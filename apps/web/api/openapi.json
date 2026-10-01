@@ -643,6 +643,665 @@
         "title": "AuthStatusResponseDto",
         "type": "object"
       },
+      "AutoMonitorConcurrencyDto": {
+        "properties": {
+          "activeSessions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activesessions"
+          },
+          "activeSessionsMeasurement": {
+            "title": "Activesessionsmeasurement",
+            "type": "string"
+          },
+          "duplicateClaims": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duplicateclaims"
+          },
+          "duplicateClaimsMeasurement": {
+            "title": "Duplicateclaimsmeasurement",
+            "type": "string"
+          },
+          "forcedReleases": {
+            "default": 0,
+            "title": "Forcedreleases",
+            "type": "integer"
+          },
+          "forcedReleasesMeasurement": {
+            "title": "Forcedreleasesmeasurement",
+            "type": "string"
+          },
+          "graceWindowKeeps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gracewindowkeeps"
+          },
+          "graceWindowKeepsMeasurement": {
+            "title": "Gracewindowkeepsmeasurement",
+            "type": "string"
+          },
+          "lastConflict": {
+            "title": "Lastconflict"
+          },
+          "lastConflictMeasurement": {
+            "title": "Lastconflictmeasurement",
+            "type": "string"
+          },
+          "reconciliations": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconciliations"
+          },
+          "reconciliationsMeasurement": {
+            "title": "Reconciliationsmeasurement",
+            "type": "string"
+          },
+          "reservationRaces": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reservationraces"
+          },
+          "reservationRacesMeasurement": {
+            "title": "Reservationracesmeasurement",
+            "type": "string"
+          },
+          "ticks": {
+            "default": 0,
+            "title": "Ticks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "activeSessionsMeasurement",
+          "duplicateClaimsMeasurement",
+          "reservationRacesMeasurement",
+          "reconciliationsMeasurement",
+          "graceWindowKeepsMeasurement",
+          "forcedReleasesMeasurement",
+          "lastConflictMeasurement"
+        ],
+        "title": "AutoMonitorConcurrencyDto",
+        "type": "object"
+      },
+      "AutoMonitorCycleDto": {
+        "properties": {
+          "closed": {
+            "default": false,
+            "title": "Closed",
+            "type": "boolean"
+          },
+          "cycleId": {
+            "title": "Cycleid",
+            "type": "string"
+          },
+          "direction": {
+            "default": "long",
+            "title": "Direction",
+            "type": "string"
+          },
+          "instrumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentid"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoMonitorCycleResultDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/AutoMonitorStepDto"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "strategyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategyversion"
+          }
+        },
+        "required": [
+          "cycleId"
+        ],
+        "title": "AutoMonitorCycleDto",
+        "type": "object"
+      },
+      "AutoMonitorCycleResultDto": {
+        "properties": {
+          "closedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closedat"
+          },
+          "pnl": {
+            "title": "Pnl"
+          }
+        },
+        "title": "AutoMonitorCycleResultDto",
+        "type": "object"
+      },
+      "AutoMonitorFactDto": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "measurement": {
+            "title": "Measurement",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "measurement"
+        ],
+        "title": "AutoMonitorFactDto",
+        "type": "object"
+      },
+      "AutoMonitorFillProgressDto": {
+        "properties": {
+          "filled": {
+            "title": "Filled"
+          },
+          "measurement": {
+            "title": "Measurement",
+            "type": "string"
+          },
+          "requested": {
+            "title": "Requested"
+          }
+        },
+        "required": [
+          "measurement"
+        ],
+        "title": "AutoMonitorFillProgressDto",
+        "type": "object"
+      },
+      "AutoMonitorHeaderDto": {
+        "properties": {
+          "asOf": {
+            "title": "Asof",
+            "type": "string"
+          },
+          "decisionClock": {
+            "default": "CLOSED BAR",
+            "title": "Decisionclock",
+            "type": "string"
+          },
+          "engineId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engineid"
+          },
+          "executionDeclared": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executiondeclared"
+          },
+          "executionEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executionenabled"
+          },
+          "graceSeconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graceseconds"
+          },
+          "granularity": {
+            "additionalProperties": true,
+            "title": "Granularity",
+            "type": "object"
+          },
+          "heartbeatSeconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heartbeatseconds"
+          },
+          "lastDecisionAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastdecisionat"
+          },
+          "nextDecisionAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextdecisionat"
+          },
+          "protectionModel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protectionmodel"
+          },
+          "realPriceEnabled": {
+            "default": false,
+            "title": "Realpriceenabled",
+            "type": "boolean"
+          },
+          "state": {
+            "default": "UNKNOWN",
+            "title": "State",
+            "type": "string"
+          },
+          "ticks": {
+            "default": 0,
+            "title": "Ticks",
+            "type": "integer"
+          },
+          "venue": {
+            "default": "paper",
+            "title": "Venue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asOf"
+        ],
+        "title": "AutoMonitorHeaderDto",
+        "type": "object"
+      },
+      "AutoMonitorReconciliationDto": {
+        "properties": {
+          "aged": {
+            "title": "Aged"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "caller": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
+          },
+          "graceWindowSeconds": {
+            "title": "Gracewindowseconds"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "AutoMonitorReconciliationDto",
+        "type": "object"
+      },
+      "AutoMonitorReservationDto": {
+        "properties": {
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          },
+          "expires": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires"
+          },
+          "expiresMeasurement": {
+            "title": "Expiresmeasurement",
+            "type": "string"
+          },
+          "fillProgress": {
+            "$ref": "#/components/schemas/AutoMonitorFillProgressDto"
+          },
+          "instrumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentid"
+          },
+          "ownerMeasurement": {
+            "title": "Ownermeasurement",
+            "type": "string"
+          },
+          "ownerSession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ownersession"
+          },
+          "quantity": {
+            "title": "Quantity"
+          },
+          "reconciliations": {
+            "items": {
+              "$ref": "#/components/schemas/AutoMonitorReconciliationDto"
+            },
+            "title": "Reconciliations",
+            "type": "array"
+          },
+          "releaseReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Releasereason"
+          },
+          "releaseReasonMeasurement": {
+            "title": "Releasereasonmeasurement",
+            "type": "string"
+          },
+          "remainingQty": {
+            "title": "Remainingqty"
+          },
+          "reservationId": {
+            "title": "Reservationid",
+            "type": "string"
+          },
+          "side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Side"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reservationId",
+          "ownerMeasurement",
+          "expiresMeasurement",
+          "state",
+          "releaseReasonMeasurement",
+          "fillProgress"
+        ],
+        "title": "AutoMonitorReservationDto",
+        "type": "object"
+      },
+      "AutoMonitorStepDto": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/AutoMonitorFactDto"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "measurement": {
+            "title": "Measurement",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "measurement"
+        ],
+        "title": "AutoMonitorStepDto",
+        "type": "object"
+      },
+      "AutoOperationalMonitorDto": {
+        "description": "DTO canónico del monitor: header + ciclos + reservas + concurrencia + huecos.",
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "asOf": {
+            "title": "Asof",
+            "type": "string"
+          },
+          "concurrency": {
+            "$ref": "#/components/schemas/AutoMonitorConcurrencyDto"
+          },
+          "cycles": {
+            "items": {
+              "$ref": "#/components/schemas/AutoMonitorCycleDto"
+            },
+            "title": "Cycles",
+            "type": "array"
+          },
+          "header": {
+            "$ref": "#/components/schemas/AutoMonitorHeaderDto"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "reservations": {
+            "items": {
+              "$ref": "#/components/schemas/AutoMonitorReservationDto"
+            },
+            "title": "Reservations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "readOnly",
+          "asOf",
+          "header",
+          "concurrency"
+        ],
+        "title": "AutoOperationalMonitorDto",
+        "type": "object"
+      },
       "AutoSelfEvaluationDto": {
         "description": "Informe completo: roll-up + filas por versión + embudo + huecos declarados.",
         "properties": {
@@ -23464,6 +24123,85 @@
         "summary": "Auth Status",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/auto/operational-monitor": {
+      "get": {
+        "description": "Proyección read-only de la cadena AUTO de una cuenta visible del principal.\n\nSin cuenta operativa visible la respuesta es un DTO vacío con ``no_account_scope``\n(fail-closed, nunca global). ``cycleId`` acota a un solo ciclo para el drill-down.",
+        "operationId": "get_auto_operational_monitor_api_auto_operational_monitor_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cycleId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cycleid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoOperationalMonitorDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Operational Monitor",
+        "tags": [
+          "auto"
         ]
       }
     },

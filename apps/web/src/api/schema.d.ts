@@ -1064,6 +1064,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/operational-monitor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Operational Monitor
+         * @description Proyección read-only de la cadena AUTO de una cuenta visible del principal.
+         *
+         *     Sin cuenta operativa visible la respuesta es un DTO vacío con ``no_account_scope``
+         *     (fail-closed, nunca global). ``cycleId`` acota a un solo ciclo para el drill-down.
+         */
+        get: operations["get_auto_operational_monitor_api_auto_operational_monitor_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/self-evaluation": {
         parameters: {
             query?: never;
@@ -4154,6 +4177,228 @@ export interface components {
         /** AuthStatusResponseDto */
         AuthStatusResponseDto: {
             data: components["schemas"]["AuthStatusDataDto"];
+        };
+        /** AutoMonitorConcurrencyDto */
+        AutoMonitorConcurrencyDto: {
+            /** Activesessions */
+            activeSessions?: number | null;
+            /** Activesessionsmeasurement */
+            activeSessionsMeasurement: string;
+            /** Duplicateclaims */
+            duplicateClaims?: number | null;
+            /** Duplicateclaimsmeasurement */
+            duplicateClaimsMeasurement: string;
+            /**
+             * Forcedreleases
+             * @default 0
+             */
+            forcedReleases: number;
+            /** Forcedreleasesmeasurement */
+            forcedReleasesMeasurement: string;
+            /** Gracewindowkeeps */
+            graceWindowKeeps?: number | null;
+            /** Gracewindowkeepsmeasurement */
+            graceWindowKeepsMeasurement: string;
+            /** Lastconflict */
+            lastConflict?: unknown;
+            /** Lastconflictmeasurement */
+            lastConflictMeasurement: string;
+            /** Reconciliations */
+            reconciliations?: number | null;
+            /** Reconciliationsmeasurement */
+            reconciliationsMeasurement: string;
+            /** Reservationraces */
+            reservationRaces?: number | null;
+            /** Reservationracesmeasurement */
+            reservationRacesMeasurement: string;
+            /**
+             * Ticks
+             * @default 0
+             */
+            ticks: number;
+        };
+        /** AutoMonitorCycleDto */
+        AutoMonitorCycleDto: {
+            /**
+             * Closed
+             * @default false
+             */
+            closed: boolean;
+            /** Cycleid */
+            cycleId: string;
+            /**
+             * Direction
+             * @default long
+             */
+            direction: string;
+            /** Instrumentid */
+            instrumentId?: string | null;
+            /** Notes */
+            notes?: string[];
+            result?: components["schemas"]["AutoMonitorCycleResultDto"] | null;
+            /** Steps */
+            steps?: components["schemas"]["AutoMonitorStepDto"][];
+            /** Strategyversion */
+            strategyVersion?: string | null;
+        };
+        /** AutoMonitorCycleResultDto */
+        AutoMonitorCycleResultDto: {
+            /** Closedat */
+            closedAt?: string | null;
+            /** Pnl */
+            pnl?: unknown;
+        };
+        /** AutoMonitorFactDto */
+        AutoMonitorFactDto: {
+            /** Key */
+            key: string;
+            /** Measurement */
+            measurement: string;
+            /** Value */
+            value?: unknown;
+        };
+        /** AutoMonitorFillProgressDto */
+        AutoMonitorFillProgressDto: {
+            /** Filled */
+            filled?: unknown;
+            /** Measurement */
+            measurement: string;
+            /** Requested */
+            requested?: unknown;
+        };
+        /** AutoMonitorHeaderDto */
+        AutoMonitorHeaderDto: {
+            /** Asof */
+            asOf: string;
+            /**
+             * Decisionclock
+             * @default CLOSED BAR
+             */
+            decisionClock: string;
+            /** Engineid */
+            engineId?: string | null;
+            /** Executiondeclared */
+            executionDeclared?: string | null;
+            /** Executionenabled */
+            executionEnabled?: boolean | null;
+            /** Graceseconds */
+            graceSeconds?: number | null;
+            /** Granularity */
+            granularity?: {
+                [key: string]: unknown;
+            };
+            /** Heartbeatseconds */
+            heartbeatSeconds?: number | null;
+            /** Lastdecisionat */
+            lastDecisionAt?: string | null;
+            /** Nextdecisionat */
+            nextDecisionAt?: string | null;
+            /** Protectionmodel */
+            protectionModel?: string | null;
+            /**
+             * Realpriceenabled
+             * @default false
+             */
+            realPriceEnabled: boolean;
+            /**
+             * State
+             * @default UNKNOWN
+             */
+            state: string;
+            /**
+             * Ticks
+             * @default 0
+             */
+            ticks: number;
+            /**
+             * Venue
+             * @default paper
+             */
+            venue: string;
+        };
+        /** AutoMonitorReconciliationDto */
+        AutoMonitorReconciliationDto: {
+            /** Aged */
+            aged?: unknown;
+            /** At */
+            at?: string | null;
+            /** Caller */
+            caller?: string | null;
+            /** Decision */
+            decision?: string | null;
+            /** Gracewindowseconds */
+            graceWindowSeconds?: unknown;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** AutoMonitorReservationDto */
+        AutoMonitorReservationDto: {
+            /** Created */
+            created?: string | null;
+            /** Expires */
+            expires?: string | null;
+            /** Expiresmeasurement */
+            expiresMeasurement: string;
+            fillProgress: components["schemas"]["AutoMonitorFillProgressDto"];
+            /** Instrumentid */
+            instrumentId?: string | null;
+            /** Ownermeasurement */
+            ownerMeasurement: string;
+            /** Ownersession */
+            ownerSession?: string | null;
+            /** Quantity */
+            quantity?: unknown;
+            /** Reconciliations */
+            reconciliations?: components["schemas"]["AutoMonitorReconciliationDto"][];
+            /** Releasereason */
+            releaseReason?: string | null;
+            /** Releasereasonmeasurement */
+            releaseReasonMeasurement: string;
+            /** Remainingqty */
+            remainingQty?: unknown;
+            /** Reservationid */
+            reservationId: string;
+            /** Side */
+            side?: string | null;
+            /** State */
+            state: string;
+        };
+        /** AutoMonitorStepDto */
+        AutoMonitorStepDto: {
+            /** At */
+            at?: string | null;
+            /** Facts */
+            facts?: components["schemas"]["AutoMonitorFactDto"][];
+            /** Id */
+            id: string;
+            /** Measurement */
+            measurement: string;
+            /** Note */
+            note?: string | null;
+            /** State */
+            state: string;
+        };
+        /**
+         * AutoOperationalMonitorDto
+         * @description DTO canónico del monitor: header + ciclos + reservas + concurrencia + huecos.
+         */
+        AutoOperationalMonitorDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Asof */
+            asOf: string;
+            concurrency: components["schemas"]["AutoMonitorConcurrencyDto"];
+            /** Cycles */
+            cycles?: components["schemas"]["AutoMonitorCycleDto"][];
+            header: components["schemas"]["AutoMonitorHeaderDto"];
+            /** Key */
+            key: string;
+            /** Notes */
+            notes?: string[];
+            /** Readonly */
+            readOnly: boolean;
+            /** Reservations */
+            reservations?: components["schemas"]["AutoMonitorReservationDto"][];
         };
         /**
          * AutoSelfEvaluationDto
@@ -12659,6 +12904,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthStatusResponseDto"];
+                };
+            };
+        };
+    };
+    get_auto_operational_monitor_api_auto_operational_monitor_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cycleId?: string | null;
+            };
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoOperationalMonitorDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -10,7 +10,7 @@
  * @see packages/shared/src/types.ts — DTOs TypeScript (manual, no OpenAPI gen)
  */
 import createClient from "openapi-fetch";
-import type { paths } from "@/api/schema";
+import type { components, paths } from "@/api/schema";
 import { getActiveAccountId } from "@/stores/active-account-store";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
@@ -923,6 +923,16 @@ export const api = {
     }>(() =>
       client.GET("/api/lifecycle/positions/{position_id}/snapshot", {
         params: { path: { position_id: positionId } },
+      }),
+    ),
+
+  /** AUTO Operational Monitor (M1) — proyección read-only de la cadena AUTO. */
+  getAutoOperationalMonitor: (input?: { limit?: number; cycleId?: string }) =>
+    call<{ data: components["schemas"]["AutoOperationalMonitorDto"] }>(() =>
+      client.GET("/api/auto/operational-monitor", {
+        params: {
+          query: { limit: input?.limit, cycleId: input?.cycleId },
+        },
       }),
     ),
 

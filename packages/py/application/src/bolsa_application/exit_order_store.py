@@ -78,6 +78,12 @@ class ExitOrderStore(Protocol):
         """INTENT vivos de la cuenta (los que aún tienen cola por materializar)."""
         ...
 
+    async def list_by_cycle_ids(
+        self, account_id: str | None, cycle_ids: Iterable[str], *, limit: int = 500
+    ) -> list[ExitOrder]:
+        """INTENT de esos ciclos financieros (``cycle_id``), para la proyección del monitor."""
+        ...
+
     async def commit(self) -> None:
         """Hace durable lo escrito (no-op en el store in-memory)."""
         ...
@@ -195,6 +201,21 @@ class InMemoryExitOrderStore:
         rows.sort(key=lambda row: (row.created_at or "", row.exit_order_id))
         return rows[:limit]
 
+    async def list_by_cycle_ids(
+        self, account_id: str | None, cycle_ids: Iterable[str], *, limit: int = 500
+    ) -> list[ExitOrder]:
+        wanted = {str(c).strip() for c in cycle_ids if str(c).strip()}
+        if not wanted or limit <= 0:
+            return []
+        rows = [
+            row
+            for row in self._rows.values()
+            if str(row.cycle_id or "").strip() in wanted
+            and (account_id is None or row.account_id == account_id)
+        ]
+        rows.sort(key=lambda row: (row.created_at or "", row.exit_order_id))
+        return rows[:limit]
+
     async def commit(self) -> None:
         """No-op: el store in-memory ya es visible (espeja el contrato del PG)."""
         return None
@@ -262,6 +283,36 @@ class PostgresExitOrderStore:
         query = (
             sa.select(AutoExitOrderRow)
             .where(AutoExitOrderRow.state.in_(_OPEN_STATE_VALUES))
+            .order_by(
+                AutoExitOrderRow.created_at.asc().nulls_first(),
+                AutoExitOrderRow.exit_order_id.asc(),
+            )
+            .limit(limit)
+        )
+        if account_id is not None:
+            query = query.where(AutoExitOrderRow.account_id == account_id)
+        rows = (await self._session.execute(query)).scalars().all()
+        orders = [_row_to_order(row) for row in rows]
+        return [order for order in orders if order is not None]
+
+    async def list_by_cycle_ids(
+        self, account_id: str | None, cycle_ids: Iterable[str], *, limit: int = 500
+    ) -> list[ExitOrder]:
+        """INTENT de esos ciclos (``auto_exit_orders.cycle_id``, índice por ciclo).
+
+        ``cycle_ids`` vacío no consulta la base. Las filas sin ciclo (``NULL``, previas a 2.47)
+        no casan nunca: "anterior a 2.47" no es un ciclo. Con ``account_id`` se acota en SQL.
+        """
+        import sqlalchemy as sa
+
+        from bolsa_infrastructure.database.models.tables import AutoExitOrderRow
+
+        wanted = [str(c).strip() for c in cycle_ids if str(c).strip()]
+        if not wanted or limit <= 0:
+            return []
+        query = (
+            sa.select(AutoExitOrderRow)
+            .where(AutoExitOrderRow.cycle_id.in_(wanted))
             .order_by(
                 AutoExitOrderRow.created_at.asc().nulls_first(),
                 AutoExitOrderRow.exit_order_id.asc(),

@@ -31,6 +31,7 @@ import { AccountsPage } from "@/features/accounts/accounts-page";
 import { HistoryPage } from "@/features/history/history-page";
 import { TaxReportPage } from "@/features/fiscal/tax-report-page";
 import { OperationalConsolePage } from "@/features/operational-console/operational-console-page";
+import { AutoMonitorPage } from "@/features/auto-monitor/auto-monitor-page";
 import { DecisionJournalPage } from "@/features/decision-journal/decision-journal-page";
 import { MesaHoyPage } from "@/features/mesa/mesa-hoy-page";
 import { ConfirmPage } from "@/features/confirm/confirm-page";
@@ -92,6 +93,8 @@ const router = createBrowserRouter([
       },
 
       { path: "operational-console", element: <OperationalConsolePage /> },
+
+      { path: "auto-monitor", element: <AutoMonitorPage /> },
 
       {
         path: "decision-board",

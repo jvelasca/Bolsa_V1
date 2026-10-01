@@ -18,6 +18,7 @@ import {
   PieChart,
   Pin,
   PinOff,
+  Radar,
   Receipt,
   UserCircle,
   Wrench,
@@ -83,6 +84,14 @@ const NAV_ITEMS: AdminNavItem[] = [
 ];
 
 const TRAILING_NAV: AdminNavItem[] = [
+  {
+    kind: "nav",
+    id: "auto-monitor",
+    label: "Monitor AUTO",
+    href: "/auto-monitor",
+    icon: Radar,
+    hint: "Cadena AUTO read-only: señal → ciclo cerrado",
+  },
   {
     kind: "nav",
     id: "fiscal",
