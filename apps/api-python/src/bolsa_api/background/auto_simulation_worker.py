@@ -237,7 +237,7 @@ from bolsa_application.simulated_settlement import (
     submit_simulated_order,
 )
 
-from bolsa_api.background.auto_price_provider import PriceSource
+from bolsa_api.background.auto_price_provider import OhlcvPriceSource, PriceSource
 from bolsa_api.background.paper_auto_engine_worker import (
     DecisionProvider,
     _effective_venue,
@@ -293,6 +293,24 @@ _QTY_EPS = Decimal("0.000001")
 def sim_worker_enabled() -> bool:
     """Env de habilitación (default OFF) del worker SIM-ONLY de A9/M5."""
     return (os.getenv(AUTO_SIM_WORKER_ENABLED) or "").strip().lower() not in {
+        "",
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+
+
+#: W4 (v2.88.17): interruptor DECLARADO del precio REAL. Default **OFF** ⇒ el runtime conserva
+#: el ``price_script`` hermético (``Δ = 0`` y todos los tests PG en verde, que es como se selló
+#: el tramo ``W3.x``). Activarlo es un acto **explícito** y es lo que mide el criterio de éxito
+#: de ``W4`` (que la banda del instrumento OOS se estreche): ``AUTO_ENGINE_SIM_REAL_PRICE=1``.
+AUTO_REAL_PRICE_ENV = "AUTO_ENGINE_SIM_REAL_PRICE"
+
+
+def real_price_enabled() -> bool:
+    """¿Está habilitado el proveedor de precio REAL? (default OFF = costura inerte)."""
+    return (os.getenv(AUTO_REAL_PRICE_ENV) or "").strip().lower() not in {
         "",
         "0",
         "false",
@@ -3179,18 +3197,23 @@ class AutoSimulationWorker:
             return None
 
     async def _v2_refresh_regime(self) -> None:
-        """Refresca el régimen y el ATR si las fuentes lo soportan (async + lectura sync).
+        """Refresca el régimen, el ATR y el PRECIO si las fuentes lo soportan (async + lectura sync).
 
-        La lectura del régimen y del ATR en el tick es SÍNCRONA; el I/O (barras) se
-        concentra aquí, una vez por tick, para que decidir no dependa de la red y para que
+        La lectura del régimen, del ATR y del precio en el tick es SÍNCRONA; el I/O (barras)
+        se concentra aquí, una vez por tick, para que decidir no dependa de la red y para que
         ``_v2_position_package`` lea siempre un valor coherente del mismo tick.
 
         E2: el ATR se refresca en el MISMO punto que el régimen para que la geometría de
         un tick sea consistente (una sola foto de barras por decisión).
+
+        W4: el precio se refresca también aquí, pero con su PROPIA frontera: el régimen y el
+        ATR leen ``<= B-1`` (decisión) y el precio de ejecución lee ``<= B`` (``open`` de la
+        barra corriente). Es el mismo instante de refresco, no la misma ventana (§3.1.b).
         """
         for source, label in (
             (self._v2_regime_source, "regime"),
             (self._v2_atr_source, "atr"),
+            (self._price_source, "price"),
         ):
             refresher = getattr(source, "refresh", None)
             if refresher is None or not callable(refresher):
@@ -3229,6 +3252,15 @@ class AutoSimulationWorker:
         (barra sub-diaria o ilegible) devuelve ``""`` ⇒ ventana VACÍA ⇒ el motor no decide.
         """
         return last_closed_bar_day(self._time, self._v2_granularity.decision.timeframe)
+
+    def _v2_current_bar_day(self) -> str:
+        """``W4`` — día de la barra **CORRIENTE** (``B``), frontera de EJECUCIÓN (§3.1.b).
+
+        Es el ``as_of`` del precio de ejecución: la ventana ``<= B`` **incluye** la barra en
+        curso, y de ella se toma sólo su ``open`` (la decisión sigue leyendo ``<= B-1``).
+        Fail-closed: sin barra legible devuelve ``""`` ⇒ sin precio ⇒ HOLD declarado.
+        """
+        return self._v2_current_bar_start()[:10]
 
     def _v2_roll_consumed_bar(self) -> None:
         """Al cambiar de barra, la memoria de consumo se reinicia.
@@ -5304,6 +5336,9 @@ class AutoSimulationWorker:
         trade_context_source: Any = None,
         edge_source: Any = None,
         atr_source: Any = None,
+        # W4 (v2.88.17): fuente de precio REAL del tick (misma sesión que régimen y ATR).
+        # Con ``None`` se conserva la del constructor (``price_script`` hermético) ⇒ Δ = 0.
+        price_source: PriceSource | None = None,
         reservation_store: ReservationStore | None = None,
         kill_switch_store: KillSwitchStore | None = None,
         exit_order_store: ExitOrderStore | None = None,
@@ -5348,6 +5383,7 @@ class AutoSimulationWorker:
             self._reservation_store,
         )
         prev_atr = self._v2_atr_source
+        prev_price = self._price_source
         prev_kill_store = self._kill_switch_store
         prev_exit_store = self._exit_order_store
         prev_cycle_sink = self._cycle_regime_sink
@@ -5383,6 +5419,9 @@ class AutoSimulationWorker:
             self._v2_edge_source = edge_source if edge_source is not None else prev_edge
             # E2: la fuente de ATR del tick se enlaza igual que el régimen (misma sesión).
             self._v2_atr_source = atr_source if atr_source is not None else prev_atr
+            # W4: la fuente de precio REAL del tick se enlaza igual (misma sesión). Sin
+            # ella queda la del constructor (``price_script`` hermético) ⇒ Δ = 0.
+            self._price_source = price_source if price_source is not None else prev_price
             # AUTO-1b: el libro durable de reservas se enlaza también por sesión (una
             # sesión por tick). Sin él se conserva el del constructor (hermético/tests).
             self._reservation_store = (
@@ -5491,6 +5530,7 @@ class AutoSimulationWorker:
             self._v2_trade_context_source = prev_context
             self._v2_edge_source = prev_edge
             self._v2_atr_source = prev_atr
+            self._price_source = prev_price
             self._reservation_store = prev_reservations
             self._kill_switch_store = prev_kill_store
             self._exit_order_store = prev_exit_store
@@ -5832,6 +5872,35 @@ def _compose_atr_source(session: Any, *, watch: Sequence[str], as_of: Any) -> An
     return AtrSource(bars_provider=loader)
 
 
+def _compose_price_source(
+    session: Any,
+    *,
+    watch: Sequence[str],
+    as_of: Any,
+    timeframe: Any = None,
+) -> Any:
+    """W4 (v2.88.17): precio REAL del tick desde el repositorio de barras.
+
+    Es la fuente que mata el ``100.0`` del simulado. Usa la MISMA sesión y el MISMO
+    repositorio que el régimen y el ATR, pero con una frontera DISTINTA: ``as_of`` es el
+    **día de la barra CORRIENTE** (``B``), porque de esa ventana sale el ``open(B)`` de la
+    ejecución; la decisión (``close(B-1)``) la toma el propio proveedor rebanando la ventana
+    (``OhlcvPriceSource``). Fail-closed: sin barra ``B`` el símbolo no tiene precio ⇒ HOLD
+    declarado, nunca un ``close(B-1)`` rancio ni un ``100.0``.
+    """
+    from bolsa_infrastructure.database.repositories.ohlcv_repository import (  # noqa: PLC0415
+        SqlAlchemyOhlcvRepository,
+    )
+
+    return OhlcvPriceSource(
+        SqlAlchemyOhlcvRepository(session),
+        list(watch),
+        as_of=as_of,
+        timeframe=timeframe,
+        limit=120,
+    )
+
+
 def _compose_trade_context_source(session: Any) -> Any:
     """V2.40.1: contexto de cartera REAL (sector + ADV + frescura) del catálogo.
 
@@ -6088,6 +6157,9 @@ class AutoSimRuntime:
         edge_source: Any = None,
         atr_source: Any = None,
         liquidity_source: Callable[[str], float | None] | None = None,
+        # W4: fuente de precio inyectable (tests). Con ``None`` (producción) se compone el
+        # ``OhlcvPriceSource`` real por sesión/tick, que es lo que mata el ``100.0``.
+        price_source: Any = None,
     ) -> None:
         self._session_factory = session_factory
         self._engine_id = engine_id
@@ -6101,6 +6173,7 @@ class AutoSimRuntime:
         self._edge_source = edge_source
         self._atr_source = atr_source
         self._liquidity_source = liquidity_source
+        self._price_source = price_source
         # V2.24/A9.1 (P1-01): lector canónico inyectable (por defecto se compone por
         # sesión desde ``position_state``). Sin él, la reconciliación es UNKNOWN.
         self._canonical_reader = canonical_positions_reader
@@ -6115,6 +6188,7 @@ class AutoSimRuntime:
                 trade_context_source=trade_context_source,
                 edge_source=edge_source,
                 atr_source=atr_source,
+                price_source=price_source,
             )
         self._worker = worker
 
@@ -6232,6 +6306,23 @@ class AutoSimRuntime:
                     session,
                     watch=tuple(_watch_symbols()),
                     as_of=self._worker._v2_closed_bar_as_of,  # noqa: SLF001 — seam interno.
+                ),
+                # W4: precio REAL del tick, **tras el interruptor declarado**
+                # (``AUTO_ENGINE_SIM_REAL_PRICE``, default OFF ⇒ costura inerte, Δ = 0). Con
+                # el flag ON, la frontera es la de EJECUCIÓN (día de la barra corriente
+                # ``B``), distinta de la de régimen/ATR (``B-1``): de aquí sale el ``open(B)``
+                # del fill; el proveedor rebanar la ventana para el ``close(B-1)`` de la
+                # decisión. Es lo que mata el ``100.0`` plano.
+                price_source=self._price_source
+                or (
+                    _compose_price_source(
+                        session,
+                        watch=tuple(_watch_symbols()),
+                        as_of=self._worker._v2_current_bar_day,  # noqa: SLF001 — seam interno.
+                        timeframe=self._worker._v2_granularity.decision.timeframe,  # noqa: SLF001
+                    )
+                    if real_price_enabled()
+                    else None
                 ),
             )
 

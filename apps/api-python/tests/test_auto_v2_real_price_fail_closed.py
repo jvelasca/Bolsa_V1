@@ -80,7 +80,7 @@ class _SplitSource:
         self._mid = dict(mid)
         self._exec = dict(exec_)
 
-    def refresh(self, *, tick: int, symbols: Sequence[str]) -> None:  # noqa: ARG002
+    async def refresh(self) -> None:
         return None
 
     def mid(self, symbol: str) -> float | None:
@@ -186,3 +186,27 @@ def test_protocol_shape_of_the_test_double() -> None:
     """El doble de prueba cumple el Protocol (si no, no probaría el seam real)."""
     source: Any = _SplitSource(mid={"A": 1.0}, exec_={"A": 2.0})
     assert isinstance(source, PriceSource)
+
+
+# ── 3. Costura INERTE: el precio real está OFF salvo declaración explícita ──────
+
+
+def test_real_price_is_inert_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El proveedor real NO se activa solo (default OFF ⇒ Δ = 0 y tests PG verdes).
+
+    Es la política de rollout decidida por el propietario (2026-10-01): activar el precio
+    real es un acto **explícito**, no un efecto colateral de actualizar el código.
+    """
+    from bolsa_api.background.auto_simulation_worker import (
+        AUTO_REAL_PRICE_ENV,
+        real_price_enabled,
+    )
+
+    monkeypatch.delenv(AUTO_REAL_PRICE_ENV, raising=False)
+    assert real_price_enabled() is False
+    for on in ("1", "true", "TRUE", "on", "yes"):
+        monkeypatch.setenv(AUTO_REAL_PRICE_ENV, on)
+        assert real_price_enabled() is True, f"{on!r} debe activar el precio real"
+    for off in ("", "0", "false", "no", "off", "  "):
+        monkeypatch.setenv(AUTO_REAL_PRICE_ENV, off)
+        assert real_price_enabled() is False, f"{off!r} NO debe activar el precio real"

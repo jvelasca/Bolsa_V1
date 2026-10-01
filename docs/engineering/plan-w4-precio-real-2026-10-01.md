@@ -227,12 +227,15 @@ manuales), `OBS-16`, `OBS-15`, `OBS-22`, `OBS-14.b`, `OBS-13`, `OBS-11`, `H-4`, 
    (el fallo es el pre-existente de PostgreSQL, verificado contra el árbol prístino),
    `mypy` y `ruff` limpios, y —**la prueba fuerte**— el artefacto del sello **reproducido
    byte a byte** (§11).
-   **PENDIENTE de 2a**: cablear `price_source.refresh` en `_v2_refresh_regime` — **no se
-   hace todavía** porque el contrato de refresco (async + `tick`/`symbols`) se fija con el
-   proveedor real, y hoy ninguna fuente real está inyectada.
+   **RESUELTO en el paso 3–4**: el contrato de refresco se alineó a **async sin argumentos**
+   (igual que régimen/ATR) y el precio se refresca en el MISMO punto por tick.
 3. **Paso 2b (pendiente)**: unificar las 6 lecturas al tick de barra (§2.b) — **`Δ ≠ 0`**.
-4. **`OhlcvPriceSource` real** + composición en `AutoSimRuntime` (`as_of = día(B)`, dos
-   ventanas §3.1.b, `solo_ohlcv` §10.1) + cableado de `refresh` + fail-closed end-to-end.
+4. **`OhlcvPriceSource` real + composición — HECHO y TRAS INTERRUPTOR** (§12): el proveedor
+   real (dos ventanas §3.1.b, `solo_ohlcv` §10.1), cableado de `refresh` y fail-closed
+   end-to-end. Componer sin más **rompía ~8 tests `_pg` y el golden day** (que no siembran
+   barras y vivían del `100.0`), así que la composición queda **inerte** tras
+   `AUTO_ENGINE_SIM_REAL_PRICE` (default OFF). Evidencia: 23 tests puros verdes y la suite
+   `auto` de vuelta al baseline `1 failed / 469 passed` (sólo el pre-existente de PG).
 5. **Mutaciones `M283`–`M287`** (deben morder).
 6. **Golden**: delta reproducible + re-elección del día por medición.
 7. **Criterio de §7**: re-correr la banda de `W3.3` con precio real y **publicar el estrechamiento**
@@ -290,3 +293,56 @@ censo del artefacto cambió.
 `bolsa_v1_replay_w4` aquí). El job del CI no lo sufre porque arranca un servicio PostgreSQL
 vacío, pero **correrlo a mano contra `bolsa_v1` da un rojo FALSO** cuya causa es la BD, no el
 motor. Queda declarado para no volver a perseguirlo.
+
+---
+
+## 12. Rollout del precio REAL: costura INERTE tras declaración (2026-10-01)
+
+Componer el `OhlcvPriceSource` en `AutoSimRuntime` **sin más** destapa una dependencia oculta
+y deja el árbol en rojo: **~8 tests `_pg` + el golden day no siembran barras** y vivían del
+`100.0` silencioso. Con `W4`, «sin precio ⇒ no se ejecuta» ⇒ dejan de abrir.
+
+Evidencia medida con `pytest -k auto` (misma BD):
+
+| Árbol | fallos |
+| --- | --- |
+| composición **sin** interruptor | **11** (≈8 nuevos) |
+| composición revertida (`git stash`), misma BD | **3** (2 del sembrado, transitorios) |
+| composición **con** interruptor (default OFF) | **1** (el pre-existente de PG) |
+
+El golden day lo dijo con la traza del propio motor:
+
+```
+WARNI auto_sim v2 precio AUSENTE symbol=inst-gd2-0-0000000001: no se ejecuta/marca (HOLD fail-closed; jamás 100.0/0 silencioso)
+assert 0 >= 3
+```
+
+⇒ **DECISIÓN del propietario (2026-10-01): opción (a), costura INERTE.** La composición queda
+tras `AUTO_ENGINE_SIM_REAL_PRICE` (**default OFF**): el runtime conserva el `price_script`
+hermético y **`main` sigue verde** (sólo el fallo pre-existente de PG). Activar el precio real
+es un **acto explícito** — el patrón «costura inerte» que ya usó `V2.88.14/W1` — y es lo que
+ejercita el criterio de éxito de §7.
+
+### 12.a Trabajo que este interruptor ORDENA (no deuda nueva, trabajo declarado)
+
+Con el flag OFF, el motor sigue usando `100.0` en producción: **`W4` no produce todavía su
+efecto**. Para retirarlo hacen falta, en este orden:
+
+1. **Sembrar barras `D1`** en los ~8 tests `_pg` y en el golden day, para que ejerciten el
+   camino **REAL** (hoy dependen de un precio que no existe) — es el arreglo **correcto**, no
+   un parche: un test que conduce el runtime real **debe** aportar su dato de precio.
+2. **Re-elegir el golden day por medición** (§6), no por conveniencia.
+3. **Encender el flag** en el camino de producción/medición y **correr §7**.
+
+Declarado: mientras el flag esté OFF, el `Δ = 0` sigue siendo exacto (replay y suite intactos);
+encenderlo **no** promete `Δ = 0` y obliga a re-medir el golden.
+
+### 12.b Fronteras y contrato del proveedor real (implementado)
+
+* `OhlcvPriceSource.refresh` es **async sin argumentos** (mismo contrato que régimen y ATR): el
+  worker lo espera en `_v2_refresh_regime`, en el MISMO punto por tick, pero con **su propia
+  ventana** (`<= B`, para sacar el `open(B)`), no la de régimen/ATR (`<= B-1`).
+* `mid` = `close` de la última barra con día `< B`; `execution` = `open` de la barra con día
+  `== B`. **Nunca** se lee `close`/`high`/`low` de `B` para la decisión (lookahead).
+* Sin barra `B` ⇒ `execution` `None` ⇒ `HOLD` declarado (`M287` caza la caída a `B-1`).
+* Sin `as_of` resoluble ⇒ ventana vacía ⇒ ningún precio (fail-closed), sin leer nada.
