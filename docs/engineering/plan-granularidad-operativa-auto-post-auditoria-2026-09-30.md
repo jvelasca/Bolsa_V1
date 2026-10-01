@@ -185,7 +185,7 @@ El diagnóstico de la auditoría se sostiene sobre estos hechos, todos presentes
 > * **Ningún incremento puede acreditarse por su R de OOS** mientras el instrumento no tenga potencia: el simulador sortea rechazos/parciales sobre un `base_mid` **constante de `100.0`** y el book es casi todo ruido. **`W4` es la palanca que más varianza quita** — y por eso **no es sólo el siguiente: es la precondición de cualquier lectura de mérito**.
 > * **El orden `W4` → (`W5`/`W6`) se mantiene**, pero cambia su **justificación**: `W4` ya no es «dar valor medible» —es **hacer medible el instrumento**—.
 > * **`W3` no se re-acredita**: su `ΔR = 2,83` es **`0,28 σ`** del instrumento ⇒ **no separable del sorteo**. `W3` se sostiene **por diseño** (no-lookahead, idempotencia intra-barra), **no** por su R.
-> * **Decisión ABIERTA del propietario** sobre el criterio de cierre de la serie (citar banda vs. punto; subir `K` con su IC; o sustituir el OOS por el PAPER longitudinal, `P3-2`): ver [`evidence/v2.88.16.3/README.md`](../evidence/v2.88.16.3/README.md) §7. **No se ejecuta ninguna opción en este sello.**
+* **Decisión del propietario (2026-10-01): opción 2** — **`W4` PRIMERO**, para reducir la varianza del venue; `W4` pasa a ser **precondición** de cualquier lectura de mérito y su criterio de éxito es **«la banda se estrecha»**, medido con la sonda de este sello. Las opciones 1, 3 y 4 quedan **no elegidas** (la 4, el PAPER longitudinal, sigue viva para `P3-2`). Detalle: [`evidence/v2.88.16.3/README.md`](../evidence/v2.88.16.3/README.md) §7.
 
 ---
 

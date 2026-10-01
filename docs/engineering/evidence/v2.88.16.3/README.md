@@ -136,25 +136,31 @@ subiera **no** autoriza a decir que `W3` mejoró nada; `W3` sigue siendo correct
 
 ---
 
-## 7. Consecuencia (decisión ABIERTA — no la toma este sello)
+## 7. Consecuencia — DECISIÓN DEL PROPIETARIO (2026-10-01): **opción 2**
 
 El OOS no puede seguir usándose como **gate de mérito** sin responder antes a una de estas
 preguntas:
 
 1. **¿Se cita como banda y se abandona el punto?** El OOS deja de certificar «mejor/peor» y pasa
    a certificar **forma** (que el instrumento corre, que la muestra existe, que el embudo cierra).
-   Barato y honesto; pierde el gate cuantitativo.
+   Barato y honesto; pierde el gate cuantitativo. **NO elegida.**
 2. **¿Se reduce el ruido del venue?** El simulador sortea rechazos (`≈1 %` + timeouts + mercado
    cerrado + parciales) que **eliminan o mutilan órdenes**. Con `flat_price_script` a `100.0` y
    sin datos reales (`W4`), el book es casi todo ruido: **`W4` es la palanca que más reduciría
-   esta varianza**. Ordenar `W4` **antes** de cualquier lectura de mérito.
+   esta varianza**. ⇒ **ELEGIDA (2026-10-01): `W4` va PRIMERO y se convierte en la precondición
+   de cualquier lectura de mérito.** `W3.3` no acredita ni desacredita nada del motor; **abre
+   `W4`** con una vara de medir declarada.
 3. **¿Se sube `K` y se cita la media con su IC?** Funciona, pero exige `K` grande: para un IC 95 %
    de ±1 R haría falta `K ≈ (1,96 · 10,14 / 1)² ≈ 395` sorteos ⇒ **≈ 9 h** de replay. Con `K = 12`
    el IC es ±5,74 R, que es más ancho que cualquier efecto que `W4`/`W5` pretenda medir.
+   **NO elegida** (queda como herramienta si `W4` no baja la `σ` lo suficiente).
 4. **¿Se retira el OOS del criterio de cierre de la serie y se sustituye por otro instrumento
-   (PAPER longitudinal)?** Es la opción que el propio plan ya contempla para `P3-2`.
+   (PAPER longitudinal)?** Es la opción que el propio plan ya contempla para `P3-2`. **NO elegida.**
 
-**Decisión del propietario. Este dossier deja las cuatro sobre la mesa y ninguna ejecutada.**
+**Consecuencia operativa de la decisión:** `W4` (`v2.88.17-beta`) pasa a ser **la precondición**
+de cualquier lectura de mérito, y su criterio de éxito deja de ser «el PAPER mide algo real» para
+pasar a ser **«la banda se estrecha»**: la sonda de este sello es exactamente la vara con la que
+se medirá si `W4` sirvió (§4, `σ(R)` y `SE`).
 
 ---
 
@@ -194,5 +200,7 @@ uv run --no-sync python apps/api-python/scripts/v2_88_16_3_oos_seed_robustness.p
   a `K = 12`, y la banda **cruza el cero** ⇒ **`point_citable = False`**.
 * **Se autocorrige**: la «banda» de `W3.2` era un intervalo de dos puntos, subestimado **≈ 13,6×**
   en R. Queda corregido con la medición delante.
-* **Deja cuatro salidas** sobre la mesa (§7) y **ninguna ejecutada**: la decisión es del propietario,
-  y afecta al orden de `W4`/`W5` y al criterio de cierre de la serie.
+* **Cierra con la decisión del propietario (2026-10-01): opción 2 — `W4` PRIMERO** (§7), para
+  reducir la varianza del venue antes de cualquier lectura de mérito. `W3.3` no acredita ni
+  desacredita nada del motor: **abre `W4` con una vara de medir declarada** (su `σ(R)` y su `SE`
+  son el criterio de éxito de `W4`: **«la banda se estrecha»**).
