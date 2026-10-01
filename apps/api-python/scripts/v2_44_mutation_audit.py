@@ -549,6 +549,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 OPTIMIZER = "packages/py/analytics/src/bolsa_analytics/cognitive/portfolio_optimizer.py"
 ENTRY = "packages/py/application/src/bolsa_application/auto_v2_entry.py"
 EXPECTED_VALUE = "packages/py/analytics/src/bolsa_analytics/cognitive/expected_value.py"
+#: La casa ÚNICA de la geometría direccional (W4 · fix `_realized_r`): la regla long/short de
+#: `expected_value`, `stop_distance`, `signed_r_from_price` y el scorer OOS vive aquí.
+DIRECTIONAL_GEOMETRY = (
+    "packages/py/analytics/src/bolsa_analytics/cognitive/directional_geometry.py"
+)
 AUTO_SELF_EVAL = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_self_evaluation.py"
 AUTO_ADAPTIVE = "packages/py/analytics/src/bolsa_analytics/cognitive/auto_adaptive.py"
 AUTO_ADAPTIVE_CONFIDENCE = (
@@ -715,6 +720,8 @@ T_OPERABILITY_AUDIT = "packages/py/application/tests/test_operability_audit.py"
 REPLAY_OOS = "packages/py/application/src/bolsa_application/replay_oos.py"
 # Suite pura hermetica (sin PG): el no-lookahead, el censo y la puntuacion OOS.
 T_REPLAY_OOS = "packages/py/application/tests/test_replay_oos.py"
+#: Contratos puros de la casa direccional compartida (risk_distance/signed_r/target_r).
+T_DIRECTIONAL_GEOMETRY = "packages/py/analytics/tests/test_directional_geometry.py"
 
 # --- W3 (V2.88.16): FRONTERA DE BARRAS CERRADAS (una sola definición, motor + replay) ---
 # ``M234``/``M235`` se MUDAN aquí: la guardia de no-lookahead dejó de vivir en el módulo del
@@ -838,14 +845,10 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     ),
     (
         "M8 (direccion short): un stop corto del lado equivocado se acepta",
-        EXPECTED_VALUE,
-        "    if resolved == _SHORT:\n"
-        "        if s <= e:\n"
-        "            return None, EV_GEOMETRY_UNMEASURED\n",
-        "    if resolved == _SHORT:\n"
-        "        if False:\n"
-        "            return None, EV_GEOMETRY_UNMEASURED\n",
-        (T_EV,),
+        DIRECTIONAL_GEOMETRY,
+        "        return (s - e) if s > e else None\n",
+        "        return (s - e) if True else None\n",
+        (T_EV, T_DIRECTIONAL_GEOMETRY),
     ),
     (
         "M9 (direccion desconocida): una direccion no soportada se asume larga",
@@ -860,18 +863,10 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     ),
     (
         "M10 (target R short): el premio de una corta se mide al reves",
-        EXPECTED_VALUE,
-        "    if resolved == _SHORT:\n"
-        "        distance = s - e\n"
-        "        if distance <= 0.0:\n"
-        "            return None\n"
-        "        reward = e - t\n",
-        "    if resolved == _SHORT:\n"
-        "        distance = s - e\n"
-        "        if distance <= 0.0:\n"
-        "            return None\n"
-        "        reward = t - e\n",
-        (T_EV,),
+        DIRECTIONAL_GEOMETRY,
+        "        distance = s - e\n        reward = e - t\n",
+        "        distance = s - e\n        reward = t - e\n",
+        (T_EV, T_DIRECTIONAL_GEOMETRY),
     ),
     (
         "M11 (cycle acunado): el cycle_id deja de ser determinista por (cuenta, senal)",
@@ -2722,8 +2717,10 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
         "M238 (puntuacion: el hueco se rellena): un riesgo no medible se publica como 0.0",
         REPLAY_OOS,
-        "    if risk != risk or risk <= 0 or exit_price != exit_price:\n        return None\n",
-        "    if risk != risk or risk <= 0 or exit_price != exit_price:\n        return 0.0\n",
+        "    if risk is None:\n        return None\n"
+        "    return signed_r(direction=resolved, entry=entry, risk=risk, price=exit_price)\n",
+        "    if risk is None:\n        return 0.0\n"
+        "    return signed_r(direction=resolved, entry=entry, risk=risk, price=exit_price)\n",
         (T_REPLAY_OOS,),
     ),
     (
@@ -3106,9 +3103,9 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "M285 (W4, vuelve el or 0): la geometria de la senal cae a 0 cuando no hay precio -> "
         "el simbolo con precio ausente deja de DECLARARSE (stop en 0 silencioso)",
         AUTO_SIM_WORKER,
-        "            raw_price = self._v2_price_mid(symbol, self._minute)\n"
+        "            raw_price = self._v2_price_mid(symbol, self._v2_bar_tick())\n"
         "            if raw_price is None:\n",
-        "            raw_price = self._v2_price_mid(symbol, self._minute) or 0\n"
+        "            raw_price = self._v2_price_mid(symbol, self._v2_bar_tick()) or 0\n"
         "            if False:\n",
         (T_AUTO_REAL_PRICE_FAIL_CLOSED,),
     ),
@@ -3127,6 +3124,55 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "                if bar_day(bar) != day_b:\n                    continue\n",
         "                if False:\n                    continue\n",
         (T_AUTO_REAL_PRICE_SOURCE,),
+    ),
+    # ── W4 · fix direccional del scorer OOS (una sola casa de geometria) ──
+    (
+        "M288 (OOS, direccion ignorada): el R realizado vuelve a asumir geometria larga",
+        REPLAY_OOS,
+        "    resolved = coerce_direction(direction)\n"
+        "    if resolved is None:\n"
+        "        return None\n"
+        "    risk = risk_distance(entry=entry, stop=stop, direction=resolved)\n",
+        '    resolved = "long"\n'
+        "    if resolved is None:\n"
+        "        return None\n"
+        "    risk = risk_distance(entry=entry, stop=stop, direction=resolved)\n",
+        (T_REPLAY_OOS,),
+    ),
+    (
+        "M289 (OOS, apertura hardcodeada): toda posicion se abre con 'buy' -> una corta se "
+        "lee como salida sin entrada",
+        REPLAY_OOS,
+        '            opening_side = "buy" if resolved == "long" else "sell"\n',
+        '            opening_side = "buy"\n',
+        (T_REPLAY_OOS,),
+    ),
+    (
+        "M290 (OOS, fail-closed roto): una direccion desconocida se degrada a larga en vez "
+        "de declararse",
+        REPLAY_OOS,
+        "            resolved = coerce_direction(row.direction)\n"
+        "            if resolved is None:\n"
+        '                unmeasured.append(f"{tick.day}:{symbol}:{UNMEASURED_DIRECTION}")\n'
+        "                continue\n",
+        '            resolved = coerce_direction(row.direction) or "long"\n',
+        (T_REPLAY_OOS,),
+    ),
+    (
+        "M291 (geometria, lado equivocado): un stop LARGO del lado equivocado se acepta -> "
+        "riesgo inventado",
+        DIRECTIONAL_GEOMETRY,
+        "    return (e - s) if s < e else None\n",
+        "    return (e - s) if True else None\n",
+        (T_DIRECTIONAL_GEOMETRY, T_EV),
+    ),
+    (
+        "M292 (W4, 2b, precio por MINUTO): una lectura vuelve a anclarse al minuto del bucle "
+        "-> decision y fill leen precios de instantes distintos dentro de la MISMA barra",
+        AUTO_SIM_WORKER,
+        "            raw_price = self._v2_price_mid(symbol, self._v2_bar_tick())\n",
+        "            raw_price = self._v2_price_mid(symbol, self._minute)\n",
+        (T_AUTO_CLOSED_BARS_SEAM,),
     ),
 ]
 

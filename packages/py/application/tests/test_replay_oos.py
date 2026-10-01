@@ -440,3 +440,71 @@ def test_score_replay_measures_vwap_entry_and_exit_prices() -> None:
     trip = report.round_trips[0]
     assert trip.entry_price == pytest.approx(105.0)  # VWAP de las compras
     assert trip.realized_r == pytest.approx((250.0 - 105.0) / (105.0 - 90.0))
+
+
+def test_score_replay_measures_a_short_round_trip_with_short_geometry() -> None:
+    """Corta: se ABRE con ``sell`` (stop ARRIBA) y se cierra con ``buy`` más abajo ⇒ R positivo.
+
+    Es el contrato que el scorer OOS no sabía leer: con geometría larga, ``stop > entry`` haría
+    que el riesgo saliera negativo y el ciclo entero se descartaría como ``riesgo_no_medible``
+    en vez de medirse.
+    """
+    ticks = [
+        _tick(
+            _day(0),
+            fills=(ReplayFill(_day(0), "AAA", "sell", 100.0, 100.0, direction="short"),),
+            stops={"AAA": 105.0},
+        ),
+        _tick(
+            _day(1),
+            fills=(ReplayFill(_day(1), "AAA", "buy", 100.0, 90.0, direction="short"),),
+        ),
+    ]
+
+    report = score_replay(ticks)
+
+    assert report.realized_count == 1
+    trip = report.round_trips[0]
+    assert trip.direction == "short"
+    assert trip.realized_r == pytest.approx(2.0)  # (100 − 90) / (105 − 100)
+    assert report.positive_share == 1.0
+    assert report.unmeasured == ()
+
+
+def test_score_replay_reports_a_short_open_position_with_unrealized_r() -> None:
+    """Una corta viva se marca a mercado con geometría corta (no se descarta)."""
+    ticks = [
+        _tick(
+            _day(0),
+            fills=(ReplayFill(_day(0), "AAA", "sell", 100.0, 100.0, direction="short"),),
+            stops={"AAA": 105.0},
+        ),
+        _tick(_day(1), prices={"AAA": 95.0}),
+    ]
+
+    report = score_replay(ticks)
+
+    assert report.realized_count == 0
+    assert len(report.open_positions) == 1
+    assert report.open_positions[0].direction == "short"
+    assert report.open_positions[0].unrealized_r == pytest.approx(1.0)  # (100 − 95) / 5
+
+
+def test_score_replay_declares_an_unsupported_direction_instead_of_assuming_long() -> None:
+    """Una dirección no reconocible se DECLARA (fail-closed); nunca se asume larga."""
+    ticks = [
+        _tick(
+            _day(0),
+            fills=(ReplayFill(_day(0), "AAA", "buy", 100.0, 100.0, direction="flat"),),
+            stops={"AAA": 95.0},
+        ),
+        _tick(
+            _day(1),
+            fills=(ReplayFill(_day(1), "AAA", "sell", 100.0, 110.0, direction="flat"),),
+        ),
+    ]
+
+    report = score_replay(ticks)
+
+    assert report.realized_count == 0
+    assert any("direccion_no_soportada" in gap for gap in report.unmeasured)

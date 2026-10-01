@@ -872,6 +872,11 @@ def _score_from_signal(signal: V2Signal, *, key: str | None = None) -> Opportuni
 #: económica), de modo que no existan dos direcciones que puedan discrepar.
 _ENTRY_DIRECTION: Final[Literal["long", "short"]] = "long"
 
+#: Alias PÚBLICO de la dirección única del motor, para los instrumentos (p. ej. el replay
+#: OOS) que necesitan estampar la dirección de un fill sin duplicar el literal y quedar
+#: desincronizados si AUTO abriese entrada corta.
+AUTO_ENTRY_DIRECTION: Final[Literal["long", "short"]] = _ENTRY_DIRECTION
+
 
 def entry_direction(signal: V2Signal) -> Literal["long", "short"] | None:
     """Dirección de entrada soportada por esta señal, o ``None`` (no soportada).
@@ -2629,6 +2634,7 @@ __all__ = [
     "SIGNAL_IDENTITY_MISSING",
     "SIGNAL_STALE",
     "SIGNAL_SUPERSEDED_BY_CANDIDATE",
+    "AUTO_ENTRY_DIRECTION",
     "V2Signal",
     "V2TickPlan",
     "V2Tunables",

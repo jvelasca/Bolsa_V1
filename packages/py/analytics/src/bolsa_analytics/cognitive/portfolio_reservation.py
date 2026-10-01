@@ -47,6 +47,7 @@ from bolsa_analytics.cognitive.auto_portfolio_snapshot import (
     UNKNOWN_SECTOR,
     PortfolioPosition,
 )
+from bolsa_analytics.cognitive.directional_geometry import risk_distance
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
     MEASUREMENT_UNKNOWN,
@@ -293,14 +294,11 @@ def stop_distance(*, entry: float, stop: float, direction: str = "long") -> floa
 
     Long exige ``stop < entry`` y short ``stop > entry``: un stop del lado equivocado no
     es un stop, y devolver una distancia ahí inventaría un riesgo que nadie va a respetar.
+    La regla vive en ``directional_geometry.risk_distance`` (una sola casa); aquí solo se
+    aplica el redondeo de la casa.
     """
-    e = _finite_positive(entry)
-    s = _finite_positive(stop)
-    if e is None or s is None:
-        return None
-    if direction == "short":
-        return _round4(s - e) if s > e else None
-    return _round4(e - s) if s < e else None
+    distance = risk_distance(entry=entry, stop=stop, direction=direction)
+    return _round4(distance) if distance is not None else None
 
 
 def estimate_trading_cost(

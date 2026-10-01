@@ -242,7 +242,11 @@ async def _run_replay(
     """Replay hermético sobre el worker CONGELADO. Devuelve los ticks materializados."""
     from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
     from bolsa_application.auto_forward_deciders import build_forward_pair_decider, split_watch
-    from bolsa_application.auto_v2_entry import AtrSource, DiscoveryRegimeSource
+    from bolsa_application.auto_v2_entry import (
+        AUTO_ENTRY_DIRECTION,
+        AtrSource,
+        DiscoveryRegimeSource,
+    )
     from bolsa_application.execution_event import InMemoryExecutionEventStore
     from bolsa_application.replay_oos import (
         ReplayCursor,
@@ -320,6 +324,8 @@ async def _run_replay(
                 price=float(row.price),
                 strategy_version=row.strategy_version_id,
                 cycle_id=row.cycle_id,
+                # La dirección sale de la ÚNICA fuente del motor (no de un literal).
+                direction=AUTO_ENTRY_DIRECTION,
             )
             for row in rows
         )

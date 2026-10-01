@@ -47,6 +47,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from bolsa_analytics.cognitive.directional_geometry import (
+    coerce_direction,
+    risk_distance,
+    signed_r,
+)
 from bolsa_analytics.cognitive.market_regime_gate import (
     map_trial_regime,
     regime_allows_entry_for,
@@ -69,6 +74,7 @@ __all__ = [
     "HORIZON_STALLED_BOOK",
     "HORIZON_UNDECLARED",
     "STALL_OPERABLE_DAYS",
+    "UNMEASURED_DIRECTION",
     "BookSnapshot",
     "CensusDay",
     "CensusReport",
@@ -393,6 +399,8 @@ class ReplayFill:
     price: float
     strategy_version: str | None = None
     cycle_id: str | None = None
+    #: Dirección de la posición a la que pertenece el fill (``"long"`` / ``"short"``).
+    direction: str = "long"
 
 
 @dataclass(frozen=True, slots=True)
@@ -425,6 +433,9 @@ class RoundTrip:
     realized_r: float
     strategy_version: str | None = None
     cycle_id: str | None = None
+    #: Dirección de la posición (``"long"`` / ``"short"``). NO se serializa en ``to_dict``:
+    #: la referencia congelada de ``replay-repro`` se queda byte a byte.
+    direction: str = "long"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -452,6 +463,8 @@ class OpenPosition:
     quantity: float
     unrealized_r: float | None
     strategy_version: str | None = None
+    #: Dirección de la posición (``"long"`` / ``"short"``). NO se serializa (ver ``RoundTrip``).
+    direction: str = "long"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -589,12 +602,24 @@ def _bucket(
     return out
 
 
-def _realized_r(*, entry: float, exit_price: float, stop: float) -> float | None:
-    """R realizado de un long: ``(exit − entry) / (entry − stop)``. Hueco si no es medible."""
-    risk = entry - stop
-    if risk != risk or risk <= 0 or exit_price != exit_price:
+def _realized_r(
+    *, entry: float, exit_price: float, stop: float, direction: str = "long"
+) -> float | None:
+    """R realizado según la DIRECCIÓN: ``(exit − entry) / riesgo`` en largo; espejo en corto.
+
+    El denominador (el riesgo al nacer) y el signo salen de la MISMA casa direccional que el
+    resto del repo (``directional_geometry``): una corta exige ``stop > entry`` y su R se mide
+    hacia abajo. Una dirección desconocida NO se asume larga: devuelve ``None`` (hueco
+    declarado), nunca un valor con la geometría equivocada. Hueco también si el riesgo no es
+    medible.
+    """
+    resolved = coerce_direction(direction)
+    if resolved is None:
         return None
-    return (exit_price - entry) / risk
+    risk = risk_distance(entry=entry, stop=stop, direction=resolved)
+    if risk is None:
+        return None
+    return signed_r(direction=resolved, entry=entry, risk=risk, price=exit_price)
 
 
 def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
@@ -604,15 +629,16 @@ def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
     (varias filas por entrada y por salida), así que contar una ida y vuelta por cada fila
     repetiría la misma R ``k`` veces e inflaría el censo. Aquí se agrega por símbolo:
 
-    * la ENTRADA toma el precio medio ponderado de sus ``buy`` y el **stop del tick en que
-      nació** la posición (el denominador de R, que no se re-media);
-    * la SALIDA toma el precio medio ponderado de los ``sell``;
+    * la ENTRADA es el lado que ABRE la posición (``buy`` en largo, ``sell`` en corto) y toma
+      su precio medio ponderado y el **stop del tick en que nació** (el denominador de R, que
+      no se re-media);
+    * la SALIDA es el lado OPUESTO y toma su precio medio ponderado;
     * cuando la posición queda a CERO se emite **una** ``RoundTrip``; mientras queda viva,
       sigue abierta (y al final se publica como ``OpenPosition`` con su R NO realizado).
 
-    Huecos declarados (``unmeasured``): una salida sin entrada previa, o un ciclo cuyo stop
-    no era medible al nacer (``entry == stop``), NO producen R. Se declara; nunca se rellena
-    con un ``0``.
+    Huecos declarados (``unmeasured``): una salida sin entrada previa, un ciclo cuyo stop no
+    era medible al nacer (``entry == stop``) o un fill cuya dirección no es reconocible
+    (``UNMEASURED_DIRECTION``), NO producen R. Se declara; nunca se rellena con un ``0``.
     """
     entry_ctx: dict[str, dict[str, Any]] = {}
     round_trips: list[RoundTrip] = []
@@ -622,41 +648,52 @@ def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
     for tick in ticks:
         for row in tick.fill_rows:
             symbol = row.symbol
-            if row.side == "buy":
+            resolved = coerce_direction(row.direction)
+            if resolved is None:
+                unmeasured.append(f"{tick.day}:{symbol}:{UNMEASURED_DIRECTION}")
+                continue
+            # La ENTRADA es el lado que ABRE la posición: ``buy`` en largo, ``sell`` en corto.
+            # Todo lo demás es cierre (idéntico a antes en el largo, donde la apertura era ``buy``).
+            opening_side = "buy" if resolved == "long" else "sell"
+            if row.side == opening_side:
                 ctx = entry_ctx.get(symbol)
                 if ctx is None:
                     entry_ctx[symbol] = {
                         "entry_day": tick.day,
-                        "buy_qty": float(row.quantity),
-                        "buy_notional": float(row.quantity) * float(row.price),
+                        "entry_qty": float(row.quantity),
+                        "entry_notional": float(row.quantity) * float(row.price),
                         "stop": float(tick.stops.get(symbol, 0.0) or 0.0),
                         "strategy_version": row.strategy_version,
                         "cycle_id": row.cycle_id,
+                        "direction": resolved,
                     }
                 else:
-                    ctx["buy_qty"] = float(ctx["buy_qty"]) + float(row.quantity)
-                    ctx["buy_notional"] = float(ctx["buy_notional"]) + float(row.quantity) * float(
-                        row.price
-                    )
+                    ctx["entry_qty"] = float(ctx["entry_qty"]) + float(row.quantity)
+                    ctx["entry_notional"] = float(ctx["entry_notional"]) + float(
+                        row.quantity
+                    ) * float(row.price)
                 continue
 
-            # side == "sell"
+            # Cierre: el lado OPUESTO a la apertura.
             ctx = entry_ctx.get(symbol)
             if ctx is None:
                 unmeasured.append(f"{tick.day}:{symbol}:salida_sin_entrada")
                 continue
-            ctx["sell_qty"] = float(ctx.get("sell_qty", 0.0)) + float(row.quantity)
-            ctx["sell_notional"] = float(ctx.get("sell_notional", 0.0)) + float(
+            ctx["exit_qty"] = float(ctx.get("exit_qty", 0.0)) + float(row.quantity)
+            ctx["exit_notional"] = float(ctx.get("exit_notional", 0.0)) + float(
                 row.quantity
             ) * float(row.price)
-            remaining = float(ctx["buy_qty"]) - float(ctx["sell_qty"])
+            remaining = float(ctx["entry_qty"]) - float(ctx["exit_qty"])
             if remaining > 1e-9:
                 continue  # posición viva por el resto: aún no hay ida y vuelta cerrada.
 
-            entry_price = float(ctx["buy_notional"]) / float(ctx["buy_qty"])
-            exit_price = float(ctx["sell_notional"]) / float(ctx["sell_qty"])
+            entry_price = float(ctx["entry_notional"]) / float(ctx["entry_qty"])
+            exit_price = float(ctx["exit_notional"]) / float(ctx["exit_qty"])
             stop = float(ctx["stop"])
-            realized = _realized_r(entry=entry_price, exit_price=exit_price, stop=stop)
+            direction = str(ctx.get("direction") or "long")
+            realized = _realized_r(
+                entry=entry_price, exit_price=exit_price, stop=stop, direction=direction
+            )
             if realized is None:
                 unmeasured.append(f"{tick.day}:{symbol}:riesgo_no_medible")
             else:
@@ -671,6 +708,7 @@ def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
                         realized_r=realized,
                         strategy_version=ctx.get("strategy_version"),
                         cycle_id=ctx.get("cycle_id"),
+                        direction=direction,
                     )
                 )
             entry_ctx.pop(symbol, None)
@@ -678,13 +716,19 @@ def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
     open_positions: list[OpenPosition] = []
     if last_tick is not None:
         for symbol, ctx in sorted(entry_ctx.items()):
-            quantity = float(ctx["buy_qty"]) - float(ctx.get("sell_qty", 0.0))
+            quantity = float(ctx["entry_qty"]) - float(ctx.get("exit_qty", 0.0))
             if quantity <= 1e-9:
                 continue
-            entry_price = float(ctx["buy_notional"]) / float(ctx["buy_qty"])
+            entry_price = float(ctx["entry_notional"]) / float(ctx["entry_qty"])
             last_price = float(last_tick.prices.get(symbol, 0.0) or 0.0)
+            direction = str(ctx.get("direction") or "long")
             unrealized = (
-                _realized_r(entry=entry_price, exit_price=last_price, stop=float(ctx["stop"]))
+                _realized_r(
+                    entry=entry_price,
+                    exit_price=last_price,
+                    stop=float(ctx["stop"]),
+                    direction=direction,
+                )
                 if last_price > 0
                 else None
             )
@@ -700,6 +744,7 @@ def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
                     quantity=quantity,
                     unrealized_r=unrealized,
                     strategy_version=ctx.get("strategy_version"),
+                    direction=direction,
                 )
             )
 
@@ -757,6 +802,12 @@ STALL_OPERABLE_DAYS = 20
 #: en vuelo. ``portfolio_reservation.RELEASE_REASON_DEAD_TAIL``; se duplica aquí para no
 #: importar el paquete de analítica desde la capa de aplicación.
 DEAD_TAIL_REASON = "tail_dead"
+
+#: Hueco declarado cuando el lado del fill NO declara una dirección reconocible. La
+#: dirección es un parámetro, nunca una suposición: una posición corta leída con geometría
+#: larga se descartaría en silencio (exactamente el defecto que ``expected_value`` ya
+#: corrigió y que ahora vive, compartido, en ``directional_geometry``).
+UNMEASURED_DIRECTION = "direccion_no_soportada"
 
 
 def operable_days_without_activity(

@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import uuid4
 
+from bolsa_analytics.cognitive.directional_geometry import signed_r
 from bolsa_analytics.cognitive.position_lifecycle import (
     LIFECYCLE_STATE_KEY,
     LIFECYCLE_STATE_UNVERIFIED,
@@ -257,15 +258,13 @@ def signed_r_from_price(
     risk: float | None,
     price: float,
 ) -> float | None:
-    """R firmado vs entry/risk. Sin inputs válidos → None."""
-    if direction not in ("long", "short"):
-        return None
-    if entry is None or risk is None or risk <= 0:
-        return None
-    if price <= 0:
-        return None
-    raw = (price - entry) / risk if direction == "long" else (entry - price) / risk
-    return _round4(raw)
+    """R firmado vs entry/risk. Sin inputs válidos → None.
+
+    La regla direccional vive en ``directional_geometry.signed_r`` (una sola casa); aquí
+    solo se aplica el redondeo de la casa.
+    """
+    raw = signed_r(direction=direction, entry=entry, risk=risk, price=price)
+    return _round4(raw) if raw is not None else None
 
 
 def _is_break_even_stop(position: PositionState) -> bool:

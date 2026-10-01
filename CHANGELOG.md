@@ -2,6 +2,27 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.17-beta] — W4 `GRANULARIDAD-OPERATIVA` (**SELLADO**): proveedor de precio REAL **+ BUNDLE del fix direccional del scorer OOS y la casa única de geometría direccional**
+
+**Bump** `2.11.16.3-beta` → `2.11.17-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`). Plan de fase: [`plan-w4-precio-real-2026-10-01.md`](./docs/engineering/plan-w4-precio-real-2026-10-01.md). Evidencia: [`docs/engineering/evidence/v2.88.17/README.md`](./docs/engineering/evidence/v2.88.17/README.md).
+
+### Paso `2b` de `W4` — unificación de las lecturas de precio al tick de BARRA (`Δ ≠ 0` acotado)
+
+- **Hallazgo:** la coherencia temporal del precio quedó a medias en `W3`: el *fill* ya usaba el tick de barra (`_settle`), pero la **decisión**, el **mark** de equity, la **protección** y el **coste de oportunidad** leían `self._minute`, que avanza cada 60 s. Con precio constante era inocuo; con precio real, decisión y *fill* leerían instantes distintos.
+- **Cambio:** **5 lecturas** pasan a `self._v2_bar_tick()` (se unen a la sexta, que ya lo usaba). **No** se toca la protección legacy (`protection_exit_reason(..., minute=self._minute)`), que es el `ProtectionClock` v2 deliberado (`W5`).
+- **`Δ` medido (A/B aislado):** batería `pytest apps/api-python/tests -k auto` ⇒ **`1 failed, 475 passed`** con `2b` (el rojo es el PG **pre-existente**) vs **`2 failed, 474 passed`** sin `2b` (pre-existente + el test nuevo del contrato). **Ninguna otra expectativa se movió** (los scripts que cuentan llamadas ignoran el `tick`; `_rising_price` vive en una sola barra ⇒ constante).
+- **`replay-repro` intacto (`Δ = 0`):** `ReplayCursor.price_script` **ignora el `tick`** ⇒ regenerar el artefacto con el seed congelado da el **mismo** `sha256 = 697526ED…C298967` (y `3 448 185 bytes`) que antes de `2b`. **Golden day `1 passed`** (precio hermético constante).
+- **Contrato fijado:** test `test_every_price_read_in_a_bar_shares_the_bar_tick` + mutación **`M292`** (una lectura vuelve al minuto) ⇒ muerde, árbol restaurado **byte a byte**. Matriz hasta **`M292`**.
+
+### Bundle `W4` — fix direccional del scorer OOS (`_realized_r`) + casa única de geometría direccional
+
+- **Hallazgo:** `replay_oos._realized_r` calculaba el R realizado **siempre como largo** y el scorer clasificaba apertura=`buy`/cierre=`sell` **fijos** ⇒ **long-only**. La regla direccional estaba además **reimplementada** (y en el OOS mal escrita) en `expected_value`, `portfolio_reservation.stop_distance` y `position_state.signed_r_from_price`. **Defecto LATENTE, no regresión live:** AUTO es long-only hoy (`auto_v2_entry._ENTRY_DIRECTION = "long"`), así que no rompía golden ni `replay-repro`, pero **descartaba en silencio** cualquier posición corta.
+- **Diseño:** módulo **nuevo** `bolsa_analytics.cognitive.directional_geometry` (`coerce_direction`/`risk_distance`/`signed_r`/`target_r`, **RAW** sin redondeo). Delegan `expected_value`, `portfolio_reservation.stop_distance` y `position_state.signed_r_from_price` conservando su `_round4` ⇒ **una sola casa** sin mover un decimal. `replay_oos` gana `direction` en `ReplayFill`/`RoundTrip`/`OpenPosition`, `_realized_r` direccional, apertura `buy`/`sell` según dirección y **dirección desconocida declarada** (`direccion_no_soportada`, fail-closed). **Los `to_dict()` no cambian** ⇒ preserva el SHA-256 de `replay-repro`. Los CLIs `v2_86`/`v2_87` estampan la dirección desde la **única fuente** del motor (`AUTO_ENTRY_DIRECTION`, alias público nuevo).
+- **`Δ = 0` long-only (demostrado):** para `long` y precios positivos la aritmética es la de antes y la serialización no cambia; la batería local `packages/py/analytics/tests` + `packages/py/application/tests` ⇒ **`3461 passed`**. La autoridad byte a byte es el job `replay-repro` (cita POST-TAG del sello `W4`).
+- **Mutaciones:** `M8`/`M10`/`M238` **retargeteadas** (la regla se mudó a `directional_geometry`/`_realized_r`) + **`M288`–`M291`** nuevas (dirección ignorada, apertura hardcodeada, fail-closed roto, stop del lado equivocado) + **`M292`** (lectura de precio al minuto) ⇒ la matriz llega a **`M292`**; corrida filtrada **`27/27 medidas`**, árbol restaurado **byte a byte**.
+- **`OBS-19` (peaje pagado):** `packages/py/application/tests/test_replay_oos.py` (**18 tests**) se registra a mano en **ambos** workflows (`python-ci.yml`, `release-tag-ci.yml`); **no corría en CI**. La causa estructural sigue **ABIERTA**.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.17/README.md`](./docs/engineering/evidence/v2.88.17/README.md) §1.
+
 ## [2.11.16.3-beta] — W3.3 `GRANULARIDAD-OPERATIVA`: ROBUSTEZ DEL INSTRUMENTO OOS — EL REPLAY ES UN SORTEO DEL VENUE Y LA BANDA DE `K = 12` SORTEOS **CRUZA EL CERO**
 
 **Bump** `2.11.16.2-beta` → `2.11.16.3-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`). **Alcance: instrumento, NO motor — CERO `src` de producto** (el desplazamiento del sorteo se inyecta y se **restaura byte a byte**: `Δ src = 0`).

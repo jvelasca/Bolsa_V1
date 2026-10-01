@@ -1674,7 +1674,7 @@ class AutoSimulationWorker:
             entry = self._entry_price.get(symbol)
             if entry is None:
                 continue
-            raw_price = self._v2_price_exec(symbol, self._minute)
+            raw_price = self._v2_price_exec(symbol, self._v2_bar_tick())
             if raw_price is None:
                 # W4: precio AUSENTE ⇒ este símbolo no se marca/no genera señal (fail-closed
                 # declarado). Antes ``... or 0`` producía un ``Decimal("0")`` que el
@@ -1961,7 +1961,7 @@ class AutoSimulationWorker:
         for symbol, qty in self._open.items():
             if qty <= 0:
                 continue
-            raw_price = self._v2_price_exec(symbol, self._minute)
+            raw_price = self._v2_price_exec(symbol, self._v2_bar_tick())
             if raw_price is None:
                 # W4: precio AUSENTE ⇒ este símbolo no se marca/no genera señal (fail-closed
                 # declarado). Antes ``... or 0`` producía un ``Decimal("0")`` que el
@@ -2109,7 +2109,7 @@ class AutoSimulationWorker:
             # ⇒ lee ``mid`` (con fuente real, ``close(B-1)``; sin lookahead). El *fill*
             # ancla en ``execution`` (``open(B)``) en ``_settle``: son fronteras distintas
             # a propósito, y su diferencia ES el hueco decisión→ejecución del modelo.
-            raw_price = self._v2_price_mid(symbol, self._minute)
+            raw_price = self._v2_price_mid(symbol, self._v2_bar_tick())
             if raw_price is None:
                 # W4: precio AUSENTE ⇒ este símbolo NO genera señal (fail-closed declarado).
                 # Antes ``... or 0`` producía un ``Decimal("0")`` del que sólo el
@@ -4208,7 +4208,7 @@ class AutoSimulationWorker:
         for index, row in enumerate(self._v2_opportunities):
             if row.status == OPPORTUNITY_TRADED or row.subsequent_price is not None:
                 continue
-            price = self._v2_price_exec(row.instrument_id, self._minute)
+            price = self._v2_price_exec(row.instrument_id, self._v2_bar_tick())
             if price is None:
                 # W4: sin precio posterior la oportunidad queda ``unmeasured`` (el propio
                 # contrato de este método ya lo exigía: nunca se inventa un precio).
@@ -4970,7 +4970,7 @@ class AutoSimulationWorker:
             # V2.23/A9 (Bloque 6 · G8/G9): la protección tiene prioridad sobre el
             # decider cuando hay posición. Emite un SELL del total a través del MISMO
             # spine (kill/sim-gate/RiskGate/posición), nunca un atajo.
-            raw_price = self._v2_price_exec(symbol, self._minute)
+            raw_price = self._v2_price_exec(symbol, self._v2_bar_tick())
             if raw_price is None:
                 # W4: precio AUSENTE ⇒ este símbolo no se marca/no genera señal (fail-closed
                 # declarado). Antes ``... or 0`` producía un ``Decimal("0")`` que el

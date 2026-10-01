@@ -174,6 +174,7 @@ El dato sale de PG por sesión/tick, igual que régimen y ATR ⇒ `PriceSource.r
 | `M285` | volver al **`or 0`** en la geometría de la señal | `P1-A` (§2) |
 | `M286` | **lookahead**: la decisión lee `close` de la barra **en curso** | la frontera `B-1` de la decisión (§3.1) |
 | `M287` | sin barra `B`, la ejecución cae a la barra **`B-1`** (precio rancio) | el fail-closed «sin `open(B)` ⇒ HOLD» (§3.1.b, §10.2) |
+| `M292` | una lectura de precio vuelve al **`self._minute`** (paso `2b`) | el contrato de tick de barra `test_every_price_read_in_a_bar_shares_the_bar_tick` (§9.3) |
 
 ---
 
@@ -253,7 +254,13 @@ manuales), `OBS-16`, `OBS-15`, `OBS-22`, `OBS-14.b`, `OBS-13`, `OBS-11`, `H-4`, 
    byte a byte** (§11).
    **RESUELTO en el paso 3–4**: el contrato de refresco se alineó a **async sin argumentos**
    (igual que régimen/ATR) y el precio se refresca en el MISMO punto por tick.
-3. **Paso 2b (pendiente)**: unificar las 6 lecturas al tick de barra (§2.b) — **`Δ ≠ 0`**.
+3. **Paso 2b — HECHO (2026-10-01)**: las 5 lecturas restantes se unifican al tick de barra (§2.b);
+   la sexta (`_settle`) ya lo usaba. **`Δ ≠ 0` acotado y medido**: la batería `auto` no cambia más que
+   el test nuevo del contrato (`1 failed, 475 passed` con `2b` vs `2 failed, 474 passed` sin él; el
+   rojo es el pre-existente de PG) y el **`replay-repro` sigue `Δ = 0`** porque `ReplayCursor`
+   **ignora el `tick`**; el **golden day `1 passed`** (precio constante). Contrato fijado con el test
+   `test_every_price_read_in_a_bar_shares_the_bar_tick` y la mutación **`M292`** ⇒ matriz hasta
+   **`M292`**.
 4. **`OhlcvPriceSource` real + composición — HECHO y TRAS INTERRUPTOR** (§12): el proveedor
    real (dos ventanas §3.1.b, `solo_ohlcv` §10.1), cableado de `refresh` y fail-closed
    end-to-end. Componer sin más **rompía ~8 tests `_pg` y el golden day** (que no siembran
@@ -381,3 +388,27 @@ Declarado: con el flag OFF el `Δ = 0` es exacto; encenderlo en la ventana PAPER
   `== B`. **Nunca** se lee `close`/`high`/`low` de `B` para la decisión (lookahead).
 * Sin barra `B` ⇒ `execution` `None` ⇒ `HOLD` declarado (`M287` caza la caída a `B-1`).
 * Sin `as_of` resoluble ⇒ ventana vacía ⇒ ningún precio (fail-closed), sin leer nada.
+
+---
+
+## 13. BUNDLE en `W4`: fix direccional del scorer OOS + casa única de geometría direccional (2026-10-01)
+
+**Alcance añadido al sello `W4`** (no lo sustituye): el scorer OOS era **long-only** y la geometría
+direccional estaba reimplementada en cuatro módulos. Se corrige y se converge en **una sola casa**.
+Es **`Δ = 0` para long-only** (AUTO es long-only hoy), así que no mueve el artefacto `replay-repro`.
+
+* **Nuevo** `packages/py/analytics/src/bolsa_analytics/cognitive/directional_geometry.py`
+  (`coerce_direction`, `risk_distance`, `signed_r`, `target_r`; **RAW**, sin redondeo).
+* Delegan: `expected_value._risk_geometry`/`_target_r`, `portfolio_reservation.stop_distance` y
+  `position_state.signed_r_from_price` (conservan su `_round4` ⇒ `Δ = 0`).
+* `replay_oos`: `direction` en `ReplayFill`/`RoundTrip`/`OpenPosition`; `_realized_r` direccional;
+  apertura `buy`/`sell` según dirección; dirección desconocida **declarada** (`direccion_no_soportada`,
+  nunca asumida larga); **`to_dict()` intactos**.
+* `v2_86`/`v2_87`: estampan `direction` desde **`auto_v2_entry.AUTO_ENTRY_DIRECTION`** (alias público
+  nuevo de `_ENTRY_DIRECTION`), no de un literal.
+* **Mutaciones** `M8`/`M10`/`M238` retargeteadas + **`M288`–`M291`** nuevas ⇒ la matriz llega a `M291`.
+* **`OBS-19` (peaje):** `packages/py/application/tests/test_replay_oos.py` entra en **ambos**
+  workflows (`python-ci.yml`, `release-tag-ci.yml`) — antes **no corría en CI**.
+* **Evidencia del bundle:** [`evidence/v2.88.17/README.md`](./evidence/v2.88.17/README.md) §1.
+* **Sin migración** (Alembic sigue en `046_fill_reference_mid`). El **bump** `2.11.16.3-beta →
+  2.11.17-beta` y el tag los hace el **sello `W4`**.

@@ -478,3 +478,49 @@ async def test_an_intra_bar_retry_reuses_the_bar_anchor_and_cannot_double_the_da
         "cada barra estrena su propio sorteo de mercado (un tick congelado lo repartiría)"
     )
     assert worker_b._v2_closed_bar_as_of() == "2026-09-18"  # noqa: SLF001
+
+
+# ══ 3 · W4 (paso 2b) · la foto del PRECIO es la del tick de BARRA ══════════════════════
+
+
+@pytest.mark.asyncio
+async def test_every_price_read_in_a_bar_shares_the_bar_tick(
+    v28816_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``W4``/paso ``2b``: TODAS las lecturas de precio usan el tick de BARRA, no el minuto.
+
+    El contrato de ``PriceScript`` (``W3``) fija que el ``tick`` que recibe el proveedor es el
+    de la **barra** (estable dentro de ella), para que la referencia de un reintento
+    intra-barra sea la MISMA. El paso ``2b`` cierra la incoherencia que quedó a medias: la
+    decisión y el *mark* leían ``self._minute`` (que avanza cada 60 s) mientras el *fill* ya
+    usaba el tick de barra ⇒ dos precios de instantes distintos dentro del mismo tick.
+
+    El script REGISTRA el tick que recibe y devuelve un precio dependiente de él: si una
+    lectura vuelve al minuto (``M292``), el registro deja de ser de un solo tick.
+    """
+    monkeypatch.setenv("AUTO_ENGINE_SIMULATED_WATCH", "AAA")
+    holder = _ClockHolder(_CLOCK_DAY)
+    seen: list[int] = []
+
+    def _script(_symbol: str, tick: int) -> float:
+        seen.append(int(tick))
+        return 100.0
+
+    worker = _worker(
+        _Stores(),
+        clock=holder,
+        decider=lambda symbol: DecisionPackage("BUY", symbol, 200.0),
+        extra={"price_script": _script},
+    )
+    await worker.auto_turn()
+    # Segundo turno DENTRO de la misma barra (otra hora del mismo día): el ancla no se mueve.
+    holder.now = _CLOCK_DAY.replace(hour=10)
+    await worker.auto_turn()
+
+    expected = bar_tick(_CLOCK_DAY, "1d")
+    assert seen, "un turno con candidata LEE precio (si no, el test no mediría nada)"
+    assert set(seen) == {expected}, (
+        "todas las lecturas de la barra comparten el tick de barra "
+        f"({expected}), no el minuto: {sorted(set(seen))}"
+    )
+

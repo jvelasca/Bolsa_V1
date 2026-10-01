@@ -271,7 +271,11 @@ async def _run_durable_replay(
     from bolsa_analytics.cognitive.measurement import MEASUREMENT_UNKNOWN
     from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
     from bolsa_application.auto_forward_deciders import build_forward_pair_decider, split_watch
-    from bolsa_application.auto_v2_entry import AtrSource, DiscoveryRegimeSource
+    from bolsa_application.auto_v2_entry import (
+        AUTO_ENTRY_DIRECTION,
+        AtrSource,
+        DiscoveryRegimeSource,
+    )
     from bolsa_application.exit_order_store import InMemoryExitOrderStore
     from bolsa_application.kill_switch_store import InMemoryKillSwitchStore
     from bolsa_application.replay_oos import (
@@ -400,6 +404,8 @@ async def _run_durable_replay(
                 price=float(row.price),
                 strategy_version=row.strategy_version_id,
                 cycle_id=row.cycle_id,
+                # La dirección sale de la ÚNICA fuente del motor (no de un literal).
+                direction=AUTO_ENTRY_DIRECTION,
             )
             for row in rows
         )

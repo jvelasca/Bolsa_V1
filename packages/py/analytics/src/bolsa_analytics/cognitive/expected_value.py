@@ -36,6 +36,11 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+from bolsa_analytics.cognitive.directional_geometry import (
+    coerce_direction,
+    risk_distance,
+    target_r,
+)
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
     MEASUREMENT_PARTIAL,
@@ -65,13 +70,11 @@ _SHORT = "short"
 
 
 def _coerce_direction(value: Any) -> str | None:
-    """``"long"``/``"short"`` (normalizado) o ``None`` si no es una dirección conocida."""
-    if not isinstance(value, str):
-        return None
-    normalized = value.strip().lower()
-    if normalized in (_LONG, _SHORT):
-        return normalized
-    return None
+    """``"long"``/``"short"`` (normalizado) o ``None`` si no es una dirección conocida.
+
+    Alias de ``directional_geometry.coerce_direction``: la regla vive en una sola casa.
+    """
+    return coerce_direction(value)
 
 
 def _finite(value: Any) -> float | None:
@@ -298,18 +301,13 @@ def _risk_geometry(
     resolved = _coerce_direction(direction)
     if resolved is None:
         return None, EV_DIRECTION_UNSUPPORTED
-    e = _finite(entry)
-    s = _finite(stop)
+    distance = risk_distance(entry=entry, stop=stop, direction=resolved)
     q = _finite(quantity)
-    if e is None or e <= 0.0 or s is None or s <= 0.0 or q is None or q <= 0.0:
+    if q is None or q <= 0.0:
         return None, EV_GEOMETRY_UNMEASURED
-    if resolved == _SHORT:
-        if s <= e:
-            return None, EV_GEOMETRY_UNMEASURED
-        return _round4((s - e) * q), None
-    if s >= e:
+    if distance is None:
         return None, EV_GEOMETRY_UNMEASURED
-    return _round4((e - s) * q), None
+    return _round4(distance * q), None
 
 
 def _target_r(
@@ -323,24 +321,8 @@ def _target_r(
     resolved = _coerce_direction(direction)
     if resolved is None:
         return None
-    e = _finite(entry)
-    s = _finite(stop)
-    t = _finite(target)
-    if e is None or s is None or t is None:
-        return None
-    if resolved == _SHORT:
-        distance = s - e
-        if distance <= 0.0:
-            return None
-        reward = e - t
-    else:
-        distance = e - s
-        if distance <= 0.0:
-            return None
-        reward = t - e
-    if reward < 0.0:
-        return None
-    return _round4(reward / distance)
+    value = target_r(entry=entry, stop=stop, target=target, direction=resolved)
+    return _round4(value) if value is not None else None
 
 
 __all__ = [
