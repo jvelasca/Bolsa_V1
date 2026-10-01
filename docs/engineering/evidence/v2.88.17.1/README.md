@@ -1,6 +1,6 @@
 # Evidencia `v2.88.17.1-beta` — W4.1 `GRANULARIDAD-OPERATIVA`: HOTFIX DEL CERTIFIER A11 (`lifecycle-pg`) — EL INSTRUMENTO DEJA DE SER UN SORTEO DEL VENUE (**TEST-ONLY**, `Δ src = 0`)
 
-> **Clase: evidencia del hotfix del sello `W4`. ESTADO: cerrado en `main` — bump `2.11.17.1-beta` aplicado; tag y cita POST-TAG los realiza el SELLO.**
+> **Clase: evidencia del hotfix del sello `W4`. ESTADO: `W4.1` CERRADO y CERTIFICADO — bump `2.11.17.1-beta` aplicado y tag `v2.88.17.1-beta` (`6221700c`) con su cita POST-TAG (abajo).**
 > **AsOf:** 2026-10-01. **Base:** tag rojo `v2.88.17-beta` (`cfd13f54`).
 > **Plan de la fase:** [`plan-w4-precio-real-2026-10-01.md`](../plan-w4-precio-real-2026-10-01.md). **Evidencia del sello:** [`evidence/v2.88.17/README.md`](../v2.88.17/README.md).
 
@@ -123,4 +123,27 @@ este quedó fuera.
 → `v2.88.16.2-beta`): el sello del hotfix es **`v2.88.17.1-beta`**.
 
 **Deuda declarada:** el rojo **no** está cubierto por un gate de CI propio (la matriz de mutaciones
-mide el contrato, pero no se corre en el tag); su cita es la del **POST-TAG del sello `W4.1`**.
+mide el contrato, pero no se corre en el tag).
+
+## 7. Cita POST-TAG — TAG `v2.88.17.1-beta` TODO VERDE
+
+`Release tag CI` run **[`36848732534`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36848732534)**
+(`ref=refs/tags/v2.88.17.1-beta`, HEAD `6221700c`, `2026-10-01T10:22:32Z`):
+
+| Job | Resultado |
+| --- | --- |
+| `security`, `shared`, `spine`, `frontend`, `python`, `playwright-mock`, `lifecycle-pg`, `replay-repro`, `dr-verify`, `a7-gate`, `certify` | **`success`** (11) |
+| `playwright integrated` | `skipped` (opt-in, como siempre) |
+
+**`ESPERADO = OBSERVADO`:**
+
+* Job **`python`** `3219 passed, 41 skipped, 6 warnings in 75.42s` — **idéntico** al run rojo
+  `36845274700` (`3219 passed, 41 skipped`): el fichero del certifier es **PG-gated** y el job offline
+  lo **ignora**, así que el hotfix **no añade línea online** (`Δ = 0`).
+* Job **`lifecycle-pg`** `167 passed, 2 warnings in 97.47s` = `165 passed + 1`: el rojo había sido
+  **`1 failed, 165 passed`** ⇒ el certifier **pasa** (lo que se venía a arreglar) y entra la **guarda
+  pura** nueva (`test_a11_instrument_id_comes_from_a_fill_sweep`).
+* **`replay-repro`** VERDE, veredicto `REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este
+  fichero en LF)` ⇒ **`Δ src = 0` confirmado por el propio job**, no por argumento.
+
+⇒ **Cadena cerrada:** `v2.88.17-beta` (rojo `lifecycle-pg`) → **`v2.88.17.1-beta` TODO VERDE**.
