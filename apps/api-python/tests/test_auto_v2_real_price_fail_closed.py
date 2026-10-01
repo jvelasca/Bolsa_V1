@@ -25,15 +25,15 @@ from decimal import Decimal
 from typing import Any, Protocol
 
 import pytest
-from bolsa_application.auto_v2_entry import V2_ENGINE_ENV, EdgeReportSource
-from bolsa_application.decision_contract import DecisionPackage
-from bolsa_application.execution_event import InMemoryExecutionEventStore
 
 from bolsa_api.background.auto_price_provider import MappingPriceSource, PriceSource
 from bolsa_api.background.auto_simulation_worker import (
     AutoSimulationWorker,
     step_minute_clock,
 )
+from bolsa_application.auto_v2_entry import V2_ENGINE_ENV, EdgeReportSource
+from bolsa_application.decision_contract import DecisionPackage
+from bolsa_application.execution_event import InMemoryExecutionEventStore
 
 _SYMBOLS = ("AAA",)
 

@@ -120,6 +120,13 @@ from bolsa_analytics.cognitive.position_state import (
 )
 from bolsa_analytics.cognitive.signal_identity import bar_window
 from bolsa_analytics.cognitive.trade_context import TradeContext
+from bolsa_api.background.auto_price_provider import OhlcvPriceSource, PriceSource
+from bolsa_api.background.paper_auto_engine_worker import (
+    DecisionProvider,
+    _effective_venue,
+    _kill_switch_env_on,
+    _watch_symbols,
+)
 from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.adaptive_gate_store import AdaptiveGateStore, sink_failures_from_state
 from bolsa_application.applied_fills import read_applied_fill_facts
@@ -235,14 +242,6 @@ from bolsa_application.simulated_broker import fill_seed
 from bolsa_application.simulated_settlement import (
     normalized_auto_venue,
     submit_simulated_order,
-)
-
-from bolsa_api.background.auto_price_provider import OhlcvPriceSource, PriceSource
-from bolsa_api.background.paper_auto_engine_worker import (
-    DecisionProvider,
-    _effective_venue,
-    _kill_switch_env_on,
-    _watch_symbols,
 )
 
 logger = logging.getLogger(__name__)

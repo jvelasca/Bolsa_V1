@@ -225,11 +225,10 @@ async def test_flag_governs_runtime_price_composition_on_pg(
     explícitamente. Se observa con un espía sobre ``_compose_price_source`` (no depende del
     llenado del venue ni de que haya ATR).
     """
+    from bolsa_api.background import auto_simulation_worker as w
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
-
-    from bolsa_api.background import auto_simulation_worker as w
 
     symbol = f"w4rp-{uuid.uuid4().hex[:10]}"
     engine_id = f"w4rp-{uuid.uuid4().hex[:10]}"

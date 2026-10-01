@@ -384,6 +384,9 @@ jobs:
           --ignore=apps/api-python/tests/test_a14_grammar_discovery_pg.py
           --ignore=apps/api-python/tests/test_auto_v2_durable_pg.py
           --ignore=apps/api-python/tests/test_auto_v2_lifecycle_pg.py
+          # V2.88.17/W4: el criterio del precio REAL sobre el runtime de producción exige
+          # PG real (se certifica en el job auto-v2-durable-pg con gate fail-if-skipped).
+          --ignore=apps/api-python/tests/test_auto_v2_real_price_production_pg.py
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
@@ -648,6 +651,11 @@ jobs:
       # ``paper_material_readiness_v2`` desde una conexión NUEVA. Sin PG el test skipearía en
       # mudo y el bloqueo del productor quedaría sin certificar por commit.
       AUTO_V74_PRODUCER_PG_REQUIRED: '1'
+      # V2.88.17/W4 (precio REAL del motor AUTO): el criterio re-declarado de W4 —que el
+      # camino de PRODUCCIÓN deje de fabricar un precio— solo se certifica contra PG real
+      # (dos fronteras close(B-1)/open(B), fail-closed sin barra B y el interruptor que
+      # gobierna la composición). Sin PG el test skipearía en mudo.
+      AUTO_V2_REAL_PRICE_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -714,6 +722,7 @@ jobs:
             apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py \
             apps/api-python/tests/test_auto_v74_producer_pg_e2e.py \
             apps/api-python/tests/test_discovery_evidence_snapshot_pg.py \
+            apps/api-python/tests/test_auto_v2_real_price_production_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 
       - name: Fail on skipped AUTO 2.0 durable PG (no skip silencioso)
