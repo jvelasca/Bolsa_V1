@@ -292,11 +292,26 @@ jobs:
         # camino de PRODUCCIÓN deje de fabricar un precio) exige PG real y se certifica en
         # el job auto-v2-durable-pg con gate fail-if-skipped (AUTO_V2_REAL_PRICE_PG_REQUIRED).
         # Aquí va en ``--ignore`` (abajo): sin PG skipearía en mudo y aparentaría cubrirlo.
+        # W-G2/1 (2026-10-01, peaje OBS-19): este job pasa a recolectar los TRES directorios
+        # que hasta ahora había que listar FICHERO a FICHERO
+        # (``packages/py/application/tests``, ``packages/py/infrastructure/tests`` y
+        # ``packages/py/ai/tests``), con ``--ignore`` para lo que exige PG/red: los 6 ficheros
+        # de certificación con PG REAL viven en ``lifecycle-pg`` con gate fail-if-skipped y sin
+        # PG se colgarían o errorarían en mudo dentro del pase de directorio. Los listados
+        # explícitos que quedan más arriba se conservan como ANCLAS redundantes (pytest
+        # deduplica: no corren dos veces), y las afirmaciones «ese directorio NO tiene pase de
+        # directorio» de las entradas ANTERIORES a esta describen el estado previo a W-G2/1:
+        # quedan SUPERADAS por esta entrada. Evidencia: el censo ``scripts/ci/test_selection.py``
+        # (guarda ``apps/api-python/tests/test_ci_test_selection_census.py``) baja el agujero
+        # declarado de 205 a 53 ficheros, sin dejar ninguno invisible.
         run: >
           uv run pytest
           packages/py/domain/tests
           packages/py/market/tests
           packages/py/analytics/tests
+          packages/py/application/tests
+          packages/py/infrastructure/tests
+          packages/py/ai/tests
           packages/py/application/tests/test_lifecycle_event_store.py
           packages/py/application/tests/test_reconcile_lifecycle_integrity_v193.py
           packages/py/application/tests/test_reconcile_financial_integrity_v194.py
@@ -405,6 +420,44 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v46_crash_injection_pg.py
           --ignore=apps/api-python/tests/test_auto_v46_multiprocess_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
+          --ignore=packages/py/application/tests/test_auto_engine_state_store_hermetic.py
+          --ignore=packages/py/application/tests/test_broker_adapter.py
+          --ignore=packages/py/application/tests/test_broker_venue_per_account.py
+          --ignore=packages/py/application/tests/test_custody_idempotency.py
+          --ignore=packages/py/application/tests/test_decision_spine.py
+          --ignore=packages/py/application/tests/test_dex2_crash_restart_cross_pid.py
+          --ignore=packages/py/application/tests/test_dex3_operational_incident.py
+          --ignore=packages/py/application/tests/test_execution_router.py
+          --ignore=packages/py/application/tests/test_instrument_lifecycle_db.py
+          --ignore=packages/py/application/tests/test_order_live_drift_incident.py
+          --ignore=packages/py/application/tests/test_paper_desk_entry.py
+          --ignore=packages/py/application/tests/test_research_observatory.py
+          --ignore=packages/py/application/tests/test_research_trials_db.py
+          --ignore=packages/py/application/tests/test_sync_queue_retryable.py
+          --ignore=packages/py/infrastructure/tests/chaos
+          --ignore=packages/py/infrastructure/tests/test_alert_channels.py
+          --ignore=packages/py/infrastructure/tests/test_concurrency_scenarios.py
+          --ignore=packages/py/infrastructure/tests/test_config.py
+          --ignore=packages/py/infrastructure/tests/test_config_production.py
+          --ignore=packages/py/infrastructure/tests/test_core_r_repository.py
+          --ignore=packages/py/infrastructure/tests/test_custody_concurrency_chaos.py
+          --ignore=packages/py/infrastructure/tests/test_custody_default_portfolio_policy.py
+          --ignore=packages/py/infrastructure/tests/test_deduct_cash_allow_partial.py
+          --ignore=packages/py/infrastructure/tests/test_f3a_account_data_migration.py
+          --ignore=packages/py/infrastructure/tests/test_financial_invariants.py
+          --ignore=packages/py/infrastructure/tests/test_get_summary_no_price_fallback.py
+          --ignore=packages/py/infrastructure/tests/test_m2_ledger_cash_reconciliation.py
+          --ignore=packages/py/infrastructure/tests/test_m4_total_fees_excludes_custody.py
+          --ignore=packages/py/infrastructure/tests/test_m7_custody_single_charge_f3_guard.py
+          --ignore=packages/py/infrastructure/tests/test_mandate_sync_orphan_instrument.py
+          --ignore=packages/py/infrastructure/tests/test_r8a_idempotency_backstop.py
+          --ignore=packages/py/infrastructure/tests/test_r8c_ledger_balance_atomic.py
+          --ignore=packages/py/application/tests/test_live_order_store_pg.py
+          --ignore=packages/py/application/tests/test_submit_intent_store_pg.py
+          --ignore=packages/py/infrastructure/tests/test_execution_event_fence_pg.py
+          --ignore=packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
+          --ignore=packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py
+          --ignore=packages/py/infrastructure/tests/test_lifecycle_event_store_pg.py
           -q
 
   lifecycle-pg:
@@ -710,6 +763,11 @@ jobs:
       # la estructura, se COMMITEA, se cortan las conexiones y el gate (lector REAL del CLI)
       # la reconstruye desde una conexión NUEVA hasta ``PRODUCER_READY``.
       # Gate fail-if-skipped: AUTO_V74_PRODUCER_PG_REQUIRED=1.
+      # V2.70/AUTO-23 (G2/`OBS-19`, 2026-10-01): el certificador del VALIDADOR de evidencia
+      # (``test_auto_v70_auto23_evidence_validation.py``) NO estaba en la lista de ningún
+      # workflow: existía y no corría. Su sonda PG estaba roja (``measuredCycles`` 17 frente a
+      # ``len(_SPECS)`` 26: el denominador de R son los ciclos CON riesgo). Se da de alta en este
+      # job, que ya trae ``AUTO20B_EXPORT_PG_REQUIRED=1`` y guarda anti-skip.
       - name: Pytest AUTO 2.0 durable PG (fail if skipped)
         run: |
           set -o pipefail
@@ -724,6 +782,7 @@ jobs:
             apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py \
             apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py \
             apps/api-python/tests/test_auto_v74_producer_pg_e2e.py \
+            apps/api-python/tests/test_auto_v70_auto23_evidence_validation.py \
             apps/api-python/tests/test_discovery_evidence_snapshot_pg.py \
             apps/api-python/tests/test_auto_v2_real_price_production_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log

@@ -416,6 +416,8 @@ async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
             from sqlalchemy import delete
 
             from bolsa_infrastructure.database.models.tables import (
+                AutoEngineRunRow,
+                AutoEngineTickRow,
                 EdgeReportRow,
                 ExecutionEventRow,
                 PortfolioReservationRow,
@@ -434,6 +436,17 @@ async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
                 ):
                     await session.execute(
                         delete(model).where(model.account_id == account_id)  # type: ignore[attr-defined]
+                    )
+                # Matriculación del motor AUTO: ``auto_engine_runs``/``auto_engine_ticks``
+                # cuelgan de ``engine_id``, NO de la cuenta, así que el bucle de arriba no las
+                # toca — y ninguna otra red de limpieza las cubre (la purga global del
+                # ``conftest`` las deja fuera A PROPÓSITO: borrarlas en bloque se llevaría por
+                # delante la operativa real de paper). Medido antes de este arreglo: 1 708
+                # filas acumuladas en ``auto_engine_ticks`` y 435 en ``auto_engine_runs`` en la
+                # BD local. Es residuo del propio test ⇒ lo retira el propio test.
+                for engine_model in (AutoEngineTickRow, AutoEngineRunRow):
+                    await session.execute(
+                        delete(engine_model).where(engine_model.engine_id == engine_id)
                     )
                 if edge_report_id is not None:
                     await session.execute(

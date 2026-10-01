@@ -24,6 +24,7 @@ import json
 import sys
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime as real_datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +45,12 @@ _CALIBRATION_FIXTURE = (
     / "fixtures"
     / "auto_calibration_cycles.json"
 )
+#: Ciclos del fixture declarado, leídos UNA vez. El denominador de R del informe se **deriva** de
+#: esta cardinalidad: un literal aquí es exactamente lo que dejó al denominador mintiendo en
+#: silencio (``measuredCycles == 126`` frente a los ciclos realmente declarados en el fichero).
+_CALIBRATION_CYCLES: list[dict[str, Any]] = json.loads(
+    _CALIBRATION_FIXTURE.read_text(encoding="utf-8")
+)["cycles"]
 
 
 def _load_validator() -> Any:
@@ -92,7 +99,13 @@ def test_the_validation_writes_a_complete_report(tmp_path: Path) -> None:
     document = json.loads((dirs[0] / "validation.json").read_text(encoding="utf-8"))
     assert document["schema"] == "auto23_evidence_validation_v2"
     assert document["materialOrigin"] == "synthetic_fixture"
-    assert document["measuredCycles"] == 126
+    # El denominador de R se DERIVA del fixture, no de un literal: todos sus ciclos declaran
+    # riesgo positivo, así que la cardinalidad del material ES el número de ciclos medibles.
+    # Si el fixture dejara de ser todo-medible, esta aserción lo dice en vez de taparlo.
+    assert all(Decimal(str(row["riskAmount"])) > 0 for row in _CALIBRATION_CYCLES), (
+        "el fixture declarado debe seguir siendo todo-medible (riesgo positivo en cada ciclo)"
+    )
+    assert document["measuredCycles"] == len(_CALIBRATION_CYCLES)
     assert document["run"]["source"] == "fixture"
     assert document["run"]["files"]["sweep"] == "sweep.json"
     assert document["sweep"]["schema"] == "auto23_sample_size_sweep_v2"
@@ -241,7 +254,14 @@ def test_the_validation_reads_real_postgres_material_and_seals_it(tmp_path: Path
         assert document["run"]["source"] == "paper_real"
         assert document["materialOrigin"] == "paper_real"
         assert document["brokerVenue"] == "paper"
-        assert document["measuredCycles"] == len(e2e._SPECS)
+        # El denominador de R son los ciclos CON riesgo (``with_risk``), NO los cerrados: el
+        # fixture AUTO-20B siembra 26 ciclos pero solo 17 tienen reserva de riesgo (los 5 de la
+        # rama C y el ciclo U no tienen denominador ⇒ no son medibles). Se DERIVA del propio
+        # fixture y se comprueba que el caso sigue conteniendo ciclos SIN R medible: sin esa
+        # segunda aserción, un fixture todo-medible haría la primera vacua y volvería a tapar
+        # el defecto (``measuredCycles`` medía 17 contra un ``len(_SPECS)`` de 26).
+        assert document["measuredCycles"] == len(e2e._RISK_CYCLES)
+        assert document["measuredCycles"] < len(e2e._SPECS)
         assert document["fingerprint"]
     finally:
         asyncio.run(e2e._cleanup(account_id))

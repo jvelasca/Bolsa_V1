@@ -482,11 +482,28 @@ jobs:
         # ``packages/py/application/tests`` NO tiene pase de directorio aquí: sin registro
         # el gate fail-closed (``1wk``/``OPEN(D+1)`` rechazados y valor desconocido no
         # degradado en silencio) no correría, repitiendo el hueco de v2.76/OBS-19.
+        # W-G2/1 (2026-10-01, peaje OBS-19): este job pasa a recolectar los TRES directorios
+        # que hasta ahora había que listar FICHERO a FICHERO
+        # (``packages/py/application/tests``, ``packages/py/infrastructure/tests`` y
+        # ``packages/py/ai/tests``), con ``--ignore`` para lo que exige PG/red: los 6 ficheros
+        # de certificación con PG REAL viven en el job ``lifecycle-pg`` de este workflow con
+        # gate fail-if-skipped y sin PG se colgarían o errorarían en mudo dentro del pase de
+        # directorio —y el pase de ``apps/api-python/tests`` ya los recogía ANTES de W-G2/1, así
+        # que el hueco no crece: se cierra—. Los listados explícitos que quedan más arriba se
+        # conservan como ANCLAS redundantes (pytest deduplica: no corren dos veces), y las
+        # afirmaciones «ese directorio NO tiene pase de directorio» de las entradas ANTERIORES a
+        # esta describen el estado previo a W-G2/1: quedan SUPERADAS por esta entrada. Evidencia:
+        # el censo ``scripts/ci/test_selection.py`` (guarda
+        # ``apps/api-python/tests/test_ci_test_selection_census.py``) baja el agujero declarado
+        # de 205 a 53 ficheros, sin dejar ninguno invisible.
         run: >
           uv run pytest
           packages/py/domain/tests
           packages/py/market/tests
           packages/py/analytics/tests
+          packages/py/application/tests
+          packages/py/infrastructure/tests
+          packages/py/ai/tests
           packages/py/application/tests/test_lifecycle_event_store.py
           packages/py/application/tests/test_reconcile_lifecycle_integrity_v193.py
           packages/py/application/tests/test_reconcile_financial_integrity_v194.py
@@ -603,6 +620,44 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v46_hardkill_recovery_pg.py
           --ignore=apps/api-python/tests/test_auto_v46_crash_injection_pg.py
           --ignore=apps/api-python/tests/test_auto_v46_multiprocess_pg.py
+          --ignore=packages/py/application/tests/test_auto_engine_state_store_hermetic.py
+          --ignore=packages/py/application/tests/test_broker_adapter.py
+          --ignore=packages/py/application/tests/test_broker_venue_per_account.py
+          --ignore=packages/py/application/tests/test_custody_idempotency.py
+          --ignore=packages/py/application/tests/test_decision_spine.py
+          --ignore=packages/py/application/tests/test_dex2_crash_restart_cross_pid.py
+          --ignore=packages/py/application/tests/test_dex3_operational_incident.py
+          --ignore=packages/py/application/tests/test_execution_router.py
+          --ignore=packages/py/application/tests/test_instrument_lifecycle_db.py
+          --ignore=packages/py/application/tests/test_order_live_drift_incident.py
+          --ignore=packages/py/application/tests/test_paper_desk_entry.py
+          --ignore=packages/py/application/tests/test_research_observatory.py
+          --ignore=packages/py/application/tests/test_research_trials_db.py
+          --ignore=packages/py/application/tests/test_sync_queue_retryable.py
+          --ignore=packages/py/infrastructure/tests/chaos
+          --ignore=packages/py/infrastructure/tests/test_alert_channels.py
+          --ignore=packages/py/infrastructure/tests/test_concurrency_scenarios.py
+          --ignore=packages/py/infrastructure/tests/test_config.py
+          --ignore=packages/py/infrastructure/tests/test_config_production.py
+          --ignore=packages/py/infrastructure/tests/test_core_r_repository.py
+          --ignore=packages/py/infrastructure/tests/test_custody_concurrency_chaos.py
+          --ignore=packages/py/infrastructure/tests/test_custody_default_portfolio_policy.py
+          --ignore=packages/py/infrastructure/tests/test_deduct_cash_allow_partial.py
+          --ignore=packages/py/infrastructure/tests/test_f3a_account_data_migration.py
+          --ignore=packages/py/infrastructure/tests/test_financial_invariants.py
+          --ignore=packages/py/infrastructure/tests/test_get_summary_no_price_fallback.py
+          --ignore=packages/py/infrastructure/tests/test_m2_ledger_cash_reconciliation.py
+          --ignore=packages/py/infrastructure/tests/test_m4_total_fees_excludes_custody.py
+          --ignore=packages/py/infrastructure/tests/test_m7_custody_single_charge_f3_guard.py
+          --ignore=packages/py/infrastructure/tests/test_mandate_sync_orphan_instrument.py
+          --ignore=packages/py/infrastructure/tests/test_r8a_idempotency_backstop.py
+          --ignore=packages/py/infrastructure/tests/test_r8c_ledger_balance_atomic.py
+          --ignore=packages/py/application/tests/test_live_order_store_pg.py
+          --ignore=packages/py/application/tests/test_submit_intent_store_pg.py
+          --ignore=packages/py/infrastructure/tests/test_execution_event_fence_pg.py
+          --ignore=packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
+          --ignore=packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py
+          --ignore=packages/py/infrastructure/tests/test_lifecycle_event_store_pg.py
           -q
 
   lifecycle-pg:
@@ -792,6 +847,13 @@ jobs:
         # conexión NUEVA hasta ``PRODUCER_READY``. Gate fail-if-skipped: AUTO_V74_PRODUCER_PG_REQUIRED=1.
         # V2.30 (higiene auditable): tests PG que estaban FUERA de todos los jobs (deuda:
         # drift silencioso). Ahora se ejecutan aquí con gate fail-if-skipped.
+        # V2.70/AUTO-23 (G2/`OBS-19`, 2026-10-01): el certificador del VALIDADOR de evidencia
+        # (``apps/api-python/tests/test_auto_v70_auto23_evidence_validation.py``) se dio de alta
+        # aquí porque NO estaba en la lista de NINGÚN workflow: existía y no corría, y cuando se
+        # ejecutó por primera vez su sonda PG estaba ROJA (``measuredCycles`` 17 frente al
+        # ``len(_SPECS)`` de 26 — el denominador de R son los ciclos CON riesgo, no los cerrados).
+        # Su gate duro ya está en el env de este job: ``AUTO20B_EXPORT_PG_REQUIRED=1`` ⇒ un skip
+        # aquí es un fallo duro, no una certificación fantasma. Sus 6 casos puros entran con él.
         run: >
           uv run pytest
           packages/py/infrastructure/tests/test_lifecycle_event_store_pg.py
@@ -821,6 +883,7 @@ jobs:
           apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py
           apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py
           apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
+          apps/api-python/tests/test_auto_v70_auto23_evidence_validation.py
           apps/api-python/tests/test_health.py
           packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py

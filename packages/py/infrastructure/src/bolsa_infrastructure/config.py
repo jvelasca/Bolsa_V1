@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     db_user: str = Field(default="bolsa", validation_alias="DB_USER")
     db_password: str = Field(default="", validation_alias="DB_PASSWORD")
     db_name: str = Field(default="bolsa_v1", validation_alias="DB_NAME")
+    # Tope de conexión a la BD, en segundos. Sin él, un host inalcanzable agota el SYN
+    # del sistema (~130 s en Windows cuando el puerto cae en un rango reservado, caso en
+    # el que NO llega ni un ECONNREFUSED) y el arranque, /health o /readiness se quedan
+    # colgados en lugar de fallar rápido. <= 0 restaura el comportamiento sin tope.
+    db_connect_timeout_seconds: int = Field(
+        default=10, validation_alias="DB_CONNECT_TIMEOUT_SECONDS"
+    )
     redis_url: str = "redis://localhost:6379/0"
     cors_origin: str = "http://localhost:5173"
     # F-SEG-3: hosts/proxies de confianza que pueden añadir `X-Forwarded-For`.

@@ -66,7 +66,7 @@ declarada para la deuda de correlación es **≥ 4 días** (`P3-2`), con el `≥
 | # | Estado | Por qué |
 | --- | --- | --- |
 | G1 | ❌ | Última auditoría externa emitida: **`v2.88.3`** (2026-09-29). `v2.88.4`…`v2.88.17.1` (**~14 versiones**) sin auditar. **Este tramo prepara el paquete** de `v2.88.17.1`, pero el informe **no existe todavía** |
-| G2 | ❌ | **`OBS-19`** abierta (listas de pytest a mano) **y** un test rojo que **ningún job ejecuta** (`test_auto_v70_auto23_evidence_validation.py`, `measuredCycles` 17 ≠ 26) |
+| G2 | ❌ | **`OBS-19` ATACADA en `v2.88.18-beta`:** el censo se **DERIVA** de los workflows (`scripts/ci/test_selection.py` + guarda de 5 tests) y el test de AUTO-23 **ya corre** (denominador de R derivado del fixture). **Sigue en rojo** porque quedan **53** ficheros que **ningún job ejecuta** — **34** `W-G2/2` (**PG**) + **19** `W-G2/3` (**red/E2E**) — **declarados con motivo y tanda** y con la guarda impidiendo que crezca ([`evidence/v2.88.18`](./evidence/v2.88.18/README.md)) |
 | G3 | ❌ | `W5` y `W6` sin sellar · regla direccional duplicada en 4 módulos · `P3-5` · `H-4` |
 | G4 | ❌ | `P3-2`/`P3-3` **sin arrancar**: el precio real está sellado pero **no medido en operación** |
 | G5 | ⚠️ | El par sellado se cita correctamente, pero la evidencia usa también un hash **local** de plataforma (`697526ED…`): declarado, pero es un imán de confusión para un tercero |

@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -9,13 +11,21 @@ from sqlalchemy.ext.asyncio import (
 from bolsa_infrastructure.config import Settings
 
 
-def create_engine(settings: Settings) -> AsyncEngine:
+def create_engine(settings: Settings, *, connect_timeout: int | None = None) -> AsyncEngine:
     url = settings.database_url
     if url is None:
         raise RuntimeError("database_url not configured")
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
-    return create_async_engine(url, pool_pre_ping=True)
+    timeout = settings.db_connect_timeout_seconds if connect_timeout is None else connect_timeout
+    connect_args: dict[str, Any] = {}
+    # Tope de conexión. Sin él, un host inalcanzable agota el SYN del sistema (~130 s en
+    # Windows cuando el puerto cae en un rango reservado, porque no llega ni un
+    # ECONNREFUSED): el arranque, /health y /readiness se quedan COLGADOS en vez de fallar
+    # rápido. `connect_timeout` es el nombre que acepta psycopg; 0/negativo = sin tope.
+    if timeout > 0 and url.startswith("postgresql+psycopg://"):
+        connect_args["connect_timeout"] = timeout
+    return create_async_engine(url, pool_pre_ping=True, connect_args=connect_args)
 
 
 def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import warnings
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -155,6 +156,18 @@ async def purge_accounts(session_factory, account_ids: list[str]) -> None:
         await session.commit()
 
 
+class ResidualsUnavailable(RuntimeError):
+    """La BD no responde: la limpieza de residuos no se puede (ni se debe) intentar."""
+
+
+#: Tope de conexión del teardown, en segundos. Corto a propósito: la limpieza final corre
+#: al cerrar CUALQUIER sesión de pytest, incluidas las puramente herméticas, así que nunca
+#: debe pagar el SYN del sistema. Sin este tope, una `DATABASE_URL` heredada que apunte a
+#: un puerto muerto (p. ej. `127.0.0.1:59999`, rango reservado de Windows: el SYN se
+#: descarta y no llega ni ECONNREFUSED) costaba ~130 s por sesión.
+_PURGE_CONNECT_TIMEOUT_S = 2
+
+
 async def purge_all_residuals() -> None:
     """Borra TODO residuo de tests: cuentas, portfolios, instrumentos sintéticos y perfiles.
 
@@ -167,17 +180,28 @@ async def purge_all_residuals() -> None:
 
     Los instrumentos sintéticos de tests se reconocen por su id ``inst-*`` (familias
     ``a11``, ``a13``, ``a14``, ``a9proc``, ``g190``...) y por símbolos ``INV*``/``dbg-*``.
+
+    Lanza ``ResidualsUnavailable`` si la BD no responde. Es un estado legítimo (jobs
+    offline, sin PostgreSQL): si la BD está caída ninguna suite pudo escribir residuo, así
+    que no hay nada que limpiar y el teardown no debe convertirlo en un fallo.
     """
     from sqlalchemy import text
+    from sqlalchemy.exc import SQLAlchemyError
 
     _load_root_env()
     from bolsa_infrastructure.config import get_settings
     from bolsa_infrastructure.database.session import create_engine, create_session_factory
 
     get_settings.cache_clear()
-    engine = create_engine(get_settings())
+    engine = create_engine(get_settings(), connect_timeout=_PURGE_CONNECT_TIMEOUT_S)
     try:
         factory = create_session_factory(engine)
+        try:
+            async with factory() as session:
+                await session.execute(text("SELECT 1"))
+        except SQLAlchemyError as exc:
+            raise ResidualsUnavailable(type(exc).__name__) from exc
+
         async with factory() as session:
             residual_accounts = (
                 (
@@ -220,9 +244,27 @@ def _cleanup_residuals_after_session() -> Iterator[None]:
     recuerde limpiar, al terminar la sesión se purga todo lo que no sea la semilla.
 
     Se ejecuta también si algún test falla, que es justo cuando más residuo se deja.
+
+    El aviso es un ``warnings.warn`` y no un ``print`` a propósito: pytest captura la
+    salida, así que un ``print`` en el teardown es INVISIBLE. Con ``print``, esta limpieza
+    podía llevar meses sin ejecutarse (BD inalcanzable por una `DATABASE_URL` heredada)
+    sin que nadie lo notara, que es exactamente el residuo que la red de seguridad existe
+    para evitar.
     """
     yield
     try:
         asyncio.run(purge_all_residuals())
+    except ResidualsUnavailable as exc:
+        # Estado legítimo (jobs offline sin PostgreSQL): se avisa, no se falla.
+        warnings.warn(
+            f"[conftest] limpieza final de residuos omitida: la BD no responde ({exc}). "
+            "Si esperabas PostgreSQL, revisa DATABASE_URL (una variable heredada puede "
+            "tener prioridad sobre el .env de la raíz).",
+            stacklevel=2,
+        )
     except Exception as exc:  # nunca debe tumbar la sesión de tests por el teardown
-        print(f"[conftest] aviso: limpieza final de residuos falló: {exc}")
+        warnings.warn(
+            f"[conftest] limpieza final de residuos FALLÓ: {type(exc).__name__}: {exc}. "
+            "Quedarán cuentas/instrumentos de test en la BD.",
+            stacklevel=2,
+        )
