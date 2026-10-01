@@ -61,6 +61,23 @@ camino de riesgo.
 Hoy son inocuas **porque el script es constante**; con precio real, **el *mark* y el *fill* leerían
 precios de instantes distintos** (y por tanto distintos símbolos «sin precio»). `W4` las unifica.
 
+**PERO la unificación NO es `Δ = 0`** (hallazgo 2026-10-01, ver §2.b): hay tests y scripts
+herméticos cuyo `price_script` **sí** depende del argumento `tick`
+(`_rising_price` = `100 + (minute % 40) * 0.05`; scripts que **cuentan llamadas**). Cambiar
+`self._minute` por el tick de barra les cambia el resultado. La unificación es, por tanto,
+un cambio de comportamiento **deliberado y medido**, no un efecto colateral gratis.
+
+#### 2.b El paso 2 se parte en dos mitades (una es `Δ = 0`, la otra no)
+
+| Mitad | Contenido | `Δ` |
+| --- | --- | --- |
+| **2a** | el worker adopta el seam `price_source` (default = envolver el `price_script` actual, que **ignora el tick**), refresco async por tick, y **muerte de los fallbacks silenciosos** (`or 100.0`, `or 0`) sustituidos por fail-closed **declarado** | **`Δ = 0` exacto**: con la envoltura constante ningún precio es `None`, así que el fail-closed no se dispara y los sitios de lectura conservan su tick actual | 
+| **2b** | **unificar** las 6 lecturas al tick de barra (el contrato de `:304`) | **`Δ ≠ 0`**: mueve `_rising_price` y los scripts que cuentan llamadas ⇒ exige re-medir y actualizar esos tests, y **re-evaluar el golden** |
+
+`2a` cierra el objetivo literal de `W4` («nunca un `100.0`/`0` silencioso») **sin mover un
+byte**; `2b` cierra la **incoherencia temporal** que dejó el `W3` a medias. Se hacen por
+separado para que cada una tenga su propia auditoría.
+
 ---
 
 ## 3. Diseño DECIDIDO (propietario, 2026-10-01)
@@ -200,27 +217,39 @@ manuales), `OBS-16`, `OBS-15`, `OBS-22`, `OBS-14.b`, `OBS-13`, `OBS-11`, `H-4`, 
 
 1. **Proveedor puro** (`ConstantPriceSource` + `PriceSource`) con sus tests puros ⇒ **`Δ = 0`**
    verificable (replay y suites existentes **byte a byte iguales**).
-2. **`OhlcvPriceSource` real** + composición en `AutoSimRuntime` + fail-closed **por símbolo**.
-3. **Muerte de los `or 100.0` / `or 0`** y unificación de las 6 lecturas al tick de barra (tests de
-   `P1-A`/`P1-B`/`P1-C`, con test que **falla** si un precio `0`/`100.0` vuelve a aparecer).
-4. **Mutaciones `M283`–`M286`** (4/4 deben morder).
-5. **Golden**: delta reproducible + re-elección del día por medición.
-6. **Criterio de §7**: re-correr la banda de `W3.3` con precio real y **publicar el estrechamiento**
+   **HECHO** (`10447d51`): 12 tests puros; `Δ = 0` **estructural** (sólo su test importa el módulo).
+2. **Paso 2a — HECHO**: el worker adopta el seam (`price_source`, default `None` ⇒ lee
+   `price_script` **en vivo**, así que el `Δ = 0` incluye a los tests que mutan
+   `worker._price_script`), **mueren los fallbacks silenciosos** (`or 100.0` en el *mid* del
+   fill; `or 0` en los cuatro sitios de marca/señal/turno) y cada ausencia se **declara y
+   cuenta** (`price_missing_counts`) con la señal anclada en `mid` (§3.1) y el *fill* en
+   `execution`. Evidencia: 17 tests nuevos, `463 passed / 1 failed` en la suite `auto`
+   (el fallo es el pre-existente de PostgreSQL, verificado contra el árbol prístino),
+   `mypy` y `ruff` limpios.
+   **PENDIENTE de 2a**: cablear `price_source.refresh` en `_v2_refresh_regime` — **no se
+   hace todavía** porque el contrato de refresco (async + `tick`/`symbols`) se fija con el
+   proveedor real, y hoy ninguna fuente real está inyectada.
+3. **Paso 2b (pendiente)**: unificar las 6 lecturas al tick de barra (§2.b) — **`Δ ≠ 0`**.
+4. **`OhlcvPriceSource` real** + composición en `AutoSimRuntime` (`as_of = día(B)`, dos
+   ventanas §3.1.b, `solo_ohlcv` §10.1) + cableado de `refresh` + fail-closed end-to-end.
+5. **Mutaciones `M283`–`M287`** (deben morder).
+6. **Golden**: delta reproducible + re-elección del día por medición.
+7. **Criterio de §7**: re-correr la banda de `W3.3` con precio real y **publicar el estrechamiento**
    (o la ausencia de él).
-7. Sello `v2.88.17-beta` (`2.11.17-beta`) con su cita POST-TAG.
+8. Sello `v2.88.17-beta` (`2.11.17-beta`) con su cita POST-TAG.
 
 ---
 
-## 10. Decisiones PENDIENTES del propietario (bloquean el paso 2)
+## 10. Decisiones del propietario
 
-1. **Origen del `open(B)` en vivo/PAPER** (§3.1.b): **(a)** sólo `ohlcv` de `B`
-   (replay ✅, vivo `BLOCKED` hasta persistir), **(b)** último precio observado vivo, o
-   **(c)** `close(B-1)` declarado como aproximación. La opción cambia si el motor puede
-   operar en vivo sin esperar la barra del día.
+1. **Origen del `open(B)` en vivo/PAPER** (§3.1.b): **DECIDIDO (2026-10-01) = opción (a)**,
+   sólo la barra `ohlcv` de `B`. En replay/OOS se lee su `open`; en vivo/PAPER, mientras la
+   barra del día no esté persistida **no hay precio de ejecución** ⇒ `HOLD` por símbolo y
+   turno `BLOCKED`, declarado. Se descartan (b) (precio vivo no determinista) y (c)
+   (`close(B-1)` como ejecución, que reintroduciría el ancla de decisión).
 
-2. **Fuente sin barra `B`**: confirmar que «no hay `open(B)`» ⇒ **`HOLD` por símbolo y turno
-   `BLOCKED`** (§3.2), y **no** caer a la barra `B-1` (eso sería el *fallback* silencioso que
-   `W4` existe para matar; se añadirá como mutación `M287`).
+2. **Fuente sin barra `B`**: confirmado por (a) — «no hay `open(B)`» ⇒ **`HOLD` por símbolo y
+   turno `BLOCKED`**, y **nunca** caer a la barra `B-1` (mutación `M287`).
 
 > La exploración de 2026-10-01 (**§3.1.b**) es un hallazgo **contra el plan original**, que
 > asumía «una sola foto por tick»: la frontera de ejecución **no** es la de régimen/ATR.

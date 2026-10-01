@@ -120,12 +120,6 @@ from bolsa_analytics.cognitive.position_state import (
 )
 from bolsa_analytics.cognitive.signal_identity import bar_window
 from bolsa_analytics.cognitive.trade_context import TradeContext
-from bolsa_api.background.paper_auto_engine_worker import (
-    DecisionProvider,
-    _effective_venue,
-    _kill_switch_env_on,
-    _watch_symbols,
-)
 from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.adaptive_gate_store import AdaptiveGateStore, sink_failures_from_state
 from bolsa_application.applied_fills import read_applied_fill_facts
@@ -243,6 +237,14 @@ from bolsa_application.simulated_settlement import (
     submit_simulated_order,
 )
 
+from bolsa_api.background.auto_price_provider import PriceSource
+from bolsa_api.background.paper_auto_engine_worker import (
+    DecisionProvider,
+    _effective_venue,
+    _kill_switch_env_on,
+    _watch_symbols,
+)
+
 logger = logging.getLogger(__name__)
 
 AUTO_SIM_WORKER_ENABLED = "AUTO_SIMULATION_WORKER_ENABLED"
@@ -306,6 +308,13 @@ def sim_worker_enabled() -> bool:
 #: intra-barra sea la MISMA (idempotencia del fill). Los proveedores actuales ignoran el
 #: argumento (constante, snapshot vivo, reloj del replay), así que pasar el tick de barra
 #: en vez del minuto no mueve ningún precio; lo que fija es el CONTRATO temporal.
+#:
+#: **W4 (v2.88.17):** un ``PriceScript`` **no puede expresar ausencia** (su único recurso
+#: era mentir con ``100.0``/``0``). Para el precio REAL el motor usa el seam
+#: ``auto_price_provider.PriceSource`` (``execution``/``mid`` → ``float | None``), que sí
+#: puede, y cae **fail-closed por símbolo** cuando no hay precio. ``PriceScript`` se
+#: conserva como el camino hermético *declarado* (replay y tests): sin ``price_source``
+#: el worker lee este script EN VIVO y el comportamiento es byte a byte el de antes.
 PriceScript = Callable[[str, int], float]
 Clock = Callable[[], datetime]
 
@@ -627,6 +636,12 @@ class AutoSimulationWorker:
         exec_store: ExecutionEventStore | None = None,
         auto_store: AutoEngineStore | None = None,
         price_script: PriceScript = flat_price_script,
+        # W4 (v2.88.17): seam de precio que PUEDE decir «no hay precio». ``None`` (default)
+        # conserva el camino hermético EXACTO: se lee ``price_script`` en vivo —así los
+        # tests pueden seguir mutando ``worker._price_script``— de modo que adoptar el seam
+        # NO mueve un precio. Con una fuente real, ``execution()``/``mid()`` pueden devolver
+        # ``None`` y el motor cae fail-closed (HOLD por símbolo, declarado), nunca a 100.0/0.
+        price_source: PriceSource | None = None,
         clock: Clock | None = None,
         finance_applier: Callable[[Any], Awaitable[bool]] | None = None,
         context_store: Any = None,
@@ -697,6 +712,10 @@ class AutoSimulationWorker:
         self._exec_store = exec_store
         self._auto_store = auto_store
         self._price_script = price_script
+        # W4: la fuente real (``None`` ⇒ camino hermético por ``price_script``).
+        self._price_source = price_source
+        # W4: precio AUSENTE declarado y contado por símbolo (nunca un fallback mudo).
+        self._v2_price_missing: dict[str, int] = {}
         self._clock = clock if clock is not None else default_clock
         self._engine_id = engine_id
         self._account_id = account_id
@@ -1357,6 +1376,59 @@ class AutoSimulationWorker:
         self._time = self._clock()
         return self._time
 
+    # ---- W4 (v2.88.17): precio con estado «NO HAY PRECIO» (fail-closed) ------------
+    def _v2_price_exec(self, symbol: str, tick: int) -> float | None:
+        """Precio de EJECUCIÓN/MARCA del tick — o ``None`` si **no hay precio**.
+
+        Sin fuente real (``price_source is None``) se lee ``price_script`` **en vivo** con
+        el MISMO ``tick`` que usaba cada llamante ⇒ comportamiento byte a byte idéntico al
+        anterior (``Δ = 0``): el fail-closed sólo puede dispararse con una fuente real.
+        """
+        source = self._price_source
+        if source is None:
+            value = self._price_script(symbol, tick)
+            return None if value is None else float(value)
+        try:
+            return source.execution(symbol)
+        except Exception:  # noqa: BLE001 — un fallo de precio ES «no hay precio».
+            logger.exception("auto_sim v2 price_source.execution failed symbol=%s", symbol)
+            return None
+
+    def _v2_price_mid(self, symbol: str, tick: int) -> float | None:
+        """Precio de DECISIÓN (con fuente real, ``close`` de la última barra cerrada).
+
+        Mismo contrato de ``Δ = 0`` que ``_v2_price_exec`` para el camino hermético.
+        """
+        source = self._price_source
+        if source is None:
+            value = self._price_script(symbol, tick)
+            return None if value is None else float(value)
+        try:
+            return source.mid(symbol)
+        except Exception:  # noqa: BLE001
+            logger.exception("auto_sim v2 price_source.mid failed symbol=%s", symbol)
+            return None
+
+    def _v2_note_price_missing(self, symbol: str) -> None:
+        """Declara y CUENTA una ausencia de precio (una vez por símbolo en el log).
+
+        Es la mitad declarativa del fail-closed: sin precios reales (default hermético)
+        esto NO se ejecuta nunca, así que no altera ningún resultado (``Δ = 0``).
+        """
+        count = self._v2_price_missing.get(symbol, 0) + 1
+        self._v2_price_missing[symbol] = count
+        if count == 1:
+            logger.warning(
+                "auto_sim v2 precio AUSENTE symbol=%s: no se ejecuta/marca "
+                "(HOLD fail-closed; jamás 100.0/0 silencioso)",
+                symbol,
+            )
+
+    @property
+    def price_missing_counts(self) -> Mapping[str, int]:
+        """W4: nº de lecturas con precio AUSENTE por símbolo (observabilidad del fail-closed)."""
+        return dict(self._v2_price_missing)
+
     # ---- settlement vía dominio (M1/M2). Fail-closed sin exec_store. ----------
     async def _settle(
         self,
@@ -1391,6 +1463,13 @@ class AutoSimulationWorker:
         # aquí es el marco de la PROtección (reloj independiente, diseño v2): su lectura
         # sigue siendo del tick corriente.
         bar_tick_now = self._v2_bar_tick()
+        # W4: sin precio de ejecución NO se liquida (fail-closed). Antes decía
+        # ``... or 100.0``: un precio FABRICADO, invisible sólo porque el script por defecto
+        # ya valía 100.0. Ahora un precio ausente es un estado declarado, no un número.
+        exec_mid = self._v2_price_exec(symbol, bar_tick_now)
+        if exec_mid is None:
+            self._v2_note_price_missing(symbol)
+            return _Settlement(requested_qty=qty)
         try:
             result, outcomes = await submit_simulated_order(
                 self._exec_store,
@@ -1401,7 +1480,7 @@ class AutoSimulationWorker:
                 account_id=self._account_id,
                 venue=venue,
                 seed=fill_seed(bar_tick_now, symbol),
-                base_mid=self._price_script(symbol, bar_tick_now) or 100.0,
+                base_mid=exec_mid,
                 fill_chunks=_FILL_CHUNKS,
                 order_id=(
                     f"auto-{side}-{symbol}-{exit_order_id}"
@@ -1577,7 +1656,14 @@ class AutoSimulationWorker:
             entry = self._entry_price.get(symbol)
             if entry is None:
                 continue
-            price = Decimal(str(self._price_script(symbol, self._minute) or 0))
+            raw_price = self._v2_price_exec(symbol, self._minute)
+            if raw_price is None:
+                # W4: precio AUSENTE ⇒ este símbolo no se marca/no genera señal (fail-closed
+                # declarado). Antes ``... or 0`` producía un ``Decimal("0")`` que el
+                # ``if price > 0`` descartaba EN SILENCIO: mismo efecto, sin declararlo.
+                self._v2_note_price_missing(symbol)
+                continue
+            price = Decimal(str(raw_price))
             if price > 0:
                 unrealized += (price - entry) * qty
         equity = Decimal(str(base)) + self._sim_realized_pnl + unrealized
@@ -1857,7 +1943,14 @@ class AutoSimulationWorker:
         for symbol, qty in self._open.items():
             if qty <= 0:
                 continue
-            price = Decimal(str(self._price_script(symbol, self._minute) or 0))
+            raw_price = self._v2_price_exec(symbol, self._minute)
+            if raw_price is None:
+                # W4: precio AUSENTE ⇒ este símbolo no se marca/no genera señal (fail-closed
+                # declarado). Antes ``... or 0`` producía un ``Decimal("0")`` que el
+                # ``if price > 0`` descartaba EN SILENCIO: mismo efecto, sin declararlo.
+                self._v2_note_price_missing(symbol)
+                continue
+            price = Decimal(str(raw_price))
             if price > 0:
                 marks[symbol] = float(price)
                 invested += qty * price
@@ -1993,7 +2086,19 @@ class AutoSimulationWorker:
             symbol = symbol.strip()
             if not symbol:
                 continue
-            price = Decimal(str(self._price_script(symbol, self._minute) or 0))
+            # W4 §3.1: este precio es el ANCLA DE ENTRADA de la geometría (``signal.price``
+            # → ``entry_price``/``atr = price * atr_pct``), es decir el precio de DECISIÓN
+            # ⇒ lee ``mid`` (con fuente real, ``close(B-1)``; sin lookahead). El *fill*
+            # ancla en ``execution`` (``open(B)``) en ``_settle``: son fronteras distintas
+            # a propósito, y su diferencia ES el hueco decisión→ejecución del modelo.
+            raw_price = self._v2_price_mid(symbol, self._minute)
+            if raw_price is None:
+                # W4: precio AUSENTE ⇒ este símbolo NO genera señal (fail-closed declarado).
+                # Antes ``... or 0`` producía un ``Decimal("0")`` del que sólo el
+                # ``signal.price > 0`` aguas abajo impedía una geometría con stop en 0.
+                self._v2_note_price_missing(symbol)
+                continue
+            price = Decimal(str(raw_price))
             action = str(getattr(pkg, "action", "HOLD")).upper()
             version = _strategy_version_from_source(getattr(pkg, "source", None))
             identity = signal_identity_for_bar(
@@ -4071,11 +4176,11 @@ class AutoSimulationWorker:
         for index, row in enumerate(self._v2_opportunities):
             if row.status == OPPORTUNITY_TRADED or row.subsequent_price is not None:
                 continue
-            try:
-                price = self._price_script(row.instrument_id, self._minute)
-            except Exception:  # noqa: BLE001 — un fallo de precio no rompe el tick.
-                continue
+            price = self._v2_price_exec(row.instrument_id, self._minute)
             if price is None:
+                # W4: sin precio posterior la oportunidad queda ``unmeasured`` (el propio
+                # contrato de este método ya lo exigía: nunca se inventa un precio).
+                self._v2_note_price_missing(row.instrument_id)
                 continue
             try:
                 measured = Decimal(str(price))
@@ -4833,7 +4938,14 @@ class AutoSimulationWorker:
             # V2.23/A9 (Bloque 6 · G8/G9): la protección tiene prioridad sobre el
             # decider cuando hay posición. Emite un SELL del total a través del MISMO
             # spine (kill/sim-gate/RiskGate/posición), nunca un atajo.
-            price = Decimal(str(self._price_script(symbol, self._minute) or 0))
+            raw_price = self._v2_price_exec(symbol, self._minute)
+            if raw_price is None:
+                # W4: precio AUSENTE ⇒ este símbolo no se marca/no genera señal (fail-closed
+                # declarado). Antes ``... or 0`` producía un ``Decimal("0")`` que el
+                # ``if price > 0`` descartaba EN SILENCIO: mismo efecto, sin declararlo.
+                self._v2_note_price_missing(symbol)
+                continue
+            price = Decimal(str(raw_price))
             if held > 0 and price > 0:
                 # Mantiene el máximo desde la entrada para el trailing (G9).
                 prev_high = self._high_price.get(symbol, Decimal("0"))
