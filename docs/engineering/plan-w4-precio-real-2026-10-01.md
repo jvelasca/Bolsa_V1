@@ -12,12 +12,24 @@
 
 `W3.3` **midió** el instrumento del que dependía toda lectura de mérito: el replay OOS es un
 **sorteo del venue** y la banda de `K = 12` sorteos va de **`R −37,72` a **`+0,82`**, con
-`σ(R) = 10,14` y la banda **cruzando el cero** ⇒ **`point_citable = False`**. El simulador sortea
-rechazos, timeouts y parciales **sobre un `base_mid` constante de `100.0`**: sin precio real, el
-book es casi todo ruido y cualquier incremento posterior no se puede distinguir del dado.
+`σ(R) = 10,14` y la banda **cruzando el cero** ⇒ **`point_citable = False`**.
 
-⇒ **`W4` es la precondición de cualquier lectura de mérito**, y su **criterio de éxito deja de ser
-«el PAPER mide algo real»** para pasar a ser **«la banda se estrecha»** (§7).
+> **CORRECCIÓN 2026-10-01 (hallazgo previo a cablear, evidencia en §7.bis).** Este plan afirmaba
+> que ese sorteo se hacía «sobre un `base_mid` constante de `100.0`». Es **falso para el OOS**:
+> el replay (`v2_86`/`v2_87`) construye el worker con `price_script=cursor.price_script`, y el
+> cursor lee el **`open` REAL** de la barra (`make_day_price_script` ← `_opens_by_symbol` ←
+> `float(bar.open)`). Está cableado así desde `564240d2` (2026-09-29), **antes** de `W3` y de
+> `W4`. La banda, por tanto, es **varianza del sorteo del venue sobre precios reales**, no un
+> artefacto del `100.0`.
+
+El `100.0` plano **sólo** corre en `AutoSimRuntime` (`auto_simulation_worker.py:6437`) — es decir en
+**producción/PAPER** (`v2_74_paper_producer_evidence`, `v2_75_paper_sample_accumulation`,
+`v2_76_forward_market_material`), **nunca** en el OOS.
+
+⇒ **`W4` es la precondición de cualquier lectura de mérito de PAPER/forward** —mientras el motor de
+producción fabrique `100.0`, la ventana PAPER no mide nada— pero **NO de la banda del OOS**, que es
+varianza del venue sobre precios reales y tiene su propia palanca (§7.ter). Su **criterio de éxito se
+re-declara en §7**: «el PAPER/forward deja de fabricar un precio».
 
 ---
 
@@ -174,33 +186,45 @@ delta no se reproduce) ⇒ **el sello no se firma si el delta no se reproduce**.
 
 ---
 
-## 7. Criterio de ÉXITO de `W4` (declarado antes de medir)
+## 7. Criterio de ÉXITO de `W4` — **re-DECLARADO 2026-10-01** (evidencia en §7.bis)
 
-> **`W4` sirve si y sólo si la banda del instrumento OOS SE ESTRECHA.**
+> **`W4` sirve si y sólo si el camino de PRODUCCIÓN/PAPER deja de fabricar un precio.**
 
-Se mide **con la sonda de `W3.3`**, sin cambios en ella:
+Se mide **sobre el runtime real** (`AutoSimRuntime`), no sobre el replay:
 
-```
-uv run --no-sync python apps/api-python/scripts/v2_88_16_3_oos_seed_robustness.py \
-    --draws 12 --observe --out-dir operability_runs/w4-band
-```
+1. Con `AUTO_ENGINE_SIM_REAL_PRICE=1` y barras `D1` sembradas: el *mid* del fill y las marcas salen
+   del precio **real** (`close(B-1)` para decisión, `open(B)` para ejecución), y **ningún** `0`/`100.0`
+   aparece en el informe del turno.
+2. Sin barra para un símbolo: ese símbolo queda en `HOLD`, **declarado y contado**
+   (`price_missing_counts`); sin ningún símbolo con precio, el turno sale `BLOCKED`.
+3. El test PG `test_auto_v2_real_price_production_pg.py` asserta (1) y (2): el criterio es un test,
+   no una narración.
 
-y se compara contra la banda sellada en `W3.3`:
+El criterio anterior —**«la banda del OOS se estrecha»**— queda **RETIRADO**: es **insatisfacible por
+`W4`** porque el OOS nunca usó el `100.0` (§7.bis). No se re-etiqueta nada como éxito: se corrige el
+registro y se declara.
 
-| Métrica | `W3.3` (línea base, `100.0` plano) | `W4` | Criterio |
-| --- | --- | --- | --- |
-| `σ(R)` | **10,1381** | ? | **debe bajar** |
-| IC 95 % de la media de R | **±5,7362** | ? | **debe bajar** |
-| banda de R | `[−37,72, +0,82]` | ? | **no debe cruzar el cero** para poder citar un punto |
-| banda de ciclos | `[43, 107]` | ? | **debe estrecharse** |
+### 7.bis Evidencia del hallazgo (2026-10-01): el OOS ya usa precio real
 
-**Si la banda NO se estrecha, se declara así y `W4` no ha servido para lo ordenado** — no se
-re-etiqueta como éxito. Es el compromiso de honestidad de todo el tramo `W3.x`.
+| # | Prueba | Resultado |
+| --- | --- | --- |
+| 1 | **Código** | `v2_87` pasa `price_script=cursor.price_script` (`:311`); el cursor es `open` real (`replay_oos.make_day_price_script` ← `v2_86._opens_by_symbol` = `float(bar.open)`). |
+| 2 | **Artefacto sellado** | los `entryPrice` del OOS son reales y variados (`68.17, 20.14, 164.70, 226.60, 328.11…`); **nunca** `100.0`. |
+| 3 | **Git** | `price_script=cursor.price_script` introducido en `564240d2` (2026-09-29), anterior a `W3`/`W4`. |
+| 4 | **Experimento** | replay con `AUTO_ENGINE_SIM_REAL_PRICE` `OFF` y `ON`, misma BD y watch ⇒ artefacto **byte-idéntico**. El flag sólo lo lee el runtime (`auto_simulation_worker.py`), que el replay no ejecuta. |
 
-> **Nota de instrumento:** la sonda de `W3.3` desplaza el ancla del `seed` del **venue**. Si con
-> precio real el venue deja de ser la fuente dominante de varianza, la sonda sigue siendo válida
-> (mide lo mismo) pero **su banda incluirá ahora la varianza del dato**, no sólo la del book. Se
-> declarará explícitamente si eso pasa.
+⇒ El `100.0` plano **sólo** afecta a producción/PAPER (`AutoSimRuntime`, `auto_simulation_worker.py:6437`,
+`v2_74`/`v2_75`/`v2_76`). Es lo único que `W4` puede y debe retirar.
+
+### 7.ter La banda del OOS pasa a *workstream* aparte
+
+La varianza que mide `W3.3` es del **sorteo del venue** (rechazos/timeouts/parciales) sobre precios
+reales; su palanca es el **modelo del venue simulado** o el **presupuesto de sorteos (`K`)**, **no** la
+fuente de precio. Se tratará como problema propio, con su hipótesis y criterio propios.
+
+> **Nota de instrumento (vigente de `W3.3`):** la sonda desplaza el ancla del `seed` del venue; su
+> banda mide lo mismo con independencia de la fuente de precio. Se declarará explícitamente si eso
+> cambia.
 
 ---
 
@@ -238,8 +262,9 @@ manuales), `OBS-16`, `OBS-15`, `OBS-22`, `OBS-14.b`, `OBS-13`, `OBS-11`, `H-4`, 
    `auto` de vuelta al baseline `1 failed / 469 passed` (sólo el pre-existente de PG).
 5. **Mutaciones `M283`–`M287`** (deben morder).
 6. **Golden**: delta reproducible + re-elección del día por medición.
-7. **Criterio de §7**: re-correr la banda de `W3.3` con precio real y **publicar el estrechamiento**
-   (o la ausencia de él).
+7. **Criterio de §7 (re-declarado 2026-10-01)**: `test_auto_v2_real_price_production_pg.py`
+   verde sobre `AutoSimRuntime` (precio real con barras / `HOLD`+`BLOCKED` sin ellas; jamás
+   `100.0`). La **banda del OOS no es criterio de `W4`** y se trata aparte (§7.ter).
 8. Sello `v2.88.17-beta` (`2.11.17-beta`) con su cita POST-TAG.
 
 ---
@@ -323,19 +348,29 @@ hermético y **`main` sigue verde** (sólo el fallo pre-existente de PG). Activa
 es un **acto explícito** — el patrón «costura inerte» que ya usó `V2.88.14/W1` — y es lo que
 ejercita el criterio de éxito de §7.
 
-### 12.a Trabajo que este interruptor ORDENA (no deuda nueva, trabajo declarado)
+### 12.a DECISIÓN de encendido (2026-10-01): por **CONFIGURACIÓN**, no por defecto
 
-Con el flag OFF, el motor sigue usando `100.0` en producción: **`W4` no produce todavía su
-efecto**. Para retirarlo hacen falta, en este orden:
+Medido: con `AUTO_ENGINE_SIM_REAL_PRICE=1`, `test_auto_v2_durable_pg.py` falla **3/3**, todos
+por el `HOLD` **correcto** (el test no siembra barras ⇒ sin `open(B)` ⇒ fail-closed). Ese es el
+coste real de encender: cada test que conduce el runtime real debería **aportar su dato de precio**.
 
-1. **Sembrar barras `D1`** en los ~8 tests `_pg` y en el golden day, para que ejerciten el
-   camino **REAL** (hoy dependen de un precio que no existe) — es el arreglo **correcto**, no
-   un parche: un test que conduce el runtime real **debe** aportar su dato de precio.
-2. **Re-elegir el golden day por medición** (§6), no por conveniencia.
-3. **Encender el flag** en el camino de producción/medición y **correr §7**.
+Decisión del propietario (2026-10-01): **el flag queda OFF por defecto en el código y en la
+suite** (CI verde, `Δ = 0` intacto) y se enciende **por configuración** —
+`AUTO_ENGINE_SIM_REAL_PRICE=1` en el despliegue y en la **ventana PAPER/forward**
+(`v2_74_paper_producer_evidence`, `v2_75_paper_sample_accumulation`, `v2_76_forward_market_material`,
+que ya componen el `OhlcvPriceSource` cuando `real_price_enabled()`). Así **producción deja de
+fabricar `100.0`** sin re-sembrar la suite ni re-elegir el golden.
 
-Declarado: mientras el flag esté OFF, el `Δ = 0` sigue siendo exacto (replay y suite intactos);
-encenderlo **no** promete `Δ = 0` y obliga a re-medir el golden.
+Trabajo **declarado y diferido** (no bloquea el encendido por configuración):
+
+1. Sembrar barras `D1` en los tests que conducen el runtime real, para que ejerciten el camino
+   REAL sin depender del flag OFF — el nuevo `test_auto_v2_real_price_production_pg.py` ya lo
+   cubre end-to-end sobre PostgreSQL (dos fronteras, fail-closed y el interruptor).
+2. Re-elegir el golden day por medición (§6) **si** se decide pasar el default a ON.
+3. `W5` (protection clock) y `P3-2` (PAPER longitudinal) ya pueden medirse con el flag encendido.
+
+Declarado: con el flag OFF el `Δ = 0` es exacto; encenderlo en la ventana PAPER **no** promete
+`Δ = 0` y obliga a re-medir el golden si se sella.
 
 ### 12.b Fronteras y contrato del proveedor real (implementado)
 

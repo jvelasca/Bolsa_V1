@@ -134,6 +134,38 @@ async def test_missing_price_is_not_recorded_when_the_source_has_it(v2_env: None
     assert worker.price_missing_counts == {}
 
 
+@pytest.mark.asyncio
+async def test_decision_price_without_execution_does_not_open(v2_env: None) -> None:
+    """Con precio de DECISIÓN pero **sin** precio de EJECUCIÓN no se abre (caza ``M283``).
+
+    Aísla la caída a la constante: si ``_v2_price_exec`` fabricara un ``100.0`` cuando la
+    fuente no tiene ejecución, la posición se abriría con un precio inventado.
+    """
+    source = _SplitSource(mid={"AAA": 50.0}, exec_={})
+    worker = _worker(source)
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    assert worker._open.get("AAA", Decimal("0")) == 0, "sin precio de EJECUCIÓN no se abre"
+    assert worker.price_missing_counts.get("AAA", 0) >= 1, "la ausencia se declara"
+
+
+@pytest.mark.asyncio
+async def test_missing_decision_price_is_declared_even_with_execution(v2_env: None) -> None:
+    """Sin precio de DECISIÓN (aunque haya ejecución) la ausencia se DECLARA (caza ``M285``).
+
+    Aísla el regreso del ``or 0``: si la geometría cayera a ``0`` en vez de declarar la
+    ausencia, el símbolo desaparecería del recuento de precios ausentes de decisión.
+    """
+    source = _SplitSource(mid={}, exec_={"AAA": 55.0})
+    worker = _worker(source)
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    assert worker._open.get("AAA", Decimal("0")) == 0, "sin decisión no hay señal que ejecutar"
+    assert worker.price_missing_counts.get("AAA", 0) >= 1, "la ausencia de DECISIÓN se declara"
+
+
 # ── 2. Cada frontera gobierna lo suyo (§3.1) ───────────────────────────────────
 
 

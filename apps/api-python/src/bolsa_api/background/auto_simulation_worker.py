@@ -304,7 +304,8 @@ def sim_worker_enabled() -> bool:
 #: W4 (v2.88.17): interruptor DECLARADO del precio REAL. Default **OFF** ⇒ el runtime conserva
 #: el ``price_script`` hermético (``Δ = 0`` y todos los tests PG en verde, que es como se selló
 #: el tramo ``W3.x``). Activarlo es un acto **explícito** y es lo que mide el criterio de éxito
-#: de ``W4`` (que la banda del instrumento OOS se estreche): ``AUTO_ENGINE_SIM_REAL_PRICE=1``.
+#: de ``W4`` (que el camino de PRODUCCIÓN/PAPER deje de fabricar un precio):
+#: ``AUTO_ENGINE_SIM_REAL_PRICE=1``.
 AUTO_REAL_PRICE_ENV = "AUTO_ENGINE_SIM_REAL_PRICE"
 
 

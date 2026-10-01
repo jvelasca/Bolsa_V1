@@ -768,6 +768,7 @@ T_OPERATIVE_GRANULARITY_POLICY = (
 # estricta: el invariante que se mide es que la optimizacion NO cambia el informe del dia y
 # que los bordes (aprobacion viva, cambio de barra) siguen siendo fail-closed.
 AUTO_SIM_WORKER = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
+AUTO_PRICE_PROVIDER = "apps/api-python/src/bolsa_api/background/auto_price_provider.py"
 T_AUTO_BAR_SHORT_CIRCUIT = "apps/api-python/tests/test_auto_v2_bar_short_circuit.py"
 
 # W3 (Fase B, anclaje temporal de BARRA). La costura nueva: el motor ancla el fill y la
@@ -775,6 +776,12 @@ T_AUTO_BAR_SHORT_CIRCUIT = "apps/api-python/tests/test_auto_v2_bar_short_circuit
 # frontera de barras CERRADAS (``B-1``). La suite del sello mide las dos mitades: que la
 # decisión no ve la barra en curso y que un reintento intra-barra no re-tira el dado.
 T_AUTO_CLOSED_BARS_SEAM = "apps/api-python/tests/test_auto_v2_closed_bars_and_bar_idempotency.py"
+
+# W4 (Fase C, precio REAL + fail-closed). Dos suites HERMÉTICAS (sin PG): el proveedor puro
+# con sus DOS fronteras (§3.1: mid=close(B-1) decisión / execution=open(B) ejecución) y el
+# fail-closed del worker con una fuente inyectada. Las caza la matriz sin base de datos.
+T_AUTO_REAL_PRICE_SOURCE = "apps/api-python/tests/test_auto_v2_real_price_source.py"
+T_AUTO_REAL_PRICE_FAIL_CLOSED = "apps/api-python/tests/test_auto_v2_real_price_fail_closed.py"
 
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
@@ -3077,6 +3084,49 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "        return bar_tick(self._time, self._v2_granularity.decision.timeframe)\n",
         "        return bar_tick(self._time, self._v2_granularity.decision.timeframe) - 1\n",
         (T_AUTO_CLOSED_BARS_SEAM,),
+    ),
+    # ── W4 (v2.88.17): precio REAL y fail-closed (Fase C) ──────────────────────────
+    (
+        "M283 (W4, precio FABRICADO): sin precio de ejecucion se cae a la constante 100.0 -> "
+        "un simbolo sin barra se ejecuta igual y la ausencia deja de declararse",
+        AUTO_SIM_WORKER,
+        "            return source.execution(symbol)\n",
+        "            return source.execution(symbol) or 100.0\n",
+        (T_AUTO_REAL_PRICE_FAIL_CLOSED,),
+    ),
+    (
+        "M284 (W4, precio NO DETERMINISTA): la frontera del precio se toma del reloj de pared "
+        "(hoy) en vez del as_of del tick -> la foto del precio deja de ser reproducible",
+        AUTO_PRICE_PROVIDER,
+        "        day_b = resolve_as_of(self._as_of)\n",
+        '        day_b = __import__("datetime").date.today().isoformat()\n',
+        (T_AUTO_REAL_PRICE_SOURCE,),
+    ),
+    (
+        "M285 (W4, vuelve el or 0): la geometria de la senal cae a 0 cuando no hay precio -> "
+        "el simbolo con precio ausente deja de DECLARARSE (stop en 0 silencioso)",
+        AUTO_SIM_WORKER,
+        "            raw_price = self._v2_price_mid(symbol, self._minute)\n"
+        "            if raw_price is None:\n",
+        "            raw_price = self._v2_price_mid(symbol, self._minute) or 0\n"
+        "            if False:\n",
+        (T_AUTO_REAL_PRICE_FAIL_CLOSED,),
+    ),
+    (
+        "M286 (W4, LOOKAHEAD): la DECISION lee el close de la barra CORRIENTE -> el ancla de "
+        "entrada se decide con un dato que la barra todavia no ha cerrado",
+        AUTO_PRICE_PROVIDER,
+        "                if day < day_b:\n",
+        "                if day <= day_b:\n",
+        (T_AUTO_REAL_PRICE_SOURCE,),
+    ),
+    (
+        "M287 (W4, precio RANCIO): sin barra B la ejecucion cae a la barra B-1 -> se ejecuta "
+        "con un open que ya no es de la barra corriente (fail-closed roto)",
+        AUTO_PRICE_PROVIDER,
+        "                if bar_day(bar) != day_b:\n                    continue\n",
+        "                if False:\n                    continue\n",
+        (T_AUTO_REAL_PRICE_SOURCE,),
     ),
 ]
 
