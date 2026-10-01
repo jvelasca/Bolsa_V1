@@ -2,6 +2,21 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.16.3-beta] — W3.3 `GRANULARIDAD-OPERATIVA`: ROBUSTEZ DEL INSTRUMENTO OOS — EL REPLAY ES UN SORTEO DEL VENUE Y LA BANDA DE `K = 12` SORTEOS **CRUZA EL CERO**
+
+**Bump** `2.11.16.2-beta` → `2.11.16.3-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`). **Alcance: instrumento, NO motor — CERO `src` de producto** (el desplazamiento del sorteo se inyecta y se **restaura byte a byte**: `Δ src = 0`).
+
+- **Qué se sella:** `W3.2` probó que el artefacto OOS es **reproducible**; este sello mide **de qué depende**. El ruido del venue es **determinista** y cuelga de **una línea** (`seed = fill_seed(bar_tick_now, symbol)`, `auto_simulation_worker.py`: de ahí salen `draw_queue_noise`, el corte de parciales, el slippage y las latencias) ⇒ el re-sorteo se hace **desplazando el ancla** (`fill_seed(bar_tick + k, symbol)`) y **el sorteo pasa a ser una ENTRADA DECLARADA**, reproducible byte a byte.
+- **Autochequeo del instrumento (en la misma corrida):** `k = 0` **es** la realización de producción y no se parchea ⇒ reproduce el sello `1E3ADAC2…929A37E7` **byte a byte**. Si `k00` no fuera el sello, la sonda estaría midiendo otra cosa.
+- **MEDIDO (`K = 12`; `decided = 24 500` en las DOCE —la estrategia evalúa lo mismo; cambia el desenlace del venue—):** ciclos `43…107` (media `70,9 ± 17,8`, dispersión `64`) · **R total `−37,7244 … +0,8182`** (media `−13,3941 ± 10,1381`, mediana `−12,6662`, dispersión `38,54`) · fills `516…1252` · signo positivo `27,9 % … 48,5 %`.
+- **POTENCIA y VALIDEZ (evaluadas, no narradas):** `SE(media R) = 2,9266` (IC 95 % **±5,7362**) y la banda **cruza el cero** ⇒ **`point_citable = False`**: con `K = 1` —lo que hace `replay-repro` en cada tag, y lo que se venía citando— el OOS **no distingue la estrategia del ruido del simulador**.
+- **AUTOCORRECCIÓN de `W3.2`:** su «banda honesta» `[62, 79]` ciclos / `[−18,37, −15,53] R` se derivó de **dos puntos de dos familias de seed distintas** (no acotan una distribución) ⇒ **subestimada ≈ 3,8× en ciclos y ≈ 13,6× en R**. Y cae su lectura del delta: el `ΔR = 2,83` de `W3` es **`0,28 σ`** del instrumento ⇒ **no es separable del sorteo**; `W3` se sostiene **por diseño** (quitar lookahead, idempotencia intra-barra), **no** por su R.
+- **Qué NO invalida:** la reproducibilidad byte a byte del artefacto (sigue siendo contrato), la ablación de `W3.2` (el `seed` **era** la causa del rojo) y `W1`…`W3.2` **como mecánica**.
+- **Consecuencia = DECISIÓN ABIERTA (no la toma este sello):** (a) citar la banda y abandonar el punto; (b) **reducir el ruido del venue** —`W4` (precio real; `flat_price_script` a `100.0` muere) es la palanca que más varianza quitaría, lo que **ordena `W4` antes de cualquier lectura de mérito**—; (c) subir `K` y citar la media con su IC (para ±1 R haría falta `K ≈ 395` ⇒ ≈ 9 h de replay); (d) retirar el OOS del criterio de cierre y sustituirlo por el PAPER longitudinal (`P3-2`).
+- **Deuda:** la banda **NO se asserta en CI** (cuesta `K × replay`, ≈ 80 s cada uno) y `K = 12` es un **presupuesto de tiempo declarado**, no una elección estadística.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.16.3/README.md`](./docs/engineering/evidence/v2.88.16.3/README.md).
+- **Cita POST-TAG:** `python` esperado **`3166 passed, 38 skipped`** (`Δ = 0`) y `replay-repro`/`lifecycle-pg`/`certify` **VERDES** — **se cita el run, no se hereda**.
+
 ## [2.11.16.2-beta] — W3.2 `GRANULARIDAD-OPERATIVA`: RE-SELLO DEL ARTEFACTO OOS AL ANCLA DE BARRA — EL ROJO DE `replay-repro` ERA EL **SEED DEL FILL**, NO LA FRONTERA (CAUSA AISLADA CON ABLACIÓN) Y LA FRONTERA CERRADA ES **INERTE** EN EL REPLAY
 
 **Bump** `2.11.16.1-beta` → `2.11.16.2-beta`. **SIN migración** (Alembic head sigue en `046_fill_reference_mid`). **Alcance: CERO `src` de producto** (el motor de `W3` ya era correcto) — re-sello de la **referencia del artefacto OOS** (4 constantes en `replay_oos_input_fixture.py`) + **manifiesto** del fixture + un **script de ablación nuevo** + este dossier + **correcciones de dossier** de `W3`.

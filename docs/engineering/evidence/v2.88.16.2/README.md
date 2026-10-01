@@ -163,6 +163,15 @@ ciclos  ∈ [62, 79]        R total ∈ [-18.37, -15.53]        signo + ∈ [37.
 porque **el replay es un sorteo del venue**: cambiar el ancla del `seed` (y nada más) mueve el
 resultado de un extremo al otro de la banda, **byte a byte reproducible**.
 
+> **⚠ CORRECCIÓN (`W3.3`, 2026-10-01) — ESTA BANDA ESTABA SUBESTIMADA POR DEFECTO.** Se derivó de
+> **dos puntos** (el sello por-minuto y el árbol `W3`), y dos puntos de **dos familias de seed
+> distintas** no acotan una distribución. Medida sobre la **misma** familia con `K = 12` sorteos
+> ([`evidence/v2.88.16.3/README.md`](../v2.88.16.3/README.md) §3): **`[43, 107]` ciclos y
+> `[−37.72, +0.82]` R**, con `σ(R) = 10,14` y la banda **cruzando el cero**. Subestimación ≈ 3,8×
+> en ciclos y ≈ 13,6× en R. Y con ella cae la lectura de §5: el `ΔR = 2,83` de `W3` es **`0,28 σ`**
+> del instrumento ⇒ **no es separable del sorteo**; `W3` se sostiene **por diseño**, no por su R.
+> La referencia viva de la banda es la de `W3.3`.
+
 **Consecuencia dura, y es la que hay que oír:** el R que se citó al sellar (`−18.3660`) **no es una
 propiedad del motor**; es **un sorteo concreto**. Citar un punto sin su banda es citar un dado como si
 fuera una constante. ⇒ **Trabajo de instrumento abierto:** medir **K sorteos** (anclas/semillas
