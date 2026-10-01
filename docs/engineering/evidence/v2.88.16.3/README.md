@@ -179,6 +179,20 @@ uv run --no-sync python apps/api-python/scripts/v2_88_16_3_oos_seed_robustness.p
 * Los `sha256_lf` de los 12 sorteos están **declarados** en la sonda ⇒ un drift en cualquiera de
   los doce artefactos sale con **exit 2**.
 
+### 8.1 Cita POST-TAG — TAG `v2.88.16.3-beta` **TODO VERDE**
+
+`Release tag CI` run **`36825434072`** (`ref=refs/tags/v2.88.16.3-beta`, HEAD `b3876cdd`):
+**11 jobs `success`** + **1 skipped** (`playwright (integrated E2E, opt-in)`).
+
+| Job | Resultado |
+| --- | --- |
+| `python` | **`3166 passed, 38 skipped, 6 warnings in 73.15s`** ⇒ **`Δ = 0`** (este sello no toca `src`) |
+| `replay-repro` | **VERDE** — `REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)` y **2ª corrida IDÉNTICA** |
+| `lifecycle-pg` · `certify` · `frontend` · `shared` · `decision-spine` · `a7-gate` · `security` · `playwright (mock)` · `dr-verify` | **VERDE** |
+
+⇒ **La reproducibilidad byte a byte sigue siendo contrato y sigue verde**: este sello mide lo que
+*rodea* a esa reproducibilidad, no la rompe.
+
 ---
 
 ## 9. Deuda que este sello NO cierra
