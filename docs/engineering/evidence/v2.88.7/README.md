@@ -1,5 +1,15 @@
 # Evidencia cruda — retirada con la materialización EXACTA del CICLO (`v2.88.7`, `AUTO-MATERIAL-20`, 2026-09-29)
 
+> **⚠ NOTA DE VIGENCIA (2026-10-01) — LA REFERENCIA DEL ARTEFACTO OOS DE ESTE SELLO QUEDA `SUPERSEDED`.**
+> El artefacto `operability_runs/replay-oos-durable-obs20-fix-20260929.json` (`7D998E4D…C804A0461` /
+> `3 393 187` B) y su par LF (`A4DA036C…13CB` / `3 290 062` B) **dejaron de ser la referencia que el job
+> `replay-repro` asserta**. Motivo **medido**: `W3` (v2.88.16) ancló el `seed` del fill a la **barra**
+> (`fill_seed(bar_tick, símbolo)`) y el replay conduce el **`AutoSimulationWorker` real** ⇒ el artefacto
+> cambia **por construcción**. Revertir **sólo** el ancla al minuto reproduce este sello **byte a byte**
+> (aislado por ablación). El contenido y las cifras de **este** documento siguen siendo **válidos como
+> evidencia de `v2.88.7`** (no se reescriben); lo que cambia es **qué artefacto es la referencia viva**.
+> Referencia vigente y delta declarado (con su banda): [`evidence/v2.88.16.2/README.md`](../v2.88.16.2/README.md).
+
 Resumen **verificable** del cierre de `OBS-20`. Las cifras están **transcritas** de las corridas, sin
 edición; los artefactos completos son **gitignoreados** (`.gitignore:102` → `/operability_runs/`) y se
 regeneran con los comandos de §6.

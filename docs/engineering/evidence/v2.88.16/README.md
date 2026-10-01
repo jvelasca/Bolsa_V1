@@ -22,9 +22,17 @@ Dos movimientos del **tiempo** del motor, ninguno observable con un test de caja
    que **contiene** el instante (`bar_tick`), no al minuto del bucle: se elimina
    `seed = self._minute * 100_003 + …` y el anclaje a `_price_script(symbol, self._minute)` del fill.
 
-El contrato temporal es **uno solo** y vive en `packages/py/application/src/bolsa_application/closed_bars.py`
-(nuevo): el **MOTOR AUTO** y el **instrumento de investigación** (`replay_oos`) comparten la **misma**
-frontera, en vez de dos definiciones parecidas que se separan con el tiempo.
+El contrato temporal **se define una vez** en `packages/py/application/src/bolsa_application/closed_bars.py`
+(nuevo) y el **MOTOR AUTO** pasa a usarlo, en vez de una definición propia que se separa con el tiempo.
+
+> **⚠ CORRECCIÓN (`W3.2`, 2026-10-01).** El texto original aquí decía que el **MOTOR AUTO** y el
+> **instrumento de investigación** (`replay_oos`) comparten la **misma** frontera. **Inexacto, por
+> medición:** el replay **inyecta** sus fuentes sobre `cursor.as_of`, que **ya era `B-1`** antes de
+> `W3` (`replay_oos.py:234`). Son **dos** implementaciones **equivalentes por medición**, no una sola;
+> `W3` convergió el **motor** al contrato que el **instrumento ya cumplía**. La medición: con la
+> frontera forzada a un día de **2099** (años de barras futuras, si se consultara), el artefacto del
+> replay sale **idéntico** ⇒ `last_closed_bar_day` **no** está en ese camino. Detalle:
+> [`evidence/v2.88.16.2/README.md`](../v2.88.16.2/README.md) §4.2.
 
 **NO** enmienda el ADR 010 y **NO** toca `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-B.
 
@@ -227,6 +235,22 @@ los **`3142`** esperados de `v2.88.15` + **`24`** del bundle `W3`, con los **mis
 > **producto** de este dossier (frontera de barras cerradas, ancla `OPEN(D+1)`, golden con delta medido,
 > mutaciones `M279`–`M282`) sigue **vigente sin cambios**.
 
+> **SEGUNDO ROJO, DEL `replay-repro` (POST-TAG `v2.88.16.1-beta`, run `36785738058`) — `W3.2` lo cierra.**
+> En `v2.88.16.1-beta` el job `lifecycle-pg` quedó **VERDE** (el hotfix funcionó) y `python` **VERDE**
+> (`3166/38`), pero **`replay-repro` quedó ROJO**: congela **byte a byte** un artefacto del replay OOS
+> cuya referencia nació en **`v2.88.7`** (**anterior** a `W3`), y el replay conduce el
+> **`AutoSimulationWorker` real** ⇒ `W3` lo movió **por construcción**. **Causa aislada por ablación:**
+> revertir **sólo** el ancla del fill al minuto (`M280`) reproduce el sello `A4DA036C…13CB` **byte a
+> byte**, y la frontera cerrada es **inerte** en el replay. **El delta del artefacto OOS (`62 → 79`
+> ciclos, R `−18.3660 → −15.5335`) NO estaba declarado en este dossier** — se declara, con su banda, en
+> [`evidence/v2.88.16.2/README.md`](../v2.88.16.2/README.md) §5, y es el hallazgo de que **el replay es
+> un sorteo del venue**. `v2.88.16.2-beta` **supersede** a `v2.88.16.1-beta` y a `v2.88.16-beta`.
+>
+> **⚠ CORRECCIÓN ADICIONAL del §7 de `v2.86`** (heredada por este sello): «la muestra es de **13
+> ciclos**, de un **único episodio** (`2022-02 → 2022-05`)» describe los `13` ciclos de `v2.86`, **no**
+> el artefacto sellado de `62`. Con la misma sonda, **el sello** reparte `2022: 50 · 2023: 7 · 2024: 2 ·
+> 2025: 3` y su signo positivo es **37.1 %** (no el `15.4 %` de `v2.86`).
+
 ---
 
 ## 10. Firma de estado (verificable)
@@ -254,8 +278,8 @@ git diff --stat v2.88.15-beta v2.88.16-beta -- packages/py apps/api-python/src \
 
 - **Implementa** `W3` del [plan](../../plan-granularidad-operativa-auto-post-auditoria-2026-09-30.md):
   `signal_bar = D → execution_bar = corriente`, referencia de ejecución anclada a la **barra** y
-  eliminación del `seed` por minuto. Converge al contrato ya probado del replay (`closed_bars`
-  compartido).
+  eliminación del `seed` por minuto. **Converge el MOTOR al contrato que el replay ya cumplía** (son dos
+  implementaciones **equivalentes por medición**, no una sola: ver la corrección del §1).
 - **Cambia resultados de forma legítima** ⇒ **golden nuevo** con el delta old-vs-new **medido** (§4),
   que es el **gate de cierre** del incremento.
 - **Siguiente incremento:** **`W4`** (`v2.88.17-beta`) — proveedor de **precio real**: el runtime

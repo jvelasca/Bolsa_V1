@@ -97,21 +97,30 @@ _SEALED_WATCH = (
     "8601a0c3f8d248b0b8052b963",
 )
 
-#: Artefacto que este fixture debe reproducir (el sello auditado), **tal cual se selló**. El
-#: sello se escribió en Windows en modo texto, así que sus `\n` están traducidos a `\r\n`.
-_SEALED_ARTIFACT_SHA256 = "7D998E4D7BCBA9DC2028D6274175C9A2C3099FAF3FE90B4DEFFBE47C804A0461"
-_SEALED_ARTIFACT_BYTES = 3_393_187
+#: Artefacto de REFERENCIA del replay OOS: el que el job `replay-repro` regenera desde la entrada
+#: congelada y **asserta**. Va en DOS renders porque el sello original se escribió en Windows en
+#: modo texto y el runner escribe LF (medido en su día: 103 125 B = 1 `\r` por línea, secciones
+#: idénticas byte a byte). Se declaran los dos y se asserta el CONTENIDO (`_assert_artifact`).
+#:
+#: HISTORIA del par (declarada, no borrada):
+#:   * `v2.88.7-beta` selló `7D998E4D…C804A0461` / 3 393 187 B (CRLF) y `A4DA036C…13CB` /
+#:     3 290 062 B (LF).
+#:   * `W3` (v2.88.16) movió el ancla temporal del fill (`fill_seed(bar_tick, símbolo)` en vez
+#:     del contador privado `_minute`) y el replay **conduce el motor real** ⇒ el artefacto
+#:     cambió. El `replay-repro` del tag `v2.88.16.1-beta` salió **rojo** por eso.
+#:   * `W3.2` (v2.88.16.2) lo **re-sella** con el delta **medido y aislado**: revertir SOLO el
+#:     seed al minuto reproduce `A4DA036C…13CB` **byte a byte**, y la frontera de barras cerradas
+#:     es **inerte** en el replay (control a `2099` ⇒ artefacto idéntico). La atribución completa,
+#:     con la banda de sensibilidad de la muestra, vive en
+#:     `docs/engineering/evidence/v2.88.16.2/README.md` y se re-verifica con
+#:     `apps/api-python/scripts/v2_88_16_2_oos_anchor_ablation.py`.
+_SEALED_ARTIFACT_SHA256 = "240662250347A2AAD0F8E9F0101185D8ACC80C1D4BD1B4BBFF02D4766D9F54F0"
+_SEALED_ARTIFACT_BYTES = 3_445_622
 
-#: EL MISMO CONTENIDO con separador LF: lo que escribe cualquier SO que no traduzca `\n`
-#: (el runner de GitHub, sin ir más lejos). Medido el 2026-09-29 sobre el artefacto real del
-#: runner (job `replay-repro`, corrida 36636706369): la única diferencia entre los dos
-#: ficheros son 103 125 bytes = las 103 125 líneas del JSON, exactamente 1 `\r` por línea.
-#: Sus SECCIONES son idénticas byte a byte (`census` 1 237 098 / `45E4CC80CFBA6E5C`,
-#: `replay` 891 272 / `EE81E76CEE0995AA`). Es decir: el `sha256` del sello hasheaba el
-#: **render de Windows**, no la evidencia, y por eso el job del tag no podía pasar en Linux.
-#: Se declaran LOS DOS renders y se asserta el CONTENIDO (ver `_assert_artifact`).
-_SEALED_ARTIFACT_SHA256_LF = "A4DA036C9AC198EAF88037EBB5D66D0A76CEA95141E03B046CECE1BCBC5B13CB"
-_SEALED_ARTIFACT_BYTES_LF = 3_290_062
+#: EL MISMO CONTENIDO con separador LF: lo que escribe cualquier SO que no traduzca `\n` (el
+#: runner de GitHub, sin ir más lejos). Es el par que el job `replay-repro` ve en Linux.
+_SEALED_ARTIFACT_SHA256_LF = "1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7"
+_SEALED_ARTIFACT_BYTES_LF = 3_340_728
 
 #: ``to_char`` de un ``timestamptz`` a ISO-8601 UTC con microsegundos y offset explícito.
 #: Se fija ``+00:00`` literal (``AT TIME ZONE 'UTC'`` ya normaliza) para no depender del
@@ -240,9 +249,11 @@ async def _export(args: argparse.Namespace) -> int:
                 "expectedArtifactSha256Lf": _SEALED_ARTIFACT_SHA256_LF,
                 "expectedArtifactBytesLf": _SEALED_ARTIFACT_BYTES_LF,
                 "expectedArtifactRenderNote": (
-                    "El sello se escribio en Windows en modo texto: su LF va como CRLF. El "
-                    "MISMO contenido en LF es expectedArtifactSha256Lf/BytesLf. Los dos "
-                    "renders son validos y las secciones son identicas byte a byte."
+                    "El sello original se escribio en Windows en modo texto: su LF va como CRLF. "
+                    "El MISMO contenido en LF es expectedArtifactSha256Lf/BytesLf. Los dos "
+                    "renders son validos y las secciones son identicas byte a byte. La referencia "
+                    "vigente desde W3.2 (v2.88.16.2) esta anclada a la BARRA: el delta y su "
+                    "atribucion medida viven en docs/engineering/evidence/v2.88.16.2/."
                 ),
                 "omittedColumns": [
                     "ohlcv_bars.id",
@@ -506,15 +517,16 @@ def _print_watch(args: argparse.Namespace) -> int:
 
 
 def _assert_artifact(args: argparse.Namespace) -> int:
-    """Contrasta el artefacto regenerado con el sello, separando CONTENIDO de RENDER.
+    """Contrasta el artefacto regenerado con la REFERENCIA, separando CONTENIDO de RENDER.
 
-    El sello se escribió en Windows en modo texto y el runner escribe en LF: el `sha256` del
-    fichero **no** identifica la evidencia, identifica su render (medido: 103 125 bytes de
-    diferencia = 1 `\\r` por línea, con las secciones idénticas). Así que hay dos formas
-    válidas de estar «reproducido», y se declaran las dos en vez de esconder una:
+    El sello original se escribió en Windows en modo texto y el runner escribe en LF: el `sha256`
+    del fichero **no** identifica la evidencia, identifica su render (medido: 103 125 bytes de
+    diferencia = 1 `\\r` por línea, con las secciones idénticas). Así que hay dos formas válidas
+    de estar «reproducido», y se declaran las dos en vez de esconder una (valores vigentes =
+    los de `_SEALED_ARTIFACT_*`):
 
-    * **render del sello**: byte a byte == `7D998E4D…` / 3 393 187 B (fichero CRLF);
-    * **mismo contenido**: LF normalizado == `A4DA036C…` / 3 290 062 B (fichero LF).
+    * **render del sello**: byte a byte == `24066225…6D9F54F0` / 3 445 622 B (fichero CRLF);
+    * **mismo contenido**: LF normalizado == `1E3ADAC2…929A37E7` / 3 340 728 B (fichero LF).
 
     Si se pasan `--sha256`/`--bytes` explícitos se exige ese render concreto: la vía
     normalizada solo se acepta contra los valores SELLADOS, no contra un valor suelto.

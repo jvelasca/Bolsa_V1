@@ -138,6 +138,23 @@ misma que la del dossier `W3`:
 > verbatim del run se añade en `main` como commit **POST-TAG** cuando el propietario publique
 > `v2.88.16.1-beta` (mismo patrón que `v2.88.16`/`v2.88.15`/`v2.88.14`).
 
+> **CITA REAL (POST-TAG, 2026-10-01) — TAG `v2.88.16.1-beta` PARCIALMENTE ROJO; lo `W3.1` se cumple, lo
+> cierra `W3.2`.** `Release tag CI` run **`36785738058`** (`ref=refs/tags/v2.88.16.1-beta`):
+> **10 jobs VERDES**, 1 *skip* y **2 rojos**.
+> - **`lifecycle-pg` VERDE** ⇒ **el objeto de este hotfix se cumple**: el certificador A9 del día AUTO
+>   vuelve a ser ejecutable con el ancla de barra (era el rojo de `v2.88.16-beta`).
+> - **`python` VERDE** con **`3166 passed, 38 skipped`** ⇒ **`ESPERADO = OBSERVADO`** (`Δ = 0`).
+> - **`replay-repro` ROJO** (y **`certify`** en cascada): el job congela **byte a byte** un artefacto del
+>   replay OOS cuya referencia nació en **`v2.88.7`** (**anterior** a `W3`), y el replay conduce el
+>   **`AutoSimulationWorker` real** ⇒ `W3` lo movió **por construcción**. **No es de este hotfix**
+>   (`Δ src = 0`), pero **hace que el tag como tal sea ROJO**.
+> - **Verdes:** `frontend`, `shared`, `decision-spine`, `a7-gate`, `security`, `playwright (mock)`,
+>   `dr-verify`.
+>
+> ⇒ El tag **`v2.88.16.1-beta` NO se reescribe** y lo **supersede** **`v2.88.16.2-beta`**, que re-apunta
+> el artefacto OOS con la causa **aislada por ablación** (el ancla del fill) y declara el delta con su
+> **banda**: [`evidence/v2.88.16.2/README.md`](../v2.88.16.2/README.md).
+
 ---
 
 ## 8. Deudas que este sello NO cierra
