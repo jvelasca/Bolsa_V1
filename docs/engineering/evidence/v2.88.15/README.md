@@ -239,9 +239,16 @@ puede vivir dentro del propio tag; se cita en `main` como commit **POST-TAG**.
 los **`3137`** del CI de `v2.88.14-beta` + **`5`** del bundle `W2`, con los **mismos `38` skips** y
 `ruff`/`import-linter`/`mypy` con los mismos veredictos. **Se cita el run, no se hereda.**
 
-> **PENDIENTE DE CITA.** Este documento se sella con la **predicción** y el **encaje que cierra** (los
-> `3180` recogidos local = `3142 + 38`); la cita verbatim del run se añade en `main` como commit
-> **POST-TAG** cuando el propietario publique `v2.88.15-beta` (mismo patrón que `v2.88.14`).
+> **CITA REAL (POST-TAG, 2026-10-01 — cerrada en `W3.2`).** `Release tag CI` run **`36761134323`**
+> (`ref=refs/tags/v2.88.15-beta`, HEAD `f6494322`): **TODO VERDE** — **11 jobs `success`** (incluidos
+> **`lifecycle-pg`**, **`replay-repro`** y **`certify`**) y `1 skipped` (`playwright (integrated E2E,
+> opt-in)`). ⇒ **`ESPERADO = OBSERVADO`**: el job `python` dio **`3142 passed, 38 skipped`**, los
+> **`3180`** recogidos = `3142 + 38`, con `ruff`/`import-linter`/`mypy` en sus veredictos esperados.
+>
+> **Nota de comparación (útil 24 h después):** el `replay-repro` de **este** run fue **VERDE** porque el
+> artefacto congelado seguía apuntando al seed **por minuto**; el tag **siguiente** (`v2.88.16.1-beta`,
+> run `36785738058`) lo puso **ROJO** al mover `W3` ese ancla. Ese rojo —y su causa **aislada por
+> ablación**— se documentan en [`evidence/v2.88.16.2/README.md`](../v2.88.16.2/README.md).
 
 ---
 
