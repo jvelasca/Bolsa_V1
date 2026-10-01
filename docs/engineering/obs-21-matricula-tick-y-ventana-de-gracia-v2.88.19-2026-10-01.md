@@ -117,7 +117,8 @@ Se sospechó también el **orden de lectura** de la evidencia durable en `_v2_re
 | `test_concurrent_auto_pg.py` | Añade volcado de diagnóstico (`cycle_id`/procedencia) al mensaje del assert ⇒ el **próximo** rojo llega **con causa** |
 | `ruff` / `mypy` (gate exacto de CI) | `All checks passed!` · `no issues found in 512 source files` |
 | `v2.88.18-beta` | **Rojo citado** (run `36886166182`), **no** borrado |
-| CI del tag `v2.88.19-beta` | **PENDIENTE** (POST-TAG) |
+| CI del tag `v2.88.19-beta` | **TODO VERDE** — run [`36895471323`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36895471323): **11 `success` + 1 `skipped`**, `certify` `success`, `python` **`4158 passed, 42 skipped`** (**+1** sobre el run rojo = la guarda nueva; **mismos `42` skips**) y `lifecycle-pg` —el job del rojo— **verde** |
+| `replay-repro` | **`REPRODUCIDO`** ⇒ los dos arreglos son **INERTES** para el artefacto del instrumento OOS (ver §9.2) |
 
 ---
 
@@ -135,8 +136,8 @@ Se sospechó también el **orden de lectura** de la evidencia durable en `_v2_re
 
 El orden que el propietario fijó — **elevar versión → auditar desde GitHub → probar la operativa en la APP** — queda así:
 
-1. **Sellar `v2.88.19-beta`** (este documento + `evidence/v2.88.19` + `CHANGELOG` + `PROJECT_STATE` + `CURRENT_SYSTEM` + índice), commit, tag anotado y push de `main` + tag.
-2. **Citar el CI del tag** (POST-TAG) en un commit de cita: es el patrón del repo y aquí tiene un interés extra — el job `lifecycle-pg` es **el que dio el rojo**, así que su verde es la certificación directa de los dos arreglos.
+1. **Sellar `v2.88.19-beta`** — **HECHO**: commit `c712f2a5`, tag anotado **`v2.88.19-beta`** empujado junto a `main`.
+2. **Citar el CI del tag** (POST-TAG) — **HECHO**: run [`36895471323`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36895471323) **TODO VERDE** (`python` **4158/42** = **+1** sobre el run rojo, **mismos `42` skips**; **`lifecycle-pg` —el job que dio el rojo— verde** con `AUTO_CONCURRENT_PG_REQUIRED=1`; `replay-repro` **`REPRODUCIDO`** ⇒ el arreglo es **INERTE** para el instrumento OOS).
 3. **Auditoría externa**: el paquete de handover vigente es [`entrega-auditoria-externa-mia-v2.88.17.1-2026-10-01.md`](./entrega-auditoria-externa-mia-v2.88.17.1-2026-10-01.md) (+ [audit-pack](./audit-pack-v2.88.17-w4-bundle-direccional-2026-10-01.md) + [arranque](./arranque-auditor-v2-88-17-1-w4-2026-10-01.md)). El auditor que entre por ahí debe **añadir** a su lista: `OBS-21` (este sello) y el criterio de salida de `-beta` ([`criterio-salida-beta-2026-10-01.md`](./criterio-salida-beta-2026-10-01.md), compuertas `G1`–`G7`).
 4. **Probar la operativa en la APP**: es el paso que **ninguna** de estas correcciones sustituye. Todo lo anterior mide «¿el motor puede sobrevivir sin mentir?»; la prueba en la APP mide «¿qué hace la operativa de verdad, durante días?». `P3-2`/`P3-3` (cubos de calendario real, A-B real) **sólo** se acreditan ahí.
 

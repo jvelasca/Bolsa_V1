@@ -267,11 +267,17 @@ uv run mypy packages/py apps/api-python
 
 El único step rojo: `Pytest Concurrent AUTO (3 sesiones concurrentes + PG, fail if skipped)`, en `test_concurrent_auto_n_sessions_claim_one_signal_pg[5]`, `apps/api-python/tests/test_concurrent_auto_pg.py:346`. **`lifecycle-pg` es, además, el job donde el fichero de concurrencia corre en serio** — de ahí que el defecto **B** sólo pudiera verse ahí (y el **A** ni siquiera ahí: ver §1.1).
 
-### 9.2 CI del tag **`v2.88.19-beta`** — PENDIENTE (POST-TAG)
+### 9.2 CI del tag **`v2.88.19-beta`** — **CITADO (POST-TAG) · TODO VERDE**
 
-Se cita **después** del push (patrón `OBS-3`/`OBS-4`): **no se hereda** de otra versión. Esperado:
+`Release tag CI` run **[`36895471323`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36895471323)** (`ref=refs/tags/v2.88.19-beta`, HEAD `c712f2a5`, `2026-10-01T16:54:27Z` → `~17:01Z`) → **`SUCCESS`**: **11 jobs `success`** + `playwright (integrated E2E, opt-in)` `skipped` por diseño, con **`certify` `success`**.
 
-- `lifecycle-pg` con el fichero de concurrencia **verde** (es el job que dio el rojo de §9.1) y las guardas `fail if skipped` cumplidas;
-- `python` sin deriva en el recuento de tests (el sello **no** añade tests offline salvo la guarda hermética nueva de §5, que sí debe verse como `+1` allí donde la selección de `G2` la cablea);
-- `replay-repro`: **`Δ src ≠ 0`** en `packages/py/application` (la matrícula del tick es del **store** del motor AUTO), así que su veredicto se **cita observado**, no se predice;
-- `certify` `GREEN`.
+| Job | Conclusión | Cifra citada |
+|---|---|---|
+| `python (ruff/imports/mypy/pytest offline)` | **success** | `All checks passed!` · `no issues found in **512** source files` · **`4158 passed, 42 skipped`** |
+| `lifecycle-pg (…)` — **el job del rojo de §9.1** | **success** | con **todos** los gates `*_PG_REQUIRED: 1` (incl. `AUTO_CONCURRENT_PG_REQUIRED`, `AUTO_V2_DURABLE_PG_REQUIRED`) ⇒ el fichero de concurrencia corrió **de verdad** y pasó |
+| `replay-repro` | **success** | **`VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`** — render **LF** `3 340 728` B / `1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`, **2ª corrida IDÉNTICA**, artefacto `11178993346` |
+| `shared` / `frontend` / `decision-spine` / `security` / `dr-verify` / `a7-gate` / `playwright (mock E2E)` | **success** | — |
+
+**Encaje de cuentas (el dato que cierra el sello):** el job `python` del run **rojo** de §9.1 dio **`4157 passed, 42 skipped`** y el del tag **`4158 passed, 42 skipped`** ⇒ **+1** = **exactamente** la guarda hermética nueva de §5, con los **mismos `42` skips** (ningún `skip` se movió). Esto **además demuestra** que la guarda **sí corre** en el job offline: no cae en la clase de `OBS-19`.
+
+**Hallazgo derivado, medido (y contrario a lo que §9.2 anticipaba antes del run):** el sello tiene **`Δ src ≠ 0`** en `packages/py/application` (la matrícula del tick es del **store** del motor AUTO) y **aun así** `replay-repro` reproduce el artefacto **byte a byte** ⇒ los dos arreglos son **INERTES para el artefacto del replay**: el replay **no** ejerce ni el alta concurrente del tick (su motor es de un solo proceso, sin carrera) ni la ventana de gracia (que solo cambia **+1 s** de margen ⇒ ninguna decisión se mueve). Es la mejor forma posible de decir que el cambio **no toca la semántica** del instrumento OOS.
