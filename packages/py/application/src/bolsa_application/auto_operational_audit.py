@@ -63,6 +63,7 @@ __all__ = [
     "build_protection_entry",
     "build_reservation_claim_entry",
     "build_reservation_reconciliation_entry",
+    "durable_fact_dedupe_key",
     "operational_audit_enabled",
 ]
 
@@ -84,6 +85,55 @@ def operational_audit_enabled(raw: str | None = None) -> bool:
     """``True`` sólo con un valor explícito de encendido; ausente/vacío ⇒ ``False`` (Δ = 0)."""
     value = raw if raw is not None else os.getenv(AUTO_OPERATIONAL_AUDIT_ENV)
     return str(value or "").strip().lower() in _TRUE_VALUES
+
+
+def durable_fact_dedupe_key(
+    *,
+    event_type: str | None,
+    account_id: str | None,
+    engine_id: str | None,
+    cycle_id: str | None = None,
+    order_id: str | None = None,
+    kind: str | None = None,
+    revision_id: str | None = None,
+) -> str | None:
+    """(PURA) identidad determinista de un hecho durable M2, o ``None`` sin base para ella.
+
+    Es lo que permite que el alta sea idempotente (``INSERT ... ON CONFLICT DO NOTHING``):
+    el MISMO hecho reintentado no duplica. Se construye SOLO cuando el productor puede
+    demostrar la identidad; si falta un componente no se inventa una clave a medias (``None``)
+    y el ``append`` conserva el INSERT plano (Δ = 0).
+
+    Vocabulario (una cosa, una clave):
+
+    * ``auto_cycle_settlement`` — un settlement por ciclo cerrado:
+      ``auto_cycle_settlement:{account}:{engine}:{cycle_id}``.
+    * ``auto_entry_order`` — una orden de entrada por ciclo y orden:
+      ``auto_entry_order:{account}:{engine}:{cycle_id}:{order_id}``.
+    * ``auto_protection_event`` — una transición por ciclo, ``kind`` y revisión. La ``kind``
+      sola NO basta: dos transiciones legítimas del mismo ``kind`` pueden ocurrir en un ciclo.
+      Se exige ``revisionId`` (referencia a la revisión durable); sin él la clave es ``None``.
+    """
+    event = _text(event_type)
+    account = _text(account_id)
+    engine = _text(engine_id)
+    cycle = _text(cycle_id)
+    if event is None or account is None or engine is None or cycle is None:
+        return None
+    if event == AUTO_CYCLE_SETTLEMENT_EVENT:
+        return f"{AUTO_CYCLE_SETTLEMENT_EVENT}:{account}:{engine}:{cycle}"
+    if event == AUTO_ENTRY_ORDER_EVENT:
+        order = _text(order_id)
+        if order is None:
+            return None
+        return f"{AUTO_ENTRY_ORDER_EVENT}:{account}:{engine}:{cycle}:{order}"
+    if event == AUTO_PROTECTION_EVENT:
+        resolved_kind = _text(kind)
+        revision = _text(revision_id)
+        if resolved_kind is None or revision is None:
+            return None
+        return f"{AUTO_PROTECTION_EVENT}:{account}:{engine}:{cycle}:{resolved_kind}:{revision}"
+    return None
 
 
 def _stamp(as_of: str | None) -> str:

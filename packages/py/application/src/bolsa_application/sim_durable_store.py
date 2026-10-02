@@ -231,6 +231,15 @@ class SimFillFinanceContextStore(Protocol):
         cycle_ids: Sequence[str],
     ) -> Mapping[str, int]: ...
 
+    # v2.88.27 — ciclos RECIENTES de la cuenta, sin depender de que su reserva siga viva
+    # (la reserva de salida se libera ANTES del cierre). Es lo que permite al arranque
+    # enumerar los ciclos que pudieron cerrarse y comprobar si su ``SETTLEMENT`` durable
+    # quedó sin publicar por un crash. Más reciente primero; las filas sin ``cycle_id``
+    # (anteriores a 2.47) no aportan un ciclo: "anterior a 2.47" no es un ciclo.
+    async def list_recent_cycle_ids(
+        self, account_id: str | None, *, limit: int = 500
+    ) -> list[str]: ...
+
 
 class SimAutoPositionStore(Protocol):
     async def read_open(self, account_id: str, engine_id: str) -> Mapping[str, Decimal]: ...
@@ -383,6 +392,28 @@ class InMemorySimFillFinanceContextStore:
                 continue
             counts[key] = counts.get(key, 0) + 1
         return counts
+
+    async def list_recent_cycle_ids(
+        self, account_id: str | None, *, limit: int = 500
+    ) -> list[str]:
+        """Ciclos recientes (v2.88.27), "más reciente primero" por orden de INSERCIÓN.
+
+        El doble hermético no conoce ``created_at``; el orden de inserción es el proxy
+        determinista del orden temporal (el store PG ordena por ``MAX(created_at) DESC``).
+        Un ciclo sin ``cycle_id`` no aporta una clave vacía.
+        """
+        if limit is not None and limit <= 0:
+            return []
+        last_seen: dict[str, int] = {}
+        for index, row in enumerate(self._rows.values()):
+            key = str(row.cycle_id or "").strip()
+            if not key:
+                continue
+            if account_id is not None and row.account_id != account_id:
+                continue
+            last_seen[key] = index
+        ordered = sorted(last_seen, key=lambda key: last_seen[key], reverse=True)
+        return ordered[:limit] if limit is not None else ordered
 
     def size(self) -> int:
         return len(self._rows)
@@ -751,6 +782,34 @@ class PostgresSimFillFinanceContextStore:
             stmt = stmt.where(SimFillFinanceContextRow.account_id == account_id)
         rows = (await self._session.execute(stmt)).all()
         return {str(row[0]): int(row[1]) for row in rows if row[0] is not None}
+
+    async def list_recent_cycle_ids(
+        self, account_id: str | None, *, limit: int = 500
+    ) -> list[str]:
+        """(v2.88.27) ciclos recientes de la cuenta, más reciente primero.
+
+        Agrupa por ``cycle_id`` y ordena por ``MAX(created_at)``: la recencia de un ciclo es
+        la de su ÚLTIMO fill (el de cierre). No trae filas ni inventa un ciclo para las filas
+        sin ``cycle_id`` (``NULL`` no agrupa un ciclo). ``limit <= 0`` ⇒ ``[]`` sin consultar.
+        """
+        from sqlalchemy import func, select
+
+        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+
+        if limit is not None and limit <= 0:
+            return []
+        stmt = (
+            select(SimFillFinanceContextRow.cycle_id)
+            .where(SimFillFinanceContextRow.cycle_id.is_not(None))
+            .group_by(SimFillFinanceContextRow.cycle_id)
+            .order_by(func.max(SimFillFinanceContextRow.created_at).desc())
+        )
+        if account_id is not None:
+            stmt = stmt.where(SimFillFinanceContextRow.account_id == account_id)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        rows = (await self._session.execute(stmt)).all()
+        return [str(row[0]) for row in rows if row[0] is not None]
 
 
 class PostgresSimAutoPositionStore:

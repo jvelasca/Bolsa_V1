@@ -43,7 +43,7 @@ _REQUIRED_ENV = "APPLIED_COST_PG_REQUIRED"
 _PREVIOUS_REVISION = "045_adaptive_gate_state"
 _FILL_TABLE = "sim_fill_finance_context"
 _COLUMN = "reference_mid"
-_HEAD = "047_fill_price_source"
+_HEAD = "048_journal_entry_dedupe_key"
 _CYCLE = "cyc-auto16"
 _VERSION = "orb-16"
 #: La ida y la vuelta de un mismo ciclo: 1.5 de fricción en la compra y 1.0 en la venta.
@@ -175,7 +175,7 @@ async def test_migration_046_roundtrip_creates_and_drops_the_reference(
     engine = create_engine(url)
     cfg = _alembic_config()
     try:
-        assert alembic_head() == _HEAD, "la guardia de la head tiene que apuntar a la 047"
+        assert alembic_head() == _HEAD, "la guardia de la head tiene que apuntar a la 048"
         with engine.connect() as connection:
             assert _column_present(connection, _FILL_TABLE, _COLUMN), (
                 "046 debe añadir la referencia del fill"

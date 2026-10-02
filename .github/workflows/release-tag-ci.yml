@@ -622,6 +622,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py
           --ignore=apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
           --ignore=apps/api-python/tests/test_auto_operational_monitor_pg.py
+          --ignore=apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
@@ -902,6 +903,7 @@ jobs:
           apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
           apps/api-python/tests/test_auto_v70_auto23_evidence_validation.py
           apps/api-python/tests/test_auto_operational_monitor_pg.py
+          apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
           apps/api-python/tests/test_health.py
           packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py

@@ -21,6 +21,7 @@ from bolsa_application.auto_operational_audit import (
     build_protection_entry,
     build_reservation_claim_entry,
     build_reservation_reconciliation_entry,
+    durable_fact_dedupe_key,
     operational_audit_enabled,
 )
 from bolsa_application.auto_operational_monitor import (
@@ -473,3 +474,85 @@ def test_protection_entry_without_cycle_or_instrument_is_a_declared_noop() -> No
     }
     assert build_protection_entry(instrument_id=None, **common) is None
     assert build_protection_entry(instrument_id="AAPL", **{**common, "cycle_id": None}) is None
+
+
+# ── v2.88.27 — identidad determinista de los hechos M2 (deduplicación) ────────────────
+
+
+def test_settlement_dedupe_key_is_deterministic_and_one_per_cycle() -> None:
+    key = durable_fact_dedupe_key(
+        event_type=AUTO_CYCLE_SETTLEMENT_EVENT,
+        account_id="acc-1",
+        engine_id="auto-sim",
+        cycle_id="cyc-1",
+    )
+    assert key == "auto_cycle_settlement:acc-1:auto-sim:cyc-1"
+    # El MISMO hecho vuelve a dar la MISMA clave: es lo que hace idempotente el reintento.
+    assert (
+        durable_fact_dedupe_key(
+            event_type=AUTO_CYCLE_SETTLEMENT_EVENT,
+            account_id="acc-1",
+            engine_id="auto-sim",
+            cycle_id="cyc-1",
+        )
+        == key
+    )
+
+
+def test_entry_order_dedupe_key_needs_the_order_identity() -> None:
+    assert (
+        durable_fact_dedupe_key(
+            event_type=AUTO_ENTRY_ORDER_EVENT,
+            account_id="acc-1",
+            engine_id="auto-sim",
+            cycle_id="cyc-1",
+            order_id="ord-9",
+        )
+        == "auto_entry_order:acc-1:auto-sim:cyc-1:ord-9"
+    )
+    # Sin orden no hay identidad demostrable: ``None`` (el ``append`` conserva el INSERT plano).
+    assert (
+        durable_fact_dedupe_key(
+            event_type=AUTO_ENTRY_ORDER_EVENT,
+            account_id="acc-1",
+            engine_id="auto-sim",
+            cycle_id="cyc-1",
+        )
+        is None
+    )
+
+
+def test_protection_dedupe_key_requires_the_revision_not_only_kind() -> None:
+    """Dos transiciones legítimas del MISMO ``kind`` pueden convivir: la ``kind`` sola no basta."""
+    assert (
+        durable_fact_dedupe_key(
+            event_type=AUTO_PROTECTION_EVENT,
+            account_id="acc-1",
+            engine_id="auto-sim",
+            cycle_id="cyc-1",
+            kind="TRAIL_ADVANCED",
+            revision_id="rev-2",
+        )
+        == "auto_protection_event:acc-1:auto-sim:cyc-1:TRAIL_ADVANCED:rev-2"
+    )
+    assert (
+        durable_fact_dedupe_key(
+            event_type=AUTO_PROTECTION_EVENT,
+            account_id="acc-1",
+            engine_id="auto-sim",
+            cycle_id="cyc-1",
+            kind="TRAIL_ADVANCED",
+            revision_id=None,
+        )
+        is None
+    )
+
+
+def test_dedupe_key_without_identity_components_is_none() -> None:
+    """Sin cuenta/motor/ciclo no se inventa una clave a medias, y un ``event_type`` ajeno es ``None``."""
+    base = {"account_id": "acc-1", "engine_id": "auto-sim", "cycle_id": "cyc-1"}
+    assert durable_fact_dedupe_key(event_type=AUTO_CYCLE_SETTLEMENT_EVENT, **{**base, "cycle_id": None}) is None
+    assert durable_fact_dedupe_key(event_type=AUTO_CYCLE_SETTLEMENT_EVENT, **{**base, "account_id": None}) is None
+    assert durable_fact_dedupe_key(event_type=AUTO_CYCLE_SETTLEMENT_EVENT, **{**base, "engine_id": None}) is None
+    assert durable_fact_dedupe_key(event_type="auto_entry_decision", **base) is None
+    assert durable_fact_dedupe_key(event_type=None, **base) is None

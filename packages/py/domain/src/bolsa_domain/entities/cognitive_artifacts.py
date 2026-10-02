@@ -73,7 +73,15 @@ class EdgeReportRecord:
 
 @dataclass(frozen=True, slots=True)
 class DecisionJournalEntryRecord:
-    """ART-DECISION-JOURNAL-ENTRY — evento append-only del spine."""
+    """ART-DECISION-JOURNAL-ENTRY — evento append-only del spine.
+
+    ``dedupe_key`` (v2.88.27): identidad **determinista** del hecho, cuando el productor
+    puede demostrarla (p. ej. ``auto_cycle_settlement:{account}:{engine}:{cycle_id}``). Es
+    lo que permite que un reintento/rearranque del sumidero sea idempotente
+    (``INSERT ... ON CONFLICT DO NOTHING``) en vez de duplicar el hecho. ``None`` = el
+    hecho no declara identidad natural (mismo camino que hasta v2.88.26: INSERT plano);
+    NUNCA se rellena con un literal inventado.
+    """
 
     id: str
     decision_id: str
@@ -84,6 +92,7 @@ class DecisionJournalEntryRecord:
     account_id: str | None = None
     instrument_id: str | None = None
     payload: dict[str, Any] | None = None
+    dedupe_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

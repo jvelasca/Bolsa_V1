@@ -167,8 +167,10 @@ from bolsa_application.auto_operational_audit import (
     build_protection_entry,
     build_reservation_claim_entry,
     build_reservation_reconciliation_entry,
+    durable_fact_dedupe_key,
     operational_audit_enabled,
 )
+from bolsa_application.auto_operational_monitor import AUTO_CYCLE_SETTLEMENT_EVENT
 from bolsa_application.auto_reason_codes import (
     ATR_GEOMETRY,
     ATR_SOURCE_FALLBACK,
@@ -314,6 +316,44 @@ _QTY_EPS = Decimal("0.000001")
 # Con la ventana LLENA (``len == limit``) la evidencia pudo truncarse y el PnL se declara
 # ``PARTIAL``/``None``: la misma disciplina fail-closed que ``CYCLE_CLOSED``.
 _SETTLEMENT_FILL_WINDOW = 500
+
+
+def settlement_snapshot_from_fills(fills: Sequence[Any]) -> dict[str, Any] | None:
+    """(PURA, v2.88.27) campos DEMOSTRABLES de un settlement a partir de los fills del ciclo.
+
+    Sólo se derivan los datos que los fills declaran: el instrumento, la cantidad liquidada
+    (Σ de las ventas) y la FUENTE de precio del fill de cierre. El motivo de salida NO se
+    reconstruye (no viaja en el fill) y el PnL no se calcula aquí: lo publica el MISMO
+    ``cycles_from_fills`` que alimenta ``CYCLE_CLOSED``, un único FIFO. Sin ventas —o sin un
+    instrumento/cantidad utilizables— no hay settlement reconstruible: ``None``, nunca un
+    hecho a medias.
+    """
+    sells = [
+        fill
+        for fill in fills
+        if str(getattr(fill, "side", "") or "").strip().lower() == "sell"
+    ]
+    if not sells:
+        return None
+    instrument = str(getattr(sells[-1], "instrument_id", "") or "").strip()
+    if not instrument:
+        return None
+    closed_qty = Decimal("0")
+    for fill in sells:
+        raw = getattr(fill, "quantity", None)
+        if raw is None or isinstance(raw, bool):
+            return None
+        try:
+            closed_qty += Decimal(str(raw))
+        except (ArithmeticError, ValueError):
+            return None
+    if closed_qty <= 0:
+        return None
+    return {
+        "instrument_id": instrument,
+        "closed_qty": closed_qty,
+        "price_source": getattr(sells[-1], "price_source", None),
+    }
 
 
 def sim_worker_enabled() -> bool:
@@ -701,6 +741,11 @@ class AutoSimulationWorker:
     # es exactamente el ``Δ = 0`` que promete el flag OFF.
     _operational_audit_sink: Callable[[Any], Awaitable[None]] | None = None
     _audit_session_id: str | None = None
+    # v2.88.27 — mismos defaults de CLASE para el lector de deduplicación y el flag de
+    # recuperación: una instancia creada sin pasar por ``__init__`` ve "sin lector" (no recupera)
+    # en vez de reventar con ``AttributeError`` a mitad de arranque.
+    _durable_fact_cycle_reader: Callable[[str], Awaitable[frozenset[str]]] | None = None
+    _v2_durable_facts_recovered: bool = False
 
     def __init__(
         self,
@@ -761,6 +806,12 @@ class AutoSimulationWorker:
         # escribe nada y el monitor declara los huecos; con él, ownership y concurrencia pasan
         # de ``NO MEDIDO`` a hechos. Interruptor ``AUTO_OPERATIONAL_AUDIT`` default OFF (Δ = 0).
         operational_audit_sink: Callable[[Any], Awaitable[None]] | None = None,
+        # v2.88.27 — LECTOR de deduplicación del MISMO spine: dado un ``event_type``, devuelve
+        # los ``cycleId`` que YA tienen ese hecho durable (acotado por cuenta y motor). Es lo que
+        # permite al arranque reemitir sólo el ``SETTLEMENT`` que un crash dejó sin publicar. Sin
+        # él no se recupera nada (el hueco sigue declarado) aunque la inserción ya sea idempotente
+        # por ``dedupe_key``.
+        durable_fact_cycle_reader: Callable[[str], Awaitable[frozenset[str]]] | None = None,
         # AUTO-11: la recomendación Adaptive DURABLE (``decision_journal_entries``). Con él, la
         # memoria de la rotación (cooldown/hysteresis) deja de vivir solo en la lista del proceso
         # y una pausa SOBREVIVE al reinicio. Sin él (hermético/test) no se escribe nada: no se
@@ -962,6 +1013,10 @@ class AutoSimulationWorker:
         # por proceso cada una (mismo patrón que ``_v2_kill_state_loaded``).
         self._v2_adaptive_state_recovered = False
         self._v2_cycle_trace_reconciled = False
+        # v2.88.27 — recuperación de hechos durables del spine, una vez por proceso. Reemite el
+        # ``SETTLEMENT`` de un ciclo cerrado que un crash dejó sin publicar; la identidad
+        # determinista (``dedupe_key``) hace el reenvío idempotente.
+        self._v2_durable_facts_recovered = False
         # V2.45/AUTO-5 — embudo del día (Golden Day 2.0): filas de oportunidad con su
         # estado FINAL y su motivo, más el contador INDEPENDIENTE de candidatas vistas
         # (así "faltó una oportunidad por explicar" es detectable, no silencioso).
@@ -1026,6 +1081,10 @@ class AutoSimulationWorker:
         # auditoría operativa (decisión/claim/reconciliación). Sin sink no se escribe (ni se
         # finge): los paneles de ownership/concurrencia siguen declarados ``NO MEDIDO``.
         self._operational_audit_sink = operational_audit_sink
+        # v2.88.27 — lo que se LEE de vuelta para deduplicar/recuperar hechos M2 en el arranque.
+        # Sin lector no se recupera nada (el hueco sigue declarado), pero la inserción ya es
+        # idempotente por ``dedupe_key``.
+        self._durable_fact_cycle_reader = durable_fact_cycle_reader
         # Identidad de sesión para la auditoría (dueño del claim y ``caller`` del barrido). Se
         # acuña perezosamente SÓLO cuando hay sink: sin auditoría no consume nada (Δ = 0).
         self._audit_session_id: str | None = None
@@ -2820,12 +2879,17 @@ class AutoSimulationWorker:
             await self._v2_audit_emit(self._v2_seal_audit_identity(entry), label="entry_decision")
 
     def _v2_seal_audit_identity(self, entry: Any) -> Any:
-        """(``M2``) sella ``account_id`` (si falta) y ``payload.engineId`` (si falta).
+        """(``M2``) sella ``account_id`` (si falta), ``payload.engineId`` (si falta) y la
+        identidad determinista ``dedupe_key`` (v2.88.27).
 
         Es **trazado**, no decisión: la identidad del hecho la trae el productor y sólo se
         completa lo que falta, sin reescribir nada. ``account_id`` es lo que permite leer por el
         índice ``(account_id, ...)``; ``payload.engineId`` acota la lectura por motor (A4) para
-        no mezclar dos motores de la misma cuenta. Con el flag OFF este tramo no corre.
+        no mezclar dos motores de la misma cuenta y forma parte de la clave de deduplicación.
+        ``dedupe_key`` la deriva ``durable_fact_dedupe_key`` (pura) SÓLO para los hechos M2 que
+        declaran identidad natural: un reintento del sumidero o la recuperación de un hecho que
+        un crash dejó sin publicar pasa a ser un no-op en vez de un duplicado. Con el flag OFF
+        este tramo no corre.
         """
         if entry is None:
             return None
@@ -2835,6 +2899,18 @@ class AutoSimulationWorker:
         if not str(payload.get("engineId") or "").strip() and self._engine_id:
             payload["engineId"] = self._engine_id
             entry = replace(entry, payload=payload)
+        if not getattr(entry, "dedupe_key", None):
+            key = durable_fact_dedupe_key(
+                event_type=getattr(entry, "event_type", None),
+                account_id=getattr(entry, "account_id", None),
+                engine_id=self._engine_id,
+                cycle_id=payload.get("cycleId"),
+                order_id=payload.get("orderId"),
+                kind=payload.get("kind"),
+                revision_id=payload.get("revisionId"),
+            )
+            if key is not None:
+                entry = replace(entry, dedupe_key=key)
         return entry
 
     async def _v2_journal_entry_order(
@@ -2959,6 +3035,29 @@ class AutoSimulationWorker:
             self._v2_seal_audit_identity(entry), label="protection"
         )
 
+    async def _v2_read_cycle_fills(
+        self, cycle_id: str
+    ) -> tuple[list[Any], MeasurementStatus]:
+        """Fills durables de UN ciclo, con la completitud de la ventana DECLARADA.
+
+        Fail-closed: sin store o con la ventana LLENA (``len == limit``, pudo perderse una pata)
+        la lectura NO es afirmable (``UNKNOWN``/``PARTIAL``). Es la ÚNICA puerta de lectura de
+        fills del ciclo, compartida por el PnL del settlement y la recuperación de arranque, para
+        que el FIFO sea uno solo.
+        """
+        if not cycle_id or self._context_store is None:
+            return [], MEASUREMENT_UNKNOWN
+        try:
+            fills = await self._context_store.list_by_cycle_ids(
+                self._account_id, [cycle_id], limit=_SETTLEMENT_FILL_WINDOW
+            )
+        except Exception:  # noqa: BLE001 — un fallo de lectura ES "no medido".
+            logger.exception("auto_sim settlement pnl read failed cycle=%s", cycle_id)
+            return [], MEASUREMENT_UNKNOWN
+        if len(fills) >= _SETTLEMENT_FILL_WINDOW:
+            return list(fills), MEASUREMENT_PARTIAL
+        return list(fills), MEASUREMENT_COMPLETE
+
     async def _v2_cycle_pnl(
         self, cycle_id: str | None
     ) -> tuple[float | None, MeasurementStatus]:
@@ -2968,16 +3067,12 @@ class AutoSimulationWorker:
         (``len == limit``, pudo perderse una pata) el PnL se declara ``PARTIAL`` y ``None``: la
         misma disciplina fail-closed que ``CYCLE_CLOSED``, aplicada al settlement.
         """
-        if not cycle_id or self._context_store is None:
+        if not cycle_id:
             return None, MEASUREMENT_UNKNOWN
-        try:
-            fills = await self._context_store.list_by_cycle_ids(
-                self._account_id, [cycle_id], limit=_SETTLEMENT_FILL_WINDOW
-            )
-        except Exception:  # noqa: BLE001 — un fallo de lectura ES "no medido".
-            logger.exception("auto_sim settlement pnl read failed cycle=%s", cycle_id)
+        fills, measurement = await self._v2_read_cycle_fills(cycle_id)
+        if measurement == MEASUREMENT_UNKNOWN:
             return None, MEASUREMENT_UNKNOWN
-        if len(fills) >= _SETTLEMENT_FILL_WINDOW:
+        if measurement == MEASUREMENT_PARTIAL:
             return None, MEASUREMENT_PARTIAL
         for row in cycles_from_fills(fills):
             if str(row.get("cycleId") or "").strip() == cycle_id:
@@ -2989,6 +3084,94 @@ class AutoSimulationWorker:
                 return None, MEASUREMENT_UNKNOWN
         # El ciclo todavía no está cerrado según el FIFO de fills: no se afirma un PnL.
         return None, MEASUREMENT_PARTIAL
+
+    async def _v2_recover_durable_facts(self) -> None:
+        """v2.88.27 — reemite el ``SETTLEMENT`` que un crash dejó sin publicar (una vez/proceso).
+
+        La ventana que cierra: ``persist_position(CLOSED)`` es durable, pero su
+        ``auto_cycle_settlement`` va DESPUÉS por el sumidero best-effort. Un crash entre ambos
+        dejaba el ciclo cerrado con el ``SETTLEMENT`` sin sellar y el monitor volvía a
+        ``settlement_not_durable``. Aquí se cruzan los ciclos cerrados que los fills durables
+        DEMUESTRAN con los ``cycleId`` que YA tienen settlement durable, y se sella SÓLO el hueco.
+        El PnL sale del mismo ``cycles_from_fills`` (un solo FIFO) y la identidad determinista
+        (``dedupe_key``) hace el reenvío idempotente: si ya existía, es un no-op.
+
+        Fail-open DECLARADO: sin lector/sink/store, sin ciclos, con la ventana truncada o con la
+        lectura rota NO se afirma nada (se registra); jamás se inventa un settlement.
+        """
+        if self._v2_durable_facts_recovered:
+            return
+        self._v2_durable_facts_recovered = True
+        reader = self._durable_fact_cycle_reader
+        store = self._context_store
+        if reader is None or store is None or self._operational_audit_sink is None:
+            return
+        lister = getattr(store, "list_recent_cycle_ids", None)
+        if not callable(lister):
+            return
+        try:
+            recent = await lister(self._account_id, limit=_DURABLE_FACTS_RECOVERY_CYCLES)
+        except Exception:  # noqa: BLE001 — sin ventana no se afirma nada.
+            logger.exception("auto_sim durable facts recovery: cycle window read failed")
+            return
+        if not recent:
+            return
+        try:
+            settled = await reader(AUTO_CYCLE_SETTLEMENT_EVENT)
+        except Exception:  # noqa: BLE001 — sin saber qué existe, no se reemite a ciegas.
+            logger.exception("auto_sim durable facts recovery: settled read failed")
+            return
+        recovered = 0
+        for cycle_id in recent:
+            cycle = str(cycle_id or "").strip()
+            if not cycle or cycle in settled:
+                continue
+            try:
+                fills, measurement = await self._v2_read_cycle_fills(cycle)
+                if measurement != MEASUREMENT_COMPLETE or not fills:
+                    continue
+                rows = cycles_from_fills(fills)
+                row = next(
+                    (r for r in rows if str(r.get("cycleId") or "").strip() == cycle), None
+                )
+                if row is None:
+                    # El FIFO no da el ciclo por cerrado (o no lo puede afirmar): no hay settlement.
+                    continue
+                snapshot = settlement_snapshot_from_fills(fills)
+                if snapshot is None:
+                    continue
+                pnl = row.get("pnl")
+                pnl_value = (
+                    float(pnl)
+                    if isinstance(pnl, (int, float, Decimal)) and not isinstance(pnl, bool)
+                    else None
+                )
+                entry = build_cycle_settlement_entry(
+                    settlement_id=f"settle-{cycle}",
+                    instrument_id=snapshot["instrument_id"],
+                    side="sell",
+                    closed_qty=snapshot["closed_qty"],
+                    pnl=pnl_value,
+                    settled_at=row.get("closedAt"),
+                    exit_reason=None,
+                    price_source=snapshot["price_source"],
+                    cycle_id=cycle,
+                    actor=self._engine_id,
+                    as_of=self._v2_instant(),
+                    account_id=self._account_id,
+                )
+                await self._v2_audit_emit(
+                    self._v2_seal_audit_identity(entry), label="cycle_settlement_recovery"
+                )
+                recovered += 1
+            except Exception:  # noqa: BLE001 — la recuperación NUNCA tumba el turno.
+                logger.exception(
+                    "auto_sim durable facts recovery failed cycle=%s (declared, ignored)", cycle
+                )
+        if recovered:
+            logger.info(
+                "auto_sim durable facts recovery: re-emitted %d settlement(s)", recovered
+            )
 
     async def _v2_save_exit_order(self, order: ExitOrder) -> bool:
         """Persiste un INTENT de salida; ``False`` si el store falta o no fue durable."""
@@ -5902,6 +6085,9 @@ class AutoSimulationWorker:
         # AUTO Operational Monitor (``M2``): sink de la auditoría operativa, sobre la MISMA
         # sesión del tick. Sin él se conserva el del constructor (hermético/tests) ⇒ Δ = 0.
         operational_audit_sink: Callable[[Any], Awaitable[None]] | None = None,
+        # v2.88.27: lector de deduplicación de los hechos M2 (``SETTLEMENT`` ya sellados), atado
+        # a la MISMA sesión del tick. Sin él se conserva el del constructor ⇒ no se recupera nada.
+        durable_fact_cycle_reader: Callable[[str], Awaitable[frozenset[str]]] | None = None,
         # AUTO-11: sink de la recomendación Adaptive durable, atado a la MISMA sesión del tick.
         adaptive_sink: Callable[[Any], Awaitable[None]] | None = None,
         # AUTO-11: lector del estado Adaptive reconstruible, también sobre la sesión del tick.
@@ -5945,6 +6131,7 @@ class AutoSimulationWorker:
         prev_cycle_sink = self._cycle_regime_sink
         prev_cycle_reader = self._cycle_regime_reader
         prev_operational_audit_sink = self._operational_audit_sink
+        prev_durable_fact_reader = self._durable_fact_cycle_reader
         prev_adaptive_sink = self._adaptive_sink
         prev_adaptive_reader = self._adaptive_reader
         prev_adaptive_gate_store = self._adaptive_gate_store
@@ -6008,6 +6195,12 @@ class AutoSimulationWorker:
                 if operational_audit_sink is not None
                 else prev_operational_audit_sink
             )
+            # v2.88.27 — la mitad de LECTURA para deduplicar/recuperar los hechos M2, misma regla.
+            self._durable_fact_cycle_reader = (
+                durable_fact_cycle_reader
+                if durable_fact_cycle_reader is not None
+                else prev_durable_fact_reader
+            )
             # AUTO-11: la recomendación Adaptive durable y su lector, con la misma regla de sesión.
             self._adaptive_sink = adaptive_sink if adaptive_sink is not None else prev_adaptive_sink
             self._adaptive_reader = (
@@ -6041,6 +6234,11 @@ class AutoSimulationWorker:
             # para que la ventana ``RESERVATION COMMITTED → CRASH → NO JOURNAL`` de AUTO-10 deje
             # de ser invisible. Read-only: solo declara, no corrige.
             await self._v2_reconcile_cycle_traces()
+            # v2.88.27 — y se recuperan los HECHOS durables que un crash pudo dejar sin publicar:
+            # un ciclo cerrado (demostrado por los fills) sin ``auto_cycle_settlement`` en el
+            # spine se vuelve a sellar aquí. La identidad determinista hace el reenvío idempotente
+            # y el lector confirma qué ciclos YA lo tienen, de modo que no se reescribe el pasado.
+            await self._v2_recover_durable_facts()
             report = await self.auto_turn()
             # OBS-14 — CIERRE del ciclo de reservas del turno: retira las reservas MUERTAS
             # (la orden no llegó a materializarse dentro del tick) sobre la MISMA sesión del
@@ -6101,6 +6299,7 @@ class AutoSimulationWorker:
             self._cycle_regime_sink = prev_cycle_sink
             self._cycle_regime_reader = prev_cycle_reader
             self._operational_audit_sink = prev_operational_audit_sink
+            self._durable_fact_cycle_reader = prev_durable_fact_reader
             self._adaptive_sink = prev_adaptive_sink
             self._adaptive_reader = prev_adaptive_reader
             self._adaptive_gate_store = prev_adaptive_gate_store
@@ -6294,6 +6493,60 @@ def build_operational_audit_sink(session: Any) -> Callable[[Any], Awaitable[None
             raise
 
     return sink
+
+
+#: v2.88.27 — ventana de lectura con la que el arranque confirma qué ciclos ya tienen su
+#: ``SETTLEMENT`` durable. Es una LECTURA de deduplicación: si la ventana se quedara corta, el
+#: peor caso es reemitir un hecho que YA existe, y la identidad determinista lo vuelve un no-op.
+_DURABLE_FACTS_READ_WINDOW = 500
+
+#: v2.88.27 — tope de ciclos recientes que el arranque examina para recuperar un ``SETTLEMENT``
+#: que un crash dejó sin publicar. La ventana acota el trabajo de arranque; el ciclo que quede
+#: fuera no se pierde: su ``SETTLEMENT`` se sellará igualmente al reabrir ese ciclo (o en el
+#: siguiente arranque), y mientras tanto el monitor lo declara ``settlement_not_durable``.
+_DURABLE_FACTS_RECOVERY_CYCLES = 200
+
+
+def build_durable_fact_cycle_reader(
+    session: Any,
+    *,
+    account_id: str | None,
+    engine_id: str | None,
+) -> Callable[[str], Awaitable[frozenset[str]]]:
+    """(v2.88.27) lector de los ``cycleId`` que YA tienen un hecho durable de ese ``event_type``.
+
+    Mitad de lectura del MISMO repositorio del spine que ``build_operational_audit_sink`` y con
+    la misma sesión del tick. Se acota por cuenta y por motor (``engineId`` en el ``payload``),
+    de modo que dos motores de una cuenta no se pisan la deduplicación. Sólo se leen los hechos
+    del ``event_type`` pedido (``auto_cycle_settlement`` en la recuperación) y se devuelve el
+    conjunto de ``payload['cycleId']``; una entrada sin ciclo no aporta un ciclo inventado.
+
+    Fail-open DECLARADO: si la lectura revienta, el error sube al worker, que lo registra y NO
+    reemite nada —reemitir sin saber qué existe seguiría siendo idempotente por la clave, pero
+    afirmar "ya está" sin prueba sería el hueco disfrazado—.
+    """
+    from bolsa_infrastructure.database.repositories.journal_repository import (  # noqa: PLC0415
+        SqlAlchemyJournalRepository,
+    )
+
+    repository = SqlAlchemyJournalRepository(session)
+
+    async def reader(event_type: str) -> frozenset[str]:
+        rows, _total = await repository.list_entries(
+            account_id=str(account_id or ""),
+            event_type=event_type,
+            engine_id=engine_id,
+            limit=_DURABLE_FACTS_READ_WINDOW,
+        )
+        cycles: set[str] = set()
+        for row in rows:
+            payload = row.payload or {}
+            cycle = str(payload.get("cycleId") or "").strip()
+            if cycle:
+                cycles.add(cycle)
+        return frozenset(cycles)
+
+    return reader
 
 
 def build_adaptive_state_reader(
@@ -6854,6 +7107,17 @@ class AutoSimRuntime:
             operational_audit_sink = (
                 build_operational_audit_sink(session) if operational_audit_enabled() else None
             )
+            # v2.88.27 — el LECTOR de deduplicación, también tras el flag: sin auditoría no hay
+            # hechos que recuperar (y sin él el arranque no toca el spine: Δ = 0).
+            durable_fact_cycle_reader = (
+                build_durable_fact_cycle_reader(
+                    session,
+                    account_id=self._account_id,
+                    engine_id=self._worker._engine_id,  # noqa: SLF001 — seam interno.
+                )
+                if operational_audit_enabled()
+                else None
+            )
             adaptive_reader = build_adaptive_state_reader(
                 session,
                 policy=self._worker._v2_adaptive_policy(),  # noqa: SLF001 — seam interno.
@@ -6883,6 +7147,7 @@ class AutoSimRuntime:
                 cycle_regime_sink=cycle_regime_sink,
                 cycle_regime_reader=cycle_regime_reader,
                 operational_audit_sink=operational_audit_sink,
+                durable_fact_cycle_reader=durable_fact_cycle_reader,
                 adaptive_sink=adaptive_sink,
                 adaptive_reader=adaptive_reader,
                 adaptive_gate_store=adaptive_gate_store,

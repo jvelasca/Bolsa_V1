@@ -321,6 +321,11 @@ async def test_entry_order_and_settlement_are_journaled_durably(
     assert payload["partial"] is False
     assert payload["priceSource"] == PRICE_SOURCE_SYNTHETIC  # script hermético → SYNTHETIC
     cycle_id = payload["cycleId"]
+    # v2.88.27 — el hecho declara identidad determinista (idempotencia del reintento).
+    assert (
+        entry_events[0].dedupe_key
+        == f"auto_entry_order:{_ACCOUNT}:auto-sim:{cycle_id}:{payload['orderId']}"
+    )
 
     # El fill durable también declara la fuente (migración 047).
     fills = await contexts.list_by_cycle_ids(_ACCOUNT, [cycle_id])
@@ -343,6 +348,8 @@ async def test_entry_order_and_settlement_are_journaled_durably(
     # Compra y venta al mismo precio: 0 es un PnL MEDIDO (no un hueco).
     assert settled["pnl"] == 0.0
     assert settled["pnlMeasurement"] == "COMPLETE"
+    # v2.88.27 — un settlement por ciclo: identidad determinista para el reenvío idempotente.
+    assert settlements[0].dedupe_key == f"auto_cycle_settlement:{_ACCOUNT}:auto-sim:{cycle_id}"
 
 
 @pytest.mark.asyncio

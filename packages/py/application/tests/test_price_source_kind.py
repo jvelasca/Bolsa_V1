@@ -14,6 +14,8 @@ from bolsa_application.price_source_kind import (
     PRICE_SOURCE_MARKET_CLOSE,
     PRICE_SOURCE_SCRIPT,
     PRICE_SOURCE_SYNTHETIC,
+    canonical_price_source,
+    price_source_snapshot_disagrees,
     usable_price_source,
 )
 
@@ -42,3 +44,21 @@ def test_vocabulary_is_closed_and_non_empty() -> None:
     assert PRICE_SOURCE_KINDS  # no vacío
     for kind in PRICE_SOURCE_KINDS:
         assert usable_price_source(kind) == kind
+
+
+def test_canonical_authority_is_the_fill_not_the_audit_snapshot() -> None:
+    """v2.88.27 — si el fill y su snapshot difieren, GANA EL FILL (la autoridad declarada)."""
+    assert (
+        canonical_price_source(PRICE_SOURCE_MARKET_CLOSE, PRICE_SOURCE_SYNTHETIC)
+        == PRICE_SOURCE_MARKET_CLOSE
+    )
+    # Un fill NO medido tampoco se rellena con el snapshot: la ausencia también es autoridad.
+    assert canonical_price_source(None, PRICE_SOURCE_MARKET_CLOSE) is None
+
+
+def test_snapshot_disagreement_requires_two_measurements() -> None:
+    assert price_source_snapshot_disagrees(PRICE_SOURCE_MARKET_CLOSE, PRICE_SOURCE_SYNTHETIC) is True
+    assert price_source_snapshot_disagrees(PRICE_SOURCE_MARKET_CLOSE, "market_close") is False
+    # "No medido" NO es una discrepancia: faltaría una de las dos medidas.
+    assert price_source_snapshot_disagrees(None, PRICE_SOURCE_SYNTHETIC) is None
+    assert price_source_snapshot_disagrees(PRICE_SOURCE_MARKET_CLOSE, "TOTALLY_MADE_UP") is None

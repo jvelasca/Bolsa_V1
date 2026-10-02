@@ -737,6 +737,10 @@ class DecisionJournalEntryRow(Base):
     actor: Mapped[str] = mapped_column(String)
     payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+    # v2.88.27 — identidad determinista del hecho para inserción idempotente. ``None`` en
+    # los hechos sin identidad natural (histórico y resto de productores): el índice único
+    # es PARCIAL (``WHERE dedupe_key IS NOT NULL``), así que los ``NULL`` no colisionan.
+    dedupe_key: Mapped[str | None] = mapped_column("dedupe_key", String, nullable=True)
 
 
 class ModelArtifactRow(Base):

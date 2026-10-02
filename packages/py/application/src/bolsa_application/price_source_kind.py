@@ -9,6 +9,11 @@ por fill (``sim_fill_finance_context.price_source``, migración 047) y se lee si
 Regla dura (misma que ``reference_mid``): la ausencia se DECLARA. Un valor fuera del vocabulario no
 se convierte en un literal inventado ni en una cadena libre — se normaliza a ``None`` (``NULL`` =
 "fila anterior al sello / fuente no medible"), nunca a un ``"UNKNOWN"`` que parecería una medición.
+
+Autoridad canónica (v2.88.27): la fuente de verdad es ``sim_fill_finance_context.price_source``
+(el fill). ``auto_entry_order.priceSource`` y ``auto_cycle_settlement.priceSource`` son SNAPSHOTS de
+auditoría, no una segunda medida: si algún día contradicen al fill, gana el fill
+(``canonical_price_source``) y la discrepancia se declara (``price_source_snapshot_disagrees``).
 """
 
 from __future__ import annotations
@@ -21,6 +26,8 @@ __all__ = [
     "PRICE_SOURCE_SCRIPT",
     "PRICE_SOURCE_SYNTHETIC",
     "PRICE_SOURCE_XTB",
+    "canonical_price_source",
+    "price_source_snapshot_disagrees",
     "usable_price_source",
 ]
 
@@ -61,3 +68,33 @@ def usable_price_source(raw: object) -> str | None:
     """
     text = str(raw or "").strip().upper()
     return text if text in PRICE_SOURCE_KINDS else None
+
+
+def canonical_price_source(
+    fill_price_source: object, event_price_source: object = None
+) -> str | None:
+    """(PURA, v2.88.27) fuente CANÓNICA cuando el fill y su snapshot de auditoría difieren.
+
+    Autoridad declarada: la fuente del FILL (``sim_fill_finance_context.price_source``), que es
+    el hecho del que el precio realmente salió. ``auto_entry_order``/``auto_cycle_settlement``
+    llevan un ``priceSource`` que es un **snapshot** para el journal, NO una segunda verdad: si
+    contradicen al fill, no lo sobreescriben. Un fill no medido (``None``) tampoco se rellena con
+    el snapshot: la ausencia también es autoridad.
+    """
+    return usable_price_source(fill_price_source)
+
+
+def price_source_snapshot_disagrees(
+    fill_price_source: object, event_price_source: object
+) -> bool | None:
+    """(PURA) ``True``/``False`` si fill y snapshot están MEDIDOS y difieren; ``None`` si no.
+
+    Discrepar exige dos mediciones: si alguna falta, no hay discrepancia que afirmar (sería
+    confundir "no medido" con "distinto"). Es la comprobación de observabilidad de la regla de
+    autoridad — cuando devuelve ``True``, gana ``canonical_price_source`` (el fill).
+    """
+    fill = usable_price_source(fill_price_source)
+    snapshot = usable_price_source(event_price_source)
+    if fill is None or snapshot is None:
+        return None
+    return fill != snapshot

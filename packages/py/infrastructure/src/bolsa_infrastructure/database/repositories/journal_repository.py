@@ -34,6 +34,7 @@ def _row_to_record(row: DecisionJournalEntryRow) -> DecisionJournalEntryRecord:
         account_id=row.account_id,
         instrument_id=row.instrument_id,
         payload=dict(row.payload) if row.payload else None,
+        dedupe_key=getattr(row, "dedupe_key", None),
     )
 
 
@@ -45,6 +46,36 @@ class SqlAlchemyJournalRepository:
 
     async def append(self, entry: DecisionJournalEntryRecord) -> DecisionJournalEntryRecord:
         now = _parse_ts(entry.created_at) or datetime.now(UTC)
+        # v2.88.27 — dos caminos, el MISMO hecho:
+        # * con ``dedupe_key`` (identidad determinista declarada por el productor) el alta es
+        #   idempotente: ``ON CONFLICT DO NOTHING`` sobre el índice único PARCIAL. Un reintento
+        #   del sumidero o la recuperación de un hecho que un crash dejó sin publicar no duplica.
+        # * sin ``dedupe_key`` (histórico y resto de productores) se conserva el INSERT plano de
+        #   siempre: sin identidad natural no se finge unicidad ni cambia el comportamiento.
+        if entry.dedupe_key:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            statement = (
+                pg_insert(DecisionJournalEntryRow)
+                .values(
+                    id=entry.id,
+                    decision_id=entry.decision_id,
+                    session_id=entry.session_id,
+                    account_id=entry.account_id,
+                    instrument_id=entry.instrument_id,
+                    event_type=entry.event_type,
+                    actor=entry.actor,
+                    payload=entry.payload,
+                    created_at=now,
+                    dedupe_key=entry.dedupe_key,
+                )
+                .on_conflict_do_nothing(
+                    index_elements=[DecisionJournalEntryRow.dedupe_key],
+                    index_where=DecisionJournalEntryRow.dedupe_key.is_not(None),
+                )
+            )
+            await self._session.execute(statement)
+            return entry
         row = DecisionJournalEntryRow(
             id=entry.id,
             decision_id=entry.decision_id,
