@@ -261,6 +261,12 @@ debe localizar el escalón donde se pierde la oportunidad (con `BEAR_TREND`, el 
 `regimeAllowed`). El gate de evidencia sigue en **`NO MEDIDO`** hasta reunir ≥4 cubos, ≥2 episodios y
 ≥32 ciclos.
 
+**Automatización (opcional):** el [runbook §3.3](./runbook-ventana-forward-v2.78-2026-09-27.md) documenta el
+runner `scripts/window-forward-runner.mjs` (`pnpm window:preflight` / `window:run-day` / `window:status` /
+`window:task:install`), que encadena los pasos 1–5 con artefactos por día, ledger y **freeze** del árbol
+(`git rev-parse "HEAD:apps" "HEAD:packages"`); aborta con `TREE_MOVED` si el código se mueve y registra
+`NO_MEDIDO_REGIMEN` cuando el preflight vetea (sin lanzar el forward).
+
 ## 5. Cadencia diaria D1..D4
 
 Los comandos exactos (PowerShell) están en el

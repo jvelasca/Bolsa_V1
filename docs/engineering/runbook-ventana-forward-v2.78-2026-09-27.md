@@ -195,6 +195,34 @@ uv run --no-sync python apps/api-python/scripts/v2_83_window_audit.py `
 | D3 | idem | idem | serie D1..D3 | idem | vigilar `otherCount` (H-4 visible) |
 | D4 | idem | idem | serie D1..D4 | `window_gate` | `READY` solo con ≥4 días / ≥2 episodios / ≥32 ciclos |
 
+### 3.3 Automatización opcional (`window-forward-runner.mjs`)
+
+Wrapper Node que encadena el pipeline de §3 con **artefactos por día**, ledger acumulado y freeze
+del árbol de código. **Ops-only**: no cambia motor, gobernador, `TOP_N`, umbrales, allocation,
+pesos A/B ni migraciones.
+
+```powershell
+pnpm window:preflight                   # solo sonda read-only (v2_76 --preflight-only)
+pnpm window:run-day                     # día completo: preflight -> forward -> v2_77 -> v2_80 -> v2_83
+pnpm window:run-day -- --force          # re-ejecuta un día ya terminal
+pnpm window:status                      # días registrados + gate (>=4 días / >=2 episodios / >=32 ciclos)
+pnpm window:task:install -- --at 18:00  # registra la tarea diaria de Windows (opcional, schtasks)
+pnpm window:task:remove
+```
+
+- **Veto de régimen**: si el preflight vetea LONG (`BEAR_TREND`), el día se registra como
+  `NO_MEDIDO_REGIMEN` y **no** se lanza el forward (regla dura §1/§5). Un `exit 2` **sin** payload
+  de preflight se trata como fallo duro, nunca como veto.
+- **Freeze**: el runner aborta con `TREE_MOVED` si `git rev-parse "HEAD:apps" "HEAD:packages"` no
+  coincide con los hashes pinneados (§0): la ventana no mezcla dos árboles de código.
+- **Artefactos** (gitignored): `operability_runs/window-runs/<YYYYMMDD>/` (manifest + logs +
+  preflight/forward/window/audit) y `operability_runs/window-runs/ledger.jsonl`.
+- **Higiene de entorno**: `AUTO_ENGINE_SIM_REAL_PRICE=1`, `AUTO_OPERATIONAL_AUDIT=1` y
+  `BROKER_VENUE=paper` se inyectan **solo** en el `env` del proceso hijo; el shell del operador no
+  se contamina (evita el falso rojo de las suites PG del §5).
+- **Intérprete**: usa `uv run --no-sync python`; si `uv` no puede lanzar `python` (bloqueo de
+  Application Control), cae a `python` directo con un aviso. Override explícito: `WINDOW_PY=python`.
+
 **Lectura honesta al cerrar.** Si el preflight sigue en `BEAR_TREND` (LONG vetadas), la ventana puede dar
 **0 oportunidades por veto de régimen legítimo**: se **declara** (`regime_invalid`), **no** se fuerza el
 gobernador ni se elige otro watch. El veredicto correcto sin material suficiente sigue siendo

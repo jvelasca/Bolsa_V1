@@ -62,6 +62,11 @@
     "test:daily-ops:offline": "node scripts/research/verify_daily_ops_battery.mjs --offline",
     "test:daily-ops:smoke": "node scripts/research/verify_daily_ops_battery.mjs --smoke",
     "ops:self-eval": "node scripts/ops_operativa_self_eval.mjs",
+    "window:preflight": "node scripts/window-forward-runner.mjs preflight",
+    "window:run-day": "node scripts/window-forward-runner.mjs run-day",
+    "window:status": "node scripts/window-forward-runner.mjs status",
+    "window:task:install": "node scripts/window-forward-runner.mjs task:install",
+    "window:task:remove": "node scripts/window-forward-runner.mjs task:remove",
     "format": "prettier --write \"**/*.{ts,tsx,js,json}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json}\"",
     "prepare": "husky"
