@@ -34,13 +34,14 @@ export const WINDOW_MIN_EPISODES = 2;
 export const WINDOW_MIN_CYCLES = 32;
 
 /**
- * Configuracion pinneada de la ventana (arbol congelado `v2.88.29-beta`).
+ * Configuracion pinneada de la ventana (arbol congelado `v2.88.30-beta`).
  * Los hashes son de `git rev-parse "HEAD:apps" "HEAD:packages"`; si el arbol de
  * codigo se mueve, el runner declara `TREE_MOVED` y aborta (fail-closed).
+ * `commit` nombra el sello de ingenieria cuyo arbol queda pinneado.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '2b67a2fa',
-  appsHash: '25afb7282e11240c19c63f85f82273ea3b1440f4',
+  commit: 'v2.88.30-beta',
+  appsHash: '2237f0693f5102e74650ccad0309a9d7ae7bae35',
   packagesHash: 'ce0a38b7e6f5a9f102490e5774f859d7f83aac4a',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',

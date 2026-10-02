@@ -7,7 +7,7 @@
 > head **hoy** `048_journal_entry_dedupe_key`).
 > Ejecutado por el script [`ops_seed_window_pair.py`](../../apps/api-python/scripts/ops_seed_window_pair.py).
 
-## 0. Re-anclaje al árbol congelado `v2.88.29-beta` (2026-10-02)
+## 0. Re-anclaje al árbol congelado `v2.88.30-beta` (2026-10-02)
 
 La ventana de `2026-09-28` (D1) se corrió sobre un árbol **anterior**; el head de migraciones
 avanzó de `046_fill_reference_mid` a `048_journal_entry_dedupe_key`. Antes de reiniciar la
@@ -15,9 +15,9 @@ ventana, este documento se **re-pinnea** al árbol congelado del sello vigente:
 
 | Dato | Valor (comprobable) |
 |---|---|
-| Sello / tag | **`v2.88.29-beta`** · commit `2b67a2fa` · package `2.11.29-beta` |
+| Sello / tag | **`v2.88.30-beta`** · package `2.11.30-beta` |
 | Alembic head | **`048_journal_entry_dedupe_key`** (**sin** migración pendiente) |
-| Árbol de **código** congelado | `git rev-parse "HEAD:apps"` = `25afb7282e11240c19c63f85f82273ea3b1440f4` · `git rev-parse "HEAD:packages"` = `ce0a38b7e6f5a9f102490e5774f859d7f83aac4a` |
+| Árbol de **código** congelado | `git rev-parse "HEAD:apps"` = `2237f0693f5102e74650ccad0309a9d7ae7bae35` · `git rev-parse "HEAD:packages"` = `ce0a38b7e6f5a9f102490e5774f859d7f83aac4a` |
 | Identidad fija (sin cambios) | `$ACCOUNT` = `1484e253d2d54645945a6b1d7` · `$VERSION_A` = `v283-window-a` · `$VERSION_B` = `v283-window-b` · watch = **20** símbolos |
 | Configuración de operación | `AUTO_ENGINE_SIM_REAL_PRICE=1` (deja de fabricar `100.0`) y `AUTO_OPERATIONAL_AUDIT=1` (hechos durables para el monitor). **Ningún** cambio de motor/`TOP_N`/régimen/umbrales/A-B. |
 
