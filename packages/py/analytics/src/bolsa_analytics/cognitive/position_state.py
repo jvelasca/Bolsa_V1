@@ -25,6 +25,7 @@ from bolsa_analytics.cognitive.position_revision import (
     PositionRevision,
     PositionRevisionOrigin,
     build_position_revision,
+    deterministic_revision_id,
     revisions_from_raw,
     stop_or_status_changed,
 )
@@ -715,10 +716,89 @@ def _with_revision_if_changed(
         next_status=next_pos.status,
         origin=origin,
         reason=reason,
+        # v2.88.28 — identidad DETERMINISTA del cambio durable (no ``REV-<uuid4>``): el
+        # mismo cambio recomputado tras un reintento/crash devuelve la misma clave y el
+        # hecho de protección no se duplica.
+        revision_id=deterministic_revision_id(
+            position_id=previous.position_id,
+            origin=origin,
+            previous_stop=previous.current_stop,
+            next_stop=next_pos.current_stop,
+            previous_status=previous.status,
+            next_status=next_pos.status,
+            ordinal=len(previous.revisions),
+        ),
         decision_id=_resolve_revision_decision_id(previous, decision_id),
         policy_id=policy_id,
     )
     return replace(next_pos, revisions=previous.revisions + (rev,))
+
+
+def seal_protection_transition(
+    previous: PositionState,
+    advanced: PositionState,
+    *,
+    kind: str,
+    origin: PositionRevisionOrigin,
+    at: str,
+    reason: str | None = None,
+) -> tuple[PositionState, str]:
+    """(PURA) sella la revisión durable de una transición de gestión y devuelve su id.
+
+    v2.88.28 — cierra el exactly-once de ``auto_protection_event``: TODA transición de
+    protección necesita una ``revision_id`` durable para derivar un ``dedupe_key``
+    determinista. Resolución, en este orden:
+
+    1. Si el paso ya añadió una revisión (``apply_position_current_stop``/``apply_position_reduce``)
+       se REUTILIZA su ``revision_id``: la traza apunta al cambio durable que ya ocurrió.
+    2. Si no la añadió pero hubo cambio real (lifecycle/status/stop) se AÑADE una revisión
+       con identidad determinista (``deterministic_revision_id``) y se devuelve la posición
+       aumentada para que el llamante la persista.
+    3. Si no hubo cambio durable (p. ej. ``PROTECT_REQUESTED`` sin efecto) NO se inventa una
+       revisión: se devuelve un id determinista por contenido. Dos ticks idénticos sin cambio
+       comparten clave (no inundan el journal); un cambio distinto produce otra clave.
+    """
+    if len(advanced.revisions) > len(previous.revisions):
+        return advanced, advanced.revisions[-1].revision_id
+    status_changed = stop_or_status_changed(
+        previous_stop=previous.current_stop,
+        next_stop=advanced.current_stop,
+        previous_status=previous.status,
+        next_status=advanced.status,
+    )
+    if previous.lifecycle_state != advanced.lifecycle_state or status_changed:
+        revision_id = deterministic_revision_id(
+            position_id=previous.position_id,
+            origin=origin,
+            previous_stop=previous.current_stop,
+            next_stop=advanced.current_stop,
+            previous_status=previous.status,
+            next_status=advanced.status,
+            ordinal=len(previous.revisions),
+        )
+        revision = build_position_revision(
+            at=at,
+            previous_stop=previous.current_stop,
+            next_stop=advanced.current_stop,
+            previous_status=previous.status,
+            next_status=advanced.status,
+            origin=origin,
+            reason=reason or kind,
+            revision_id=revision_id,
+            decision_id=_resolve_revision_decision_id(previous, None),
+        )
+        return replace(advanced, revisions=previous.revisions + (revision,)), revision_id
+    revision_id = deterministic_revision_id(
+        position_id=previous.position_id,
+        origin=origin,
+        previous_stop=previous.current_stop,
+        next_stop=advanced.current_stop,
+        previous_status=previous.status,
+        next_status=advanced.status,
+        ordinal=len(previous.revisions),
+        discriminator=kind,
+    )
+    return advanced, revision_id
 
 
 def apply_position_mark(

@@ -1,7 +1,10 @@
 """PositionRevision OI-5 — historia auditada (ADR-034)."""
 
+from dataclasses import replace
+
 from bolsa_analytics.cognitive.position_revision import (
     build_position_revision,
+    deterministic_revision_id,
     position_revision_from_dict,
     revision_origin_from_exit_reason,
     revisions_from_raw,
@@ -13,6 +16,7 @@ from bolsa_analytics.cognitive.position_state import (
     apply_position_reduce,
     build_position_state_from_fill,
     position_state_from_dict,
+    seal_protection_transition,
 )
 
 
@@ -199,3 +203,91 @@ def test_revision_origin_from_exit_reason() -> None:
     assert revision_origin_from_exit_reason("TARGET_1") == "protect"
     assert revision_origin_from_exit_reason("TRAILING") == "protect"
     assert revision_origin_from_exit_reason(None) == "protect"
+
+
+# ── v2.88.28 — identidad determinista y sellado de transiciones de protección ──────
+
+
+def test_deterministic_revision_id_is_stable_and_content_addressed() -> None:
+    base = {
+        "position_id": "pos-1",
+        "origin": "protect",
+        "previous_stop": 95.0,
+        "next_stop": 98.0,
+        "previous_status": "OPEN",
+        "next_status": "OPEN",
+        "ordinal": 0,
+    }
+    first = deterministic_revision_id(**base)
+    second = deterministic_revision_id(**base)
+    assert first == second
+    assert first.startswith("REV-")
+    # El MISMO cambio en otro ordinal (otra transición real) NO colisiona.
+    assert deterministic_revision_id(**{**base, "ordinal": 1}) != first
+    # Un ``discriminator`` distinto separa dos hechos sin cambio de estado.
+    assert (
+        deterministic_revision_id(**base, discriminator="PROTECT_APPLIED")
+        != deterministic_revision_id(**base, discriminator="PROTECT_REQUESTED")
+    )
+
+
+def test_apply_stop_revision_id_is_deterministic() -> None:
+    pos = _open_long()
+    first = apply_position_current_stop(pos, 98.0, at="t1", origin="protect")
+    second = apply_position_current_stop(pos, 98.0, at="t2", origin="protect")
+    assert first is not None and second is not None
+    # El mismo cambio recomputado (mismo estado de partida, otro instante) ⇒ misma clave.
+    assert first.revisions[0].revision_id == second.revisions[0].revision_id
+
+
+def test_apply_reduce_revision_id_is_deterministic() -> None:
+    pos = _open_long()
+    first = apply_position_reduce(pos, 5.0, exit_price=105.0, at="t1")
+    second = apply_position_reduce(pos, 5.0, exit_price=105.0, at="t2")
+    assert first is not None and second is not None
+    assert first.revisions[0].revision_id == second.revisions[0].revision_id
+
+
+def test_seal_protection_transition_reuses_the_step_revision() -> None:
+    pos = _open_long()
+    advanced = apply_position_current_stop(pos, 98.0, at="t1", origin="protect")
+    assert advanced is not None
+    sealed, revision_id = seal_protection_transition(
+        pos, advanced, kind="PROTECT_APPLIED", origin="protect", at="t1"
+    )
+    # El paso ya añadió la revisión: se reutiliza, no se duplica.
+    assert sealed.revisions == advanced.revisions
+    assert revision_id == advanced.revisions[-1].revision_id
+
+
+def test_seal_protection_transition_adds_lifecycle_revision() -> None:
+    pos = _open_long()
+    advanced = replace(pos, lifecycle_state="PROTECTED")
+    sealed, revision_id = seal_protection_transition(
+        pos, advanced, kind="PROTECT_APPLIED", origin="protect", at="t1", reason="plan"
+    )
+    assert len(sealed.revisions) == 1
+    assert sealed.revisions[0].revision_id == revision_id
+    assert sealed.revisions[0].origin == "protect"
+    # La identidad se deriva del estado durable, no del intento de escritura.
+    again, again_id = seal_protection_transition(
+        pos, advanced, kind="PROTECT_APPLIED", origin="protect", at="t9", reason="plan"
+    )
+    assert again_id == revision_id
+
+
+def test_seal_protection_transition_without_change_shares_content_id() -> None:
+    pos = _open_long()
+    sealed, revision_id = seal_protection_transition(
+        pos, pos, kind="PROTECT_REQUESTED", origin="protect", at="t1"
+    )
+    # Sin cambio durable no se inventa revisión: sólo la identidad por contenido.
+    assert sealed.revisions == ()
+    same, same_id = seal_protection_transition(
+        pos, pos, kind="PROTECT_REQUESTED", origin="protect", at="t2"
+    )
+    assert same_id == revision_id
+    _, other_id = seal_protection_transition(
+        pos, pos, kind="PROTECT_APPLIED", origin="protect", at="t1"
+    )
+    assert other_id != revision_id

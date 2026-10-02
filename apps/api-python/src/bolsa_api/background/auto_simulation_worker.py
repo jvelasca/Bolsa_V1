@@ -118,6 +118,7 @@ from bolsa_analytics.cognitive.position_state import (
     apply_position_reduce,
     build_position_state_from_fill,
     position_state_from_dict,
+    seal_protection_transition,
 )
 from bolsa_analytics.cognitive.signal_identity import bar_window
 from bolsa_analytics.cognitive.trade_context import TradeContext
@@ -5195,9 +5196,19 @@ class AutoSimulationWorker:
         # la copia previa, el evento pisaría el stop recién ratcheado.
         current = self._v2_positions.get(symbol) or position
         advanced, transition = advance_lifecycle(current, event, at=at)
-        if transition.accepted:
-            self._v2_positions[symbol] = advanced
-        else:
+        # v2.88.28 — toda transición de protección lleva una ``revision_id`` durable para
+        # derivar un ``dedupe_key`` determinista (antes esta salida pedida viajaba sin ella y
+        # el hecho era duplicable). La identidad procede del cambio real del ``PositionState``.
+        advanced, protection_revision_id = seal_protection_transition(
+            current,
+            advanced,
+            kind=event,
+            origin="protect",
+            at=at,
+            reason=event,
+        )
+        self._v2_positions[symbol] = advanced
+        if not transition.accepted:
             self._journal_position_event(
                 symbol,
                 LIFECYCLE_TRANSITION_REJECTED,
@@ -5230,6 +5241,7 @@ class AutoSimulationWorker:
             stop_before=current.current_stop,
             stop_after=advanced.current_stop,
             trailing_status=trailing_status(advanced),
+            revision_id=protection_revision_id,
             source=None,
         )
 
@@ -5286,6 +5298,16 @@ class AutoSimulationWorker:
                 # v2.88.26 — el pedido sin efecto también es un HECHO durable de protección
                 # (``PROTECT_REQUESTED``): sin esto, "se intentó proteger y no se pudo"
                 # quedaría mudo en el monitor.
+                # v2.88.28 — el hecho lleva identidad determinista (contenido) para que un
+                # reintento del mismo tick no lo duplique.
+                _, protection_revision_id = seal_protection_transition(
+                    current,
+                    current,
+                    kind=PROTECT_REQUESTED,
+                    origin="protect",
+                    at=at,
+                    reason=PROTECT_REQUESTED,
+                )
                 await self._v2_journal_protection(
                     kind=PROTECT_REQUESTED,
                     instrument_id=symbol,
@@ -5296,6 +5318,7 @@ class AutoSimulationWorker:
                     stop_before=current.current_stop,
                     stop_after=current.current_stop,
                     trailing_status=trailing_status(current),
+                    revision_id=protection_revision_id,
                     source=None,
                 )
             return
@@ -5336,6 +5359,17 @@ class AutoSimulationWorker:
         self._v2_positions[symbol] = advanced
         changed = before != advanced.current_stop
         if changed:
+            # v2.88.28 — se sella ANTES de persistir para que la revisión determinista del
+            # movimiento viaje en el mismo ``position_state`` durable.
+            advanced, protection_revision_id = seal_protection_transition(
+                current,
+                advanced,
+                kind=event if transition.accepted else STOP_RATCHET_APPLIED,
+                origin="trail" if trailing_armed else "protect",
+                at=at,
+                reason="auto_v2_ratchet",
+            )
+            self._v2_positions[symbol] = advanced
             held = self._open.get(symbol, Decimal("0"))
             if held > 0:
                 await self._persist_position(symbol, held)
@@ -5354,7 +5388,7 @@ class AutoSimulationWorker:
             # v2.88.26 — HECHO durable del movimiento del stop. ``kind`` es la transición FSM
             # aceptada (``PROTECT_APPLIED``/``TRAIL_ADVANCED``); si el FSM la rechazó pero el
             # stop SÍ se movió, el hecho es el ratchet desnudo (``STOP_RATCHET_APPLIED``).
-            last_rev = advanced.revisions[-1] if advanced.revisions else None
+            revision = advanced.revisions[-1] if advanced.revisions else None
             await self._v2_journal_protection(
                 kind=event if transition.accepted else STOP_RATCHET_APPLIED,
                 instrument_id=symbol,
@@ -5365,12 +5399,26 @@ class AutoSimulationWorker:
                 stop_before=before,
                 stop_after=advanced.current_stop,
                 trailing_status=trailing_status(advanced),
-                revision_id=last_rev.revision_id if last_rev else None,
-                source=last_rev.origin if last_rev else None,
+                revision_id=protection_revision_id,
+                source=revision.origin if revision else None,
             )
         else:
             # Idempotente: el stop no cambia, pero la transición sí puede haber ocurrido.
             if advanced.lifecycle_state != current.lifecycle_state:
+                # v2.88.28 — la transición FSM sin mover el stop también añade su revisión
+                # determinista y se persiste, para que el hecho durable tenga identidad.
+                advanced, protection_revision_id = seal_protection_transition(
+                    current,
+                    advanced,
+                    kind=PROTECT_REQUESTED,
+                    origin="protect",
+                    at=at,
+                    reason=PROTECT_REQUESTED,
+                )
+                self._v2_positions[symbol] = advanced
+                held = self._open.get(symbol, Decimal("0"))
+                if held > 0:
+                    await self._persist_position(symbol, held)
                 self._journal_position_event(
                     symbol,
                     PROTECT_REQUESTED,
@@ -5393,6 +5441,7 @@ class AutoSimulationWorker:
                     stop_before=before,
                     stop_after=advanced.current_stop,
                     trailing_status=trailing_status(advanced),
+                    revision_id=protection_revision_id,
                     source=None,
                 )
             elif advanced.current_stop is not None:
@@ -5508,6 +5557,17 @@ class AutoSimulationWorker:
                 detail={"event": "ENTRY_FILLED", "from": transition.from_state},
             )
             entered = replace(entered, lifecycle_state="OPEN")
+        # v2.88.28 — el nacimiento de la protección es una TRANSICIÓN: se le añade su
+        # revisión durable determinista para que el hecho ``PROTECT_APPLIED`` tenga
+        # identidad (antes viajaba sin ``revision_id`` ⇒ clave ``None`` ⇒ duplicable).
+        entered, protection_revision_id = seal_protection_transition(
+            pending,
+            entered,
+            kind="PROTECT_APPLIED",
+            origin="protect",
+            at=at,
+            reason="plan",
+        )
         self._v2_positions[symbol] = entered
         # v2.88.26 — HECHO durable del nacimiento de la protección (``source=plan``: el stop
         # estructural del plan). La traza copia el estado que ya produjo el FSM; no lo deriva.
@@ -5516,9 +5576,12 @@ class AutoSimulationWorker:
             instrument_id=symbol,
             cycle_id=entered.cycle_id,
             position_id=entered.position_id,
+            lifecycle_from=pending.lifecycle_state,
             lifecycle_to=entered.lifecycle_state,
+            stop_before=pending.current_stop,
             stop_after=entered.current_stop,
             trailing_status=trailing_status(entered),
+            revision_id=protection_revision_id,
             source="plan",
         )
 
@@ -5586,6 +5649,23 @@ class AutoSimulationWorker:
             protection_events.append(("T2_HIT", 2))
         if "target_1" in exit_reasons:
             protection_events.append(("TRAIL_ARMED", 1))
+        # v2.88.28 — se sella UNA revisión durable para la transición del fill y se comparte
+        # como ``revision_id`` de sus hechos (T1/T2/armado). Las claves de deduplicación
+        # difieren por ``kind``; el cambio durable referenciado es el mismo.
+        protection_revision_id: str | None = None
+        if protection_events:
+            advanced, protection_revision_id = seal_protection_transition(
+                position,
+                advanced,
+                kind=protection_events[0][0],
+                origin=(
+                    "trail"
+                    if any(kind in ("TRAIL_ARMED", "TRAIL_ADVANCED") for kind, _ in protection_events)
+                    else "protect"
+                ),
+                at=at,
+                reason=",".join(exit_reasons) or None,
+            )
         for kind, target in protection_events:
             await self._v2_journal_protection(
                 kind=kind,
@@ -5598,6 +5678,7 @@ class AutoSimulationWorker:
                 stop_after=advanced.current_stop,
                 target=target,
                 trailing_status=trailing_status(advanced),
+                revision_id=protection_revision_id,
                 source=None,
             )
         if advanced.status == "CLOSED":

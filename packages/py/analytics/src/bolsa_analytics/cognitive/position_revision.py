@@ -5,6 +5,7 @@ Append-only en PositionState.revisions. ≠ Journal ≠ ExecutionRecord ≠ Pape
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Literal
 from uuid import uuid4
@@ -100,6 +101,49 @@ def build_position_revision(
         decision_id=_non_empty(decision_id),
         policy_id=_non_empty(policy_id),
     )
+
+
+def _num_text(value: object | None) -> str:
+    """Representación estable de un stop (o ``""``) para hashear la identidad."""
+    number = _finite(value)
+    return "" if number is None else f"{number:.4f}"
+
+
+def deterministic_revision_id(
+    *,
+    position_id: str | None,
+    origin: str,
+    previous_stop: object | None,
+    next_stop: object | None,
+    previous_status: object | None,
+    next_status: object | None,
+    ordinal: int,
+    discriminator: str | None = None,
+) -> str:
+    """(PURA) identidad DETERMINISTA de una revisión a partir del cambio durable.
+
+    v2.88.28 — antes cada revisión recibía ``REV-<uuid4>``: un reintento del MISMO cambio
+    durable —o recomputarlo tras un crash antes de persistir— producía otra identidad y con
+    ella otro ``dedupe_key`` de protección (dos hechos donde hubo una transición). Esta
+    identidad se deriva del ESTADO DURABLE (posición, origen, stop/status antes→después y el
+    ordinal dentro de ``PositionState.revisions``), NUNCA del intento de escritura, así que el
+    mismo cambio recomputado devuelve la misma clave. ``at`` NO entra a propósito: un reintento
+    reintenta el mismo hecho, no un instante nuevo.
+    """
+    payload = "|".join(
+        (
+            _non_empty(position_id) or "",
+            str(origin or ""),
+            _num_text(previous_stop),
+            _num_text(next_stop),
+            str(previous_status or ""),
+            str(next_status or ""),
+            str(int(ordinal)),
+            _non_empty(discriminator) or "",
+        )
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    return f"REV-{digest}"
 
 
 def position_revision_from_dict(raw: object) -> PositionRevision | None:

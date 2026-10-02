@@ -24,6 +24,7 @@ from bolsa_api.background.auto_simulation_worker import (
     FillObservation,
     step_minute_clock,
 )
+from bolsa_application.auto_operational_monitor import AUTO_PROTECTION_EVENT
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
@@ -1206,6 +1207,38 @@ async def test_v2_protect_is_never_silent(v2_env: None) -> None:
         degraded=False,
     )
     assert "protect_requested" in _journal_codes(worker)
+
+
+@pytest.mark.asyncio
+async def test_v88_28_protection_birth_carries_a_deterministic_identity(v2_env: None) -> None:
+    """v2.88.28 — el nacimiento sella ``revision_id`` durable y ``dedupe_key`` determinista.
+
+    Antes la transición de nacimiento (``PROTECT_APPLIED``, ``source=plan``) viajaba SIN
+    revisión ⇒ ``durable_fact_dedupe_key`` devolvía ``None`` ⇒ el hecho era duplicable. Ahora
+    añade su ``PositionRevision`` al ``PositionState`` (identidad derivada del estado durable,
+    no del intento de escritura) y el ``dedupe_key`` del hecho la referencia.
+    """
+    sink = _Collector()
+    worker = _worker(operational_audit_sink=sink, account_id="acc-v88-28")
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    births = [
+        entry
+        for entry in sink.entries
+        if entry.event_type == AUTO_PROTECTION_EVENT
+        and (entry.payload or {}).get("kind") == "PROTECT_APPLIED"
+    ]
+    assert births, "el nacimiento de la protección debe quedar sellado"
+    entry = births[0]
+    assert entry.dedupe_key, "el hecho durable declara identidad determinista"
+    revision_id = (entry.payload or {}).get("revisionId")
+    assert isinstance(revision_id, str) and revision_id.startswith("REV-")
+
+    position = worker._v2_positions["AAA"]
+    assert position.revisions, "la transición añade su revisión durable al PositionState"
+    assert position.revisions[-1].origin == "protect"
+    assert position.revisions[-1].revision_id == revision_id
 
 
 @pytest.mark.asyncio
