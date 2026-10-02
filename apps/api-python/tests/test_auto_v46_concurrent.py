@@ -22,9 +22,12 @@ Invariantes medidos:
 * ``count(distinct venue_order_id)`` por señal/barra **≤ 1** (una sola orden);
 * exactamente UN worker abre la posición; los otros dos no emiten;
 * **una sola fila** de reserva por ``(cuenta, instrumento)`` (sin doble compromiso);
-* ``Σ reserved_cash`` viva == la cola NO llenada (nunca la cola completa × nº workers);
-* ``Σ`` cantidades ``APPLIED`` == cantidad materializada, y la cola liberada == pedido −
-  materializado (contabilidad cerrada);
+* contrato TERMINAL OBS-18 (oráculo único en ``tests/obs18_contract.py``, compartido con el
+  gemelo PG): la fila se libera ENTERA (``released_qty == pedido``), no queda cola viva
+  (``remaining_qty == 0``), motivo ``tail_dead`` y ``reserved_cash == 0`` (nunca la cola × nº
+  de workers). Para observarlo hay que conducir ``real_turn`` (el cierre de turno), no el
+  ``auto_turn`` suelto —que deja el intermedio con la cola viva—;
+* ``Σ`` cantidades ``APPLIED`` == cantidad materializada (el ledger manda lo materializado);
 * una SEGUNDA oleada (otra terna de workers) no añade ni una orden más.
 """
 
@@ -55,6 +58,7 @@ from bolsa_application.sim_durable_store import (
     InMemorySimFillFinanceContextStore,
 )
 from bolsa_application.simulated_broker import fill_seed
+from tests.obs18_contract import assert_obs18_terminal_reservation
 
 ACCOUNT_ID = "acc-v46-conc"
 ENGINE_ID = "auto-sim-v46-conc"
@@ -219,10 +223,28 @@ def _buy_once(symbol: str, quantity: float = 250.0) -> _Prov:
 
 
 async def _run_wave(stores: _Stores, symbol: str, count: int = 3) -> list[AutoSimulationWorker]:
+    """Una oleada de ``count`` workers sobre los MISMOS stores, por el turno REAL.
+
+    Se conduce ``real_turn`` (no ``auto_turn`` suelto) para medir el estado TERMINAL de
+    producción: ``real_turn`` añade el CIERRE de reservas del turno (OBS-18), que es donde la
+    cola muerta del fill parcial se retira. Con ``auto_turn`` suelto se vería el intermedio
+    (cola viva) y el gemelo hermético divergiría del PG por el PUNTO DE ENTRADA, no por la
+    semántica; ese fue exactamente el desajuste que ``tests/obs18_contract.py`` unifica.
+    """
     import asyncio
 
     workers = [_worker(stores, decider=_buy_once(symbol)) for _ in range(count)]
-    await asyncio.gather(*(worker.auto_turn() for worker in workers))
+    await asyncio.gather(
+        *(
+            worker.real_turn(
+                exec_store=stores.exec_store,
+                auto_store=None,
+                finance_applier=_apply_true,
+                account_id=ACCOUNT_ID,
+            )
+            for worker in workers
+        )
+    )
     return workers
 
 
@@ -275,7 +297,9 @@ async def test_concurrent_auto_n_workers_claim_one_signal_one_order(
     held = opened[0]._open[symbol]
     assert held > 0
 
-    # (3) Una sola fila de reserva (sin doble compromiso) y su cola viva == lo no llenado.
+    # (3) Una sola fila de reserva (sin doble compromiso) y contrato TERMINAL OBS-18: la fila
+    #     se libera ENTERA, no queda cola viva y el motivo declara ``tail_dead``. Ese oráculo
+    #     vive en UN único sitio (``tests/obs18_contract.py``), compartido con el gemelo PG.
     rows = await stores.reservations.list_all(ACCOUNT_ID, limit=1000)
     assert len(rows) == 1, (
         f"la reserva debe ser única por (cuenta, instrumento): hay {len(rows)} filas"
@@ -283,20 +307,19 @@ async def test_concurrent_auto_n_workers_claim_one_signal_one_order(
     reservation = rows[0]
     requested = Decimal(str(reservation.quantity))
     assert held < requested, "el escenario exige fill PARCIAL"
-    # Contabilidad cerrada: pedido = materializado + cola liberada.
-    assert Decimal(str(reservation.released_qty)) == held, (
-        "lo liberado por fill debe ser exactamente lo materializado"
+    assert_obs18_terminal_reservation(
+        reservation, diagnostic=f"materializado_en_posicion={held} pedido={requested}"
     )
-    assert Decimal(str(reservation.remaining_qty)) == requested - held
 
-    # (4) Σ reserved_cash viva ≤ cola realmente comprometida (nunca × nº de workers).
+    # (4) Sin capital muerto NI sobre-riesgo × nº de workers: la retirada de la cola deja 0
+    #     retenido. Misma lectura que fija el gemelo PG (``retained == 0``).
     live = await stores.reservations.list_live(ACCOUNT_ID, limit=1000)
-    assert len(live) <= 1
-    committed = sum(float(row.reserved_cash or 0) for row in live)
-    # La cola viva compromete, como máximo, su propio notional sin llenar.
-    assert committed <= float(requested - held) * 100.0 + 1e-6, (
-        f"sobre-riesgo: comprometido {committed} > cola {float(requested - held) * 100.0}"
+    assert live == [], (
+        "OBS-18: no puede quedar capital comprometido vivo al cerrar el turno: "
+        f"{[row.reservation_id for row in live]}"
     )
+    committed = sum(float(row.reserved_cash or 0) for row in rows)
+    assert committed == 0.0, f"capital retenido tras retirar la cola: {committed}"
 
     # (5) Los perdedores declaran POR QUÉ no emitieron (no un veto silencioso).
     losers = [w for w in workers if w._open.get(symbol, Decimal("0")) <= 0]
@@ -314,18 +337,22 @@ async def test_concurrent_auto_second_wave_adds_nothing(
     monkeypatch.setenv("AUTO_ENGINE_SIMULATED_WATCH", symbol)
     stores = _Stores()
 
-    await _run_wave(stores, symbol)
+    first = await _run_wave(stores, symbol)
     first_buys = await _buy_orders(stores, symbol)
     first_rows = await stores.reservations.list_all(ACCOUNT_ID, limit=1000)
     assert len(first_buys) == 1 and len(first_rows) == 1
+    held = max((w._open.get(symbol, Decimal("0")) for w in first), default=Decimal("0"))
+    assert held > 0
 
-    # Otra terna, MISMOS stores/cuenta/barra: la señal ya está consumida y la reserva
-    # sigue viva ⇒ ni una orden ni una reserva nuevas.
+    # Otra terna, MISMOS stores/cuenta/barra: la señal ya está consumida y la reserva sigue
+    # cerrada ⇒ ni una orden ni una reserva nuevas. Y con ``real_turn`` (turno real) la
+    # instancia nueva RE-ADOPTA la posición durable —misma cantidad—, nunca la re-abre.
     second = await _run_wave(stores, symbol)
     assert await _buy_orders(stores, symbol) == first_buys, (
         "la segunda oleada no puede añadir órdenes (señal consumida + claim vivo)"
     )
     assert len(await stores.reservations.list_all(ACCOUNT_ID, limit=1000)) == 1
-    assert all(w._open.get(symbol, Decimal("0")) <= 0 for w in second), (
-        "ningún worker de la segunda oleada debe abrir una posición nueva"
+    assert all(w._open.get(symbol, Decimal("0")) in (Decimal("0"), held) for w in second), (
+        "ningún worker de la segunda oleada debe abrir una posición DISTINTA: "
+        f"{[str(w._open.get(symbol)) for w in second]} (readoptado {held})"
     )

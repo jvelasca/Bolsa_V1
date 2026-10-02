@@ -551,8 +551,73 @@ def test_protection_dedupe_key_requires_the_revision_not_only_kind() -> None:
 def test_dedupe_key_without_identity_components_is_none() -> None:
     """Sin cuenta/motor/ciclo no se inventa una clave a medias, y un ``event_type`` ajeno es ``None``."""
     base = {"account_id": "acc-1", "engine_id": "auto-sim", "cycle_id": "cyc-1"}
-    assert durable_fact_dedupe_key(event_type=AUTO_CYCLE_SETTLEMENT_EVENT, **{**base, "cycle_id": None}) is None
-    assert durable_fact_dedupe_key(event_type=AUTO_CYCLE_SETTLEMENT_EVENT, **{**base, "account_id": None}) is None
-    assert durable_fact_dedupe_key(event_type=AUTO_CYCLE_SETTLEMENT_EVENT, **{**base, "engine_id": None}) is None
+    assert (
+        durable_fact_dedupe_key(
+            event_type=AUTO_CYCLE_SETTLEMENT_EVENT, **{**base, "cycle_id": None}
+        )
+        is None
+    )
+    assert (
+        durable_fact_dedupe_key(
+            event_type=AUTO_CYCLE_SETTLEMENT_EVENT, **{**base, "account_id": None}
+        )
+        is None
+    )
+    assert (
+        durable_fact_dedupe_key(
+            event_type=AUTO_CYCLE_SETTLEMENT_EVENT, **{**base, "engine_id": None}
+        )
+        is None
+    )
     assert durable_fact_dedupe_key(event_type="auto_entry_decision", **base) is None
     assert durable_fact_dedupe_key(event_type=None, **base) is None
+
+
+# ── v2.88.29 — la clave no puede desbordar ``decision_journal_entries.dedupe_key`` (160) ─
+def test_dedupe_key_stays_byte_identical_when_it_fits_the_column() -> None:
+    """Δ = 0: para todo literal histórico (≤ 160) la clave es EXACTAMENTE la de siempre."""
+    key = durable_fact_dedupe_key(
+        event_type=AUTO_ENTRY_ORDER_EVENT,
+        account_id="1484e253d2d54645945a6b1d7",
+        engine_id="auto-sim",
+        cycle_id="cyc-1",
+        order_id="ord-9",
+    )
+    assert key == ("auto_entry_order:1484e253d2d54645945a6b1d7:auto-sim:cyc-1:ord-9")
+    assert len(key or "") <= 160
+
+
+def test_dedupe_key_is_bounded_to_the_column_width_without_losing_identity() -> None:
+    """Un ``order_id`` de venue largo NO revienta el INSERT: la clave se acota a ≤160 y es
+    determinista (mismo orden ⇒ misma clave ⇒ el ``ON CONFLICT`` sigue colapsando el
+    reintento). Un orden distinto ⇒ otra clave (no se confunde la identidad)."""
+    order_id = "ORD-" + "x" * 400
+    key = durable_fact_dedupe_key(
+        event_type=AUTO_ENTRY_ORDER_EVENT,
+        account_id="acc-1",
+        engine_id="auto-sim",
+        cycle_id="cyc-1",
+        order_id=order_id,
+    )
+    assert key is not None
+    assert len(key) <= 160, f"la clave desbordaría varchar(160): len={len(key)}"
+    assert (
+        durable_fact_dedupe_key(
+            event_type=AUTO_ENTRY_ORDER_EVENT,
+            account_id="acc-1",
+            engine_id="auto-sim",
+            cycle_id="cyc-1",
+            order_id=order_id,
+        )
+        == key
+    ), "la clave acotada debe seguir siendo determinista"
+    assert (
+        durable_fact_dedupe_key(
+            event_type=AUTO_ENTRY_ORDER_EVENT,
+            account_id="acc-1",
+            engine_id="auto-sim",
+            cycle_id="cyc-1",
+            order_id=order_id + "-otro",
+        )
+        != key
+    ), "dos órdenes distintas no pueden colapsar a la misma clave"

@@ -532,6 +532,12 @@ async def test_protection_is_persisted_with_account_and_engine() -> None:
     assert entry.payload["trailingStatus"] == "armed"
     assert entry.payload["revisionId"] == "REV-1"
     assert entry.payload["cycleId"] == "cyc-aaa"
+    # v2.88.29 — la identidad determinista VIAJA en el hecho: sin ``revisionId`` la clave
+    # sería ``None`` y el alta volvería a ser duplicable (el agujero de v2.88.27). La clave
+    # es content-addressed: MISMA transición ⇒ MISMA clave ⇒ ``ON CONFLICT`` la colapsa.
+    assert entry.dedupe_key == (
+        f"auto_protection_event:{_ACCOUNT}:auto-sim:cyc-aaa:STOP_RATCHET_APPLIED:REV-1"
+    ), "el hecho de protección debe llevar su dedupe_key determinista (no None)"
 
 
 @pytest.mark.asyncio

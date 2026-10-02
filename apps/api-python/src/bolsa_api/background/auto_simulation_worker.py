@@ -3791,23 +3791,23 @@ class AutoSimulationWorker:
             return None
 
     async def _v2_refresh_regime(self) -> None:
-        """Refresca el régimen, el ATR y el PRECIO si las fuentes lo soportan (async + lectura sync).
+        """Refresca el régimen y el ATR si las fuentes lo soportan (async + lectura sync).
 
-        La lectura del régimen, del ATR y del precio en el tick es SÍNCRONA; el I/O (barras)
-        se concentra aquí, una vez por tick, para que decidir no dependa de la red y para que
-        ``_v2_position_package`` lea siempre un valor coherente del mismo tick.
+        La lectura del régimen y del ATR en el tick es SÍNCRONA; el I/O (barras) se concentra
+        aquí, una vez por barra, para que decidir no dependa de la red.
 
         E2: el ATR se refresca en el MISMO punto que el régimen para que la geometría de
         un tick sea consistente (una sola foto de barras por decisión).
 
-        W4: el precio se refresca también aquí, pero con su PROPIA frontera: el régimen y el
-        ATR leen ``<= B-1`` (decisión) y el precio de ejecución lee ``<= B`` (``open`` de la
-        barra corriente). Es el mismo instante de refresco, no la misma ventana (§3.1.b).
+        W4: el PRECIO **no** viaja aquí. Su frontera es otra (``<= B``, ``open`` de la barra
+        corriente, distinta de la decisión ``<= B-1``) y, sobre todo, debe releerse en CADA
+        turno: la fuente se recompone por sesión/tick y el short-circuit por barra no la
+        refrescaría dentro de la misma barra (§3.1.b). Se refresca aparte en
+        ``_v2_refresh_price``, siempre.
         """
         for source, label in (
             (self._v2_regime_source, "regime"),
             (self._v2_atr_source, "atr"),
-            (self._price_source, "price"),
         ):
             refresher = getattr(source, "refresh", None)
             if refresher is None or not callable(refresher):
@@ -3816,6 +3816,27 @@ class AutoSimulationWorker:
                 await refresher()
             except Exception:  # noqa: BLE001 — sin refresco el valor queda como estaba.
                 logger.exception("auto_sim v2 %s refresh failed", label)
+
+    async def _v2_refresh_price(self) -> None:
+        """``W4`` — refresca la fuente de PRECIO en CADA turno (no sólo al rodar la barra).
+
+        El runtime compone la fuente de precio sobre la MISMA sesión del tick, así que el
+        objeto que llega al turno está VACÍO hasta que se refresca. A diferencia del régimen
+        y del ATR (que se leen una vez por barra y quedan cacheados en RAM), el precio se
+        consulta en vivo en cada turno —para marcar y para cerrar— y el short-circuit por
+        barra (``reuse_bar_datum``) NO puede refrescarlo: si se omitiera, un turno dentro de
+        la misma barra se quedaría con ``execution`` ausente y no podría marcar ni vender
+        (fail-closed silencioso en el camino de precio real). Sin fuente real
+        (``price_source is None``) es un no-op ⇒ ``Δ = 0`` para el ``price_script`` hermético.
+        """
+        source = self._price_source
+        refresher = getattr(source, "refresh", None)
+        if refresher is None or not callable(refresher):
+            return
+        try:
+            await refresher()
+        except Exception:  # noqa: BLE001 — sin refresco el valor queda como estaba.
+            logger.exception("auto_sim v2 price refresh failed")
 
     def _v2_current_bar_start(self) -> str:
         """Inicio ISO-UTC de la barra corriente (``""`` si el timeframe no se entiende).
@@ -3999,6 +4020,11 @@ class AutoSimulationWorker:
         """
         if not reuse_bar_datum:
             await self._v2_refresh_regime()
+        # W4: el PRECIO se relee SIEMPRE, también con el dato de barra reutilizado. La
+        # fuente se recompone por sesión/tick y el short-circuit por barra no la refresca:
+        # sin esta relectura un turno dentro de la MISMA barra se quedaría sin ``execution``
+        # y no podría marcar ni cerrar (fail-closed involuntario en el camino de precio real).
+        await self._v2_refresh_price()
         self._v2_roll_consumed_bar()
         if not reuse_bar_datum:
             await self._v2_load_consumed_signals()

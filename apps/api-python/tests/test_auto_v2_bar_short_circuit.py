@@ -127,6 +127,9 @@ class _Scenario:
             auto_store=self.auto_store,
             decider=decider,
         )
+        # v2.88.29 — sink de auditoría opcional del overlay M2. Por defecto ``None`` (flag OFF,
+        # Δ = 0); el test de Δ motor lo enciende para comprobar que el informe NO cambia.
+        self.sink: Any | None = None
 
     def _clock(self) -> datetime:
         """Un minuto por llamada (como ``step_minute_clock``), con salto de barra a mano."""
@@ -144,6 +147,7 @@ class _Scenario:
             finance_applier=None,
             account_id=_ACCOUNT,
             reservation_store=self.reservations,
+            operational_audit_sink=self.sink,
         )
 
     async def turns(self, count: int = _TURNS) -> list[Any]:
@@ -411,4 +415,46 @@ async def test_changing_the_bar_re_reads_the_datum(
     assert scenario.worker._v2_bar_short_circuit_ticks == 3, (  # noqa: SLF001
         "los cuatro turnos de la barra anterior reutilizaron el dato en tres de ellos; el "
         "turno de la barra nueva RELEYÓ (no cuenta como reutilizado)"
+    )
+
+
+class _AuditCollector:
+    """Sink de mentira del overlay M2: registra los hechos durables que el worker publica."""
+
+    def __init__(self) -> None:
+        self.entries: list[Any] = []
+
+    async def __call__(self, entry: Any) -> None:
+        self.entries.append(entry)
+
+
+@pytest.mark.asyncio
+async def test_the_operational_audit_overlay_is_delta_zero_on_the_motor_report(
+    v2_env: None,
+) -> None:
+    """(v2.88.29) El overlay M2 (``AUDIT`` ON) NO cambia el informe del día: Δ motor = 0.
+
+    El MISMO día se conduce dos veces: OFF (sin sink: el default del flag) y ON (con el sink
+    inyectado, que es exactamente lo que hace el proceso real tras el flag). El informe
+    agregado —embudo, journal, ATR, atribución, PnL— sale IDÉNTICO; lo único que cambia es que
+    el camino ON AÑADE hechos durables al spine. Es la garantía de que encender la auditoría
+    no mueve el artefacto que decide (``Δ decisión motor = 0``).
+    """
+    off = _Scenario(prices={"AAA": 100.0}, decider=_always_buy)
+    on = _Scenario(prices={"AAA": 100.0}, decider=_always_buy)
+    collector = _AuditCollector()
+    on.sink = collector
+
+    await off.turns()
+    await on.turns()
+
+    assert _report(on.worker) == _report(off.worker), (
+        "el overlay de auditoría NO puede cambiar el artefacto del día (Δ motor = 0)"
+    )
+    fact_types = {"auto_entry_order", "auto_cycle_settlement", "auto_protection_event"}
+    facts = [entry for entry in collector.entries if entry.event_type in fact_types]
+    assert facts, "con el sink inyectado el overlay debe AÑADIR hechos durables al spine"
+    assert all(entry.dedupe_key for entry in facts), (
+        f"todo hecho M2 durable debe llevar identidad determinista: "
+        f"{[e.event_type for e in facts if not e.dedupe_key]}"
     )

@@ -56,8 +56,10 @@ from sqlalchemy import func, select
 if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+from tests.obs18_contract import assert_obs18_terminal_reservation  # noqa: E402
 from tests.test_golden_day_v2_process_pg import (  # noqa: E402
     _bar_ticks,
+    _durable_fact_health,
     _env_for,
     _seed_account,
     _seed_edge_report,
@@ -137,9 +139,7 @@ def _partial_buy_instrument_id(prefix: str) -> str:
             )
             for tick in ticks
         ]
-        if all(
-            r.status == "partial" and len(r.fills) >= _MIN_BUY_CHUNKS for r in results
-        ):
+        if all(r.status == "partial" and len(r.fills) >= _MIN_BUY_CHUNKS for r in results):
             return candidate
     raise AssertionError(
         f"ningún id determinista de {prefix} tiene BUY PARCIAL (≥{_MIN_BUY_CHUNKS} "
@@ -332,9 +332,7 @@ async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
         )
 
         # (2) Exactamente UNA instancia abre la posición; el resto no.
-        opened = [
-            worker for worker in workers if worker._open.get(instrument_id, Decimal("0")) > 0
-        ]
+        opened = [worker for worker in workers if worker._open.get(instrument_id, Decimal("0")) > 0]
         assert len(opened) == 1, (
             "exactamente una instancia debe abrir; abrieron "
             f"{len(opened)}: {[str(w._open.get(instrument_id)) for w in workers]}"
@@ -350,9 +348,11 @@ async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
         allowed = {RESERVATION_ALREADY_LIVE, "hold_no_op", "signal_already_consumed"}
         for loser in losers:
             raw = loser._last_gate_reason  # noqa: SLF001
-            codes = {str(code) for code in raw} if isinstance(raw, (tuple, list, set)) else {
-                str(raw or "")
-            }
+            codes = (
+                {str(code) for code in raw}
+                if isinstance(raw, (tuple, list, set))
+                else {str(raw or "")}
+            )
             codes.discard("")
             assert codes, "una instancia perdedora no puede vetar sin declarar el motivo"
             assert codes <= allowed, (
@@ -367,37 +367,25 @@ async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
         )
         reservation = rows[0]
         requested = Decimal(str(reservation.quantity))
-        released = Decimal(str(reservation.released_qty or 0))
-        remaining = Decimal(str(reservation.remaining_qty or 0))
 
-        # (5) Contabilidad cerrada con la semántica de OBS-18: la fila queda liberada ENTERA
-        #     —lo materializado por FILL y la COLA muerta retirada declarando ``tail_dead``—
-        #     y lo materializado lo manda el ledger (``Σ APPLIED``), no la fila.
-        assert released == requested, (
-            "la reserva debe quedar liberada ENTERA (materializado por fill + cola retirada); "
-            f"released={released} pedido={requested} materializado={held}"
-        )
-        assert remaining == 0, (
-            f"OBS-18: al cerrar el turno no puede quedar cola viva (remaining={remaining})"
-        )
-        # Sonda de diagnóstico: si el motivo NO es ``tail_dead``, el mensaje debe decir si la
-        # fila materializó de verdad. ``Σ APPLIED`` lo manda el LEDGER (no la fila), así que
-        # distingue las dos causas: fila sin fill (``0``) o procedencia perdida (``>0``).
+        # (5) Contrato TERMINAL OBS-18 (oráculo único en ``tests/obs18_contract.py``,
+        #     compartido con el gemelo hermético): la fila queda liberada ENTERA —lo
+        #     materializado por FILL y la COLA muerta retirada declarando ``tail_dead``—, sin
+        #     cola viva ni capital retenido. Lo materializado lo manda el ledger (``Σ APPLIED``).
+        # Sonda de diagnóstico: ``Σ APPLIED`` lo manda el LEDGER (no la fila), así que
+        # distingue las dos causas de un motivo inesperado: fila sin fill (``0``) o
+        # procedencia perdida (``>0``).
         applied = await _applied_buy_qty(concurrent_pg_factory, account_id)
         facts = await _applied_buy_facts(concurrent_pg_factory, account_id)
-        assert str(reservation.release_reason) == "tail_dead", (
-            "la retirada debe DECLARAR que había cola de fill parcial: "
-            f"motivo={reservation.release_reason!r} status={reservation.status!r} "
-            f"cycle_id={getattr(reservation, 'cycle_id', None)!r} "
-            f"released_qty={reservation.released_qty!r} Σ_APPLIED={applied} "
-            f"materializado_en_posicion={held} pedido={requested} hechos={facts}"
+        assert_obs18_terminal_reservation(
+            reservation,
+            diagnostic=(
+                f"cycle_id={getattr(reservation, 'cycle_id', None)!r} "
+                f"Σ_APPLIED={applied} materializado_en_posicion={held} pedido={requested} "
+                f"hechos={facts}"
+            ),
         )
-        assert str(reservation.status).upper() != "OPEN", (
-            f"una reserva retirada no puede quedar OPEN: {reservation.status!r}"
-        )
-        assert applied == held, (
-            f"Σ APPLIED BUY ({applied}) != materializado en posición ({held})"
-        )
+        assert applied == held, f"Σ APPLIED BUY ({applied}) != materializado en posición ({held})"
         assert 0 < applied < requested, (
             "el escenario exige fill PARCIAL (0 < materializado < pedido): "
             f"materializado={applied} pedido={requested}"
@@ -424,6 +412,27 @@ async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
         assert float(reservation.reserved_risk or 0) > 0, (
             "la fila cerrada conserva el riesgo comprometido como denominador de R: "
             f"reserved_risk={reservation.reserved_risk}"
+        )
+
+        # (7) v2.88.29 — HECHOS DURABLES M2 bajo N sesiones concurrentes: la misma señal
+        #     produce EXACTAMENTE una orden de entrada durable y, por la identidad
+        #     determinista + ``ON CONFLICT (dedupe_key)`` de la 048, NINGUNA clave se
+        #     duplica ni queda sin identidad. Es el contrato exactly-once medido en PG.
+        from bolsa_application.auto_operational_monitor import AUTO_ENTRY_ORDER_EVENT
+
+        durable = await _durable_fact_health(concurrent_pg_factory, account_id)
+        assert durable["nullKey"] == 0, (
+            f"{sessions} sesiones concurrentes dejaron hechos durables SIN identidad "
+            f"(``dedupe_key IS NULL``): {durable}"
+        )
+        assert durable["duplicates"] == [], (
+            f"{sessions} sesiones concurrentes DUPLICARON hechos durables (misma "
+            f"``dedupe_key`` ⇒ 1 sola fila): {durable['duplicates']}"
+        )
+        assert durable["counts"][AUTO_ENTRY_ORDER_EVENT] == 1, (
+            "una señal ⇒ UNA orden de entrada durable, sea cual sea el número de "
+            f"contendientes; con {sessions} sesiones hay "
+            f"{durable['counts'][AUTO_ENTRY_ORDER_EVENT]}: {durable}"
         )
 
         # ── OLEADA 2 · N instancias NUEVAS (RAM vacía) sobre la MISMA base ─────────

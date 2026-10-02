@@ -161,9 +161,7 @@ def _filling_instrument_id(prefix: str) -> str:
     ticks = _bar_ticks()
     for n in range(512):
         candidate = f"{prefix}{n:010d}"
-        buy_ok = all(
-            len(_probe("buy", tick, candidate).fills) >= _MIN_BUY_CHUNKS for tick in ticks
-        )
+        buy_ok = all(len(_probe("buy", tick, candidate).fills) >= _MIN_BUY_CHUNKS for tick in ticks)
         sell_ok = all(_probe("sell", tick, candidate).status == "filled" for tick in ticks)
         if buy_ok and sell_ok:
             return candidate
@@ -382,6 +380,162 @@ async def _count_positions(factory: async_sessionmaker[AsyncSession], account_id
             ).scalar()
             or 0
         )
+
+
+# ── Hechos durables del overlay M2 (``AUTO_OPERATIONAL_AUDIT``) ─────────────────────
+#
+# Con el flag ON el motor sella en ``decision_journal_entries`` la orden de entrada, la
+# liquidación y las transiciones de protección, cada una con su ``dedupe_key``
+# determinista. Aquí se leen y se comprueba que NINGÚN hecho queda sin identidad: un
+# ``dedupe_key`` nulo volvería a hacer el alta duplicable (el agujero de ``v2.88.27``).
+async def _durable_fact_health(
+    factory: async_sessionmaker[AsyncSession], account_id: str
+) -> dict[str, Any]:
+    """Conteo por tipo de hecho durable y cuántos quedan SIN ``dedupe_key``.
+
+    Devuelve además ``duplicates``: las ``dedupe_key`` no nulas que aparecen MÁS DE UNA VEZ.
+    Bajo el contrato exactly-once (``ON CONFLICT`` de la 048 + identidad determinista) esa
+    lista debe ser SIEMPRE vacía: una clave repetida es un hecho duplicado.
+    """
+    from bolsa_application.auto_operational_monitor import (
+        AUTO_CYCLE_SETTLEMENT_EVENT,
+        AUTO_ENTRY_ORDER_EVENT,
+        AUTO_PROTECTION_EVENT,
+    )
+    from bolsa_infrastructure.database.models.tables import DecisionJournalEntryRow
+
+    events = (AUTO_ENTRY_ORDER_EVENT, AUTO_CYCLE_SETTLEMENT_EVENT, AUTO_PROTECTION_EVENT)
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                select(
+                    DecisionJournalEntryRow.event_type, DecisionJournalEntryRow.dedupe_key
+                ).where(
+                    DecisionJournalEntryRow.account_id == account_id,
+                    DecisionJournalEntryRow.event_type.in_(events),
+                )
+            )
+        ).all()
+    counts = {event: 0 for event in events}
+    null_keys = 0
+    occurrences: dict[str, int] = {}
+    for event_type, dedupe_key in rows:
+        key = str(event_type)
+        if key in counts:
+            counts[key] += 1
+        if not dedupe_key:
+            null_keys += 1
+            continue
+        text_key = str(dedupe_key)
+        occurrences[text_key] = occurrences.get(text_key, 0) + 1
+    return {
+        "counts": counts,
+        "nullKey": null_keys,
+        "total": len(rows),
+        "duplicates": sorted(key for key, n in occurrences.items() if n > 1),
+    }
+
+
+async def _read_monitor_cycles(
+    factory: async_sessionmaker[AsyncSession], *, account_id: str, engine_id: str
+) -> list[dict[str, Any]]:
+    """Ciclos que el monitor reconstruye del material DURABLE (read-only, sin RAM)."""
+    from bolsa_application.auto_operational_monitor import read_operational_monitor
+
+    async with factory() as session:
+        dto = await read_operational_monitor(
+            session, account_id, engine_id=engine_id, grace_seconds=61.0
+        )
+    return list(dto.get("cycles") or [])
+
+
+async def _fill_price_sources(
+    factory: async_sessionmaker[AsyncSession], account_id: str
+) -> list[tuple[Decimal, str, Decimal | None]]:
+    """``(price, price_source, reference_mid)`` de cada fill durable de la cuenta."""
+    from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                select(
+                    SimFillFinanceContextRow.price,
+                    SimFillFinanceContextRow.price_source,
+                    SimFillFinanceContextRow.reference_mid,
+                ).where(SimFillFinanceContextRow.account_id == account_id)
+            )
+        ).all()
+    return [
+        (
+            Decimal(str(price)),
+            str(source or ""),
+            None if reference is None else Decimal(str(reference)),
+        )
+        for price, source, reference in rows
+    ]
+
+
+def _monitor_steps(cycle: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {str(step.get("id")): step for step in (cycle.get("steps") or [])}
+
+
+async def _count_watch_bars(
+    factory: async_sessionmaker[AsyncSession], instrument_ids: list[str]
+) -> int:
+    """Barras OHLCV durables de los instrumentos del watch (diagnóstico del precio real)."""
+    from bolsa_infrastructure.database.models.tables import OhlcvBarRow
+
+    async with factory() as session:
+        return int(
+            (
+                await session.execute(
+                    select(func.count())
+                    .select_from(OhlcvBarRow)
+                    .where(OhlcvBarRow.instrument_id.in_(instrument_ids))
+                )
+            ).scalar()
+            or 0
+        )
+
+
+async def _seed_watch_bars(
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    instrument_ids: list[str],
+    bars: list[tuple[str, float, float]],
+) -> None:
+    """Siembra barras D1 por símbolo para el camino de PRECIO REAL (``W4``).
+
+    ``bars`` es una lista ``(día ISO, open, close)``. En la ventana ``<= B`` el proveedor
+    toma el ``close`` de la última barra CERRADA (decisión, ``B-1``) y el ``open`` de la
+    barra CORRIENTE (ejecución, ``B``). Se siembran precios distintos de ``100.0`` para que
+    un fallback silencioso al ``flat_price_script`` quede cazado por la aserción de precio.
+    """
+    from bolsa_infrastructure.database.models.tables import OhlcvBarRow
+    from bolsa_infrastructure.ids import new_id
+
+    async with factory() as session:
+        for instrument_id in instrument_ids:
+            for day, open_, close in bars:
+                open_d = Decimal(str(open_))
+                close_d = Decimal(str(close))
+                session.add(
+                    OhlcvBarRow(
+                        id=new_id(),
+                        instrument_id=instrument_id,
+                        timeframe="1d",
+                        timestamp=datetime.fromisoformat(f"{day}T00:00:00+00:00"),
+                        open=open_d,
+                        high=max(open_d, close_d) + Decimal("1"),
+                        low=min(open_d, close_d) - Decimal("1"),
+                        close=close_d,
+                        volume=1000,
+                        adj_close=close_d,
+                        source="yahoo",
+                        created_at=datetime.now(UTC),
+                    )
+                )
+        await session.commit()
 
 
 async def _day_progress(
@@ -610,7 +764,13 @@ async def _assert_materialized_and_flat(
         assert_equity_invariant(accounting)
 
 
-def _env_for(account_id: str, engine_id: str, *, instrument_ids: list[str]) -> dict[str, str]:
+def _env_for(
+    account_id: str,
+    engine_id: str,
+    *,
+    instrument_ids: list[str],
+    extra: dict[str, str] | None = None,
+) -> dict[str, str]:
     env = os.environ.copy()
     env.update(
         {
@@ -627,9 +787,15 @@ def _env_for(account_id: str, engine_id: str, *, instrument_ids: list[str]) -> d
             "AUTO_ENGINE_SIMULATED_WATCH": ",".join(instrument_ids),
             "AUTO_ENGINE_SIM_INTERVAL_SECONDS": "1.0",
             "AUTO_ENGINE_SIM_LOT_QTY": "100",
+            # v2.88.29 — overlay M2 ON: el día sella los HECHOS durables (orden de entrada,
+            # liquidación y transiciones de protección) con su ``dedupe_key`` determinista.
+            # Sin esto el monitor declaraba ``*_not_durable`` y el exactly-once no se ejercía.
+            "AUTO_OPERATIONAL_AUDIT": "1",
             "PYTHONUNBUFFERED": "1",
         }
     )
+    if extra:
+        env.update({str(key): str(value) for key, value in extra.items()})
     return env
 
 
@@ -783,6 +949,60 @@ async def test_golden_day_v2_real_process_opens_and_closes_the_book_pg(
         )
         await _assert_materialized_and_flat(golden_pg_factory, account_id=account_id)
 
+        # ── FASE 3: hechos durables M2 + reconstrucción desde el MONITOR ─────────
+        # Con ``AUTO_OPERATIONAL_AUDIT=1`` el día deja en el spine la orden de entrada, la
+        # liquidación y las transiciones de protección. Se exige que TODOS lleven su
+        # ``dedupe_key`` (un hecho sin identidad volvería a ser duplicable) y que el monitor
+        # reconstruya la cadena SIN declarar ``protection_not_durable``/``settlement_not_durable``.
+        from bolsa_application.auto_operational_monitor import (
+            AUTO_CYCLE_SETTLEMENT_EVENT,
+            AUTO_ENTRY_ORDER_EVENT,
+            AUTO_PROTECTION_EVENT,
+        )
+
+        health = await _durable_fact_health(golden_pg_factory, account_id)
+        assert health["counts"][AUTO_ENTRY_ORDER_EVENT] >= len(instrument_ids), (
+            "cada orden de ENTRADA del día debe sellar su hecho durable "
+            f"(auto_entry_order={health['counts'][AUTO_ENTRY_ORDER_EVENT]} de "
+            f"{len(instrument_ids)}); salud={health}"
+        )
+        assert health["counts"][AUTO_CYCLE_SETTLEMENT_EVENT] >= len(instrument_ids), (
+            "cada ciclo cerrado debe sellar su liquidación durable "
+            f"(auto_cycle_settlement={health['counts'][AUTO_CYCLE_SETTLEMENT_EVENT]} de "
+            f"{len(instrument_ids)}); salud={health}"
+        )
+        assert health["counts"][AUTO_PROTECTION_EVENT] >= len(instrument_ids), (
+            "cada posición debe sellar al menos su hecho de protección de nacimiento "
+            f"(auto_protection_event={health['counts'][AUTO_PROTECTION_EVENT]} de "
+            f"{len(instrument_ids)}); salud={health}"
+        )
+        assert health["nullKey"] == 0, (
+            "ningún hecho durable puede quedar SIN identidad determinista (``dedupe_key`` "
+            f"nulo ⇒ duplicable); salud={health}"
+        )
+
+        cycles = await _read_monitor_cycles(
+            golden_pg_factory, account_id=account_id, engine_id=engine_id
+        )
+        assert cycles, "el monitor debe reconstruir al menos un ciclo del material durable"
+        reached_protection = reached_settlement = False
+        for cycle in cycles:
+            steps = _monitor_steps(cycle)
+            protection = steps.get("PROTECTION", {})
+            settlement = steps.get("SETTLEMENT", {})
+            assert protection.get("note") != "protection_not_durable", (
+                "el monitor NO puede declarar PROTECTION no durable: el hecho existe "
+                f"(ciclo={cycle.get('cycleId')!r})"
+            )
+            assert settlement.get("note") != "settlement_not_durable", (
+                "el monitor NO puede declarar SETTLEMENT no durable: el hecho existe "
+                f"(ciclo={cycle.get('cycleId')!r})"
+            )
+            reached_protection = reached_protection or protection.get("state") == "reached"
+            reached_settlement = reached_settlement or settlement.get("state") == "reached"
+        assert reached_protection, "algún ciclo debe encender PROTECTION desde el hecho durable"
+        assert reached_settlement, "algún ciclo debe encender SETTLEMENT desde el hecho durable"
+
         # Zero human / zero LIVE: ninguna traza de ESTA cuenta con venue live.
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
 
@@ -808,6 +1028,7 @@ async def test_golden_day_v2_real_process_opens_and_closes_the_book_pg(
             await _stop(proc)
         if account_id is not None:
             from bolsa_infrastructure.database.models.tables import (
+                DecisionJournalEntryRow,
                 ExecutionEventRow,
                 SimAutoPositionRow,
                 SimConsumedSignalRow,
@@ -834,9 +1055,249 @@ async def test_golden_day_v2_real_process_opens_and_closes_the_book_pg(
                 await session.execute(
                     delete(ExecutionEventRow).where(ExecutionEventRow.account_id == account_id)
                 )
+                # v2.88.29 — el overlay M2 escribe hechos en el spine; se retiran por cuenta
+                # (``decision_journal_entries`` no está en la purga global del conftest).
+                await session.execute(
+                    delete(DecisionJournalEntryRow).where(
+                        DecisionJournalEntryRow.account_id == account_id
+                    )
+                )
                 if edge_report_id is not None:
                     from bolsa_infrastructure.database.models.tables import EdgeReportRow
 
+                    await session.execute(
+                        delete(EdgeReportRow).where(EdgeReportRow.id == edge_report_id)
+                    )
+                try:
+                    await SqlAlchemyAccountRepository(session).close_account(account_id)
+                except Exception:  # noqa: BLE001 — cleanup nunca tira el test
+                    pass
+                await session.commit()
+
+
+# ── A2 · Golden Day 2.0 con PRECIO REAL (``AUTO_ENGINE_SIM_REAL_PRICE=1``) ──────────
+#
+# El mismo día que el golden de arriba, pero con el precio del REPOSITORIO de barras en vez
+# del ``flat_price_script`` (``100.0``). Se siembran barras D1 y se exige que el fill declare
+# su fuente canónica (``MARKET_CLOSE``) y que NINGÚN precio salga del script fabricado.
+_RP_SYMBOLS = ("RPA", "RPB", "RPC")
+_RP_SECTORS = ("Technology", "Healthcare", "Energy")
+_RP_INSTRUMENT_PREFIXES = ("inst-gd2rp-0-", "inst-gd2rp-1-", "inst-gd2rp-2-")
+#: Precio de decisión (``close(B-1)``) y de ejecución (``open(B)``) — ninguno es ``100.0``.
+#:
+#: Se siembran IGUALES a propósito: un hueco decisión↔ejecución (p. ej. ``20``→``30``)
+#: deja la posición comprada por encima de sus objetivos calculados con el precio de
+#: decisión, dispara T1/T2 en el primer tick y arma el trailing; y como ``TRAIL`` precede a
+#: ``TIME_STOP`` en ``EXIT_REASON_PRECEDENCE``, el techo vencido deja de cerrar y el día
+#: queda a medias. Eso es un artefacto del hueco, no de la costura de precio real: la
+#: frontera ``<= B-1`` / ``open(B)`` la certifica en exclusiva
+#: ``test_auto_v2_real_price_production_pg.py``. Aquí lo que se certifica es que el DÍA
+#: (apertura → techo vencido → libro plano) corre sobre la fuente REAL y no sobre ``100.0``.
+_RP_DECISION_PRICE = 30.0
+_RP_EXECUTION_PRICE = 30.0
+_RP_NEXT_PRICE = 30.0
+#: El precio del ``flat_price_script`` que el camino hermético fabrica: cazado si reaparece.
+_RP_FLAT_PRICE = Decimal("100.0")
+
+
+@pytest.mark.asyncio
+async def test_golden_day_v2_real_price_process_opens_and_closes_the_book_pg(
+    golden_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """El día completo con PRECIO REAL: abre/cierra igual y ningún fill vale ``100.0``.
+
+    Se siembran barras D1 (``close(B-1)``/``open(B)``, más ``B+1`` por si el run cruza la
+    medianoche UTC) y se enciende ``AUTO_ENGINE_SIM_REAL_PRICE``. El día debe seguir abriendo
+    una posición por instrumento y cerrando plano por ``time_exit``, pero cada fill durable
+    debe declarar ``price_source == 'MARKET_CLOSE'`` y ningún precio puede ser el ``100.0``
+    fabricado por el script hermético.
+    """
+    instrument_ids = [_filling_instrument_id(prefix) for prefix in _RP_INSTRUMENT_PREFIXES]
+    engine_id = f"auto-gd2rp-{uuid.uuid4().hex[:8]}"
+    log_path = Path(tempfile.gettempdir()) / f"gd2rp-{engine_id}.log"
+    account_id: str | None = None
+    edge_report_id: str | None = None
+    proc: subprocess.Popen[bytes] | None = None
+
+    try:
+        account_id = await _seed_account(golden_pg_factory)
+        for instrument_id, symbol, sector in zip(
+            instrument_ids, _RP_SYMBOLS, _RP_SECTORS, strict=True
+        ):
+            await _seed_instrument(
+                golden_pg_factory,
+                instrument_id=instrument_id,
+                symbol=symbol,
+                sector=sector,
+            )
+        edge_report_id = await _seed_edge_report(
+            golden_pg_factory, account_id=account_id, strategy_ref="unversioned"
+        )
+
+        today = datetime.now(UTC).date()
+        await _seed_watch_bars(
+            golden_pg_factory,
+            instrument_ids=instrument_ids,
+            bars=[
+                ((today - timedelta(days=1)).isoformat(), _RP_DECISION_PRICE, _RP_DECISION_PRICE),
+                (today.isoformat(), _RP_EXECUTION_PRICE, _RP_EXECUTION_PRICE),
+                ((today + timedelta(days=1)).isoformat(), _RP_NEXT_PRICE, _RP_NEXT_PRICE),
+            ],
+        )
+
+        env = _env_for(
+            account_id,
+            engine_id,
+            instrument_ids=instrument_ids,
+            extra={"AUTO_ENGINE_SIM_REAL_PRICE": "1"},
+        )
+        proc = _spawn(env, log_path)
+
+        # FASE 1 — apertura con precio real.
+        opened = 0
+        for _ in range(_OPEN_POLLS):
+            await asyncio.sleep(0.5)
+            if proc.poll() is not None:
+                raise AssertionError(
+                    _proc_failure(
+                        f"el proceso terminó (exit={proc.returncode}) antes de abrir (precio real)",
+                        log_path,
+                    )
+                )
+            opened = await _count_positions(golden_pg_factory, account_id)
+            if opened >= len(instrument_ids):
+                break
+        ticks = await _count_scoped_ticks(golden_pg_factory, engine_id)
+        buy_orders = await _count_buy_orders(golden_pg_factory, account_id)
+        assert opened >= len(instrument_ids), _proc_failure(
+            f"con precio real el proceso debe abrir una posición por instrumento "
+            f"(abiertas={opened} de {len(instrument_ids)}, buy_orders={buy_orders}, ticks={ticks})",
+            log_path,
+        )
+        fills = await _count_fill_contexts(golden_pg_factory, account_id)
+        orders = await _count_distinct_orders(golden_pg_factory, account_id)
+        assert fills > orders, _proc_failure(
+            f"el día con precio real debe materializar MÁS tranchas que órdenes "
+            f"(fills={fills}, orders={orders})",
+            log_path,
+        )
+        phase1_sources = await _fill_price_sources(golden_pg_factory, account_id)
+        assert phase1_sources, _proc_failure(
+            "el día con precio real debe dejar fills durables ya en la apertura", log_path
+        )
+        assert all(source == "MARKET_CLOSE" for _price, source, _ref in phase1_sources), (
+            "la APERTURA ya debe usar la fuente real (MARKET_CLOSE); fuentes="
+            f"{sorted({source for _p, source, _r in phase1_sources})} filas={phase1_sources}"
+        )
+
+        # FASE 2 — reinicio con el techo vencido ⇒ cierre por ``time_exit``.
+        assert (
+            await _count_watch_bars(golden_pg_factory, instrument_ids) == len(instrument_ids) * 3
+        ), "diagnóstico: las barras deben seguir presentes al cerrar la FASE 1"
+        await _stop(proc)
+        proc = None
+        assert (
+            await _count_watch_bars(golden_pg_factory, instrument_ids) == len(instrument_ids) * 3
+        ), "diagnóstico: las barras siguen tras parar el proceso de la FASE 1"
+        expired = await _expire_holding_deadlines(golden_pg_factory, account_id)
+        assert expired >= len(instrument_ids), (
+            f"deben vencer los {len(instrument_ids)} techos durables, no {expired}"
+        )
+
+        proc = _spawn(env, log_path)
+        sides: set[str] = set()
+        pending = 1
+        remaining = Decimal("0")
+        closed_polls = 0
+        for _ in range(_CLOSE_POLLS):
+            await asyncio.sleep(0.5)
+            if proc.poll() is not None:
+                raise AssertionError(
+                    _proc_failure(
+                        f"el proceso terminó (exit={proc.returncode}) durante el cierre (precio real)",
+                        log_path,
+                    )
+                )
+            sides, pending, remaining = await _day_progress(golden_pg_factory, account_id)
+            if (
+                await _count_positions(golden_pg_factory, account_id) == 0
+                and {"buy", "sell"} <= sides
+                and pending == 0
+                and remaining == 0
+            ):
+                closed_polls += 1
+                if closed_polls >= _CLOSED_DAY_POLLS:
+                    break
+            else:
+                closed_polls = 0
+
+        bars_at_close = await _count_watch_bars(golden_pg_factory, instrument_ids)
+        assert await _count_positions(golden_pg_factory, account_id) == 0, _proc_failure(
+            "el día con precio real debe cerrar los planes durables (time_exit); "
+            f"barras presentes al cierre={bars_at_close}",
+            log_path,
+        )
+        await _assert_materialized_and_flat(golden_pg_factory, account_id=account_id)
+
+        # FASE 3 — la FUENTE del precio es real: ``MARKET_CLOSE`` y jamás el ``100.0`` plano.
+        sources = await _fill_price_sources(golden_pg_factory, account_id)
+        assert sources, "el día con precio real debe dejar fills durables"
+        assert all(source == "MARKET_CLOSE" for _price, source, _ref in sources), (
+            "cada fill debe declarar su fuente canónica de precio real; fuentes="
+            f"{sorted({source for _price, source, _ref in sources})}"
+        )
+        assert all(price != _RP_FLAT_PRICE for price, _source, _ref in sources), (
+            "ningún fill puede salir del ``flat_price_script`` (100.0): "
+            f"{[str(price) for price, _s, _r in sources if price == _RP_FLAT_PRICE]}"
+        )
+        assert all(reference is not None for _price, _source, reference in sources), (
+            "el mid de REFERENCIA del fill debe estar medido (NULL delataría un fallback): "
+            f"{[str(p) for p, _s, r in sources if r is None]}"
+        )
+    finally:
+        if proc is not None:
+            await _stop(proc)
+        if account_id is not None:
+            from bolsa_infrastructure.database.models.tables import (
+                DecisionJournalEntryRow,
+                EdgeReportRow,
+                ExecutionEventRow,
+                OhlcvBarRow,
+                SimAutoPositionRow,
+                SimConsumedSignalRow,
+                SimFillFinanceContextRow,
+            )
+            from bolsa_infrastructure.database.repositories.account_repository import (
+                SqlAlchemyAccountRepository,
+            )
+
+            async with golden_pg_factory() as session:
+                await session.execute(
+                    delete(SimAutoPositionRow).where(SimAutoPositionRow.account_id == account_id)
+                )
+                await session.execute(
+                    delete(SimConsumedSignalRow).where(
+                        SimConsumedSignalRow.account_id == account_id
+                    )
+                )
+                await session.execute(
+                    delete(SimFillFinanceContextRow).where(
+                        SimFillFinanceContextRow.account_id == account_id
+                    )
+                )
+                await session.execute(
+                    delete(ExecutionEventRow).where(ExecutionEventRow.account_id == account_id)
+                )
+                await session.execute(
+                    delete(DecisionJournalEntryRow).where(
+                        DecisionJournalEntryRow.account_id == account_id
+                    )
+                )
+                for instrument_id in instrument_ids:
+                    await session.execute(
+                        delete(OhlcvBarRow).where(OhlcvBarRow.instrument_id == instrument_id)
+                    )
+                if edge_report_id is not None:
                     await session.execute(
                         delete(EdgeReportRow).where(EdgeReportRow.id == edge_report_id)
                     )

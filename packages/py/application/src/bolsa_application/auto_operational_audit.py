@@ -30,6 +30,7 @@ Tres reglas duras, declaradas en vez de asumidas:
 
 from __future__ import annotations
 
+import hashlib
 import math
 import os
 from typing import Any
@@ -87,6 +88,30 @@ def operational_audit_enabled(raw: str | None = None) -> bool:
     return str(value or "").strip().lower() in _TRUE_VALUES
 
 
+#: ``v2.88.29`` — la columna ``decision_journal_entries.dedupe_key`` es ``varchar(160)``
+#: (migración ``048``, sin migración nueva). Un ``order_id`` de venue largo desbordaba el
+#: literal y el alta reventaba con ``StringDataRightTruncation``. La clave se acota a esta
+#: longitud **sin perder identidad**: si el literal completo no cabe, se conserva un prefijo
+#: legible y se ancla el resto en un ``sha256`` determinista del MISMO contenido.
+_DEDUPE_KEY_MAX_LENGTH = 160
+_DEDUPE_KEY_DIGEST_LENGTH = 16
+
+
+def _bounded_dedupe_key(key: str) -> str:
+    """(PURA) acota una clave determinista al ancho de la columna, sin perder unicidad.
+
+    Con el literal corto (todos los casos históricos: settlement, protección y órdenes de
+    id corto) devuelve EXACTAMENTE la misma cadena: ``Δ = 0``. Sólo si desborda
+    ``varchar(160)`` se recorta a un prefijo legible + ``sha256[:16]`` del literal completo,
+    de modo que la clave sigue siendo determinista y colisiona como un hash de 64 bits.
+    """
+    if len(key) <= _DEDUPE_KEY_MAX_LENGTH:
+        return key
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:_DEDUPE_KEY_DIGEST_LENGTH]
+    head = key[: _DEDUPE_KEY_MAX_LENGTH - _DEDUPE_KEY_DIGEST_LENGTH - 1]
+    return f"{head}:{digest}"
+
+
 def durable_fact_dedupe_key(
     *,
     event_type: str | None,
@@ -121,18 +146,22 @@ def durable_fact_dedupe_key(
     if event is None or account is None or engine is None or cycle is None:
         return None
     if event == AUTO_CYCLE_SETTLEMENT_EVENT:
-        return f"{AUTO_CYCLE_SETTLEMENT_EVENT}:{account}:{engine}:{cycle}"
+        return _bounded_dedupe_key(f"{AUTO_CYCLE_SETTLEMENT_EVENT}:{account}:{engine}:{cycle}")
     if event == AUTO_ENTRY_ORDER_EVENT:
         order = _text(order_id)
         if order is None:
             return None
-        return f"{AUTO_ENTRY_ORDER_EVENT}:{account}:{engine}:{cycle}:{order}"
+        return _bounded_dedupe_key(
+            f"{AUTO_ENTRY_ORDER_EVENT}:{account}:{engine}:{cycle}:{order}"
+        )
     if event == AUTO_PROTECTION_EVENT:
         resolved_kind = _text(kind)
         revision = _text(revision_id)
         if resolved_kind is None or revision is None:
             return None
-        return f"{AUTO_PROTECTION_EVENT}:{account}:{engine}:{cycle}:{resolved_kind}:{revision}"
+        return _bounded_dedupe_key(
+            f"{AUTO_PROTECTION_EVENT}:{account}:{engine}:{cycle}:{resolved_kind}:{revision}"
+        )
     return None
 
 

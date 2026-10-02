@@ -799,6 +799,16 @@ T_AUTO_REAL_PRICE_FAIL_CLOSED = "apps/api-python/tests/test_auto_v2_real_price_f
 # (``test_a11_instrument_id_comes_from_a_fill_sweep``) es la que muerde aquí.
 T_A11_CERT = "apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py"
 
+# --- v2.88.29 (Golden Day 2.0 v2): EXACTLY-ONCE de los hechos durables (``dedupe_key``) ---
+# El overlay M2 sella la identidad determinista de cada hecho; el exactly-once depende de que
+# ESA identidad viaje. ``M294`` quita la ``revision_id`` del hecho de PROTECCIÓN ⇒ ``dedupe_key``
+# ``None`` ⇒ alta duplicable; ``M295`` rompe la DETERMINISMO de la revisión (``uuid4`` en vez de
+# contenido) ⇒ dos ticks idénticos dejan de colapsar. La costura hermetica que lo muerde es
+# ``test_auto_m2_operational_audit_seam.py`` (sin PG); la pureza de la revisión, su suite pura.
+POSITION_STATE = "packages/py/analytics/src/bolsa_analytics/cognitive/position_state.py"
+T_M2_SEAM = "apps/api-python/tests/test_auto_m2_operational_audit_seam.py"
+T_POSITION_REVISION = "packages/py/analytics/tests/test_position_revision.py"
+
 # (etiqueta, fichero, fragmento original, fragmento mutado, ficheros de test a correr)
 MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     (
@@ -3191,6 +3201,40 @@ MUTATIONS: list[tuple[str, str, str, str, tuple[str, ...]]] = [
         "        if all(_buy_fills(candidate, tick) for tick in _bar_ticks()):\n",
         "        if not all(_buy_fills(candidate, tick) for tick in _bar_ticks()):\n",
         (T_A11_CERT,),
+    ),
+    # ── v2.88.29 (Golden Day 2.0 v2): EXACTLY-ONCE de los hechos durables ─────────────
+    (
+        "M294 (v2.88.29, PROTECCION sin identidad): el hecho de proteccion deja de llevar "
+        "``revision_id`` -> ``dedupe_key`` queda ``None`` y la transicion vuelve a ser "
+        "DUPLICABLE (el agujero de v2.88.27)",
+        WORKER,
+        "            trailing_status=trailing_status,\n"
+        "            revision_id=revision_id,\n"
+        "            source=source,\n",
+        "            trailing_status=trailing_status,\n"
+        "            revision_id=None,\n"
+        "            source=source,\n",
+        (T_M2_SEAM,),
+    ),
+    (
+        "M295 (v2.88.29, revision NO determinista): la transicion sin cambio durable deja de "
+        "ser content-addressed (``uuid4``) -> dos ticks identicos ya NO comparten revision y el "
+        "``dedupe_key`` deja de colapsar (exactly-once roto)",
+        POSITION_STATE,
+        "    revision_id = deterministic_revision_id(\n"
+        "        position_id=previous.position_id,\n"
+        "        origin=origin,\n"
+        "        previous_stop=previous.current_stop,\n"
+        "        next_stop=advanced.current_stop,\n"
+        "        previous_status=previous.status,\n"
+        "        next_status=advanced.status,\n"
+        "        ordinal=len(previous.revisions),\n"
+        "        discriminator=kind,\n"
+        "    )\n"
+        "    return advanced, revision_id\n",
+        "    revision_id = uuid4().hex\n"
+        "    return advanced, revision_id\n",
+        (T_POSITION_REVISION,),
     ),
 ]
 

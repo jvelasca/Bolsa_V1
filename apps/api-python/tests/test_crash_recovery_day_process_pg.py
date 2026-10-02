@@ -25,6 +25,11 @@ Invariantes (medidos sobre lo durable, nunca sobre RAM del test):
 * el reinicio NO re-libera ni resucita la cola (la fila cerrada no se toca: idempotencia);
 * todo ``ExecutionEvent`` en ``APPLIED`` y **cada** fill con su transacción
   (``transactions.idempotency_key``);
+* los HECHOS DURABLES M2 (``AUTO_OPERATIONAL_AUDIT=1``: ``auto_entry_order``,
+  ``auto_cycle_settlement``, ``auto_protection_event``) quedan con ``dedupe_key`` no nulo y
+  **sin duplicados** tras el crash/restart (la 048 colapsa la misma clave a 1 fila);
+* la matriz §14.B de puntos de inyección está DECLARADA: cada punto inyectable cita el test
+  que lo ejerce y cada punto no inyectable mid-tick declara su motivo (patrón §7);
 * ``POSITION == Σ APPLIED BUY − Σ APPLIED SELL`` y libro canónico plano al cerrar;
 * ni una reserva viva al final (ni cola retenida ni liberaciones pendientes);
 * cero trazas de venue LIVE.
@@ -46,6 +51,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import subprocess  # noqa: S404 — proceso real del scheduler (objeto del test).
 import sys
 import tempfile
@@ -72,6 +78,7 @@ from tests.test_golden_day_v2_process_pg import (  # noqa: E402
     _count_positions,
     _count_scoped_ticks,
     _day_progress,
+    _durable_fact_health,
     _env_for,
     _expire_holding_deadlines,
     _proc_failure,
@@ -356,6 +363,14 @@ async def test_crash_recovery_day_real_process_survives_dirty_kill_pg(
             log_path,
         )
 
+        # v2.88.29 — foto de los hechos durables M2 ANTES de la muerte sucia. El reinicio
+        # no puede DUPLICAR ninguna ``dedupe_key`` (la 048 la colapsa) ni sellar un hecho
+        # nuevo del mismo tipo: la recuperación es idempotente por identidad.
+        facts_before = await _durable_fact_health(golden_pg_factory, account_id)
+        assert facts_before["nullKey"] == 0, (
+            f"ya en la apertura ningún hecho durable puede quedar sin identidad: {facts_before}"
+        )
+
         # ── MUERTE SUCIA (RAM perdida; sólo sobrevive lo durable) ─────────────────
         await _kill_hard(proc)
         proc = None
@@ -407,6 +422,43 @@ async def test_crash_recovery_day_real_process_survives_dirty_kill_pg(
 
         # (1) Cada fill con su transacción y ningún fill sin materializar.
         await _assert_materialized_and_flat(golden_pg_factory, account_id=account_id)
+
+        # (1b) v2.88.29 · hechos durables M2: el crash/restart NO los duplica ni los inventa.
+        #      La recuperación sólo vuelve a sellar lo que falta, con ``dedupe_key``
+        #      determinista; el ``ON CONFLICT`` de la 048 hace imposible la doble fila.
+        from bolsa_application.auto_operational_monitor import (
+            AUTO_CYCLE_SETTLEMENT_EVENT,
+            AUTO_ENTRY_ORDER_EVENT,
+            AUTO_PROTECTION_EVENT,
+        )
+
+        facts_after = await _durable_fact_health(golden_pg_factory, account_id)
+        assert facts_after["nullKey"] == 0, (
+            "tras el crash ningún hecho durable puede quedar sin identidad "
+            f"(``dedupe_key IS NULL``): {facts_after}"
+        )
+        assert facts_after["duplicates"] == [], (
+            "el crash/restart DUPLICÓ hechos durables (misma ``dedupe_key`` ⇒ 1 sola fila): "
+            f"{facts_after['duplicates']}"
+        )
+        assert facts_after["counts"][AUTO_ENTRY_ORDER_EVENT] == 1, (
+            "un instrumento ⇒ UNA orden de entrada (1 hecho ``auto_entry_order``): "
+            f"{facts_after['counts']}"
+        )
+        assert (
+            facts_after["counts"][AUTO_ENTRY_ORDER_EVENT]
+            == facts_before["counts"][AUTO_ENTRY_ORDER_EVENT]
+        ), (
+            "el reinicio re-emitió la orden de entrada ya sellada antes del crash: "
+            f"antes={facts_before['counts']} después={facts_after['counts']}"
+        )
+        assert facts_after["counts"][AUTO_PROTECTION_EVENT] >= 1, (
+            "el nacimiento de la posición debe sellar ≥1 transición ``auto_protection_event``: "
+            f"{facts_after}"
+        )
+        assert facts_after["counts"][AUTO_CYCLE_SETTLEMENT_EVENT] >= 1, (
+            f"el cierre del ciclo readoptado debe sellar la liquidación: {facts_after}"
+        )
 
         # (2) OBS-18: la cola del parcial quedó retirada ANTES del crash (retirada declarada) y
         #     el reinicio no la resucita; al cerrar el día no queda ninguna reserva viva.
@@ -511,3 +563,138 @@ async def test_crash_recovery_day_real_process_survives_dirty_kill_pg(
                 except Exception:  # noqa: BLE001 — cleanup nunca tira el test
                     pass
                 await session.commit()
+
+
+# ─────────────────────────────────────────────────────────────────────────────────────
+# v2.88.29 · Matriz declarada de puntos de inyección (§14.B del owner)
+# ─────────────────────────────────────────────────────────────────────────────────────
+# El plan exige cubrir los puntos de inyección del ciclo AUTO y **declarar** los que el
+# broker SIM no permite matar *mid-tick* (patrón §7): no se fingen. Esta tabla es un
+# contrato vivo — cada punto ``injectable`` cita el test real que lo ejerce y cada punto
+# no-injectable explica por qué; el test de abajo muerde si la tabla se edita a la ligera.
+_INJECTION_MATRIX: tuple[dict[str, Any], ...] = (
+    {
+        "point": "AFTER_ENTRY",
+        "injectable": True,
+        "covered_by": ("test_crash_recovery_day_real_process_survives_dirty_kill_pg",),
+        "reason": "",
+    },
+    {
+        "point": "AFTER_RESERVATION",
+        "injectable": True,
+        "covered_by": ("test_crash_recovery_day_real_process_survives_dirty_kill_pg",),
+        "reason": "",
+    },
+    {
+        "point": "BEFORE_ORDER",
+        "injectable": False,
+        "covered_by": (),
+        "reason": (
+            "reserva y orden se publican en el MISMO tick del broker SIM; no hay frontera "
+            "observable entre ambas ⇒ no inyectable mid-tick (se declara)"
+        ),
+    },
+    {
+        "point": "AFTER_ORDER",
+        "injectable": True,
+        "covered_by": ("test_crash_recovery_day_real_process_survives_dirty_kill_pg",),
+        "reason": "",
+    },
+    {
+        "point": "BEFORE_FILL",
+        "injectable": False,
+        "covered_by": (),
+        "reason": (
+            "el fill SIM liquida dentro del tick de la orden; el único borde inyectable es "
+            "DENTRO de la materialización (APPLYING) ⇒ ver AFTER_FILL"
+        ),
+    },
+    {
+        "point": "AFTER_FILL",
+        "injectable": True,
+        "covered_by": (
+            "test_crash_while_applying_is_reclaimed_and_applied_once_pg",
+            "test_crash_between_two_partial_fills_never_doubles_pg",
+        ),
+        "reason": "",
+    },
+    {
+        "point": "BEFORE_PROTECTION",
+        "injectable": False,
+        "covered_by": (),
+        "reason": (
+            "el overlay PROTECTION se aplica en el mismo tick que el fill; no hay frontera "
+            "mid-tick (recovery de AUSENCIA sigue fuera de alcance, solo exactly-once)"
+        ),
+    },
+    {
+        "point": "AFTER_PROTECTION",
+        "injectable": True,
+        "covered_by": ("test_crash_recovery_day_real_process_survives_dirty_kill_pg",),
+        "reason": "",
+    },
+    {
+        "point": "BEFORE_SETTLEMENT",
+        "injectable": False,
+        "covered_by": (),
+        "reason": (
+            "la liquidación se sella en el mismo tick que el cierre del ciclo; no hay "
+            "frontera mid-tick observable (se declara)"
+        ),
+    },
+)
+
+_EXPECTED_INJECTION_POINTS = {
+    "AFTER_ENTRY",
+    "AFTER_RESERVATION",
+    "BEFORE_ORDER",
+    "AFTER_ORDER",
+    "BEFORE_FILL",
+    "AFTER_FILL",
+    "BEFORE_PROTECTION",
+    "AFTER_PROTECTION",
+    "BEFORE_SETTLEMENT",
+}
+
+
+def _defined_test_names() -> set[str]:
+    """Nombres ``def test_*`` realmente definidos en el directorio de tests."""
+    names: set[str] = set()
+    for path in Path(__file__).resolve().parent.glob("test_*.py"):
+        for match in re.finditer(
+            r"^\s*(?:async\s+)?def\s+(test_\w+)", path.read_text("utf-8"), re.M
+        ):
+            names.add(match.group(1))
+    return names
+
+
+def test_crash_injection_matrix_is_declared_and_covered() -> None:
+    """La matriz §14.B está completa y cada punto inyectable cita un test que EXISTE.
+
+    Muerde si: (a) se quita/añade un punto sin reflejarlo, (b) un punto inyectable se queda
+    sin cobertura, o (c) la cobertura apunta a un test inexistente (renombrado/eliminado).
+    """
+    points = [entry["point"] for entry in _INJECTION_MATRIX]
+    assert len(points) == len(set(points)), f"punto de inyección duplicado: {points}"
+    assert set(points) == _EXPECTED_INJECTION_POINTS, (
+        "la matriz §14.B cambió de forma: "
+        f"faltan={sorted(_EXPECTED_INJECTION_POINTS - set(points))} "
+        f"sobran={sorted(set(points) - _EXPECTED_INJECTION_POINTS)}"
+    )
+
+    defined = _defined_test_names()
+    for entry in _INJECTION_MATRIX:
+        point = entry["point"]
+        if entry["injectable"]:
+            assert entry["covered_by"], (
+                f"el punto {point} se declara inyectable pero no cita cobertura (§14.B)"
+            )
+            missing = [name for name in entry["covered_by"] if name not in defined]
+            assert not missing, (
+                f"el punto {point} cita tests inexistentes {missing}: la cobertura §14.B "
+                "quedó obsoleta (renombrado/eliminado)"
+            )
+        else:
+            assert entry["reason"], (
+                f"el punto {point} se declara NO inyectable sin motivo (patrón §7)"
+            )
