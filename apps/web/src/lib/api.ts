@@ -928,7 +928,7 @@ export const api = {
 
   /** AUTO Operational Monitor (M1) — proyección read-only de la cadena AUTO. */
   getAutoOperationalMonitor: (input?: { limit?: number; cycleId?: string }) =>
-    call<{ data: components["schemas"]["AutoOperationalMonitorDto"] }>(() =>
+    call<components["schemas"]["AutoOperationalMonitorDto"]>(() =>
       client.GET("/api/auto/operational-monitor", {
         params: {
           query: { limit: input?.limit, cycleId: input?.cycleId },

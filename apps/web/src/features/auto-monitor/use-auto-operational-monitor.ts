@@ -35,9 +35,9 @@ export function useAutoOperationalMonitor(input?: {
 
   const view: AutoOperationalMonitorViewV1 | null = useMemo(
     () =>
-      query.data?.data
+      query.data
         ? buildAutoOperationalMonitorView(
-            query.data.data as unknown as AutoOperationalMonitorV1,
+            query.data as unknown as AutoOperationalMonitorV1,
           )
         : null,
     [query.data],

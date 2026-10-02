@@ -1,0 +1,144 @@
+/**
+ * Regresión del Monitor AUTO contra la forma REAL del endpoint.
+ *
+ * `GET /api/auto/operational-monitor` responde el `AutoOperationalMonitorDto` DIRECTO
+ * (sin envoltorio `{ data }`). Un `query.data.data` en el hook dejaba `view = null`:
+ * la página quedaba en blanco, sin "Cargando" y sin error. Este test muerde si vuelve.
+ *
+ * El resto de `auto-monitor.test.tsx` mockea el hook (por eso no lo detectó); aquí se
+ * monta la página real con el hook real y sólo se mockean la API y la cuenta activa.
+ */
+
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+vi.mock("@/lib/api", () => ({
+  // El mock devuelve el DTO directo (como el endpoint), NO `{ data: dto }`.
+  api: {
+    getAutoOperationalMonitor: vi.fn(async () => ({
+      key: "auto_operational_monitor_v1",
+      readOnly: true,
+      accountId: "acc-1",
+      asOf: "2026-10-01T00:00:00Z",
+      header: {
+        engineId: "auto-sim",
+        state: "RUNNING",
+        venue: "paper",
+        granularity: { decision: "1d", execution: "signal_bar" },
+        decisionClock: "CLOSED BAR",
+        executionDeclared: "next_bar_open",
+        executionEnabled: false,
+        protectionModel: "bar_ohlc",
+        heartbeatSeconds: 60,
+        graceSeconds: 61,
+        lastHeartbeatAt: "2026-10-01T09:00:00Z",
+        lastHeartbeatMeasurement: "COMPLETE",
+        lastDecisionAt: "2026-09-30T23:00:00Z",
+        lastDecisionMeasurement: "COMPLETE",
+        nextDecisionAt: "2026-10-01T00:01:00Z",
+        realPriceEnabled: false,
+        heartbeatsPersisted: 42,
+        asOf: "2026-10-01T00:00:00Z",
+      },
+      cycles: [
+        {
+          cycleId: "cyc-1",
+          instrumentId: "AAPL",
+          strategyVersion: "sv-1",
+          direction: "long",
+          closed: false,
+          steps: [
+            {
+              id: "SIGNAL",
+              state: "reached",
+              at: "2026-09-30T22:00:00Z",
+              measurement: "COMPLETE",
+              facts: [],
+              note: null,
+            },
+          ],
+          result: null,
+          notes: [],
+        },
+      ],
+      reservations: [],
+      concurrency: {
+        activeSessions: 0,
+        activeSessionsMeasurement: "COMPLETE",
+        heartbeatsPersisted: 42,
+        claimAttempts: 0,
+        claimAttemptsMeasurement: "COMPLETE",
+        successfulClaims: 0,
+        successfulClaimsMeasurement: "COMPLETE",
+        lostClaims: 0,
+        lostClaimsMeasurement: "COMPLETE",
+        raceConflicts: 0,
+        raceConflictsMeasurement: "COMPLETE",
+        reconciliations: 0,
+        reconciliationsMeasurement: "COMPLETE",
+        graceWindowKeeps: 0,
+        graceWindowKeepsMeasurement: "COMPLETE",
+        forcedReleases: 0,
+        forcedReleasesMeasurement: "COMPLETE",
+        lastConflict: null,
+        lastConflictMeasurement: "COMPLETE",
+      },
+      notes: ["decision_journal_not_durable"],
+    })),
+  },
+}));
+
+vi.mock("@/features/accounts/use-active-account", () => ({
+  useActiveAccount: () => ({
+    effectiveAccountId: "acc-1",
+    account: { id: "acc-1" },
+    isLoading: false,
+    accounts: [],
+  }),
+}));
+
+import { api } from "@/lib/api";
+import { AutoMonitorPage } from "@/features/auto-monitor/auto-monitor-page";
+
+function renderPage() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <AutoMonitorPage />
+    </QueryClientProvider>,
+  );
+}
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+describe("AutoMonitorPage — consume el DTO directo del endpoint", () => {
+  it("monta header, notas y timeline con la respuesta real (sin envoltorio `data`)", async () => {
+    renderPage();
+
+    // Si el hook volviera a leer `query.data.data`, esto nunca aparecería.
+    await waitFor(() =>
+      expect(screen.getByTestId("auto-monitor-header")).toBeTruthy(),
+    );
+
+    expect(screen.queryByTestId("auto-monitor-loading")).toBeNull();
+    expect(screen.queryByTestId("auto-monitor-error")).toBeNull();
+    expect(screen.getByTestId("auto-monitor-execution").textContent).toContain(
+      "next_bar_open",
+    );
+    expect(screen.getByTestId("auto-monitor-real-price").textContent).toBe(
+      "NO",
+    );
+    expect(screen.getByTestId("auto-monitor-cycles")).toBeTruthy();
+    expect(screen.getByTestId("auto-monitor-notes").textContent).toContain(
+      "decision_journal_not_durable",
+    );
+
+    expect(api.getAutoOperationalMonitor).toHaveBeenCalledTimes(1);
+  });
+});
