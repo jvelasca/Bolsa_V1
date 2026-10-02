@@ -81,12 +81,18 @@ function StepRow({ step }: { step: AutoMonitorStepViewV1 }) {
 }
 
 function CycleCard({ cycle }: { cycle: AutoMonitorCycleViewV1 }) {
+  const closedAsserted =
+    cycle.closed !== null &&
+    cycle.closed !== undefined &&
+    (cycle.closedMeasurement ?? "COMPLETE") === "COMPLETE";
   return (
     <Card
       className="rounded-xl border border-border bg-card"
       data-testid="auto-monitor-cycle"
       data-cycle-id={cycle.cycleId}
-      data-cycle-closed={cycle.closed ? "true" : "false"}
+      data-cycle-closed={
+        closedAsserted ? (cycle.closed ? "true" : "false") : "unknown"
+      }
     >
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -103,9 +109,11 @@ function CycleCard({ cycle }: { cycle: AutoMonitorCycleViewV1 }) {
             <span
               className={cn(
                 "rounded px-1.5 py-0.5 font-semibold uppercase tracking-wide",
-                cycle.closed
-                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                  : "bg-muted text-muted-foreground",
+                !closedAsserted
+                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                  : cycle.closed
+                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                    : "bg-muted text-muted-foreground",
               )}
             >
               {cycle.statusLabel}

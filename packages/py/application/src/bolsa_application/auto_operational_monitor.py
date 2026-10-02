@@ -457,15 +457,52 @@ def _settlement_step(
     )
 
 
-def _cycle_closed_step(closed: Mapping[str, Any] | None) -> dict[str, Any]:
+def _cycle_closed_step(
+    closed: Mapping[str, Any] | None, *, window_truncated: bool = False
+) -> dict[str, Any]:
+    """``CYCLE_CLOSED`` — cierre reconstruido de los fills, DECLARADO si la ventana se truncó.
+
+    Con la ventana de fills truncada el conjunto pudo perder una pata y ``cycles_from_fills``
+    puede reconstruir un cierre que la evidencia completa desmintiera: el paso **no** se afirma
+    (``unknown``/``PARTIAL`` con nota), por coherencia con ``FILL``. Sin truncamiento se comporta
+    como antes.
+    """
     if closed is None:
         return _step("CYCLE_CLOSED", state=STEP_PENDING, measurement=MEASUREMENT_UNKNOWN)
+    if window_truncated:
+        return _step(
+            "CYCLE_CLOSED",
+            state=STEP_UNKNOWN,
+            measurement=MEASUREMENT_PARTIAL,
+            note="cycle_closed_window_truncated",
+        )
     return _step(
         "CYCLE_CLOSED",
         state=STEP_REACHED,
         at=closed.get("closedAt"),
         facts=[_fact("pnl", closed.get("pnl")), _fact("reason", closed.get("reason", "flat"))],
     )
+
+
+def _cycle_window_truncated(
+    cycle_id: str,
+    *,
+    fills_by_cycle: Mapping[str, Sequence[Any]],
+    fills_total_by_cycle: Mapping[str, int] | None,
+    fills_window_full: bool,
+) -> bool:
+    """Si la ventana de fills de ESTE ciclo pudo truncarse.
+
+    Con el agregado ``fills_total_by_cycle`` (``count_by_cycle_ids``) la completitud se decide
+    ciclo a ciclo: ``cargados < total conocido`` ⇒ truncada (y un ciclo sin filas no aparece en
+    el mapa, así que no se marca). Sin agregado disponible (``None``, lectura caída) se cae al
+    suelo GLOBAL declarado por el llamante (``fills_window_full``): la ventana pudo truncarse
+    para todos, y no se puede afirmar lo contrario.
+    """
+    if fills_total_by_cycle is not None:
+        expected = int(fills_total_by_cycle.get(cycle_id, 0))
+        return len(fills_by_cycle.get(cycle_id, ())) < expected
+    return fills_window_full
 
 
 def _build_cycle(
@@ -478,7 +515,7 @@ def _build_cycle(
     closed_by_cycle: Mapping[str, Mapping[str, Any]],
     journal: Sequence[Any],
     settlement_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
-    fills_window_full: bool = False,
+    window_truncated: bool = False,
 ) -> dict[str, Any]:
     reservation = reservations[0] if reservations else None
     cycle_journal = _journal_for_cycle(journal, cycle_id)
@@ -496,26 +533,37 @@ def _build_cycle(
         _entry_decision_step("RISK", cycle_journal, note_absent="risk_not_durable"),
         _reservation_step(reservation),
         _order_step(orders),
-        _fill_step(cycle_fills, window_full=fills_window_full),
+        _fill_step(cycle_fills, window_full=window_truncated),
         _protection_step(positions_by_cycle.get(cycle_id)),
         _settlement_step(settlement, cycle_fills),
-        _cycle_closed_step(closed),
+        _cycle_closed_step(closed, window_truncated=window_truncated),
     ]
     notes: list[str] = []
     for step in steps:
         if step["state"] == STEP_UNKNOWN and step["note"]:
             notes.append(step["note"])
+    # ``closed`` deja de ser un booleano ciego: con la ventana truncada o un ``side`` no
+    # clasificable no se puede AFIRMAR el cierre (el neto puede estar incompleto), así que
+    # viaja ``None`` + ``PARTIAL``. Con la ventana completa se afirma True/False sin ambigüedad.
+    if window_truncated or unclassified_fills > 0:
+        closed_value: bool | None = None
+        closed_measurement: MeasurementStatus = MEASUREMENT_PARTIAL
+    else:
+        closed_value = closed is not None and not is_open
+        closed_measurement = MEASUREMENT_COMPLETE
     return {
         "cycleId": cycle_id,
         "instrumentId": _get(reservation, "instrument_id", "instrumentId"),
         "strategyVersion": _get(reservation, "strategy_version_id", "strategyVersionId"),
         "direction": "short" if side == "sell" else "long",
-        # Un fill con ``side`` no clasificable deja el neto incompleto: NO se afirma ``closed``.
-        "closed": closed is not None and not is_open and unclassified_fills == 0,
+        "closed": closed_value,
+        "closedMeasurement": closed_measurement,
         "steps": steps,
+        # El PnL reconstruido sale de la ventana de fills: truncada, un suelo no es un
+        # resultado. Se declara ausente antes que publicar una cifra sobre evidencia parcial.
         "result": (
             None
-            if closed is None
+            if closed is None or window_truncated
             else {
                 "pnl": closed.get("pnl"),
                 "closedAt": closed.get("closedAt"),
@@ -712,67 +760,71 @@ def _concurrency(
     # agregado se cae a las filas cargadas y se marca ``PARTIAL`` cuando el total conocido
     # demuestra que la ventana se truncó. Un hueco se declara ``UNKNOWN``, nunca un ``0``.
     if counts is not None:
-        raw_claim_attempts = int(counts.get("claimAttempts") or 0)
-        claims_measured = raw_claim_attempts > 0
-        claim_attempts = raw_claim_attempts if claims_measured else None
-        successful_claims = int(counts.get("successfulClaims") or 0) if claims_measured else None
-        lost_claims_count = int(counts.get("lostClaims") or 0) if claims_measured else None
-        race_conflicts = int(counts.get("raceConflicts") or 0) if claims_measured else None
-        undeclared_conflicts = int(counts.get("lostClaimsUndeclaredConflict") or 0)
-        raw_reconciliations = int(counts.get("reconciliations") or 0)
-        reconciliations_measured = raw_reconciliations > 0
-        reconciliations_count = raw_reconciliations if reconciliations_measured else None
-        grace_keeps = (
-            int(counts.get("graceWindowKeeps") or 0) if reconciliations_measured else None
-        )
-        claim_breakdown_measurement: MeasurementStatus = (
-            MEASUREMENT_COMPLETE if claims_measured else MEASUREMENT_UNKNOWN
-        )
+        # El agregado en base SE EJECUTÓ: un ``0`` es evidencia de "cero eventos", no un hueco.
+        # Distinguir "consulta no disponible" (``counts is None``) de "consulta disponible y
+        # COUNT(*) = 0" es justo lo que evita declarar UNKNOWN una medición que sí se hizo.
+        claim_attempts: int | None = int(counts.get("claimAttempts") or 0)
+        successful_claims: int | None = int(counts.get("successfulClaims") or 0)
+        lost_claims_count: int | None = int(counts.get("lostClaims") or 0)
+        race_conflicts: int | None = int(counts.get("raceConflicts") or 0)
+        undeclared_conflicts: int = int(counts.get("lostClaimsUndeclaredConflict") or 0)
+        reconciliations_count: int | None = int(counts.get("reconciliations") or 0)
+        grace_keeps: int | None = int(counts.get("graceWindowKeeps") or 0)
+        claims_measured = True
+        reconciliations_measured = True
+        # El desglose por estado sale del universo completo (agregado): es COMPLETE. Solo la
+        # carrera se degrada a PARTIAL si hay claims perdidos sin ``conflict`` declarado.
+        claim_breakdown_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
         race_conflicts_measurement: MeasurementStatus = (
-            MEASUREMENT_PARTIAL
-            if claims_measured and undeclared_conflicts > 0
-            else (MEASUREMENT_COMPLETE if claims_measured else MEASUREMENT_UNKNOWN)
+            MEASUREMENT_PARTIAL if undeclared_conflicts > 0 else MEASUREMENT_COMPLETE
         )
-        reconciliation_breakdown_measurement: MeasurementStatus = (
-            MEASUREMENT_COMPLETE if reconciliations_measured else MEASUREMENT_UNKNOWN
-        )
+        reconciliation_breakdown_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
     else:
         claim_attempts = (
             claims_total if claims_total is not None else (len(claims) if claims else None)
         )
-        successful_claims = (
-            sum(1 for entry in claims if _entry_payload(entry).get("claimed") is True)
-            if claims
-            else None
-        )
-        lost_claims_count = (
-            sum(1 for entry in claims if _entry_payload(entry).get("claimed") is False)
-            if claims
-            else None
-        )
-        race_conflicts = (
-            sum(1 for entry in claims if _entry_payload(entry).get("conflict") is True)
-            if claims
-            else None
-        )
+        # Con el total del universo conocido (aunque sea ``0``) los subcontadores se pueden
+        # AFIRMAR si la página trae todo el universo; si no, viajan como SUELO con ``PARTIAL``.
+        # Un total ``0`` es una medición completa de "cero claims", no un hueco.
+        if claim_attempts == 0:
+            successful_claims = 0
+            lost_claims_count = 0
+            race_conflicts = 0
+        else:
+            successful_claims = (
+                sum(1 for entry in claims if _entry_payload(entry).get("claimed") is True)
+                if claims
+                else None
+            )
+            lost_claims_count = (
+                sum(1 for entry in claims if _entry_payload(entry).get("claimed") is False)
+                if claims
+                else None
+            )
+            race_conflicts = (
+                sum(1 for entry in claims if _entry_payload(entry).get("conflict") is True)
+                if claims
+                else None
+            )
         reconciliations_count = (
             reconciliations_total
             if reconciliations_total is not None
             else (len(reconcilations) if reconcilations else None)
         )
-        grace_keeps = (
-            sum(
-                1
-                for entry in reconcilations
-                if _entry_payload(entry).get("reason") == GRACE_WINDOW_KEEP
+        if reconciliations_count == 0:
+            grace_keeps = 0
+        else:
+            grace_keeps = (
+                sum(
+                    1
+                    for entry in reconcilations
+                    if _entry_payload(entry).get("reason") == GRACE_WINDOW_KEEP
+                )
+                if reconcilations
+                else None
             )
-            if reconcilations
-            else None
-        )
-        claims_measured = claim_attempts is not None and claim_attempts > 0
-        reconciliations_measured = (
-            reconciliations_count is not None and reconciliations_count > 0
-        )
+        claims_measured = claim_attempts is not None
+        reconciliations_measured = reconciliations_count is not None
         claim_breakdown_measurement = (
             MEASUREMENT_PARTIAL
             if claim_attempts is not None and len(claims) < claim_attempts
@@ -922,6 +974,7 @@ def build_operational_monitor(
     forced_releases_total: int | None = None,
     header_decision_entries: Sequence[Any] | None = None,
     fills_window_full: bool = False,
+    fills_total_by_cycle: Mapping[str, int] | None = None,
 ) -> dict[str, Any]:
     """(PURA) construye el DTO del monitor desde el estado durable ya leído. Sin I/O.
 
@@ -1005,7 +1058,12 @@ def build_operational_monitor(
             closed_by_cycle=closed_by_cycle,
             journal=journal,
             settlement_by_cycle=settlement_by_cycle,
-            fills_window_full=fills_window_full,
+            window_truncated=_cycle_window_truncated(
+                key,
+                fills_by_cycle=fills_by_cycle,
+                fills_total_by_cycle=fills_total_by_cycle,
+                fills_window_full=fills_window_full,
+            ),
         )
         for key in ordered
     ]
@@ -1123,13 +1181,24 @@ async def read_operational_monitor(
     fills: list[Any] = []
     exit_orders: list[Any] = []
     fills_window_full = False
+    fills_total_by_cycle: Mapping[str, int] | None = None
     if cycle_ids:
         fill_limit = max(limit * 50, 200)
         fills = await context_store.list_by_cycle_ids(
             account_id, cycle_ids, limit=fill_limit
         )
-        # ``len == limit`` ⇒ la ventana pudo truncarse: el paso FILL lo declara ``PARTIAL``.
+        # ``len == limit`` ⇒ la ventana pudo truncarse: el suelo GLOBAL que se declara cuando
+        # no hay agregado por ciclo. Con el agregado (abajo) la completitud se decide ciclo a
+        # ciclo y una ventana global llena con ciclos cortos NO degrada a los que están completos.
         fills_window_full = len(fills) >= fill_limit
+        # Completitud POR CICLO: cuántos fills existen de cada ciclo, sin cargarlos. Si falla,
+        # se declara (queda ``None``) y el lector cae al suelo global. Nunca se finge un total.
+        try:
+            fills_total_by_cycle = await context_store.count_by_cycle_ids(
+                account_id, cycle_ids
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("auto monitor: fill per-cycle counts unavailable", exc_info=True)
         exit_orders = await exit_store.list_by_cycle_ids(account_id, cycle_ids)
 
     engine = await engine_store.read(engine_id)
@@ -1179,12 +1248,15 @@ async def read_operational_monitor(
     # Lectura GLOBAL del último ``auto_entry_decision`` durable, independiente de las reservas
     # visibles: por índice de ``event_type``, más nueva primero (``limit=1``). Sin esto
     # ``lastDecisionAt`` quedaba atado a los ciclos de la ventana y podía ocultar una decisión
-    # real. Si la consulta falla se deja ``None``: el header cae al journal del ciclo.
+    # real. Se acota por ``engine_id`` (A4): la "última decisión" es la de ESTE motor, no la de
+    # otro motor de la misma cuenta. Si la consulta falla se deja ``None``: el header cae al
+    # journal del ciclo.
     header_decision_entries: list[Any] | None = None
     try:
         header_decision_entries, _ = await repository.list_entries(
             account_id=account_id,
             event_type=AUTO_ENTRY_DECISION_EVENT,
+            engine_id=engine_id,
             limit=1,
         )
     except Exception:  # noqa: BLE001
@@ -1253,6 +1325,7 @@ async def read_operational_monitor(
         forced_releases_total=forced_releases_total,
         header_decision_entries=header_decision_entries,
         fills_window_full=fills_window_full,
+        fills_total_by_cycle=fills_total_by_cycle,
     )
 
 

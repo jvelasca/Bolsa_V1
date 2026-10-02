@@ -190,6 +190,9 @@ async def _seed_journal(
                 "strategyVersion": "orb-1",
                 "rank": 1,
                 "opportunityScore": 0.9,
+                # El motor que produce la decisión (A4): el header la lee scoped por
+                # ``account_id + engine_id``.
+                "engineId": _ENGINE_ID,
             },
         )
     )
@@ -446,3 +449,201 @@ async def test_monitor_forced_releases_come_from_the_aggregate(
         assert concurrency["forcedReleasesMeasurement"] == "COMPLETE"
     finally:
         await _wipe(monitor_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_monitor_truncated_fill_window_does_not_affirm_cycle_closed(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """(A1) Con la ventana de fills truncada NO se afirma ``CYCLE_CLOSED`` ni el PnL.
+
+    Se siembran 251 fills del mismo ciclo: 200 forman 100 round-trips cerrados y 51 son compras
+    abiertas posteriores. La lectura (``limit=1`` ⇒ ventana de 200) solo ve el prefijo —que
+    ``cycles_from_fills`` reconstruiría como ciclo CERRADO— y el agregado por ciclo declara
+    ``251`` existentes. Sin la corrección, ese prefijo afirmaría un cierre falso; con ella, el
+    ciclo se declara ``PARTIAL`` y ``closed``/``result`` no se afirman.
+    """
+    from bolsa_application.auto_operational_monitor import read_operational_monitor
+
+    account_id = f"acc-monitor-{uuid.uuid4().hex[:10]}"
+    suffix = uuid.uuid4().hex[:10]
+    cycle_id = f"cyc-{suffix}"
+    await _wipe(monitor_pg_factory, account_id)
+    try:
+        async with monitor_pg_factory() as session:
+            for index in range(100):
+                await _seed_fill(
+                    session,
+                    account_id=account_id,
+                    cycle_id=cycle_id,
+                    instrument="EEE",
+                    side="buy",
+                    price=100.0,
+                    reference_mid=100.0,
+                    execution_id=f"EX-{suffix}-{index:03d}-buy",
+                )
+                await _seed_fill(
+                    session,
+                    account_id=account_id,
+                    cycle_id=cycle_id,
+                    instrument="EEE",
+                    side="sell",
+                    price=101.0,
+                    reference_mid=101.0,
+                    execution_id=f"EX-{suffix}-{index:03d}-sell",
+                )
+            for index in range(100, 151):
+                await _seed_fill(
+                    session,
+                    account_id=account_id,
+                    cycle_id=cycle_id,
+                    instrument="EEE",
+                    side="buy",
+                    price=100.0,
+                    reference_mid=100.0,
+                    execution_id=f"EX-{suffix}-{index:03d}-buy",
+                )
+            await session.commit()
+
+        async with monitor_pg_factory() as session:
+            dto = await read_operational_monitor(
+                session,
+                account_id,
+                engine_id=_ENGINE_ID,
+                cycle_id=cycle_id,
+                limit=1,
+                grace_seconds=61.0,
+            )
+
+        cycle = dto["cycles"][0]
+        steps = {step["id"]: step for step in cycle["steps"]}
+        assert steps["FILL"]["measurement"] == "PARTIAL"
+        assert "fill_window_truncated" in (steps["FILL"]["note"] or "")
+        assert steps["CYCLE_CLOSED"]["state"] == "unknown"
+        assert steps["CYCLE_CLOSED"]["measurement"] == "PARTIAL"
+        assert steps["CYCLE_CLOSED"]["note"] == "cycle_closed_window_truncated"
+        assert cycle["closed"] is None
+        assert cycle["closedMeasurement"] == "PARTIAL"
+        assert cycle["result"] is None
+    finally:
+        await _wipe(monitor_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_monitor_aggregate_zero_is_measured_complete(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """(A2) El agregado ejecutado con 0 eventos es ``COMPLETE`` (cero medido), no ``UNKNOWN``."""
+    from bolsa_application.auto_operational_monitor import read_operational_monitor
+
+    account_id = f"acc-monitor-{uuid.uuid4().hex[:10]}"
+    await _wipe(monitor_pg_factory, account_id)
+    try:
+        async with monitor_pg_factory() as session:
+            dto = await read_operational_monitor(
+                session, account_id, engine_id=_ENGINE_ID, grace_seconds=61.0
+            )
+
+        concurrency = dto["concurrency"]
+        assert concurrency["claimAttempts"] == 0
+        assert concurrency["claimAttemptsMeasurement"] == "COMPLETE"
+        assert concurrency["reconciliations"] == 0
+        assert concurrency["reconciliationsMeasurement"] == "COMPLETE"
+    finally:
+        await _wipe(monitor_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_list_entries_tiebreaks_equal_timestamps_deterministically(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """(A3) Con ``created_at`` empatado, ``ORDER BY created_at DESC, id DESC`` decide."""
+    from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
+    from bolsa_infrastructure.database.repositories.journal_repository import (
+        SqlAlchemyJournalRepository,
+    )
+
+    account_id = f"acc-monitor-{uuid.uuid4().hex[:10]}"
+    await _wipe(monitor_pg_factory, account_id)
+    try:
+        async with monitor_pg_factory() as session:
+            repository = SqlAlchemyJournalRepository(session)
+            for entry_id in ("JNL-000001", "JNL-000002"):
+                await repository.append(
+                    DecisionJournalEntryRecord(
+                        id=entry_id,
+                        decision_id="dec-tie",
+                        event_type="auto_entry_decision",
+                        actor="auto-sim",
+                        created_at="2026-10-01T09:00:00Z",
+                        account_id=account_id,
+                    )
+                )
+            await session.commit()
+
+        async with monitor_pg_factory() as session:
+            repository = SqlAlchemyJournalRepository(session)
+            rows, total = await repository.list_entries(
+                account_id=account_id, event_type="auto_entry_decision", limit=1
+            )
+            assert total == 2
+            assert rows[0].id == "JNL-000002"
+    finally:
+        await _wipe(monitor_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_monitor_last_decision_is_scoped_by_engine(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """(A4) ``lastDecisionAt`` es la decisión de ESTE motor, no la de otro de la misma cuenta."""
+    from bolsa_application.auto_operational_monitor import read_operational_monitor
+    from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
+    from bolsa_infrastructure.database.repositories.journal_repository import (
+        SqlAlchemyJournalRepository,
+    )
+
+    account_id = f"acc-monitor-{uuid.uuid4().hex[:10]}"
+    await _wipe(monitor_pg_factory, account_id)
+    try:
+        async with monitor_pg_factory() as session:
+            repository = SqlAlchemyJournalRepository(session)
+            # Motor A: decisión más vieja. Motor B: decisión más nueva (no debe ganar para A).
+            await repository.append(
+                DecisionJournalEntryRecord(
+                    id="JNL-engine-a",
+                    decision_id="dec-engine-a",
+                    event_type="auto_entry_decision",
+                    actor="auto-sim",
+                    created_at="2026-10-01T09:00:00Z",
+                    account_id=account_id,
+                    payload={"engineId": "engine-a", "cycleId": "cyc-a"},
+                )
+            )
+            await repository.append(
+                DecisionJournalEntryRecord(
+                    id="JNL-engine-b",
+                    decision_id="dec-engine-b",
+                    event_type="auto_entry_decision",
+                    actor="auto-sim",
+                    created_at="2026-10-01T18:00:00Z",
+                    account_id=account_id,
+                    payload={"engineId": "engine-b", "cycleId": "cyc-b"},
+                )
+            )
+            await session.commit()
+
+        async with monitor_pg_factory() as session:
+            dto = await read_operational_monitor(
+                session, account_id, engine_id="engine-a", grace_seconds=61.0
+            )
+        assert dto["header"]["lastDecisionAt"] == "2026-10-01T09:00:00Z"
+
+        async with monitor_pg_factory() as session:
+            dto_b = await read_operational_monitor(
+                session, account_id, engine_id="engine-b", grace_seconds=61.0
+            )
+        assert dto_b["header"]["lastDecisionAt"] == "2026-10-01T18:00:00Z"
+    finally:
+        await _wipe(monitor_pg_factory, account_id)
+

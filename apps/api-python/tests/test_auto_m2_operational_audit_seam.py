@@ -153,9 +153,48 @@ async def test_entry_decision_without_account_is_stamped_for_the_global_read() -
     assert len(sink.entries) == 1
     stamped = sink.entries[0]
     assert stamped.account_id == _ACCOUNT
-    # El hecho persistido no se reescribe más allá del sello de cuenta (identidad intacta).
+    # El hecho persistido no se reescribe más allá de los sellos de trazado (identidad
+    # intacta): ``account_id`` y, aditivo, ``payload.engineId`` para la lectura por motor.
     assert stamped.decision_id == "dec-bbb"
-    assert stamped.payload == entry.payload
+    assert stamped.payload["cycleId"] == "cyc-bbb"
+    assert stamped.payload["rank"] == 1
+    assert stamped.payload["engineId"] == "auto-sim"
+
+
+@pytest.mark.asyncio
+async def test_entry_decision_seals_the_engine_id_for_the_scoped_read() -> None:
+    """(A4) El tramo de trazado sella ``payload.engineId`` cuando el productor no lo trae.
+
+    Es lo que permite acotar ``lastDecisionAt`` a ``account_id + engine_id``: dos motores de
+    la misma cuenta no comparten "última decisión".
+    """
+    sink = _Collector()
+    worker = _worker(sink=sink)
+    await worker._v2_journal_entry_decisions([_journal_entry(cycle_id="cyc-aaa")])
+
+    assert sink.entries[0].payload is not None
+    assert sink.entries[0].payload["engineId"] == "auto-sim"
+
+
+@pytest.mark.asyncio
+async def test_entry_decision_keeps_a_producer_engine_id_without_rewriting() -> None:
+    """Un ``engineId`` ya presente NO se pisa: el sello es solo para quien no lo declara."""
+    sink = _Collector()
+    worker = _worker(sink=sink)
+    entry = DecisionJournalEntryRecord(
+        id="JNL-dec-ccc",
+        decision_id="dec-ccc",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        actor="auto-sim",
+        created_at="2026-10-01T09:59:00Z",
+        account_id=_ACCOUNT,
+        instrument_id="AAA",
+        payload={"cycleId": "cyc-ccc", "engineId": "auto-otro"},
+    )
+    await worker._v2_journal_entry_decisions([entry])
+
+    assert sink.entries[0].payload is not None
+    assert sink.entries[0].payload["engineId"] == "auto-otro"
 
 
 @pytest.mark.asyncio

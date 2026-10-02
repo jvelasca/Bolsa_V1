@@ -89,7 +89,10 @@ class SqlAlchemyJournalRepository:
         statement = (
             select(DecisionJournalEntryRow)
             .where(DecisionJournalEntryRow.decision_id.in_(ids))
-            .order_by(DecisionJournalEntryRow.created_at.desc())
+            .order_by(
+                DecisionJournalEntryRow.created_at.desc(),
+                DecisionJournalEntryRow.id.desc(),
+            )
         )
         if limit is not None:
             statement = statement.limit(limit)
@@ -103,6 +106,7 @@ class SqlAlchemyJournalRepository:
         instrument_id: str | None = None,
         since: str | None = None,
         event_type: str | None = None,
+        engine_id: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[DecisionJournalEntryRecord], int]:
@@ -115,6 +119,13 @@ class SqlAlchemyJournalRepository:
                 filters.append(DecisionJournalEntryRow.created_at >= since_dt)
         if event_type:
             filters.append(DecisionJournalEntryRow.event_type == event_type)
+        # Alcance por motor (AUTO monitor A4): el evento durable ``auto_entry_decision`` sella
+        # ``engineId`` en el ``payload`` (JSONB, sin migración). Con ``engine_id`` se acota la
+        # lectura al motor que la produce: dos motores de una cuenta no comparten "última decisión".
+        if engine_id:
+            filters.append(
+                DecisionJournalEntryRow.payload["engineId"].as_string() == engine_id
+            )
 
         count_stmt = select(func.count()).select_from(DecisionJournalEntryRow).where(*filters)
         count_result = await self._session.execute(count_stmt)
@@ -123,7 +134,12 @@ class SqlAlchemyJournalRepository:
         stmt = (
             select(DecisionJournalEntryRow)
             .where(*filters)
-            .order_by(DecisionJournalEntryRow.created_at.desc())
+            # Desempate determinista (``id``) para que un ``LIMIT`` sobre timestamps empatados
+            # (resolución limitada) no dependa del orden físico de la tabla.
+            .order_by(
+                DecisionJournalEntryRow.created_at.desc(),
+                DecisionJournalEntryRow.id.desc(),
+            )
             .limit(limit)
             .offset(offset)
         )

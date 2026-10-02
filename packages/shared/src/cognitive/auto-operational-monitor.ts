@@ -82,7 +82,10 @@ export type AutoMonitorCycleV1 = {
   instrumentId?: string | null;
   strategyVersion?: string | null;
   direction?: string;
-  closed?: boolean;
+  // `closed` es nullable: `null` = la evidencia (ventana de fills) está truncada y NO se puede
+  // afirmar el cierre. `closedMeasurement` acompaña (PARTIAL/UNKNOWN); la UI no adivina.
+  closed?: boolean | null;
+  closedMeasurement?: string;
   steps: AutoMonitorStepV1[];
   result?: { pnl?: unknown; closedAt?: string | null } | null;
   notes?: string[];
@@ -302,7 +305,17 @@ export function buildAutoOperationalMonitorView(
         ...cycle,
         steps,
         directionLabel: cycle.direction === "short" ? "Corto" : "Largo",
-        statusLabel: cycle.closed ? "Cerrado" : "Abierto",
+        // El cierre solo se afirma con la evidencia COMPLETA: `closed = null` o una medición
+        // distinta de `COMPLETE` (ventana de fills truncada) se rotula `NO MEDIDO`, jamás
+        // "Abierto" (que afirmaría lo contrario de lo que no se pudo medir).
+        statusLabel:
+          cycle.closed === null ||
+          cycle.closed === undefined ||
+          (cycle.closedMeasurement ?? "COMPLETE") !== "COMPLETE"
+            ? NO_MEASUREMENT_LABEL
+            : cycle.closed
+              ? "Cerrado"
+              : "Abierto",
         unmeasuredStepIds: steps
           .filter((step) => step.measurement === "UNKNOWN")
           .map((step) => step.id),

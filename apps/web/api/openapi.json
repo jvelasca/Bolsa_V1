@@ -789,9 +789,20 @@
       "AutoMonitorCycleDto": {
         "properties": {
           "closed": {
-            "default": false,
-            "title": "Closed",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed"
+          },
+          "closedMeasurement": {
+            "default": "UNKNOWN",
+            "title": "Closedmeasurement",
+            "type": "string"
           },
           "cycleId": {
             "title": "Cycleid",

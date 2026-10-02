@@ -140,6 +140,23 @@ describe("AutoCycleTimeline", () => {
     render(<AutoCycleTimeline cycles={[]} />);
     expect(screen.getByTestId("auto-monitor-empty")).toBeTruthy();
   });
+
+  it("no afirma cerrado/abierto cuando la ventana de fills truncó el cierre", () => {
+    const truncated = buildAutoOperationalMonitorView({
+      ...dtoFixture(),
+      cycles: [
+        {
+          ...dtoFixture().cycles[0]!,
+          closed: null,
+          closedMeasurement: "PARTIAL",
+        },
+      ],
+    });
+    render(<AutoCycleTimeline cycles={truncated.cycles} />);
+    const card = screen.getByTestId("auto-monitor-cycle");
+    expect(card.getAttribute("data-cycle-closed")).toBe("unknown");
+    expect(card.textContent).toContain("NO MEDIDO");
+  });
 });
 
 describe("AutoConcurrencyPanel", () => {

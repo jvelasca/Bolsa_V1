@@ -489,9 +489,10 @@ def test_concurrency_marks_race_partial_when_conflicts_are_undeclared() -> None:
     # El total y el desglose de claims SÍ son completos.
     assert concurrency["claimAttemptsMeasurement"] == "COMPLETE"
     assert concurrency["lostClaimsMeasurement"] == "COMPLETE"
-    # Sin reconciliaciones el hueco se declara.
-    assert concurrency["reconciliations"] is None
-    assert concurrency["reconciliationsMeasurement"] == "UNKNOWN"
+    # El agregado SE EJECUTÓ y devolvió 0 reconciliaciones: es una medición COMPLETA
+    # ("cero eventos"), no un hueco. Solo la ausencia de lectura sería UNKNOWN.
+    assert concurrency["reconciliations"] == 0
+    assert concurrency["reconciliationsMeasurement"] == "COMPLETE"
 
 
 def test_concurrency_marks_partial_when_row_window_is_truncated() -> None:
@@ -693,6 +694,9 @@ def test_fill_with_unclassifiable_side_is_declared_partial_not_dropped() -> None
     # El bucket de compras SÍ se mide, pero es un suelo: la cantidad lo declara ``PARTIAL``.
     assert _fact(step, "buyQty")["measurement"] == "PARTIAL"
     assert _fact(step, "buyQty")["value"] == 10.0
+    # Con un ``side`` no clasificable el neto está incompleto: tampoco se AFIRMA el cierre.
+    assert dto["cycles"][0]["closed"] is None
+    assert dto["cycles"][0]["closedMeasurement"] == "PARTIAL"
 
 
 def test_fill_window_full_is_declared_partial() -> None:
@@ -706,3 +710,105 @@ def test_fill_window_full_is_declared_partial() -> None:
     step = _step(dto["cycles"][0]["steps"], "FILL")
     assert step["measurement"] == "PARTIAL"
     assert step["note"] is not None and "fill_window_truncated" in step["note"]
+
+
+def test_cycle_window_truncated_degrades_cycle_closed_and_pnl() -> None:
+    """(A1) Ventana de fills truncada ⇒ NO se afirma CYCLE_CLOSED ni el PnL reconstruido.
+
+    Con ``fills_total_by_cycle`` el ciclo declara 250 fills existentes frente a 2 cargados: el
+    ``cycles_from_fills`` sobre el subconjunto puede reconstruir un cierre que la evidencia
+    completa desmintiera, así que ``CYCLE_CLOSED`` pasa a ``unknown``/``PARTIAL`` y ``closed``/
+    ``result`` dejan de afirmarse.
+    """
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100),
+            _fill(side="sell", qty=10, price=110),
+        ],
+        fills_total_by_cycle={"cyc-1": 250},
+    )
+    cycle = dto["cycles"][0]
+    fill = _step(cycle["steps"], "FILL")
+    assert fill["measurement"] == "PARTIAL"
+    assert fill["note"] is not None and "fill_window_truncated" in fill["note"]
+    closed_step = _step(cycle["steps"], "CYCLE_CLOSED")
+    assert closed_step["state"] == STEP_UNKNOWN
+    assert closed_step["measurement"] == "PARTIAL"
+    assert closed_step["note"] == "cycle_closed_window_truncated"
+    assert closed_step["facts"] == []
+    assert cycle["closed"] is None
+    assert cycle["closedMeasurement"] == "PARTIAL"
+    assert cycle["result"] is None
+
+
+def test_cycle_window_complete_keeps_cycle_closed_even_with_global_window_full() -> None:
+    """(A1) La completitud es POR CICLO: un ciclo corto completo no se degrada por la ventana global.
+
+    ``fills_window_full`` es solo el suelo cuando NO hay agregado. Con ``fills_total_by_cycle``
+    que demuestra ``2/2``, el ciclo conserva su cierre y su PnL aunque la ventana global esté llena.
+    """
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100),
+            _fill(side="sell", qty=10, price=110),
+        ],
+        fills_window_full=True,
+        fills_total_by_cycle={"cyc-1": 2},
+    )
+    cycle = dto["cycles"][0]
+    assert _step(cycle["steps"], "FILL")["measurement"] == "COMPLETE"
+    assert _step(cycle["steps"], "CYCLE_CLOSED")["state"] == STEP_REACHED
+    assert cycle["closed"] is True
+    assert cycle["closedMeasurement"] == "COMPLETE"
+    assert cycle["result"]["pnl"] == 100
+
+
+def test_cycle_window_full_without_aggregate_falls_back_to_global() -> None:
+    """(A1) Sin agregado por ciclo el suelo GLOBAL vuelve a mandar (fail-closed)."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100),
+            _fill(side="sell", qty=10, price=110),
+        ],
+        fills_window_full=True,
+        fills_total_by_cycle=None,
+    )
+    cycle = dto["cycles"][0]
+    assert _step(cycle["steps"], "CYCLE_CLOSED")["state"] == STEP_UNKNOWN
+    assert cycle["closed"] is None
+    assert cycle["result"] is None
+
+
+def test_concurrency_aggregate_zero_is_measured_not_unknown() -> None:
+    """(A2) El agregado EJECUTADO con COUNT=0 es evidencia COMPLETA, no un hueco ``UNKNOWN``."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        concurrency_counts={
+            "claimAttempts": 0,
+            "successfulClaims": 0,
+            "lostClaims": 0,
+            "raceConflicts": 0,
+            "lostClaimsUndeclaredConflict": 0,
+            "reconciliations": 0,
+            "graceWindowKeeps": 0,
+        },
+    )
+    concurrency = dto["concurrency"]
+    for key in (
+        "claimAttempts",
+        "successfulClaims",
+        "lostClaims",
+        "raceConflicts",
+        "reconciliations",
+        "graceWindowKeeps",
+    ):
+        assert concurrency[key] == 0
+        assert concurrency[f"{key}Measurement"] == "COMPLETE"
+

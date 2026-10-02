@@ -9,6 +9,7 @@ import {
   formatLastConflict,
   formatMonitorFactValue,
   formatMonitorInstant,
+  NO_MEASUREMENT_LABEL,
   realPriceEnabledLabel,
   stepStateLabel,
   type AutoOperationalMonitorV1,
@@ -97,6 +98,14 @@ describe("buildAutoOperationalMonitorView", () => {
     expect(cycle.steps[0]!.label).toBe("Riesgo");
     expect(cycle.steps[0]!.stateLabel).toBe(stepStateLabel("unknown"));
     expect(cycle.unmeasuredStepIds).toEqual(["RISK"]);
+  });
+
+  it("no afirma el cierre cuando la ventana de fills truncó la evidencia", () => {
+    const dto = minimalDto();
+    dto.cycles[0]!.closed = null;
+    dto.cycles[0]!.closedMeasurement = "PARTIAL";
+    const cycle = buildAutoOperationalMonitorView(dto).cycles[0]!;
+    expect(cycle.statusLabel).toBe(NO_MEASUREMENT_LABEL);
   });
 });
 

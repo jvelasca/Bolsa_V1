@@ -210,6 +210,17 @@ class SimFillFinanceContextStore(Protocol):
         limit: int = 500,
     ) -> list[SimFillFinanceContext]: ...
 
+    # AUTO-16 / monitor: completitud de la ventana de fills POR CICLO. Cuenta los fills de
+    # cada ciclo sin traer sus filas (agregado ``GROUP BY cycle_id``), de modo que el lector
+    # pueda comparar lo cargado con lo que existe y declarar truncada SOLO esa ventana. Un
+    # ciclo sin filas no aparece en el mapa: el hueco lo declara el llamante, no se rellena
+    # con un ``0`` que afirmaría "este ciclo no tiene fills".
+    async def count_by_cycle_ids(
+        self,
+        account_id: str | None,
+        cycle_ids: Sequence[str],
+    ) -> Mapping[str, int]: ...
+
 
 class SimAutoPositionStore(Protocol):
     async def read_open(self, account_id: str, engine_id: str) -> Mapping[str, Decimal]: ...
@@ -343,6 +354,25 @@ class InMemorySimFillFinanceContextStore:
         if limit is not None and limit > 0:
             rows = rows[:limit]
         return rows
+
+    async def count_by_cycle_ids(
+        self,
+        account_id: str | None,
+        cycle_ids: Sequence[str],
+    ) -> Mapping[str, int]:
+        """Espeja el agregado PG: ``cycle_id -> COUNT(*)`` (un ciclo sin filas no aparece)."""
+        wanted = {str(c).strip() for c in cycle_ids if str(c).strip()}
+        if not wanted:
+            return {}
+        counts: dict[str, int] = {}
+        for row in self._rows.values():
+            key = str(row.cycle_id or "").strip()
+            if key not in wanted:
+                continue
+            if account_id is not None and row.account_id != account_id:
+                continue
+            counts[key] = counts.get(key, 0) + 1
+        return counts
 
     def size(self) -> int:
         return len(self._rows)
@@ -675,6 +705,37 @@ class PostgresSimFillFinanceContextStore:
             )
             for row in rows
         ]
+
+    async def count_by_cycle_ids(
+        self,
+        account_id: str | None,
+        cycle_ids: Sequence[str],
+    ) -> Mapping[str, int]:
+        """(monitor A1) agregado ``cycle_id -> COUNT(*)`` sobre el UNIVERSO completo.
+
+        La ventana de ``list_by_cycle_ids`` está limitada: contar las filas cargadas truncaba
+        el universo y el lector podía afirmar un cierre sobre un subconjunto. Aquí se agrupa y
+        cuenta en SQL, sin traer filas. ``cycle_ids`` vacío ⇒ ``{}`` sin consultar; las filas
+        sin ciclo (``NULL``) no casan (``IN`` sobre una lista no nula nunca es cierto para NULL).
+        Solo aparecen los ciclos con al menos una fila: un ciclo sin fills no recibe un ``0``
+        inventado, el llamante declara el hueco.
+        """
+        from sqlalchemy import func, select
+
+        from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+
+        wanted = [str(c).strip() for c in cycle_ids if str(c).strip()]
+        if not wanted:
+            return {}
+        stmt = (
+            select(SimFillFinanceContextRow.cycle_id, func.count())
+            .where(SimFillFinanceContextRow.cycle_id.in_(wanted))
+            .group_by(SimFillFinanceContextRow.cycle_id)
+        )
+        if account_id is not None:
+            stmt = stmt.where(SimFillFinanceContextRow.account_id == account_id)
+        rows = (await self._session.execute(stmt)).all()
+        return {str(row[0]): int(row[1]) for row in rows if row[0] is not None}
 
 
 class PostgresSimAutoPositionStore:

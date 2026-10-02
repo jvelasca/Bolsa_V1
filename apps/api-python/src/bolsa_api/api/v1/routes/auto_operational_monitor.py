@@ -65,7 +65,10 @@ class AutoMonitorCycleDto(BaseModel):
     instrumentId: str | None = None
     strategyVersion: str | None = None
     direction: str = "long"
-    closed: bool = False
+    # ``closed`` es nullable: con la ventana de fills truncada no se puede AFIRMAR el cierre.
+    # ``None`` + ``closedMeasurement`` (PARTIAL/UNKNOWN) declara el hueco; la UI lo rotula.
+    closed: bool | None = None
+    closedMeasurement: str = "UNKNOWN"
     steps: list[AutoMonitorStepDto] = Field(default_factory=list)
     result: AutoMonitorCycleResultDto | None = None
     notes: list[str] = Field(default_factory=list)

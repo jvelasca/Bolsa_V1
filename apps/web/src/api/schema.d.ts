@@ -4227,11 +4227,13 @@ export interface components {
         };
         /** AutoMonitorCycleDto */
         AutoMonitorCycleDto: {
+            /** Closed */
+            closed?: boolean | null;
             /**
-             * Closed
-             * @default false
+             * Closedmeasurement
+             * @default UNKNOWN
              */
-            closed: boolean;
+            closedMeasurement: string;
             /** Cycleid */
             cycleId: string;
             /**

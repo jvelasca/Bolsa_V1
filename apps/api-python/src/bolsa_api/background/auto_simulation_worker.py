@@ -2772,9 +2772,19 @@ class AutoSimulationWorker:
         # por ``account_id + event_type`` (índice) sin depender de las reservas visibles. No es
         # una decisión de inversión: es trazado. La columna ``session_id`` apunta por FK a
         # ``decision_sessions`` y no se invade: la sesión de motor vive en los claims.
+        #
+        # A4 (monitor): se sella ADEMÁS ``payload.engineId`` cuando falta, para que la lectura
+        # global acote por motor y no mezcle dos motores de la misma cuenta. Aditivo e inerte
+        # (con el flag de auditoría OFF este tramo no corre).
         for entry in entries:
-            if entry is not None and not getattr(entry, "account_id", None):
+            if entry is None:
+                continue
+            if not getattr(entry, "account_id", None):
                 entry = replace(entry, account_id=self._account_id)
+            payload = dict(entry.payload or {})
+            if not str(payload.get("engineId") or "").strip() and self._engine_id:
+                payload["engineId"] = self._engine_id
+                entry = replace(entry, payload=payload)
             await self._v2_audit_emit(entry, label="entry_decision")
 
     async def _v2_save_exit_order(self, order: ExitOrder) -> bool:
