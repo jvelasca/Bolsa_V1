@@ -1,10 +1,50 @@
 # Arranque operativo de la ventana PAPER forward — semilla A/B y cuenta fija (2026-09-27)
 
-> **AsOf:** 2026-09-27 · **Naturaleza:** **operación** (no es una fase de motor) ·
+> **AsOf:** 2026-09-27 · **Re-anclaje:** 2026-10-02 (ver §0) · **Naturaleza:** **operación** (no es una fase de motor) ·
 > **Objeto:** dejar listo el entorno para la ventana PAPER **≥4 días** de `AUTO-MATERIAL-12`
 > que persigue cerrar `P3-2`/`P3-3`. **No** se toca motor, gobernador, `TOP_N`, umbrales,
-> allocation, pesos A/B ni migraciones (head sigue `046_fill_reference_mid`).
+> allocation, pesos A/B ni migraciones (arranque original con head `046_fill_reference_mid`;
+> head **hoy** `048_journal_entry_dedupe_key`).
 > Ejecutado por el script [`ops_seed_window_pair.py`](../../apps/api-python/scripts/ops_seed_window_pair.py).
+
+## 0. Re-anclaje al árbol congelado `v2.88.29-beta` (2026-10-02)
+
+La ventana de `2026-09-28` (D1) se corrió sobre un árbol **anterior**; el head de migraciones
+avanzó de `046_fill_reference_mid` a `048_journal_entry_dedupe_key`. Antes de reiniciar la
+ventana, este documento se **re-pinnea** al árbol congelado del sello vigente:
+
+| Dato | Valor (comprobable) |
+|---|---|
+| Sello / tag | **`v2.88.29-beta`** · commit `2b67a2fa` · package `2.11.29-beta` |
+| Alembic head | **`048_journal_entry_dedupe_key`** (**sin** migración pendiente) |
+| Árbol de **código** congelado | `git rev-parse "HEAD:apps"` = `25afb7282e11240c19c63f85f82273ea3b1440f4` · `git rev-parse "HEAD:packages"` = `ce0a38b7e6f5a9f102490e5774f859d7f83aac4a` |
+| Identidad fija (sin cambios) | `$ACCOUNT` = `1484e253d2d54645945a6b1d7` · `$VERSION_A` = `v283-window-a` · `$VERSION_B` = `v283-window-b` · watch = **20** símbolos |
+| Configuración de operación | `AUTO_ENGINE_SIM_REAL_PRICE=1` (deja de fabricar `100.0`) y `AUTO_OPERATIONAL_AUDIT=1` (hechos durables para el monitor). **Ningún** cambio de motor/`TOP_N`/régimen/umbrales/A-B. |
+
+**Declaración:** el bloque §4.bis (D1 del `2026-09-28`) pertenece al árbol **previo** al re-anclaje
+y **no** cuenta para esta ventana; la ventana se reanuda sobre el árbol congelado de arriba. Si
+`apps`/`packages` vuelven a moverse durante D1..D4, la hoja se **repite** (mismo protocolo del
+incidente declarado en §4.bis).
+
+### 0.1 Verificación de identidad ejecutada (2026-10-02, read-only)
+
+| Comprobación | Comando | Resultado |
+|---|---|---|
+| Árbol congelado vivo | `git rev-parse "HEAD:apps" "HEAD:packages"` | `25afb728…` / `ce0a38b7…` (**coinciden** con el sello) |
+| Watch de 20 símbolos | `v2_76 … --preflight-only --watch-size 20` | `watch 20 símbolos` · `barras servidas 20` |
+| Régimen de hoy | idem | `{'trend_down': 10, 'range': 5, 'trend_up': 5}` ⇒ agregado `trend_down` ⇒ **`BEAR_TREND`** ⇒ **entradas LONG VETADAS** (`exit 2`) |
+| Versión B (`v283-window-b`) | `session.get(StrategyVersionRow, …)` | **existe** (`PAPER-WINDOW sma_crossover`) |
+| Localizador de promoción | `strategy_promotions.instrument_id == $ACCOUNT` | **1 fila** (`promoted=true`, `shadow_validated=false`) |
+| `EdgeReport` A/B | `count(*) where account_id == $ACCOUNT` | **2 filas** |
+| Cuenta `$ACCOUNT` | `session.get(InvestmentAccountRow, $ACCOUNT)` | **NO EXISTE**: la BD alcanzable sólo tiene `default-account-seed` (`Cuenta demo EUR`, 2026-09-11) |
+
+**Bloqueante declarado (B1):** la fila de cuenta de la ventana **no está** en la BD alcanzable
+(mientras sus `EdgeReport`/promoción sí sobreviven). **No** se fabrica la cuenta ni se cambia de
+cuenta en silencio: un cambio de `$ACCOUNT` **invalida** la identidad documentada. La ventana queda
+**BLOQUEADA** hasta decidir entre (a) **re-sembrar la misma cuenta** `1484e253d2d54645945a6b1d7`
+(acción de operación del propietario) o (b) **re-anclar** la ventana a una cuenta nueva (declarando
+la ruptura de identidad). El día de hoy, además, es **veto legítimo de régimen** (`BEAR_TREND`),
+así que no avanzaría aunque la cuenta existiera.
 
 ## 1. Qué se ha hecho (una sola vez, antes de D1)
 
@@ -15,7 +55,7 @@
 | 3 | Fila **localizadora** de promoción keyed por la cuenta | `strategy_promotions.instrument_id = 1484e253d2d54645945a6b1d7`, `promoted=true` |
 | 4 | `EdgeReport` de **A** y de **B** sobre la misma cuenta | 2 filas (`edge_score=0.90`, `credibility=0.80`) |
 | 5 | `.env` del operador | `PAPER_D_ACCOUNT_ID=1484e253d2d54645945a6b1d7`, `BROKER_VENUE=paper` |
-| 6 | API reiniciada para releer `.env` | `/api/health/ready` = `ready`, head `046_fill_reference_mid` |
+| 6 | API reiniciada para releer `.env` | `/api/health/ready` = `ready`, head `046_fill_reference_mid` (hoy `048_journal_entry_dedupe_key`) |
 | 7 | Registro de setup | `operability_runs/window-setup.json` (no versionado) |
 
 **Identificadores fijos de la ventana (D1..D4):**

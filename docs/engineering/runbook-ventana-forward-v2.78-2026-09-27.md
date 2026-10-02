@@ -12,6 +12,28 @@
 > **Regla dura:** esto es **operación**, no una fase de código. **No** se bajan umbrales, **no** se
 > fuerza el régimen, **no** se backdatea nada.
 
+## 0. Re-anclaje al árbol congelado `v2.88.29-beta` (2026-10-02)
+
+El pin de la ventana se **re-ancla** al sello vigente (head `048_journal_entry_dedupe_key`; ver
+[arranque operativo §0](./arranque-ventana-paper-operativa-2026-09-27.md)). Identidad fija y
+configuración **sin cambios** de motor:
+
+| Dato | Valor |
+|---|---|
+| Árbol de **código** congelado | `apps` = `25afb7282e11240c19c63f85f82273ea3b1440f4` · `packages` = `ce0a38b7e6f5a9f102490e5774f859d7f83aac4a` (commit `2b67a2fa`, tag `v2.88.29-beta`) |
+| `$ACCOUNT` / `$VERSION_A` / `$VERSION_B` | `1484e253d2d54645945a6b1d7` / `v283-window-a` / `v283-window-b` |
+| Watch | **20** símbolos (derivación determinista por `id`, ≥60 barras D1) |
+| Variables de operación | `AUTO_ENGINE_SIM_REAL_PRICE=1` y `AUTO_OPERATIONAL_AUDIT=1` en el entorno del forward |
+
+Los comandos de §3/§3.1 se ejecutan con esas variables en el entorno del proceso. **Ningún** cambio
+de motor, `TOP_N`, gobernador, umbrales ni pesos A/B.
+
+> **Bloqueante declarado (2026-10-02, ver arranque §0.1).** El `watch`, la versión B, la promoción y
+> los `EdgeReport` **verifican**; pero la **fila de cuenta** `1484e253d2d54645945a6b1d7` **no existe**
+> en la BD alcanzable (sólo `default-account-seed`) ⇒ la ventana queda **BLOQUEADA** hasta re-sembrar
+> la misma cuenta (o re-anclar declarándolo). Además, hoy el preflight da `BEAR_TREND` (LONG vetadas):
+> día **no computable** aunque la cuenta existiera.
+
 ## 1. Preflight real de hoy (2026-09-27) — hecho y declarado
 
 ```bash
