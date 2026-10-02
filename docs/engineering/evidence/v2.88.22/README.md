@@ -83,6 +83,6 @@ uv run mypy packages/py/domain/src packages/py/market/src packages/py/infrastruc
 
 ## 5. Sello
 
-- **Sello**: commit de este incremento + tag anotado `v2.88.22-beta` (sobre `v2.88.21.1-beta`).
-- **CI del tag**: **PENDIENTE** — se cita en el commit siguiente al push del tag (patrón del repo: el tag es inmutable y se sella antes de escribir su cita).
-- **`replay-repro`**: `Δ motor = 0` y `Δ src` acotado a read model/contrato/UI (el motor no añade escrituras) ⇒ el artefacto OOS no puede moverse. Se declara la razón; se medirá al empujar el tag.
+- **Sello**: commit [`e904ad3f`](https://github.com/jvelasca/Bolsa_V1/commit/e904ad3f39466eac9011a667b7e7518bd5a60201) + tag anotado `v2.88.22-beta` (tag object `0ca503c0`, sobre `v2.88.21.1-beta`); package `2.11.22-beta`.
+- **CI del tag**: **TODO VERDE** — [`Release tag CI` run `36972156676`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36972156676) (`2026-10-02T06:08:44Z`): **11 jobs `success`** + `playwright` integrado `skipped` por diseño (opt-in); `certify` `success`; `python` **`4193 passed, 42 skipped`** (`ruff` `All checks passed!`; `mypy` `no issues found in 515 source files`); **`lifecycle-pg` VERDE** con `AUTO_CONCURRENT_PG_REQUIRED=1` (**176** + **45** + 1 + 1 + 3 + 2 + 2 + **1** `passed`, sin skips silenciosos).
+- **`replay-repro`**: `REPRODUCIDO` — SHA-256 **`1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`** (`3340728` bytes de contenido; sello en CRLF `3445622` · mismo contenido en LF) ⇒ con `Δ motor = 0` el artefacto OOS **no se mueve**, tal como se declaró.
