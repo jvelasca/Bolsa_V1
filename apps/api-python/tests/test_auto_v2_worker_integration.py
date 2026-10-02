@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Protocol
+from typing import Any, Protocol
 
 import pytest
 
@@ -66,6 +66,16 @@ def _hold() -> _Prov:
         return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0)
 
     return _d
+
+
+class _Collector:
+    """Sink de mentira: registra las entradas durables que el worker publica."""
+
+    def __init__(self) -> None:
+        self.entries: list[Any] = []
+
+    async def __call__(self, entry: Any) -> None:
+        self.entries.append(entry)
 
 
 def _worker(**kwargs: object) -> AutoSimulationWorker:
@@ -154,6 +164,48 @@ async def test_v2_position_state_created_on_entry(v2_env: None) -> None:
     assert position.initial_stop == 97.0
     assert position.target1 == 103.0
     assert position.target2 == 106.0
+
+
+@pytest.mark.asyncio
+async def test_v2_protection_birth_is_journaled_durably(v2_env: None) -> None:
+    """v2.88.26 — el nacimiento de la protección sella ``auto_protection_event``.
+
+    Sin este hecho durable el monitor declararía ``protection_not_durable`` hasta la primera
+    gestión: la traza append-only del nacimiento cierra ese hueco.
+    """
+    sink = _Collector()
+    worker = _worker(operational_audit_sink=sink)
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    position = worker._v2_positions.get("AAA")
+    assert position is not None
+    protections = [e for e in sink.entries if e.event_type == "auto_protection_event"]
+    assert protections, "el nacimiento debe sellar PROTECT_APPLIED"
+    birth = protections[0]
+    assert birth.payload is not None
+    assert birth.payload["kind"] == "PROTECT_APPLIED"
+    assert birth.payload["source"] == "plan"
+    assert birth.payload["stopAfter"] == 97.0
+    assert birth.payload["cycleId"] == position.cycle_id
+
+
+@pytest.mark.asyncio
+async def test_v2_protection_sink_does_not_change_the_engine(v2_env: None) -> None:
+    """Δ = 0: el sumidero de protección no altera la posición que abre el motor."""
+    worker_no_sink = _worker()
+    worker_no_sink._decider = _buy_lot()
+    await worker_no_sink.auto_turn()
+    baseline = worker_no_sink._open.get("AAA", Decimal("0"))
+    assert baseline > 0
+
+    sink = _Collector()
+    worker_with_sink = _worker(operational_audit_sink=sink)
+    worker_with_sink._decider = _buy_lot()
+    await worker_with_sink.auto_turn()
+    assert worker_with_sink._open.get("AAA", Decimal("0")) == baseline
+    # El flag ON sólo añade traza: no hay decisión distinta.
+    assert [e for e in sink.entries if e.event_type == "auto_protection_event"]
 
 
 @pytest.mark.asyncio

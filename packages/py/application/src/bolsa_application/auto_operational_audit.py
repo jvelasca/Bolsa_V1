@@ -44,10 +44,12 @@ from bolsa_application.auto_cycle_journal import cycle_decision_id
 from bolsa_application.auto_operational_monitor import (
     AUTO_CYCLE_SETTLEMENT_EVENT,
     AUTO_ENTRY_ORDER_EVENT,
+    AUTO_PROTECTION_EVENT,
     AUTO_RESERVATION_CLAIM_EVENT,
     AUTO_RESERVATION_RECONCILIATION_EVENT,
 )
 from bolsa_application.price_source_kind import usable_price_source
+from bolsa_application.protection_event_kind import usable_protection_kind
 from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
 
 __all__ = [
@@ -58,6 +60,7 @@ __all__ = [
     "REASON_SESSION_OWNED",
     "build_cycle_settlement_entry",
     "build_entry_order_entry",
+    "build_protection_entry",
     "build_reservation_claim_entry",
     "build_reservation_reconciliation_entry",
     "operational_audit_enabled",
@@ -366,6 +369,74 @@ def build_cycle_settlement_entry(
         id=f"JNL-{uuid4().hex[:12]}",
         decision_id=decision_id,
         event_type=AUTO_CYCLE_SETTLEMENT_EVENT,
+        actor=str(actor or ""),
+        created_at=_stamp(as_of),
+        session_id=None,
+        account_id=_text(account_id),
+        instrument_id=instrument,
+        payload=payload,
+    )
+
+
+def build_protection_entry(
+    *,
+    kind: str | None,
+    instrument_id: str | None,
+    cycle_id: str | None,
+    lifecycle_from: str | None,
+    lifecycle_to: str | None,
+    stop_before: Any,
+    stop_after: Any,
+    target: Any,
+    trailing_status: str | None,
+    revision_id: str | None,
+    source: str | None,
+    actor: str,
+    as_of: str | None,
+    account_id: str | None = None,
+    position_id: str | None = None,
+) -> DecisionJournalEntryRecord | None:
+    """(PURA) entrada append-only del HECHO durable de una transición de PROTECCIÓN.
+
+    Hasta v2.88.25 la protección vivía **sólo** en la proyección ``position_state``: el monitor
+    encendía ``PROTECTION`` con esa proyección y no existía traza append-only de *cuándo* cambió
+    el stop, se alcanzó T1/T2, se armó el trailing o se pidió la salida. Esta entrada sella esa
+    transición por ``cycle_id``.
+
+    Canonicalidad: el hecho es la **traza** de la transición que ya produjo ``PositionState``
+    (la autoridad): NO re-deriva el stop ni el estado — los copia. ``revisionId``/``positionId``
+    son la referencia al estado durable. Sin ``instrument_id``/``cycle_id`` no se finge un hecho:
+    ``None``. Un ``kind`` ajeno al vocabulario se declara ``None`` (no medido), nunca inventado.
+    """
+    instrument = _text(instrument_id)
+    cycle = _text(cycle_id)
+    if instrument is None or cycle is None:
+        return None
+    resolved_kind = usable_protection_kind(kind)
+    decision_id, derived = _decision_id(cycle)
+    raw_from = _text(lifecycle_from)
+    raw_to = _text(lifecycle_to)
+    payload: dict[str, Any] = {
+        "event": AUTO_PROTECTION_EVENT,
+        "kind": resolved_kind,
+        "instrumentId": instrument,
+        "positionId": _text(position_id),
+        "lifecycleFrom": raw_from.upper() if raw_from else None,
+        "lifecycleTo": raw_to.upper() if raw_to else None,
+        "stopBefore": _number(stop_before),
+        "stopAfter": _number(stop_after),
+        "target": _number(target),
+        "trailingStatus": _text(trailing_status),
+        "revisionId": _text(revision_id),
+        "source": _text(source),
+        "at": _stamp(as_of),
+        "cycleIdDerived": derived,
+        "cycleId": cycle,
+    }
+    return DecisionJournalEntryRecord(
+        id=f"JNL-{uuid4().hex[:12]}",
+        decision_id=decision_id,
+        event_type=AUTO_PROTECTION_EVENT,
         actor=str(actor or ""),
         created_at=_stamp(as_of),
         session_id=None,

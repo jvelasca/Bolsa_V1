@@ -8,6 +8,7 @@ medición, nunca un valor de relleno). El ``event_type`` es el que el monitor le
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from bolsa_application.auto_operational_audit import (
     AUTO_OPERATIONAL_AUDIT_ENV,
@@ -17,6 +18,7 @@ from bolsa_application.auto_operational_audit import (
     RECONCILIATION_RELEASE,
     build_cycle_settlement_entry,
     build_entry_order_entry,
+    build_protection_entry,
     build_reservation_claim_entry,
     build_reservation_reconciliation_entry,
     operational_audit_enabled,
@@ -24,6 +26,7 @@ from bolsa_application.auto_operational_audit import (
 from bolsa_application.auto_operational_monitor import (
     AUTO_CYCLE_SETTLEMENT_EVENT,
     AUTO_ENTRY_ORDER_EVENT,
+    AUTO_PROTECTION_EVENT,
     AUTO_RESERVATION_CLAIM_EVENT,
     AUTO_RESERVATION_RECONCILIATION_EVENT,
 )
@@ -359,3 +362,114 @@ def test_cycle_settlement_entry_without_cycle_is_a_declared_noop() -> None:
         )
         is None
     )
+
+
+# ── v2.88.26 — PROTECTION durable ──
+
+
+def test_protection_entry_seals_the_transition_and_the_venue() -> None:
+    entry = build_protection_entry(
+        kind="TRAIL_ADVANCED",
+        instrument_id="AAPL",
+        cycle_id="cyc-abc",
+        position_id="pos-1",
+        lifecycle_from="T1_REACHED",
+        lifecycle_to="TRAILING",
+        stop_before=99.0,
+        stop_after=101.5,
+        target=1,
+        trailing_status="armed",
+        revision_id="rev-1",
+        source="plan",
+        actor="auto-sim",
+        as_of="2026-01-02T00:00:00Z",
+        account_id="acc-1",
+    )
+    assert entry is not None
+    assert entry.event_type == AUTO_PROTECTION_EVENT
+    assert entry.decision_id == "dec-abc"  # derivado del ciclo, igual que el resto de la cadena
+    assert entry.account_id == "acc-1"
+    assert entry.instrument_id == "AAPL"
+    payload = entry.payload or {}
+    assert payload["event"] == AUTO_PROTECTION_EVENT
+    assert payload["kind"] == "TRAIL_ADVANCED"
+    assert payload["lifecycleFrom"] == "T1_REACHED"
+    assert payload["lifecycleTo"] == "TRAILING"
+    assert payload["stopBefore"] == 99.0
+    assert payload["stopAfter"] == 101.5
+    assert payload["target"] == 1.0
+    assert payload["trailingStatus"] == "armed"
+    assert payload["revisionId"] == "rev-1"
+    assert payload["source"] == "plan"
+    assert payload["cycleId"] == "cyc-abc"
+    assert payload["cycleIdDerived"] is True
+
+
+def test_protection_entry_normalizes_kind_and_upper_cases_lifecycle() -> None:
+    entry = build_protection_entry(
+        kind="t2_hit",
+        instrument_id="AAPL",
+        cycle_id="cyc-1",
+        position_id=None,
+        lifecycle_from="t1_reached",
+        lifecycle_to="trailing",
+        stop_before=None,
+        stop_after=None,
+        target=2,
+        trailing_status=None,
+        revision_id=None,
+        source=None,
+        actor="auto-sim",
+        as_of="2026-01-02T00:00:00Z",
+    )
+    assert entry is not None
+    payload = entry.payload or {}
+    # El ``kind`` se normaliza contra el vocabulario cerrado (mayúsculas/espacios).
+    assert payload["kind"] == "T2_HIT"
+    assert payload["lifecycleFrom"] == "T1_REACHED"
+    assert payload["lifecycleTo"] == "TRAILING"
+    # Un stop sin valor viaja ``None`` (no medido), jamás un ``0``.
+    assert payload["stopBefore"] is None
+    assert payload["stopAfter"] is None
+
+
+def test_protection_entry_declares_unknown_kind_as_none() -> None:
+    """Un ``kind`` ajeno al vocabulario NO se convierte en literal: se declara ``None``."""
+    entry = build_protection_entry(
+        kind="TOTALLY_MADE_UP",
+        instrument_id="AAPL",
+        cycle_id="cyc-1",
+        position_id="pos-1",
+        lifecycle_from="OPEN",
+        lifecycle_to="PROTECTED",
+        stop_before=100,
+        stop_after=100,
+        target=None,
+        trailing_status=None,
+        revision_id=None,
+        source=None,
+        actor="auto-sim",
+        as_of="2026-01-02T00:00:00Z",
+    )
+    assert entry is not None
+    assert (entry.payload or {})["kind"] is None
+
+
+def test_protection_entry_without_cycle_or_instrument_is_a_declared_noop() -> None:
+    common: dict[str, Any] = {
+        "kind": "PROTECT_APPLIED",
+        "cycle_id": "cyc-1",
+        "position_id": None,
+        "lifecycle_from": None,
+        "lifecycle_to": None,
+        "stop_before": None,
+        "stop_after": None,
+        "target": None,
+        "trailing_status": None,
+        "revision_id": None,
+        "source": None,
+        "actor": "auto-sim",
+        "as_of": "2026-01-02T00:00:00Z",
+    }
+    assert build_protection_entry(instrument_id=None, **common) is None
+    assert build_protection_entry(instrument_id="AAPL", **{**common, "cycle_id": None}) is None

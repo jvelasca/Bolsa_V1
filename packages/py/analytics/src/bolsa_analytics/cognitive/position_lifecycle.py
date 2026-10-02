@@ -80,6 +80,14 @@ LIFECYCLE_TRANSITION_REJECTED = "lifecycle_transition_rejected"
 LIFECYCLE_STATE_UNVERIFIED = "lifecycle_state_unverified"
 LIFECYCLE_RESOLUTION_MISSING = "lifecycle_resolution_missing"
 
+#: v2.88.26 — T2 alcanzado. Espejo de ``T1_HIT`` para el HECHO durable de protección
+#: (``auto_protection_event``): el FSM no tiene estado ni evento T2 (cerrar la posición es
+#: ``EXIT_FILLED``/``CLOSED``), así que este literal NO entra en ``PositionLifecycleEvent``
+#: ni en la tabla de transiciones ⇒ **Δ motor = 0**. Vive aquí por ser la casa única de los
+#: literales del ciclo de vida (dueño único; el vocabulario del hecho durable lo compone
+#: ``bolsa_application.protection_event_kind``).
+T2_HIT = "T2_HIT"
+
 #: Estados con posición verificable (la familia "abierta" + los terminales).
 VERIFIED_LIFECYCLE_STATES: frozenset[PositionLifecycleState] = frozenset(
     {

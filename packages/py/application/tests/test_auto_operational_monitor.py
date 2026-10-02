@@ -14,6 +14,7 @@ from bolsa_application.auto_operational_monitor import (
     AUTO_CYCLE_SETTLEMENT_EVENT,
     AUTO_ENTRY_DECISION_EVENT,
     AUTO_ENTRY_ORDER_EVENT,
+    AUTO_PROTECTION_EVENT,
     OPERATIONAL_STEPS,
     STEP_ABSENT,
     STEP_REACHED,
@@ -661,6 +662,9 @@ def test_facts_without_value_are_never_declared_measured() -> None:
                 "trailingState": None,
             }
         },
+        # v2.88.26 — con el HECHO durable el paso se enciende; los facts proyectados SIN valor
+        # siguen viajando ``UNKNOWN`` (no se rotulan medidos por el hecho).
+        protection_events=[dict(_protection_event().payload)],
     )
     step = _step(dto["cycles"][0]["steps"], "PROTECTION")
     assert step["state"] == STEP_REACHED
@@ -977,5 +981,147 @@ def test_fill_price_sources_unknown_when_no_fill_declares_the_source() -> None:
     fact = _fact(_step(dto["cycles"][0]["steps"], "FILL"), "priceSources")
     assert fact["value"] is None
     assert fact["measurement"] == "UNKNOWN"
+
+
+# ── v2.88.26 — PROTECTION durable ──
+
+
+def _protection_event(**overrides: Any) -> Any:
+    payload: dict[str, Any] = {
+        "cycleId": "cyc-1",
+        "kind": "PROTECT_APPLIED",
+        "instrumentId": "AAPL",
+        "positionId": "pos-1",
+        "lifecycleFrom": "OPEN",
+        "lifecycleTo": "PROTECTED",
+        "stopBefore": None,
+        "stopAfter": 99.0,
+        "target": None,
+        "trailingStatus": None,
+        "revisionId": "REV-1",
+        "source": "plan",
+        "at": "2026-01-02T00:30:00Z",
+    }
+    payload.update(overrides)
+    return SimpleNamespace(
+        decision_id="dec-cyc-1",
+        event_type=AUTO_PROTECTION_EVENT,
+        created_at="2026-01-02T00:30:00Z",
+        account_id="acc-1",
+        payload=payload,
+    )
+
+
+def test_protection_without_durable_event_is_declared_unknown_not_reached() -> None:
+    """Sin hecho durable el paso NO se enciende con la proyección: ``protection_not_durable``."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        positions={
+            "AAPL": {
+                "positionState": {"cycleId": "cyc-1", "currentStop": 99.0},
+                "stopPrice": 99.0,
+                "highWatermark": 101.0,
+                "t1State": "pending",
+                "trailingState": "off",
+            }
+        },
+    )
+    step = _step(dto["cycles"][0]["steps"], "PROTECTION")
+    assert step["state"] == STEP_UNKNOWN
+    assert step["measurement"] == "UNKNOWN"
+    assert step["note"] == "protection_not_durable"
+    # La proyección NO se presenta como medida: todos sus facts viajan ``UNKNOWN``.
+    for key in ("stopPrice", "currentStop", "highWatermark", "t1State", "trailingState"):
+        fact = _fact(step, key)
+        assert fact["value"] is not None
+        assert fact["measurement"] == "UNKNOWN"
+
+
+def test_protection_reached_from_durable_event_and_exposes_the_transition() -> None:
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        positions={
+            "AAPL": {
+                "positionState": {"cycleId": "cyc-1", "currentStop": 101.5},
+                "stopPrice": 101.5,
+                "highWatermark": 103.0,
+                "t1State": "done",
+                "trailingState": "armed",
+            }
+        },
+        protection_events=[
+            dict(
+                _protection_event(
+                    kind="TRAIL_ADVANCED",
+                    lifecycleFrom="T1_REACHED",
+                    lifecycleTo="TRAILING",
+                    stopBefore=99.0,
+                    stopAfter=101.5,
+                    target=1,
+                    trailingStatus="armed",
+                ).payload
+            )
+        ],
+    )
+    step = _step(dto["cycles"][0]["steps"], "PROTECTION")
+    assert step["state"] == STEP_REACHED
+    assert step["measurement"] == "COMPLETE"
+    assert step["note"] is None
+    assert step["at"] == "2026-01-02T00:30:00Z"
+    assert _fact(step, "protectionKind")["value"] == "TRAIL_ADVANCED"
+    assert _fact(step, "lifecycleFrom")["value"] == "T1_REACHED"
+    assert _fact(step, "lifecycleTo")["value"] == "TRAILING"
+    assert _fact(step, "stopBefore")["value"] == 99.0
+    assert _fact(step, "stopAfter")["value"] == 101.5
+    assert _fact(step, "target")["value"] == 1
+    assert _fact(step, "trailingStatus")["value"] == "armed"
+    assert _fact(step, "revisionId")["value"] == "REV-1"
+    # Con el hecho durable la proyección SÍ es medible.
+    assert _fact(step, "currentStop")["value"] == 101.5
+    assert _fact(step, "currentStop")["measurement"] == "COMPLETE"
+
+
+def test_protection_keeps_the_latest_transition_of_the_cycle() -> None:
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        protection_events=[
+            dict(_protection_event(kind="PROTECT_APPLIED", at="2026-01-02T00:10:00Z").payload),
+            dict(
+                _protection_event(
+                    kind="T2_HIT",
+                    target=2,
+                    at="2026-01-02T01:00:00Z",
+                ).payload
+            ),
+            dict(
+                _protection_event(
+                    kind="T1_HIT",
+                    target=1,
+                    at="2026-01-02T00:40:00Z",
+                ).payload
+            ),
+        ],
+    )
+    step = _step(dto["cycles"][0]["steps"], "PROTECTION")
+    assert step["state"] == STEP_REACHED
+    assert _fact(step, "protectionKind")["value"] == "T2_HIT"
+    assert _fact(step, "target")["value"] == 2
+
+
+def test_protection_exit_requested_without_materialization_is_declared() -> None:
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        protection_events=[
+            dict(_protection_event(kind="EXIT_REQUESTED", lifecycleTo="EXIT_PENDING").payload)
+        ],
+    )
+    step = _step(dto["cycles"][0]["steps"], "PROTECTION")
+    assert step["state"] == STEP_REACHED
+    assert step["note"] == "protection_exit_requested_without_materialization"
+
 
 

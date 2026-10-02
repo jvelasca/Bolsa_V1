@@ -33,6 +33,7 @@ from bolsa_application.auto_operational_monitor import (
     AUTO_CYCLE_SETTLEMENT_EVENT,
     AUTO_ENTRY_DECISION_EVENT,
     AUTO_ENTRY_ORDER_EVENT,
+    AUTO_PROTECTION_EVENT,
     AUTO_RESERVATION_CLAIM_EVENT,
     AUTO_RESERVATION_RECONCILIATION_EVENT,
 )
@@ -493,3 +494,76 @@ async def test_cycle_settlement_without_a_sink_is_a_declared_noop() -> None:
         exit_reason=None,
     )
     assert worker._operational_audit_sink is None
+
+
+# ── v2.88.26 — la PROTECCIÓN deja su traza en el spine ───────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_protection_is_persisted_with_account_and_engine() -> None:
+    """El productor sella ``account_id``/``engineId`` y conserva before→after y la transición."""
+    sink = _Collector()
+    worker = _worker(sink=sink)
+    await worker._v2_journal_protection(
+        kind="STOP_RATCHET_APPLIED",
+        instrument_id="AAA",
+        cycle_id="cyc-aaa",
+        position_id="pos-1",
+        lifecycle_from="T1_REACHED",
+        lifecycle_to="TRAILING",
+        stop_before=95.0,
+        stop_after=99.0,
+        trailing_status="armed",
+        revision_id="REV-1",
+        source="protect",
+    )
+
+    assert len(sink.entries) == 1
+    entry = sink.entries[0]
+    assert entry.event_type == AUTO_PROTECTION_EVENT
+    assert entry.account_id == _ACCOUNT
+    assert entry.payload is not None
+    assert entry.payload["engineId"] == "auto-sim"
+    assert entry.payload["kind"] == "STOP_RATCHET_APPLIED"
+    assert entry.payload["lifecycleFrom"] == "T1_REACHED"
+    assert entry.payload["lifecycleTo"] == "TRAILING"
+    assert entry.payload["stopBefore"] == 95.0
+    assert entry.payload["stopAfter"] == 99.0
+    assert entry.payload["trailingStatus"] == "armed"
+    assert entry.payload["revisionId"] == "REV-1"
+    assert entry.payload["cycleId"] == "cyc-aaa"
+
+
+@pytest.mark.asyncio
+async def test_protection_without_a_cycle_is_a_declared_noop() -> None:
+    """Sin ``cycle_id`` no se puede atar el hecho al ciclo: el builder no lo finge."""
+    sink = _Collector()
+    worker = _worker(sink=sink)
+    await worker._v2_journal_protection(
+        kind="PROTECT_APPLIED",
+        instrument_id="AAA",
+        cycle_id=None,
+    )
+    assert sink.entries == []
+
+
+@pytest.mark.asyncio
+async def test_protection_without_a_sink_is_a_declared_noop() -> None:
+    worker = _worker(sink=None)
+    await worker._v2_journal_protection(
+        kind="PROTECT_APPLIED",
+        instrument_id="AAA",
+        cycle_id="cyc-aaa",
+    )
+    assert worker._operational_audit_sink is None
+
+
+@pytest.mark.asyncio
+async def test_a_broken_sink_on_protection_does_not_tumble_the_turn() -> None:
+    """Publicar no puede tumbar el turno: el fallo se registra y la traza se declara perdida."""
+    worker = _worker(sink=_BrokenSink())
+    await worker._v2_journal_protection(
+        kind="PROTECT_APPLIED",
+        instrument_id="AAA",
+        cycle_id="cyc-aaa",
+    )

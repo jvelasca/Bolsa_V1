@@ -48,6 +48,7 @@ __all__ = [
     "AUTO_CYCLE_SETTLEMENT_EVENT",
     "AUTO_ENTRY_DECISION_EVENT",
     "AUTO_ENTRY_ORDER_EVENT",
+    "AUTO_PROTECTION_EVENT",
     "AUTO_RESERVATION_CLAIM_EVENT",
     "AUTO_RESERVATION_RECONCILIATION_EVENT",
     "OPERATIONAL_STEPS",
@@ -92,6 +93,10 @@ AUTO_ENTRY_ORDER_EVENT = "auto_entry_order"
 #: v2.88.25 — el HECHO durable del ciclo cerrado (liquidación real), distinto del ``CYCLE_CLOSED``
 #: reconstruido de fills. Cierra ``settlement_not_durable`` del paso ``SETTLEMENT``.
 AUTO_CYCLE_SETTLEMENT_EVENT = "auto_cycle_settlement"
+#: v2.88.26 — el HECHO durable de una transición de PROTECCIÓN (ratchet, T1/T2, armado de
+#: trailing, salida pedida). Cierra ``protection_not_durable`` del paso ``PROTECTION``: sin este
+#: evento el paso se declara ``unknown`` (jamás ``reached`` desde la proyección).
+AUTO_PROTECTION_EVENT = "auto_protection_event"
 
 #: Motivos de liberación que cuentan como retirada FORZADA (no por fill materializado).
 _FORCED_RELEASE_REASONS: frozenset[str] = frozenset({"cancel", "restart", "tail_dead", "rollback"})
@@ -463,36 +468,85 @@ def _fill_step(fills: Sequence[Any], *, window_full: bool = False) -> dict[str, 
     )
 
 
-def _protection_step(position: Mapping[str, Any] | None) -> dict[str, Any]:
+def _protection_projection_facts(
+    position: Mapping[str, Any] | None,
+    *,
+    measurement: MeasurementStatus | None,
+) -> list[dict[str, Any]]:
+    """Facts proyectados del ``PositionState`` vivo (autoridad del estado ACTUAL).
+
+    Con un hecho durable se exponen con su medición natural (``None`` ⇒ ``_fact`` la deduce
+    del valor). Sin hecho durable NO son evidencia de que la transición ocurriera, así que se
+    fuerzan ``UNKNOWN``: la UI no puede rotular ``MEDIDO`` una proyección sin traza.
+    """
     if position is None:
+        return []
+    state_map = position.get("positionState") or {}
+    active_map = state_map if isinstance(state_map, Mapping) else {}
+    mfe_mae = active_map.get("mfeMae")
+    return [
+        _fact("stopPrice", position.get("stopPrice"), measurement),
+        _fact("currentStop", active_map.get("currentStop"), measurement),
+        _fact("highWatermark", position.get("highWatermark"), measurement),
+        _fact("t1State", position.get("t1State"), measurement),
+        _fact("trailingState", position.get("trailingState"), measurement),
+        _fact("protectionState", active_map.get("protectionState"), measurement),
+        _fact("lifecycleState", active_map.get("lifecycleState"), measurement),
+        _fact("mfeMae", mfe_mae, measurement),
+    ]
+
+
+def _protection_step(
+    position: Mapping[str, Any] | None,
+    protection: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """``PROTECTION`` — SOLO desde un hecho durable explícito de protección.
+
+    Regla dura de esta versión (simétrica a ``SETTLEMENT``): la proyección
+    (``sim_auto_positions.position_state``) describe el estado **actual**, pero **no** demuestra
+    que una transición de protección haya ocurrido. Sin un hecho durable
+    (``auto_protection_event``) el paso se declara ``unknown`` con ``protection_not_durable``
+    — **jamás** ``reached`` desde la proyección — y los facts proyectados viajan ``UNKNOWN``.
+
+    Con el hecho durable, el paso se enciende (``reached``) y expone la transición sellada
+    (``kind``, ``stopBefore``/``stopAfter``, ``target``, ``lifecycleFrom``→``lifecycleTo``)
+    junto con la proyección viva. Si el último ``kind`` es una salida pedida
+    (``EXIT_REQUESTED``/``PROTECT_REQUESTED``) se declara que aún no hay materialización.
+    """
+    if protection is None:
         return _step(
             "PROTECTION",
             state=STEP_UNKNOWN,
             measurement=MEASUREMENT_UNKNOWN,
-            note="no_open_position_for_cycle",
+            note="protection_not_durable",
+            facts=_protection_projection_facts(position, measurement=MEASUREMENT_UNKNOWN),
         )
-    state_map = position.get("positionState") or {}
-    mfe_mae = state_map.get("mfeMae") if isinstance(state_map, Mapping) else None
-    facts = [
-        _fact("stopPrice", position.get("stopPrice")),
-        _fact(
-            "currentStop",
-            state_map.get("currentStop") if isinstance(state_map, Mapping) else None,
-        ),
-        _fact("highWatermark", position.get("highWatermark")),
-        _fact("t1State", position.get("t1State")),
-        _fact("trailingState", position.get("trailingState")),
-        _fact(
-            "protectionState",
-            state_map.get("protectionState") if isinstance(state_map, Mapping) else None,
-        ),
-        _fact(
-            "lifecycleState",
-            state_map.get("lifecycleState") if isinstance(state_map, Mapping) else None,
-        ),
-        _fact("mfeMae", mfe_mae),
+    kind = protection.get("kind")
+    facts: list[dict[str, Any]] = [
+        _fact("protectionKind", kind),
+        _fact("lifecycleFrom", protection.get("lifecycleFrom")),
+        _fact("lifecycleTo", protection.get("lifecycleTo")),
+        _fact("stopBefore", protection.get("stopBefore")),
+        _fact("stopAfter", protection.get("stopAfter")),
+        _fact("target", protection.get("target")),
+        _fact("trailingStatus", protection.get("trailingStatus")),
+        _fact("revisionId", protection.get("revisionId")),
+        _fact("source", protection.get("source")),
+        *_protection_projection_facts(position, measurement=None),
     ]
-    return _step("PROTECTION", state=STEP_REACHED, facts=facts)
+    kind_text = str(kind or "").strip().upper()
+    note = (
+        "protection_exit_requested_without_materialization"
+        if kind_text in {"EXIT_REQUESTED", "PROTECT_REQUESTED"}
+        else None
+    )
+    return _step(
+        "PROTECTION",
+        state=STEP_REACHED,
+        at=protection.get("at"),
+        facts=facts,
+        note=note,
+    )
 
 
 def _settlement_step(
@@ -592,6 +646,22 @@ def _cycle_window_truncated(
     return fills_window_full
 
 
+def _protection_is_newer(candidate: Mapping[str, Any], current: Mapping[str, Any]) -> bool:
+    """(PURA) si ``candidate`` es un hecho de protección más reciente que ``current``.
+
+    Un ciclo puede tener VARIAS transiciones de protección; el paso expone la ÚLTIMA. Se
+    compara por instante declarado (``at``/``created_at``) y, si no es parseable, se conserva
+    lo ya visto (fail-closed: no se inventa un orden que no consta).
+    """
+    candidate_at = _parse_instant(_get(candidate, "at", "created_at", "createdAt"))
+    if candidate_at is None:
+        return False
+    current_at = _parse_instant(_get(current, "at", "created_at", "createdAt"))
+    if current_at is None:
+        return True
+    return candidate_at >= current_at
+
+
 def _build_cycle(
     cycle_id: str,
     *,
@@ -602,6 +672,7 @@ def _build_cycle(
     closed_by_cycle: Mapping[str, Mapping[str, Any]],
     journal: Sequence[Any],
     settlement_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
+    protection_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
     window_truncated: bool = False,
 ) -> dict[str, Any]:
     reservation = reservations[0] if reservations else None
@@ -610,6 +681,7 @@ def _build_cycle(
     orders = list(orders_by_cycle.get(cycle_id, ()))
     closed = closed_by_cycle.get(cycle_id)
     settlement = (settlement_by_cycle or {}).get(cycle_id)
+    protection = (protection_by_cycle or {}).get(cycle_id)
     net, unclassified_fills = _net_open_qty(cycle_fills)
     is_open = net > 1e-9
     side = str(_get(reservation, "side") or "").strip().lower() if reservation else ""
@@ -621,7 +693,7 @@ def _build_cycle(
         _reservation_step(reservation),
         _order_step(orders, cycle_journal),
         _fill_step(cycle_fills, window_full=window_truncated),
-        _protection_step(positions_by_cycle.get(cycle_id)),
+        _protection_step(positions_by_cycle.get(cycle_id), protection),
         _settlement_step(settlement, cycle_fills),
         _cycle_closed_step(closed, window_truncated=window_truncated),
     ]
@@ -1048,6 +1120,7 @@ def build_operational_monitor(
     reconciliation_entries: Sequence[Any] = (),
     claim_entries: Sequence[Any] = (),
     settlements: Sequence[Any] = (),
+    protection_events: Sequence[Any] = (),
     granularity: Mapping[str, Any] | None = None,
     interval_seconds: float | None = None,
     grace_seconds: float | None = None,
@@ -1118,6 +1191,18 @@ def build_operational_monitor(
         if key and isinstance(row, Mapping):
             settlement_by_cycle[key] = row
 
+    # v2.88.26 — HECHOS durables de protección por ciclo. Un ciclo puede tener VARIAS
+    # transiciones (nacimiento, ratchet, T1/T2, salida): el paso expone la ÚLTIMA, comparando
+    # por instante declarado (nunca por el orden accidental de la lista).
+    protection_by_cycle: dict[str, Mapping[str, Any]] = {}
+    for row in protection_events:
+        key = _cycle_id_of(row)
+        if not key or not isinstance(row, Mapping):
+            continue
+        previous = protection_by_cycle.get(key)
+        if previous is None or _protection_is_newer(row, previous):
+            protection_by_cycle[key] = row
+
     cycle_ids: list[str] = []
     seen: set[str] = set()
     if cycle_id:
@@ -1145,6 +1230,7 @@ def build_operational_monitor(
             closed_by_cycle=closed_by_cycle,
             journal=journal,
             settlement_by_cycle=settlement_by_cycle,
+            protection_by_cycle=protection_by_cycle,
             window_truncated=_cycle_window_truncated(
                 key,
                 fills_by_cycle=fills_by_cycle,
@@ -1336,12 +1422,19 @@ async def read_operational_monitor(
     # la orden de entrada y la liquidación. El PnL del settlement se publica con su medición;
     # sin evento, el paso ``SETTLEMENT`` sigue declarando ``settlement_not_durable``.
     settlements: list[dict[str, Any]] = []
+    # v2.88.26 — el HECHO durable de protección (``auto_protection_event``): un ciclo puede
+    # tener VARIAS transiciones; el read model se queda con la más reciente por instante.
+    protections: list[dict[str, Any]] = []
     for entry in journal:
-        if _get(entry, "event_type", "eventType") != AUTO_CYCLE_SETTLEMENT_EVENT:
-            continue
-        payload = _entry_payload(entry)
-        if payload:
-            settlements.append(dict(payload))
+        event_type = _get(entry, "event_type", "eventType")
+        if event_type == AUTO_CYCLE_SETTLEMENT_EVENT:
+            payload = _entry_payload(entry)
+            if payload:
+                settlements.append(dict(payload))
+        elif event_type == AUTO_PROTECTION_EVENT:
+            payload = _entry_payload(entry)
+            if payload:
+                protections.append(dict(payload))
     # Lectura GLOBAL del último ``auto_entry_decision`` durable, independiente de las reservas
     # visibles: por índice de ``event_type``, más nueva primero (``limit=1``). Sin esto
     # ``lastDecisionAt`` quedaba atado a los ciclos de la ventana y podía ocultar una decisión
@@ -1411,6 +1504,7 @@ async def read_operational_monitor(
         reconciliation_entries=reconciliation_entries,
         claim_entries=claim_entries,
         settlements=settlements,
+        protection_events=protections,
         granularity=granularity_view_from_env(),
         interval_seconds=interval_seconds,
         grace_seconds=grace_seconds,

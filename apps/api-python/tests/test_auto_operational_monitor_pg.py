@@ -844,6 +844,136 @@ async def test_monitor_projects_durable_entry_order_and_settlement(
 
 
 @pytest.mark.asyncio
+async def test_monitor_projects_durable_protection_event(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Con el hecho durable ``PROTECTION`` alcanza (ya no ``protection_not_durable``)."""
+    from bolsa_application.auto_operational_audit import build_protection_entry
+    from bolsa_application.auto_operational_monitor import read_operational_monitor
+    from bolsa_application.reservation_store import PostgresReservationStore
+    from bolsa_infrastructure.database.repositories.journal_repository import (
+        SqlAlchemyJournalRepository,
+    )
+
+    account_id = f"acc-monitor-{uuid.uuid4().hex[:10]}"
+    suffix = uuid.uuid4().hex[:10]
+    cycle_id = f"cyc-{suffix}"
+    instrument = "HHH"
+    await _wipe(monitor_pg_factory, account_id)
+    try:
+        async with monitor_pg_factory() as session:
+            reservations = PostgresReservationStore(session, autocommit=True)
+            assert await reservations.save_claim(
+                _reservation(
+                    reservation_id=f"RES-dec-{suffix}",
+                    cycle_id=cycle_id,
+                    account_id=account_id,
+                    instrument=instrument,
+                )
+            )
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument=instrument,
+                side="buy",
+                price=100.0,
+                reference_mid=99.9,
+                execution_id=f"EX-{suffix}-buy",
+                price_source="MARKET_CLOSE",
+            )
+            await _seed_journal(
+                session, account_id=account_id, cycle_id=cycle_id, instrument=instrument
+            )
+            repository = SqlAlchemyJournalRepository(session)
+            protection = build_protection_entry(
+                kind="TRAIL_ADVANCED",
+                instrument_id=instrument,
+                cycle_id=cycle_id,
+                position_id="pos-1",
+                lifecycle_from="T1_REACHED",
+                lifecycle_to="TRAILING",
+                stop_before=97.0,
+                stop_after=101.0,
+                target=1,
+                trailing_status="armed",
+                revision_id="REV-1",
+                source="trail",
+                actor="auto-sim",
+                as_of="2026-10-01T15:30:00Z",
+                account_id=account_id,
+            )
+            assert protection is not None
+            await repository.append(protection)
+            await session.commit()
+
+        async with monitor_pg_factory() as session:
+            dto = await read_operational_monitor(
+                session, account_id, engine_id=_ENGINE_ID, cycle_id=cycle_id, grace_seconds=61.0
+            )
+        steps = {step["id"]: step for step in dto["cycles"][0]["steps"]}
+        assert steps["PROTECTION"]["state"] == "reached"
+        assert steps["PROTECTION"]["note"] is None
+        assert _fact_value(steps["PROTECTION"], "protectionKind")["value"] == "TRAIL_ADVANCED"
+        assert _fact_value(steps["PROTECTION"], "stopAfter")["value"] == 101.0
+        assert _fact_value(steps["PROTECTION"], "lifecycleTo")["value"] == "TRAILING"
+    finally:
+        await _wipe(monitor_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_monitor_declares_protection_not_durable_without_the_event(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Sin el hecho durable la proyección NO enciende ``PROTECTION``: se declara el hueco."""
+    from bolsa_application.auto_operational_monitor import read_operational_monitor
+    from bolsa_application.reservation_store import PostgresReservationStore
+
+    account_id = f"acc-monitor-{uuid.uuid4().hex[:10]}"
+    suffix = uuid.uuid4().hex[:10]
+    cycle_id = f"cyc-{suffix}"
+    instrument = "III"
+    await _wipe(monitor_pg_factory, account_id)
+    try:
+        async with monitor_pg_factory() as session:
+            reservations = PostgresReservationStore(session, autocommit=True)
+            assert await reservations.save_claim(
+                _reservation(
+                    reservation_id=f"RES-dec-{suffix}",
+                    cycle_id=cycle_id,
+                    account_id=account_id,
+                    instrument=instrument,
+                )
+            )
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument=instrument,
+                side="buy",
+                price=100.0,
+                reference_mid=99.9,
+                execution_id=f"EX-{suffix}-buy",
+                price_source="MARKET_CLOSE",
+            )
+            await _seed_journal(
+                session, account_id=account_id, cycle_id=cycle_id, instrument=instrument
+            )
+            await session.commit()
+
+        async with monitor_pg_factory() as session:
+            dto = await read_operational_monitor(
+                session, account_id, engine_id=_ENGINE_ID, cycle_id=cycle_id, grace_seconds=61.0
+            )
+        steps = {step["id"]: step for step in dto["cycles"][0]["steps"]}
+        assert steps["PROTECTION"]["state"] == "unknown"
+        assert steps["PROTECTION"]["note"] == "protection_not_durable"
+        assert steps["PROTECTION"]["measurement"] == "UNKNOWN"
+    finally:
+        await _wipe(monitor_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
 async def test_migration_047_price_source_upgrade_downgrade_is_idempotent(
     monitor_pg_factory: async_sessionmaker[AsyncSession],
 ) -> None:

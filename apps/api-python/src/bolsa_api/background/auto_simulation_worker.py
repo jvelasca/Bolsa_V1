@@ -164,6 +164,7 @@ from bolsa_application.auto_operational_audit import (
     RECONCILIATION_RELEASE,
     build_cycle_settlement_entry,
     build_entry_order_entry,
+    build_protection_entry,
     build_reservation_claim_entry,
     build_reservation_reconciliation_entry,
     operational_audit_enabled,
@@ -2910,6 +2911,54 @@ class AutoSimulationWorker:
             self._v2_seal_audit_identity(entry), label="cycle_settlement"
         )
 
+    async def _v2_journal_protection(
+        self,
+        *,
+        kind: str,
+        instrument_id: str,
+        cycle_id: str | None,
+        position_id: str | None = None,
+        lifecycle_from: str | None = None,
+        lifecycle_to: str | None = None,
+        stop_before: Any = None,
+        stop_after: Any = None,
+        target: Any = None,
+        trailing_status: str | None = None,
+        revision_id: str | None = None,
+        source: str | None = None,
+    ) -> None:
+        """(``M2``) sella el HECHO durable de una transición de PROTECCIÓN (v2.88.26).
+
+        Cierra ``protection_not_durable`` del paso ``PROTECTION``: hasta hoy la protección vivía
+        sólo en el ``position_state`` proyectado y no había traza append-only de *cuándo* cambió
+        el stop, se alcanzó T1/T2, se armó el trailing o se pidió la salida. El hecho es la
+        **traza** de la transición que ya produjo ``PositionState`` (la autoridad): NO re-deriva
+        nada. Sin ``cycle_id``/``instrument_id`` el builder devuelve ``None`` y no se finge el
+        hecho. Best-effort y aditivo: sin sink es un no-op (Δ = 0).
+        """
+        if self._operational_audit_sink is None:
+            return
+        entry = build_protection_entry(
+            kind=kind,
+            instrument_id=instrument_id,
+            cycle_id=cycle_id,
+            position_id=position_id,
+            lifecycle_from=lifecycle_from,
+            lifecycle_to=lifecycle_to,
+            stop_before=stop_before,
+            stop_after=stop_after,
+            target=target,
+            trailing_status=trailing_status,
+            revision_id=revision_id,
+            source=source,
+            actor=self._engine_id,
+            as_of=self._v2_instant(),
+            account_id=self._account_id,
+        )
+        await self._v2_audit_emit(
+            self._v2_seal_audit_identity(entry), label="protection"
+        )
+
     async def _v2_cycle_pnl(
         self, cycle_id: str | None
     ) -> tuple[float | None, MeasurementStatus]:
@@ -4917,12 +4966,12 @@ class AutoSimulationWorker:
             trailing_armed=armed,
             degraded=degraded,
         )
-        self._v2_journal_exit_request(
+        await self._v2_journal_exit_request(
             symbol, position, outcome, at=at, thesis_invalid=thesis_invalid
         )
         return position_manager_package(outcome)
 
-    def _v2_journal_exit_request(
+    async def _v2_journal_exit_request(
         self,
         symbol: str,
         position: PositionState,
@@ -4985,6 +5034,21 @@ class AutoSimulationWorker:
                 "exitReasons": list(outcome.exit_reasons),
             },
         )
+        # v2.88.26 — HECHO durable de la salida pedida (cierra ``protection_not_durable``
+        # cuando el primer hecho de protección de un ciclo es la salida). La transición se
+        # sella tal cual la aceptó el FSM; sin ``cycle_id`` el builder no finge el hecho.
+        await self._v2_journal_protection(
+            kind=event,
+            instrument_id=symbol,
+            cycle_id=advanced.cycle_id or current.cycle_id,
+            position_id=advanced.position_id,
+            lifecycle_from=transition.from_state,
+            lifecycle_to=transition.to_state,
+            stop_before=current.current_stop,
+            stop_after=advanced.current_stop,
+            trailing_status=trailing_status(advanced),
+            source=None,
+        )
 
     async def _v2_apply_stop_update(
         self,
@@ -5035,6 +5099,21 @@ class AutoSimulationWorker:
                     PROTECT_REQUESTED,
                     at=at,
                     detail={"exitReasons": list(outcome.exit_reasons)},
+                )
+                # v2.88.26 — el pedido sin efecto también es un HECHO durable de protección
+                # (``PROTECT_REQUESTED``): sin esto, "se intentó proteger y no se pudo"
+                # quedaría mudo en el monitor.
+                await self._v2_journal_protection(
+                    kind=PROTECT_REQUESTED,
+                    instrument_id=symbol,
+                    cycle_id=current.cycle_id,
+                    position_id=current.position_id,
+                    lifecycle_from=current.lifecycle_state,
+                    lifecycle_to=current.lifecycle_state,
+                    stop_before=current.current_stop,
+                    stop_after=current.current_stop,
+                    trailing_status=trailing_status(current),
+                    source=None,
                 )
             return
         before = current.current_stop
@@ -5089,6 +5168,23 @@ class AutoSimulationWorker:
                     "degraded": degraded,
                 },
             )
+            # v2.88.26 — HECHO durable del movimiento del stop. ``kind`` es la transición FSM
+            # aceptada (``PROTECT_APPLIED``/``TRAIL_ADVANCED``); si el FSM la rechazó pero el
+            # stop SÍ se movió, el hecho es el ratchet desnudo (``STOP_RATCHET_APPLIED``).
+            last_rev = advanced.revisions[-1] if advanced.revisions else None
+            await self._v2_journal_protection(
+                kind=event if transition.accepted else STOP_RATCHET_APPLIED,
+                instrument_id=symbol,
+                cycle_id=advanced.cycle_id or current.cycle_id,
+                position_id=advanced.position_id,
+                lifecycle_from=transition.from_state,
+                lifecycle_to=advanced.lifecycle_state,
+                stop_before=before,
+                stop_after=advanced.current_stop,
+                trailing_status=trailing_status(advanced),
+                revision_id=last_rev.revision_id if last_rev else None,
+                source=last_rev.origin if last_rev else None,
+            )
         else:
             # Idempotente: el stop no cambia, pero la transición sí puede haber ocurrido.
             if advanced.lifecycle_state != current.lifecycle_state:
@@ -5102,6 +5198,20 @@ class AutoSimulationWorker:
                     },
                 )
                 self._v2_protect_noop_stop.pop(symbol, None)
+                # v2.88.26 — la transición FSM ocurrió sin mover el stop (break-even ya
+                # alcanzado): es un hecho de protección durable, no un no-op mudo.
+                await self._v2_journal_protection(
+                    kind=PROTECT_REQUESTED,
+                    instrument_id=symbol,
+                    cycle_id=advanced.cycle_id or current.cycle_id,
+                    position_id=advanced.position_id,
+                    lifecycle_from=current.lifecycle_state,
+                    lifecycle_to=advanced.lifecycle_state,
+                    stop_before=before,
+                    stop_after=advanced.current_stop,
+                    trailing_status=trailing_status(advanced),
+                    source=None,
+                )
             elif advanced.current_stop is not None:
                 # H-2: el stop ya estaba aplicado y el estado no cambió. Antes esto era
                 # MUDO; ahora se declara UNA vez por stop (el journal no se inunda con un
@@ -5159,13 +5269,17 @@ class AutoSimulationWorker:
         except Exception:  # noqa: BLE001 — journalizar nunca tumba el turno.
             logger.exception("auto_sim position journal emit failed symbol=%s", symbol)
 
-    def _v2_track_entry(self, symbol: str, price: Decimal, qty: Decimal) -> None:
+    async def _v2_track_entry(self, symbol: str, price: Decimal, qty: Decimal) -> None:
         """Crea el ``PositionState`` V2 al abrir (desde el TradePlan que lo originó).
 
         AUTO-2: la entrada se registra como TRANSICIÓN del FSM
         (``ENTRY_PENDING`` → ``ENTRY_FILLED`` → ``OPEN``) y la protección se declara
         ``ACTIVE`` con ``source=plan``: el plan aporta el stop estructural. La
         persistencia la hace el llamante (``_persist_position``) en el mismo tick.
+
+        v2.88.26 — además se sella el HECHO durable de protección del nacimiento
+        (``PROTECT_APPLIED``): sin él, ``PROTECTION`` no tendría traza append-only hasta la
+        primera gestión y el monitor lo declararía ``protection_not_durable``.
         """
         plan = getattr(self._v2_plan, "decisions", ()) if self._v2_plan else ()
         trade_plan_dict: dict[str, object] | None = None
@@ -5212,8 +5326,20 @@ class AutoSimulationWorker:
             )
             entered = replace(entered, lifecycle_state="OPEN")
         self._v2_positions[symbol] = entered
+        # v2.88.26 — HECHO durable del nacimiento de la protección (``source=plan``: el stop
+        # estructural del plan). La traza copia el estado que ya produjo el FSM; no lo deriva.
+        await self._v2_journal_protection(
+            kind="PROTECT_APPLIED",
+            instrument_id=symbol,
+            cycle_id=entered.cycle_id,
+            position_id=entered.position_id,
+            lifecycle_to=entered.lifecycle_state,
+            stop_after=entered.current_stop,
+            trailing_status=trailing_status(entered),
+            source="plan",
+        )
 
-    def _v2_track_reduce(
+    async def _v2_track_reduce(
         self,
         symbol: str,
         qty: Decimal,
@@ -5224,6 +5350,10 @@ class AutoSimulationWorker:
 
         AUTO-2: emite las TRANSICIONES que el fill verifica (``T1_HIT``/``PARTIAL_FILL``/
         ``EXIT_FILLED``) en vez de dejar el FSM congelado en el estado de nacimiento.
+
+        v2.88.26 — además sella los HECHOS durables de PROTECCIÓN: ``T1_HIT``/``T2_HIT``
+        (objetivo alcanzado) y ``TRAIL_ARMED`` (el T1 arma el trailing). La traza copia la
+        transición que ya produjo el FSM; no la re-deriva.
         """
         position: PositionState | None = self._v2_positions.get(symbol)
         if position is None:
@@ -5263,6 +5393,30 @@ class AutoSimulationWorker:
                     at=at,
                     detail={"event": event, "from": transition.from_state},
                 )
+        # v2.88.26 — HECHOS durables de objetivo/armado. ``T1_HIT``/``T2_HIT`` declaran el
+        # objetivo alcanzado; ``TRAIL_ARMED`` declara que el T1 armó el trailing. El
+        # ``cycle_id`` se captura ANTES del posible ``pop`` de una posición cerrada.
+        protection_events: list[tuple[str, int | None]] = []
+        if "target_1" in exit_reasons:
+            protection_events.append(("T1_HIT", 1))
+        if "target_2" in exit_reasons:
+            protection_events.append(("T2_HIT", 2))
+        if "target_1" in exit_reasons:
+            protection_events.append(("TRAIL_ARMED", 1))
+        for kind, target in protection_events:
+            await self._v2_journal_protection(
+                kind=kind,
+                instrument_id=symbol,
+                cycle_id=advanced.cycle_id or position.cycle_id,
+                position_id=advanced.position_id,
+                lifecycle_from=position.lifecycle_state,
+                lifecycle_to=advanced.lifecycle_state,
+                stop_before=position.current_stop,
+                stop_after=advanced.current_stop,
+                target=target,
+                trailing_status=trailing_status(advanced),
+                source=None,
+            )
         if advanced.status == "CLOSED":
             self._v2_positions.pop(symbol, None)
         else:
@@ -5582,7 +5736,7 @@ class AutoSimulationWorker:
                 # AUTO-1A: con la cantidad MATERIALIZADA (T1/trailing/stop se calculan
                 # sobre la posición real, no sobre lo pedido).
                 if self._v2_enabled and held <= 0:
-                    self._v2_track_entry(symbol, price, applied_qty)
+                    await self._v2_track_entry(symbol, price, applied_qty)
                 await self._persist_position(symbol, materialized)
                 report.opened += 1
                 # AUTO-1b: lo MATERIALIZADO deja de ser reserva y pasa a ser posición.
@@ -5613,7 +5767,7 @@ class AutoSimulationWorker:
                 # AUTO 2.0 (V2): actualiza el PositionState tras la venta (parcial o
                 # total) para que T1/T2 no se re-disparen en ticks sucesivos.
                 if self._v2_enabled:
-                    self._v2_track_reduce(
+                    await self._v2_track_reduce(
                         symbol,
                         applied_qty,
                         price,
