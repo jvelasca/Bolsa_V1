@@ -2,6 +2,16 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.32-beta] — `OPS`: `window:unlock` DEJA DE PODER BORRAR UN LOCK VIVO (ownership + staleness en el escape hatch del lock diario)
+
+**Bump** `2.11.31-beta` → `2.11.32-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra el **único hallazgo nuevo** de la auditoría de `v2.88.31-beta` sobre el runner operativo **sin tocar motor** (sigue `Δ decisión motor = 0`): `window:unlock` borraba **cualquier** lock —incluido el de un `run-day` **vivo**— porque no aplicaba ownership, habilitando de nuevo dos corridas concurrentes del mismo día. Evidencia: [`docs/engineering/evidence/v2.88.32/README.md`](./docs/engineering/evidence/v2.88.32/README.md).
+
+- **(P1/P2 · 🟠 · operativo) `unlock` respeta el ownership del lock.** Nuevo `unlockDecision()` (puro, en `scripts/lib/window-forward.mjs`) que aplica a `window:unlock` la **misma lógica** que `run-day`: sin lock ⇒ no-op; **PID vivo del mismo host ⇒ `deny`** (exit `1`, **ni con `--force`**: el operador mata el proceso y el PID pasa a muerto ⇒ se reclama solo); PID muerto del mismo host ⇒ `reclaim`; host ajeno con TTL **expirado** (>12 h) ⇒ `reclaim` sin `--force`; host ajeno con TTL **fresco** o `lock.json` **ilegible** ⇒ `deny` salvo `--force` (`host_distinto_force` / `lock_ilegible_force`). Incoherencia cerrada entre la intención documentada («liberar un lock huérfano») y la implementación previa («borrar cualquier lock»).
+- **Regresiones que muerden.** `scripts/lib/window-forward.test.mjs` pasa de `19` a **`25` tests `node:test`**: `6` nuevos cubren `unlockDecision` (sin lock · PID vivo con y sin `--force` · PID muerto · host ajeno fresco/`--force` · host ajeno TTL expirado · lock ilegible/`--force`). Mismo step `Window runner guards` (`pnpm window:test`) del job `shared` del `Release tag CI`, sin cambios de workflow.
+- **`Δ decisión motor = 0`.** Sólo cambia el orquestador Node y su módulo puro: no se toca motor, gobernador, `TOP_N`, umbrales, allocation, pesos A/B, UI ni migraciones. **Sin cambios de producto Python** y sin cambios de contrato.
+- **Límite declarado:** este sello cierra la deuda del **runner**, **no** la ventana PAPER (`≥4 días`/`≥2 episodios`/`≥32 ciclos` sigue **abierta**, ledger vacío). `--force` **no** salta un PID vivo del mismo host por diseño (favorece la exclusión mutua).
+- **CITA REAL DEL CI (POST-TAG, `<PENDIENTE>`):** *(se rellena con el run real de `Release tag CI` tras el tag).*
+
 ## [2.11.31-beta] — `OPS`: EL RUNNER DE LA VENTANA PAPER DEJA DE PODER CONTAMINAR LA MEDICIÓN (lock diario atómico, configuración de freeze inmutable, provenance del gate)
 
 **Bump** `2.11.30-beta` → `2.11.31-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra los **3 hallazgos** de la auditoría de `v2.88.30-beta` sobre el runner operativo **sin tocar motor** (sigue `Δ decisión motor = 0`): el runner no tenía exclusión mutua por día (dos `run-day` podían escribir el mismo material), `windowConfig()` dejaba que el **entorno** reescribiera los hashes del freeze/cuenta/versiones, y `window:status` podía pintar un gate de `operability-window.json` sin ligarlo al ledger. Evidencia: [`docs/engineering/evidence/v2.88.31/README.md`](./docs/engineering/evidence/v2.88.31/README.md).

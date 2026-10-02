@@ -66,6 +66,7 @@ import {
   runDir,
   runLockDir,
   summarizeLedger,
+  unlockDecision,
   verifyWindowProvenance,
   windowConfig,
 } from './lib/window-forward.mjs';
@@ -118,13 +119,16 @@ Comandos:
   preflight                 Solo v2_76 --preflight-only (read-only). Declara el regimen de hoy.
   run-day [--force]         Dia completo: preflight -> forward -> v2_77 -> v2_80 -> v2_83.
   status                    Dias del ledger + gate LIGADO al run (>=4 dias, >=2 episodios, >=32 ciclos).
-  unlock                    Elimina el lock diario de hoy (escape hatch si quedo huerfano).
+  unlock [--force]          Reclama el lock diario de hoy SOLO si esta huerfano (misma logica de
+                            ownership que run-day). Nunca borra un PID vivo de este host: si hay un
+                            run en curso, deniega (exit 1). --force solo fuerza un lock ajeno con TTL
+                            fresco o un lock ilegible; para un PID vivo, mata el proceso.
   task:install [--at HH:MM] Registra la tarea diaria de Windows (schtasks). Opcional.
   task:remove               Elimina la tarea diaria de Windows.
 
 Flags:
   --dry-run                 Valida config/freeze/cadena sin abrir el motor.
-  --force                   Re-ejecuta un dia ya terminal; NO salta un lock vivo (solo un lock huerfano de otro host/TTL).
+  --force                   Re-ejecuta un dia ya terminal; NO salta un lock vivo (solo un lock huerfano de otro host/TTL). En unlock, reclama un lock ajeno con TTL fresco o ilegible.
   --skip-api-check          No exige /api/health/ready (el scheduler de barras vive en el API).
   --unsafe-override-window-config
                             Permite que WINDOW_APPS_HASH/WINDOW_PACKAGES_HASH/WINDOW_ACCOUNT/
@@ -905,21 +909,50 @@ function cmdStatus() {
   return 0;
 }
 
-/** Elimina el lock del dia (escape hatch si quedo huerfano de un host desconocido). */
+/**
+ * `unlock` (escape hatch administrativo) reclama el lock del dia SOLO si esta
+ * huerfano: aplica exactamente la misma logica de ownership que `run-day`
+ * (`unlockDecision`). Nunca borra el lock de un proceso vivo: para un PID vivo
+ * del mismo host ni `--force` lo salta (mata el proceso y el PID pasa a muerto
+ * => se reclama solo). Un lock de otro host con TTL fresco o un lock ilegible
+ * exigen `--force`, que reclamara incluso un lock vivo de otro host.
+ */
 function cmdUnlock(flags) {
   const day = flags.at || dayStamp(new Date());
   const lockPath = join(ROOT, runLockDir(day));
-  const existing = readLock(day);
-  if (!existsSync(lockPath)) {
+  const lockExists = existsSync(lockPath);
+  const existing = lockExists ? readLock(day) : null;
+  const decision = unlockDecision({
+    lockExists,
+    lock: existing,
+    host: hostname(),
+    isProcessAlive: pidAlive,
+    force: flags.force,
+  });
+  if (decision.action === 'nothing') {
     logInfo(SCOPE, `no hay lock para el dia ${day}`);
     return 0;
   }
+  if (decision.action === 'deny') {
+    const owner =
+      existing && typeof existing === 'object'
+        ? `(pid ${existing.pid ?? 'n/d'} · host ${existing.host ?? 'n/d'} · ${existing.startedAt ?? 'n/d'})`
+        : '(lock ilegible: sin lock.json)';
+    logError(
+      SCOPE,
+      `unlock DENEGADO (${decision.reason}): el lock del dia ${day} ${owner} no es reclamable por defecto` +
+        (decision.reason === 'pid_vivo'
+          ? '; hay un run en curso: no lances otro run-day'
+          : '; si estas seguro de que es un resto administrativo, usa --force'),
+    );
+    return 1;
+  }
   if (flags.dryRun) {
-    console.log(`rm -rf ${lockPath} (${JSON.stringify(existing)})`);
+    console.log(`rm -rf ${lockPath} (${decision.reason})`);
     return 0;
   }
   rmSync(lockPath, { recursive: true, force: true });
-  logInfo(SCOPE, `lock del dia ${day} eliminado`);
+  logInfo(SCOPE, `lock del dia ${day} eliminado (${decision.reason})`);
   return 0;
 }
 

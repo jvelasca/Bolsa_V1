@@ -206,17 +206,23 @@ pnpm window:preflight                   # solo sonda read-only (v2_76 --prefligh
 pnpm window:run-day                     # día completo: preflight -> forward -> v2_77 -> v2_80 -> v2_83
 pnpm window:run-day -- --force          # re-ejecuta un día ya terminal
 pnpm window:status                      # días registrados + gate (>=4 días / >=2 episodios / >=32 ciclos)
-pnpm window:unlock                      # elimina el lock del día (si quedó huérfano)
-pnpm window:test                        # regresiones puras del runner (lock/config/provenance)
+pnpm window:unlock                      # reclama el lock del dia SOLO si esta huerfano (nunca un PID vivo)
+pnpm window:test                        # regresiones puras del runner (lock/config/unlock/provenance)
 pnpm window:task:install -- --at 18:00  # registra la tarea diaria de Windows (opcional, schtasks)
 pnpm window:task:remove
 ```
 
-- **Lock diario (2.11.31).** `run-day` crea `operability_runs/window-runs/<DIA>/.run.lock/` con `mkdir`
+- **Lock diario (2.11.31–2.11.32).** `run-day` crea `operability_runs/window-runs/<DIA>/.run.lock/` con `mkdir`
   (operación indivisible) **antes** de la idempotencia y del freeze, y lo libera en un `try/finally`. Un
   segundo run del mismo día aborta con `RUN_ALREADY_IN_PROGRESS` (exit `1`). Un `--force` **no** salta un
   lock vivo: sólo reclama un lock huérfano con PID muerto en este host (automático) o de otro host/TTL
-  superado (12 h, con `--force`). Si un lock quedara huérfano sin PID verificable: `pnpm window:unlock`.
+  superado (12 h, con `--force`).
+- **`window:unlock` respeta el ownership (2.11.32).** `pnpm window:unlock` **no** borra un lock cuyo PID
+  está **vivo** en este host (ni con `--force`): deniega con exit `1` y el operador debe **matar** el
+  proceso (entonces el PID pasa a muerto y se reclama solo). Reclama automáticamente un lock con PID muerto
+  en este host o de otro host con TTL superado (>12 h); un lock de otro host con TTL fresco o un
+  `lock.json` **ilegible** exigen `--force` (escape hatch administrativo). Si un lock quedara huérfano sin
+  PID verificable, `pnpm window:unlock --force`.
 - **Veto de régimen**: si el preflight vetea LONG (`BEAR_TREND`), el día se registra como
   `NO_MEDIDO_REGIMEN` y **no** se lanza el forward (regla dura §1/§5). Un `exit 2` **sin** payload
   de preflight se trata como fallo duro, nunca como veto.

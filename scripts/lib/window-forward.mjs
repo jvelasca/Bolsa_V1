@@ -185,6 +185,62 @@ export function lockDecision({
 }
 
 /**
+ * Decide que hacer con `window:unlock`. A diferencia de `acquireDayLock`, el
+ * unlock es una accion MANUAL del operador: **nunca** debe borrar el lock de un
+ * proceso vivo (romper el lock de exclusion mutua permitiria dos `run-day`
+ * simultaneos del mismo dia). Logica PURA (reloj y `isProcessAlive` inyectables):
+ *   - sin lock => `nothing`.
+ *   - lock ilegible (`lock.json` ausente/corrupto: no se puede probar ownership)
+ *     => `deny` salvo `--force` => `reclaim` (`lock_ilegible_force`).
+ *   - mismo host + PID vivo => `deny` (un `--force` **no** salta un PID vivo: el
+ *     operador mata el proceso y el PID pasa a muerto => `reclaim` automatico).
+ *   - mismo host + PID muerto => `reclaim` (huerfano inequivoco, sin `--force`).
+ *   - otro host + TTL superado (12 h) => `reclaim` (huerfano), sin `--force`.
+ *   - otro host + TTL no expirado => `deny` salvo `--force` => `reclaim`.
+ * @param {{
+ *   lockExists?: boolean,
+ *   lock?: Record<string, unknown> | null,
+ *   now?: number,
+ *   host?: string,
+ *   isProcessAlive?: (pid: unknown) => boolean,
+ *   ttlMs?: number,
+ *   force?: boolean,
+ * }} [options]
+ */
+export function unlockDecision({
+  lockExists = false,
+  lock = null,
+  now = Date.now(),
+  host = '',
+  isProcessAlive = () => false,
+  ttlMs = LOCK_TTL_MS,
+  force = false,
+} = {}) {
+  if (!lockExists) {
+    return { action: 'nothing', reason: 'sin_lock', stale: false };
+  }
+  if (!lock || typeof lock !== 'object') {
+    return force
+      ? { action: 'reclaim', reason: 'lock_ilegible_force', stale: true }
+      : { action: 'deny', reason: 'lock_ilegible', stale: false };
+  }
+  const base = lockDecision({ lock, now, host, isProcessAlive, ttlMs, force });
+  if (base.action === 'acquire') {
+    return { action: 'nothing', reason: 'sin_lock', stale: false };
+  }
+  if (base.action === 'reclaim') {
+    return { action: 'reclaim', reason: base.reason, stale: true };
+  }
+  if (base.reason === 'pid_vivo') {
+    return { action: 'deny', reason: 'pid_vivo', stale: false };
+  }
+  if (base.reason === 'ttl_expirado') {
+    return { action: 'reclaim', reason: 'ttl_expirado', stale: true };
+  }
+  return { action: 'deny', reason: base.reason, stale: false };
+}
+
+/**
  * Clasifica el codigo de salida de un script del pipeline.
  * `0` ok · `2` declarado (bloqueo/no material, NO es fallo duro) · `1` uso incorrecto
  * · `null`/otro error duro.

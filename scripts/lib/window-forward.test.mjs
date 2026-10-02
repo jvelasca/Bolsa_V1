@@ -1,10 +1,11 @@
 /**
  * Regresiones del modulo PURO del runner de la ventana PAPER.
  *
- * Cubre las tres guardias del sello `2.11.31` (Muerden de verdad: revertir la
+ * Cubre las cuatro guardias del sello `2.11.32` (Muerden de verdad: revertir la
  * proteccion en `window-forward.mjs` pone el test en rojo):
  *   - config de freeze inmutable salvo `unsafeOverride`;
  *   - lock diario (`--force` no salta un lock vivo);
+ *   - `unlock` respeta el ownership (nunca borra un PID vivo) y la staleness;
  *   - provenance del gate (status no pinta material stale).
  *
  * Ejecutar: `pnpm window:test` (o `node --test scripts/lib/window-forward.test.mjs`).
@@ -21,6 +22,7 @@ import {
   parseGate,
   parseRevParse,
   resolveDayStatus,
+  unlockDecision,
   verifyWindowProvenance,
   windowConfig,
 } from './window-forward.mjs';
@@ -116,6 +118,115 @@ test('lockDecision reclama un lock de otro host/TTL sólo con --force', () => {
   });
   assert.equal(decision.action, 'reclaim');
   assert.equal(decision.reason, 'ttl_expirado_force');
+});
+
+// ---------------------------------------------------------------------------
+// unlock: ownership / staleness (P1)
+// ---------------------------------------------------------------------------
+
+const NOW = Date.parse('2026-10-02T20:00:00.000Z');
+const freshLock = { host: 'h', pid: 42, startedAt: new Date(NOW).toISOString() };
+
+test('unlockDecision no hace nada si no hay lock', () => {
+  const decision = unlockDecision({ lockExists: false, host: 'h' });
+  assert.equal(decision.action, 'nothing');
+  assert.equal(decision.reason, 'sin_lock');
+});
+
+test('unlockDecision deniega un lock con PID vivo en el mismo host (ni con --force)', () => {
+  const decision = unlockDecision({
+    lockExists: true,
+    lock: freshLock,
+    now: NOW,
+    host: 'h',
+    isProcessAlive: alive,
+  });
+  assert.equal(decision.action, 'deny');
+  assert.equal(decision.reason, 'pid_vivo');
+  const forced = unlockDecision({
+    lockExists: true,
+    lock: freshLock,
+    now: NOW,
+    host: 'h',
+    isProcessAlive: alive,
+    force: true,
+  });
+  assert.equal(forced.action, 'deny');
+  assert.equal(forced.reason, 'pid_vivo');
+});
+
+test('unlockDecision reclama un lock con PID muerto en el mismo host', () => {
+  const decision = unlockDecision({
+    lockExists: true,
+    lock: freshLock,
+    now: NOW,
+    host: 'h',
+    isProcessAlive: dead,
+  });
+  assert.equal(decision.action, 'reclaim');
+  assert.equal(decision.reason, 'pid_muerto');
+});
+
+test('unlockDecision deniega un lock de otro host con TTL fresco (y --force lo reclama)', () => {
+  const lock = { host: 'otro', pid: 42, startedAt: new Date(NOW).toISOString() };
+  const decision = unlockDecision({
+    lockExists: true,
+    lock,
+    now: NOW,
+    host: 'h',
+    isProcessAlive: dead,
+  });
+  assert.equal(decision.action, 'deny');
+  assert.equal(decision.reason, 'host_distinto');
+  const forced = unlockDecision({
+    lockExists: true,
+    lock,
+    now: NOW,
+    host: 'h',
+    isProcessAlive: dead,
+    force: true,
+  });
+  assert.equal(forced.action, 'reclaim');
+  assert.equal(forced.reason, 'host_distinto_force');
+});
+
+test('unlockDecision reclama un lock de otro host con TTL expirado sin --force', () => {
+  const lock = {
+    host: 'otro',
+    pid: 42,
+    startedAt: new Date(NOW - LOCK_TTL_MS - 1000).toISOString(),
+  };
+  const decision = unlockDecision({
+    lockExists: true,
+    lock,
+    now: NOW,
+    host: 'h',
+    isProcessAlive: dead,
+  });
+  assert.equal(decision.action, 'reclaim');
+  assert.equal(decision.reason, 'ttl_expirado');
+});
+
+test('unlockDecision deniega un lock ilegible (sin lock.json) y --force lo reclama', () => {
+  const decision = unlockDecision({
+    lockExists: true,
+    lock: null,
+    now: NOW,
+    host: 'h',
+    isProcessAlive: dead,
+  });
+  assert.equal(decision.action, 'deny');
+  assert.equal(decision.reason, 'lock_ilegible');
+  const forced = unlockDecision({
+    lockExists: true,
+    lock: null,
+    now: NOW,
+    host: 'h',
+    isProcessAlive: dead,
+    force: true,
+  });
+  assert.equal(forced.action, 'reclaim');
+  assert.equal(forced.reason, 'lock_ilegible_force');
 });
 
 // ---------------------------------------------------------------------------
