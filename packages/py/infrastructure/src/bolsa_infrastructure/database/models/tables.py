@@ -2248,6 +2248,11 @@ class SimFillFinanceContextRow(Base):
     reference_mid: Mapped[Decimal | None] = mapped_column(
         "reference_mid", Numeric(18, 6), nullable=True
     )
+    # AUTO v2.88.25 — la FUENTE de precio realmente usada para construir ``price`` (migración
+    # 047). Nullable y sin default: ``NULL`` = fila anterior al sello o fuente no medible
+    # (nunca un literal inventado). Deja de confundir ``realPriceEnabled`` (configuración) con
+    # el precio que de verdad se usó en ESTA operación.
+    price_source: Mapped[str | None] = mapped_column("price_source", String(32), nullable=True)
     account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
     venue: Mapped[str] = mapped_column("venue", String, nullable=False)
     # V2.28 / A10 (P1-02 real): procedencia del fill. ``NULL`` = sin atribución

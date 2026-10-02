@@ -15,6 +15,8 @@ import pytest
 from bolsa_application.sim_durable_store import (
     InMemorySimAutoPositionStore,
     InMemorySimConsumedSignalStore,
+    InMemorySimFillFinanceContextStore,
+    SimFillFinanceContext,
     rebuild_sim_position_projection,
 )
 
@@ -121,3 +123,45 @@ async def test_consumed_signal_prune_drops_previous_bars() -> None:
     assert removed == 1
     assert await store.list_bar("acc-1", "auto-sim", old_bar) == []
     assert await store.list_bar("acc-1", "auto-sim", now_bar) == ["sig-now"]
+
+
+# ── v2.88.25 — la FUENTE de precio por fill viaja en el contexto financiero durable ──
+
+
+def test_fill_finance_context_normalizes_the_price_source() -> None:
+    """El vocabulario es cerrado: una fuente válida se canoniza y una ajena se declara ``None``."""
+    base = dict(
+        execution_id="EX-1",
+        instrument_id="AAA",
+        side="buy",
+        quantity=Decimal("10"),
+        price=Decimal("100"),
+    )
+    canonical = SimFillFinanceContext(**base, price_source="market_close")
+    assert canonical.price_source == "MARKET_CLOSE"
+
+    undeclared = SimFillFinanceContext(**base, price_source="TOTALLY_MADE_UP")
+    assert undeclared.price_source is None, "un valor ajeno NO se convierte en literal"
+
+    absent = SimFillFinanceContext(**base)
+    assert absent.price_source is None
+
+
+@pytest.mark.asyncio
+async def test_fill_finance_context_price_source_survives_the_store() -> None:
+    """El doble hermético espeja el contrato: la fuente se persiste y se relee igual."""
+    store = InMemorySimFillFinanceContextStore()
+    await store.save(
+        SimFillFinanceContext(
+            execution_id="EX-2",
+            instrument_id="AAA",
+            side="sell",
+            quantity=Decimal("10"),
+            price=Decimal("110"),
+            cycle_id="cyc-1",
+            price_source="MARKET_CLOSE",
+        )
+    )
+    rows = await store.list_by_cycle_ids(None, ["cyc-1"])
+    assert len(rows) == 1
+    assert rows[0].price_source == "MARKET_CLOSE"

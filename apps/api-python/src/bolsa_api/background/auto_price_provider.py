@@ -34,6 +34,13 @@ import math
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol, cast, runtime_checkable
 
+from bolsa_application.price_source_kind import (
+    PRICE_SOURCE_MAPPING,
+    PRICE_SOURCE_MARKET_CLOSE,
+    PRICE_SOURCE_SYNTHETIC,
+    usable_price_source,
+)
+
 logger = logging.getLogger(__name__)
 
 #: Contrato histórico del precio por ``(símbolo, tick de BARRA)``. Se conserva para el
@@ -77,13 +84,22 @@ class ConstantPriceSource:
     precio del camino hermético.
     """
 
-    __slots__ = ("_script", "_tick")
+    __slots__ = ("_script", "_tick", "_kind")
 
-    def __init__(self, script: PriceScript) -> None:
+    def __init__(self, script: PriceScript, *, kind: str = PRICE_SOURCE_SYNTHETIC) -> None:
         if not callable(script):
             raise TypeError("ConstantPriceSource exige un PriceScript invocable")
         self._script = script
         self._tick = 0
+        # La FUENTE que construye el precio: por defecto ``SYNTHETIC`` (el ``flat_price_script``
+        # hermético). Un llamante honesto puede declarar ``REPLAY``/``XTB``; un valor fuera del
+        # vocabulario se normaliza a ``None`` (no medido), nunca a un literal inventado.
+        self._kind = usable_price_source(kind)
+
+    @property
+    def kind(self) -> str | None:
+        """Literal canónico de la fuente (o ``None`` = no medible)."""
+        return self._kind
 
     async def refresh(self, *, tick: int | None = None) -> None:  # noqa: ARG002 (paridad de firma)
         """Fija el tick del script. El worker la invoca SIN argumentos (una vez por tick),
@@ -137,6 +153,11 @@ class MappingPriceSource:
     def refreshes(self) -> int:
         """Nº de ``refresh`` observados (prueba de que la foto es una por tick)."""
         return self._refreshes
+
+    @property
+    def kind(self) -> str:
+        """La fuente es un mapa estático (tests/dry-run), por construcción."""
+        return PRICE_SOURCE_MAPPING
 
 
 class OhlcvPriceSource:
@@ -234,6 +255,11 @@ class OhlcvPriceSource:
     def missing(self, symbols: Sequence[str]) -> tuple[str, ...]:
         return tuple(s for s in symbols if self._exec.get(s) is None)
 
+    @property
+    def kind(self) -> str:
+        """Precio REAL desde barras (``close(B-1)``/``open(B)``): ``MARKET_CLOSE``."""
+        return PRICE_SOURCE_MARKET_CLOSE
+
 
 def _finite_field(bar: Any, name: str) -> float | None:
     """Campo numérico finito de una barra (dataclass/Mapping/atributo); ``None`` si no.
@@ -255,6 +281,18 @@ def _default_timeframe() -> Any:
     from bolsa_domain.value_objects.timeframe import TimeFrame  # noqa: PLC0415
 
     return TimeFrame.D1
+
+
+def price_source_kind(source: PriceSource | None) -> str | None:
+    """(PURA) el literal canónico de la fuente, o ``None`` si no lo declara (no medido).
+
+    Una fuente sin ``kind`` no se degrada a un literal inventado: se declara no medible. Es lo
+    que persiste el worker junto al fill (migración 047) para dejar de confundir la CONFIGURACIÓN
+    (``AUTO_ENGINE_SIM_REAL_PRICE``) con el precio realmente usado en ESTA operación.
+    """
+    if source is None:
+        return None
+    return usable_price_source(getattr(source, "kind", None))
 
 
 def as_price_source(provided: PriceSource | PriceScript) -> PriceSource:

@@ -39,12 +39,15 @@ from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_PARTIAL,
     MEASUREMENT_UNKNOWN,
     MeasurementStatus,
+    coerce_measurement,
 )
 from bolsa_application.auto_cycle_journal import cycle_decision_id
 from bolsa_application.auto_self_evaluation_feed import cycles_from_fills
 
 __all__ = [
+    "AUTO_CYCLE_SETTLEMENT_EVENT",
     "AUTO_ENTRY_DECISION_EVENT",
+    "AUTO_ENTRY_ORDER_EVENT",
     "AUTO_RESERVATION_CLAIM_EVENT",
     "AUTO_RESERVATION_RECONCILIATION_EVENT",
     "OPERATIONAL_STEPS",
@@ -83,6 +86,12 @@ STEP_UNKNOWN = "unknown"
 AUTO_ENTRY_DECISION_EVENT = "auto_entry_decision"
 AUTO_RESERVATION_CLAIM_EVENT = "auto_reservation_claim"
 AUTO_RESERVATION_RECONCILIATION_EVENT = "auto_reservation_reconciliation"
+#: v2.88.25 — la ORDEN DE ENTRADA emitida y materializada (hasta hoy sólo ``exitOrders`` era
+#: durable). Cierra ``entry_order_not_durable`` del paso ``ORDER``.
+AUTO_ENTRY_ORDER_EVENT = "auto_entry_order"
+#: v2.88.25 — el HECHO durable del ciclo cerrado (liquidación real), distinto del ``CYCLE_CLOSED``
+#: reconstruido de fills. Cierra ``settlement_not_durable`` del paso ``SETTLEMENT``.
+AUTO_CYCLE_SETTLEMENT_EVENT = "auto_cycle_settlement"
 
 #: Motivos de liberación que cuentan como retirada FORZADA (no por fill materializado).
 _FORCED_RELEASE_REASONS: frozenset[str] = frozenset({"cancel", "restart", "tail_dead", "rollback"})
@@ -234,6 +243,29 @@ def _applied_friction(fills: Sequence[Any]) -> tuple[float | None, MeasurementSt
     return round(total, 6), MEASUREMENT_COMPLETE if unvalued == 0 else MEASUREMENT_PARTIAL
 
 
+def _price_sources(fills: Sequence[Any]) -> tuple[dict[str, int] | None, MeasurementStatus]:
+    """v2.88.25 — FUENTES de precio realmente usadas por los fills del ciclo, contadas.
+
+    Es el hecho que sustituye a leer ``realPriceEnabled`` (configuración) como si fuera el
+    precio de la operación: ``{"MARKET_CLOSE": 2}`` dice que AMBAS patas se construyeron con
+    precio real de barra. Un fill sin fuente declarada NO se descarta en silencio: degrada el
+    agregado a ``PARTIAL`` (medido a medias), y sin ninguna fuente el valor es ``None`` con
+    ``UNKNOWN`` — nunca un ``{}`` que afirmaría "ninguna fuente", que no es lo mismo.
+    """
+    counts: dict[str, int] = {}
+    unmeasured = 0
+    for fill in fills:
+        raw = _get(fill, "price_source", "priceSource")
+        kind = str(raw).strip() if raw is not None else ""
+        if kind:
+            counts[kind] = counts.get(kind, 0) + 1
+        else:
+            unmeasured += 1
+    if not counts:
+        return None, MEASUREMENT_COMPLETE if unmeasured == 0 else MEASUREMENT_UNKNOWN
+    return counts, MEASUREMENT_COMPLETE if unmeasured == 0 else MEASUREMENT_PARTIAL
+
+
 def _entry_decision_step(
     step_id: str,
     journal: Sequence[Any],
@@ -297,9 +329,21 @@ def _reservation_step(reservation: Any | None) -> dict[str, Any]:
     return _step("RESERVATION", state=STEP_REACHED, at=at, facts=facts)
 
 
-def _order_step(orders: Sequence[Any]) -> dict[str, Any]:
-    """``ORDER`` — INTENT de salida durable. La emisión de la orden de ENTRADA no es durable."""
-    if not orders:
+def _order_step(orders: Sequence[Any], journal: Sequence[Any] = ()) -> dict[str, Any]:
+    """``ORDER`` — INTENT de salida durable **y** orden de ENTRADA durable (v2.88.25).
+
+    Hasta v2.88.25 la orden de entrada no era durable y el paso sólo podía leer las salidas
+    (``auto_exit_orders``), quedando ``entry_order_not_durable``. Ahora el evento
+    ``auto_entry_order`` del spine aporta el hecho de entrada (pedido vs materializado +
+    fuente de precio); si hay salida durable pero ninguna entrada, el hueco se declara en la
+    nota en vez de esconderse.
+    """
+    entry_orders = [
+        entry
+        for entry in journal
+        if _get(entry, "event_type", "eventType") == AUTO_ENTRY_ORDER_EVENT
+    ]
+    if not orders and not entry_orders:
         return _step(
             "ORDER",
             state=STEP_UNKNOWN,
@@ -307,6 +351,20 @@ def _order_step(orders: Sequence[Any]) -> dict[str, Any]:
             note="entry_order_not_durable",
         )
     facts: list[dict[str, Any]] = []
+    for entry in entry_orders:
+        payload = _entry_payload(entry)
+        facts.append(
+            _fact(
+                "entryOrder",
+                {
+                    "orderId": payload.get("orderId"),
+                    "requestedQty": payload.get("requestedQty"),
+                    "appliedQty": payload.get("appliedQty"),
+                    "partial": payload.get("partial"),
+                    "priceSource": payload.get("priceSource"),
+                },
+            )
+        )
     for order in orders:
         facts.append(
             _fact(
@@ -320,8 +378,20 @@ def _order_step(orders: Sequence[Any]) -> dict[str, Any]:
                 },
             )
         )
-    at = _iso(_parse_instant(_get(orders[0], "created_at", "createdAt")))
-    return _step("ORDER", state=STEP_REACHED, at=at, facts=facts)
+    moments = [
+        _parse_instant(_get(row, "created_at", "createdAt"))
+        for row in (*entry_orders, *orders)
+    ]
+    valid = [moment for moment in moments if moment is not None]
+    # Salida durable sin hecho de entrada: el hueco se declara, no se oculta.
+    note = "entry_order_not_durable" if orders and not entry_orders else None
+    return _step(
+        "ORDER",
+        state=STEP_REACHED,
+        at=_iso(max(valid)) if valid else None,
+        facts=facts,
+        note=note,
+    )
 
 
 def _fill_step(fills: Sequence[Any], *, window_full: bool = False) -> dict[str, Any]:
@@ -356,6 +426,7 @@ def _fill_step(fills: Sequence[Any], *, window_full: bool = False) -> dict[str, 
     buy_vwap, buy_qty = _vwap(buys)
     sell_vwap, sell_qty = _vwap(sells)
     friction, friction_measurement = _applied_friction(fills)
+    price_sources, price_sources_measurement = _price_sources(fills)
     # Los buckets de lado son incompletos si algún fill no declara un lado clasificable.
     bucket_measurement: MeasurementStatus = (
         MEASUREMENT_PARTIAL if unclassified else MEASUREMENT_COMPLETE
@@ -374,6 +445,7 @@ def _fill_step(fills: Sequence[Any], *, window_full: bool = False) -> dict[str, 
             MEASUREMENT_UNKNOWN if sell_vwap is None else bucket_measurement,
         ),
         _fact("appliedFriction", friction, friction_measurement),
+        _fact("priceSources", price_sources, price_sources_measurement),
     ]
     at = _iso(_parse_instant(_get(fills[-1], "created_at", "createdAt")))
     notes: list[str] = []
@@ -433,7 +505,11 @@ def _settlement_step(
     haya ocurrido un settlement durable. Tener ``fill + PnL + ciclo cerrado`` no es evidencia de
     liquidación, así que sin un evento/estado durable de settlement el paso se declara
     ``unknown`` con ``settlement_not_durable`` — **jamás** ``reached``. El PnL se lee en
-    ``CYCLE_CLOSED``. La costura ``settlement`` queda lista para el ``SETTLEMENT_EVENT`` de ``M2``.
+    ``CYCLE_CLOSED``.
+
+    v2.88.25: el hecho durable lo produce el worker al cerrar la posición
+    (``auto_cycle_settlement``). El PnL viaja con su MEDICIÓN (``pnlMeasurement``): una cifra
+    marcada ``PARTIAL`` (evidencia truncada) no se publica como afirmada.
     """
     if settlement is None:
         return _step(
@@ -446,9 +522,20 @@ def _settlement_step(
     facts: list[dict[str, Any]] = [
         _fact("appliedFriction", friction, friction_measurement),
     ]
-    for key in ("settlementId", "pnl", "settledAt"):
+    pnl_measurement = coerce_measurement(settlement.get("pnlMeasurement"))
+    for key in ("settlementId", "closedQty", "exitReason", "priceSource", "settledAt"):
         if settlement.get(key) is not None:
             facts.append(_fact(key, settlement.get(key)))
+    # El PnL viaja con SU medición declarada por el productor (no se deduce del valor).
+    facts.append(
+        _fact(
+            "pnl",
+            settlement.get("pnl"),
+            pnl_measurement
+            if settlement.get("pnl") is None
+            else (pnl_measurement or MEASUREMENT_COMPLETE),
+        )
+    )
     return _step(
         "SETTLEMENT",
         state=STEP_REACHED,
@@ -532,7 +619,7 @@ def _build_cycle(
         _entry_decision_step("TOP_N", cycle_journal, note_absent="top_n_not_durable"),
         _entry_decision_step("RISK", cycle_journal, note_absent="risk_not_durable"),
         _reservation_step(reservation),
-        _order_step(orders),
+        _order_step(orders, cycle_journal),
         _fill_step(cycle_fills, window_full=window_truncated),
         _protection_step(positions_by_cycle.get(cycle_id)),
         _settlement_step(settlement, cycle_fills),
@@ -1245,6 +1332,16 @@ async def read_operational_monitor(
             journal = await repository.list_by_decision_ids(decision_ids)
         except Exception:  # noqa: BLE001
             logger.warning("auto monitor: decision journal unavailable", exc_info=True)
+    # v2.88.25 — HECHOS durables del ciclo que viajan en el spine y NO requieren query nueva:
+    # la orden de entrada y la liquidación. El PnL del settlement se publica con su medición;
+    # sin evento, el paso ``SETTLEMENT`` sigue declarando ``settlement_not_durable``.
+    settlements: list[dict[str, Any]] = []
+    for entry in journal:
+        if _get(entry, "event_type", "eventType") != AUTO_CYCLE_SETTLEMENT_EVENT:
+            continue
+        payload = _entry_payload(entry)
+        if payload:
+            settlements.append(dict(payload))
     # Lectura GLOBAL del último ``auto_entry_decision`` durable, independiente de las reservas
     # visibles: por índice de ``event_type``, más nueva primero (``limit=1``). Sin esto
     # ``lastDecisionAt`` quedaba atado a los ciclos de la ventana y podía ocultar una decisión
@@ -1313,6 +1410,7 @@ async def read_operational_monitor(
         journal=journal,
         reconciliation_entries=reconciliation_entries,
         claim_entries=claim_entries,
+        settlements=settlements,
         granularity=granularity_view_from_env(),
         interval_seconds=interval_seconds,
         grace_seconds=grace_seconds,

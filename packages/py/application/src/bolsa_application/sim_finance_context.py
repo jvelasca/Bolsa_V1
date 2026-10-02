@@ -43,6 +43,7 @@ async def persist_fill_finance_context(
     strategy_version_id: str | None = None,
     cycle_id: str | None = None,
     reference_mid: Any = None,
+    price_source: str | None = None,
 ) -> int:
     """Persiste el contexto durable de cada fill del order. Devuelve nº de filas.
 
@@ -57,6 +58,10 @@ async def persist_fill_finance_context(
     Es el único hecho que la fricción APLICADA necesita y que el precio no lleva dentro; sin
     él la fricción del fill es un hueco declarado (nunca un ``0``). Se normaliza aquí para
     que un valor inservible no llegue nunca a la fila.
+
+    v2.88.25: ``price_source`` es el literal canónico de la FUENTE que construyó el precio
+    (``MARKET_CLOSE``/``SYNTHETIC``/...). ``None`` = no medible (nunca se inventa): deja de
+    confundir ``realPriceEnabled`` (configuración) con el precio realmente usado.
     """
     reference = usable_reference_mid(reference_mid)
     finances: tuple[SimulatedFillFinance, ...] = sim_fill_finances(
@@ -76,6 +81,7 @@ async def persist_fill_finance_context(
                 quantity=Decimal(fin.quantity),
                 price=Decimal(fin.price),
                 reference_mid=reference,
+                price_source=price_source,
                 account_id=fin.account_id,
                 venue=fin.venue,
                 idempotency_key=fin.idempotency_key,

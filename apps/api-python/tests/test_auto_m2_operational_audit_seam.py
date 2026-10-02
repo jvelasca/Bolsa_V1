@@ -19,16 +19,20 @@ import pytest
 from bolsa_api.background.auto_simulation_worker import (
     AutoSimulationWorker,
     build_operational_audit_sink,
+    flat_price_script,
 )
 from bolsa_application.auto_operational_audit import (
     REASON_GRACE_WINDOW_KEEP,
     REASON_SESSION_OWNED,
     RECONCILIATION_KEEP,
     RECONCILIATION_RELEASE,
+    build_entry_order_entry,
     build_reservation_claim_entry,
 )
 from bolsa_application.auto_operational_monitor import (
+    AUTO_CYCLE_SETTLEMENT_EVENT,
     AUTO_ENTRY_DECISION_EVENT,
+    AUTO_ENTRY_ORDER_EVENT,
     AUTO_RESERVATION_CLAIM_EVENT,
     AUTO_RESERVATION_RECONCILIATION_EVENT,
 )
@@ -87,6 +91,10 @@ def _worker(*, sink: Any | None = None) -> AutoSimulationWorker:
     worker._audit_session_id = None
     worker._v2_reservation_grace = timedelta(seconds=61)
     worker._time = SimpleNamespace(strftime=lambda _fmt: "2026-10-01T10:00:00Z")
+    # v2.88.25 — la fuente de precio y el store de fills que usan los nuevos productores.
+    worker._price_source = None
+    worker._price_script = flat_price_script
+    worker._context_store = None
     return worker
 
 
@@ -380,3 +388,108 @@ async def test_a_worker_without_the_seam_attribute_is_a_declared_noop() -> None:
             )
         ]
     )
+
+
+# ── v2.88.25 — la ORDEN DE ENTRADA y la LIQUIDACIÓN dejan su traza en el spine ───────
+
+
+@pytest.mark.asyncio
+async def test_entry_order_is_persisted_with_account_and_engine() -> None:
+    """El productor sella ``account_id`` y ``payload.engineId`` y conserva pedido vs aplicado."""
+    sink = _Collector()
+    worker = _worker(sink=sink)
+    await worker._v2_journal_entry_order(
+        order_id="ORD-1",
+        instrument_id="AAA",
+        requested_qty=100,
+        applied_qty=73.5,
+        partial=True,
+        cycle_id="cyc-aaa",
+    )
+
+    assert len(sink.entries) == 1
+    entry = sink.entries[0]
+    assert entry.event_type == AUTO_ENTRY_ORDER_EVENT
+    assert entry.account_id == _ACCOUNT
+    assert entry.payload is not None
+    assert entry.payload["engineId"] == "auto-sim"
+    assert entry.payload["orderId"] == "ORD-1"
+    assert entry.payload["requestedQty"] == 100.0
+    assert entry.payload["appliedQty"] == 73.5
+    assert entry.payload["partial"] is True
+    # Sin ``PriceSource`` inyectada y con el script hermético, la fuente es SYNTHETIC.
+    assert entry.payload["priceSource"] == "SYNTHETIC"
+    assert entry.payload["cycleId"] == "cyc-aaa"
+
+
+@pytest.mark.asyncio
+async def test_entry_order_without_a_sink_is_a_declared_noop() -> None:
+    worker = _worker(sink=None)
+    await worker._v2_journal_entry_order(
+        order_id="ORD-1",
+        instrument_id="AAA",
+        requested_qty=100,
+        applied_qty=100,
+        partial=False,
+        cycle_id="cyc-aaa",
+    )
+    assert worker._operational_audit_sink is None
+
+
+def test_seal_identity_keeps_a_producer_engine_id() -> None:
+    """El sello de trazado NO pisa un ``engineId`` ya declarado por el productor."""
+    worker = _worker(sink=None)
+    entry = build_entry_order_entry(
+        order_id="ORD-1",
+        instrument_id="AAA",
+        side="buy",
+        requested_qty=100,
+        applied_qty=100,
+        partial=False,
+        price_source="MARKET_CLOSE",
+        cycle_id="cyc-aaa",
+        actor="auto-sim",
+        as_of="2026-10-01T10:00:00Z",
+    )
+    assert entry is not None
+    from dataclasses import replace as _replace
+
+    entry = _replace(entry, payload={**(entry.payload or {}), "engineId": "auto-otro"})
+    sealed = worker._v2_seal_audit_identity(entry)
+    assert sealed.payload["engineId"] == "auto-otro"
+
+
+@pytest.mark.asyncio
+async def test_cycle_settlement_is_persisted_with_declared_pnl_measurement() -> None:
+    """Sin store de fills el PnL se DECLARA no medido (``UNKNOWN``), nunca una cifra fingida."""
+    sink = _Collector()
+    worker = _worker(sink=sink)
+    await worker._v2_journal_cycle_settlement(
+        instrument_id="AAA",
+        closed_qty=10,
+        cycle_id="cyc-aaa",
+        exit_reason="time_exit",
+    )
+
+    assert len(sink.entries) == 1
+    entry = sink.entries[0]
+    assert entry.event_type == AUTO_CYCLE_SETTLEMENT_EVENT
+    assert entry.account_id == _ACCOUNT
+    assert entry.payload is not None
+    assert entry.payload["engineId"] == "auto-sim"
+    assert entry.payload["pnl"] is None
+    assert entry.payload["pnlMeasurement"] == "UNKNOWN"
+    assert entry.payload["closedQty"] == 10.0
+    assert entry.payload["cycleId"] == "cyc-aaa"
+
+
+@pytest.mark.asyncio
+async def test_cycle_settlement_without_a_sink_is_a_declared_noop() -> None:
+    worker = _worker(sink=None)
+    await worker._v2_journal_cycle_settlement(
+        instrument_id="AAA",
+        closed_qty=10,
+        cycle_id="cyc-aaa",
+        exit_reason=None,
+    )
+    assert worker._operational_audit_sink is None

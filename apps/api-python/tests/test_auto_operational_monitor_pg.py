@@ -125,6 +125,7 @@ async def _seed_fill(
     price: float,
     reference_mid: float,
     execution_id: str | None = None,
+    price_source: str | None = None,
 ) -> None:
     from bolsa_application.sim_durable_store import (
         PostgresSimFillFinanceContextStore,
@@ -144,6 +145,8 @@ async def _seed_fill(
             quantity=Decimal("10"),
             price=Decimal(str(price)),
             reference_mid=Decimal(str(reference_mid)),
+            # v2.88.25 — la FUENTE que construyó el precio (migración 047).
+            price_source=price_source,
             account_id=account_id,
             cycle_id=cycle_id,
             created_at=datetime(2026, 10, 1, 15, 0, tzinfo=UTC),
@@ -646,4 +649,240 @@ async def test_monitor_last_decision_is_scoped_by_engine(
         assert dto_b["header"]["lastDecisionAt"] == "2026-10-01T18:00:00Z"
     finally:
         await _wipe(monitor_pg_factory, account_id)
+
+
+# ── v2.88.25 — hechos durables: ENTRY_ORDER, SETTLEMENT y price_source (migración 047) ──
+
+
+def _fact_value(step: dict[str, Any], key: str) -> dict[str, Any]:
+    return next(fact for fact in step["facts"] if fact["key"] == key)
+
+
+def _migration_047_path() -> Path:
+    return (
+        Path(__file__).resolve().parents[3]
+        / "packages"
+        / "py"
+        / "infrastructure"
+        / "alembic"
+        / "versions"
+        / "047_fill_price_source.py"
+    )
+
+
+@pytest.mark.asyncio
+async def test_fill_price_source_is_durable_and_projected(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """La FUENTE de precio sobrevive el roundtrip por PG y el monitor la proyecta por fill."""
+    from bolsa_application.auto_operational_monitor import read_operational_monitor
+    from bolsa_application.reservation_store import PostgresReservationStore
+    from bolsa_application.sim_durable_store import PostgresSimFillFinanceContextStore
+
+    account_id = f"acc-monitor-{uuid.uuid4().hex[:10]}"
+    suffix = uuid.uuid4().hex[:10]
+    cycle_id = f"cyc-{suffix}"
+    instrument = "FFF"
+    await _wipe(monitor_pg_factory, account_id)
+    try:
+        async with monitor_pg_factory() as session:
+            reservations = PostgresReservationStore(session, autocommit=True)
+            assert await reservations.save_claim(
+                _reservation(
+                    reservation_id=f"RES-dec-{suffix}",
+                    cycle_id=cycle_id,
+                    account_id=account_id,
+                    instrument=instrument,
+                )
+            )
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument=instrument,
+                side="buy",
+                price=100.0,
+                reference_mid=99.9,
+                execution_id=f"EX-{suffix}-buy",
+                price_source="MARKET_CLOSE",
+            )
+            # En minúsculas: la normalización del dataclass la deja canónica al persistir.
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument=instrument,
+                side="sell",
+                price=110.0,
+                reference_mid=110.1,
+                execution_id=f"EX-{suffix}-sell",
+                price_source="market_close",
+            )
+            await session.commit()
+            store = PostgresSimFillFinanceContextStore(session, autocommit=False)
+            rows = await store.list_by_cycle_ids(account_id, [cycle_id])
+            assert rows and all(row.price_source == "MARKET_CLOSE" for row in rows)
+
+        async with monitor_pg_factory() as session:
+            dto = await read_operational_monitor(
+                session, account_id, engine_id=_ENGINE_ID, cycle_id=cycle_id, grace_seconds=61.0
+            )
+        fill_step = next(
+            step for step in dto["cycles"][0]["steps"] if step["id"] == "FILL"
+        )
+        sources = _fact_value(fill_step, "priceSources")
+        assert sources["value"] == {"MARKET_CLOSE": 2}
+        assert sources["measurement"] == "COMPLETE"
+    finally:
+        await _wipe(monitor_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_monitor_projects_durable_entry_order_and_settlement(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Con los dos eventos en el spine, ``ORDER`` y ``SETTLEMENT`` alcanzan (ya no ``unknown``)."""
+    from bolsa_application.auto_operational_audit import (
+        build_cycle_settlement_entry,
+        build_entry_order_entry,
+    )
+    from bolsa_application.auto_operational_monitor import read_operational_monitor
+    from bolsa_application.reservation_store import PostgresReservationStore
+    from bolsa_infrastructure.database.repositories.journal_repository import (
+        SqlAlchemyJournalRepository,
+    )
+
+    account_id = f"acc-monitor-{uuid.uuid4().hex[:10]}"
+    suffix = uuid.uuid4().hex[:10]
+    cycle_id = f"cyc-{suffix}"
+    instrument = "GGG"
+    await _wipe(monitor_pg_factory, account_id)
+    try:
+        async with monitor_pg_factory() as session:
+            reservations = PostgresReservationStore(session, autocommit=True)
+            assert await reservations.save_claim(
+                _reservation(
+                    reservation_id=f"RES-dec-{suffix}",
+                    cycle_id=cycle_id,
+                    account_id=account_id,
+                    instrument=instrument,
+                )
+            )
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument=instrument,
+                side="buy",
+                price=100.0,
+                reference_mid=99.9,
+                execution_id=f"EX-{suffix}-buy",
+                price_source="MARKET_CLOSE",
+            )
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument=instrument,
+                side="sell",
+                price=110.0,
+                reference_mid=110.1,
+                execution_id=f"EX-{suffix}-sell",
+                price_source="MARKET_CLOSE",
+            )
+            await _seed_journal(
+                session, account_id=account_id, cycle_id=cycle_id, instrument=instrument
+            )
+            repository = SqlAlchemyJournalRepository(session)
+            entry_order = build_entry_order_entry(
+                order_id="ORD-1",
+                instrument_id=instrument,
+                side="buy",
+                requested_qty=10,
+                applied_qty=10,
+                partial=False,
+                price_source="MARKET_CLOSE",
+                cycle_id=cycle_id,
+                actor="auto-sim",
+                as_of="2026-10-01T15:00:00Z",
+                account_id=account_id,
+            )
+            settlement = build_cycle_settlement_entry(
+                settlement_id="SET-1",
+                instrument_id=instrument,
+                side="sell",
+                closed_qty=10,
+                pnl=100.0,
+                settled_at="2026-10-01T16:00:00Z",
+                exit_reason="time_exit",
+                price_source="MARKET_CLOSE",
+                cycle_id=cycle_id,
+                actor="auto-sim",
+                as_of="2026-10-01T16:00:00Z",
+                account_id=account_id,
+            )
+            assert entry_order is not None and settlement is not None
+            await repository.append(entry_order)
+            await repository.append(settlement)
+            await session.commit()
+
+        async with monitor_pg_factory() as session:
+            dto = await read_operational_monitor(
+                session, account_id, engine_id=_ENGINE_ID, cycle_id=cycle_id, grace_seconds=61.0
+            )
+        steps = {step["id"]: step for step in dto["cycles"][0]["steps"]}
+        assert steps["ORDER"]["state"] == "reached"
+        assert steps["ORDER"]["note"] is None
+        assert _fact_value(steps["ORDER"], "entryOrder")["value"]["orderId"] == "ORD-1"
+        assert steps["SETTLEMENT"]["state"] == "reached"
+        assert _fact_value(steps["SETTLEMENT"], "settlementId")["value"] == "SET-1"
+        pnl = _fact_value(steps["SETTLEMENT"], "pnl")
+        assert pnl["value"] == 100.0
+        assert pnl["measurement"] == "COMPLETE"
+    finally:
+        await _wipe(monitor_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_migration_047_price_source_upgrade_downgrade_is_idempotent(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """La 047 es simétrica e idempotente: ``upgrade``/``downgrade`` pueden repetirse.
+
+    Se ejercita dentro de una transacción que se REVIERTE al final: no altera el esquema
+    compartido (PostgreSQL soporta DDL transaccional).
+    """
+    import importlib.util
+
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    path = _migration_047_path()
+    spec = importlib.util.spec_from_file_location("mig047_price_source", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.revision == "047_fill_price_source"
+    assert module.down_revision == "046_fill_reference_mid"
+
+    table = "sim_fill_finance_context"
+    column = "price_source"
+
+    async with monitor_pg_factory() as session:
+        conn = await session.connection()
+
+        def _exercise(sync_conn: Any) -> None:
+            module.op = Operations(MigrationContext.configure(sync_conn))
+            # La columna ya existe (``ensure_migrated``): upgrade idempotente (no-op).
+            module.upgrade()
+            assert module._column_exists(sync_conn, table, column)
+            module.downgrade()
+            assert not module._column_exists(sync_conn, table, column)
+            module.downgrade()  # segundo downgrade: no-op
+            module.upgrade()
+            assert module._column_exists(sync_conn, table, column)
+
+        await conn.run_sync(_exercise)
+        # Se revierte todo: el esquema de la base compartida queda intacto.
+        await session.rollback()
 

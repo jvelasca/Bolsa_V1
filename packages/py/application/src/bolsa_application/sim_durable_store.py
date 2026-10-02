@@ -31,6 +31,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Protocol
 
+from bolsa_application.price_source_kind import usable_price_source
+
 __all__ = [
     "InMemorySimAutoPositionStore",
     "InMemorySimConsumedSignalStore",
@@ -104,6 +106,11 @@ class SimFillFinanceContext:
     # (migración 046). ``None`` = no se midió (fila anterior a 2.57, o un mid inválido):
     # la fricción aplicada NO se puede afirmar. Nunca un ``0``: diría "fricción gratis".
     reference_mid: Decimal | None = None
+    # AUTO v2.88.25 — la FUENTE de precio realmente usada para construir ``price`` (migración
+    # 047). ``None`` = no medido (fila anterior al sello, o un valor fuera del vocabulario):
+    # "fuente desconocida", nunca un literal inventado. Es lo que permite dejar de leer
+    # ``realPriceEnabled`` (configuración) como si fuera el precio de ESTA operación.
+    price_source: str | None = None
     account_id: str | None = None
     venue: str = "simulated"
     idempotency_key: str | None = None
@@ -135,6 +142,9 @@ class SimFillFinanceContext:
         # fill pasa a ser un hueco, que es exactamente lo que se sabe de él. Y se normaliza
         # a ``Decimal`` para que el mismo hecho no viaje con dos tipos distintos.
         object.__setattr__(self, "reference_mid", usable_reference_mid(self.reference_mid))
+        # AUTO v2.88.25: una fuente fuera del vocabulario se declara ``None`` (no medido),
+        # nunca un literal inventado ni una cadena libre.
+        object.__setattr__(self, "price_source", usable_price_source(self.price_source))
 
 
 @dataclass(frozen=True, slots=True)
@@ -495,6 +505,7 @@ class PostgresSimFillFinanceContextStore:
                 quantity=context.quantity,
                 price=context.price,
                 reference_mid=context.reference_mid,
+                price_source=context.price_source,
                 account_id=context.account_id,
                 venue=context.venue,
                 strategy_version_id=context.strategy_version_id,
@@ -530,6 +541,7 @@ class PostgresSimFillFinanceContextStore:
             quantity=row.quantity,
             price=row.price,
             reference_mid=getattr(row, "reference_mid", None),
+            price_source=getattr(row, "price_source", None),
             account_id=row.account_id,
             venue=row.venue,
             idempotency_key=row.idempotency_key,
@@ -570,6 +582,7 @@ class PostgresSimFillFinanceContextStore:
                 quantity=row.quantity,
                 price=row.price,
                 reference_mid=getattr(row, "reference_mid", None),
+                price_source=getattr(row, "price_source", None),
                 account_id=row.account_id,
                 venue=row.venue,
                 idempotency_key=row.idempotency_key,
@@ -618,6 +631,7 @@ class PostgresSimFillFinanceContextStore:
                 quantity=row.quantity,
                 price=row.price,
                 reference_mid=getattr(row, "reference_mid", None),
+                price_source=getattr(row, "price_source", None),
                 account_id=row.account_id,
                 venue=row.venue,
                 idempotency_key=row.idempotency_key,
@@ -696,6 +710,7 @@ class PostgresSimFillFinanceContextStore:
                 quantity=row.quantity,
                 price=row.price,
                 reference_mid=getattr(row, "reference_mid", None),
+                price_source=getattr(row, "price_source", None),
                 account_id=row.account_id,
                 venue=row.venue,
                 idempotency_key=row.idempotency_key,

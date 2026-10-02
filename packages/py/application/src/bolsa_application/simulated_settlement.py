@@ -184,6 +184,7 @@ async def apply_simulated_order_once(
     strategy_version_id: str | None = None,
     cycle_id: str | None = None,
     reference_mid: Any = None,
+    price_source: str | None = None,
 ) -> dict[str, str]:
     """Liquida un order simulado (buy o sell) en trazas idempotentes una sola vez.
 
@@ -223,6 +224,8 @@ async def apply_simulated_order_once(
             # fricción aplicada del fill no se puede recomponer NUNCA (el precio ya la lleva
             # dentro), y es la pata que un reinicio perdería.
             reference_mid=reference_mid,
+            # v2.88.25: la FUENTE que construyó ese precio, sellada por fill (migración 047).
+            price_source=price_source,
         )
     outcomes: dict[str, str] = {}
     for ev in events:
@@ -257,6 +260,7 @@ async def submit_simulated_order(
     owner: str = "auto-sim",
     strategy_version_id: str | None = None,
     cycle_id: str | None = None,
+    price_source: str | None = None,
 ) -> tuple[SimulatedOrderResult, dict[str, str]]:
     """Submit determinista simulado (buy/sell) + liquidación idempotente.
 
@@ -329,5 +333,8 @@ async def submit_simulated_order(
         # del fill (columna ``reference_mid``, migración 046). Es lo que permite medir la
         # fricción APLICADA después, incluso en otro proceso.
         reference_mid=base_mid,
+        # v2.88.25: la FUENTE que construyó el precio (``MARKET_CLOSE``/``SYNTHETIC``/...),
+        # sellada por fill (migración 047).
+        price_source=price_source,
     )
     return result, outcomes

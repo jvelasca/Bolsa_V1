@@ -15,11 +15,15 @@ from bolsa_application.auto_operational_audit import (
     REASON_SESSION_OWNED,
     RECONCILIATION_KEEP,
     RECONCILIATION_RELEASE,
+    build_cycle_settlement_entry,
+    build_entry_order_entry,
     build_reservation_claim_entry,
     build_reservation_reconciliation_entry,
     operational_audit_enabled,
 )
 from bolsa_application.auto_operational_monitor import (
+    AUTO_CYCLE_SETTLEMENT_EVENT,
+    AUTO_ENTRY_ORDER_EVENT,
     AUTO_RESERVATION_CLAIM_EVENT,
     AUTO_RESERVATION_RECONCILIATION_EVENT,
 )
@@ -215,3 +219,143 @@ def test_owned_keep_declares_session_owned_reason() -> None:
     assert payload["agedMeasurement"] == "UNKNOWN"
     assert payload["graceWindowSeconds"] is None
     assert payload["graceWindowMeasurement"] == "UNKNOWN"
+
+
+# ── v2.88.25 — ENTRY_ORDER y SETTLEMENT durables ──
+
+
+def test_entry_order_entry_seals_requested_vs_applied_and_source() -> None:
+    entry = build_entry_order_entry(
+        order_id="ORD-1",
+        instrument_id="AAPL",
+        side="BUY",
+        requested_qty=100,
+        applied_qty=73.5,
+        partial=True,
+        price_source="MARKET_CLOSE",
+        cycle_id="cyc-abc",
+        actor="auto-sim",
+        as_of="2026-01-02T00:00:00Z",
+        account_id="acc-1",
+    )
+    assert entry is not None
+    assert entry.event_type == AUTO_ENTRY_ORDER_EVENT
+    assert entry.decision_id == "dec-abc"  # derivado del ciclo, igual que el resto de la cadena
+    assert entry.account_id == "acc-1"
+    payload = entry.payload or {}
+    assert payload["event"] == AUTO_ENTRY_ORDER_EVENT
+    assert payload["orderId"] == "ORD-1"
+    assert payload["side"] == "buy"
+    # Pedido vs materializado viajan SEPARADOS: un fill parcial no se disfraza de completo.
+    assert payload["requestedQty"] == 100.0
+    assert payload["appliedQty"] == 73.5
+    assert payload["partial"] is True
+    assert payload["priceSource"] == "MARKET_CLOSE"
+    assert payload["cycleId"] == "cyc-abc"
+    assert payload["cycleIdDerived"] is True
+
+
+def test_entry_order_entry_without_order_is_a_declared_noop() -> None:
+    assert (
+        build_entry_order_entry(
+            order_id=None,
+            instrument_id="AAPL",
+            side="buy",
+            requested_qty=100,
+            applied_qty=100,
+            partial=False,
+            price_source="SYNTHETIC",
+            cycle_id="cyc-1",
+            actor="auto-sim",
+            as_of="2026-01-02T00:00:00Z",
+        )
+        is None
+    )
+
+
+def test_entry_order_entry_declares_unknown_source_as_none() -> None:
+    """Una fuente ajena al vocabulario NO se convierte en literal: se declara ``None``."""
+    entry = build_entry_order_entry(
+        order_id="ORD-1",
+        instrument_id="AAPL",
+        side="buy",
+        requested_qty=100,
+        applied_qty=100,
+        partial=False,
+        price_source="TOTALLY_MADE_UP",
+        cycle_id="cyc-1",
+        actor="auto-sim",
+        as_of="2026-01-02T00:00:00Z",
+    )
+    assert entry is not None
+    assert (entry.payload or {})["priceSource"] is None
+
+
+def test_cycle_settlement_entry_carries_pnl_and_measurement() -> None:
+    entry = build_cycle_settlement_entry(
+        settlement_id="SET-1",
+        instrument_id="AAPL",
+        side="SELL",
+        closed_qty=10,
+        pnl=123.45,
+        settled_at="2026-01-02T03:00:00Z",
+        exit_reason="time_exit",
+        price_source="MARKET_CLOSE",
+        cycle_id="cyc-abc",
+        actor="auto-sim",
+        as_of="2026-01-02T03:00:00Z",
+        account_id="acc-1",
+    )
+    assert entry is not None
+    assert entry.event_type == AUTO_CYCLE_SETTLEMENT_EVENT
+    assert entry.decision_id == "dec-abc"
+    payload = entry.payload or {}
+    assert payload["settlementId"] == "SET-1"
+    assert payload["closedQty"] == 10.0
+    assert payload["pnl"] == 123.45
+    assert payload["pnlMeasurement"] == "COMPLETE"
+    assert payload["exitReason"] == "time_exit"
+    assert payload["settledAt"] == "2026-01-02T03:00:00Z"
+    assert payload["cycleId"] == "cyc-abc"
+
+
+def test_cycle_settlement_entry_partial_pnl_keeps_no_figure() -> None:
+    """Con evidencia truncada el PnL es ``None`` + ``PARTIAL``: nunca una cifra sobre un recorte."""
+    entry = build_cycle_settlement_entry(
+        settlement_id="SET-2",
+        instrument_id="AAPL",
+        side="sell",
+        closed_qty=10,
+        pnl=None,
+        pnl_measurement="PARTIAL",
+        settled_at="2026-01-02T03:00:00Z",
+        exit_reason=None,
+        price_source=None,
+        cycle_id="cyc-1",
+        actor="auto-sim",
+        as_of="2026-01-02T03:00:00Z",
+    )
+    assert entry is not None
+    payload = entry.payload or {}
+    assert payload["pnl"] is None
+    assert payload["pnlMeasurement"] == "PARTIAL"
+    assert payload["priceSource"] is None
+
+
+def test_cycle_settlement_entry_without_cycle_is_a_declared_noop() -> None:
+    assert (
+        build_cycle_settlement_entry(
+            settlement_id="SET-1",
+            instrument_id="AAPL",
+            side="sell",
+            closed_qty=10,
+            pnl=1.0,
+            settled_at="2026-01-02T03:00:00Z",
+            exit_reason=None,
+            price_source=None,
+            cycle_id=None,
+            actor="auto-sim",
+            as_of="2026-01-02T03:00:00Z",
+        )
+        is None
+    )

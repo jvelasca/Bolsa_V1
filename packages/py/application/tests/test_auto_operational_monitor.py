@@ -11,7 +11,9 @@ from types import SimpleNamespace
 from typing import Any
 
 from bolsa_application.auto_operational_monitor import (
+    AUTO_CYCLE_SETTLEMENT_EVENT,
     AUTO_ENTRY_DECISION_EVENT,
+    AUTO_ENTRY_ORDER_EVENT,
     OPERATIONAL_STEPS,
     STEP_ABSENT,
     STEP_REACHED,
@@ -27,6 +29,7 @@ def _fill(
     price: float,
     cycle_id: str = "cyc-1",
     reference_mid: float | None = None,
+    price_source: str | None = None,
 ) -> Any:
     return SimpleNamespace(
         side=side,
@@ -34,6 +37,8 @@ def _fill(
         price=price,
         cycle_id=cycle_id,
         reference_mid=reference_mid,
+        # v2.88.25 — la FUENTE de precio realmente usada (migración 047).
+        price_source=price_source,
         created_at="2026-01-02T00:00:00Z",
         strategy_version_id="sv-1",
     )
@@ -811,4 +816,166 @@ def test_concurrency_aggregate_zero_is_measured_not_unknown() -> None:
     ):
         assert concurrency[key] == 0
         assert concurrency[f"{key}Measurement"] == "COMPLETE"
+
+
+# ── v2.88.25 — hechos durables: ENTRY_ORDER, SETTLEMENT y price_source por fill ──
+
+
+def _entry_order_entry(**overrides: Any) -> Any:
+    payload: dict[str, Any] = {
+        "cycleId": "cyc-1",
+        "orderId": "ORD-1",
+        "instrumentId": "AAPL",
+        "side": "buy",
+        "requestedQty": 100.0,
+        "appliedQty": 73.5,
+        "partial": True,
+        "priceSource": "MARKET_CLOSE",
+    }
+    payload.update(overrides)
+    return SimpleNamespace(
+        decision_id="dec-cyc-1",
+        event_type=AUTO_ENTRY_ORDER_EVENT,
+        created_at="2026-01-02T00:00:00Z",
+        account_id="acc-1",
+        payload=payload,
+    )
+
+
+def _settlement_event(**overrides: Any) -> Any:
+    payload: dict[str, Any] = {
+        "cycleId": "cyc-1",
+        "settlementId": "SET-1",
+        "closedQty": 10.0,
+        "pnl": 100.0,
+        "pnlMeasurement": "COMPLETE",
+        "settledAt": "2026-01-02T03:00:00Z",
+        "priceSource": "MARKET_CLOSE",
+    }
+    payload.update(overrides)
+    return SimpleNamespace(
+        decision_id="dec-cyc-1",
+        event_type=AUTO_CYCLE_SETTLEMENT_EVENT,
+        created_at="2026-01-02T03:00:00Z",
+        account_id="acc-1",
+        payload=payload,
+    )
+
+
+def test_order_step_reached_from_durable_entry_order_event() -> None:
+    """La ORDEN DE ENTRADA durable enciende ``ORDER`` y expone pedido vs materializado."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        journal=[_entry_order_entry()],
+    )
+    step = _step(dto["cycles"][0]["steps"], "ORDER")
+    assert step["state"] == STEP_REACHED
+    # Con hecho de entrada el hueco ya no se declara.
+    assert step["note"] is None
+    entry = _fact(step, "entryOrder")["value"]
+    assert entry["orderId"] == "ORD-1"
+    assert entry["requestedQty"] == 100.0
+    assert entry["appliedQty"] == 73.5
+    assert entry["partial"] is True
+    assert entry["priceSource"] == "MARKET_CLOSE"
+
+
+def test_order_step_declares_gap_when_only_exit_orders_are_durable() -> None:
+    """Salida durable SIN hecho de entrada: el hueco se declara (no se esconde)."""
+    order = SimpleNamespace(
+        exit_order_id="EX-1",
+        cycle_id="cyc-1",
+        state="FILLED",
+        requested_qty=10.0,
+        filled_qty=10.0,
+        remaining_qty=0.0,
+        created_at="2026-01-02T01:00:00Z",
+    )
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        exit_orders=[order],
+    )
+    step = _step(dto["cycles"][0]["steps"], "ORDER")
+    assert step["state"] == STEP_REACHED
+    assert step["note"] == "entry_order_not_durable"
+    assert _fact(step, "exitOrder")["value"]["exitOrderId"] == "EX-1"
+
+
+def test_settlement_step_reached_from_durable_settlement_event() -> None:
+    """Sólo el evento durable de liquidación enciende ``SETTLEMENT`` (no el ciclo cerrado)."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100, price_source="MARKET_CLOSE"),
+            _fill(side="sell", qty=10, price=110, price_source="MARKET_CLOSE"),
+        ],
+        settlements=[dict(_settlement_event().payload)],
+    )
+    cycle = dto["cycles"][0]
+    assert cycle["closed"] is True
+    step = _step(cycle["steps"], "SETTLEMENT")
+    assert step["state"] == STEP_REACHED
+    assert _fact(step, "settlementId")["value"] == "SET-1"
+    pnl = _fact(step, "pnl")
+    assert pnl["value"] == 100.0
+    assert pnl["measurement"] == "COMPLETE"
+
+
+def test_settlement_partial_pnl_is_not_published_as_affirmed() -> None:
+    """Un PnL marcado ``PARTIAL`` (evidencia truncada) viaja sin cifra y con su medición."""
+    payload = dict(_settlement_event(pnl=None, pnlMeasurement="PARTIAL").payload)
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        settlements=[payload],
+    )
+    step = _step(dto["cycles"][0]["steps"], "SETTLEMENT")
+    assert step["state"] == STEP_REACHED
+    pnl = _fact(step, "pnl")
+    assert pnl["value"] is None
+    assert pnl["measurement"] == "PARTIAL"
+
+
+def test_fill_price_sources_measured_complete_when_every_fill_declares() -> None:
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100, price_source="MARKET_CLOSE"),
+            _fill(side="sell", qty=10, price=110, price_source="MARKET_CLOSE"),
+        ],
+    )
+    fact = _fact(_step(dto["cycles"][0]["steps"], "FILL"), "priceSources")
+    assert fact["value"] == {"MARKET_CLOSE": 2}
+    assert fact["measurement"] == "COMPLETE"
+
+
+def test_fill_price_sources_partial_when_some_fills_lack_the_source() -> None:
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100, price_source="SYNTHETIC"),
+            _fill(side="sell", qty=10, price=110),
+        ],
+    )
+    fact = _fact(_step(dto["cycles"][0]["steps"], "FILL"), "priceSources")
+    assert fact["value"] == {"SYNTHETIC": 1}
+    assert fact["measurement"] == "PARTIAL"
+
+
+def test_fill_price_sources_unknown_when_no_fill_declares_the_source() -> None:
+    """Ninguna fuente declarada ⇒ ``None`` + ``UNKNOWN`` (nunca un ``{}`` que afirme "ninguna")."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[_fill(side="buy", qty=10, price=100)],
+    )
+    fact = _fact(_step(dto["cycles"][0]["steps"], "FILL"), "priceSources")
+    assert fact["value"] is None
+    assert fact["measurement"] == "UNKNOWN"
+
 

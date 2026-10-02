@@ -74,6 +74,7 @@ from bolsa_analytics.cognitive.exit_policy import (
 from bolsa_analytics.cognitive.hard_kill_switch import HardKillSwitch
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
+    MEASUREMENT_PARTIAL,
     MEASUREMENT_UNKNOWN,
     MeasurementStatus,
     combine_measurements,
@@ -120,7 +121,11 @@ from bolsa_analytics.cognitive.position_state import (
 )
 from bolsa_analytics.cognitive.signal_identity import bar_window
 from bolsa_analytics.cognitive.trade_context import TradeContext
-from bolsa_api.background.auto_price_provider import OhlcvPriceSource, PriceSource
+from bolsa_api.background.auto_price_provider import (
+    OhlcvPriceSource,
+    PriceSource,
+    price_source_kind,
+)
 from bolsa_api.background.paper_auto_engine_worker import (
     DecisionProvider,
     _effective_venue,
@@ -157,6 +162,8 @@ from bolsa_application.auto_operational_audit import (
     REASON_SESSION_OWNED,
     RECONCILIATION_KEEP,
     RECONCILIATION_RELEASE,
+    build_cycle_settlement_entry,
+    build_entry_order_entry,
     build_reservation_claim_entry,
     build_reservation_reconciliation_entry,
     operational_audit_enabled,
@@ -186,6 +193,7 @@ from bolsa_application.auto_self_evaluation_feed import (
     build_adaptive_confidence_from_fills,
     build_adaptive_uncertainty_from_fills,
     build_auto_self_evaluation,
+    cycles_from_fills,
     recovery_evidence_from_fills,
 )
 from bolsa_application.auto_v2_entry import (
@@ -233,6 +241,10 @@ from bolsa_application.position_manager import (
     RISK_EXIT,
     PositionManagerResult,
     PositionManagerSkip,
+)
+from bolsa_application.price_source_kind import (
+    PRICE_SOURCE_SCRIPT,
+    PRICE_SOURCE_SYNTHETIC,
 )
 from bolsa_application.protection_compat import (
     ProtectionPolicy,
@@ -296,6 +308,11 @@ _APPLIED_OUTCOMES: frozenset[str] = frozenset({"applied", "already_applied"})
 JOURNAL_FILL_UNAPPLIED = "fill_unapplied"
 
 _QTY_EPS = Decimal("0.000001")
+
+# v2.88.25 — ventana de lectura de fills del ciclo para sellar el PnL del settlement durable.
+# Con la ventana LLENA (``len == limit``) la evidencia pudo truncarse y el PnL se declara
+# ``PARTIAL``/``None``: la misma disciplina fail-closed que ``CYCLE_CLOSED``.
+_SETTLEMENT_FILL_WINDOW = 500
 
 
 def sim_worker_enabled() -> bool:
@@ -1497,6 +1514,22 @@ class AutoSimulationWorker:
         """W4: nº de lecturas con precio AUSENTE por símbolo (observabilidad del fail-closed)."""
         return dict(self._v2_price_missing)
 
+    def _v2_price_source_kind(self) -> str | None:
+        """v2.88.25 — la FUENTE canónica que construye el precio del tick, o ``None``.
+
+        Con ``PriceSource`` inyectada se lee su ``kind`` (``MARKET_CLOSE`` para el OHLCV real,
+        ``SYNTHETIC`` para un script constante...). Sin ella se lee ``price_script`` en vivo: si
+        es el ``flat_price_script`` hermético el precio es FABRICADO (``SYNTHETIC``); un script
+        distinto (replay/tests) se declara ``SCRIPT``. Nunca un literal inventado."""
+        source = self._price_source
+        if source is None:
+            return (
+                PRICE_SOURCE_SYNTHETIC
+                if self._price_script is flat_price_script
+                else PRICE_SOURCE_SCRIPT
+            )
+        return price_source_kind(source)
+
     # ---- settlement vía dominio (M1/M2). Fail-closed sin exec_store. ----------
     async def _settle(
         self,
@@ -1567,6 +1600,10 @@ class AutoSimulationWorker:
                 # V2.47: el fill hereda el ciclo financiero para que el trazado inverso
                 # posición→fill→reserva→decisión sea posible.
                 cycle_id=cycle_id,
+                # v2.88.25: la FUENTE real que construyó este precio viaja al contexto durable
+                # del fill (migración 047). Ya NO hay que leer ``realPriceEnabled``
+                # (configuración) como si fuera el precio de ESTA operación.
+                price_source=self._v2_price_source_kind(),
             )
         except Exception:  # noqa: BLE001 — un fallo de settlement no tumba el motor.
             # Fail-closed: un problema al persistir contexto/aplicar dinero NO debe
@@ -2779,13 +2816,130 @@ class AutoSimulationWorker:
         for entry in entries:
             if entry is None:
                 continue
-            if not getattr(entry, "account_id", None):
-                entry = replace(entry, account_id=self._account_id)
-            payload = dict(entry.payload or {})
-            if not str(payload.get("engineId") or "").strip() and self._engine_id:
-                payload["engineId"] = self._engine_id
-                entry = replace(entry, payload=payload)
-            await self._v2_audit_emit(entry, label="entry_decision")
+            await self._v2_audit_emit(self._v2_seal_audit_identity(entry), label="entry_decision")
+
+    def _v2_seal_audit_identity(self, entry: Any) -> Any:
+        """(``M2``) sella ``account_id`` (si falta) y ``payload.engineId`` (si falta).
+
+        Es **trazado**, no decisión: la identidad del hecho la trae el productor y sólo se
+        completa lo que falta, sin reescribir nada. ``account_id`` es lo que permite leer por el
+        índice ``(account_id, ...)``; ``payload.engineId`` acota la lectura por motor (A4) para
+        no mezclar dos motores de la misma cuenta. Con el flag OFF este tramo no corre.
+        """
+        if entry is None:
+            return None
+        if not getattr(entry, "account_id", None):
+            entry = replace(entry, account_id=self._account_id)
+        payload = dict(entry.payload or {})
+        if not str(payload.get("engineId") or "").strip() and self._engine_id:
+            payload["engineId"] = self._engine_id
+            entry = replace(entry, payload=payload)
+        return entry
+
+    async def _v2_journal_entry_order(
+        self,
+        *,
+        order_id: str | None,
+        instrument_id: str,
+        requested_qty: Any,
+        applied_qty: Any,
+        partial: bool,
+        cycle_id: str | None,
+    ) -> None:
+        """(``M2``) sella la ORDEN DE ENTRADA emitida y materializada (v2.88.25).
+
+        Cierra ``entry_order_not_durable`` del paso ``ORDER``: hasta hoy sólo las órdenes de
+        SALIDA eran durables. Best-effort y aditivo: sin sink es un no-op (Δ = 0). La cantidad
+        PEDIDA y la MATERIALIZADA viajan separadas (un fill parcial no se disfraza de completo).
+        """
+        if self._operational_audit_sink is None:
+            return
+        entry = build_entry_order_entry(
+            order_id=order_id,
+            instrument_id=instrument_id,
+            side="buy",
+            requested_qty=requested_qty,
+            applied_qty=applied_qty,
+            partial=partial,
+            price_source=self._v2_price_source_kind(),
+            cycle_id=cycle_id,
+            actor=self._engine_id,
+            as_of=self._v2_instant(),
+            account_id=self._account_id,
+        )
+        await self._v2_audit_emit(
+            self._v2_seal_audit_identity(entry), label="entry_order"
+        )
+
+    async def _v2_journal_cycle_settlement(
+        self,
+        *,
+        instrument_id: str,
+        closed_qty: Any,
+        cycle_id: str | None,
+        exit_reason: str | None,
+    ) -> None:
+        """(``M2``) sella el HECHO durable de liquidación de un ciclo cerrado (v2.88.25).
+
+        Cierra ``settlement_not_durable`` del paso ``SETTLEMENT``. El PnL se lee del MISMO
+        material durable que ``CYCLE_CLOSED`` (``cycles_from_fills`` sobre los fills del ciclo),
+        nunca con un segundo FIFO que pueda divergir. Con la evidencia incompleta el PnL viaja
+        ``None`` + ``PARTIAL``: jamás una cifra sobre un subconjunto. Sin sink es un no-op.
+        """
+        if self._operational_audit_sink is None:
+            return
+        pnl, pnl_measurement = await self._v2_cycle_pnl(cycle_id)
+        entry = build_cycle_settlement_entry(
+            settlement_id=(
+                f"settle-{cycle_id}" if cycle_id else None
+            ),
+            instrument_id=instrument_id,
+            side="sell",
+            closed_qty=closed_qty,
+            pnl=pnl,
+            pnl_measurement=pnl_measurement,
+            settled_at=self._v2_instant(),
+            exit_reason=exit_reason,
+            price_source=self._v2_price_source_kind(),
+            cycle_id=cycle_id,
+            actor=self._engine_id,
+            as_of=self._v2_instant(),
+            account_id=self._account_id,
+        )
+        await self._v2_audit_emit(
+            self._v2_seal_audit_identity(entry), label="cycle_settlement"
+        )
+
+    async def _v2_cycle_pnl(
+        self, cycle_id: str | None
+    ) -> tuple[float | None, MeasurementStatus]:
+        """PnL del ciclo desde el material durable (``cycles_from_fills``), o un hueco declarado.
+
+        Sin ``cycle_id``/store se declara ``UNKNOWN``. Con la ventana de fills truncada
+        (``len == limit``, pudo perderse una pata) el PnL se declara ``PARTIAL`` y ``None``: la
+        misma disciplina fail-closed que ``CYCLE_CLOSED``, aplicada al settlement.
+        """
+        if not cycle_id or self._context_store is None:
+            return None, MEASUREMENT_UNKNOWN
+        try:
+            fills = await self._context_store.list_by_cycle_ids(
+                self._account_id, [cycle_id], limit=_SETTLEMENT_FILL_WINDOW
+            )
+        except Exception:  # noqa: BLE001 — un fallo de lectura ES "no medido".
+            logger.exception("auto_sim settlement pnl read failed cycle=%s", cycle_id)
+            return None, MEASUREMENT_UNKNOWN
+        if len(fills) >= _SETTLEMENT_FILL_WINDOW:
+            return None, MEASUREMENT_PARTIAL
+        for row in cycles_from_fills(fills):
+            if str(row.get("cycleId") or "").strip() == cycle_id:
+                pnl = row.get("pnl")
+                # ``cycles_from_fills`` publica el PnL como ``Decimal`` (es dinero): aceptar
+                # sólo ``int``/``float`` lo declaraba no medido, un hueco falso.
+                if isinstance(pnl, (int, float, Decimal)) and not isinstance(pnl, bool):
+                    return float(pnl), MEASUREMENT_COMPLETE
+                return None, MEASUREMENT_UNKNOWN
+        # El ciclo todavía no está cerrado según el FIFO de fills: no se afirma un PnL.
+        return None, MEASUREMENT_PARTIAL
 
     async def _v2_save_exit_order(self, order: ExitOrder) -> bool:
         """Persiste un INTENT de salida; ``False`` si el store falta o no fue durable."""
@@ -5336,6 +5490,9 @@ class AutoSimulationWorker:
                     continue
             else:
                 exit_order_id = None
+            # v2.88.25: el ciclo se captura UNA vez y lo comparten el settlement y los hechos
+            # durables (orden de entrada / liquidación) para que todos apunten al mismo ciclo.
+            cycle_id = self._v2_cycle_for(symbol)
             settlement = await self._settle(
                 action.lower(),
                 symbol,
@@ -5346,7 +5503,7 @@ class AutoSimulationWorker:
                 # de proceso que un reinicio reinicia).
                 exit_order_id=exit_order_id,
                 # V2.47: el fill (entrada o salida) queda atado a su ciclo financiero.
-                cycle_id=self._v2_cycle_for(symbol),
+                cycle_id=cycle_id,
             )
             # AUTO-1A (P0) — SOLO lo materializado es posición/riesgo/protección. La
             # cantidad PEDIDA (`exec_qty`) se sigue liquidando y se journaliza como
@@ -5369,7 +5526,26 @@ class AutoSimulationWorker:
             applied_qty = settlement.applied_qty
             if settlement.is_partial:
                 reasons.append(FILL_PARTIALLY_MATERIALIZED)
+            # v2.88.25 — si esta venta CIERRA el ciclo (``new_held <= 0``) se sella el hecho
+            # durable de liquidación DESPUÉS de persistir la posición. Se declara aquí porque
+            # el instante del cierre solo se conoce en la rama SELL.
+            closed_cycle_id: str | None = None
+            close_reason: str | None = None
             self._emit("order", venue, None, action.lower(), exec_qty)
+            # v2.88.25 — la ORDEN DE ENTRADA deja de vivir sólo en el journal RAM: con el
+            # sumidero M2 (flag ``AUTO_OPERATIONAL_AUDIT``) se sella como hecho durable por
+            # ciclo, con la cantidad PEDIDA vs MATERIALIZADA y la FUENTE de precio real. Sin
+            # sink es un no-op (Δ = 0). Sólo ENTRADA: la salida ya es durable en
+            # ``auto_exit_orders``.
+            if action == "BUY":
+                await self._v2_journal_entry_order(
+                    order_id=settlement.applied[0].order_id,
+                    instrument_id=symbol,
+                    requested_qty=exec_qty,
+                    applied_qty=applied_qty,
+                    partial=settlement.is_partial,
+                    cycle_id=cycle_id,
+                )
             for o in settlement.applied:
                 self._emit("fill", o.venue, o.execution_id, o.side, o.qty)
                 self._record_applied_event(symbol, o, price)
@@ -5455,6 +5631,12 @@ class AutoSimulationWorker:
                     # T1 parcial ejecutado: marca para no repetirlo.
                     self._t1_done.add(symbol)
                 if new_held <= 0:
+                    close_reason = (
+                        self._v2_last_exit_label.get(symbol, "")
+                        if self._v2_enabled
+                        else (prot or "")
+                    )
+                    closed_cycle_id = cycle_id
                     self._emit(
                         "position_close",
                         venue,
@@ -5467,11 +5649,7 @@ class AutoSimulationWorker:
                         # motivo de protección (``protective_stop``/``t1_exit``/...).
                         # Un cierre del decider sin motivo de protección queda sin
                         # declarar y el día lo cuenta como ``undeclared``.
-                        reason=(
-                            self._v2_last_exit_label.get(symbol, "")
-                            if self._v2_enabled
-                            else (prot or "")
-                        ),
+                        reason=close_reason,
                         # V2.45/AUTO-5 — el CIERRE hereda la versión que abrió la posición
                         # (para no dejar la serie con compras sin ventas).
                         strategy_version=effective_version,
@@ -5487,6 +5665,16 @@ class AutoSimulationWorker:
                     self._position_version.pop(symbol, None)
                 self._open[symbol] = new_held
                 await self._persist_position(symbol, new_held)
+                # v2.88.25 — CIERRE del ciclo: el hecho durable de liquidación se sella DESPUÉS
+                # de persistir la posición. Es lo único que enciende ``SETTLEMENT`` (un
+                # ``CYCLE_CLOSED`` reconstruido de fills NO es una liquidación). Sin sink, no-op.
+                if closed_cycle_id is not None:
+                    await self._v2_journal_cycle_settlement(
+                        instrument_id=symbol,
+                        closed_qty=applied_qty,
+                        cycle_id=closed_cycle_id,
+                        exit_reason=close_reason,
+                    )
             report.orders += 1
             report.fills += len(settlement.applied)
         self._v2_bar_note_settlement()
