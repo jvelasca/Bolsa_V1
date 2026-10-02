@@ -28,11 +28,11 @@ configuración **sin cambios** de motor:
 Los comandos de §3/§3.1 se ejecutan con esas variables en el entorno del proceso. **Ningún** cambio
 de motor, `TOP_N`, gobernador, umbrales ni pesos A/B.
 
-> **Bloqueante declarado (2026-10-02, ver arranque §0.1).** El `watch`, la versión B, la promoción y
-> los `EdgeReport` **verifican**; pero la **fila de cuenta** `1484e253d2d54645945a6b1d7` **no existe**
-> en la BD alcanzable (sólo `default-account-seed`) ⇒ la ventana queda **BLOQUEADA** hasta re-sembrar
-> la misma cuenta (o re-anclar declarándolo). Además, hoy el preflight da `BEAR_TREND` (LONG vetadas):
-> día **no computable** aunque la cuenta existiera.
+> **Estado del bloqueante (2026-10-02, ver arranque §0.1/§0.2).** El `watch` (20), la versión B, la
+> promoción y los `EdgeReport` **verifican**, y la **fila de cuenta** `1484e253d2d54645945a6b1d7`
+> fue **re-sembrada** con el mismo id (operación autorizada) ⇒ identidad **completa**. Lo que queda
+> es **mercado**: hoy el preflight da `BEAR_TREND` (LONG vetadas) ⇒ día **no computable**; la ventana
+> exige **≥4 días reales distintos** con material, así que avanza solo en días futuros sin veto.
 
 ## 1. Preflight real de hoy (2026-09-27) — hecho y declarado
 

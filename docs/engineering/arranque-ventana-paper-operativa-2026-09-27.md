@@ -36,15 +36,30 @@ incidente declarado en §4.bis).
 | Versión B (`v283-window-b`) | `session.get(StrategyVersionRow, …)` | **existe** (`PAPER-WINDOW sma_crossover`) |
 | Localizador de promoción | `strategy_promotions.instrument_id == $ACCOUNT` | **1 fila** (`promoted=true`, `shadow_validated=false`) |
 | `EdgeReport` A/B | `count(*) where account_id == $ACCOUNT` | **2 filas** |
-| Cuenta `$ACCOUNT` | `session.get(InvestmentAccountRow, $ACCOUNT)` | **NO EXISTE**: la BD alcanzable sólo tiene `default-account-seed` (`Cuenta demo EUR`, 2026-09-11) |
+| Cuenta `$ACCOUNT` | `session.get(InvestmentAccountRow, $ACCOUNT)` | **NO EXISTÍA** (sólo `default-account-seed`); **re-sembrada** el 2026-10-02 con el **mismo id** fijo (ver §0.2) |
 
-**Bloqueante declarado (B1):** la fila de cuenta de la ventana **no está** en la BD alcanzable
-(mientras sus `EdgeReport`/promoción sí sobreviven). **No** se fabrica la cuenta ni se cambia de
-cuenta en silencio: un cambio de `$ACCOUNT` **invalida** la identidad documentada. La ventana queda
-**BLOQUEADA** hasta decidir entre (a) **re-sembrar la misma cuenta** `1484e253d2d54645945a6b1d7`
-(acción de operación del propietario) o (b) **re-anclar** la ventana a una cuenta nueva (declarando
-la ruptura de identidad). El día de hoy, además, es **veto legítimo de régimen** (`BEAR_TREND`),
-así que no avanzaría aunque la cuenta existiera.
+### 0.2 Re-siembra de la cuenta fija (2026-10-02, operación autorizada por el propietario)
+
+La BD alcanzable había **perdido** la fila de `investment_accounts` de la ventana (sus `EdgeReport`
+y la promoción sobrevivían). Para **no** inventar identidad ni romper la continuidad, se re-sembró la
+cuenta con el **MISMO id documentado** `1484e253d2d54645945a6b1d7` (nombre `PAPER-VENTANA-a9c515`),
+usando el constructor del repo (`create_simulated_account`, `initial_deposit=100000.0`) para crear la
+cuenta **completa**: `investment_accounts` + cartera legacy + cartera de inversión + asiento de
+depósito. **Sólo** se forzó el id de la cuenta al valor fijo; el resto de ids los generó el repo.
+
+| Comprobación (read-only, tras la re-siembra) | Resultado |
+|---|---|
+| `investment_accounts` | `1484e253d2d54645945a6b1d7` = (`PAPER-VENTANA-a9c515`, `simulated`, `active`) |
+| Cartera + depósito | **1** cartera de inversión · **1** asiento de depósito |
+| Promoción (localizador) | **1** fila (`promoted=true`, `shadow_validated=false`, `reasons=[semilla_operativa_ventana_no_gate_certificada]`) |
+| `EdgeReport` A/B | **2** filas |
+| `v283-window-b` | **existe** (`PAPER-WINDOW sma_crossover`) |
+| Watch | **20** símbolos |
+
+**Bloqueante que queda (B2, no resoluble por código):** el día de hoy es **veto legítimo de régimen**
+(`BEAR_TREND`, LONG vetadas) ⇒ **no computa** y **no** se fuerza el gobernador. La ventana exige
+**≥4 días reales distintos** con material durable, así que `window-run`/`window-close` **avanzan solo
+en días futuros sin veto**. `P3-2`/`P3-3` siguen **abiertas** mientras no exista el material.
 
 ## 1. Qué se ha hecho (una sola vez, antes de D1)
 
