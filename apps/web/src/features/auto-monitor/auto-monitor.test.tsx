@@ -176,6 +176,22 @@ describe("AutoConcurrencyPanel", () => {
       screen.getByTestId("auto-monitor-last-conflict").textContent,
     ).toContain("RES-dec-aaa");
   });
+
+  it("distingue PARCIAL de COMPLETE en los conteos de concurrencia", () => {
+    render(
+      <AutoConcurrencyPanel
+        concurrency={{
+          ...view.concurrency,
+          raceConflicts: 3,
+          raceConflictsMeasurement: "PARTIAL",
+        }}
+      />,
+    );
+    const node = screen.getByTestId("auto-monitor-race-conflicts");
+    expect(node.textContent).toContain("3");
+    expect(node.textContent).toContain("PARCIAL");
+    expect(node.getAttribute("data-measurement")).toBe("PARTIAL");
+  });
 });
 
 describe("AutoReservationPanel", () => {

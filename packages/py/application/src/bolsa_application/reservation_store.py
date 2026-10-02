@@ -197,6 +197,22 @@ class ReservationStore(Protocol):
         """
         ...
 
+    async def count_forced_releases(
+        self,
+        account_id: str | None,
+        *,
+        reasons: Iterable[str],
+    ) -> int:
+        """Cuenta las reservas retiradas FORZADAMENTE (por motivo) sobre el UNIVERSO completo.
+
+        El monitor proyecta ``forcedReleases`` y NO puede contarlo sobre la ventana de reservas
+        (``list_recent_with_cycle`` está limitada y solo trae filas con ciclo): eso truncaba el
+        conteo y lo declaraba ``COMPLETE``. Esta consulta agregada cuenta todas las filas de la
+        cuenta sin cargarlas. Los motivos llegan por parámetro para no invertir la dirección del
+        vocabulario (la fuente única vive en el monitor, que los inyecta).
+        """
+        ...
+
     async def release(
         self,
         reservation_id: str,
@@ -503,6 +519,23 @@ class InMemoryReservationStore:
         rows.sort(key=_order_key, reverse=True)
         return rows[:limit]
 
+    async def count_forced_releases(
+        self,
+        account_id: str | None,
+        *,
+        reasons: Iterable[str],
+    ) -> int:
+        """Espeja el agregado del PG: cuenta sobre TODAS las filas, no sobre una ventana."""
+        wanted = {str(reason) for reason in reasons if str(reason or "").strip()}
+        if not wanted:
+            return 0
+        return sum(
+            1
+            for row in self._rows.values()
+            if (row.release_reason or "") in wanted
+            and (account_id is None or row.account_id == account_id)
+        )
+
     async def release(
         self,
         reservation_id: str,
@@ -751,6 +784,33 @@ class PostgresReservationStore:
             query = query.where(PortfolioReservationRow.account_id == account_id)
         rows = (await self._session.execute(query)).scalars().all()
         return [_row_to_reservation(row) for row in rows]
+
+    async def count_forced_releases(
+        self,
+        account_id: str | None,
+        *,
+        reasons: Iterable[str],
+    ) -> int:
+        """Agregado ``COUNT(*)`` sobre ``release_reason IN (...)`` (universo completo).
+
+        No filtra por ``cycle_id``: una reserva anterior a ``2.47`` también pudo retirarse
+        forzadamente y la ventana de la reconciliación la habría omitido además de truncarla.
+        """
+        import sqlalchemy as sa
+
+        from bolsa_infrastructure.database.models.tables import PortfolioReservationRow
+
+        wanted = sorted({str(reason) for reason in reasons if str(reason or "").strip()})
+        if not wanted:
+            return 0
+        query = (
+            sa.select(sa.func.count())
+            .select_from(PortfolioReservationRow)
+            .where(PortfolioReservationRow.release_reason.in_(wanted))
+        )
+        if account_id is not None:
+            query = query.where(PortfolioReservationRow.account_id == account_id)
+        return int((await self._session.execute(query)).scalar_one() or 0)
 
     async def release(
         self,

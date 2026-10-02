@@ -225,7 +225,11 @@ export function formatMonitorFactValue(
   measurement: string,
 ): string {
   if (value === null || value === undefined) {
-    return formatMeasurementLabel(measurement);
+    // Un hecho SIN valor no puede estar `MEDIDO`: `COMPLETE` se degrada a `NO MEDIDO` (la UI
+    // nunca debe afirmar una medición que el propio hecho no trae).
+    return formatMeasurementLabel(
+      measurement === "COMPLETE" ? "UNKNOWN" : measurement,
+    );
   }
   if (typeof value === "boolean") return value ? "sí" : "no";
   if (typeof value === "number") return String(value);

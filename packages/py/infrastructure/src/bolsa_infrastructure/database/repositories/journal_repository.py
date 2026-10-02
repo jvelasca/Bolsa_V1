@@ -131,6 +131,50 @@ class SqlAlchemyJournalRepository:
         rows = result.scalars().all()
         return [_row_to_record(row) for row in rows], total
 
+    async def aggregate_auto_operational_audit(
+        self,
+        *,
+        account_id: str,
+        claim_event_type: str = "auto_reservation_claim",
+        reconciliation_event_type: str = "auto_reservation_reconciliation",
+        grace_window_reason: str = "grace_window_keep",
+    ) -> dict[str, int]:
+        """(AUTO Monitor) conteos GLOBALES de la auditoría operativa, agregados en la base.
+
+        El monitor proyecta claims/reconciliaciones y necesita contadores **completos**: cargar
+        las filas con un ``limit`` truncaba el universo y lo declaraba ``COMPLETE``. Aquí se
+        agrega con ``COUNT(*) FILTER`` sobre el mismo ``account_id`` y ``event_type`` del índice,
+        de modo que el conteo **no depende del límite de lectura** y no escala con el número de
+        eventos. Los campos del ``payload`` se leen como texto (``->>``); un campo ausente/null
+        sale ``NULL`` (no declarado) y por eso ``lostClaimsUndeclaredConflict`` los separa.
+
+        Los ``event_type``/motivo llegan por parámetro (con defaults locales) para no invertir la
+        dirección infraestructura→aplicación: la fuente única de los literales sigue en
+        ``auto_operational_monitor`` y el monitor los inyecta.
+        """
+        claims = DecisionJournalEntryRow.event_type == claim_event_type
+        reconciliations = DecisionJournalEntryRow.event_type == reconciliation_event_type
+        claimed = DecisionJournalEntryRow.payload["claimed"].as_string()
+        conflict = DecisionJournalEntryRow.payload["conflict"].as_string()
+        reason = DecisionJournalEntryRow.payload["reason"].as_string()
+        statement = select(
+            func.count().filter(claims).label("claimAttempts"),
+            func.count().filter(claims, claimed == "true").label("successfulClaims"),
+            func.count().filter(claims, claimed == "false").label("lostClaims"),
+            func.count().filter(claims, conflict == "true").label("raceConflicts"),
+            func.count()
+            .filter(claims, claimed == "false", conflict.is_(None))
+            .label("lostClaimsUndeclaredConflict"),
+            func.count().filter(reconciliations).label("reconciliations"),
+            func.count().filter(reconciliations, reason == grace_window_reason).label(
+                "graceWindowKeeps"
+            ),
+        ).where(DecisionJournalEntryRow.account_id == account_id)
+        result = await self._session.execute(statement)
+        row = result.mappings().one()
+        return {key: int(value or 0) for key, value in row.items()}
+
+
 
 # Alias retrocompatible con F1 (JournalWriter DI).
 SqlAlchemyJournalWriter = SqlAlchemyJournalRepository

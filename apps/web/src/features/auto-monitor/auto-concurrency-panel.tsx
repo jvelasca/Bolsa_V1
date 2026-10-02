@@ -27,6 +27,9 @@ function Metric({
   testId: string;
 }) {
   const measured = value !== null && value !== undefined;
+  // Un ``PARTIAL`` SÍ trae valor (es un suelo medido), pero no es un total demostrado: se
+  // pinta distinto de un ``COMPLETE`` para que la UI no degrade la honestidad del DTO.
+  const partial = measured && measurement === "PARTIAL";
   return (
     <div className="flex items-baseline justify-between gap-2 border-b border-border/40 py-1 last:border-b-0">
       <span className="text-[11px] text-muted-foreground">{label}</span>
@@ -35,12 +38,16 @@ function Metric({
         data-measurement={measurement}
         className={cn(
           "text-xs font-medium tabular-nums",
-          measured
+          measured && !partial
             ? "text-foreground/80"
             : "text-amber-600 dark:text-amber-400",
         )}
       >
-        {measured ? value : formatMeasurementLabel(measurement)}
+        {!measured
+          ? formatMeasurementLabel(measurement)
+          : partial
+            ? `${value} · ${formatMeasurementLabel(measurement)}`
+            : value}
       </span>
     </div>
   );
@@ -123,7 +130,8 @@ export function AutoConcurrencyPanel({
             data-measurement={concurrency.lastConflictMeasurement}
             className={cn(
               "text-xs font-medium",
-              concurrency.lastConflict == null
+              concurrency.lastConflict == null ||
+                concurrency.lastConflictMeasurement === "PARTIAL"
                 ? "text-amber-600 dark:text-amber-400"
                 : "text-foreground/80",
             )}
@@ -132,6 +140,10 @@ export function AutoConcurrencyPanel({
               concurrency.lastConflict,
               concurrency.lastConflictMeasurement,
             )}
+            {concurrency.lastConflict != null &&
+            concurrency.lastConflictMeasurement === "PARTIAL"
+              ? ` · ${formatMeasurementLabel("PARTIAL")}`
+              : ""}
           </span>
         </div>
       </CardContent>

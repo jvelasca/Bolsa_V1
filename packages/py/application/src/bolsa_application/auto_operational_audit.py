@@ -117,19 +117,22 @@ def build_reservation_claim_entry(
     ``False`` es el claim **perdido** (ya había un compromiso vivo con la misma identidad
     determinista). El hecho de que un claim perdido sea además una **carrera** se declara
     aparte en ``conflict``/``conflictReason``: ``claimed=False`` también puede venir de
-    invalid/expired/already_released/wrong_state, así que NO se infiere. Sin ``conflict``
-    explícito se deriva ``conflict = not claimed`` con motivo ``duplicate_claim`` (comportamiento
-    que el monitor lee para ``raceConflicts``).
+    invalid/expired/already_released/wrong_state, así que **NO se infiere**.
+
+    Sin ``conflict`` explícito el conflicto viaja **NO DECLARADO**: ``conflict=None`` con su
+    ``conflictMeasurement = UNKNOWN`` y sin ``conflictReason`` inventado. Sólo la capa de
+    concurrencia que **demostró** la carrera puede emitir ``conflict=True``; un claim perdido
+    sin esa prueba queda como ``lostClaims``, nunca como ``raceConflicts``.
     """
     rid = _text(reservation_id)
     if rid is None:
         return None
     cycle = _text(cycle_id)
     decision_id, derived = _decision_id(cycle)
-    resolved_conflict = (not claimed) if conflict is None else bool(conflict)
-    resolved_reason = _text(conflict_reason) or (
-        "duplicate_claim" if resolved_conflict else None
-    )
+    # ``conflict`` ausente = NO DECLARADO (UNKNOWN), jamás ``not claimed``: un claim perdido no
+    # demuestra por sí solo una carrera (invalid/expired/already_released/wrong_state).
+    resolved_conflict: bool | None = None if conflict is None else bool(conflict)
+    resolved_reason = _text(conflict_reason)
     payload: dict[str, Any] = {
         "event": AUTO_RESERVATION_CLAIM_EVENT,
         "reservation_id": rid,
@@ -137,7 +140,7 @@ def build_reservation_claim_entry(
         "conflict": resolved_conflict,
         "conflictReason": resolved_reason,
         "conflictMeasurement": (
-            MEASUREMENT_COMPLETE if resolved_reason is not None else MEASUREMENT_UNKNOWN
+            MEASUREMENT_COMPLETE if conflict is not None else MEASUREMENT_UNKNOWN
         ),
         "cycleIdDerived": derived,
     }

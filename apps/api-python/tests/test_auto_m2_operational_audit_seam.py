@@ -131,6 +131,42 @@ async def test_entry_decisions_are_persisted_with_their_identity() -> None:
 
 
 @pytest.mark.asyncio
+async def test_entry_decision_without_account_is_stamped_for_the_global_read() -> None:
+    """El productor no trae ``account_id``: el tramo de TRAZADO lo sella (no es una decisión).
+
+    Es lo que permite al monitor leer el último ``auto_entry_decision`` por
+    ``account_id + event_type`` sin depender de las reservas visibles.
+    """
+    sink = _Collector()
+    worker = _worker(sink=sink)
+    entry = DecisionJournalEntryRecord(
+        id="JNL-dec-bbb",
+        decision_id="dec-bbb",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        actor="auto-sim",
+        created_at="2026-10-01T09:59:00Z",
+        instrument_id="AAA",
+        payload={"cycleId": "cyc-bbb", "instrumentId": "AAA", "rank": 1},
+    )
+    await worker._v2_journal_entry_decisions([entry])
+
+    assert len(sink.entries) == 1
+    stamped = sink.entries[0]
+    assert stamped.account_id == _ACCOUNT
+    # El hecho persistido no se reescribe más allá del sello de cuenta (identidad intacta).
+    assert stamped.decision_id == "dec-bbb"
+    assert stamped.payload == entry.payload
+
+
+@pytest.mark.asyncio
+async def test_entry_decision_keeps_a_producer_account_without_rewriting() -> None:
+    sink = _Collector()
+    worker = _worker(sink=sink)
+    await worker._v2_journal_entry_decisions([_journal_entry(cycle_id="cyc-aaa")])
+    assert sink.entries[0].account_id == _ACCOUNT
+
+
+@pytest.mark.asyncio
 async def test_without_a_sink_the_journal_is_not_written() -> None:
     worker = _worker(sink=None)
     await worker._v2_journal_entry_decisions([_journal_entry(cycle_id="cyc-aaa")])

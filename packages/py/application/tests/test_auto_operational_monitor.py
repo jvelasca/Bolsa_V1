@@ -350,16 +350,21 @@ def _claim(
     session_id: str,
     reservation_id: str = "res-1",
     created_at: str = "2026-01-03T00:00:00Z",
+    conflict: bool | None = None,
 ) -> Any:
+    payload: dict[str, Any] = {
+        "reservation_id": reservation_id,
+        "claimed": claimed,
+        "caller": session_id,
+    }
+    # ``conflict`` sólo viaja si el productor lo DECLARÓ: ausente = NO DECLARADO (UNKNOWN).
+    if conflict is not None:
+        payload["conflict"] = conflict
     return SimpleNamespace(
         decision_id="dec-1",
         created_at=created_at,
         session_id=session_id,
-        payload={
-            "reservation_id": reservation_id,
-            "claimed": claimed,
-            "caller": session_id,
-        },
+        payload=payload,
     )
 
 
@@ -389,10 +394,14 @@ def test_owner_session_stays_unmeasured_without_won_claim() -> None:
     assert "owner_session_not_durable" in dto["notes"]
 
 
-def test_last_conflict_measured_from_lost_claim() -> None:
-    """El último conflicto es la carrera perdida más reciente; con claims sin carrera, ``None``."""
-    older = _claim(claimed=False, session_id="sess-a", created_at="2026-01-02T00:00:00Z")
-    newer = _claim(claimed=False, session_id="sess-b", created_at="2026-01-04T00:00:00Z")
+def test_last_conflict_measured_from_declared_race_only() -> None:
+    """El último conflicto es la carrera DECLARADA más reciente; un claim perdido no lo es."""
+    older = _claim(
+        claimed=False, session_id="sess-a", created_at="2026-01-02T00:00:00Z", conflict=True
+    )
+    newer = _claim(
+        claimed=False, session_id="sess-b", created_at="2026-01-04T00:00:00Z", conflict=True
+    )
     dto = build_operational_monitor(
         account_id="acc-1",
         reservations=[_reservation()],
@@ -414,6 +423,185 @@ def test_last_conflict_measured_from_lost_claim() -> None:
     unknown = build_operational_monitor(account_id="acc-1", reservations=[_reservation()])
     assert unknown["concurrency"]["lastConflict"] is None
     assert unknown["concurrency"]["lastConflictMeasurement"] == "UNKNOWN"
+
+
+def test_last_conflict_ignores_lost_claim_without_declared_conflict() -> None:
+    """Un claim perdido sin ``conflict`` es ``lostClaims``, NO una carrera: ``lastConflict`` None."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        claim_entries=[_claim(claimed=False, session_id="sess-loser")],
+    )
+    concurrency = dto["concurrency"]
+    assert concurrency["lostClaims"] == 1
+    assert concurrency["raceConflicts"] == 0
+    assert concurrency["lastConflict"] is None
+    # Los claims SÍ se midieron (hay filas): la afirmación "no hay carrera declarada" es completa.
+    assert concurrency["lastConflictMeasurement"] == "COMPLETE"
+
+
+def test_concurrency_uses_aggregate_counts_independent_from_row_window() -> None:
+    """El agregado manda: contadores COMPLETE aunque la ventana de filas esté vacía/truncada."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        claim_entries=[],
+        concurrency_counts={
+            "claimAttempts": 347,
+            "successfulClaims": 100,
+            "lostClaims": 247,
+            "raceConflicts": 3,
+            "lostClaimsUndeclaredConflict": 0,
+            "reconciliations": 12,
+            "graceWindowKeeps": 2,
+        },
+    )
+    concurrency = dto["concurrency"]
+    # 347 (no 100 por el ``limit``): el conteo sale de la base, no de las filas cargadas.
+    assert concurrency["claimAttempts"] == 347
+    assert concurrency["successfulClaims"] == 100
+    assert concurrency["lostClaims"] == 247
+    assert concurrency["raceConflicts"] == 3
+    assert concurrency["raceConflictsMeasurement"] == "COMPLETE"
+    assert concurrency["claimAttemptsMeasurement"] == "COMPLETE"
+    assert concurrency["reconciliations"] == 12
+    assert concurrency["graceWindowKeeps"] == 2
+
+
+def test_concurrency_marks_race_partial_when_conflicts_are_undeclared() -> None:
+    """Claims perdidos sin ``conflict`` declarado ⇒ ``raceConflicts`` no puede ser COMPLETE."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        concurrency_counts={
+            "claimAttempts": 5,
+            "successfulClaims": 1,
+            "lostClaims": 4,
+            "raceConflicts": 1,
+            "lostClaimsUndeclaredConflict": 2,
+            "reconciliations": 0,
+            "graceWindowKeeps": 0,
+        },
+    )
+    concurrency = dto["concurrency"]
+    assert concurrency["raceConflicts"] == 1
+    assert concurrency["raceConflictsMeasurement"] == "PARTIAL"
+    # El total y el desglose de claims SÍ son completos.
+    assert concurrency["claimAttemptsMeasurement"] == "COMPLETE"
+    assert concurrency["lostClaimsMeasurement"] == "COMPLETE"
+    # Sin reconciliaciones el hueco se declara.
+    assert concurrency["reconciliations"] is None
+    assert concurrency["reconciliationsMeasurement"] == "UNKNOWN"
+
+
+def test_concurrency_marks_partial_when_row_window_is_truncated() -> None:
+    """Sin agregado: el ``total`` de ``list_entries`` acota el conteo y el desglose es PARTIAL."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        claim_entries=[_claim(claimed=True, session_id="sess-a")],
+        claims_total=250,
+    )
+    concurrency = dto["concurrency"]
+    assert concurrency["claimAttempts"] == 250
+    assert concurrency["claimAttemptsMeasurement"] == "COMPLETE"
+    # El desglose por estado NO puede afirmarse sobre 1 fila de 250.
+    assert concurrency["successfulClaimsMeasurement"] == "PARTIAL"
+    assert concurrency["lostClaimsMeasurement"] == "PARTIAL"
+    assert concurrency["raceConflictsMeasurement"] == "PARTIAL"
+
+
+def test_concurrency_forced_releases_use_the_aggregate_when_available() -> None:
+    """El agregado manda sobre la ventana: ``forcedReleases`` completo aunque la ventana se trunque."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        limit=1,
+        forced_releases_total=42,
+    )
+    concurrency = dto["concurrency"]
+    assert concurrency["forcedReleases"] == 42
+    assert concurrency["forcedReleasesMeasurement"] == "COMPLETE"
+
+
+def test_concurrency_forced_releases_partial_when_the_reservation_window_is_full() -> None:
+    """Sin agregado: con la ventana LLENA (``len == limit``) el conteo puede estar truncado."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[
+            _reservation(reservation_id="res-1", cycle_id="cyc-1"),
+            _reservation(reservation_id="res-2", cycle_id="cyc-2"),
+        ],
+        limit=1,
+    )
+    concurrency = dto["concurrency"]
+    # Ambas tienen ``release_reason='fill'``: no son retiradas forzadas, pero el conteo de la
+    # ventana no puede afirmarse completo con la ventana llena.
+    assert concurrency["forcedReleases"] == 0
+    assert concurrency["forcedReleasesMeasurement"] == "PARTIAL"
+
+
+def test_concurrency_forced_releases_complete_when_the_window_is_not_full() -> None:
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        limit=20,
+    )
+    concurrency = dto["concurrency"]
+    assert concurrency["forcedReleases"] == 0
+    assert concurrency["forcedReleasesMeasurement"] == "COMPLETE"
+
+
+def test_concurrency_forced_releases_counts_forced_reasons_in_the_window() -> None:
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation(release_reason="cancel")],
+        limit=20,
+    )
+    concurrency = dto["concurrency"]
+    assert concurrency["forcedReleases"] == 1
+    assert concurrency["forcedReleasesMeasurement"] == "COMPLETE"
+
+
+def test_header_uses_global_decision_entries_over_visible_cycle_journal() -> None:
+    """``lastDecisionAt`` sale de la lectura GLOBAL, no de los ciclos/reservas visibles."""
+    entry = SimpleNamespace(
+        decision_id="dec-global",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        created_at="2026-01-05T09:00:00Z",
+        session_id="sess-a",
+        payload={"cycleId": "cyc-otro", "instrumentId": "AAPL"},
+    )
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        engine=_engine(),
+        reservations=[_reservation()],
+        journal=[],
+        header_decision_entries=[entry],
+        interval_seconds=3600.0,
+    )
+    header = dto["header"]
+    assert header["lastDecisionAt"] == "2026-01-05T09:00:00Z"
+    assert header["lastDecisionMeasurement"] == "COMPLETE"
+    assert header["nextDecisionAt"] == "2026-01-05T10:00:00Z"
+
+
+def test_header_falls_back_to_cycle_journal_when_global_not_supplied() -> None:
+    """Sin lectura global (``None``) el header conserva el journal del ciclo (compatibilidad)."""
+    entry = SimpleNamespace(
+        decision_id="dec-1",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        created_at="2026-01-01T22:00:00Z",
+        session_id="sess-a",
+        payload={"cycleId": "cyc-1", "instrumentId": "AAPL"},
+    )
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        engine=_engine(),
+        reservations=[_reservation()],
+        journal=[entry],
+    )
+    assert dto["header"]["lastDecisionAt"] == "2026-01-01T22:00:00Z"
 
 
 def test_header_separates_last_heartbeat_from_last_decision() -> None:
@@ -451,3 +639,70 @@ def test_header_heartbeats_persisted_is_not_an_operational_event_count() -> None
     dto = build_operational_monitor(account_id="acc-1", engine=_engine(), engine_ticks=1234)
     assert dto["header"]["heartbeatsPersisted"] == 1234
     assert dto["concurrency"]["heartbeatsPersisted"] == 1234
+
+
+def test_facts_without_value_are_never_declared_measured() -> None:
+    """Un hecho SIN valor no puede viajar ``COMPLETE``: la UI lo rotularía ``MEDIDO``."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        positions={
+            "AAPL": {
+                "positionState": {"cycleId": "cyc-1"},
+                "stopPrice": None,
+                "highWatermark": None,
+                "t1State": None,
+                "trailingState": None,
+            }
+        },
+    )
+    step = _step(dto["cycles"][0]["steps"], "PROTECTION")
+    assert step["state"] == STEP_REACHED
+    for key in ("stopPrice", "currentStop", "highWatermark", "t1State", "trailingState"):
+        fact = _fact(step, key)
+        assert fact["value"] is None
+        assert fact["measurement"] == "UNKNOWN"
+
+
+def test_fallback_marks_race_partial_on_undeclared_conflict() -> None:
+    """Sin agregado, la ruta de filas debe degradar igual que el agregado ante conflicto no declarado."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        claim_entries=[_claim(claimed=False, session_id="sess-loser")],
+    )
+    concurrency = dto["concurrency"]
+    assert concurrency["lostClaims"] == 1
+    assert concurrency["raceConflicts"] == 0
+    assert concurrency["raceConflictsMeasurement"] == "PARTIAL"
+
+
+def test_fill_with_unclassifiable_side_is_declared_partial_not_dropped() -> None:
+    """Un ``side`` no clasificable no se descarta en silencio: el paso FILL se declara ``PARTIAL``."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100),
+            _fill(side="", qty=5, price=101),
+        ],
+    )
+    step = _step(dto["cycles"][0]["steps"], "FILL")
+    assert step["measurement"] == "PARTIAL"
+    assert step["note"] is not None and "fill_side_undeclared" in step["note"]
+    # El bucket de compras SÍ se mide, pero es un suelo: la cantidad lo declara ``PARTIAL``.
+    assert _fact(step, "buyQty")["measurement"] == "PARTIAL"
+    assert _fact(step, "buyQty")["value"] == 10.0
+
+
+def test_fill_window_full_is_declared_partial() -> None:
+    """Con la ventana de fills LLENA el paso FILL declara ``PARTIAL`` (pudo truncarse)."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[_fill(side="buy", qty=10, price=100)],
+        fills_window_full=True,
+    )
+    step = _step(dto["cycles"][0]["steps"], "FILL")
+    assert step["measurement"] == "PARTIAL"
+    assert step["note"] is not None and "fill_window_truncated" in step["note"]

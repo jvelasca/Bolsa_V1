@@ -81,6 +81,11 @@ describe("formatMonitorFactValue", () => {
   it("rotula PARCIAL", () => {
     expect(formatMonitorFactValue(null, "PARTIAL")).toBe("PARCIAL");
   });
+
+  it("nunca rotula MEDIDO un hecho sin valor aunque la medición diga COMPLETE", () => {
+    expect(formatMonitorFactValue(null, "COMPLETE")).toBe("NO MEDIDO");
+    expect(formatMonitorFactValue(undefined, "COMPLETE")).toBe("NO MEDIDO");
+  });
 });
 
 describe("buildAutoOperationalMonitorView", () => {

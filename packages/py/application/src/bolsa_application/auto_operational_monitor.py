@@ -136,8 +136,20 @@ def _step(
     }
 
 
-def _fact(key: str, value: Any, measurement: MeasurementStatus = MEASUREMENT_COMPLETE) -> dict[str, Any]:
-    return {"key": key, "value": value, "measurement": measurement}
+def _fact(
+    key: str, value: Any, measurement: MeasurementStatus | None = None
+) -> dict[str, Any]:
+    """Hecho con su medición. Un hecho SIN valor NO se declara medido.
+
+    ``measurement`` ausente (``None``) significa "deduce la medición del valor": con valor ⇒
+    ``COMPLETE``; sin valor (``None``) ⇒ ``UNKNOWN``, para que la UI nunca rotule ``MEDIDO`` un
+    hecho ausente (regla de la casa: ``NO HAY EVIDENCIA → UNKNOWN``, jamás un valor silencioso).
+    Un llamante que necesite forzar la medición la pasa explícita.
+    """
+    resolved = measurement
+    if resolved is None:
+        resolved = MEASUREMENT_COMPLETE if value is not None else MEASUREMENT_UNKNOWN
+    return {"key": key, "value": value, "measurement": resolved}
 
 
 def _cycle_id_of(holder: Any) -> str:
@@ -170,14 +182,25 @@ def _entry_payload(entry: Any) -> Mapping[str, Any]:
     return payload if isinstance(payload, Mapping) else {}
 
 
-def _net_open_qty(fills: Sequence[Any]) -> float:
-    """Cantidad neta viva del ciclo (compras − ventas); ``> 0`` ⇒ el ciclo sigue abierto."""
+def _net_open_qty(fills: Sequence[Any]) -> tuple[float, int]:
+    """Cantidad neta viva del ciclo (compras − ventas) y nº de fills con ``side`` NO clasificable.
+
+    Un ``side`` ausente o ilegible NO se descarta en silencio (eso torcería el neto y podría
+    declarar un ciclo cerrado que no lo está): se cuenta aparte y el llamante declara el hueco.
+    ``> 0`` ⇒ el ciclo sigue abierto.
+    """
     total = 0.0
+    unclassified = 0
     for fill in fills:
         qty = float(_get(fill, "quantity") or 0.0)
         side = str(_get(fill, "side") or "").strip().lower()
-        total += qty if side == "buy" else (-qty if side == "sell" else 0.0)
-    return total
+        if side == "buy":
+            total += qty
+        elif side == "sell":
+            total -= qty
+        else:
+            unclassified += 1
+    return total, unclassified
 
 
 def _applied_friction(fills: Sequence[Any]) -> tuple[float | None, MeasurementStatus]:
@@ -301,11 +324,21 @@ def _order_step(orders: Sequence[Any]) -> dict[str, Any]:
     return _step("ORDER", state=STEP_REACHED, at=at, facts=facts)
 
 
-def _fill_step(fills: Sequence[Any]) -> dict[str, Any]:
+def _fill_step(fills: Sequence[Any], *, window_full: bool = False) -> dict[str, Any]:
+    """``FILL`` — VWAPs y fricción del ciclo, declarando los huecos de la ventana y del ``side``.
+
+    ``window_full`` es el suelo declarado de la lectura (``len == limit``): con la ventana llena
+    el conjunto de fills pudo truncarse y el paso se declara ``PARTIAL``. Un fill con ``side``
+    no clasificable TAMPOCO se descarta en silencio: no entra en ``buyQty``/``sellQty`` y por eso
+    el paso se declara ``PARTIAL`` con la nota ``fill_side_undeclared``.
+    """
     if not fills:
         return _step("FILL", state=STEP_PENDING, measurement=MEASUREMENT_UNKNOWN, note="no_fills")
     buys = [f for f in fills if str(_get(f, "side") or "").lower() == "buy"]
     sells = [f for f in fills if str(_get(f, "side") or "").lower() == "sell"]
+    unclassified = [
+        f for f in fills if str(_get(f, "side") or "").strip().lower() not in {"buy", "sell"}
+    ]
 
     def _vwap(rows: Sequence[Any]) -> tuple[float | None, float]:
         qty_total = 0.0
@@ -323,19 +356,39 @@ def _fill_step(fills: Sequence[Any]) -> dict[str, Any]:
     buy_vwap, buy_qty = _vwap(buys)
     sell_vwap, sell_qty = _vwap(sells)
     friction, friction_measurement = _applied_friction(fills)
+    # Los buckets de lado son incompletos si algún fill no declara un lado clasificable.
+    bucket_measurement: MeasurementStatus = (
+        MEASUREMENT_PARTIAL if unclassified else MEASUREMENT_COMPLETE
+    )
     facts = [
-        _fact("buyQty", round(buy_qty, 6)),
-        _fact("buyVwap", buy_vwap, MEASUREMENT_COMPLETE if buy_vwap is not None else MEASUREMENT_UNKNOWN),
-        _fact("sellQty", round(sell_qty, 6)),
+        _fact("buyQty", round(buy_qty, 6), bucket_measurement),
+        _fact(
+            "buyVwap",
+            buy_vwap,
+            MEASUREMENT_UNKNOWN if buy_vwap is None else bucket_measurement,
+        ),
+        _fact("sellQty", round(sell_qty, 6), bucket_measurement),
         _fact(
             "sellVwap",
             sell_vwap,
-            MEASUREMENT_COMPLETE if sell_vwap is not None else MEASUREMENT_UNKNOWN,
+            MEASUREMENT_UNKNOWN if sell_vwap is None else bucket_measurement,
         ),
         _fact("appliedFriction", friction, friction_measurement),
     ]
     at = _iso(_parse_instant(_get(fills[-1], "created_at", "createdAt")))
-    return _step("FILL", state=STEP_REACHED, at=at, facts=facts)
+    notes: list[str] = []
+    if unclassified:
+        notes.append("fill_side_undeclared")
+    if window_full:
+        notes.append("fill_window_truncated")
+    return _step(
+        "FILL",
+        state=STEP_REACHED,
+        at=at,
+        measurement=MEASUREMENT_PARTIAL if notes else MEASUREMENT_COMPLETE,
+        facts=facts,
+        note=", ".join(notes) or None,
+    )
 
 
 def _protection_step(position: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -425,6 +478,7 @@ def _build_cycle(
     closed_by_cycle: Mapping[str, Mapping[str, Any]],
     journal: Sequence[Any],
     settlement_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
+    fills_window_full: bool = False,
 ) -> dict[str, Any]:
     reservation = reservations[0] if reservations else None
     cycle_journal = _journal_for_cycle(journal, cycle_id)
@@ -432,7 +486,7 @@ def _build_cycle(
     orders = list(orders_by_cycle.get(cycle_id, ()))
     closed = closed_by_cycle.get(cycle_id)
     settlement = (settlement_by_cycle or {}).get(cycle_id)
-    net = _net_open_qty(cycle_fills)
+    net, unclassified_fills = _net_open_qty(cycle_fills)
     is_open = net > 1e-9
     side = str(_get(reservation, "side") or "").strip().lower() if reservation else ""
 
@@ -442,7 +496,7 @@ def _build_cycle(
         _entry_decision_step("RISK", cycle_journal, note_absent="risk_not_durable"),
         _reservation_step(reservation),
         _order_step(orders),
-        _fill_step(cycle_fills),
+        _fill_step(cycle_fills, window_full=fills_window_full),
         _protection_step(positions_by_cycle.get(cycle_id)),
         _settlement_step(settlement, cycle_fills),
         _cycle_closed_step(closed),
@@ -456,7 +510,8 @@ def _build_cycle(
         "instrumentId": _get(reservation, "instrument_id", "instrumentId"),
         "strategyVersion": _get(reservation, "strategy_version_id", "strategyVersionId"),
         "direction": "short" if side == "sell" else "long",
-        "closed": closed is not None and not is_open,
+        # Un fill con ``side`` no clasificable deja el neto incompleto: NO se afirma ``closed``.
+        "closed": closed is not None and not is_open and unclassified_fills == 0,
         "steps": steps,
         "result": (
             None
@@ -640,40 +695,137 @@ def _concurrency(
     reconcilations: Sequence[Any],
     claims: Sequence[Any],
     journal: Sequence[Any],
+    counts: Mapping[str, Any] | None = None,
+    claims_total: int | None = None,
+    reconciliations_total: int | None = None,
+    forced_releases_total: int | None = None,
+    reservations_window_full: bool = False,
 ) -> dict[str, Any]:
-    reconciliations_count = len(reconcilations)
-    grace_keeps = sum(
-        1
-        for entry in reconcilations
-        if _entry_payload(entry).get("reason") == GRACE_WINDOW_KEEP
-    )
-    has_claims = bool(claims)
     # Se DECLARAN por separado: ``claimAttempts`` (todo intento auditado), ``successfulClaims``
     # (``claimed=True``), ``lostClaims`` (``claimed=False``) y ``raceConflicts`` (conflicto de
     # carrera DECLARADO por el productor). ``claimed=False`` NO equivale a carrera: puede ser
     # invalid/expired/already_released/wrong_state; por eso la carrera se lee de
     # ``payload.conflict`` y no se infiere del claim perdido.
-    claim_attempts = len(claims) if has_claims else None
-    successful_claims = (
-        sum(1 for entry in claims if _entry_payload(entry).get("claimed") is True)
-        if has_claims
-        else None
+    #
+    # Los contadores salen del AGREGADO en base (``counts``) cuando está disponible: así no
+    # dependen del ``limit`` de lectura y no se declaran ``COMPLETE`` estando truncados. Sin
+    # agregado se cae a las filas cargadas y se marca ``PARTIAL`` cuando el total conocido
+    # demuestra que la ventana se truncó. Un hueco se declara ``UNKNOWN``, nunca un ``0``.
+    if counts is not None:
+        raw_claim_attempts = int(counts.get("claimAttempts") or 0)
+        claims_measured = raw_claim_attempts > 0
+        claim_attempts = raw_claim_attempts if claims_measured else None
+        successful_claims = int(counts.get("successfulClaims") or 0) if claims_measured else None
+        lost_claims_count = int(counts.get("lostClaims") or 0) if claims_measured else None
+        race_conflicts = int(counts.get("raceConflicts") or 0) if claims_measured else None
+        undeclared_conflicts = int(counts.get("lostClaimsUndeclaredConflict") or 0)
+        raw_reconciliations = int(counts.get("reconciliations") or 0)
+        reconciliations_measured = raw_reconciliations > 0
+        reconciliations_count = raw_reconciliations if reconciliations_measured else None
+        grace_keeps = (
+            int(counts.get("graceWindowKeeps") or 0) if reconciliations_measured else None
+        )
+        claim_breakdown_measurement: MeasurementStatus = (
+            MEASUREMENT_COMPLETE if claims_measured else MEASUREMENT_UNKNOWN
+        )
+        race_conflicts_measurement: MeasurementStatus = (
+            MEASUREMENT_PARTIAL
+            if claims_measured and undeclared_conflicts > 0
+            else (MEASUREMENT_COMPLETE if claims_measured else MEASUREMENT_UNKNOWN)
+        )
+        reconciliation_breakdown_measurement: MeasurementStatus = (
+            MEASUREMENT_COMPLETE if reconciliations_measured else MEASUREMENT_UNKNOWN
+        )
+    else:
+        claim_attempts = (
+            claims_total if claims_total is not None else (len(claims) if claims else None)
+        )
+        successful_claims = (
+            sum(1 for entry in claims if _entry_payload(entry).get("claimed") is True)
+            if claims
+            else None
+        )
+        lost_claims_count = (
+            sum(1 for entry in claims if _entry_payload(entry).get("claimed") is False)
+            if claims
+            else None
+        )
+        race_conflicts = (
+            sum(1 for entry in claims if _entry_payload(entry).get("conflict") is True)
+            if claims
+            else None
+        )
+        reconciliations_count = (
+            reconciliations_total
+            if reconciliations_total is not None
+            else (len(reconcilations) if reconcilations else None)
+        )
+        grace_keeps = (
+            sum(
+                1
+                for entry in reconcilations
+                if _entry_payload(entry).get("reason") == GRACE_WINDOW_KEEP
+            )
+            if reconcilations
+            else None
+        )
+        claims_measured = claim_attempts is not None and claim_attempts > 0
+        reconciliations_measured = (
+            reconciliations_count is not None and reconciliations_count > 0
+        )
+        claim_breakdown_measurement = (
+            MEASUREMENT_PARTIAL
+            if claim_attempts is not None and len(claims) < claim_attempts
+            else (MEASUREMENT_COMPLETE if claims_measured else MEASUREMENT_UNKNOWN)
+        )
+        reconciliation_breakdown_measurement = (
+            MEASUREMENT_PARTIAL
+            if reconciliations_count is not None and len(reconcilations) < reconciliations_count
+            else (MEASUREMENT_COMPLETE if reconciliations_measured else MEASUREMENT_UNKNOWN)
+        )
+        # Paridad con el agregado: un claim perdido con ``conflict`` NO declarado degrada la
+        # carrera a ``PARTIAL`` (aunque la ventana no contenga la carrera, el hueco se declara).
+        undeclared_conflicts = (
+            sum(
+                1
+                for entry in claims
+                if _entry_payload(entry).get("claimed") is False
+                and _entry_payload(entry).get("conflict") is None
+            )
+            if claims
+            else 0
+        )
+        race_conflicts_measurement = (
+            MEASUREMENT_PARTIAL
+            if claims_measured and undeclared_conflicts > 0
+            else claim_breakdown_measurement
+        )
+
+    claim_measurement: MeasurementStatus = (
+        MEASUREMENT_COMPLETE if claims_measured else MEASUREMENT_UNKNOWN
     )
-    lost_claims_count = (
-        sum(1 for entry in claims if _entry_payload(entry).get("claimed") is False)
-        if has_claims
-        else None
+    reconciliation_measurement: MeasurementStatus = (
+        MEASUREMENT_COMPLETE if reconciliations_measured else MEASUREMENT_UNKNOWN
     )
-    race_conflicts = (
-        sum(1 for entry in claims if _entry_payload(entry).get("conflict") is True)
-        if has_claims
-        else None
-    )
-    forced_releases = sum(
-        1
-        for row in reservations
-        if str(_get(row, "release_reason", "releaseReason") or "") in _FORCED_RELEASE_REASONS
-    )
+    # La ventana de filas de claims está truncada si el total conocido supera las filas cargadas.
+    claim_window_truncated = claim_attempts is not None and len(claims) < claim_attempts
+    # ``forcedReleases`` sale del AGREGADO en base cuando está disponible (universo completo,
+    # sin depender de la ventana de reservas). Sin agregado se cuenta la ventana y se declara
+    # ``PARTIAL`` si la ventana está LLENA (``len == limit`` ⇒ pudo truncarse): el mismo criterio
+    # que los claims, porque la ventana de reservas también está limitada.
+    if forced_releases_total is not None:
+        forced_releases: int | None = forced_releases_total
+        forced_releases_measurement: MeasurementStatus = MEASUREMENT_COMPLETE
+    else:
+        forced_releases = sum(
+            1
+            for row in reservations
+            if str(_get(row, "release_reason", "releaseReason") or "") in _FORCED_RELEASE_REASONS
+        )
+        forced_releases_measurement = (
+            MEASUREMENT_PARTIAL if reservations_window_full else MEASUREMENT_COMPLETE
+        )
+
     def _entry_session(entry: Any) -> str | None:
         # La sesión de motor viaja en ``payload.caller`` (la columna ``session_id`` apunta por
         # FK a ``decision_sessions`` y no se invade); se acepta también la columna por si una
@@ -690,21 +842,35 @@ def _concurrency(
     # ``activeSessions`` por ``DISTINCT`` sesión del spine: es un SUELO (solo ve sesiones que
     # ya escribieron), no el censo vivo. Sin sesiones en la ventana se declara NO MEDIDO.
     active_sessions: int | None = len(sessions) if sessions else None
-    # Último conflicto: la carrera de claim PERDIDA más reciente (otra sesión ya tenía vivo el
-    # compromiso con la misma identidad determinista). Sin claims, el hueco se declara.
-    lost_claims = [entry for entry in claims if _entry_payload(entry).get("claimed") is False]
-    if lost_claims:
-        latest = max(lost_claims, key=lambda e: str(_get(e, "created_at", "createdAt") or ""))
+    # Último conflicto: la carrera de claim DECLARADA (``conflict is True``) más reciente. Un
+    # claim perdido sin ``conflict`` declarado NO es una carrera y no entra aquí. Si la ventana
+    # de filas está truncada el valor se declara ``PARTIAL``: no puede afirmarse como el ÚLTIMO.
+    declared_conflicts = [
+        entry for entry in claims if _entry_payload(entry).get("conflict") is True
+    ]
+    if declared_conflicts:
+        latest = max(
+            declared_conflicts, key=lambda e: str(_get(e, "created_at", "createdAt") or "")
+        )
         latest_payload = _entry_payload(latest)
         last_conflict: dict[str, Any] | None = {
             "at": _iso(_parse_instant(_get(latest, "created_at", "createdAt"))),
-            "reservationId": latest_payload.get("reservation_id", latest_payload.get("reservationId")),
+            "reservationId": latest_payload.get(
+                "reservation_id", latest_payload.get("reservationId")
+            ),
             "loserSession": latest_payload.get("caller"),
         }
-        last_conflict_measurement = MEASUREMENT_COMPLETE
+        last_conflict_measurement: MeasurementStatus = (
+            MEASUREMENT_PARTIAL if claim_window_truncated else MEASUREMENT_COMPLETE
+        )
     else:
         last_conflict = None
-        last_conflict_measurement = MEASUREMENT_COMPLETE if claims else MEASUREMENT_UNKNOWN
+        if claim_window_truncated:
+            last_conflict_measurement = MEASUREMENT_PARTIAL
+        elif claims_measured:
+            last_conflict_measurement = MEASUREMENT_COMPLETE
+        else:
+            last_conflict_measurement = MEASUREMENT_UNKNOWN
     return {
         "activeSessions": active_sessions,
         "activeSessionsMeasurement": (
@@ -712,25 +878,19 @@ def _concurrency(
         ),
         "heartbeatsPersisted": engine_ticks,
         "claimAttempts": claim_attempts,
-        "claimAttemptsMeasurement": MEASUREMENT_COMPLETE if has_claims else MEASUREMENT_UNKNOWN,
+        "claimAttemptsMeasurement": claim_measurement,
         "successfulClaims": successful_claims,
-        "successfulClaimsMeasurement": (
-            MEASUREMENT_COMPLETE if has_claims else MEASUREMENT_UNKNOWN
-        ),
+        "successfulClaimsMeasurement": claim_breakdown_measurement,
         "lostClaims": lost_claims_count,
-        "lostClaimsMeasurement": MEASUREMENT_COMPLETE if has_claims else MEASUREMENT_UNKNOWN,
+        "lostClaimsMeasurement": claim_breakdown_measurement,
         "raceConflicts": race_conflicts,
-        "raceConflictsMeasurement": MEASUREMENT_COMPLETE if has_claims else MEASUREMENT_UNKNOWN,
-        "reconciliations": reconciliations_count if reconcilations else None,
-        "reconciliationsMeasurement": (
-            MEASUREMENT_COMPLETE if reconcilations else MEASUREMENT_UNKNOWN
-        ),
-        "graceWindowKeeps": grace_keeps if reconcilations else None,
-        "graceWindowKeepsMeasurement": (
-            MEASUREMENT_COMPLETE if reconcilations else MEASUREMENT_UNKNOWN
-        ),
+        "raceConflictsMeasurement": race_conflicts_measurement,
+        "reconciliations": reconciliations_count,
+        "reconciliationsMeasurement": reconciliation_measurement,
+        "graceWindowKeeps": grace_keeps,
+        "graceWindowKeepsMeasurement": reconciliation_breakdown_measurement,
         "forcedReleases": forced_releases,
-        "forcedReleasesMeasurement": MEASUREMENT_COMPLETE,
+        "forcedReleasesMeasurement": forced_releases_measurement,
         "lastConflict": last_conflict,
         "lastConflictMeasurement": last_conflict_measurement,
     }
@@ -756,12 +916,22 @@ def build_operational_monitor(
     cycle_id: str | None = None,
     limit: int = 20,
     as_of: str | None = None,
+    concurrency_counts: Mapping[str, Any] | None = None,
+    claims_total: int | None = None,
+    reconciliations_total: int | None = None,
+    forced_releases_total: int | None = None,
+    header_decision_entries: Sequence[Any] | None = None,
+    fills_window_full: bool = False,
 ) -> dict[str, Any]:
     """(PURA) construye el DTO del monitor desde el estado durable ya leído. Sin I/O.
 
     No sintetiza pasos: cada etapa viene de un hecho durable concreto y lo que no existe se
     declara ``unknown``/``absent`` con su nota. Un ``cycle_id`` filtra a un único ciclo (para el
     drill-down); sin él se devuelven los ciclos de la ventana (``limit``).
+
+    ``header_decision_entries`` es la lectura GLOBAL del último ``auto_entry_decision`` durable
+    (independiente de los ciclos/reservas visibles): sin ella, el header cae al ``journal`` del
+    ciclo para no romper llamadas puras antiguas.
     """
     positions = dict(positions or {})
     granularity_view = dict(granularity or {})
@@ -835,6 +1005,7 @@ def build_operational_monitor(
             closed_by_cycle=closed_by_cycle,
             journal=journal,
             settlement_by_cycle=settlement_by_cycle,
+            fills_window_full=fills_window_full,
         )
         for key in ordered
     ]
@@ -850,6 +1021,9 @@ def build_operational_monitor(
         for row in reservations
     ]
 
+    decision_entries = (
+        journal if header_decision_entries is None else header_decision_entries
+    )
     header = _header(
         engine,
         engine_ticks=engine_ticks,
@@ -857,7 +1031,7 @@ def build_operational_monitor(
         interval_seconds=interval_seconds,
         real_price_enabled=real_price_enabled,
         grace_seconds=grace_seconds,
-        last_decision_at=_last_decision_instant(journal),
+        last_decision_at=_last_decision_instant(decision_entries),
         as_of=stamp,
     )
     concurrency = _concurrency(
@@ -866,6 +1040,11 @@ def build_operational_monitor(
         reconcilations=reconciliations,
         claims=list(claim_entries),
         journal=journal,
+        counts=concurrency_counts,
+        claims_total=claims_total,
+        reconciliations_total=reconciliations_total,
+        forced_releases_total=forced_releases_total,
+        reservations_window_full=limit > 0 and len(reservations) >= limit,
     )
     notes: list[str] = []
     if not journal:
@@ -943,8 +1122,14 @@ async def read_operational_monitor(
 
     fills: list[Any] = []
     exit_orders: list[Any] = []
+    fills_window_full = False
     if cycle_ids:
-        fills = await context_store.list_by_cycle_ids(account_id, cycle_ids, limit=max(limit * 50, 200))
+        fill_limit = max(limit * 50, 200)
+        fills = await context_store.list_by_cycle_ids(
+            account_id, cycle_ids, limit=fill_limit
+        )
+        # ``len == limit`` ⇒ la ventana pudo truncarse: el paso FILL lo declara ``PARTIAL``.
+        fills_window_full = len(fills) >= fill_limit
         exit_orders = await exit_store.list_by_cycle_ids(account_id, cycle_ids)
 
     engine = await engine_store.read(engine_id)
@@ -983,25 +1168,67 @@ async def read_operational_monitor(
     journal: list[Any] = []
     reconciliation_entries: list[Any] = []
     claim_entries: list[Any] = []
+    reconciliation_total: int | None = None
+    claim_total: int | None = None
     decision_ids = [d for d in (cycle_decision_id(cid) for cid in cycle_ids) if d]
     if decision_ids:
         try:
             journal = await repository.list_by_decision_ids(decision_ids)
         except Exception:  # noqa: BLE001
             logger.warning("auto monitor: decision journal unavailable", exc_info=True)
+    # Lectura GLOBAL del último ``auto_entry_decision`` durable, independiente de las reservas
+    # visibles: por índice de ``event_type``, más nueva primero (``limit=1``). Sin esto
+    # ``lastDecisionAt`` quedaba atado a los ciclos de la ventana y podía ocultar una decisión
+    # real. Si la consulta falla se deja ``None``: el header cae al journal del ciclo.
+    header_decision_entries: list[Any] | None = None
     try:
-        reconciliation_entries, _ = await repository.list_entries(
+        header_decision_entries, _ = await repository.list_entries(
+            account_id=account_id,
+            event_type=AUTO_ENTRY_DECISION_EVENT,
+            limit=1,
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning("auto monitor: latest decision unavailable", exc_info=True)
+    try:
+        reconciliation_entries, reconciliation_total = await repository.list_entries(
             account_id=account_id,
             event_type=AUTO_RESERVATION_RECONCILIATION_EVENT,
             limit=max(limit * 10, 100),
         )
-        claim_entries, _ = await repository.list_entries(
+    except Exception:  # noqa: BLE001
+        logger.warning("auto monitor: reconciliation journal unavailable", exc_info=True)
+    try:
+        claim_entries, claim_total = await repository.list_entries(
             account_id=account_id,
             event_type=AUTO_RESERVATION_CLAIM_EVENT,
             limit=max(limit * 10, 100),
         )
     except Exception:  # noqa: BLE001
-        logger.warning("auto monitor: audit journal unavailable", exc_info=True)
+        logger.warning("auto monitor: claim journal unavailable", exc_info=True)
+
+    # Contadores GLOBALES de concurrencia agregados en base: NO dependen del ``limit`` de lectura
+    # (cargar las filas truncaba el universo y lo declaraba ``COMPLETE``). Si el agregado falla,
+    # el monitor cae a las filas cargadas y marca ``PARTIAL`` cuando el total las supera.
+    concurrency_counts: dict[str, Any] | None = None
+    try:
+        concurrency_counts = await repository.aggregate_auto_operational_audit(
+            account_id=account_id,
+            claim_event_type=AUTO_RESERVATION_CLAIM_EVENT,
+            reconciliation_event_type=AUTO_RESERVATION_RECONCILIATION_EVENT,
+            grace_window_reason=GRACE_WINDOW_KEEP,
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning("auto monitor: concurrency aggregate unavailable", exc_info=True)
+
+    # ``forcedReleases`` también es agregado en base: la ventana de reservas está limitada y no
+    # puede sostener un conteo global sin declararlo truncado.
+    forced_releases_total: int | None = None
+    try:
+        forced_releases_total = await reservation_store.count_forced_releases(
+            account_id, reasons=_FORCED_RELEASE_REASONS
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning("auto monitor: forced releases aggregate unavailable", exc_info=True)
 
     return build_operational_monitor(
         account_id=account_id,
@@ -1020,6 +1247,12 @@ async def read_operational_monitor(
         real_price_enabled=real_price_enabled_from_env(),
         cycle_id=cycle_id,
         limit=limit,
+        concurrency_counts=concurrency_counts,
+        claims_total=claim_total,
+        reconciliations_total=reconciliation_total,
+        forced_releases_total=forced_releases_total,
+        header_decision_entries=header_decision_entries,
+        fills_window_full=fills_window_full,
     )
 
 

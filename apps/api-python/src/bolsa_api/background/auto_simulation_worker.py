@@ -2767,9 +2767,14 @@ class AutoSimulationWorker:
         if self._operational_audit_sink is None:
             return
         # La identidad (``decision_id``/``payload.cycleId``) la trae el productor: se persiste
-        # tal cual, sin reescribir ningún hecho. La columna ``session_id`` apunta por FK a
+        # tal cual, sin reescribir ningún hecho. SÓLO se sella ``account_id`` cuando el
+        # productor NO lo trae: es lo que permite al monitor leer el último ``auto_entry_decision``
+        # por ``account_id + event_type`` (índice) sin depender de las reservas visibles. No es
+        # una decisión de inversión: es trazado. La columna ``session_id`` apunta por FK a
         # ``decision_sessions`` y no se invade: la sesión de motor vive en los claims.
         for entry in entries:
+            if entry is not None and not getattr(entry, "account_id", None):
+                entry = replace(entry, account_id=self._account_id)
             await self._v2_audit_emit(entry, label="entry_decision")
 
     async def _v2_save_exit_order(self, order: ExitOrder) -> bool:

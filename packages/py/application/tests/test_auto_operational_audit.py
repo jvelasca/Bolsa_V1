@@ -61,7 +61,8 @@ def test_claim_entry_derives_decision_id_and_declares_owner() -> None:
     assert payload["reservation_id"] == "RES-dec-abc"
     assert payload["cycleId"] == "cyc-abc"
     assert payload["claimed"] is True
-    assert payload["conflict"] is False
+    # ``conflict`` ausente = NO DECLARADO: no se deriva de ``claimed`` ni se inventa motivo.
+    assert payload["conflict"] is None
     assert payload["conflictReason"] is None
     assert payload["conflictMeasurement"] == "UNKNOWN"
     assert payload["caller"] == "sess-a"
@@ -93,11 +94,51 @@ def test_lost_claim_is_recorded_as_lost_with_session() -> None:
         as_of="2026-01-02T00:00:00Z",
     )
     assert entry is not None
-    assert (entry.payload or {})["claimed"] is False
-    assert (entry.payload or {})["conflict"] is True
-    assert (entry.payload or {})["conflictReason"] == "duplicate_claim"
-    assert (entry.payload or {})["conflictMeasurement"] == "COMPLETE"
-    assert (entry.payload or {})["caller"] == "sess-loser"
+    payload = entry.payload or {}
+    assert payload["claimed"] is False
+    # Un claim PERDIDO no declara carrera por sí solo: sin ``conflict`` explícito viaja NO
+    # DECLARADO (UNKNOWN), nunca ``duplicate_claim`` fabricado.
+    assert payload["conflict"] is None
+    assert payload["conflictReason"] is None
+    assert payload["conflictMeasurement"] == "UNKNOWN"
+    assert payload["caller"] == "sess-loser"
+
+
+def test_declared_conflict_is_measured_and_carries_its_reason() -> None:
+    """Sólo la capa que DEMOSTRÓ la carrera puede emitir ``conflict=True`` (COMPLETE)."""
+    entry = build_reservation_claim_entry(
+        reservation_id="res-1",
+        cycle_id="cyc-1",
+        claimed=False,
+        actor="auto-sim",
+        session_id="sess-loser",
+        as_of="2026-01-02T00:00:00Z",
+        conflict=True,
+        conflict_reason="duplicate_claim",
+    )
+    assert entry is not None
+    payload = entry.payload or {}
+    assert payload["conflict"] is True
+    assert payload["conflictReason"] == "duplicate_claim"
+    assert payload["conflictMeasurement"] == "COMPLETE"
+
+
+def test_explicit_no_conflict_is_a_declared_complete_measurement() -> None:
+    """``conflict=False`` es un hecho DECLARADO ("no hubo carrera") ⇒ COMPLETE, sin motivo."""
+    entry = build_reservation_claim_entry(
+        reservation_id="res-1",
+        cycle_id="cyc-1",
+        claimed=False,
+        actor="auto-sim",
+        session_id="sess-a",
+        as_of="2026-01-02T00:00:00Z",
+        conflict=False,
+    )
+    assert entry is not None
+    payload = entry.payload or {}
+    assert payload["conflict"] is False
+    assert payload["conflictReason"] is None
+    assert payload["conflictMeasurement"] == "COMPLETE"
 
 
 def test_release_reconciliation_carries_caller_reason_and_age() -> None:

@@ -86,7 +86,15 @@ async def _wipe(factory: async_sessionmaker[AsyncSession], account_id: str) -> N
         await session.commit()
 
 
-def _reservation(*, reservation_id: str, cycle_id: str, account_id: str, instrument: str) -> Any:
+def _reservation(
+    *,
+    reservation_id: str,
+    cycle_id: str,
+    account_id: str,
+    instrument: str,
+    release_reason: str | None = None,
+    status: str = "OPEN",
+) -> Any:
     from bolsa_analytics.cognitive.portfolio_reservation import PortfolioReservation
 
     return PortfolioReservation(
@@ -102,6 +110,8 @@ def _reservation(*, reservation_id: str, cycle_id: str, account_id: str, instrum
         strategy_version_id="orb-1",
         created_at="2026-10-01T09:00:00+00:00",
         cycle_id=cycle_id,
+        release_reason=release_reason,
+        status=status,
     )
 
 
@@ -280,6 +290,10 @@ async def test_monitor_projects_a_real_durable_chain(
         assert steps["SETTLEMENT"]["state"] == "unknown"
         assert steps["SETTLEMENT"]["note"] == "settlement_not_durable"
 
+        # ``lastDecisionAt`` sale de la lectura GLOBAL del spine, no de los ciclos visibles.
+        assert dto["header"]["lastDecisionAt"] == "2026-10-01T09:00:00Z"
+        assert dto["header"]["lastDecisionMeasurement"] == "COMPLETE"
+
         reservation = dto["reservations"][0]
         assert reservation["ownerSession"] == "sess-owner"
         assert reservation["ownerMeasurement"] == "COMPLETE"
@@ -335,5 +349,100 @@ async def test_monitor_declares_absence_when_the_spine_has_no_trace(
         assert reservation["ownerMeasurement"] == "UNKNOWN"
         assert "decision_journal_not_durable" in dto["notes"]
         assert "owner_session_not_durable" in dto["notes"]
+    finally:
+        await _wipe(monitor_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_monitor_claim_counts_come_from_the_aggregate_not_the_page(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Con más claims que la página, ``claimAttempts`` es el TOTAL real (COMPLETE), no la página.
+
+    Es la grieta que la auditoría v2.88.22 señaló: ``limit`` truncaba el universo y el DTO podía
+    declararlo ``COMPLETE``. El agregado en base cuenta TODO el universo sin cargar los eventos;
+    el desglose de carrera se declara ``PARTIAL`` porque ningún claim declaró ``conflict``.
+    """
+    from bolsa_application.auto_operational_audit import build_reservation_claim_entry
+    from bolsa_application.auto_operational_monitor import read_operational_monitor
+    from bolsa_infrastructure.database.repositories.journal_repository import (
+        SqlAlchemyJournalRepository,
+    )
+
+    account_id = f"acc-monitor-{uuid.uuid4().hex[:10]}"
+    total_claims = 120
+    await _wipe(monitor_pg_factory, account_id)
+    try:
+        async with monitor_pg_factory() as session:
+            repository = SqlAlchemyJournalRepository(session)
+            for index in range(total_claims):
+                claim = build_reservation_claim_entry(
+                    reservation_id=f"RES-agg-{index}",
+                    cycle_id=None,
+                    claimed=False,
+                    actor="auto-sim",
+                    session_id="sess-a",
+                    as_of=f"2026-10-01T09:{index % 60:02d}:00Z",
+                    account_id=account_id,
+                    instrument_id="CCC",
+                )
+                assert claim is not None
+                await repository.append(claim)
+            await session.commit()
+
+        # ``limit=1`` ⇒ la página de ``list_entries`` trae 100 filas (< 120): si el conteo saliera
+        # de la página, mentiría. El agregado debe dar el total real.
+        async with monitor_pg_factory() as session:
+            dto = await read_operational_monitor(
+                session, account_id, engine_id=_ENGINE_ID, limit=1, grace_seconds=61.0
+            )
+
+        concurrency = dto["concurrency"]
+        assert concurrency["claimAttempts"] == total_claims
+        assert concurrency["claimAttemptsMeasurement"] == "COMPLETE"
+        assert concurrency["lostClaims"] == total_claims
+        # Ninguno declaró ``conflict``: la carrera NO se mide (PARTIAL), nunca un 0 afirmado.
+        assert concurrency["raceConflicts"] == 0
+        assert concurrency["raceConflictsMeasurement"] == "PARTIAL"
+    finally:
+        await _wipe(monitor_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_monitor_forced_releases_come_from_the_aggregate(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """``forcedReleases`` es el conteo GLOBAL: con la ventana truncada sigue siendo el total."""
+    from bolsa_application.auto_operational_monitor import read_operational_monitor
+    from bolsa_application.reservation_store import PostgresReservationStore
+
+    account_id = f"acc-monitor-{uuid.uuid4().hex[:10]}"
+    total_forced = 5
+    await _wipe(monitor_pg_factory, account_id)
+    try:
+        async with monitor_pg_factory() as session:
+            reservations = PostgresReservationStore(session, autocommit=True)
+            for index in range(total_forced):
+                await reservations.save(
+                    _reservation(
+                        reservation_id=f"RES-fr-{index}",
+                        cycle_id=f"cyc-fr-{index}",
+                        account_id=account_id,
+                        instrument="DDD",
+                        release_reason="cancel",
+                        status="RELEASED_BY_CANCEL",
+                    )
+                )
+
+        # ``limit=1`` ⇒ la ventana de reservas trae 1 de 5: si el conteo saliera de la ventana
+        # mentiría. El agregado en base da el universo completo.
+        async with monitor_pg_factory() as session:
+            dto = await read_operational_monitor(
+                session, account_id, engine_id=_ENGINE_ID, limit=1, grace_seconds=61.0
+            )
+
+        concurrency = dto["concurrency"]
+        assert concurrency["forcedReleases"] == total_forced
+        assert concurrency["forcedReleasesMeasurement"] == "COMPLETE"
     finally:
         await _wipe(monitor_pg_factory, account_id)
