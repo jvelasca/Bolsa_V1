@@ -43,10 +43,9 @@
 | `node … status` (fixtures de ledger/`window.json`) | sin provenance ⇒ `STALE`; sha corrupto ⇒ `STALE (sha256_no_coincide)`; provenance válida ⇒ `gate READY (run 20261002)`; ledger vacío ⇒ `NO_MEDIDO` |
 | `node … status` con `.run.lock` vivo | `RUN EN CURSO: dia … (pid …) — no lances otro run-day` |
 | `pnpm --filter @bolsa/web test` / `typecheck` | *(no se toca UI; se re-ejecuta para descartar regresión)* |
+| **CI de tag** — `Release tag CI` run [`37049811028`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37049811028) (`ref=refs/tags/v2.88.31-beta`, HEAD `1f870100`, `2026-10-02T18:47:24Z → 18:55:33Z`) | **`SUCCESS`**: **11 jobs `success`** (`security`, `shared`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. El job `shared` estrena el step **Window runner guards** (`pnpm window:test`) → `# tests 19 · # pass 19 · # fail 0`; `shared` además **96 ficheros / 798 tests `passed` (+1 todo)**. `python`: **`4324 passed, 45 skipped`** (**idéntico a `v2.88.30`** ⇒ sin cambios de producto Python). `frontend`: **`235` ficheros / `1355` tests `passed`** · `passed=true · critical=0 · warn=0`. `lifecycle-pg`: Golden Day 2.0 `2 passed` · Crash/Recovery `2 passed` · Concurrent AUTO `3 passed` · crash injection matrix `2 passed` · multiprocess AUTO `1 passed` (gates *fail-if-skipped*). `replay-repro`: `REPRODUCIDO` (`1E3ADAC2…`, 2ª corrida IDÉNTICA) ⇒ el árbol no mueve el artefacto OOS |
 
-> **Pendiente post-tag:** la **cita real del CI del tag** (`Release tag CI` sobre `refs/tags/v2.88.31-beta`) se
-> anexa al publicar el tag; este documento **no** inventa el run id. El job `shared` incorpora
-> `pnpm window:test` (nuevo step *Window runner guards*).
+> El step nuevo `Window runner guards` (`pnpm window:test`) ya corre en el job `shared` del `Release tag CI`.
 
 ---
 
@@ -83,4 +82,5 @@ pnpm --filter @bolsa/web typecheck
 - **Versión:** `2.11.31-beta` (base `2.11.30-beta`); **SIN migración** — Alembic head sigue `048_journal_entry_dedupe_key`.
 - **Ficheros de operación:** `scripts/lib/window-forward.mjs` (config inmutable, `lockDecision`, `verifyWindowProvenance`), `scripts/window-forward-runner.mjs` (lock, `--unsafe-override-window-config`, `unlock`, provenance + `sha256`), `scripts/lib/window-forward.test.mjs` (nuevo), `package.json` (`window:unlock`/`window:test`, bump), `.github/workflows/release-tag-ci.yml` (step `pnpm window:test` en `shared`), docs de runbook/arranque.
 - **RELEASE (GitHub):** `v2.88.31-beta` — *pre-release* sobre el tag anotado.
+- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`37049811028`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37049811028) (`ref=refs/tags/v2.88.31-beta`, HEAD `1f870100`) → **`SUCCESS`**: 11 jobs `success` + `playwright (integrated E2E, opt-in)` `skipped` por diseño, `certify` `success`. Step nuevo en `shared` **Window runner guards** (`pnpm window:test`) **`19/19`**; `python` **`4324 passed, 45 skipped`** (idéntico a `v2.88.30`); `frontend` **`235` ficheros / `1355` tests `passed`**; `lifecycle-pg` **VERDE** (Golden Day 2.0 `2 passed`, Crash/Recovery `2 passed`, Concurrent AUTO `3 passed`, gates *fail-if-skipped*); `replay-repro` **REPRODUCIDO** (`1E3ADAC2…`, 2ª corrida IDÉNTICA) ⇒ el árbol no mueve el artefacto OOS.
 - **`Δ motor = 0`:** ningún fichero de motor/producto Python tocado; sin cambios de contrato.
