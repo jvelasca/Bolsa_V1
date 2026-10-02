@@ -224,6 +224,15 @@ fabricado. Mientras no se cumpla el gate, el veredicto honesto es **`NO MEDIDO`*
 - **Forward, no replay.**
 - **No** borrar los fixtures de `operability_runs/`.
 - Veredicto honesto: `INCONCLUSIVE` / `NO MEDIDO` si el material sigue degenerado.
+- **Higiene de entorno (2026-10-02).** Los flags de **operación** (`AUTO_ENGINE_SIM_REAL_PRICE=1`,
+  `AUTO_OPERATIONAL_AUDIT=1`, `BROKER_VENUE=paper`) **no** deben quedar exportados en el mismo shell
+  con el que luego se corren las suites PG de proceso
+  (`test_golden_day_v2_process_pg.py`, `test_crash_recovery_day_process_pg.py`,
+  `test_concurrent_auto_pg.py`). El proceso hijodal los **hereda** (`os.environ.copy()`), y con
+  `AUTO_ENGINE_SIM_REAL_PRICE=1` los días que **no** siembran barras caen en *precio AUSENTE* ⇒
+  `HOLD fail-closed` ⇒ el test falla por «no abrir posición» (falso rojo). Los tests ya fijan lo que
+  necesitan; el shell debe aportar sólo `PYTHONPATH` y los gates `*_PG_REQUIRED=1`. Al terminar una
+  tanda de operación, **`Remove-Item Env:AUTO_ENGINE_SIM_REAL_PRICE, Env:AUTO_OPERATIONAL_AUDIT, Env:BROKER_VENUE`**.
 
 ## 6. Qué mirar cada día en la tabla de operabilidad
 
