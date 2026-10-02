@@ -114,6 +114,7 @@ async def _seed_fill(
     side: str,
     price: float,
     reference_mid: float,
+    execution_id: str | None = None,
 ) -> None:
     from bolsa_application.sim_durable_store import (
         PostgresSimFillFinanceContextStore,
@@ -123,7 +124,11 @@ async def _seed_fill(
     store = PostgresSimFillFinanceContextStore(session, autocommit=False)
     await store.save(
         SimFillFinanceContext(
-            execution_id=f"EX-{uuid.uuid4().hex[:12]}",
+            # ``execution_id`` determinista: el store sella su propio ``created_at`` (``_now()``),
+            # así que ``cycles_from_fills`` ordena por ``(created_at, execution_id)``. Un id
+            # aleatorio podía hacer leer la venta antes de su compra y descartar el ciclo (test
+            # flaky); prefijar ``...-buy``/``...-sell`` fija el orden FIFO.
+            execution_id=execution_id or f"EX-{uuid.uuid4().hex[:12]}",
             instrument_id=instrument,
             side=side,
             quantity=Decimal("10"),
@@ -240,6 +245,7 @@ async def test_monitor_projects_a_real_durable_chain(
                 side="buy",
                 price=100.0,
                 reference_mid=99.9,
+                execution_id=f"EX-{suffix}-buy",
             )
             await _seed_fill(
                 session,
@@ -249,6 +255,7 @@ async def test_monitor_projects_a_real_durable_chain(
                 side="sell",
                 price=110.0,
                 reference_mid=110.1,
+                execution_id=f"EX-{suffix}-sell",
             )
             await _seed_journal(
                 session, account_id=account_id, cycle_id=cycle_id, instrument=instrument
@@ -269,13 +276,19 @@ async def test_monitor_projects_a_real_durable_chain(
         assert steps["FILL"]["state"] == "reached"
         assert cycle["closed"] is True
         assert steps["CYCLE_CLOSED"]["state"] == "reached"
+        # Un ciclo cerrado NO demuestra settlement durable: se declara, no se finge.
+        assert steps["SETTLEMENT"]["state"] == "unknown"
+        assert steps["SETTLEMENT"]["note"] == "settlement_not_durable"
 
         reservation = dto["reservations"][0]
         assert reservation["ownerSession"] == "sess-owner"
         assert reservation["ownerMeasurement"] == "COMPLETE"
         concurrency = dto["concurrency"]
-        assert concurrency["duplicateClaims"] == 0
-        assert concurrency["duplicateClaimsMeasurement"] == "COMPLETE"
+        assert concurrency["claimAttempts"] == 1
+        assert concurrency["successfulClaims"] == 1
+        assert concurrency["lostClaims"] == 0
+        assert concurrency["raceConflicts"] == 0
+        assert concurrency["claimAttemptsMeasurement"] == "COMPLETE"
         assert concurrency["graceWindowKeeps"] == 1
         assert concurrency["graceWindowKeepsMeasurement"] == "COMPLETE"
         assert "decision_journal_not_durable" not in dto["notes"]

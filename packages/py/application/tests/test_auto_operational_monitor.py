@@ -39,6 +39,17 @@ def _fill(
     )
 
 
+def _engine(**overrides: Any) -> Any:
+    base: dict[str, Any] = {
+        "engine_id": "auto-sim",
+        "state": "RUNNING",
+        "venue": "paper",
+        "last_tick_at": "2026-01-02T10:00:00Z",
+    }
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
 def _reservation(**overrides: Any) -> Any:
     base: dict[str, Any] = {
         "reservation_id": "res-1",
@@ -180,7 +191,50 @@ def test_closed_cycle_reuses_cycles_from_fills_for_pnl() -> None:
     assert cycle["closed"] is True
     assert cycle["result"]["pnl"] == 100
     assert _step(cycle["steps"], "CYCLE_CLOSED")["state"] == STEP_REACHED
-    assert _step(cycle["steps"], "SETTLEMENT")["state"] == STEP_REACHED
+    # Un ciclo cerrado (``cycles_from_fills``) NO demuestra settlement durable.
+    settlement = _step(cycle["steps"], "SETTLEMENT")
+    assert settlement["state"] == STEP_UNKNOWN
+    assert settlement["measurement"] == "UNKNOWN"
+    assert settlement["note"] == "settlement_not_durable"
+
+
+def test_settlement_is_unknown_and_never_derived_from_cycle_closed() -> None:
+    """``fill + PnL + ciclo cerrado`` NO es un settlement durable (regla de la casa).
+
+    Con una costura durable explícita (``settlements``) el paso SÍ alcanza; sin ella se declara.
+    """
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100),
+            _fill(side="sell", qty=10, price=110),
+        ],
+    )
+    cycle = dto["cycles"][0]
+    assert cycle["closed"] is True
+    settlement = _step(cycle["steps"], "SETTLEMENT")
+    assert settlement["state"] == STEP_UNKNOWN
+    assert settlement["note"] == "settlement_not_durable"
+    assert settlement["facts"] == []
+    assert "settlement_not_durable" in cycle["notes"]
+
+    durable = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[_fill(side="buy", qty=10, price=100)],
+        settlements=[
+            {
+                "cycle_id": "cyc-1",
+                "settlementId": "SET-1",
+                "pnl": 100,
+                "settledAt": "2026-01-02T00:00:00Z",
+            }
+        ],
+    )
+    reached = _step(durable["cycles"][0]["steps"], "SETTLEMENT")
+    assert reached["state"] == STEP_REACHED
+    assert _fact(reached, "settlementId")["value"] == "SET-1"
 
 
 def test_open_cycle_settlement_pending_and_not_closed() -> None:
@@ -191,7 +245,7 @@ def test_open_cycle_settlement_pending_and_not_closed() -> None:
     )
     cycle = dto["cycles"][0]
     assert cycle["closed"] is False
-    assert _step(cycle["steps"], "SETTLEMENT")["state"] == "pending"
+    assert _step(cycle["steps"], "SETTLEMENT")["state"] == STEP_UNKNOWN
     assert _step(cycle["steps"], "CYCLE_CLOSED")["state"] == "pending"
 
 
@@ -213,8 +267,9 @@ def test_reservation_view_ownership_declared_not_measured() -> None:
 def test_concurrency_declares_unmeasured_when_no_audit() -> None:
     dto = build_operational_monitor(account_id="acc-1", reservations=[_reservation()])
     concurrency = dto["concurrency"]
-    assert concurrency["duplicateClaims"] is None
-    assert concurrency["duplicateClaimsMeasurement"] == "UNKNOWN"
+    for key in ("claimAttempts", "successfulClaims", "lostClaims", "raceConflicts"):
+        assert concurrency[key] is None
+        assert concurrency[f"{key}Measurement"] == "UNKNOWN"
     assert concurrency["reconciliations"] is None
     assert concurrency["forcedReleases"] == 0
 
@@ -237,7 +292,7 @@ def test_concurrency_counts_audit_entries_when_present() -> None:
         decision_id="dec-1",
         created_at="2026-01-03T00:00:00Z",
         session_id="sess-b",
-        payload={"reservation_id": "res-1", "claimed": False},
+        payload={"reservation_id": "res-1", "claimed": False, "conflict": True},
     )
     dto = build_operational_monitor(
         account_id="acc-1",
@@ -248,11 +303,45 @@ def test_concurrency_counts_audit_entries_when_present() -> None:
     view = dto["reservations"][0]
     assert view["reconciliations"][0]["decision"] == "KEEP"
     concurrency = dto["concurrency"]
-    assert concurrency["duplicateClaims"] == 1
+    assert concurrency["claimAttempts"] == 1
+    assert concurrency["successfulClaims"] == 0
+    assert concurrency["lostClaims"] == 1
+    assert concurrency["raceConflicts"] == 1
     assert concurrency["graceWindowKeeps"] == 1
     assert concurrency["reconciliations"] == 1
     assert concurrency["activeSessions"] == 2
     assert "reconciliation_not_durable" not in dto["notes"]
+
+
+def test_concurrency_separates_lost_claims_from_declared_race_conflicts() -> None:
+    """``claimed=False`` NO equivale a carrera: solo cuenta como tal si el productor la declara."""
+    lost_but_not_race = SimpleNamespace(
+        decision_id="dec-1",
+        created_at="2026-01-03T00:00:00Z",
+        session_id="sess-a",
+        payload={"reservation_id": "res-1", "claimed": False, "conflict": False},
+    )
+    declared_race = SimpleNamespace(
+        decision_id="dec-1",
+        created_at="2026-01-03T00:01:00Z",
+        session_id="sess-b",
+        payload={
+            "reservation_id": "res-1",
+            "claimed": False,
+            "conflict": True,
+            "conflictReason": "duplicate_claim",
+        },
+    )
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        claim_entries=[lost_but_not_race, declared_race],
+    )
+    concurrency = dto["concurrency"]
+    assert concurrency["claimAttempts"] == 2
+    assert concurrency["successfulClaims"] == 0
+    assert concurrency["lostClaims"] == 2
+    assert concurrency["raceConflicts"] == 1
 
 
 def _claim(
@@ -325,3 +414,40 @@ def test_last_conflict_measured_from_lost_claim() -> None:
     unknown = build_operational_monitor(account_id="acc-1", reservations=[_reservation()])
     assert unknown["concurrency"]["lastConflict"] is None
     assert unknown["concurrency"]["lastConflictMeasurement"] == "UNKNOWN"
+
+
+def test_header_separates_last_heartbeat_from_last_decision() -> None:
+    """El heartbeat del motor NUNCA se publica como 'última decisión'."""
+    dto = build_operational_monitor(account_id="acc-1", engine=_engine())
+    header = dto["header"]
+    assert header["lastHeartbeatAt"] == "2026-01-02T10:00:00Z"
+    assert header["lastHeartbeatMeasurement"] == "COMPLETE"
+    assert header["lastDecisionAt"] is None
+    assert header["lastDecisionMeasurement"] == "UNKNOWN"
+    assert header["nextDecisionAt"] is None
+
+    entry = SimpleNamespace(
+        decision_id="dec-1",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        created_at="2026-01-01T22:00:00Z",
+        session_id="sess-a",
+        payload={"cycleId": "cyc-1", "instrumentId": "AAPL", "rank": 1},
+    )
+    dto2 = build_operational_monitor(
+        account_id="acc-1",
+        engine=_engine(),
+        reservations=[_reservation()],
+        journal=[entry],
+        interval_seconds=3600.0,
+    )
+    header2 = dto2["header"]
+    assert header2["lastDecisionAt"] == "2026-01-01T22:00:00Z"
+    assert header2["lastDecisionMeasurement"] == "COMPLETE"
+    assert header2["nextDecisionAt"] == "2026-01-01T23:00:00Z"
+    assert header2["lastHeartbeatAt"] == "2026-01-02T10:00:00Z"
+
+
+def test_header_heartbeats_persisted_is_not_an_operational_event_count() -> None:
+    dto = build_operational_monitor(account_id="acc-1", engine=_engine(), engine_ticks=1234)
+    assert dto["header"]["heartbeatsPersisted"] == 1234
+    assert dto["concurrency"]["heartbeatsPersisted"] == 1234

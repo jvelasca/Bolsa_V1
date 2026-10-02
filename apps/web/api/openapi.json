@@ -660,7 +660,7 @@
             "title": "Activesessionsmeasurement",
             "type": "string"
           },
-          "duplicateClaims": {
+          "claimAttempts": {
             "anyOf": [
               {
                 "type": "integer"
@@ -669,10 +669,10 @@
                 "type": "null"
               }
             ],
-            "title": "Duplicateclaims"
+            "title": "Claimattempts"
           },
-          "duplicateClaimsMeasurement": {
-            "title": "Duplicateclaimsmeasurement",
+          "claimAttemptsMeasurement": {
+            "title": "Claimattemptsmeasurement",
             "type": "string"
           },
           "forcedReleases": {
@@ -699,11 +699,46 @@
             "title": "Gracewindowkeepsmeasurement",
             "type": "string"
           },
+          "heartbeatsPersisted": {
+            "default": 0,
+            "title": "Heartbeatspersisted",
+            "type": "integer"
+          },
           "lastConflict": {
             "title": "Lastconflict"
           },
           "lastConflictMeasurement": {
             "title": "Lastconflictmeasurement",
+            "type": "string"
+          },
+          "lostClaims": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lostclaims"
+          },
+          "lostClaimsMeasurement": {
+            "title": "Lostclaimsmeasurement",
+            "type": "string"
+          },
+          "raceConflicts": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raceconflicts"
+          },
+          "raceConflictsMeasurement": {
+            "title": "Raceconflictsmeasurement",
             "type": "string"
           },
           "reconciliations": {
@@ -721,7 +756,7 @@
             "title": "Reconciliationsmeasurement",
             "type": "string"
           },
-          "reservationRaces": {
+          "successfulClaims": {
             "anyOf": [
               {
                 "type": "integer"
@@ -730,22 +765,19 @@
                 "type": "null"
               }
             ],
-            "title": "Reservationraces"
+            "title": "Successfulclaims"
           },
-          "reservationRacesMeasurement": {
-            "title": "Reservationracesmeasurement",
+          "successfulClaimsMeasurement": {
+            "title": "Successfulclaimsmeasurement",
             "type": "string"
-          },
-          "ticks": {
-            "default": 0,
-            "title": "Ticks",
-            "type": "integer"
           }
         },
         "required": [
           "activeSessionsMeasurement",
-          "duplicateClaimsMeasurement",
-          "reservationRacesMeasurement",
+          "claimAttemptsMeasurement",
+          "successfulClaimsMeasurement",
+          "lostClaimsMeasurement",
+          "raceConflictsMeasurement",
           "reconciliationsMeasurement",
           "graceWindowKeepsMeasurement",
           "forcedReleasesMeasurement",
@@ -954,6 +986,11 @@
             ],
             "title": "Heartbeatseconds"
           },
+          "heartbeatsPersisted": {
+            "default": 0,
+            "title": "Heartbeatspersisted",
+            "type": "integer"
+          },
           "lastDecisionAt": {
             "anyOf": [
               {
@@ -964,6 +1001,27 @@
               }
             ],
             "title": "Lastdecisionat"
+          },
+          "lastDecisionMeasurement": {
+            "default": "UNKNOWN",
+            "title": "Lastdecisionmeasurement",
+            "type": "string"
+          },
+          "lastHeartbeatAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastheartbeatat"
+          },
+          "lastHeartbeatMeasurement": {
+            "default": "UNKNOWN",
+            "title": "Lastheartbeatmeasurement",
+            "type": "string"
           },
           "nextDecisionAt": {
             "anyOf": [
@@ -996,11 +1054,6 @@
             "default": "UNKNOWN",
             "title": "State",
             "type": "string"
-          },
-          "ticks": {
-            "default": 0,
-            "title": "Ticks",
-            "type": "integer"
           },
           "venue": {
             "default": "paper",

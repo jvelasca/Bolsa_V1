@@ -53,6 +53,8 @@
 | `duplicateClaims`/`reservationRaces` | `NO MEDIDO` | conteo de claims perdidos |
 | `reconciliations`/`graceWindowKeeps`/`forcedReleases` | `NO MEDIDO` | reconciliaciones del spine + `release_reason` |
 
+> **Errata (corregida en [`v2.88.22-beta`](../v2.88.22/README.md)):** `duplicateClaims`/`reservationRaces` se sustituyen por `claimAttempts`/`successfulClaims`/`lostClaims`/`raceConflicts`. `claimed=False` **no** equivale a carrera (puede ser invalid/expired/already_released/wrong_state): `raceConflicts` sólo cuenta el conflicto declarado por el productor (`payload.conflict`). Este texto describe el estado de `M2`; la corrección posterior no reescribe su historia.
+
 ---
 
 ## 3. Verificación (re-ejecutada en el momento del sello)

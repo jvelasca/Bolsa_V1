@@ -4184,10 +4184,10 @@ export interface components {
             activeSessions?: number | null;
             /** Activesessionsmeasurement */
             activeSessionsMeasurement: string;
-            /** Duplicateclaims */
-            duplicateClaims?: number | null;
-            /** Duplicateclaimsmeasurement */
-            duplicateClaimsMeasurement: string;
+            /** Claimattempts */
+            claimAttempts?: number | null;
+            /** Claimattemptsmeasurement */
+            claimAttemptsMeasurement: string;
             /**
              * Forcedreleases
              * @default 0
@@ -4199,23 +4199,31 @@ export interface components {
             graceWindowKeeps?: number | null;
             /** Gracewindowkeepsmeasurement */
             graceWindowKeepsMeasurement: string;
+            /**
+             * Heartbeatspersisted
+             * @default 0
+             */
+            heartbeatsPersisted: number;
             /** Lastconflict */
             lastConflict?: unknown;
             /** Lastconflictmeasurement */
             lastConflictMeasurement: string;
+            /** Lostclaims */
+            lostClaims?: number | null;
+            /** Lostclaimsmeasurement */
+            lostClaimsMeasurement: string;
+            /** Raceconflicts */
+            raceConflicts?: number | null;
+            /** Raceconflictsmeasurement */
+            raceConflictsMeasurement: string;
             /** Reconciliations */
             reconciliations?: number | null;
             /** Reconciliationsmeasurement */
             reconciliationsMeasurement: string;
-            /** Reservationraces */
-            reservationRaces?: number | null;
-            /** Reservationracesmeasurement */
-            reservationRacesMeasurement: string;
-            /**
-             * Ticks
-             * @default 0
-             */
-            ticks: number;
+            /** Successfulclaims */
+            successfulClaims?: number | null;
+            /** Successfulclaimsmeasurement */
+            successfulClaimsMeasurement: string;
         };
         /** AutoMonitorCycleDto */
         AutoMonitorCycleDto: {
@@ -4289,8 +4297,25 @@ export interface components {
             };
             /** Heartbeatseconds */
             heartbeatSeconds?: number | null;
+            /**
+             * Heartbeatspersisted
+             * @default 0
+             */
+            heartbeatsPersisted: number;
             /** Lastdecisionat */
             lastDecisionAt?: string | null;
+            /**
+             * Lastdecisionmeasurement
+             * @default UNKNOWN
+             */
+            lastDecisionMeasurement: string;
+            /** Lastheartbeatat */
+            lastHeartbeatAt?: string | null;
+            /**
+             * Lastheartbeatmeasurement
+             * @default UNKNOWN
+             */
+            lastHeartbeatMeasurement: string;
             /** Nextdecisionat */
             nextDecisionAt?: string | null;
             /** Protectionmodel */
@@ -4305,11 +4330,6 @@ export interface components {
              * @default UNKNOWN
              */
             state: string;
-            /**
-             * Ticks
-             * @default 0
-             */
-            ticks: number;
             /**
              * Venue
              * @default paper

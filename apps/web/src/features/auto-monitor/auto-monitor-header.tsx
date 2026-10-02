@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   executionModeLabel,
   formatMeasurementLabel,
+  formatMonitorInstant,
   NO_MEASUREMENT_LABEL,
+  realPriceEnabledLabel,
   type AutoMonitorHeaderV1,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
@@ -97,16 +99,32 @@ export function AutoMonitorHeader({ header }: { header: AutoMonitorHeaderV1 }) {
           }
         />
         <Field
+          label="Último heartbeat"
+          value={formatMonitorInstant(
+            header.lastHeartbeatAt,
+            header.lastHeartbeatMeasurement,
+          )}
+          data-testid="auto-monitor-last-heartbeat"
+        />
+        <Field
           label="Última decisión"
-          value={header.lastDecisionAt ?? NO_MEASUREMENT_LABEL}
+          value={formatMonitorInstant(
+            header.lastDecisionAt,
+            header.lastDecisionMeasurement,
+          )}
+          data-testid="auto-monitor-last-decision"
         />
         <Field
           label="Próxima decisión"
-          value={header.nextDecisionAt ?? NO_MEASUREMENT_LABEL}
+          value={formatMonitorInstant(
+            header.nextDecisionAt,
+            header.lastDecisionMeasurement,
+          )}
+          data-testid="auto-monitor-next-decision"
         />
         <Field
-          label="Precio real"
-          value={header.realPriceEnabled ? "ON" : "OFF"}
+          label="Precio real habilitado"
+          value={realPriceEnabledLabel(header.realPriceEnabled)}
           tone={
             header.realPriceEnabled
               ? "text-emerald-600 dark:text-emerald-400"
@@ -115,8 +133,8 @@ export function AutoMonitorHeader({ header }: { header: AutoMonitorHeaderV1 }) {
           data-testid="auto-monitor-real-price"
         />
         <Field
-          label="Ticks duros"
-          value={`${header.ticks} · ${formatMeasurementLabel("COMPLETE")}`}
+          label="Heartbeats persistidos"
+          value={`${header.heartbeatsPersisted} · ${formatMeasurementLabel("COMPLETE")}`}
           data-testid="auto-monitor-ticks"
         />
       </CardContent>

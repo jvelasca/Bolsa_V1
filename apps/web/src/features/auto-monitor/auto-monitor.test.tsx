@@ -32,10 +32,13 @@ function dtoFixture(): AutoOperationalMonitorV1 {
       protectionModel: "bar_ohlc",
       heartbeatSeconds: 60,
       graceSeconds: 61,
+      lastHeartbeatAt: "2026-10-01T09:00:00Z",
+      lastHeartbeatMeasurement: "COMPLETE",
       lastDecisionAt: "2026-09-30T23:00:00Z",
+      lastDecisionMeasurement: "COMPLETE",
       nextDecisionAt: "2026-10-01T00:01:00Z",
       realPriceEnabled: false,
-      ticks: 42,
+      heartbeatsPersisted: 42,
       asOf: "2026-10-01T00:00:00Z",
     },
     cycles: [
@@ -91,11 +94,15 @@ function dtoFixture(): AutoOperationalMonitorV1 {
     concurrency: {
       activeSessions: null,
       activeSessionsMeasurement: "UNKNOWN",
-      ticks: 42,
-      duplicateClaims: null,
-      duplicateClaimsMeasurement: "UNKNOWN",
-      reservationRaces: null,
-      reservationRacesMeasurement: "UNKNOWN",
+      heartbeatsPersisted: 42,
+      claimAttempts: null,
+      claimAttemptsMeasurement: "UNKNOWN",
+      successfulClaims: null,
+      successfulClaimsMeasurement: "UNKNOWN",
+      lostClaims: null,
+      lostClaimsMeasurement: "UNKNOWN",
+      raceConflicts: null,
+      raceConflictsMeasurement: "UNKNOWN",
       reconciliations: null,
       reconciliationsMeasurement: "UNKNOWN",
       graceWindowKeeps: null,
@@ -138,9 +145,12 @@ describe("AutoCycleTimeline", () => {
 describe("AutoConcurrencyPanel", () => {
   it("muestra NO MEDIDO en los conteos sin productor durable", () => {
     render(<AutoConcurrencyPanel concurrency={view.concurrency} />);
-    expect(
-      screen.getByTestId("auto-monitor-duplicate-claims").textContent,
-    ).toBe("NO MEDIDO");
+    expect(screen.getByTestId("auto-monitor-race-conflicts").textContent).toBe(
+      "NO MEDIDO",
+    );
+    expect(screen.getByTestId("auto-monitor-claim-attempts").textContent).toBe(
+      "NO MEDIDO",
+    );
     expect(screen.getByTestId("auto-monitor-forced-releases").textContent).toBe(
       "0",
     );
@@ -216,8 +226,14 @@ describe("AutoMonitorPage", () => {
       "next_bar_open",
     );
     expect(screen.getByTestId("auto-monitor-real-price").textContent).toBe(
-      "OFF",
+      "NO",
     );
+    expect(
+      screen.getByTestId("auto-monitor-last-heartbeat").textContent,
+    ).toContain("2026-10-01T09:00:00Z");
+    expect(
+      screen.getByTestId("auto-monitor-last-decision").textContent,
+    ).toContain("2026-09-30T23:00:00Z");
     expect(screen.getByTestId("auto-monitor-cycles")).toBeTruthy();
     vi.doUnmock("@/features/auto-monitor/use-auto-operational-monitor");
   });

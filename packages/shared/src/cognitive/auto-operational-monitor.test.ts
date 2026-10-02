@@ -8,6 +8,8 @@ import {
   executionModeLabel,
   formatLastConflict,
   formatMonitorFactValue,
+  formatMonitorInstant,
+  realPriceEnabledLabel,
   stepStateLabel,
   type AutoOperationalMonitorV1,
 } from "./auto-operational-monitor.js";
@@ -24,8 +26,11 @@ function minimalDto(): AutoOperationalMonitorV1 {
       decisionClock: "CLOSED BAR",
       executionDeclared: "next_bar_open",
       executionEnabled: false,
+      lastHeartbeatAt: "2026-10-01T09:00:00Z",
+      lastHeartbeatMeasurement: "COMPLETE",
+      lastDecisionMeasurement: "UNKNOWN",
       realPriceEnabled: false,
-      ticks: 1,
+      heartbeatsPersisted: 1,
       asOf: "2026-10-01T00:00:00Z",
     },
     cycles: [
@@ -49,9 +54,11 @@ function minimalDto(): AutoOperationalMonitorV1 {
     reservations: [],
     concurrency: {
       activeSessionsMeasurement: "UNKNOWN",
-      ticks: 1,
-      duplicateClaimsMeasurement: "UNKNOWN",
-      reservationRacesMeasurement: "UNKNOWN",
+      heartbeatsPersisted: 1,
+      claimAttemptsMeasurement: "UNKNOWN",
+      successfulClaimsMeasurement: "UNKNOWN",
+      lostClaimsMeasurement: "UNKNOWN",
+      raceConflictsMeasurement: "UNKNOWN",
       reconciliationsMeasurement: "UNKNOWN",
       graceWindowKeepsMeasurement: "UNKNOWN",
       forcedReleases: 0,
@@ -117,5 +124,22 @@ describe("formatLastConflict", () => {
     );
     expect(label).toContain("RES-dec-aaa");
     expect(label).toContain("2026-10-01T10:00:00Z");
+  });
+});
+
+describe("realPriceEnabledLabel", () => {
+  it("declara la configuración, no la fuente usada", () => {
+    expect(realPriceEnabledLabel(true)).toBe("SÍ (habilitado)");
+    expect(realPriceEnabledLabel(false)).toBe("NO");
+  });
+});
+
+describe("formatMonitorInstant", () => {
+  it("rotula NO MEDIDO cuando no hay instante durable", () => {
+    expect(formatMonitorInstant(null, "UNKNOWN")).toBe("NO MEDIDO");
+    expect(formatMonitorInstant(null, "COMPLETE")).toBe("MEDIDO");
+    expect(formatMonitorInstant("2026-10-01T22:00:00Z", "COMPLETE")).toBe(
+      "2026-10-01T22:00:00Z",
+    );
   });
 });

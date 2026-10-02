@@ -108,22 +108,37 @@ def build_reservation_claim_entry(
     as_of: str | None,
     account_id: str | None = None,
     instrument_id: str | None = None,
+    conflict: bool | None = None,
+    conflict_reason: str | None = None,
 ) -> DecisionJournalEntryRecord | None:
     """(PURA) entrada append-only del claim de una reserva, o ``None`` sin reserva.
 
     ``claimed = True`` es el claim **ganado** por esta sesión (dueña del compromiso);
-    ``False`` es la carrera **perdida** (ya había un compromiso vivo con la misma identidad
-    determinista). Es la materia prima del panel de concurrencia (``duplicateClaims``).
+    ``False`` es el claim **perdido** (ya había un compromiso vivo con la misma identidad
+    determinista). El hecho de que un claim perdido sea además una **carrera** se declara
+    aparte en ``conflict``/``conflictReason``: ``claimed=False`` también puede venir de
+    invalid/expired/already_released/wrong_state, así que NO se infiere. Sin ``conflict``
+    explícito se deriva ``conflict = not claimed`` con motivo ``duplicate_claim`` (comportamiento
+    que el monitor lee para ``raceConflicts``).
     """
     rid = _text(reservation_id)
     if rid is None:
         return None
     cycle = _text(cycle_id)
     decision_id, derived = _decision_id(cycle)
+    resolved_conflict = (not claimed) if conflict is None else bool(conflict)
+    resolved_reason = _text(conflict_reason) or (
+        "duplicate_claim" if resolved_conflict else None
+    )
     payload: dict[str, Any] = {
         "event": AUTO_RESERVATION_CLAIM_EVENT,
         "reservation_id": rid,
         "claimed": bool(claimed),
+        "conflict": resolved_conflict,
+        "conflictReason": resolved_reason,
+        "conflictMeasurement": (
+            MEASUREMENT_COMPLETE if resolved_reason is not None else MEASUREMENT_UNKNOWN
+        ),
         "cycleIdDerived": derived,
     }
     if cycle is not None:

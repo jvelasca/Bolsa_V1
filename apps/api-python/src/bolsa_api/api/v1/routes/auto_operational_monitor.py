@@ -115,11 +115,15 @@ class AutoMonitorConcurrencyDto(BaseModel):
 
     activeSessions: int | None = None
     activeSessionsMeasurement: str
-    ticks: int = 0
-    duplicateClaims: int | None = None
-    duplicateClaimsMeasurement: str
-    reservationRaces: int | None = None
-    reservationRacesMeasurement: str
+    heartbeatsPersisted: int = 0
+    claimAttempts: int | None = None
+    claimAttemptsMeasurement: str
+    successfulClaims: int | None = None
+    successfulClaimsMeasurement: str
+    lostClaims: int | None = None
+    lostClaimsMeasurement: str
+    raceConflicts: int | None = None
+    raceConflictsMeasurement: str
     reconciliations: int | None = None
     reconciliationsMeasurement: str
     graceWindowKeeps: int | None = None
@@ -143,10 +147,13 @@ class AutoMonitorHeaderDto(BaseModel):
     protectionModel: str | None = None
     heartbeatSeconds: float | None = None
     graceSeconds: float | None = None
+    lastHeartbeatAt: str | None = None
+    lastHeartbeatMeasurement: str = "UNKNOWN"
     lastDecisionAt: str | None = None
+    lastDecisionMeasurement: str = "UNKNOWN"
     nextDecisionAt: str | None = None
     realPriceEnabled: bool = False
-    ticks: int = 0
+    heartbeatsPersisted: int = 0
     asOf: str
 
 

@@ -24,6 +24,8 @@ Camino obligatorio respetado: `DOMAIN EVENT → PERSISTED OPERATIONAL STATE → 
 | ownership de reservas | (no durable en `M1`) | **`NO MEDIDO`** |
 | concurrencia (races/claims) | (no durable en `M1`) | **`NO MEDIDO`** |
 
+> **Errata (corregida en [`v2.88.22-beta`](../v2.88.22/README.md)):** el **código** de `M1` afirmaba `SETTLEMENT = reached` en cuanto `cycles_from_fills()` calculaba un ciclo cerrado, contradiciendo esta misma fila (`UNKNOWN` sin productor). `v2.88.22` lo corrige: `SETTLEMENT` sólo alcanza con un hecho durable explícito; sin él viaja `unknown` + `settlement_not_durable`. `lastDecisionAt` dejó de ser `last_tick_at` (heartbeat) y las métricas de concurrencia se separaron. Este texto describe el estado de `M1`; la corrección posterior no reescribe su historia.
+
 **Ficheros del sello:**
 
 - `packages/py/application/src/bolsa_application/auto_operational_monitor.py` (nuevo; `build_operational_monitor` puro + `read_operational_monitor` con I/O).

@@ -116,11 +116,15 @@ export type AutoMonitorReservationV1 = {
 export type AutoMonitorConcurrencyV1 = {
   activeSessions?: number | null;
   activeSessionsMeasurement: string;
-  ticks: number;
-  duplicateClaims?: number | null;
-  duplicateClaimsMeasurement: string;
-  reservationRaces?: number | null;
-  reservationRacesMeasurement: string;
+  heartbeatsPersisted: number;
+  claimAttempts?: number | null;
+  claimAttemptsMeasurement: string;
+  successfulClaims?: number | null;
+  successfulClaimsMeasurement: string;
+  lostClaims?: number | null;
+  lostClaimsMeasurement: string;
+  raceConflicts?: number | null;
+  raceConflictsMeasurement: string;
   reconciliations?: number | null;
   reconciliationsMeasurement: string;
   graceWindowKeeps?: number | null;
@@ -142,10 +146,13 @@ export type AutoMonitorHeaderV1 = {
   protectionModel?: string | null;
   heartbeatSeconds?: number | null;
   graceSeconds?: number | null;
+  lastHeartbeatAt?: string | null;
+  lastHeartbeatMeasurement: string;
   lastDecisionAt?: string | null;
+  lastDecisionMeasurement: string;
   nextDecisionAt?: string | null;
   realPriceEnabled: boolean;
-  ticks: number;
+  heartbeatsPersisted: number;
   asOf: string;
 };
 
@@ -238,6 +245,22 @@ export function executionModeLabel(header: AutoMonitorHeaderV1): string {
   const flag = header.executionEnabled ? "habilitado" : "NO habilitado";
   if (declared === enabledText) return `${enabledText} · ${flag}`;
   return `declarado ${declared} · en curso ${enabledText} · ${flag}`;
+}
+
+/**
+ * "Precio real habilitado" es la CONFIGURACIÓN, no la fuente usada en una operación concreta.
+ * La UI no debe dejar leer `ON` como "AUTO está operando con precio real".
+ */
+export function realPriceEnabledLabel(enabled: boolean): string {
+  return enabled ? "SÍ (habilitado)" : "NO";
+}
+
+/** Instante del monitor: un hueco (sin valor) se rotula `NO MEDIDO`, nunca un `—` mudo. */
+export function formatMonitorInstant(
+  value: string | null | undefined,
+  measurement: string,
+): string {
+  return value ?? formatMeasurementLabel(measurement);
 }
 
 /** Último conflicto de claim (carrera perdida) con su estado de medición, sin fingir un `0`. */

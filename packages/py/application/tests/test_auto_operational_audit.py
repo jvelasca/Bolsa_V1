@@ -61,6 +61,9 @@ def test_claim_entry_derives_decision_id_and_declares_owner() -> None:
     assert payload["reservation_id"] == "RES-dec-abc"
     assert payload["cycleId"] == "cyc-abc"
     assert payload["claimed"] is True
+    assert payload["conflict"] is False
+    assert payload["conflictReason"] is None
+    assert payload["conflictMeasurement"] == "UNKNOWN"
     assert payload["caller"] == "sess-a"
     assert payload["callerMeasurement"] == "COMPLETE"
     assert payload["cycleIdDerived"] is True
@@ -91,6 +94,9 @@ def test_lost_claim_is_recorded_as_lost_with_session() -> None:
     )
     assert entry is not None
     assert (entry.payload or {})["claimed"] is False
+    assert (entry.payload or {})["conflict"] is True
+    assert (entry.payload or {})["conflictReason"] == "duplicate_claim"
+    assert (entry.payload or {})["conflictMeasurement"] == "COMPLETE"
     assert (entry.payload or {})["caller"] == "sess-loser"
 
 

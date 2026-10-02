@@ -67,22 +67,34 @@ export function AutoConcurrencyPanel({
           testId="auto-monitor-active-sessions"
         />
         <Metric
-          label="Ticks duros"
-          value={concurrency.ticks}
+          label="Heartbeats persistidos"
+          value={concurrency.heartbeatsPersisted}
           measurement="COMPLETE"
           testId="auto-monitor-concurrency-ticks"
         />
         <Metric
-          label="Claims duplicados"
-          value={concurrency.duplicateClaims}
-          measurement={concurrency.duplicateClaimsMeasurement}
-          testId="auto-monitor-duplicate-claims"
+          label="Claims intentados"
+          value={concurrency.claimAttempts}
+          measurement={concurrency.claimAttemptsMeasurement}
+          testId="auto-monitor-claim-attempts"
         />
         <Metric
-          label="Carreras de reserva"
-          value={concurrency.reservationRaces}
-          measurement={concurrency.reservationRacesMeasurement}
-          testId="auto-monitor-reservation-races"
+          label="Claims ganados"
+          value={concurrency.successfulClaims}
+          measurement={concurrency.successfulClaimsMeasurement}
+          testId="auto-monitor-successful-claims"
+        />
+        <Metric
+          label="Claims perdidos"
+          value={concurrency.lostClaims}
+          measurement={concurrency.lostClaimsMeasurement}
+          testId="auto-monitor-lost-claims"
+        />
+        <Metric
+          label="Conflictos de carrera"
+          value={concurrency.raceConflicts}
+          measurement={concurrency.raceConflictsMeasurement}
+          testId="auto-monitor-race-conflicts"
         />
         <Metric
           label="Reconciliaciones"

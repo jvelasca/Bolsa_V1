@@ -370,25 +370,36 @@ def _protection_step(position: Mapping[str, Any] | None) -> dict[str, Any]:
     return _step("PROTECTION", state=STEP_REACHED, facts=facts)
 
 
-def _settlement_step(closed: Mapping[str, Any] | None, fills: Sequence[Any]) -> dict[str, Any]:
-    if closed is None:
+def _settlement_step(
+    settlement: Mapping[str, Any] | None,
+    fills: Sequence[Any],
+) -> dict[str, Any]:
+    """``SETTLEMENT`` — SOLO desde un hecho durable explícito de liquidación.
+
+    Regla dura de esta versión: un ciclo cerrado (``cycles_from_fills``) **no** demuestra que
+    haya ocurrido un settlement durable. Tener ``fill + PnL + ciclo cerrado`` no es evidencia de
+    liquidación, así que sin un evento/estado durable de settlement el paso se declara
+    ``unknown`` con ``settlement_not_durable`` — **jamás** ``reached``. El PnL se lee en
+    ``CYCLE_CLOSED``. La costura ``settlement`` queda lista para el ``SETTLEMENT_EVENT`` de ``M2``.
+    """
+    if settlement is None:
         return _step(
             "SETTLEMENT",
-            state=STEP_PENDING,
+            state=STEP_UNKNOWN,
             measurement=MEASUREMENT_UNKNOWN,
-            note="cycle_not_closed",
+            note="settlement_not_durable",
         )
     friction, friction_measurement = _applied_friction(fills)
-    facts = [
-        _fact("pnl", closed.get("pnl")),
+    facts: list[dict[str, Any]] = [
         _fact("appliedFriction", friction, friction_measurement),
     ]
-    if closed.get("closedAt"):
-        facts.append(_fact("closedAt", closed.get("closedAt")))
+    for key in ("settlementId", "pnl", "settledAt"):
+        if settlement.get(key) is not None:
+            facts.append(_fact(key, settlement.get(key)))
     return _step(
         "SETTLEMENT",
         state=STEP_REACHED,
-        at=closed.get("closedAt"),
+        at=settlement.get("settledAt"),
         facts=facts,
     )
 
@@ -413,12 +424,14 @@ def _build_cycle(
     positions_by_cycle: Mapping[str, Mapping[str, Any]],
     closed_by_cycle: Mapping[str, Mapping[str, Any]],
     journal: Sequence[Any],
+    settlement_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     reservation = reservations[0] if reservations else None
     cycle_journal = _journal_for_cycle(journal, cycle_id)
     cycle_fills = list(fills_by_cycle.get(cycle_id, ()))
     orders = list(orders_by_cycle.get(cycle_id, ()))
     closed = closed_by_cycle.get(cycle_id)
+    settlement = (settlement_by_cycle or {}).get(cycle_id)
     net = _net_open_qty(cycle_fills)
     is_open = net > 1e-9
     side = str(_get(reservation, "side") or "").strip().lower() if reservation else ""
@@ -431,7 +444,7 @@ def _build_cycle(
         _order_step(orders),
         _fill_step(cycle_fills),
         _protection_step(positions_by_cycle.get(cycle_id)),
-        _settlement_step(closed, cycle_fills),
+        _settlement_step(settlement, cycle_fills),
         _cycle_closed_step(closed),
     ]
     notes: list[str] = []
@@ -567,12 +580,16 @@ def _header(
     interval_seconds: float | None,
     real_price_enabled: bool,
     grace_seconds: float | None,
+    last_decision_at: datetime | None,
     as_of: str,
 ) -> dict[str, Any]:
+    # ``last_tick_at`` es el LATIDO del motor, NO la última decisión de inversión. Se exponen
+    # por separado (``lastHeartbeatAt`` vs ``lastDecisionAt``): mezclarlos haría pasar un
+    # heartbeat por una decisión. La próxima decisión solo se deriva si hay decisión durable.
     last_tick = _parse_instant(_get(engine, "last_tick_at", "lastTickAt")) if engine else None
-    next_tick = (
-        last_tick + timedelta(seconds=interval_seconds)
-        if last_tick is not None and interval_seconds is not None
+    next_decision = (
+        last_decision_at + timedelta(seconds=interval_seconds)
+        if last_decision_at is not None and interval_seconds is not None
         else None
     )
     return {
@@ -586,12 +603,34 @@ def _header(
         "protectionModel": granularity.get("protection"),
         "heartbeatSeconds": interval_seconds,
         "graceSeconds": grace_seconds,
-        "lastDecisionAt": _iso(last_tick),
-        "nextDecisionAt": _iso(next_tick),
+        "lastHeartbeatAt": _iso(last_tick),
+        "lastHeartbeatMeasurement": (
+            MEASUREMENT_COMPLETE if last_tick is not None else MEASUREMENT_UNKNOWN
+        ),
+        "lastDecisionAt": _iso(last_decision_at),
+        "lastDecisionMeasurement": (
+            MEASUREMENT_COMPLETE if last_decision_at is not None else MEASUREMENT_UNKNOWN
+        ),
+        "nextDecisionAt": _iso(next_decision),
         "realPriceEnabled": real_price_enabled,
-        "ticks": engine_ticks,
+        "heartbeatsPersisted": engine_ticks,
         "asOf": as_of,
     }
+
+
+def _last_decision_instant(journal: Sequence[Any]) -> datetime | None:
+    """Instante de la última DECISIÓN de entrada durable (``auto_entry_decision``).
+
+    Sin entrada durable de decisión no hay "última decisión": devolver el ``last_tick_at`` del
+    motor sería afirmar un heartbeat como decisión. ``None`` ⇒ la UI rotula ``NO MEDIDO``.
+    """
+    moments = [
+        _parse_instant(_get(entry, "created_at", "createdAt"))
+        for entry in journal
+        if _get(entry, "event_type", "eventType") == AUTO_ENTRY_DECISION_EVENT
+    ]
+    valid = [moment for moment in moments if moment is not None]
+    return max(valid) if valid else None
 
 
 def _concurrency(
@@ -608,7 +647,28 @@ def _concurrency(
         for entry in reconcilations
         if _entry_payload(entry).get("reason") == GRACE_WINDOW_KEEP
     )
-    duplicate_claims = sum(1 for entry in claims if _entry_payload(entry).get("claimed") is False)
+    has_claims = bool(claims)
+    # Se DECLARAN por separado: ``claimAttempts`` (todo intento auditado), ``successfulClaims``
+    # (``claimed=True``), ``lostClaims`` (``claimed=False``) y ``raceConflicts`` (conflicto de
+    # carrera DECLARADO por el productor). ``claimed=False`` NO equivale a carrera: puede ser
+    # invalid/expired/already_released/wrong_state; por eso la carrera se lee de
+    # ``payload.conflict`` y no se infiere del claim perdido.
+    claim_attempts = len(claims) if has_claims else None
+    successful_claims = (
+        sum(1 for entry in claims if _entry_payload(entry).get("claimed") is True)
+        if has_claims
+        else None
+    )
+    lost_claims_count = (
+        sum(1 for entry in claims if _entry_payload(entry).get("claimed") is False)
+        if has_claims
+        else None
+    )
+    race_conflicts = (
+        sum(1 for entry in claims if _entry_payload(entry).get("conflict") is True)
+        if has_claims
+        else None
+    )
     forced_releases = sum(
         1
         for row in reservations
@@ -650,11 +710,17 @@ def _concurrency(
         "activeSessionsMeasurement": (
             MEASUREMENT_PARTIAL if active_sessions is not None else MEASUREMENT_UNKNOWN
         ),
-        "ticks": engine_ticks,
-        "duplicateClaims": duplicate_claims if claims else None,
-        "duplicateClaimsMeasurement": MEASUREMENT_COMPLETE if claims else MEASUREMENT_UNKNOWN,
-        "reservationRaces": duplicate_claims if claims else None,
-        "reservationRacesMeasurement": MEASUREMENT_COMPLETE if claims else MEASUREMENT_UNKNOWN,
+        "heartbeatsPersisted": engine_ticks,
+        "claimAttempts": claim_attempts,
+        "claimAttemptsMeasurement": MEASUREMENT_COMPLETE if has_claims else MEASUREMENT_UNKNOWN,
+        "successfulClaims": successful_claims,
+        "successfulClaimsMeasurement": (
+            MEASUREMENT_COMPLETE if has_claims else MEASUREMENT_UNKNOWN
+        ),
+        "lostClaims": lost_claims_count,
+        "lostClaimsMeasurement": MEASUREMENT_COMPLETE if has_claims else MEASUREMENT_UNKNOWN,
+        "raceConflicts": race_conflicts,
+        "raceConflictsMeasurement": MEASUREMENT_COMPLETE if has_claims else MEASUREMENT_UNKNOWN,
         "reconciliations": reconciliations_count if reconcilations else None,
         "reconciliationsMeasurement": (
             MEASUREMENT_COMPLETE if reconcilations else MEASUREMENT_UNKNOWN
@@ -682,6 +748,7 @@ def build_operational_monitor(
     journal: Sequence[Any] = (),
     reconciliation_entries: Sequence[Any] = (),
     claim_entries: Sequence[Any] = (),
+    settlements: Sequence[Any] = (),
     granularity: Mapping[str, Any] | None = None,
     interval_seconds: float | None = None,
     grace_seconds: float | None = None,
@@ -733,6 +800,14 @@ def build_operational_monitor(
         if key:
             positions_by_cycle.setdefault(key, position)
 
+    # Un settlement durable por ciclo (costura de ``M2``): sin entradas el paso se declara
+    # ``unknown``; nunca se deriva de ``CYCLE_CLOSED``.
+    settlement_by_cycle: dict[str, Mapping[str, Any]] = {}
+    for row in settlements:
+        key = _cycle_id_of(row)
+        if key and isinstance(row, Mapping):
+            settlement_by_cycle[key] = row
+
     cycle_ids: list[str] = []
     seen: set[str] = set()
     if cycle_id:
@@ -759,6 +834,7 @@ def build_operational_monitor(
             positions_by_cycle=positions_by_cycle,
             closed_by_cycle=closed_by_cycle,
             journal=journal,
+            settlement_by_cycle=settlement_by_cycle,
         )
         for key in ordered
     ]
@@ -781,6 +857,7 @@ def build_operational_monitor(
         interval_seconds=interval_seconds,
         real_price_enabled=real_price_enabled,
         grace_seconds=grace_seconds,
+        last_decision_at=_last_decision_instant(journal),
         as_of=stamp,
     )
     concurrency = _concurrency(
