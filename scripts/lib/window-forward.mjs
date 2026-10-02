@@ -33,6 +33,11 @@ export const WINDOW_MIN_DAYS = 4;
 export const WINDOW_MIN_EPISODES = 2;
 export const WINDOW_MIN_CYCLES = 32;
 
+/** Nombre del directorio-lock atomico de un dia. */
+export const LOCK_DIR_NAME = '.run.lock';
+/** TTL de un lock de host desconocido antes de poder reclamarlo con `--force` (12 h). */
+export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
+
 /**
  * Configuracion pinneada de la ventana (arbol congelado `v2.88.30-beta`).
  * Los hashes son de `git rev-parse "HEAD:apps" "HEAD:packages"`; si el arbol de
@@ -57,23 +62,51 @@ export const WINDOW_CONFIG = Object.freeze({
 });
 
 /**
- * Config efectiva: los defaults pinneados, con override explicito por entorno
- * (util para sondas/dry-run en otro arbol sin tocar el codigo).
- * @param {NodeJS.ProcessEnv | Record<string,string|undefined>} [env]
+ * Variables de entorno que **solo** pueden tocar la identidad/el freeze en modo
+ * explicitamente inseguro (`--unsafe-override-window-config`). `WINDOW_PY`,
+ * `WINDOW_UV` y `WINDOW_API_READY_URL` NO son freeze y siguen siendo legitimas.
  */
-export function windowConfig(env = {}) {
-  const number = (value, fallback) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-  };
+export const FREEZE_ENV_KEYS = Object.freeze({
+  appsHash: 'WINDOW_APPS_HASH',
+  packagesHash: 'WINDOW_PACKAGES_HASH',
+  account: 'WINDOW_ACCOUNT',
+  versionA: 'WINDOW_VERSION_A',
+  versionB: 'WINDOW_VERSION_B',
+  watchSize: 'WINDOW_WATCH_SIZE',
+});
+
+/**
+ * Config efectiva de la ventana. Por defecto es **inmutable**: el entorno NO
+ * puede reescribir `appsHash`/`packagesHash`/`account`/`versionA`/`versionB`/`watchSize`
+ * (si lo hiciera, el freeze `TREE_MOVED` dejaria de ser un freeze). El override
+ * exige `unsafeOverride: true`; devuelve `configMode` y `configOverrides` para
+ * sellarlos en el manifest.
+ * @param {NodeJS.ProcessEnv | Record<string,string|undefined>} [env]
+ * @param {{unsafeOverride?: boolean}} [options]
+ */
+export function windowConfig(env = {}, { unsafeOverride = false } = {}) {
+  const base = { ...WINDOW_CONFIG };
+  const configOverrides = [];
+  if (unsafeOverride) {
+    for (const [field, key] of Object.entries(FREEZE_ENV_KEYS)) {
+      const raw = env[key];
+      if (raw === undefined || raw === '') continue;
+      if (field === 'watchSize') {
+        const parsed = Number(raw);
+        if (Number.isFinite(parsed) && parsed > 0) {
+          base.watchSize = parsed;
+          configOverrides.push(key);
+        }
+      } else if (String(raw) !== String(WINDOW_CONFIG[field])) {
+        base[field] = raw;
+        configOverrides.push(key);
+      }
+    }
+  }
   return {
-    ...WINDOW_CONFIG,
-    account: env.WINDOW_ACCOUNT || WINDOW_CONFIG.account,
-    versionA: env.WINDOW_VERSION_A || WINDOW_CONFIG.versionA,
-    versionB: env.WINDOW_VERSION_B || WINDOW_CONFIG.versionB,
-    watchSize: number(env.WINDOW_WATCH_SIZE, WINDOW_CONFIG.watchSize),
-    appsHash: env.WINDOW_APPS_HASH || WINDOW_CONFIG.appsHash,
-    packagesHash: env.WINDOW_PACKAGES_HASH || WINDOW_CONFIG.packagesHash,
+    ...base,
+    configMode: unsafeOverride ? 'UNSAFE' : 'FROZEN',
+    configOverrides,
   };
 }
 
@@ -102,6 +135,53 @@ export function runFile(day, name) {
 /** Ruta canonica del forward del dia (`operability_runs/forward-market-<DIA>.json`). */
 export function forwardPath(day) {
   return `${OPERABILITY_DIR}/forward-market-${day}.json`;
+}
+
+/** Directorio-lock (creado con `mkdir`, atomico) que serializa el dia. */
+export function runLockDir(day) {
+  return `${runDir(day)}/${LOCK_DIR_NAME}`;
+}
+
+/**
+ * Decide que hacer con un lock existente. Logica PURA (reloj y `isProcessAlive`
+ * inyectables) para poder ejercitarla sin tocar el sistema de ficheros:
+ *   - sin lock => `acquire`.
+ *   - mismo host + PID vivo => `blocked` (un `--force` **no** salta un lock vivo).
+ *   - mismo host + PID muerto => `reclaim` (stale inequivoco, sin `--force`).
+ *   - otro host / TTL superado => `blocked` salvo `--force` => `reclaim`.
+ * @param {{
+ *   lock?: Record<string, unknown> | null,
+ *   now?: number,
+ *   host?: string,
+ *   isProcessAlive?: (pid: unknown) => boolean,
+ *   ttlMs?: number,
+ *   force?: boolean,
+ * }} [options]
+ */
+export function lockDecision({
+  lock = null,
+  now = Date.now(),
+  host = '',
+  isProcessAlive = () => false,
+  ttlMs = LOCK_TTL_MS,
+  force = false,
+} = {}) {
+  if (!lock || typeof lock !== 'object') {
+    return { action: 'acquire', reason: 'sin_lock', stale: false };
+  }
+  const sameHost = String(lock.host ?? '') !== '' && String(lock.host) === String(host);
+  if (sameHost && isProcessAlive(lock.pid)) {
+    return { action: 'blocked', reason: 'pid_vivo', stale: false };
+  }
+  if (sameHost) {
+    return { action: 'reclaim', reason: 'pid_muerto', stale: true };
+  }
+  const startedAt = Date.parse(String(lock.startedAt ?? ''));
+  const expired = Number.isFinite(startedAt) && now - startedAt > ttlMs;
+  if (force) {
+    return { action: 'reclaim', reason: expired ? 'ttl_expirado_force' : 'host_distinto_force', stale: true };
+  }
+  return { action: 'blocked', reason: expired ? 'ttl_expirado' : 'host_distinto', stale: true };
 }
 
 /**
@@ -302,4 +382,68 @@ export function summarizeLedger(rows, gate = null) {
     gate,
     ready: Boolean(gate?.ready),
   };
+}
+
+/**
+ * Comprueba que el gate que se va a pintar procede de un run **ligado** al ledger
+ * y al arbol congelado: mismo dia/cuenta/versionA, freeze certificado, sha256 del
+ * `window.json` del run y cabecera (`meta.header`) coherente. Logica PURA.
+ * Cualquier problema => `ok:false` (el runner NO debe mostrar el gate).
+ * @param {{
+ *   ledgerRow?: Record<string, unknown> | null,
+ *   manifest?: Record<string, unknown> | null,
+ *   windowGate?: ReturnType<typeof parseGate> | null,
+ *   windowJsonSha256?: string | null,
+ *   windowHeader?: Record<string, unknown> | null,
+ *   frozen?: typeof WINDOW_CONFIG,
+ * }} [options]
+ */
+export function verifyWindowProvenance({
+  ledgerRow = null,
+  manifest = null,
+  windowGate = null,
+  windowJsonSha256 = null,
+  windowHeader = null,
+  frozen = WINDOW_CONFIG,
+} = {}) {
+  const problems = [];
+  if (!manifest || typeof manifest !== 'object') {
+    return { ok: false, problems: ['sin_manifest'] };
+  }
+  const provenance = manifest.windowProvenance;
+  if (!provenance || typeof provenance !== 'object') problems.push('sin_provenance');
+  if (!windowGate) problems.push('sin_gate');
+  if (!manifest.freeze || manifest.freeze.ok !== true) {
+    problems.push('freeze_no_certificado');
+  } else {
+    if (manifest.freeze.apps !== frozen.appsHash) problems.push('apps_hash_no_congelado');
+    if (manifest.freeze.packages !== frozen.packagesHash) problems.push('packages_hash_no_congelado');
+  }
+  if (manifest.configMode === 'UNSAFE') problems.push('config_override_unsafe');
+  if (ledgerRow) {
+    if (String(ledgerRow.day ?? '') !== String(manifest.day ?? '')) problems.push('dia_no_coincide');
+    if (String(ledgerRow.account ?? '') !== String(manifest.account ?? '')) {
+      problems.push('cuenta_no_coincide');
+    }
+    if (String(ledgerRow.versionA ?? '') !== String(manifest.versionA ?? '')) {
+      problems.push('version_a_no_coincide');
+    }
+  }
+  if (provenance && provenance.windowJsonSha256) {
+    if (!windowJsonSha256 || windowJsonSha256 !== provenance.windowJsonSha256) {
+      problems.push('sha256_no_coincide');
+    }
+  }
+  if (windowHeader) {
+    if (String(windowHeader.account ?? '') !== String(manifest.account ?? '')) {
+      problems.push('window_cuenta_no_coincide');
+    }
+    const versions = Array.isArray(windowHeader.versions) ? windowHeader.versions.map(String) : [];
+    if (versions.length > 0 && !versions.includes(String(manifest.versionA ?? ''))) {
+      problems.push('window_version_no_coincide');
+    }
+  } else {
+    problems.push('sin_window_header');
+  }
+  return { ok: problems.length === 0, problems };
 }

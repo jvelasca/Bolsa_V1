@@ -206,17 +206,32 @@ pnpm window:preflight                   # solo sonda read-only (v2_76 --prefligh
 pnpm window:run-day                     # día completo: preflight -> forward -> v2_77 -> v2_80 -> v2_83
 pnpm window:run-day -- --force          # re-ejecuta un día ya terminal
 pnpm window:status                      # días registrados + gate (>=4 días / >=2 episodios / >=32 ciclos)
+pnpm window:unlock                      # elimina el lock del día (si quedó huérfano)
+pnpm window:test                        # regresiones puras del runner (lock/config/provenance)
 pnpm window:task:install -- --at 18:00  # registra la tarea diaria de Windows (opcional, schtasks)
 pnpm window:task:remove
 ```
 
+- **Lock diario (2.11.31).** `run-day` crea `operability_runs/window-runs/<DIA>/.run.lock/` con `mkdir`
+  (operación indivisible) **antes** de la idempotencia y del freeze, y lo libera en un `try/finally`. Un
+  segundo run del mismo día aborta con `RUN_ALREADY_IN_PROGRESS` (exit `1`). Un `--force` **no** salta un
+  lock vivo: sólo reclama un lock huérfano con PID muerto en este host (automático) o de otro host/TTL
+  superado (12 h, con `--force`). Si un lock quedara huérfano sin PID verificable: `pnpm window:unlock`.
 - **Veto de régimen**: si el preflight vetea LONG (`BEAR_TREND`), el día se registra como
   `NO_MEDIDO_REGIMEN` y **no** se lanza el forward (regla dura §1/§5). Un `exit 2` **sin** payload
   de preflight se trata como fallo duro, nunca como veto.
 - **Freeze**: el runner aborta con `TREE_MOVED` si `git rev-parse "HEAD:apps" "HEAD:packages"` no
-  coincide con los hashes pinneados (§0): la ventana no mezcla dos árboles de código.
+  coincide con los hashes pinneados (§0): la ventana no mezcla dos árboles de código. La config es
+  **inmutable por defecto**: `WINDOW_APPS_HASH`/`WINDOW_PACKAGES_HASH`/`WINDOW_ACCOUNT`/`WINDOW_VERSION_A`/
+  `WINDOW_VERSION_B`/`WINDOW_WATCH_SIZE` **se ignoran** salvo `--unsafe-override-window-config` (que sella
+  `CONFIG_OVERRIDE = UNSAFE` y **invalida** el gate de esos días).
+- **Gate con provenance (2.11.31).** `window:status` **no** pinta el `operability-window.json` canónico:
+  deriva el gate del `window.json` del run y lo liga al ledger (día/cuenta/versión + freeze + `sha256` +
+  cabecera). Si no liga, imprime `STALE` (hubo días medidos pero sin provenance válida) o `NO_MEDIDO`
+  (sin días medidos), **nunca** un `4/2/32` heredado de otra ejecución.
 - **Artefactos** (gitignored): `operability_runs/window-runs/<YYYYMMDD>/` (manifest + logs +
-  preflight/forward/window/audit) y `operability_runs/window-runs/ledger.jsonl`.
+  preflight/forward/window/audit + `.run.lock/` mientras corre + `windowProvenance`) y
+  `operability_runs/window-runs/ledger.jsonl`.
 - **Higiene de entorno**: `AUTO_ENGINE_SIM_REAL_PRICE=1`, `AUTO_OPERATIONAL_AUDIT=1` y
   `BROKER_VENUE=paper` se inyectan **solo** en el `env` del proceso hijo; el shell del operador no
   se contamina (evita el falso rojo de las suites PG del §5).

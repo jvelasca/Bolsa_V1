@@ -267,6 +267,17 @@ runner `scripts/window-forward-runner.mjs` (`pnpm window:preflight` / `window:ru
 (`git rev-parse "HEAD:apps" "HEAD:packages"`); aborta con `TREE_MOVED` si el código se mueve y registra
 `NO_MEDIDO_REGIMEN` cuando el preflight vetea (sin lanzar el forward).
 
+**Blindaje del runner (`2.11.31`, 2026-10-02).** Antes de reanudar la ventana, el runner cierra tres
+grietas de la auditoría de `v2.88.30`: (1) **lock diario atómico** (`operability_runs/window-runs/<DIA>/.run.lock/`
+creado con `mkdir`): dos `run-day` del mismo día no conviven y `--force` no salta un lock vivo
+(`RUN_ALREADY_IN_PROGRESS`); (2) **config de freeze inmutable**: `WINDOW_ACCOUNT`/`WINDOW_VERSION_A`/
+`WINDOW_VERSION_B`/`WINDOW_WATCH_SIZE`/`WINDOW_APPS_HASH`/`WINDOW_PACKAGES_HASH` se **ignoran** salvo
+`--unsafe-override-window-config` (sella `CONFIG_OVERRIDE = UNSAFE` e invalida el gate); (3)
+**provenance**: `window:status` liga el gate al `window.json` del run (día/cuenta/versión + freeze +
+`sha256`) y muestra `STALE`/`NO_MEDIDO` si no cuadra, nunca un `4/2/32` heredado. Regresiones puras:
+`pnpm window:test`. El bloqueante de mercado (`BEAR_TREND` ⇒ día no computable) **sigue vigente**: esto
+endurece el instrumento, **no** fabrica días.
+
 ## 5. Cadencia diaria D1..D4
 
 Los comandos exactos (PowerShell) están en el

@@ -58,6 +58,9 @@ jobs:
       - name: Test shared
         run: pnpm --filter @bolsa/shared test
 
+      - name: Window runner guards (lock/config/provenance)
+        run: pnpm window:test
+
   spine:
     name: decision-spine
     runs-on: ubuntu-latest

@@ -25,14 +25,18 @@
  *       docs/engineering/arranque-ventana-paper-operativa-2026-09-27.md
  */
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   appendFileSync,
   copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
+import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
 import { loadEnvFile } from './lib/load-env.mjs';
 import { ROOT, logError, logInfo, logWarn } from './lib/logger.mjs';
@@ -53,13 +57,16 @@ import {
   freezeCheck,
   isPreflightPayload,
   isTerminalStatus,
+  lockDecision,
   parseGate,
   parseJsonLoose,
   parsePreflight,
   parseRevParse,
   resolveDayStatus,
   runDir,
+  runLockDir,
   summarizeLedger,
+  verifyWindowProvenance,
   windowConfig,
 } from './lib/window-forward.mjs';
 
@@ -77,7 +84,14 @@ const SCOPE = 'window';
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const flags = { force: false, dryRun: false, skipApiCheck: false, at: null, help: false };
+  const flags = {
+    force: false,
+    dryRun: false,
+    skipApiCheck: false,
+    unsafeOverride: false,
+    at: null,
+    help: false,
+  };
   const positionals = [];
   const unknown = [];
   for (let i = 0; i < argv.length; i += 1) {
@@ -85,6 +99,7 @@ function parseArgs(argv) {
     if (arg === '--force') flags.force = true;
     else if (arg === '--dry-run') flags.dryRun = true;
     else if (arg === '--skip-api-check') flags.skipApiCheck = true;
+    else if (arg === '--unsafe-override-window-config') flags.unsafeOverride = true;
     else if (arg === '--help' || arg === '-h') flags.help = true;
     else if (arg === '--at') {
       flags.at = argv[i + 1] ?? null;
@@ -97,19 +112,24 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`Runner de la ventana PAPER forward (v2.88.29-beta)
+  console.log(`Runner de la ventana PAPER forward (v2.88.30-beta)
 
 Comandos:
   preflight                 Solo v2_76 --preflight-only (read-only). Declara el regimen de hoy.
   run-day [--force]         Dia completo: preflight -> forward -> v2_77 -> v2_80 -> v2_83.
-  status                    Lee el ledger y el gate de la ventana (>=4 dias, >=2 episodios, >=32 ciclos).
+  status                    Dias del ledger + gate LIGADO al run (>=4 dias, >=2 episodios, >=32 ciclos).
+  unlock                    Elimina el lock diario de hoy (escape hatch si quedo huerfano).
   task:install [--at HH:MM] Registra la tarea diaria de Windows (schtasks). Opcional.
   task:remove               Elimina la tarea diaria de Windows.
 
 Flags:
   --dry-run                 Valida config/freeze/cadena sin abrir el motor.
-  --force                   Re-ejecuta un dia ya terminal.
+  --force                   Re-ejecuta un dia ya terminal; NO salta un lock vivo (solo un lock huerfano de otro host/TTL).
   --skip-api-check          No exige /api/health/ready (el scheduler de barras vive en el API).
+  --unsafe-override-window-config
+                            Permite que WINDOW_APPS_HASH/WINDOW_PACKAGES_HASH/WINDOW_ACCOUNT/
+                            WINDOW_VERSION_A/WINDOW_VERSION_B/WINDOW_WATCH_SIZE sustituyan la config
+                            certificada. Sella configMode=UNSAFE y el gate deja de ser valido.
   -h, --help                Esta ayuda.`);
 }
 
@@ -274,6 +294,102 @@ function readJson(path) {
   }
 }
 
+/** sha256 de un fichero (para sellar y re-verificar el `window.json` del run). */
+function sha256File(path) {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+/** ¿El PID existe en ESTE host? (`EPERM` = existe pero no es nuestro). */
+function pidAlive(pid) {
+  const value = Number(pid);
+  if (!Number.isInteger(value) || value <= 0) return false;
+  try {
+    process.kill(value, 0);
+    return true;
+  } catch (error) {
+    return error?.code === 'EPERM';
+  }
+}
+
+function readLock(day) {
+  return readJson(join(ROOT, runLockDir(day), 'lock.json'));
+}
+
+/**
+ * Adquiere el lock diario con `mkdir` (indivisible). Devuelve una funcion de
+ * liberacion, o `null` si ya hay un run en curso (`RUN_ALREADY_IN_PROGRESS`).
+ * `--force` NO salta un lock vivo: solo permite reclamar uno huerfano de otro
+ * host o superado el TTL.
+ */
+function acquireDayLock(day, iso, command, config, flags) {
+  const lockPath = join(ROOT, runLockDir(day));
+  mkdirSync(join(ROOT, runDir(day)), { recursive: true });
+  const host = hostname();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const existing = readLock(day);
+    const decision = lockDecision({
+      lock: existing,
+      host,
+      isProcessAlive: pidAlive,
+      force: flags.force,
+    });
+    if (decision.action === 'blocked') {
+      logError(
+        SCOPE,
+        `RUN_ALREADY_IN_PROGRESS (${decision.reason}): el dia ${day} ya tiene un run en curso ` +
+          `(pid ${existing?.pid ?? 'n/d'} · host ${existing?.host ?? 'n/d'} · ${existing?.startedAt ?? 'n/d'})`,
+      );
+      return null;
+    }
+    if (decision.action === 'reclaim') {
+      logWarn(SCOPE, `lock huerfano (${decision.reason}); se reclama el lock del dia ${day}`);
+      rmSync(lockPath, { recursive: true, force: true });
+    }
+    try {
+      mkdirSync(lockPath);
+    } catch (error) {
+      if (error?.code === 'EEXIST') continue; // otra instancia gano la carrera: se reevalua.
+      throw error;
+    }
+    writeFileSync(
+      join(lockPath, 'lock.json'),
+      `${JSON.stringify(
+        {
+          day,
+          dayIso: iso,
+          pid: process.pid,
+          host,
+          startedAt: new Date().toISOString(),
+          command,
+          configMode: config.configMode,
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    return () => rmSync(lockPath, { recursive: true, force: true });
+  }
+  logError(SCOPE, `no se pudo adquirir el lock del dia ${day} (contencion tras 3 intentos)`);
+  return null;
+}
+
+/** Dias (bajo `window-runs/`) con un lock vivo en este host; solo para avisar en `status`. */
+function activeLockDays() {
+  const runsRoot = dirname(join(ROOT, runDir('x')));
+  if (!existsSync(runsRoot)) return [];
+  const host = hostname();
+  const days = [];
+  for (const entry of readdirSync(runsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const lock = readLock(entry.name);
+    if (lock && String(lock.host ?? '') === host && pidAlive(lock.pid)) {
+      days.push({ day: entry.name, ...lock });
+    }
+  }
+  return days;
+}
+
 function readLedger() {
   const path = join(ROOT, LEDGER_PATH);
   if (!existsSync(path)) return [];
@@ -306,6 +422,8 @@ function ledgerEntry(manifest) {
     account: manifest.account,
     versionA: manifest.versionA,
     watchSize: manifest.watchSize,
+    configMode: manifest.configMode ?? 'FROZEN',
+    configOverrides: manifest.configOverrides ?? [],
     regime: manifest.regime ?? null,
     gate: manifest.gate ?? null,
     freeze: manifest.freeze
@@ -423,6 +541,23 @@ async function cmdRunDay(config, flags) {
   const startedAt = new Date();
   const day = dayStamp(startedAt);
   const iso = dayIso(startedAt);
+
+  if (flags.dryRun) {
+    return dryRunDay(config, day);
+  }
+
+  // Lock diario atomico ANTES de la idempotencia y del freeze: dos `run-day`
+  // simultaneos del mismo dia no pueden coexistir (un `--force` no salta el lock vivo).
+  const release = acquireDayLock(day, iso, 'run-day', config, flags);
+  if (!release) return 1;
+  try {
+    return await runDayBody(config, flags, { day, iso, startedAt });
+  } finally {
+    release();
+  }
+}
+
+async function runDayBody(config, flags, { day, iso, startedAt }) {
   const steps = {};
   const artifacts = {};
 
@@ -437,12 +572,10 @@ async function cmdRunDay(config, flags) {
     versionB: config.versionB,
     watchSize: config.watchSize,
     commit: config.commit,
+    configMode: config.configMode,
+    configOverrides: config.configOverrides,
     startedAt: startedAt.toISOString(),
   };
-
-  if (flags.dryRun) {
-    return dryRunDay(config, day);
-  }
 
   const dir = join(ROOT, runDir(day));
   mkdirSync(dir, { recursive: true });
@@ -637,6 +770,26 @@ async function cmdRunDay(config, flags) {
   manifest.status = resolveDayStatus({ preflight: steps.preflight, window: steps.window, hard });
   manifest.veto = Boolean(steps.preflight.veto);
   if (manifest.status === 'NO_MEDIDO_REGIMEN') manifest.reason = 'regime_invalid';
+
+  // Provenance: liga el gate al run (dia/cuenta/version + freeze + sha256 del window.json).
+  const runWindowPath = join(dir, 'window.json');
+  if (existsSync(runWindowPath)) {
+    const windowPayload = parseJsonLoose(win.out) ?? readJson(windowJsonPath);
+    manifest.windowProvenance = {
+      windowRunId: `${day}-${manifest.startedAt}`,
+      commit: manifest.commit,
+      appsHash: manifest.freeze?.apps ?? null,
+      packagesHash: manifest.freeze?.packages ?? null,
+      account: manifest.account,
+      versionA: manifest.versionA,
+      versionB: manifest.versionB,
+      watchSize: manifest.watchSize,
+      capturedAt: windowPayload?.meta?.header?.capturedAt ?? null,
+      windowJsonSha256: sha256File(runWindowPath),
+      gate: manifest.gate ?? null,
+    };
+  }
+
   finishDay(manifest, steps, artifacts);
   return manifest.status === 'HARD_ERROR' ? 1 : 0;
 }
@@ -644,8 +797,11 @@ async function cmdRunDay(config, flags) {
 async function dryRunDay(config, day) {
   logInfo(
     SCOPE,
-    `--dry-run · dia ${day} · cuenta ${config.account} · versionA ${config.versionA} · watch ${config.watchSize}`,
+    `--dry-run · dia ${day} · cuenta ${config.account} · versionA ${config.versionA} · watch ${config.watchSize} · config ${config.configMode}`,
   );
+  if (config.configMode === 'UNSAFE') {
+    logWarn(SCOPE, `CONFIG_OVERRIDE = UNSAFE · overrides ${config.configOverrides.join(', ') || 'ninguno'}`);
+  }
   const freeze = await gitFreeze(config);
   if (freeze.ok) {
     logInfo(SCOPE, `freeze OK · apps ${freeze.apps} · packages ${freeze.packages}`);
@@ -675,11 +831,53 @@ async function dryRunDay(config, day) {
   return freeze.ok ? 0 : 1;
 }
 
+/**
+ * Deriva el gate SOLO de un run ligado al ledger y al arbol congelado: recorre
+ * los dias MEDIDOS (del mas nuevo al mas viejo), lee el `manifest.json` y el
+ * `window.json` del run, y exige que `verifyWindowProvenance` cuadre. Nunca se
+ * pinta el `operability_runs/operability-window.json` canonico a pelo (podria
+ * ser material stale de otra ejecucion).
+ */
+function resolveVerifiedGate(days) {
+  let lastProblems = null;
+  let sawMeasured = false;
+  for (const row of [...days].reverse()) {
+    if (row.status !== 'MEDIDO') continue;
+    sawMeasured = true;
+    const runWindowPath = join(ROOT, runDir(row.day), 'window.json');
+    const manifest = readJson(join(ROOT, runDir(row.day), 'manifest.json'));
+    const windowPayload = existsSync(runWindowPath) ? readJson(runWindowPath) : null;
+    const windowGate = parseGate(windowPayload);
+    const windowJsonSha256 = existsSync(runWindowPath) ? sha256File(runWindowPath) : null;
+    const verdict = verifyWindowProvenance({
+      ledgerRow: row,
+      manifest,
+      windowGate,
+      windowJsonSha256,
+      windowHeader: windowPayload?.meta?.header ?? null,
+    });
+    if (verdict.ok) return { gate: windowGate, day: row.day, problems: [], sawMeasured };
+    if (!lastProblems) lastProblems = { day: row.day, problems: verdict.problems };
+  }
+  return { gate: null, day: null, problems: lastProblems?.problems ?? [], sawMeasured };
+}
+
 function cmdStatus() {
   const rows = readLedger();
-  const gate = parseGate(readJson(join(ROOT, WINDOW_JSON)));
-  const summary = summarizeLedger(rows, gate);
-  logInfo(SCOPE, `estado de la ventana · ${WINDOW_MIN_DAYS} dias / ${WINDOW_MIN_EPISODES} episodios / ${WINDOW_MIN_CYCLES} ciclos`);
+  const summary = summarizeLedger(rows, null);
+  const verified = resolveVerifiedGate(summary.days);
+  const gate = verified.gate;
+  logInfo(
+    SCOPE,
+    `estado de la ventana · ${WINDOW_MIN_DAYS} dias / ${WINDOW_MIN_EPISODES} episodios / ${WINDOW_MIN_CYCLES} ciclos`,
+  );
+  const locks = activeLockDays();
+  for (const lock of locks) {
+    logWarn(
+      SCOPE,
+      `RUN EN CURSO: dia ${lock.day} (pid ${lock.pid} · ${lock.startedAt}) — no lances otro run-day`,
+    );
+  }
   if (summary.total === 0) {
     logWarn(SCOPE, 'ledger vacio: aun no hay ningun dia registrado (NO MEDIDO, nunca 0)');
   } else {
@@ -693,12 +891,35 @@ function cmdStatus() {
   );
   if (gate) {
     console.log(
-      `  gate ${gate.verdict}: dias ${gate.days}/${gate.minDays} · episodios ${gate.episodes}/${gate.minEpisodes} · ciclos ${gate.cycles}/${gate.minCycles}`,
+      `  gate ${gate.verdict} (run ${verified.day}): dias ${gate.days}/${gate.minDays} · ` +
+        `episodios ${gate.episodes}/${gate.minEpisodes} · ciclos ${gate.cycles}/${gate.minCycles}`,
+    );
+  } else if (verified.sawMeasured) {
+    console.log(
+      `  gate: STALE (ningun run MEDIDO con provenance valida${verified.problems.length ? `: ${verified.problems.join(', ')}` : ''})`,
     );
   } else {
-    console.log('  gate: n/d (sin ventana leible)');
+    console.log('  gate: NO_MEDIDO (sin dias medidos)');
   }
   console.log(`  ledger: ${LEDGER_PATH}`);
+  return 0;
+}
+
+/** Elimina el lock del dia (escape hatch si quedo huerfano de un host desconocido). */
+function cmdUnlock(flags) {
+  const day = flags.at || dayStamp(new Date());
+  const lockPath = join(ROOT, runLockDir(day));
+  const existing = readLock(day);
+  if (!existsSync(lockPath)) {
+    logInfo(SCOPE, `no hay lock para el dia ${day}`);
+    return 0;
+  }
+  if (flags.dryRun) {
+    console.log(`rm -rf ${lockPath} (${JSON.stringify(existing)})`);
+    return 0;
+  }
+  rmSync(lockPath, { recursive: true, force: true });
+  logInfo(SCOPE, `lock del dia ${day} eliminado`);
   return 0;
 }
 
@@ -762,7 +983,8 @@ function cmdTaskRemove(flags) {
 async function main() {
   loadEnvFile();
   const { command, flags, unknown } = parseArgs(process.argv.slice(2));
-  const config = windowConfig(process.env);
+  const unsafeOverride = flags.unsafeOverride || process.env.WINDOW_UNSAFE_CONFIG_OVERRIDE === '1';
+  const config = windowConfig(process.env, { unsafeOverride });
 
   if (flags.help || command === 'help') {
     printHelp();
@@ -770,6 +992,13 @@ async function main() {
   }
   if (unknown.length > 0) {
     logWarn(SCOPE, `flags desconocidos ignorados: ${unknown.join(', ')}`);
+  }
+  if (config.configMode === 'UNSAFE') {
+    logWarn(
+      SCOPE,
+      `CONFIG_OVERRIDE = UNSAFE: la config certificada NO aplica ` +
+        `(overrides: ${config.configOverrides.join(', ') || 'ninguno'}); el gate de estos dias no es valido`,
+    );
   }
 
   switch (command) {
@@ -779,6 +1008,8 @@ async function main() {
       return cmdRunDay(config, flags);
     case 'status':
       return cmdStatus();
+    case 'unlock':
+      return cmdUnlock(flags);
     case 'task:install':
       return cmdTaskInstall(flags);
     case 'task:remove':
