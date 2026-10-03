@@ -81,6 +81,9 @@
    > commiteó por separado), así que su árbol no existe como objeto `HEAD:apps`/`packages`. El pin **vivo**
    > del runner es el de `v2.88.34-beta` (`apps` `69bd72d8…` / `packages` `2c15ecb8…`): ver
    > [`evidence/v2.88.34/README.md`](../v2.88.34/README.md) §3.8.
+   > **Re-anclado de nuevo (2026-10-03, cierre `G2`):** el pin **vivo** pasa a `apps` `71c3024c…` /
+   > `packages` `21b2585b…` (`commit` = `05c429a8`) porque el cierre de `G2` tocó tests+seed bajo
+   > `apps`/`packages` (`Δ motor = 0`).
 
 ---
 

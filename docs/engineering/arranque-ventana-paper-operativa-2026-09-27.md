@@ -19,16 +19,16 @@ realimentación):
 |---|---|
 | Sello / tag | **`v2.88.34-beta`** · package `2.11.34-beta` · commit y cita POST-TAG **pendientes de sellar** (se completan al empujar el tag) |
 | Alembic head | **`048_journal_entry_dedupe_key`** (**sin** migración pendiente) |
-| Árbol de **código** congelado | `git rev-parse "HEAD:apps"` = `69bd72d81c64d24937f6e6af325e866586d76a71` · `git rev-parse "HEAD:packages"` = `2c15ecb8b017793f38bfee307d3573398b9d6ead` |
+| Árbol de **código** congelado | `git rev-parse "HEAD:apps"` = `71c3024ccd5c1e755c36e3c49a1cff67349a576b` · `git rev-parse "HEAD:packages"` = `21b2585b93dc758bbe18602584903d916a7778c8` (**re-anclado 2026-10-03** tras el cierre de `G2`; antes `69bd72d8…` / `2c15ecb8…`) |
 | Identidad fija (sin cambios) | `$ACCOUNT` = `1484e253d2d54645945a6b1d7` · `$VERSION_A` = `v283-window-a` · `$VERSION_B` = `v283-window-b` · watch = **20** símbolos |
 | Configuración de operación | `AUTO_ENGINE_SIM_REAL_PRICE=1` (deja de fabricar `100.0`) y `AUTO_OPERATIONAL_AUDIT=1` (hechos durables para el monitor). **Ningún** cambio de motor/`TOP_N`/régimen/umbrales/A-B. |
 
 > **Freeze por hash (no por tag).** El runner pinnea el **árbol de código** por hash
-> (`69bd72d8…` / `2c15ecb8…`), **no** por tag. `v2.88.34-beta` **sí** mueve `apps`/`packages`
-> (bucle de realimentación por valor del `DÍA-D AUTO` read-only + vista en `/auto-monitor`;
-> **`Δ motor = 0`**), así que el pin del runner se **re-ancla** a los hashes de arriba y
-> `WINDOW_CONFIG.commit` pasa a `v2.88.34-beta`; con el sello commiteado, `run-day` **no** abortará
-> por `TREE_MOVED`.
+> (`71c3024c…` / `21b2585b…`), **no** por tag. El pin se **re-ancló 2026-10-03** por el **cierre de
+> `G2`/`OBS-19`**, que tocó **tests** bajo `apps/` y el `seed.ts` bajo `packages/` (**CI+tests,
+> `Δ motor = 0`**); antes el pin era el del sello `v2.88.34-beta` (`69bd72d8…` / `2c15ecb8…`).
+> `WINDOW_CONFIG.commit` = `05c429a8`; con el árbol commiteado, `run-day` **no** abortará por
+> `TREE_MOVED`.
 
 **Declaración:** el bloque §4.bis (D1 del `2026-09-28`) pertenece al árbol **previo** al re-anclaje
 y **no** cuenta para esta ventana; la ventana se reanuda sobre el árbol congelado de arriba. Si
@@ -39,7 +39,7 @@ incidente declarado en §4.bis).
 
 | Comprobación | Comando | Resultado |
 |---|---|---|
-| Árbol congelado vivo | `git rev-parse "HEAD:apps" "HEAD:packages"` | sello `v2.88.34`: `69bd72d8…` / `2c15ecb8…` (**exacto tras el commit del sello**, 2026-10-03; antes daba `2237f069…` / `ce0a38b7…`) |
+| Árbol congelado vivo | `git rev-parse "HEAD:apps" "HEAD:packages"` | **pin vivo (2026-10-03, post-`G2`)**: `71c3024c…` / `21b2585b…`; antes, sello `v2.88.34`: `69bd72d8…` / `2c15ecb8…` (y antes `2237f069…` / `ce0a38b7…`) |
 | Watch de 20 símbolos | `v2_76 … --preflight-only --watch-size 20` | `watch 20 símbolos` · `barras servidas 20` |
 | Régimen de hoy | idem | `{'trend_down': 10, 'range': 5, 'trend_up': 5}` ⇒ agregado `trend_down` ⇒ **`BEAR_TREND`** ⇒ **entradas LONG VETADAS** (`exit 2`) |
 | Versión B (`v283-window-b`) | `session.get(StrategyVersionRow, …)` | **existe** (`PAPER-WINDOW sma_crossover`) |
@@ -79,7 +79,7 @@ Antes de lanzar el primer día, ejecutar (desde la raíz del repo) y leer la sal
 | `pnpm window:test` | **`25/25`** regresiones puras del runner (lock / config de freeze / unlock / provenance). |
 | `pnpm window:status` | `NO_MEDIDO` mientras el ledger esté vacío; si aparece **`RUN EN CURSO`**, **no** lanzar otro `run-day`. |
 | `pnpm window:preflight` | Régimen de hoy: `exit 0` ⇒ LONG permitidas; `exit 2`/`BEAR_TREND` ⇒ día **no computable** (se declara `NO_MEDIDO_REGIMEN`, no se fuerza el gobernador). |
-| `node scripts/window-forward-runner.mjs --dry-run run-day` | `config FROZEN` · `freeze OK · apps 69bd72d8… · packages 2c15ecb8…` (valida cadena, config y freeze sin abrir el motor). |
+| `node scripts/window-forward-runner.mjs --dry-run run-day` | `config FROZEN` · `freeze OK · apps 71c3024c… · packages 21b2585b…` (valida cadena, config y freeze sin abrir el motor). |
 | `pnpm window:run-day` | Día completo (preflight → forward → v2_77 → v2_80 → v2_83) con **lock + freeze + provenance**. `--force` **sólo** re-ejecuta un día terminal; **no** salta un lock vivo. |
 
 **Nota:** si el preflight vetea (`BEAR_TREND`), el día se registra como `NO_MEDIDO_REGIMEN` y **no** se lanza el

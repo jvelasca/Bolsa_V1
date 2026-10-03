@@ -20,7 +20,7 @@ configuración **sin cambios** de motor:
 
 | Dato | Valor |
 |---|---|
-| Árbol de **código** congelado | `apps` = `69bd72d81c64d24937f6e6af325e866586d76a71` · `packages` = `2c15ecb8b017793f38bfee307d3573398b9d6ead` (pinneado por **hash**; el sello `v2.88.34-beta` **sí** mueve el árbol —bucle de realimentación por valor del `DÍA-D AUTO` read-only + vista en `/auto-monitor`— y el runner se re-ancla a estos hashes: `WINDOW_CONFIG.commit` pasa a `v2.88.34-beta`) |
+| Árbol de **código** congelado | `apps` = `71c3024ccd5c1e755c36e3c49a1cff67349a576b` · `packages` = `21b2585b93dc758bbe18602584903d916a7778c8` (pinneado por **hash**; **re-anclado 2026-10-03** tras el **cierre de `G2`/`OBS-19`**, que tocó **tests** bajo `apps/` y el `seed.ts` bajo `packages/` con **`Δ motor = 0`** — el pin ya **no** es el del sello `v2.88.34-beta`, sino el del commit `05c429a8` ⇒ `WINDOW_CONFIG.commit` = `05c429a8`) |
 | `$ACCOUNT` / `$VERSION_A` / `$VERSION_B` | `1484e253d2d54645945a6b1d7` / `v283-window-a` / `v283-window-b` |
 | Watch | **20** símbolos (derivación determinista por `id`, ≥60 barras D1) |
 | Variables de operación | `AUTO_ENGINE_SIM_REAL_PRICE=1` y `AUTO_OPERATIONAL_AUDIT=1` en el entorno del forward |

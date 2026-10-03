@@ -82,6 +82,11 @@
    `apps` commiteado se recalcula por hash y el pin se fija a **ese** valor: `apps` `69bd72d8…`, distinto del
    `0f9b83cb…` estimado antes de commitear). `git rev-parse "HEAD:apps" "HEAD:packages"` devuelve el par
    pineado. `pnpm window:test` (25/25) **no** se ve afectado.
+   **Re-anclaje posterior (2026-10-03, cierre `G2`):** el cierre de `G2`/`OBS-19` tocó **tests** bajo
+   `apps/` y el `seed.ts` bajo `packages/` (**CI+tests, `Δ motor = 0`**), moviendo el árbol a `apps`
+   `71c3024c…` / `packages` `21b2585b…`; `WINDOW_CONFIG` se **re-ancló** a esos hashes (`commit` =
+   `05c429a8`). El par de arriba (`69bd72d8…`/`2c15ecb8…`) describe el árbol **del sello** y deja de ser
+   el vigente; el pin vivo verificado es `freeze OK · apps 71c3024c… · packages 21b2585b…`.
 
 ---
 

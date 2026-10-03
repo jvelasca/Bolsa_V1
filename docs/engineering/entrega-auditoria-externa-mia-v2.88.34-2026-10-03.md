@@ -3,6 +3,11 @@
 > **Objeto auditado:** tag anotado **`v2.88.34-beta`** → tag object **`1034e4a5`** → commit **`a98996ed`**,
 > versión **`2.11.34-beta`**, base del diff **`v2.88.32-beta`** → **`f87425ae`**, Alembic head
 > **`048_journal_entry_dedupe_key`** (**sin migración**).
+>
+> **Candidato a PROMOCIÓN (tip `main`, 2026-10-03): commit `05c429a8`.** Incluye, sobre el sello, el
+> **cierre de `G2`/`OBS-19`** (**tests** + `seed.ts` + CI + docs; **`Δ src` de motor = 0**). Es el SHA que
+> se etiquetaría para la versión estable (el sello `v2.88.34-beta` es su **base**). El **CI del candidato
+> aún no se ha corrido** (se correrá al etiquetar); el `572/572` del censo está verificado **localmente**.
 > **Remote:** `https://github.com/jvelasca/Bolsa_V1` — **PÚBLICO** (el auditor clona sin credenciales).
 > **Clase:** entrega de **investigación/sandbox** sobre el motor AUTO, **advisory y read-only**.
 > **Evidencia cruda:** [`evidence/v2.88.34/`](./evidence/v2.88.34/README.md) ·
@@ -75,7 +80,8 @@ git log --oneline -1                       # a98996ed (sello v2.88.34)
 | Delta tag-a-tag total | **40 ficheros, `+7169 / −53`** (incluye docs) |
 | Delta `packages/`+`apps/` | **25 ficheros, `+6311 / −13`** |
 | `Δ motor` | **ningún** fichero de motor en el diff (verificado, §2) |
-| Commit siguiente (POST-TAG, `main`) | `30294546` — cita del CI (docs-only, **no** es el sello) |
+| **Candidato a promoción** (tip `main`, POST-TAG, 2026-10-03) | **`05c429a8`** — cierre de `G2`/`OBS-19` (tests+seed+CI+docs, `Δ motor = 0`) |
+| Cadena POST-TAG sobre el sello | `30294546` (cita CI) → `938c5fd3` (este pack) → `eb24a4d2` (cableado 53→3) → **`05c429a8`** (cierre `G2`) |
 | CI del tag | `Release tag CI` run **`37109548555`** — **TODO VERDE** |
 
 **Composición del delta `packages/`+`apps/` (25 ficheros):**
@@ -114,7 +120,7 @@ Corrida **por el auditor en su clon**, no heredada:
 | Migración | **ninguna** (head `048_journal_entry_dedupe_key`) |
 | Umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-B | intactos |
 | Ficheros de motor en el diff | **ausentes** |
-| Freeze del runner (`git rev-parse "HEAD:apps" "HEAD:packages"`) | `69bd72d81c64d24937f6e6af325e866586d76a71` / `2c15ecb8b017793f38bfee307d3573398b9d6ead` |
+| Freeze del runner en el **candidato** (`git rev-parse "HEAD:apps" "HEAD:packages"`) | `71c3024ccd5c1e755c36e3c49a1cff67349a576b` / `21b2585b93dc758bbe18602584903d916a7778c8` (el par del **sello** `v2.88.34-beta` era `69bd72d8…` / `2c15ecb8…`; el cierre de `G2` movió el árbol y el pin se **re-ancló**) |
 | CI del tag | **11 `success`** + `playwright (integrated E2E, opt-in)` `skipped` por diseño; `certify` `success` |
 
 **Verificación local re-ejecutada en el momento del sello** (todos verdes): `pytest` `17+7 passed` ·
@@ -146,9 +152,16 @@ gate `INCONCLUSIVE`.
 8. **El veredicto por valor `complementa`** el gate global `window_gate(...)`; **no** lo sustituye.
 9. **Este sello mueve el árbol** `apps`/`packages`, así que el runner de la ventana se **re-ancló** a los
    hashes del árbol sellado (`69bd72d8…` / `2c15ecb8…`), **distintos** del `0f9b83cb…` estimado *antes*
-   de commitear (`lint-staged` reformatea el frontend en el pre-commit).
+   de commitear (`lint-staged` reformatea el frontend en el pre-commit). **Re-anclaje posterior
+   (2026-10-03, cierre `G2`):** el cierre tocó tests+seed bajo `apps`/`packages` (CI+tests, `Δ motor = 0`),
+   así que el pin **vivo** es `apps` `71c3024c…` / `packages` `21b2585b…` (`WINDOW_CONFIG.commit` =
+   `05c429a8`); dry-run `freeze OK` verificado.
 10. **Los documentos de auditoría y esta entrega son POST-TAG (en `main`).** El sello es `a98996ed`; la
-    cita del CI es `30294546`.
+    cita del CI es `30294546`; el **candidato a promoción** (tip `main`) es **`05c429a8`** (cierre `G2`).
+11. **El CI citado es del TAG, no del candidato.** La run `37109548555` (`SUCCESS`) certifica el tag
+    `a98996ed`; el **CI del candidato `05c429a8` aún no se ha corrido** — se correrá al etiquetar. El
+    censo `572/572` (cierre de `G2`) está verificado **LOCALMENTE**; el primer `Release tag CI` del
+    candidato lo certifica en GitHub.
 
 ---
 
@@ -187,9 +200,9 @@ configuración de freeze sin `UNSAFE`?
 no paga llamadas extra)? ¿Hay algún sitio donde `NO MEDIDO` se degrade a `0`, `—` o `null` silencioso?
 
 **P10.** **Orden del siguiente trabajo.** Candidatos: (a) **ventana PAPER real** (`P3-2`/`P3-3`, `≥4
-días`/`≥32 ciclos`) con el interruptor `AUTO_ENGINE_SIM_REAL_PRICE=1`; (b) cerrar **`G2`/`OBS-19`** (ya
-bajó de 53 a **3** ficheros el 2026-10-03 —cableados 50— y sólo quedan **3 tests ROJOS ocultos** por
-arreglar, `W-G2/4`); (c) productor durable del «lado ejecutado». ¿Cuál
+días`/`≥32 ciclos`) con el interruptor `AUTO_ENGINE_SIM_REAL_PRICE=1`; (b) **`G2`/`OBS-19` — YA CERRADA**
+el 2026-10-03 (censo **572/572 · 0 declarados**; los 3 últimos arreglados en `W-G2/4`), así que deja de ser
+trabajo pendiente y pasa a **hecho certificable**; (c) productor durable del «lado ejecutado». ¿Cuál
 reduce más riesgo por unidad de esfuerzo, y cuál es **prerrequisito** de cuál?
 
 ---
@@ -241,8 +254,10 @@ la **recomendación de siguiente trabajo** (P10).
 Actúa como auditor externo independiente. Auditas un repositorio PÚBLICO de GitHub:
 https://github.com/jvelasca/Bolsa_V1
 
-OBJETO: tag anotado v2.88.34-beta -> tag object 1034e4a5 -> commit a98996ed, version 2.11.34-beta,
+OBJETO (sello): tag anotado v2.88.34-beta -> tag object 1034e4a5 -> commit a98996ed, version 2.11.34-beta,
 base del diff v2.88.32-beta (f87425ae), Alembic head 048_journal_entry_dedupe_key (SIN migracion).
+CANDIDATO A PROMOCION (tip main, 2026-10-03): commit 05c429a8 (cierre G2/OBS-19; tests+seed+CI+docs,
+delta src de motor = 0). Si se promueve, el objeto es ESTE SHA; el sello es su base.
 Clase: sandbox de investigacion sobre el motor AUTO (DIA-D AUTO por dia v2.88.33, ABSORBIDO, + bucle de
 realimentacion POR VALOR sobre una ventana D0..D1). DELTA MOTOR = 0: ningun fichero de motor aparece en
 el diff. Advisory y read-only. NO cierra la ventana PAPER real.
@@ -256,12 +271,15 @@ PRIMERO lee, en este orden:
 VERIFICA PRIMERO (firma de estado, en el clon):
   git cat-file -t v2.88.34-beta                                       (tag anotado)
   git rev-list -n 1 v2.88.34-beta                                     (a98996ed)
+  git rev-parse 05c429a8                                              (CANDIDATO a promocion; tip main)
+  git diff --stat v2.88.34-beta 05c429a8                              (17 ficheros: tests+seed+CI+docs)
+  git diff --numstat v2.88.34-beta 05c429a8 -- packages apps          (5 ficheros, +158/-7: SIN src motor)
   git diff --name-only v2.88.32-beta v2.88.34-beta \
     -- "*auto_simulation_worker*" "*auto_v2_entry*" "*sim_durable_store*" \
        "*market_operability*" "*replay_oos*"                           (VACIO = delta motor 0)
   git diff --name-only v2.88.32-beta v2.88.34-beta -- "*alembic*" "*versions*"   (VACIO = sin migracion)
   git diff --numstat v2.88.32-beta v2.88.34-beta -- packages apps      (25 ficheros, +6311/-13)
-  git rev-parse "HEAD:apps" "HEAD:packages"                            (69bd72d8... / 2c15ecb8...)
+  git rev-parse "HEAD:apps" "HEAD:packages"                            (71c3024c... / 21b2585b...)
 
 QUE QUEREMOS (respuestas concretas a los 10 puntos de §4 de la entrega):
   a) El barrido, ¿es de verdad read-only? ¿algun camino que escriba un cubo durable o backdatee created_at?
@@ -283,5 +301,6 @@ REGLAS:
   - NO leas 'DIA-D AUTO' como 'ventana PAPER operada': es un replay hermetico, no fabrica dias reales.
   - El artefacto del barrido es gitignored: regeneralo con el comando de evidence/v2.88.34 §4.
   - Los documentos de auditoria (esta entrega) estan en MAIN (POST-TAG). El sello es a98996ed; la cita del
-    CI es 30294546.
+    CI es 30294546; el CANDIDATO A PROMOCION (tip main, 2026-10-03) es 05c429a8 (cierre G2/OBS-19). El CI
+    del candidato aun no se ha corrido (se correra al etiquetar).
 ```

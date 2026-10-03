@@ -39,15 +39,22 @@ export const LOCK_DIR_NAME = '.run.lock';
 export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
 
 /**
- * Configuracion pinneada de la ventana (arbol congelado `v2.88.34-beta`).
+ * Configuracion pinneada de la ventana (arbol congelado).
  * Los hashes son de `git rev-parse "HEAD:apps" "HEAD:packages"`; si el arbol de
  * codigo se mueve, el runner declara `TREE_MOVED` y aborta (fail-closed).
- * `commit` nombra el sello de ingenieria cuyo arbol queda pinneado.
+ * `commit` nombra el commit cuyo arbol queda pinneado.
+ *
+ * RE-ANCLAJE 2026-10-03 (post-cierre `G2`/`OBS-19`, `W-G2/4`): el sello
+ * `v2.88.34-beta` (a98996ed) ya NO define el arbol pinneado porque el cierre de
+ * `G2` toco ficheros de TEST bajo `apps/` y el `seed.ts` bajo `packages/`
+ * (cambio de CI+tests, CERO `src` de motor). El arbol pinneado pasa a ser el del
+ * commit `05c429a8` (tip de `main` tras el cierre). Editar el pin NO mueve a su
+ * vez el arbol porque este modulo vive en `scripts/`, no en `apps`/`packages`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'v2.88.34-beta',
-  appsHash: '69bd72d81c64d24937f6e6af325e866586d76a71',
-  packagesHash: '2c15ecb8b017793f38bfee307d3573398b9d6ead',
+  commit: '05c429a8',
+  appsHash: '71c3024ccd5c1e755c36e3c49a1cff67349a576b',
+  packagesHash: '21b2585b93dc758bbe18602584903d916a7778c8',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
