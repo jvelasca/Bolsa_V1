@@ -44,18 +44,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * codigo se mueve, el runner declara `TREE_MOVED` y aborta (fail-closed).
  * `commit` nombra el commit cuyo arbol queda pinneado.
  *
- * RE-ANCLAJE 2026-10-03 (sello `v2.88.41-beta`): la atribucion MULTIRREGIMEN
- * DIA-D (`dia_d_multi.py` + tests + CLI `v2_93`) toco `src`/tests bajo
- * `packages/` y scripts bajo `apps/` (`Δ motor = 0`: CERO ficheros de motor).
- * El arbol pinneado es el del commit funcional `85b00235`. Editar el pin NO
+ * RE-ANCLAJE 2026-10-03 (sello `v2.88.42-beta`): la BANDA del SORTEO del venue
+ * DIA-D (`dia_d_multi_uncertainty.py` + tests + CLI `v2_94`) toco `src`/tests
+ * bajo `packages/` y scripts bajo `apps/` (`Δ motor = 0`: CERO ficheros de motor).
+ * El arbol pinneado es el del commit funcional `4533b034`. Editar el pin NO
  * mueve a su vez el arbol porque este modulo vive en `scripts/`. Pin anterior
- * (sello `v2.88.40-beta`, commit `bd3c9cd9`):
- * `apps` `22ca3e78…` / `packages` `f169415e…`.
+ * (sello `v2.88.41-beta`, commit `85b00235`):
+ * `apps` `b0cd0174…` / `packages` `35a37d56…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '85b00235',
-  appsHash: 'b0cd017438c2a745cffa876f45211c021ba3309f',
-  packagesHash: '35a37d565b6d211306f6cb1aef87d6c8e12536aa',
+  commit: '4533b034',
+  appsHash: '18d885faa7fc790ada9828efd0988399040eccc5',
+  packagesHash: '8fbd4e6c0871e86faa3114c1e6fcf8789110ac16',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
