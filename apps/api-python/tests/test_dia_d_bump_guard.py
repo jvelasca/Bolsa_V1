@@ -17,6 +17,7 @@ _SCRIPTS = {
     "v2_90": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_90_dia_d_feedback.py",
     "v2_91": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_91_dia_d_longitudinal.py",
     "v2_92": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_92_dia_d_attribution.py",
+    "v2_93": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_93_dia_d_multi.py",
 }
 _BUMP_RE = re.compile(r'"bump"\s*:\s*"([^"]+)"')
 

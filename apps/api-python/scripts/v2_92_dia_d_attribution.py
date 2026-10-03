@@ -333,7 +333,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             universe_coverage=universe_coverage,
             probe=probe,
             meta={
-                "bump": "2.11.40-beta",
+                "bump": "2.11.41-beta",
                 "phase": "V2.92 DIA-D AUTO ATTRIBUTION",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
