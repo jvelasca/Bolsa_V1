@@ -136,6 +136,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         DEFAULT_LIMITS,
         build_dia_d_multi_artifact,
     )
+    from bolsa_application.dia_d_multi_sampling import build_cycle_ledger
     from bolsa_application.replay_oos import census_operable_days
     from bolsa_application.universe_point_in_time_catalog import CatalogPointInTimeUniverse
     from bolsa_infrastructure.config import get_settings
@@ -321,7 +322,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             regime_by_day=regime_all,
             operational_regime_by_day=operational_all,
             meta={
-                "bump": "2.11.42-beta",
+                "bump": "2.11.43-beta",
                 "phase": "V2.93 DIA-D AUTO MULTI ATTRIBUTION",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
@@ -341,6 +342,23 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         artifact["crossCheck"] = v92._cross_check_summary(  # noqa: SLF001
             reference, current=artifact["summary"]
         )
+        if args.cycles_out:
+            # Ledger de ciclos (muestra cruda del sorteo): lo consume el bootstrap de ``v2_95``.
+            # No cambia la forma del artefacto ``dia-d-multi-v1``.
+            ledger = build_cycle_ledger(
+                round_trips=all_trips,
+                excursions_rows=all_excursions,
+                regime_by_day=regime_all,
+                operational_regime_by_day=operational_all,
+            )
+            ledger_path = pathlib.Path(args.cycles_out)
+            if not ledger_path.is_absolute():
+                ledger_path = _REPO_ROOT / ledger_path
+            ledger_path.parent.mkdir(parents=True, exist_ok=True)
+            ledger_path.write_text(
+                json.dumps(ledger, indent=2, sort_keys=True, ensure_ascii=False, default=str) + "\n",
+                encoding="utf-8",
+            )
         return artifact
     finally:
         await engine.dispose()
@@ -446,6 +464,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="emite el artefacto como JSON")
     parser.add_argument("--out", default=None, help="ruta del JSON de evidencia")
+    parser.add_argument(
+        "--cycles-out",
+        default=None,
+        help="ruta del ledger de ciclos (dia-d-multi-cycle-ledger-v1) que consume v2_95",
+    )
     args = parser.parse_args(argv)
 
     if int(args.watch_size) <= 0 or int(args.min_bars) <= 0:

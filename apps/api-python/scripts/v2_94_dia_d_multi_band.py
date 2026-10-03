@@ -102,7 +102,12 @@ def _load_mutations() -> Any:
 # ── Comando del runner multirregimen (v2_93) ─────────────────────────────────────
 
 
-def _v93_command(args: argparse.Namespace, out_path: pathlib.Path) -> list[str]:
+def _v93_command(
+    args: argparse.Namespace,
+    out_path: pathlib.Path,
+    *,
+    cycles_out: pathlib.Path | None = None,
+) -> list[str]:
     """Argv del runner ``v2_93`` para UN sorteo (el seed no viaja aquí: se parchea el árbol)."""
     command = [sys.executable, str(_V93)]
     if args.years:
@@ -137,14 +142,21 @@ def _v93_command(args: argparse.Namespace, out_path: pathlib.Path) -> list[str]:
         command += ["--watch", str(args.watch)]
     command += ["--fallback" if args.fallback else "--no-fallback"]
     command += ["--out", str(out_path)]
+    if cycles_out is not None:
+        command += ["--cycles-out", str(cycles_out)]
     return command
 
 
-def _run_v93(args: argparse.Namespace, out_path: pathlib.Path) -> dict[str, Any]:
+def _run_v93(
+    args: argparse.Namespace,
+    out_path: pathlib.Path,
+    *,
+    cycles_out: pathlib.Path | None = None,
+) -> dict[str, Any]:
     """Corre ``v2_93`` en un proceso NUEVO (el árbol parcheado del seed debe cargarse fresco)."""
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
     result = subprocess.run(  # noqa: S603 — argv construido, no hay shell.
-        _v93_command(args, out_path),
+        _v93_command(args, out_path, cycles_out=cycles_out),
         cwd=_REPO_ROOT,
         capture_output=True,
         text=True,
@@ -164,7 +176,8 @@ def _run_v93(args: argparse.Namespace, out_path: pathlib.Path) -> dict[str, Any]
 def _draw(args: argparse.Namespace, *, k: int, out_dir: pathlib.Path, mutations: Any) -> dict[str, Any]:
     """Un sorteo: parchea el seed (si ``k > 0``), corre ``v2_93``, restaura byte a byte."""
     draw_path = out_dir / f"draw-{k:02d}" / "multi.json"
-    if args.reuse and draw_path.is_file():
+    cycles_path = out_dir / f"draw-{k:02d}" / "multi-cycles.json"
+    if args.reuse and draw_path.is_file() and (not args.cycles or cycles_path.is_file()):
         print(f"### draw {k:02d}  (reutilizado de {draw_path.name})")
         return json.loads(draw_path.read_text(encoding="utf-8"))
     draw_path.parent.mkdir(parents=True, exist_ok=True)
@@ -192,7 +205,7 @@ def _draw(args: argparse.Namespace, *, k: int, out_dir: pathlib.Path, mutations:
             print(f"### draw {k:02d}  (re-sorteo: seed=fill_seed(bar_tick_now + {k}, ...))")
         else:
             print("### draw 00  (realización de PRODUCCIÓN, sin tocar el árbol)")
-        payload = _run_v93(args, draw_path)
+        payload = _run_v93(args, draw_path, cycles_out=cycles_path if args.cycles else None)
     finally:
         if k > 0:
             restored = mutations._restore(worker, _WORKER_REL, original)  # noqa: SLF001
@@ -301,6 +314,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--draws", type=int, default=_DEFAULT_DRAWS, help="numero K de sorteos del venue")
     parser.add_argument(
+        "--cycles",
+        action="store_true",
+        help="persiste el ledger de ciclos por sorteo (multi-cycles.json) para el bootstrap de v2_95",
+    )
+    parser.add_argument(
         "--check-against", default=None, help="artefacto multirregimen sellado para cruzar el sorteo 0"
     )
     parser.add_argument(
@@ -365,7 +383,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         cross_check=cross_check,
         meta={
-            "bump": "2.11.42-beta",
+            "bump": "2.11.43-beta",
             "phase": "V2.94 DIA-D AUTO MULTI BAND",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),
