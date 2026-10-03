@@ -72,7 +72,7 @@ Ambos runs: veredicto `NOT_MEASURED` (sin hechos durables de `D`), `Δ motor = 0
 3. **No hay historial real de listado/baja ni de sector:** `active_from`/`active_until`/`sector_at` son **aproximaciones DECLARADAS** (no PIT genuino). El artefacto lo declara (`meta.universeCoverage` + `limits`).
 4. **No se ejecuta la ventana longitudinal DÍA-D** ni se mide la estabilidad del edge: se difiere a `v2.88.38`.
 5. **`CONFIRMED` sigue reservado** a evidencia PAPER real; hoy **no** se emite.
-6. **Freeze del runner:** sin re-anclar en este slice. El pin vigente (`WINDOW_CONFIG.commit=e9af4ada`, `apps=5cdd0666…`, `packages=eb2242ea…`) sigue casando con `HEAD`; el re-anclaje al commit funcional de `v2.88.37` corresponde al **commit de sello**.
+6. **Freeze del runner (re-anclado):** el sello **mueve el árbol** `apps`/`packages`; `WINDOW_CONFIG` se **re-ancló** al árbol del commit funcional **`b2e858c7`** (`git rev-parse "HEAD:apps" "HEAD:packages"`): `apps` = `c29b84a1d007209cf338594689a46939990a8da6`, `packages` = `3df71fe7fd0d4fca63e35441644601050fc4ab22`. Editar el pin no mueve el árbol (el módulo vive en `scripts/`). `pnpm window:test` (25/25) no se ve afectado. Pin anterior (sello `v2.88.36-beta`): `apps` `5cdd0666…` / `packages` `eb2242ea…` (`commit` = `e9af4ada`).
 
 ---
 

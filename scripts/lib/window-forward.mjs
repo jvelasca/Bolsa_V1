@@ -44,19 +44,19 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * codigo se mueve, el runner declara `TREE_MOVED` y aborta (fail-closed).
  * `commit` nombra el commit cuyo arbol queda pinneado.
  *
- * RE-ANCLAJE 2026-10-03 (sello `v2.88.36-beta`): la consolidacion del DIA-D
- * (contrato Universe(D) demostrable, cycle_closure_summary None-safe,
- * validacion numerica finita y lenguaje UI) toco `src`/tests bajo `apps/` y
- * `src`/tests bajo `packages/` (`Δ motor = 0`: CERO ficheros de motor). El arbol
- * pinneado pasa a ser el del commit `e9af4ada` (sello de este tramo). Editar el
- * pin NO mueve a su vez el arbol porque este modulo vive en `scripts/`, no en
- * `apps`/`packages`. Pin anterior (sello `v2.88.35-beta`, commit `1f31576c`):
- * `apps` `9bba8571…` / `packages` `2ac1927b…`.
+ * RE-ANCLAJE 2026-10-03 (sello `v2.88.37-beta`): el `Universe(D)` real
+ * (`CatalogPointInTimeUniverse` + flag `--universe pit` en el sandbox DIA-D)
+ * toco `src`/tests bajo `packages/` y el script bajo `apps/`
+ * (`Δ motor = 0`: CERO ficheros de motor). El arbol pinneado pasa a ser el del
+ * commit `b2e858c7` (sello de este tramo). Editar el pin NO mueve a su vez el
+ * arbol porque este modulo vive en `scripts/`, no en `apps`/`packages`. Pin
+ * anterior (sello `v2.88.36-beta`, commit `e9af4ada`): `apps` `5cdd0666…` /
+ * `packages` `eb2242ea…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'e9af4ada',
-  appsHash: '5cdd066671257c48f444a4d31002aae69701619c',
-  packagesHash: 'eb2242ea874027c5d2d759015ee11d23ba1fa983',
+  commit: 'b2e858c7',
+  appsHash: 'c29b84a1d007209cf338594689a46939990a8da6',
+  packagesHash: '3df71fe7fd0d4fca63e35441644601050fc4ab22',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
