@@ -20,13 +20,14 @@
 
 **Es** la corrección **quirúrgica** de la capa de **atribución** del OOS 2022 que introdujo `v2.88.39`,
 sobre la MISMA muestra medida. Cierra los tres hallazgos que la auditoría de `v2.88.39` marcó como
-bloqueantes de uso:
+bloqueantes de uso, y re-cita el cuarto (**A39-04**, la cita del CI del tag) ya VERDE:
 
 | Hallazgo | Qué se corrige |
 | --- | --- |
 | **A39-01 🔴** | `capture_study` medía `realized / mfe` **sin acotar**: ratios **negativos** y explosión con `MFE → 0+` (evidencia del sello anterior: `meanCapture=-12.12`, `medianCapture=-1.26`). Ahora `capturedR = max(realizedR, 0)` y el ratio vive en `[0, +inf)`; un `captureRatio > 1` se **declara** (`aboveOneCount`), no se recorta. |
 | **A39-02 🔴** | `mae_severity` afirmaba medir "perdedores" pero contaba **cualquier** ciclo con MAE bajo el umbral (no conocía `realizedR`). Ahora publica **poblaciones** `ALL` / `WINNERS` / `LOSERS`, uniendo el MAE con su ciclo por `cycle_key`. |
 | **A39-03 🟠** | El cross-check comparaba floats por **igualdad exacta** (`!=`). Ahora `expectancyR`/`hitRate` usan `math.isclose` (`rel_tol=abs_tol=1e-12`); el resto sigue exacto. |
+| **A39-04 🟠** | La **cita del CI del tag** (patrón `OBS-3`: el `Release tag CI` sólo corre al empujar el tag, así que su resultado no puede vivir dentro del mismo tag) queda **evidenciada VERDE** en `main` para `v2.88.40-beta`: `Release tag CI` run [`37132550660`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37132550660) — `11 jobs success` + `playwright` integrado `skipped` por diseño; `certify` `success`; `python` `4436 passed / 45 skipped`; `replay-repro` `REPRODUCIDO` `1E3ADAC2…`. Se **re-cita** aquí sin re-sellar. |
 
 **`SCHEMA_VERSION` de la atribución sube a `dia-d-attribution-v2`** (cambia la forma de `capture` y
 `maeSeverity`).
