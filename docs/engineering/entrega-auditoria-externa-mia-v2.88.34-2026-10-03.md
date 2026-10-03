@@ -4,10 +4,14 @@
 > versión **`2.11.34-beta`**, base del diff **`v2.88.32-beta`** → **`f87425ae`**, Alembic head
 > **`048_journal_entry_dedupe_key`** (**sin migración**).
 >
-> **Candidato a PROMOCIÓN (tip `main`, 2026-10-03): commit `05c429a8`.** Incluye, sobre el sello, el
+> **Candidato a PROMOCIÓN (2026-10-03): commit `05c429a8`.** Incluye, sobre el sello, el
 > **cierre de `G2`/`OBS-19`** (**tests** + `seed.ts` + CI + docs; **`Δ src` de motor = 0**). Es el SHA que
 > se etiquetaría para la versión estable (el sello `v2.88.34-beta` es su **base**). El **CI del candidato
 > aún no se ha corrido** (se correrá al etiquetar); el `572/572` del censo está verificado **localmente**.
+> **Identidad ESTABLE del producto:** el objeto se identifica por sus **árboles** `apps` `71c3024c…` /
+> `packages` `21b2585b…`, **invariantes** a los commits posteriores que solo tocan `docs/`/`scripts/`
+> (el commit que los define es `05c429a8`). Cita el `tip` que veas en el clon, pero valida el objeto por
+> esos dos hashes.
 > **Remote:** `https://github.com/jvelasca/Bolsa_V1` — **PÚBLICO** (el auditor clona sin credenciales).
 > **Clase:** entrega de **investigación/sandbox** sobre el motor AUTO, **advisory y read-only**.
 > **Evidencia cruda:** [`evidence/v2.88.34/`](./evidence/v2.88.34/README.md) ·
@@ -80,7 +84,7 @@ git log --oneline -1                       # a98996ed (sello v2.88.34)
 | Delta tag-a-tag total | **40 ficheros, `+7169 / −53`** (incluye docs) |
 | Delta `packages/`+`apps/` | **25 ficheros, `+6311 / −13`** |
 | `Δ motor` | **ningún** fichero de motor en el diff (verificado, §2) |
-| **Candidato a promoción** (tip `main`, POST-TAG, 2026-10-03) | **`05c429a8`** — cierre de `G2`/`OBS-19` (tests+seed+CI+docs, `Δ motor = 0`) |
+| **Candidato a promoción** (POST-TAG, 2026-10-03) | commit **`05c429a8`** (cierre de `G2`/`OBS-19`, `Δ motor = 0`); el **producto** se identifica por sus árboles `apps` `71c3024c…` / `packages` `21b2585b…`, invariantes a los commits posteriores de `docs/`/`scripts/` |
 | Cadena POST-TAG sobre el sello | `30294546` (cita CI) → `938c5fd3` (este pack) → `eb24a4d2` (cableado 53→3) → **`05c429a8`** (cierre `G2`) |
 | CI del tag | `Release tag CI` run **`37109548555`** — **TODO VERDE** |
 
