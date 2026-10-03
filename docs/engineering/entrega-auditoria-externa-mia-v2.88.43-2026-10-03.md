@@ -95,8 +95,8 @@ La deuda metodológica que señaló la auditoría de `v2.88.42` (`2023 × trend_
 ## 6. Sello
 
 - **Producto:** `V2.88.43-beta`. **Package:** `2.11.43-beta`. **Sin migración.**
-- **Tag:** `v2.88.43-beta` **PENDIENTE** de push/CI (se cita aquí tras el `Release tag CI`).
+- **Tag:** `v2.88.43-beta` → objeto `dcea3c55`, commit `edaa8d23` (tip `main`).
+- **`Release tag CI` run [`37143981929`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37143981929) VERDE:** `11 jobs success` + `playwright` integrado `skipped` por diseño; `certify` `success`; `python` `4469 passed / 45 skipped` (**+14** sobre `v2.88.42`); `replay-repro` `REPRODUCIDO` `1E3ADAC2…` (`3 340 728 B`) ⇒ el artefacto congelado no se movió. `main`: [`Frontend`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37143963314) · [`Python`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37143963257) · [`Fase 2`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37143963285) · [`Optimize`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37143963249) · [`Gitleaks`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37143963294) VERDE.
 - **Ficheros añadidos:** módulo + test + `v2_95` + `evidence/v2.88.43/README.md`.
 - **Ficheros modificados:** `v2_89..v2_94` (`meta.bump`; `v2_93`/`v2_94` flags), bump guard, `package.json`, `CHANGELOG.md`, `CURRENT_SYSTEM.md`, `versioning.md`.
-- **Commits locales:** funcional `4e8eec0f`; re-anclaje del freeze del runner `c71f85ba` (fijado al árbol de `4e8eec0f`).
-- **Tag:** `v2.88.43-beta` **PENDIENTE** de push/CI.
+- **Commits:** funcional `4e8eec0f` → re-anclaje del freeze del runner `c71f85ba` (fijado al árbol de `4e8eec0f`) → docs `edaa8d23`.
