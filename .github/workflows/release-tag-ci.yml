@@ -236,6 +236,42 @@ jobs:
           pnpm --filter @bolsa/database db:generate
           pnpm db:seed
 
+      # G2 / `OBS-19` (2026-10-03) — tanda W-G2/3 (16 de 19 ficheros) cableada en el job
+      # integrado, que es su destino DECLARADO: estos tests usan la app ASGI *in-process*
+      # (`ASGITransport`) y sólo necesitan el catálogo sembrado, no un servidor levantado.
+      # Verificado antes de cablear contra PG real con catálogo sembrado (76 passed).
+      #
+      # Los 3 ficheros restantes de la tanda NO se cablean a propósito: su primera
+      # ejecución real es ROJA y el agujero los estaba ocultando (hallazgo del peaje):
+      #   - test_lists.py: exige listas sembradas (p. ej. "IBEX 35") y `db:seed` sólo
+      #     siembra instrumentos ⇒ premisa imposible en BD recién sembrada.
+      #   - test_workspaces.py: espera 400 al borrar el workspace por defecto y recibe 204.
+      #   - integration/test_tax_report.py: el trade de apertura devuelve 403.
+      # Quedan declarados en `scripts/ci/ci-test-selection-baseline.json` con su tanda de
+      # arreglo (W-G2/4). La guarda `tests/test_ci_test_selection_census.py` impide que
+      # vuelvan a quedar sin declarar.
+      - name: Pytest W-G2/3 seeded API batch (16 files, OBS-19/G2)
+        run: >
+          uv run pytest
+          apps/api-python/tests/integration/test_accounts.py
+          apps/api-python/tests/integration/test_core_p_multi_profile.py
+          apps/api-python/tests/integration/test_http_retry_idempotency.py
+          apps/api-python/tests/integration/test_idempotency_reused_409.py
+          apps/api-python/tests/integration/test_portfolio_trade_opening_gate.py
+          apps/api-python/tests/integration/test_position_policies_flow.py
+          apps/api-python/tests/integration/test_sprint1_endpoints.py
+          apps/api-python/tests/integration/test_trade_idempotency.py
+          apps/api-python/tests/integration/test_v159_e2e_operational_wire.py
+          apps/api-python/tests/integration/test_v159_e2e_paper_desk.py
+          apps/api-python/tests/integration/test_v167_mercado_e2e_seed.py
+          apps/api-python/tests/integration/test_v168_hoy_e2e_seed.py
+          apps/api-python/tests/integration/test_v174_paper_autonomous_day.py
+          apps/api-python/tests/test_ai_authoring.py
+          apps/api-python/tests/test_auth.py
+          packages/py/infrastructure/tests/test_alert_channels.py
+          -q
+          --tb=short
+
       - name: Start API
         run: |
           uvicorn bolsa_api.main:app --host 127.0.0.1 --port 8000 &
@@ -807,6 +843,61 @@ jobs:
 
       - name: Alembic upgrade head
         run: cd packages/py/infrastructure && uv run alembic upgrade head
+
+      # G2 / `OBS-19` (2026-10-03) — tanda W-G2/2 del agujero DECLARADO de selección de tests.
+      # Estos 34 ficheros existían y NO los ejecutaba ningún job: el job offline los deja fuera
+      # con `--ignore` porque requieren PostgreSQL real. Verificado antes de cablear contra PG
+      # real (200 passed, 1 xfailed) y cubierto por el gate de procedencia de abajo.
+      #
+      # Va en paso DEDICADO (sesión de pytest propia) a propósito: la sesión larga de
+      # lifecycle/golden certifica otra cosa y ésta es una certiFICACIÓN PG autocontenida
+      # (chaos/concurrencia/ledger/config). La BD `bolsa_v1` está recién migrada en este punto
+      # y el teardown de sesión del conftest purga los residuos (cuentas + instrumentos
+      # sintéticos) al terminar, así que la sesión de abajo arranca limpia.
+      #
+      # La guarda `apps/api-python/tests/test_ci_test_selection_census.py` falla si alguno de
+      # estos ficheros vuelve a quedarse sin job; la línea base declarada vive en
+      # `scripts/ci/ci-test-selection-baseline.json` y se regenera con
+      # `uv run --no-sync python scripts/ci/test_selection.py --write-baseline`.
+      - name: Pytest W-G2/2 PostgreSQL batch (34 files, OBS-19/G2)
+        run: >
+          uv run pytest
+          apps/api-python/tests/test_f7b_legacy_user_id_backfill.py
+          packages/py/application/tests/test_auto_engine_state_store_hermetic.py
+          packages/py/application/tests/test_broker_adapter.py
+          packages/py/application/tests/test_broker_venue_per_account.py
+          packages/py/application/tests/test_custody_idempotency.py
+          packages/py/application/tests/test_decision_spine.py
+          packages/py/application/tests/test_dex2_crash_restart_cross_pid.py
+          packages/py/application/tests/test_dex3_operational_incident.py
+          packages/py/application/tests/test_execution_router.py
+          packages/py/application/tests/test_instrument_lifecycle_db.py
+          packages/py/application/tests/test_order_live_drift_incident.py
+          packages/py/application/tests/test_paper_desk_entry.py
+          packages/py/application/tests/test_research_observatory.py
+          packages/py/application/tests/test_research_trials_db.py
+          packages/py/application/tests/test_sync_queue_retryable.py
+          packages/py/infrastructure/tests/chaos/test_crash_consistency.py
+          packages/py/infrastructure/tests/chaos/test_load_concurrency_flow.py
+          packages/py/infrastructure/tests/chaos/test_multi_portfolio_ledger_sequence.py
+          packages/py/infrastructure/tests/test_concurrency_scenarios.py
+          packages/py/infrastructure/tests/test_config.py
+          packages/py/infrastructure/tests/test_config_production.py
+          packages/py/infrastructure/tests/test_core_r_repository.py
+          packages/py/infrastructure/tests/test_custody_concurrency_chaos.py
+          packages/py/infrastructure/tests/test_custody_default_portfolio_policy.py
+          packages/py/infrastructure/tests/test_deduct_cash_allow_partial.py
+          packages/py/infrastructure/tests/test_f3a_account_data_migration.py
+          packages/py/infrastructure/tests/test_financial_invariants.py
+          packages/py/infrastructure/tests/test_get_summary_no_price_fallback.py
+          packages/py/infrastructure/tests/test_m2_ledger_cash_reconciliation.py
+          packages/py/infrastructure/tests/test_m4_total_fees_excludes_custody.py
+          packages/py/infrastructure/tests/test_m7_custody_single_charge_f3_guard.py
+          packages/py/infrastructure/tests/test_mandate_sync_orphan_instrument.py
+          packages/py/infrastructure/tests/test_r8a_idempotency_backstop.py
+          packages/py/infrastructure/tests/test_r8c_ledger_balance_atomic.py
+          -q
+          --tb=short
 
       - name: Pytest lifecycle PG + auth + golden V1.88–V1.91/V1.95/V1.96 + worker V1.92/V1.93/V1.97 + integrity V1.94 + health schema-aware V2.15 (fail if skipped)
         # V2.40.2: los comentarios de procedencia van FUERA del bloque plegado. En un

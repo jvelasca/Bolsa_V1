@@ -66,7 +66,7 @@ declarada para la deuda de correlación es **≥ 4 días** (`P3-2`), con el `≥
 | # | Estado | Por qué |
 | --- | --- | --- |
 | G1 | ❌ (pack listo) | La auditoría externa **APROBADA** de `v2.88.32-beta` (0 bloqueantes, 2026-10-03) **no** cubre el tag que se promovería: `v2.88.33`/`v2.88.34` (**DÍA-D AUTO + bucle de realimentación por valor**) están **sin auditar**. La auditoría se **mueve con cada sello de código**. **Pack de handover ENTREGADO** el 2026-10-03 ([`entrega-auditoria-externa-mia-v2.88.34-2026-10-03.md`](./entrega-auditoria-externa-mia-v2.88.34-2026-10-03.md)): el objeto está preparado y es verificable desde GitHub, pero la compuerta **sólo se cierra con el veredicto de un tercero**, que **aún no existe** |
-| G2 | ❌ | `OBS-19`/`G2`: el censo se **DERIVA** de los workflows (`scripts/ci/test_selection.py` + guarda) y el agujero bajó de **205 a 53** ficheros (**34** `W-G2/2` PG + **19** `W-G2/3` red/E2E), pero **53 siguen sin ejecutarse en ningún job** ⇒ la compuerta **no** se cierra ([`evidence/v2.88.18`](./evidence/v2.88.18/README.md)) |
+| G2 | ❌ (a 3 ficheros) | `OBS-19`/`G2`: censo **DERIVADO** de los workflows (`scripts/ci/test_selection.py` + guarda de 5 tests). Agujero **205 → 53 → 3**: el 2026-10-03 se cablearon **34** `W-G2/2` (paso dedicado en `lifecycle-pg`, verificado `200 passed`/`1 xfailed`) y **16** `W-G2/3` (job integrado con catálogo sembrado, verificado `76 passed`). **Quedan 3**, y son **ROJOS en su primera ejecución real** (el agujero los ocultaba: `test_lists`, `test_workspaces`, `test_tax_report`); declarados con motivo y tanda **`W-G2/4`** ⇒ la compuerta **no** se cierra hasta arreglarlos ([informe](./obs-19-g2-cableado-50-de-53-2026-10-03.md)) |
 | G3 | ❌ | `W5` y `W6` sin sellar · regla direccional duplicada en 4 módulos · `P3-5` · `H-4` · `OBS-14.b` (alcance del barrido de arranque) · **`OBS-15`** (techo de 1000 `APPLIED`) |
 | G4 | ❌ | `P3-2`/`P3-3` **sin arrancar**: el **runner** de la ventana PAPER está construido y blindado (`v2.88.30`…`v2.88.32`) y el precio real está medido en PG (`v2.88.29`), pero **no hay días reales con material** (el mercado ha vetado `LONG` por régimen) |
 | G5 | ⚠️ | El par sellado se cita correctamente; la evidencia de `v2.88.33`/`v2.88.34` cita además hashes **locales** de artefacto (`sha256` de `operability_runs/*`, **gitignored**): declarado, pero un tercero no puede reproducirlo desde el tag salvo **regenerándolo** |
@@ -74,10 +74,11 @@ declarada para la deuda de correlación es **≥ 4 días** (`P3-2`), con el `≥
 | G7 | ✅ | En el tramo `v2.88.33`/`v2.88.34` se pone al día `CURRENT_SYSTEM.md` (**AsOf `V2.88.34`**, con el tramo `v2.88.20`…`v2.88.34`), la tabla de las **5 verdades** de `versioning.md`, y `PROJECT_PREMISES.md` gana la **§5 (operativa AUTO/PAPER)**. `versioning.md` regla 3 sigue **pendiente de enmienda** en el commit de promoción |
 
 ⇒ **Lectura honesta (2026-10-03): sigue sin cumplirse ninguna compuerta difícil (G1–G4).** El tramo
-`v2.88.18`…`v2.88.34` ha **preparado** G2 (censo derivado), G4 (runner de la ventana) y G7 (gobernanza al
+`v2.88.18`…`v2.88.34` ha **preparado** G2 (censo derivado) y el **cableado del 2026-10-03** lo deja a **3
+ficheros** (los 3 rojos ocultos, `W-G2/4`), ha preparado G4 (runner de la ventana) y G7 (gobernanza al
 día), pero **G4 solo se cierra operando** días reales y **G1 exige un auditor externo**. Orden natural:
-**G2** (barato, es lo primero que mira un auditor) → **G1** (auditar el tramo `v2.88.33`/`v2.88.34`) →
-**G4** (la ventana PAPER real) → **G3/G7**.
+**G2** (barato, es lo primero que mira un auditor: sólo falta arreglar los 3 rojos) → **G1** (auditar el
+tramo `v2.88.33`/`v2.88.34`) → **G4** (la ventana PAPER real) → **G3/G7**.
 
 ---
 

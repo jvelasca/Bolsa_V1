@@ -187,8 +187,9 @@ configuración de freeze sin `UNSAFE`?
 no paga llamadas extra)? ¿Hay algún sitio donde `NO MEDIDO` se degrade a `0`, `—` o `null` silencioso?
 
 **P10.** **Orden del siguiente trabajo.** Candidatos: (a) **ventana PAPER real** (`P3-2`/`P3-3`, `≥4
-días`/`≥32 ciclos`) con el interruptor `AUTO_ENGINE_SIM_REAL_PRICE=1`; (b) cerrar **`G2`/`OBS-19`** (los
-53 ficheros de test que no corren en ningún job); (c) productor durable del «lado ejecutado». ¿Cuál
+días`/`≥32 ciclos`) con el interruptor `AUTO_ENGINE_SIM_REAL_PRICE=1`; (b) cerrar **`G2`/`OBS-19`** (ya
+bajó de 53 a **3** ficheros el 2026-10-03 —cableados 50— y sólo quedan **3 tests ROJOS ocultos** por
+arreglar, `W-G2/4`); (c) productor durable del «lado ejecutado». ¿Cuál
 reduce más riesgo por unidad de esfuerzo, y cuál es **prerrequisito** de cuál?
 
 ---
@@ -198,10 +199,15 @@ reduce más riesgo por unidad de esfuerzo, y cuál es **prerrequisito** de cuál
 - **`P3-2`/`P3-3` (ventana PAPER real) — ABIERTAS.** El **runner** está construido y blindado
   (`v2.88.30`…`v2.88.32`) y el precio real está medido en PG (`v2.88.29`), pero **no hay días reales con
   material**. Aquí el gate se declara `INCONCLUSIVE`.
-- **`OBS-19`/`G2` — ABIERTA.** El censo **se deriva** de los workflows (`scripts/ci/test_selection.py` +
-  guarda, `maxUndeclared: 0`) y el agujero bajó de **205 a 53** ficheros (**34** `W-G2/2` PG + **19**
-  `W-G2/3` red/E2E), pero **53 siguen sin ejecutarse en ningún job**
-  ([`evidence/v2.88.18`](./evidence/v2.88.18/README.md)).
+- **`OBS-19`/`G2` — ABIERTA pero a 3 ficheros.** El censo **se deriva** de los workflows
+  (`scripts/ci/test_selection.py` + guarda, `maxUndeclared: 0`). Progresión **205 → 53 → 3**: el
+  2026-10-03 se cablearon **34** `W-G2/2` (paso dedicado en el job `lifecycle-pg` del tag) y **16**
+  `W-G2/3` (job integrado con catálogo sembrado). Los **3** que quedan se descubrieron **ROJOS** en su
+  primera ejecución real (el agujero los ocultaba): `test_lists` (exige listas sembradas que `db:seed`
+  no crea), `test_workspaces` (da **204** al borrar el workspace por defecto en vez de **400**) y
+  `test_tax_report` (el trade de apertura da **403**); declarados con tanda **`W-G2/4`**
+  ([informe](./obs-19-g2-cableado-50-de-53-2026-10-03.md) ·
+  [`evidence/v2.88.18`](./evidence/v2.88.18/README.md)).
 - **Compuertas `G1`–`G7` del criterio de salida:** `G6` ✅ (nada peligroso armado: `LIVE_EXECUTION_UNLOCKED`
   off · `PAPER_D_EXECUTE` off · XTB **PARKED** · este sello es read-only) y `G7` ✅ (gobernanza al día);
   **`G1`–`G4` siguen ❌** ([`criterio-salida-beta-2026-10-01.md`](./criterio-salida-beta-2026-10-01.md) §3).

@@ -36,7 +36,7 @@ Cierra la **observabilidad durable** del motor AUTO y **prepara la ventana PAPER
 
 **Lo que este tramo NO cambia:** ningún umbral `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-B; `LIVE_EXECUTION_UNLOCKED`
 y `PAPER_D_EXECUTE` siguen **off**; `P3-2`/`P3-3` (ventana PAPER real ≥4 días / ≥32 ciclos con material)
-siguen **ABIERTAS**; `OBS-19`/`G2` sigue **abierta** (53 ficheros declarados sin correr en ningún job).
+siguen **ABIERTAS**; `OBS-19`/`G2` sigue **abierta** pero el agujero bajó a **3** ficheros declarados sin correr en ningún job (los 3 restantes son **ROJOS en su primera ejecución real**: tanda de arreglo `W-G2/4`).
 
 **Qué es hoy el producto.** Un **Investment Operating System** (ADR-010) cuyo camino vivo es:
 descubrimiento → embudo/lista AUTO → `propose` → **Confirm** (firma humana) → ejecución **PAPER** →
@@ -49,9 +49,9 @@ oportunidades, decisiones, journal, confirmar) · `/trading` (Mercado: terminal)
 `/overview` · `/screeners` · `/research` · `/backtests` · `/instruments`. Componentes AUTO ya montados:
 `auto-evidence-section` y `auto-desk-panel`.
 
-**El peaje `G2` / `OBS-19` (tests invisibles) — sello `v2.88.18-beta`.**
+**El peaje `G2` / `OBS-19` (tests invisibles) — sellos `v2.88.18-beta` → `2026-10-03`.**
 
-El agujero declarado baja de **205 a 53** ficheros: **152 herméticos** pasan a **correr** por **pase de directorio** en los dos jobs offline (`packages/py/application|infrastructure|ai/tests`) y **53 quedan declarados con motivo y tanda** (**34** `W-G2/2` PG + **19** `W-G2/3` red/E2E). El censo **se DERIVA** de los workflows (`scripts/ci/test_selection.py` + `ci-test-selection-baseline.json`, `maxUndeclared: 0`) y una **guarda** de 5 tests impide que el agujero **crezca** (sí puede encoger). **`G2` sigue ABIERTA:** quedan 53 ficheros sin ejecutarse en ningún job. Evidencia: [`evidence/v2.88.18/README.md`](./engineering/evidence/v2.88.18/README.md).
+El agujero declarado bajó en dos peldaños. **(1) `v2.88.18`:** de **205 a 53** ficheros — **152 herméticos** pasan a **correr** por **pase de directorio** en los dos jobs offline (`packages/py/application|infrastructure|ai/tests`) y **53 quedan declarados con motivo y tanda**. **(2) `2026-10-03`:** de **53 a 3** — se cablearon **34** `W-G2/2` (paso dedicado en el job `lifecycle-pg` del tag, verificado `200 passed`/`1 xfailed`) y **16** `W-G2/3` (job integrado con catálogo sembrado, verificado `76 passed`). El censo **se DERIVA** de los workflows (`scripts/ci/test_selection.py` + `ci-test-selection-baseline.json`, `maxUndeclared: 0`) y una **guarda** de 5 tests impide que el agujero **crezca** (sí puede encoger). **`G2` sigue ABIERTA:** los **3** ficheros restantes son **ROJOS en su primera ejecución real** (el agujero los estaba ocultando: `test_lists` exige listas sembradas que `db:seed` no crea; `test_workspaces` no recibe el 400 al borrar el workspace por defecto; el trade de `test_tax_report` da 403) ⇒ tanda de arreglo **`W-G2/4`**. Evidencia: [`evidence/v2.88.18/README.md`](./engineering/evidence/v2.88.18/README.md) · [informe del cableado](./engineering/obs-19-g2-cableado-50-de-53-2026-10-03.md).
 
 **La serie de granularidad (lo que cambió el motor, en orden).**
 
