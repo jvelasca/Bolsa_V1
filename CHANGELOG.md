@@ -2,6 +2,16 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.37-beta] — `AUTO · DÍA-D`: `Universe(D)` deja de ser solo contrato — **`PointInTimeUniverseProvider` real** (disponibilidad desde barras + aproximaciones declaradas), sin tocar motor
+
+**Bump** `2.11.36-beta` → `2.11.37-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra la única deuda naranja de DÍA-D (D35-01 como **capacidad operativa**): el contrato `Universe(D)` pasa a tener una **fuente real** conectada al replay tras un flag, con la procedencia de cada campo **declarada** y **sin tocar el motor** (`auto_simulation_worker.py`, `auto_v2_entry.py`, `sim_durable_store.py`, `market_operability.py`, `replay_oos.py`): **`Δ decisión motor = 0`**. Evidencia: [`docs/engineering/evidence/v2.88.37/README.md`](./docs/engineering/evidence/v2.88.37/README.md).
+
+- **(D35-01 🟠 capacidad) Nuevo `CatalogPointInTimeUniverse`** (`packages/py/application/src/bolsa_application/universe_point_in_time_catalog.py`): implementa el protocolo `PointInTimeUniverse` leyendo la BD en una sola sesión read-only (agregado `MIN`/`MAX(timestamp)` de `ohlcv_bars` D1 + `instruments`). `load(...)` (BD) y `from_catalog_rows(...)` (puro) materializan `UniverseMember`; `members(day)`/`ids(day)` filtran por `eligible_at` (fail-closed), deduplican y ordenan.
+- **(honestidad) Procedencia declarada.** `availability_from`/`availability_until` = **REALES** (`MIN`/`MAX` de barras). `active_from` = `instruments.created_at` (alta en catálogo, **no** fecha de listado), `active_until` = abierto si `is_active` / última barra si no, `sector_at` = sector **actual** (no PIT): todo **DECLARADO** y expuesto en `coverage()` + `limits` del artefacto. Un instrumento **sin barras** es inelegible (no se inventan fechas).
+- **(wiring) Flag `--universe {catalog,pit}`** en `apps/api-python/scripts/v2_89_dia_d_auto_replay.py` (default `catalog`, comportamiento intacto). Con `pit` y sin `--watch`: el watch sale de `universe_ids(provider, D)`; sin elegibles ⇒ **fail-closed** (no cae al catálogo). `meta.watchSource` gana el valor `"pit"`, `survivorBiasRisk=false` cuando `pit`, y se añaden `meta.universeCoverage`/`meta.universeExcludedNoBars`.
+- **Contrato.** Sin cambios de DTO (el proveedor es Python puro, no viaja por OpenAPI).
+- **Límites declarados (NO se cierran aquí):** **`Δ motor = 0`**; sin migración; **no** existe historial real de listado/baja ni de sector (siguen siendo aproximaciones declaradas); **no** se ejecuta la ventana longitudinal DÍA-D (se difiere a `v2.88.38`); `CONFIRMED` sigue reservado a evidencia PAPER. **CI de tag PENDIENTE** (se cita tras el push del tag).
+
 ## [2.11.36-beta] — `AUTO · DÍA-D`: consolidación del instrumento (contrato `Universe(D)` demostrable, identidad de ciclo None-safe, validación numérica finita, lenguaje UI)
 
 **Bump** `2.11.35-beta` → `2.11.36-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra los hallazgos **D35-01…D35-04** de la auditoría de `v2.88.35` sobre el instrumento **DÍA-D** (advisory, read-only) **sin tocar el motor** (`auto_simulation_worker.py`, `auto_v2_entry.py`, `sim_durable_store.py`, `market_operability.py`, `replay_oos.py`): **`Δ decisión motor = 0`**. Evidencia: [`docs/engineering/evidence/v2.88.36/README.md`](./docs/engineering/evidence/v2.88.36/README.md).

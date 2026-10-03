@@ -23,6 +23,10 @@ Uso::
 
     uv run --no-sync python apps/api-python/scripts/v2_89_dia_d_auto_replay.py \
         --at 2026-09-30 --json
+
+    # Universe(D) point-in-time: disponibilidad REAL desde barras (+ aproximaciones declaradas)
+    uv run --no-sync python apps/api-python/scripts/v2_89_dia_d_auto_replay.py \
+        --at 2026-09-30 --universe pit --json
 """
 
 from __future__ import annotations
@@ -272,6 +276,10 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         normalize_day,
     )
     from bolsa_application.replay_oos import census_operable_days
+    from bolsa_application.universe_point_in_time import universe_ids
+    from bolsa_application.universe_point_in_time_catalog import (
+        CatalogPointInTimeUniverse,
+    )
     from bolsa_infrastructure.config import get_settings
     from bolsa_infrastructure.database.migrations import ensure_migrated
     from bolsa_infrastructure.database.session import create_engine, create_session_factory
@@ -286,8 +294,23 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     v87 = _load_v87()
 
     try:
+        day = normalize_day(args.at) or datetime.now(UTC).strftime("%Y-%m-%d")
         explicit_watch = [s.strip() for s in (args.watch or "").split(",") if s.strip()]
+        universe_coverage: dict[str, Any] | None = None
         watch = explicit_watch
+        if not watch and str(args.universe) == "pit":
+            # D35-01: fuente point-in-time REAL (disponibilidad desde barras) + aproximaciones
+            # DECLARADAS (alta/baja/sector del catálogo). Fail-closed: sin miembros NO se cae
+            # al catálogo actual (eso reintroduciría el sesgo que el flag quiere evitar).
+            provider = await CatalogPointInTimeUniverse.load(
+                factory, min_bars=int(args.min_bars)
+            )
+            universe_coverage = provider.coverage()
+            watch = universe_ids(provider, day)[: max(1, int(args.watch_size))]
+            if not watch:
+                raise RuntimeError(
+                    "el universo point-in-time no aportó ningún instrumento elegible en D"
+                )
         if not watch:
             v76 = v86._load_v76_module()  # noqa: SLF001 — MISMA derivación del watch.
             watch = await v76._watch_from_catalog(  # noqa: SLF001
@@ -296,8 +319,15 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         if not watch:
             raise RuntimeError("el catálogo no aportó ningún instrumento con sector e historia")
         # D34-05: el watch derivado del catálogo ACTUAL puede introducir survivorship bias en
-        # estudios históricos. Se DECLARA (no se cambia la derivación).
-        watch_source = "explicit" if explicit_watch else "catalog"
+        # estudios históricos. Se DECLARA (no se cambia la derivación). El watch point-in-time
+        # (``runtime`` = "pit") sí parte de un contrato Universe(D), pero su ``active_*`` y
+        # ``sector_at`` siguen siendo aproximaciones declaradas (ver ``meta.universeCoverage``).
+        if explicit_watch:
+            watch_source = "explicit"
+        elif universe_coverage is not None:
+            watch_source = "pit"
+        else:
+            watch_source = "catalog"
         v86._configure_env(watch=watch, venue=str(args.venue), edge=float(args.edge))  # noqa: SLF001
         # Determinismo: el precio del replay es el ``price_script`` histórico inyectado, no
         # una lectura en vivo. No se fuerza régimen ni se baja ningún umbral.
@@ -308,7 +338,6 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         if not days:
             raise RuntimeError("no hay barras D1 para simular")
 
-        day = normalize_day(args.at) or datetime.now(UTC).strftime("%Y-%m-%d")
         if day not in days:
             raise RuntimeError(f"el día {day} no está en el calendario de barras ({days[0]}..{days[-1]})")
         d_index = days.index(day)
@@ -355,6 +384,14 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         declared = _declared_steps(day_row)
         declared["CYCLE_CLOSED"] = _cycle_closed_step(oos)
 
+        limits = list(DEFAULT_LIMITS)
+        if watch_source == "pit":
+            limits.append(
+                "Universe(D) point-in-time: availability_from/until son REALES (barras D1); "
+                "active_from/active_until y sector_at son aproximaciones DECLARADAS (no hay "
+                "historial de listado/baja ni de sector). Ver meta.universeCoverage."
+            )
+
         artifact = build_dia_d_auto_artifact(
             day=day,
             declared=declared,
@@ -369,7 +406,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             },
             executed_detail=executed_detail,
             meta={
-                "bump": "2.11.36-beta",
+                "bump": "2.11.37-beta",
                 "phase": "V2.89 DIA-D AUTO SANDBOX",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
@@ -378,13 +415,15 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 "watchSize": len(watch),
                 "watchSource": watch_source,
                 "survivorBiasRisk": watch_source == "catalog",
+                "universeCoverage": universe_coverage,
+                "universeExcludedNoBars": (universe_coverage or {}).get("excludedNoBars"),
                 "historyDays": int(args.history_days),
                 "horizonDays": int(args.horizon_days),
                 "replayStart": replay.get("startDay"),
                 "replayEnd": replay.get("endDay"),
                 "realPriceForcedOff": True,
             },
-            limits=DEFAULT_LIMITS,
+            limits=limits,
         )
         return artifact
     finally:
@@ -418,6 +457,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--at", required=True, help="día D (YYYY-MM-DD) que se opera como si fuese hoy")
     parser.add_argument("--watch", default=None, help="instrumentos separados por coma (si falta, catálogo)")
+    parser.add_argument(
+        "--universe",
+        default="catalog",
+        choices=("catalog", "pit"),
+        help="fuente del watch si no hay --watch: 'catalog' (actual, con sesgo declarado) o 'pit' (Universe(D))",
+    )
     parser.add_argument("--watch-size", type=int, default=20, help="tamaño del watch derivado")
     parser.add_argument("--min-bars", type=int, default=60, help="barras D1 mínimas en el watch derivado")
     parser.add_argument("--history-days", type=int, default=_DEFAULT_HISTORY_DAYS, help="días previos a D simulados (contexto)")
