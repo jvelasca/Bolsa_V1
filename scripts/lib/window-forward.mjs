@@ -44,18 +44,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * codigo se mueve, el runner declara `TREE_MOVED` y aborta (fail-closed).
  * `commit` nombra el commit cuyo arbol queda pinneado.
  *
- * RE-ANCLAJE 2026-10-03 (sello `v2.88.39-beta`): la ATRIBUCIÓN del OOS 2022 del
- * DIA-D (`dia_d_attribution.py` + CLI `v2_92`) toco `src`/tests bajo `packages/`
- * y scripts+tests bajo `apps/` (`Δ motor = 0`: CERO ficheros de motor). El arbol
- * pinneado es el del commit funcional `fe3128c9` (base `41b69265` + DIA-D-3a).
- * Editar el pin NO mueve a su vez el arbol porque este modulo vive en `scripts/`.
- * Pin anterior (sello `v2.88.38-beta`, commit `20dae993`): `apps` `0a936c3c…` /
- * `packages` `6387fdfa…`.
+ * RE-ANCLAJE 2026-10-03 (sello `v2.88.40-beta`): la CORRECCION SEMANTICA de la
+ * atribucion DIA-D (`dia_d_attribution.py` + tests + CLI `v2_92`) toco `src`/
+ * tests bajo `packages/` y scripts bajo `apps/` (`Δ motor = 0`: CERO ficheros de
+ * motor). El arbol pinneado es el del commit funcional `bd3c9cd9` (v2.88.39 +
+ * DIA-D-3a.1). Editar el pin NO mueve a su vez el arbol porque este modulo vive
+ * en `scripts/`. Pin anterior (sello `v2.88.39-beta`, commit `fe3128c9`):
+ * `apps` `2fd946c4…` / `packages` `fdcae617…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'fe3128c9',
-  appsHash: '2fd946c4850dfcb7ad638c6c37175b7bb5821730',
-  packagesHash: 'fdcae617202251d0d6a82585246106eefca2d294',
+  commit: 'bd3c9cd9',
+  appsHash: '22ca3e78ec4e18f69a11a9fd047dfb9db9f3f43f',
+  packagesHash: 'f169415e7c46c38ed15c53d0030a86480d49132b',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
