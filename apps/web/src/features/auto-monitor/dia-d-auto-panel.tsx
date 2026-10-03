@@ -90,7 +90,6 @@ function NotAvailable({ detail }: { detail: DiaDAutoReplayDto }) {
       "No hay artefacto para este día. Ejecuta el sandbox por CLI para generarlo.",
     no_account_scope: "Sin cuenta activa: no se puede resolver el artefacto.",
     invalid_day: "Fecha inválida.",
-    account_scope_mismatch: "El artefacto pertenece a otra cuenta.",
   };
   return (
     <Card

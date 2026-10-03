@@ -1,7 +1,8 @@
 """API: DÍA-D AUTO · FEEDBACK (por valor) — espejo read-only del artefacto de la ventana.
 
 Expone el artefacto que produce ``apps/api-python/scripts/v2_90_dia_d_feedback.py``: el veredicto
-por instrumento (``CONFIRMED``/``MIXED``/``REFUTED``/``NOT_MEASURED``), la matriz valor × día, el
+por instrumento (``OOS_SUPPORTED``/``MIXED``/``REFUTED``/``NOT_MEASURED``) + ``evidenceQuality``,
+la matriz valor × día (atribuida por ``entryDay``), el
 catálogo de errores (``SOFTWARE``/``OPERATIONAL``/``DATA``) y el gate de ventana.
 
 Read-only: este router NO ejecuta el motor (eso vive en el CLI) y NO escribe nada. Sin cuenta
@@ -92,11 +93,12 @@ class DiaDFeedbackSummaryDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     values: int = 0
-    confirmed: int = 0
+    oosSupported: int = 0
     mixed: int = 0
     refuted: int = 0
     notMeasured: int = 0
     measuredValues: int = 0
+    byEvidenceQuality: dict[str, int] = Field(default_factory=dict)
     errors: DiaDFeedbackErrorCountsDto = Field(default_factory=DiaDFeedbackErrorCountsDto)
 
 
@@ -105,6 +107,8 @@ class DiaDFeedbackValueLimitsDto(BaseModel):
 
     minCycles: int = 0
     minHitRate: float = 0.0
+    supportedMinCycles: int = 0
+    strongMinCycles: int = 0
 
 
 class DiaDFeedbackByDayDto(BaseModel):
@@ -121,6 +125,7 @@ class DiaDFeedbackValueDto(BaseModel):
     symbol: str
     verdict: str
     verdictReason: str | None = None
+    evidenceQuality: str = "NOT_MEASURED"
     expectancyR: float | None = None
     hitRate: float | None = None
     measuredCycles: int = 0
@@ -169,6 +174,7 @@ class DiaDFeedbackDto(BaseModel):
     readOnly: bool = True
     schemaVersion: str | None = None
     kind: str | None = None
+    matrixBasis: str = "entryDay"
     window: DiaDFeedbackWindowDto = Field(default_factory=DiaDFeedbackWindowDto)
     summary: DiaDFeedbackSummaryDto | None = None
     values: list[DiaDFeedbackValueDto] = Field(default_factory=list)
@@ -190,18 +196,27 @@ class DiaDFeedbackListDto(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
-def _project(artifact: dict[str, Any], scope: str) -> DiaDFeedbackDto:
-    """Proyecta el artefacto crudo al DTO del contrato (declarando la cuenta si no cuadra)."""
-    notes: list[str] = []
+def _artifact_account(artifact: dict[str, Any]) -> str | None:
+    """Cuenta sellada en el artefacto; ``None`` si no declara ninguna (fail-closed)."""
     meta = artifact.get("meta") or {}
-    artifact_account = meta.get("account")
-    if artifact_account and artifact_account != scope:
-        notes.append("account_scope_mismatch")
+    account = meta.get("account")
+    return str(account) if account else None
+
+
+def _artifact_matches_scope(artifact: dict[str, Any], scope: str) -> bool:
+    """``True`` solo si el artefacto declara EXACTAMENTE la cuenta del principal (D34-06)."""
+    return _artifact_account(artifact) == scope
+
+
+def _project(artifact: dict[str, Any]) -> DiaDFeedbackDto:
+    """Proyecta el artefacto crudo al DTO del contrato (ya validado el scope de cuenta)."""
+    meta = artifact.get("meta") or {}
     return DiaDFeedbackDto(
         available=True,
         readOnly=bool(artifact.get("readOnly", True)),
         schemaVersion=artifact.get("schemaVersion"),
         kind=artifact.get("kind"),
+        matrixBasis=str(artifact.get("matrixBasis") or "entryDay"),
         window=DiaDFeedbackWindowDto(**dict(artifact.get("window") or {})),
         summary=(
             DiaDFeedbackSummaryDto(**artifact["summary"]) if artifact.get("summary") else None
@@ -212,7 +227,6 @@ def _project(artifact: dict[str, Any], scope: str) -> DiaDFeedbackDto:
         gate=dict(artifact.get("gate") or {}),
         meta=dict(meta),
         limits=list(artifact.get("limits", [])),
-        notes=notes,
     )
 
 
@@ -221,19 +235,25 @@ async def list_auto_dia_d_feedback(
     request: Request,
     account_id: Annotated[str | None, Depends(get_account_id_header)] = None,
 ) -> DiaDFeedbackListDto:
-    """Ventanas con feedback disponibles + el artefacto MÁS RECIENTE (read-only, fail-closed)."""
+    """Ventanas con feedback DISPONIBLES PARA LA CUENTA + el artefacto más reciente (fail-closed)."""
     scope = await resolve_account_scope_or_default(request, account_id)
     if scope is None:
         return DiaDFeedbackListDto(windows=[], notes=["no_account_scope"])
-    windows = _list_windows()
-    if not windows:
+    matching: list[str] = []
+    latest_artifact: dict[str, Any] | None = None
+    for candidate in _list_windows():
+        artifact = _read_artifact(candidate)
+        if artifact is None or not _artifact_matches_scope(artifact, scope):
+            continue
+        matching.append(candidate)
+        if latest_artifact is None:
+            latest_artifact = artifact
+    if not matching or latest_artifact is None:
         return DiaDFeedbackListDto(windows=[], notes=["no_artifacts"])
-    latest = windows[0]
-    artifact = _read_artifact(latest)
     return DiaDFeedbackListDto(
-        windows=windows,
-        latest=latest,
-        artifact=None if artifact is None else _project(artifact, scope),
+        windows=matching,
+        latest=matching[0],
+        artifact=_project(latest_artifact),
         notes=[],
     )
 
@@ -244,13 +264,14 @@ async def get_auto_dia_d_feedback(
     window: str,
     account_id: Annotated[str | None, Depends(get_account_id_header)] = None,
 ) -> DiaDFeedbackDto:
-    """Artefacto de feedback de ``window`` (``D0_D1``), read-only y fail-closed."""
+    """Artefacto de feedback de ``window`` (``D0_D1``), read-only y fail-closed por cuenta."""
     if not _WINDOW_RE.match(window):
         return DiaDFeedbackDto(available=False, notes=["invalid_window"])
     scope = await resolve_account_scope_or_default(request, account_id)
     if scope is None:
         return DiaDFeedbackDto(available=False, notes=["no_account_scope"])
     artifact = _read_artifact(window)
-    if artifact is None:
+    # D34-06: una cuenta distinta es INDISTINGUIBLE de inexistente: no se revela que existe.
+    if artifact is None or not _artifact_matches_scope(artifact, scope):
         return DiaDFeedbackDto(available=False, notes=["artifact_not_found"])
-    return _project(artifact, scope)
+    return _project(artifact)

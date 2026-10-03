@@ -239,7 +239,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     from dotenv import load_dotenv
 
     load_dotenv(_DOTENV, override=False)
-    from bolsa_application.dia_d_auto import compare_declared_vs_executed
+    from bolsa_application.dia_d_auto import compare_declared_vs_executed, normalize_day
     from bolsa_application.dia_d_auto_feedback import (
         SOFTWARE,
         build_dia_d_feedback_artifact,
@@ -264,7 +264,8 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     factory = create_session_factory(engine)
 
     try:
-        watch = [s.strip() for s in (args.watch or "").split(",") if s.strip()]
+        explicit_watch = [s.strip() for s in (args.watch or "").split(",") if s.strip()]
+        watch = explicit_watch
         if not watch:
             v76 = v86._load_v76_module()  # noqa: SLF001 — MISMA derivación del watch.
             watch = await v76._watch_from_catalog(  # noqa: SLF001
@@ -272,6 +273,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             )
         if not watch:
             raise RuntimeError("el catálogo no aportó ningún instrumento con sector e historia")
+        # D34-05: el watch derivado del catálogo ACTUAL puede introducir survivorship bias en
+        # estudios históricos. Se DECLARA (no se cambia la derivación).
+        watch_source = "explicit" if explicit_watch else "catalog"
         v86._configure_env(watch=watch, venue=str(args.venue), edge=float(args.edge))  # noqa: SLF001
         # Determinismo: el precio del replay es el ``price_script`` histórico inyectado.
         os.environ["AUTO_ENGINE_SIM_REAL_PRICE"] = "0"
@@ -323,6 +327,15 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         errors: list[dict[str, Any]] = []
         gate_rows: list[dict[str, Any]] = []
 
+        # El cierre durable de un D-cycle se busca hasta el MISMO horizonte OOS que el replay
+        # (identidad única declarado/ejecutado; hallazgo D34-01).
+        replay_end = normalize_day(replay.get("endDay"))
+        close_window_end = (
+            datetime.fromisoformat(f"{replay_end}T00:00:00+00:00") + timedelta(days=1)
+            if replay_end
+            else None
+        )
+
         def _add(entry: dict[str, Any] | None) -> None:
             if entry is not None:
                 errors.append(entry)
@@ -333,7 +346,10 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             oos = v89._oos_for_day(score, day)  # noqa: SLF001
             declared["CYCLE_CLOSED"] = v89._cycle_closed_step(oos)  # noqa: SLF001
             executed, executed_detail = await v89._read_executed_facts(  # noqa: SLF001
-                factory, account_id=str(args.account_id), day=day
+                factory,
+                account_id=str(args.account_id),
+                day=day,
+                close_window_end=close_window_end,
             )
             comparison = compare_declared_vs_executed(declared, executed)
             for row in comparison:
@@ -407,13 +423,15 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             errors=errors,
             gate=gate,
             meta={
-                "bump": "2.11.34-beta",
+                "bump": "2.11.35-beta",
                 "phase": "V2.90 DIA-D AUTO FEEDBACK",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
                 "versionA": str(args.version_a),
                 "venue": str(args.venue),
                 "watchSize": len(watch),
+                "watchSource": watch_source,
+                "survivorBiasRisk": watch_source == "catalog",
                 "historyDays": int(args.history_days),
                 "horizonDays": int(args.horizon_days),
                 "replayStart": replay.get("startDay"),
@@ -434,7 +452,7 @@ def _print_text(artifact: dict[str, Any]) -> None:
     errors = summary["errors"]
     print(
         f"valores                   {summary['values']} "
-        f"(confirmados={summary['confirmed']} mixtos={summary['mixed']} "
+        f"(soportadosOOS={summary['oosSupported']} mixtos={summary['mixed']} "
         f"refutados={summary['refuted']} n/d={summary['notMeasured']})"
     )
     print(

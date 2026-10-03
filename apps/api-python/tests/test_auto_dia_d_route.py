@@ -161,7 +161,8 @@ async def test_invalid_day_is_declared(app, tmp_path, monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_account_mismatch_is_declared_as_a_note(app, tmp_path, monkeypatch) -> None:
+async def test_account_mismatch_is_fail_closed(app, tmp_path, monkeypatch) -> None:
+    # D34-06: una cuenta ajena es INDISTINGUIBLE de inexistente; no se entrega el artefacto.
     monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
     _write(tmp_path, "2026-09-30", account="otra-cuenta")
 
@@ -169,9 +170,27 @@ async def test_account_mismatch_is_declared_as_a_note(app, tmp_path, monkeypatch
         return "acc"
 
     monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
-    response = await _get(app, "/api/auto/dia-d-replay/2026-09-30")
+    detail = await _get(app, "/api/auto/dia-d-replay/2026-09-30")
+    listing = await _get(app, "/api/auto/dia-d-replay")
 
-    assert response.status_code == 200
-    body = response.json()
-    assert body["available"] is True
-    assert "account_scope_mismatch" in body["notes"]
+    assert detail.status_code == 200
+    assert detail.json()["available"] is False
+    assert detail.json()["notes"] == ["artifact_not_found"]
+    assert detail.json()["steps"] == []
+    # El listado tampoco revela el día de otra cuenta.
+    assert listing.json()["days"] == []
+    assert listing.json()["notes"] == ["no_artifacts"]
+
+
+@pytest.mark.asyncio
+async def test_listing_only_returns_days_of_the_current_account(app, tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    _write(tmp_path, "2026-09-29", account="acc")
+    _write(tmp_path, "2026-09-30", account="otra-cuenta")
+
+    async def _scope(_request, _account_id):
+        return "acc"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
+    body = (await _get(app, "/api/auto/dia-d-replay")).json()
+    assert body["days"] == ["2026-09-29"]

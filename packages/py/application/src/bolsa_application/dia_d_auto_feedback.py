@@ -58,16 +58,37 @@ from bolsa_application.market_operability import (
 #: Versión del esquema del artefacto de feedback. Un cambio de forma la sube.
 SCHEMA_VERSION = "dia-d-feedback-v1"
 
-#: Veredicto POR VALOR: confirma / mezcla / refuta / no se pudo medir.
-VALUE_CONFIRMED = "CONFIRMED"
+#: Veredicto POR VALOR sobre evidencia de REPLAY/OOS: soporta / mezcla / refuta / no medido.
+#: ``OOS_SUPPORTED`` NO significa "valor confirmado operativamente": afirma que el
+#: comportamiento OOS del REPLAY del motor fue positivo bajo este experimento (D34-03). No
+#: dice nada sobre la ejecución PAPER real. ``CONFIRMED`` se RESERVA para evidencia PAPER
+#: (ejecución real + muestra suficiente + datos íntegros); hoy NO se emite.
+VALUE_OOS_SUPPORTED = "OOS_SUPPORTED"
 VALUE_MIXED = "MIXED"
 VALUE_REFUTED = "REFUTED"
 VALUE_NOT_MEASURED = "NOT_MEASURED"
 VALUE_VERDICTS: tuple[str, ...] = (
-    VALUE_CONFIRMED,
+    VALUE_OOS_SUPPORTED,
     VALUE_MIXED,
     VALUE_REFUTED,
     VALUE_NOT_MEASURED,
+)
+
+#: Reservado: veredicto para evidencia PAPER real. NO entra en ``VALUE_VERDICTS`` ni se emite
+#: mientras el instrumento sólo observe el replay.
+VALUE_CONFIRMED = "CONFIRMED"
+
+#: Calidad de la EVIDENCIA por tamaño de muestra (eje INDEPENDIENTE del veredicto, D34-04):
+#: ``n = 5`` basta para MEDIR, no para llamar "confirmado" a nada.
+EVIDENCE_NOT_MEASURED = "NOT_MEASURED"
+EVIDENCE_PRELIMINARY = "PRELIMINARY"
+EVIDENCE_SUPPORTED = "SUPPORTED"
+EVIDENCE_STRONG = "STRONG"
+EVIDENCE_QUALITIES: tuple[str, ...] = (
+    EVIDENCE_NOT_MEASURED,
+    EVIDENCE_PRELIMINARY,
+    EVIDENCE_SUPPORTED,
+    EVIDENCE_STRONG,
 )
 
 #: Familias de error del bucle. ``SOFTWARE`` es el fallo lógico, ``OPERATIONAL`` la gestión
@@ -83,9 +104,14 @@ DETERMINISTIC_STEPS: frozenset[str] = frozenset({"SIGNAL", "ORDER", "FILL"})
 #: Suelo de muestra declarado (NO se relaja para forzar un veredicto). Por debajo de él un
 #: valor se declara ``NOT_MEASURED``: no se afirma nada con dos ciclos.
 MIN_VALUE_CYCLES = 5
-#: Hit-rate mínimo declarado para ``CONFIRMED`` (una esperanza positiva sin acierto sólido
-#: no confirma nada).
+#: Hit-rate mínimo declarado para ``OOS_SUPPORTED`` (una esperanza positiva sin acierto
+#: sólido no soporta nada).
 MIN_VALUE_HIT_RATE = 0.5
+#: Suelos de CALIDAD de evidencia (declarados, no una decisión estadística definitiva): con
+#: ``n = 5`` se puede MEDIR, pero no llamar "soportado" a nada. ``n >= 20`` es el mínimo
+#: para hablar de evidencia OOS soportada; ``n >= 32`` la refuerza.
+EVIDENCE_SUPPORTED_MIN_CYCLES = 20
+EVIDENCE_STRONG_MIN_CYCLES = 32
 
 #: Estados de la reconciliación de integridad que se leen como fallo de SOFTWARE.
 _RECONCILE_SOFTWARE_STATES: frozenset[str] = frozenset({"drift", "blocked"})
@@ -120,6 +146,14 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "La deteccion de divergencia de software es heuristica (pasos deterministas), no una prueba de bug.",
     "Un hueco es None/NOT_MEASURED; nunca se rellena con 0.",
     "El lado ejecutado queda NOT_MEASURED en dias historicos hasta que la ventana PAPER opere ese D.",
+    "OOS_SUPPORTED describe evidencia de REPLAY/OOS, no ejecucion PAPER: CONFIRMED queda "
+    "reservado para evidencia PAPER y NO se emite todavia.",
+    "evidenceQuality clasifica la muestra: NOT_MEASURED (<5), PRELIMINARY (5-19), "
+    "SUPPORTED (20-31), STRONG (>=32).",
+    "La matriz valor x dia atribuye por entryDay (dia de decision); exitDay es atributo de la "
+    "operacion, no dimension del experimento.",
+    "El watch derivado del catalogo actual puede introducir survivorship bias en estudios "
+    "historicos (ver meta.survivorBiasRisk).",
 )
 
 
@@ -223,6 +257,26 @@ def _mean(values: Sequence[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
 
+def evidence_quality_for(measured_cycles: Any) -> str:
+    """Tier de CALIDAD de evidencia por tamaño de muestra (eje independiente del veredicto).
+
+    ``NOT_MEASURED`` (<5), ``PRELIMINARY`` (5-19), ``SUPPORTED`` (20-31), ``STRONG`` (>=32).
+    No decide nada por sí solo: describe cuánta muestra respalda el veredicto. Un valor no
+    numérico se trata como ``0`` mediciones (fail-closed).
+    """
+    try:
+        cycles = int(measured_cycles)
+    except (TypeError, ValueError):
+        cycles = 0
+    if cycles < MIN_VALUE_CYCLES:
+        return EVIDENCE_NOT_MEASURED
+    if cycles < EVIDENCE_SUPPORTED_MIN_CYCLES:
+        return EVIDENCE_PRELIMINARY
+    if cycles < EVIDENCE_STRONG_MIN_CYCLES:
+        return EVIDENCE_SUPPORTED
+    return EVIDENCE_STRONG
+
+
 def build_value_scorecard(
     symbol: Any,
     *,
@@ -237,6 +291,12 @@ def build_value_scorecard(
     ilegible se declara hueco (no cuenta como ciclo). ``errors`` son las incidencias del valor
     (``{"kind", "code", "day"}``). ``days`` es el calendario de la ventana (para la cobertura y
     la matriz valor × día). Nada se rellena con ``0``.
+
+    Atribución temporal (D34-02): el día del experimento es el **día de DECISIÓN**
+    (``entryDay``), la MISMA dimensión con la que ``v2_90`` selecciona los ciclos. ``exitDay``
+    es un atributo de la operación, no una dimensión: si un ciclo se abre en ``D`` y cierra
+    fuera de la ventana, pertenece a ``D``. Un ciclo sin ``entryDay`` legible no se atribuye a
+    ningún día (hueco declarado), nunca se cae a ``exitDay``.
     """
     name = str(symbol or "").strip()
     window_days = [normalize_day(day) for day in days if normalize_day(day)]
@@ -249,7 +309,7 @@ def build_value_scorecard(
         if value is None:
             continue
         realized.append(value)
-        day = normalize_day(trip.get("exitDay")) or normalize_day(trip.get("entryDay"))
+        day = normalize_day(trip.get("entryDay"))
         if day:
             by_day_r.setdefault(day, []).append(value)
             by_day_cycles[day] = by_day_cycles.get(day, 0) + 1
@@ -279,6 +339,7 @@ def build_value_scorecard(
         hit_rate=hit_rate,
         software_errors=software_errors,
     )
+    evidence_quality = evidence_quality_for(measured_cycles)
 
     by_day: dict[str, dict[str, Any]] = {}
     for day in window_days:
@@ -294,6 +355,7 @@ def build_value_scorecard(
         "symbol": name,
         "verdict": verdict,
         "verdictReason": reason,
+        "evidenceQuality": evidence_quality,
         "expectancyR": expectancy_r,
         "hitRate": hit_rate,
         "measuredCycles": measured_cycles,
@@ -306,6 +368,8 @@ def build_value_scorecard(
         "limits": {
             "minCycles": MIN_VALUE_CYCLES,
             "minHitRate": MIN_VALUE_HIT_RATE,
+            "supportedMinCycles": EVIDENCE_SUPPORTED_MIN_CYCLES,
+            "strongMinCycles": EVIDENCE_STRONG_MIN_CYCLES,
         },
     }
 
@@ -323,11 +387,13 @@ def _value_verdict(
        un fallo lógico no se esconde detrás del suelo de muestra.
     2. Muestra insuficiente ⇒ ``NOT_MEASURED`` (no se afirma nada).
     3. ``expectancyR <= 0`` ⇒ ``REFUTED`` (la tesis no paga).
-    4. ``expectancyR > 0`` y hit-rate suficiente y sin software ⇒ ``CONFIRMED``.
+    4. ``expectancyR > 0`` y hit-rate suficiente ⇒ ``OOS_SUPPORTED`` SOLO si la muestra llega
+       al suelo de evidencia soportada (``>= 20``); por debajo ⇒ ``MIXED`` (``preliminary_sample``).
     5. Resto ⇒ ``MIXED`` (se mide, no concluye).
 
-    Un ``expectancyR``/``hit_rate`` ausente con muestra ``>=`` suelo es imposible por
-    construcción; por si acaso, se trata como ``NOT_MEASURED`` (fail-closed).
+    El veredicto NUNCA llama "confirmado" a evidencia de replay (D34-03): ``CONFIRMED`` queda
+    reservado a evidencia PAPER. Un ``expectancyR``/``hit_rate`` ausente con muestra ``>=``
+    suelo es imposible por construcción; por si acaso, se trata como ``NOT_MEASURED``.
     """
     if software_errors > 0:
         return VALUE_REFUTED, "software_divergence"
@@ -337,9 +403,11 @@ def _value_verdict(
         return VALUE_NOT_MEASURED, "no_measurement"
     if expectancy_r <= 0:
         return VALUE_REFUTED, "negative_expectancy"
-    if hit_rate >= MIN_VALUE_HIT_RATE:
-        return VALUE_CONFIRMED, "positive_expectancy"
-    return VALUE_MIXED, "no_conclusive_edge"
+    if hit_rate < MIN_VALUE_HIT_RATE:
+        return VALUE_MIXED, "no_conclusive_edge"
+    if measured_cycles < EVIDENCE_SUPPORTED_MIN_CYCLES:
+        return VALUE_MIXED, "preliminary_sample"
+    return VALUE_OOS_SUPPORTED, "positive_expectancy"
 
 
 # ── Matriz valor × día (heatmap) y catálogo de errores ───────────────────────────
@@ -398,12 +466,16 @@ def summarize_feedback(
     values: Sequence[Mapping[str, Any]],
     errors: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
-    """Resumen GLOBAL: conteo de veredictos por valor y de errores por familia."""
+    """Resumen GLOBAL: conteo de veredictos, de CALIDAD de evidencia y de errores por familia."""
     verdicts = {verdict: 0 for verdict in VALUE_VERDICTS}
+    evidence = {tier: 0 for tier in EVIDENCE_QUALITIES}
     for value in values:
         key = str(value.get("verdict") or "")
         if key in verdicts:
             verdicts[key] += 1
+        tier = str(value.get("evidenceQuality") or "")
+        if tier in evidence:
+            evidence[tier] += 1
     error_counts = {kind: 0 for kind in ERROR_KINDS}
     for error in errors or ():
         kind = str(error.get("kind") or "").strip().upper()
@@ -411,13 +483,14 @@ def summarize_feedback(
             error_counts[kind] += 1
     return {
         "values": len(values),
-        "confirmed": verdicts[VALUE_CONFIRMED],
+        "oosSupported": verdicts[VALUE_OOS_SUPPORTED],
         "mixed": verdicts[VALUE_MIXED],
         "refuted": verdicts[VALUE_REFUTED],
         "notMeasured": verdicts[VALUE_NOT_MEASURED],
         "measuredValues": (
-            verdicts[VALUE_CONFIRMED] + verdicts[VALUE_MIXED] + verdicts[VALUE_REFUTED]
+            verdicts[VALUE_OOS_SUPPORTED] + verdicts[VALUE_MIXED] + verdicts[VALUE_REFUTED]
         ),
+        "byEvidenceQuality": evidence,
         "errors": {**error_counts, "total": sum(error_counts.values())},
     }
 
@@ -496,6 +569,7 @@ def build_dia_d_feedback_artifact(
         "schemaVersion": SCHEMA_VERSION,
         "kind": "DIA_D_AUTO_FEEDBACK",
         "readOnly": True,
+        "matrixBasis": "entryDay",
         "window": {
             "from": normalize_day(window_from),
             "to": normalize_day(window_to),
@@ -517,6 +591,13 @@ __all__ = [
     "DEFAULT_LIMITS",
     "DETERMINISTIC_STEPS",
     "ERROR_KINDS",
+    "EVIDENCE_NOT_MEASURED",
+    "EVIDENCE_PRELIMINARY",
+    "EVIDENCE_QUALITIES",
+    "EVIDENCE_STRONG",
+    "EVIDENCE_STRONG_MIN_CYCLES",
+    "EVIDENCE_SUPPORTED",
+    "EVIDENCE_SUPPORTED_MIN_CYCLES",
     "MIN_VALUE_CYCLES",
     "MIN_VALUE_HIT_RATE",
     "OPERATIONAL",
@@ -526,6 +607,7 @@ __all__ = [
     "VALUE_CONFIRMED",
     "VALUE_MIXED",
     "VALUE_NOT_MEASURED",
+    "VALUE_OOS_SUPPORTED",
     "VALUE_REFUTED",
     "VALUE_VERDICTS",
     "build_day_matrix",
@@ -536,6 +618,7 @@ __all__ = [
     "error_kind_for_exit_state",
     "error_kind_for_reason",
     "error_kind_for_reconcile_state",
+    "evidence_quality_for",
     "normalize_error",
     "software_error_for_step",
     "summarize_feedback",

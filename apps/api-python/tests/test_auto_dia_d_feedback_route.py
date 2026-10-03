@@ -23,13 +23,20 @@ def _artifact(window: str, account: str = "acc") -> dict:
         "kind": "DIA_D_AUTO_FEEDBACK",
         "readOnly": True,
         "window": {"from": day_from, "to": day_to, "days": [day_from, day_to]},
+        "matrixBasis": "entryDay",
         "summary": {
             "values": 1,
-            "confirmed": 0,
+            "oosSupported": 0,
             "mixed": 0,
             "refuted": 1,
             "notMeasured": 0,
             "measuredValues": 1,
+            "byEvidenceQuality": {
+                "NOT_MEASURED": 0,
+                "PRELIMINARY": 1,
+                "SUPPORTED": 0,
+                "STRONG": 0,
+            },
             "errors": {"SOFTWARE": 1, "OPERATIONAL": 0, "DATA": 0, "total": 1},
         },
         "values": [
@@ -37,6 +44,7 @@ def _artifact(window: str, account: str = "acc") -> dict:
                 "symbol": "AAA",
                 "verdict": "REFUTED",
                 "verdictReason": "software_divergence",
+                "evidenceQuality": "PRELIMINARY",
                 "expectancyR": 0.5,
                 "hitRate": 0.6,
                 "measuredCycles": 5,
@@ -136,8 +144,11 @@ async def test_get_returns_the_artifact_projection(app, tmp_path, monkeypatch) -
     body = response.json()
     assert body["available"] is True
     assert body["kind"] == "DIA_D_AUTO_FEEDBACK"
+    assert body["matrixBasis"] == "entryDay"
     assert body["summary"]["refuted"] == 1
+    assert body["summary"]["oosSupported"] == 0
     assert body["values"][0]["symbol"] == "AAA"
+    assert body["values"][0]["evidenceQuality"] == "PRELIMINARY"
     assert body["values"][0]["expectancyR"] == 0.5
     assert body["matrix"][0]["cells"][1]["outcome"] == "NOT_MEASURED"
     assert body["errors"][0]["kind"] == "SOFTWARE"
@@ -195,7 +206,8 @@ async def test_invalid_window_is_declared(app, tmp_path, monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_account_mismatch_is_declared_as_a_note(app, tmp_path, monkeypatch) -> None:
+async def test_account_mismatch_is_fail_closed(app, tmp_path, monkeypatch) -> None:
+    # D34-06: una cuenta ajena es INDISTINGUIBLE de inexistente; no se entrega el artefacto.
     monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
     _write(tmp_path, "2026-09-25_2026-09-30", account="otra-cuenta")
 
@@ -203,12 +215,36 @@ async def test_account_mismatch_is_declared_as_a_note(app, tmp_path, monkeypatch
         return "acc"
 
     monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
-    response = await _get(app, "/api/auto/dia-d-feedback/2026-09-25_2026-09-30")
+    detail = await _get(app, "/api/auto/dia-d-feedback/2026-09-25_2026-09-30")
+    listing = await _get(app, "/api/auto/dia-d-feedback")
 
-    assert response.status_code == 200
-    body = response.json()
-    assert body["available"] is True
-    assert "account_scope_mismatch" in body["notes"]
+    assert detail.status_code == 200
+    body = detail.json()
+    assert body["available"] is False
+    assert body["notes"] == ["artifact_not_found"]
+    assert body["values"] == []
+    assert body["matrix"] == []
+    # El listado tampoco revela la ventana de otra cuenta.
+    assert listing.json()["windows"] == []
+    assert listing.json()["latest"] is None
+    assert listing.json()["notes"] == ["no_artifacts"]
+
+
+@pytest.mark.asyncio
+async def test_listing_only_returns_windows_of_the_current_account(
+    app, tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    _write(tmp_path, "2026-09-25_2026-09-29", account="acc")
+    _write(tmp_path, "2026-09-25_2026-09-30", account="otra-cuenta")
+
+    async def _scope(_request, _account_id):
+        return "acc"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
+    body = (await _get(app, "/api/auto/dia-d-feedback")).json()
+    assert body["windows"] == ["2026-09-25_2026-09-29"]
+    assert body["latest"] == "2026-09-25_2026-09-29"
 
 
 @pytest.mark.asyncio

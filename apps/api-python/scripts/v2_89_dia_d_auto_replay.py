@@ -87,15 +87,22 @@ async def _read_executed_facts(
     *,
     account_id: str,
     day: str,
+    close_window_end: datetime | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Lee (read-only) los hechos durables de ``D`` y los proyecta a la cadena AUTO.
 
     Devuelve ``(executed, detail)``. Cada magnitud no observable queda ``None`` (hueco
     declarado), nunca un ``0``. El rango temporal es ``[D 00:00 UTC, D+1 00:00 UTC)`` para
     ser determinista con independencia del huso de la sesión.
+
+    ``CYCLE_CLOSED`` usa la MISMA identidad que el lado declarado (hallazgo D34-01): un
+    **D-cycle** nace con su fill de APERTURA (``buy``) en ``D`` y se busca su CIERRE
+    (``sell``) hasta ``close_window_end`` (el horizonte OOS del replay), no sólo dentro de
+    ``D``. Así "ciclo nacido en D que cierra después" cuenta como cerrado en ambos lados.
     """
     from sqlalchemy import select
 
+    from bolsa_application.dia_d_auto import cycle_closure_summary
     from bolsa_infrastructure.database.models.tables import (
         AutoExitOrderRow,
         DecisionJournalEntryRow,
@@ -105,6 +112,7 @@ async def _read_executed_facts(
 
     start = datetime.fromisoformat(f"{day}T00:00:00+00:00")
     end = start + timedelta(days=1)
+    close_end = close_window_end if close_window_end is not None and close_window_end > end else end
 
     detail: dict[str, Any] = {"day": day, "windowStart": start.isoformat(), "windowEnd": end.isoformat()}
     executed: dict[str, Any] = {}
@@ -147,27 +155,31 @@ async def _read_executed_facts(
                 select(
                     SimFillFinanceContextRow.cycle_id,
                     SimFillFinanceContextRow.side,
-                )
-                .where(
+                    SimFillFinanceContextRow.created_at,
+                ).where(
                     SimFillFinanceContextRow.account_id == account_id,
                     SimFillFinanceContextRow.created_at >= start,
-                    SimFillFinanceContextRow.created_at < end,
+                    SimFillFinanceContextRow.created_at < close_end,
                     SimFillFinanceContextRow.cycle_id.is_not(None),
                 )
-                .distinct()
             )
         ).all()
 
-    # Un ciclo se declara CERRADO en ``D`` si en ``D`` tiene fill de apertura (buy en largo)
-    # y de cierre (sell). Es el único proxy medible con los hechos durables disponibles.
-    sides_by_cycle: dict[str, set[str]] = {}
-    for cycle_id, side in cycle_rows:
-        sides_by_cycle.setdefault(str(cycle_id), set()).add(str(side).lower())
-    closed_cycles = sorted(
-        cycle_id
-        for cycle_id, sides in sides_by_cycle.items()
-        if "buy" in sides and "sell" in sides
-    )
+    # Identidad ÚNICA (D34-01): el D-cycle nace con su APERTURA (buy) en D; su cierre es un
+    # sell POSTERIOR a la apertura, hasta el horizonte OOS del replay. Un ciclo abierto en
+    # D-1 y cerrado en D NO es un D-cycle (no nació aquí).
+    opened_cycle_ids: set[str] = set()
+    closed_cycle_ids: set[str] = set()
+    for cycle_id, side, created_at in cycle_rows:
+        key = str(cycle_id) if cycle_id is not None else ""
+        if not key:
+            continue
+        side_key = str(side).lower()
+        if side_key == "buy" and start <= created_at < end:
+            opened_cycle_ids.add(key)
+        elif side_key == "sell":
+            closed_cycle_ids.add(key)
+    closure = cycle_closure_summary(opened_cycle_ids, closed_cycle_ids)
 
     any_durable = bool(reservations or fills or exit_orders or journal_entries)
     if any_durable:
@@ -177,7 +189,7 @@ async def _read_executed_facts(
         # protección de una posición. No hay tabla de órdenes de ENTRADA separada (viven en
         # la reserva), así que ``ORDER`` queda como hueco declarado.
         executed["PROTECTION"] = exit_orders
-        executed["CYCLE_CLOSED"] = len(closed_cycles)
+        executed["CYCLE_CLOSED"] = closure["step"]
     # ``SIGNAL``/``TOP_N``/``RISK``/``ORDER``/``SETTLEMENT`` no tienen una proyección durable
     # fiable: se declaran huecos (``None``), no ceros.
 
@@ -188,8 +200,11 @@ async def _read_executed_facts(
             "fills": fills,
             "exitOrdersCreated": exit_orders,
             "journalEntries": journal_entries,
-            "closedCycles": closed_cycles,
-            "durableCyclesSeen": sorted(sides_by_cycle),
+            "closeWindowEnd": close_end.isoformat(),
+            "openedCycles": closure["opened"],
+            "closedCycles": closure["closed"],
+            "openCycles": closure["open"],
+            "cycleClosureUnmeasured": closure["unmeasured"],
         }
     )
     return executed, detail
@@ -271,7 +286,8 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     v87 = _load_v87()
 
     try:
-        watch = [s.strip() for s in (args.watch or "").split(",") if s.strip()]
+        explicit_watch = [s.strip() for s in (args.watch or "").split(",") if s.strip()]
+        watch = explicit_watch
         if not watch:
             v76 = v86._load_v76_module()  # noqa: SLF001 — MISMA derivación del watch.
             watch = await v76._watch_from_catalog(  # noqa: SLF001
@@ -279,6 +295,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             )
         if not watch:
             raise RuntimeError("el catálogo no aportó ningún instrumento con sector e historia")
+        # D34-05: el watch derivado del catálogo ACTUAL puede introducir survivorship bias en
+        # estudios históricos. Se DECLARA (no se cambia la derivación).
+        watch_source = "explicit" if explicit_watch else "catalog"
         v86._configure_env(watch=watch, venue=str(args.venue), edge=float(args.edge))  # noqa: SLF001
         # Determinismo: el precio del replay es el ``price_script`` histórico inyectado, no
         # una lectura en vivo. No se fuerza régimen ni se baja ningún umbral.
@@ -321,8 +340,17 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         score = replay.get("score") or {}
         oos = _oos_for_day(score, day)
 
+        replay_end = normalize_day(replay.get("endDay"))
+        close_window_end = (
+            datetime.fromisoformat(f"{replay_end}T00:00:00+00:00") + timedelta(days=1)
+            if replay_end
+            else None
+        )
         executed, executed_detail = await _read_executed_facts(
-            factory, account_id=str(args.account_id), day=day
+            factory,
+            account_id=str(args.account_id),
+            day=day,
+            close_window_end=close_window_end,
         )
         declared = _declared_steps(day_row)
         declared["CYCLE_CLOSED"] = _cycle_closed_step(oos)
@@ -341,13 +369,15 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             },
             executed_detail=executed_detail,
             meta={
-                "bump": "2.11.33-beta",
+                "bump": "2.11.35-beta",
                 "phase": "V2.89 DIA-D AUTO SANDBOX",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
                 "versionA": str(args.version_a),
                 "venue": str(args.venue),
                 "watchSize": len(watch),
+                "watchSource": watch_source,
+                "survivorBiasRisk": watch_source == "catalog",
                 "historyDays": int(args.history_days),
                 "horizonDays": int(args.horizon_days),
                 "replayStart": replay.get("startDay"),

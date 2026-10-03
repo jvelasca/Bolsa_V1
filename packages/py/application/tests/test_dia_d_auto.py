@@ -24,6 +24,7 @@ from bolsa_application.dia_d_auto import (
     build_dia_d_auto_artifact,
     compare_declared_vs_executed,
     compare_step,
+    cycle_closure_summary,
     normalize_day,
     summarize_comparison,
     values_equal,
@@ -161,3 +162,37 @@ def test_artifact_declared_without_executed_is_a_gap() -> None:
     artifact = build_dia_d_auto_artifact(day="2026-09-30", declared={"FILL": 1})
     assert artifact["summary"]["verdict"] == VERDICT_NOT_MEASURED
     assert artifact["summary"]["notMeasured"] == len(CHAIN_STEPS)
+
+
+# ── Identidad única del ciclo (D34-01) ──────────────────────────────────────────
+
+
+def test_cycle_closure_one_when_a_d_cycle_closes_later() -> None:
+    summary = cycle_closure_summary(["c1"], ["c1"])
+    assert summary["step"] == 1
+    assert summary["opened"] == ["c1"]
+    assert summary["closed"] == ["c1"]
+    assert summary["open"] == []
+    assert summary["unmeasured"] is False
+
+
+def test_cycle_closure_zero_when_d_cycle_still_open() -> None:
+    summary = cycle_closure_summary(["c1"], [])
+    assert summary["step"] == 0
+    assert summary["open"] == ["c1"]
+    assert summary["closed"] == []
+
+
+def test_cycle_closure_ignores_cycles_not_born_in_d() -> None:
+    # Un ciclo abierto en D-1 y cerrado en D NO es un D-cycle: no puede afirmar cierre.
+    summary = cycle_closure_summary(["c_born_in_d"], ["c_born_in_d_minus_1"])
+    assert summary["step"] == 0
+    assert summary["opened"] == ["c_born_in_d"]
+    assert summary["closed"] == []
+
+
+def test_cycle_closure_none_when_no_opening_is_reconstructible() -> None:
+    summary = cycle_closure_summary([], ["c1"])
+    assert summary["step"] is None
+    assert summary["unmeasured"] is True
+    assert summary["opened"] == []

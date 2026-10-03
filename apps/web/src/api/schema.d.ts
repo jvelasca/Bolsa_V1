@@ -1073,7 +1073,7 @@ export interface paths {
         };
         /**
          * List Auto Dia D Feedback
-         * @description Ventanas con feedback disponibles + el artefacto MÁS RECIENTE (read-only, fail-closed).
+         * @description Ventanas con feedback DISPONIBLES PARA LA CUENTA + el artefacto más reciente (fail-closed).
          */
         get: operations["list_auto_dia_d_feedback_api_auto_dia_d_feedback_get"];
         put?: never;
@@ -1093,7 +1093,7 @@ export interface paths {
         };
         /**
          * Get Auto Dia D Feedback
-         * @description Artefacto de feedback de ``window`` (``D0_D1``), read-only y fail-closed.
+         * @description Artefacto de feedback de ``window`` (``D0_D1``), read-only y fail-closed por cuenta.
          */
         get: operations["get_auto_dia_d_feedback_api_auto_dia_d_feedback__window__get"];
         put?: never;
@@ -1113,7 +1113,7 @@ export interface paths {
         };
         /**
          * List Auto Dia D Replay
-         * @description Días con artefacto DÍA-D AUTO disponibles (para el selector de fecha de la UI).
+         * @description Días con artefacto DÍA-D AUTO DISPONIBLES PARA LA CUENTA (selector de fecha, fail-closed).
          */
         get: operations["list_auto_dia_d_replay_api_auto_dia_d_replay_get"];
         put?: never;
@@ -1133,7 +1133,7 @@ export interface paths {
         };
         /**
          * Get Auto Dia D Replay
-         * @description Artefacto DÍA-D AUTO de ``day`` (``YYYY-MM-DD``), read-only y fail-closed.
+         * @description Artefacto DÍA-D AUTO de ``day`` (``YYYY-MM-DD``), read-only y fail-closed por cuenta.
          */
         get: operations["get_auto_dia_d_replay_api_auto_dia_d_replay__day__get"];
         put?: never;
@@ -6162,6 +6162,11 @@ export interface components {
             limits?: string[];
             /** Matrix */
             matrix?: components["schemas"]["DiaDFeedbackMatrixRowDto"][];
+            /**
+             * Matrixbasis
+             * @default entryDay
+             */
+            matrixBasis: string;
             /** Meta */
             meta?: {
                 [key: string]: unknown;
@@ -6246,11 +6251,10 @@ export interface components {
         };
         /** DiaDFeedbackSummaryDto */
         DiaDFeedbackSummaryDto: {
-            /**
-             * Confirmed
-             * @default 0
-             */
-            confirmed: number;
+            /** Byevidencequality */
+            byEvidenceQuality?: {
+                [key: string]: number;
+            };
             errors?: components["schemas"]["DiaDFeedbackErrorCountsDto"];
             /**
              * Measuredvalues
@@ -6267,6 +6271,11 @@ export interface components {
              * @default 0
              */
             notMeasured: number;
+            /**
+             * Oossupported
+             * @default 0
+             */
+            oosSupported: number;
             /**
              * Refuted
              * @default 0
@@ -6295,6 +6304,11 @@ export interface components {
              */
             errorTotal: number;
             errors?: components["schemas"]["DiaDFeedbackErrorCountsDto"];
+            /**
+             * Evidencequality
+             * @default NOT_MEASURED
+             */
+            evidenceQuality: string;
             /** Expectancyr */
             expectancyR?: number | null;
             /** Hitrate */
@@ -6331,6 +6345,16 @@ export interface components {
              * @default 0
              */
             minHitRate: number;
+            /**
+             * Strongmincycles
+             * @default 0
+             */
+            strongMinCycles: number;
+            /**
+             * Supportedmincycles
+             * @default 0
+             */
+            supportedMinCycles: number;
         };
         /** DiaDFeedbackWindowDto */
         DiaDFeedbackWindowDto: {

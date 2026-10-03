@@ -71,6 +71,9 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "Aproximacion D1: un dia = un tick.",
     "Un paso sin traza durable se declara NOT_MEASURED; nunca se rellena con 0.",
     "AUTO_ENGINE_SIM_REAL_PRICE no se fuerza: el precio del replay es el price_script inyectado.",
+    "CYCLE_CLOSED usa una identidad unica: D-cycle = ciclo cuya APERTURA ocurre en D; el "
+    "cycle_id del replay vive en memoria y el durable en la ventana PAPER, asi que se "
+    "compara la REGLA (1/0/None), no una union literal de ids.",
 )
 
 
@@ -198,6 +201,38 @@ def summarize_comparison(comparison: Sequence[Mapping[str, Any]]) -> dict[str, A
     }
 
 
+def cycle_closure_summary(
+    opened_ids: Sequence[Any],
+    closed_ids: Sequence[Any],
+) -> dict[str, Any]:
+    """Identidad ÚNICA del ciclo para el paso ``CYCLE_CLOSED`` (declarado y ejecutado).
+
+    Un **D-cycle** es un ciclo cuya **apertura** (buy) ocurre en ``D``. Este helper traduce
+    "qué ciclos nacieron en D" y "qué ciclos cerraron después" al MISMO valor comparable
+    ``1`` / ``0`` / ``None`` (antes, el lado declarado emitía ``1/0/None`` y el ejecutado una
+    CUENTA: no eran comparables y la identidad del ciclo difería — hallazgo D34-01).
+
+    * ``1`` si al menos un D-cycle tiene un cierre posterior;
+    * ``0`` si hay D-cycles y ninguno cerró (sigue vivo);
+    * ``None`` (UNKNOWN) si no hay ninguna apertura reconstruible: no se puede afirmar ni
+      cierre ni vida. Los conjuntos ``opened``/``closed``/``open`` acompañan al veredicto para
+      que el detalle durable explique la decisión.
+    """
+    opened = sorted({str(value) for value in opened_ids if str(value).strip()})
+    closed = {str(value) for value in closed_ids if str(value).strip()}
+    if not opened:
+        return {"step": None, "opened": [], "closed": [], "open": [], "unmeasured": True}
+    closed_in = [cycle_id for cycle_id in opened if cycle_id in closed]
+    still_open = [cycle_id for cycle_id in opened if cycle_id not in closed]
+    return {
+        "step": 1 if closed_in else 0,
+        "opened": opened,
+        "closed": closed_in,
+        "open": still_open,
+        "unmeasured": False,
+    }
+
+
 def build_dia_d_auto_artifact(
     *,
     day: Any,
@@ -267,6 +302,7 @@ __all__ = [
     "build_dia_d_auto_artifact",
     "compare_declared_vs_executed",
     "compare_step",
+    "cycle_closure_summary",
     "normalize_day",
     "summarize_comparison",
     "values_equal",

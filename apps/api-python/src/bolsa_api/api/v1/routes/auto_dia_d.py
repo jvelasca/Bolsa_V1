@@ -129,16 +129,32 @@ class DiaDAutoReplayListDto(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+def _artifact_account(artifact: dict[str, Any]) -> str | None:
+    """Cuenta sellada en el artefacto; ``None`` si no declara ninguna (fail-closed)."""
+    meta = artifact.get("meta") or {}
+    account = meta.get("account")
+    return str(account) if account else None
+
+
+def _artifact_matches_scope(artifact: dict[str, Any], scope: str) -> bool:
+    """``True`` solo si el artefacto declara EXACTAMENTE la cuenta del principal (D34-06)."""
+    return _artifact_account(artifact) == scope
+
+
 @router.get("/auto/dia-d-replay", response_model=DiaDAutoReplayListDto)
 async def list_auto_dia_d_replay(
     request: Request,
     account_id: Annotated[str | None, Depends(get_account_id_header)] = None,
 ) -> DiaDAutoReplayListDto:
-    """Días con artefacto DÍA-D AUTO disponibles (para el selector de fecha de la UI)."""
+    """Días con artefacto DÍA-D AUTO DISPONIBLES PARA LA CUENTA (selector de fecha, fail-closed)."""
     scope = await resolve_account_scope_or_default(request, account_id)
     if scope is None:
         return DiaDAutoReplayListDto(days=[], notes=["no_account_scope"])
-    days = _list_days()
+    days: list[str] = []
+    for candidate in _list_days():
+        artifact = _read_artifact(candidate)
+        if artifact is not None and _artifact_matches_scope(artifact, scope):
+            days.append(candidate)
     notes = [] if days else ["no_artifacts"]
     return DiaDAutoReplayListDto(days=days, notes=notes)
 
@@ -149,7 +165,7 @@ async def get_auto_dia_d_replay(
     day: str,
     account_id: Annotated[str | None, Depends(get_account_id_header)] = None,
 ) -> DiaDAutoReplayDto:
-    """Artefacto DÍA-D AUTO de ``day`` (``YYYY-MM-DD``), read-only y fail-closed."""
+    """Artefacto DÍA-D AUTO de ``day`` (``YYYY-MM-DD``), read-only y fail-closed por cuenta."""
     if not _DAY_RE.match(day):
         return DiaDAutoReplayDto(available=False, day=day, notes=["invalid_day"])
     scope = await resolve_account_scope_or_default(request, account_id)
@@ -157,15 +173,11 @@ async def get_auto_dia_d_replay(
         return DiaDAutoReplayDto(available=False, day=day, notes=["no_account_scope"])
 
     artifact = _read_artifact(day)
-    if artifact is None:
+    # D34-06: una cuenta distinta es INDISTINGUIBLE de inexistente: no se revela que existe.
+    if artifact is None or not _artifact_matches_scope(artifact, scope):
         return DiaDAutoReplayDto(available=False, day=day, notes=["artifact_not_found"])
 
-    notes: list[str] = []
     meta = artifact.get("meta") or {}
-    artifact_account = meta.get("account")
-    if artifact_account and artifact_account != scope:
-        notes.append("account_scope_mismatch")
-
     return DiaDAutoReplayDto(
         available=True,
         readOnly=bool(artifact.get("readOnly", True)),
@@ -177,5 +189,5 @@ async def get_auto_dia_d_replay(
         meta=dict(meta),
         limits=list(artifact.get("limits", [])),
         executedDetail=dict(artifact.get("executedDetail") or {}),
-        notes=notes,
+        notes=[],
     )

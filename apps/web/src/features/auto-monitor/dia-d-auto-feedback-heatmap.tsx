@@ -108,7 +108,8 @@ export function DiaDAutoFeedbackHeatmap({
         ))}
       </div>
       <p className="mt-1 text-[10px] text-muted-foreground">
-        Verde ganancia · rojo pérdida · ámbar error · atenuado NO MEDIDO.
+        Verde ganancia · rojo pérdida · ámbar error · atenuado NO MEDIDO. Cada
+        celda se atribuye por día de ENTRADA (decisión), no por día de salida.
       </p>
     </div>
   );

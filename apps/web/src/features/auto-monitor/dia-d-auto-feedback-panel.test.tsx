@@ -32,20 +32,28 @@ const FEEDBACK = {
     to: "2026-09-30",
     days: ["2026-09-29", "2026-09-30"],
   },
+  matrixBasis: "entryDay",
   summary: {
     values: 3,
-    confirmed: 1,
+    oosSupported: 1,
     mixed: 0,
     refuted: 0,
     notMeasured: 2,
     measuredValues: 1,
+    byEvidenceQuality: {
+      NOT_MEASURED: 2,
+      PRELIMINARY: 1,
+      SUPPORTED: 0,
+      STRONG: 0,
+    },
     errors: { SOFTWARE: 1, OPERATIONAL: 0, DATA: 0, total: 1 },
   },
   values: [
     {
       symbol: "AAA",
-      verdict: "CONFIRMED",
+      verdict: "OOS_SUPPORTED",
       verdictReason: "positive_expectancy",
+      evidenceQuality: "PRELIMINARY",
       expectancyR: 0.5,
       hitRate: 0.67,
       measuredCycles: 6,
@@ -64,6 +72,7 @@ const FEEDBACK = {
       symbol: "BBB",
       verdict: "NOT_MEASURED",
       verdictReason: "insufficient_sample",
+      evidenceQuality: "NOT_MEASURED",
       expectancyR: null,
       hitRate: null,
       measuredCycles: 2,
@@ -82,6 +91,7 @@ const FEEDBACK = {
       symbol: "CCC",
       verdict: "REFUTED",
       verdictReason: "software_divergence",
+      evidenceQuality: "PRELIMINARY",
       expectancyR: 0.1,
       hitRate: 0.5,
       measuredCycles: 5,
@@ -272,6 +282,19 @@ describe("DiaDAutoFeedbackPanel", () => {
     expect(notMeasured?.getAttribute("data-verdict")).toBe("NOT_MEASURED");
     expect(notMeasured?.textContent).toContain("NO MEDIDO");
     expect(notMeasured?.textContent).not.toContain("0.00");
+
+    // El veredicto OOS NO se rotula "Confirmado" y la evidencia es un eje aparte.
+    const supported = rows.find(
+      (row) => row.getAttribute("data-symbol") === "AAA",
+    );
+    expect(supported?.getAttribute("data-verdict")).toBe("OOS_SUPPORTED");
+    expect(supported?.textContent).toContain("Soportado OOS");
+    expect(supported?.textContent).toContain("Preliminar");
+    expect(
+      screen
+        .getAllByTestId("dia-d-auto-feedback-evidence")
+        .some((badge) => badge.getAttribute("data-evidence") === "PRELIMINARY"),
+    ).toBe(true);
 
     // El heatmap marca los días sin medición sin pintarlos como ganancia/pérdida.
     const cells = screen.getAllByTestId("dia-d-auto-feedback-cell");

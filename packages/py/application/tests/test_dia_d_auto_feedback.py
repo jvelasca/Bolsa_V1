@@ -19,6 +19,12 @@ from bolsa_application.dia_d_auto_feedback import (
     DATA,
     DEFAULT_LIMITS,
     ERROR_KINDS,
+    EVIDENCE_NOT_MEASURED,
+    EVIDENCE_PRELIMINARY,
+    EVIDENCE_STRONG,
+    EVIDENCE_STRONG_MIN_CYCLES,
+    EVIDENCE_SUPPORTED,
+    EVIDENCE_SUPPORTED_MIN_CYCLES,
     MIN_VALUE_CYCLES,
     MIN_VALUE_HIT_RATE,
     OPERATIONAL,
@@ -28,13 +34,16 @@ from bolsa_application.dia_d_auto_feedback import (
     VALUE_CONFIRMED,
     VALUE_MIXED,
     VALUE_NOT_MEASURED,
+    VALUE_OOS_SUPPORTED,
     VALUE_REFUTED,
+    VALUE_VERDICTS,
     build_day_matrix,
     build_dia_d_feedback_artifact,
     build_value_scorecard,
     classify_error,
     error_kind_for_exit_state,
     error_kind_for_reason,
+    evidence_quality_for,
     normalize_error,
     software_error_for_step,
     summarize_feedback,
@@ -51,17 +60,46 @@ def _trips(*values: float, day: str = "2026-09-30") -> list[dict]:
 # ── Veredicto por valor ──────────────────────────────────────────────────────────
 
 
-def test_confirmed_needs_positive_edge_hit_rate_and_sample() -> None:
+def test_oos_supported_needs_positive_edge_hit_rate_and_supported_sample() -> None:
+    # 20 ciclos con edge positivo y hit-rate suficiente ⇒ evidencia OOS SOPORTADA.
+    card = build_value_scorecard(
+        "AAA",
+        round_trips=_trips(*([1.0, 0.5] * 10)),  # 20 ciclos, hit 100%
+        days=["2026-09-30"],
+    )
+    assert card["measuredCycles"] == 20
+    assert card["verdict"] == VALUE_OOS_SUPPORTED
+    assert card["evidenceQuality"] == EVIDENCE_SUPPORTED
+    assert card["expectancyR"] is not None and card["expectancyR"] > 0
+    assert card["hitRate"] is not None and card["hitRate"] >= MIN_VALUE_HIT_RATE
+    assert card["verdictReason"] == "positive_expectancy"
+    # ``CONFIRMED`` queda reservado a evidencia PAPER: no es un veredicto del replay.
+    assert VALUE_CONFIRMED not in VALUE_VERDICTS
+
+
+def test_positive_edge_with_preliminary_sample_is_mixed_not_supported() -> None:
+    # 5..19 ciclos: se MIDE, pero no se declara SOPORTADO (D34-04).
     card = build_value_scorecard(
         "AAA",
         round_trips=_trips(1.0, 2.0, 0.5, 1.5, -0.5, 2.0),
         days=["2026-09-30"],
     )
     assert card["measuredCycles"] == 6
-    assert card["verdict"] == VALUE_CONFIRMED
+    assert card["evidenceQuality"] == EVIDENCE_PRELIMINARY
+    assert card["verdict"] == VALUE_MIXED
+    assert card["verdictReason"] == "preliminary_sample"
     assert card["expectancyR"] is not None and card["expectancyR"] > 0
-    assert card["hitRate"] is not None and card["hitRate"] >= MIN_VALUE_HIT_RATE
-    assert card["verdictReason"] == "positive_expectancy"
+
+
+def test_evidence_quality_tiers_and_strong_boundary() -> None:
+    assert evidence_quality_for(0) == EVIDENCE_NOT_MEASURED
+    assert evidence_quality_for(MIN_VALUE_CYCLES - 1) == EVIDENCE_NOT_MEASURED
+    assert evidence_quality_for(MIN_VALUE_CYCLES) == EVIDENCE_PRELIMINARY
+    assert evidence_quality_for(EVIDENCE_SUPPORTED_MIN_CYCLES - 1) == EVIDENCE_PRELIMINARY
+    assert evidence_quality_for(EVIDENCE_SUPPORTED_MIN_CYCLES) == EVIDENCE_SUPPORTED
+    assert evidence_quality_for(EVIDENCE_STRONG_MIN_CYCLES - 1) == EVIDENCE_SUPPORTED
+    assert evidence_quality_for(EVIDENCE_STRONG_MIN_CYCLES) == EVIDENCE_STRONG
+    assert evidence_quality_for("n/d") == EVIDENCE_NOT_MEASURED
 
 
 def test_refuted_when_expectancy_is_not_positive() -> None:
@@ -194,8 +232,8 @@ def test_day_matrix_cell_outcomes() -> None:
     card = build_value_scorecard(
         "AAA",
         round_trips=[
-            {"exitDay": "2026-09-30", "realizedR": 1.0},
-            {"exitDay": "2026-10-01", "realizedR": -1.0},
+            {"entryDay": "2026-09-30", "exitDay": "2026-09-30", "realizedR": 1.0},
+            {"entryDay": "2026-10-01", "exitDay": "2026-10-01", "realizedR": -1.0},
         ],
         errors=[{"day": "2026-10-02", "symbol": "AAA", "kind": SOFTWARE, "code": "FILL"}],
         days=["2026-09-30", "2026-10-01", "2026-10-02", "2026-10-03"],
@@ -206,12 +244,38 @@ def test_day_matrix_cell_outcomes() -> None:
     assert outcomes == ["GAIN", "LOSS", "ERROR", "NOT_MEASURED"]
 
 
-def test_summary_counts_verdicts_and_error_families() -> None:
+def test_by_day_attributes_by_entry_day_not_exit_day() -> None:
+    # D34-02: un ciclo abierto en D y cerrado FUERA de la ventana pertenece a D.
+    card = build_value_scorecard(
+        "AAA",
+        round_trips=[
+            {"entryDay": "2026-09-30", "exitDay": "2026-10-07", "realizedR": 2.4},
+        ],
+        days=["2026-09-29", "2026-09-30", "2026-10-01"],
+    )
+    assert card["measuredCycles"] == 1
+    assert card["byDay"]["2026-09-30"]["cycles"] == 1
+    assert card["byDay"]["2026-09-30"]["realizedR"] == 2.4
+    assert card["daysCovered"] == 1
+
+
+def test_cycle_without_entry_day_is_not_attributed_to_any_day() -> None:
+    card = build_value_scorecard(
+        "AAA",
+        round_trips=[{"exitDay": "2026-09-30", "realizedR": 1.0}],
+        days=["2026-09-30"],
+    )
+    assert card["measuredCycles"] == 1
+    assert card["daysCovered"] == 0
+    assert card["byDay"]["2026-09-30"]["cycles"] == 0
+
+
+def test_summary_counts_verdicts_evidence_and_error_families() -> None:
     values = [
-        {"verdict": VALUE_CONFIRMED},
-        {"verdict": VALUE_MIXED},
-        {"verdict": VALUE_REFUTED},
-        {"verdict": VALUE_NOT_MEASURED},
+        {"verdict": VALUE_OOS_SUPPORTED, "evidenceQuality": EVIDENCE_SUPPORTED},
+        {"verdict": VALUE_MIXED, "evidenceQuality": EVIDENCE_PRELIMINARY},
+        {"verdict": VALUE_REFUTED, "evidenceQuality": EVIDENCE_PRELIMINARY},
+        {"verdict": VALUE_NOT_MEASURED, "evidenceQuality": EVIDENCE_NOT_MEASURED},
     ]
     errors = [
         {"kind": SOFTWARE, "code": "FILL"},
@@ -220,11 +284,14 @@ def test_summary_counts_verdicts_and_error_families() -> None:
     ]
     summary = summarize_feedback(values, errors)
     assert summary["values"] == 4
-    assert summary["confirmed"] == 1
+    assert summary["oosSupported"] == 1
     assert summary["mixed"] == 1
     assert summary["refuted"] == 1
     assert summary["notMeasured"] == 1
     assert summary["measuredValues"] == 3
+    assert summary["byEvidenceQuality"][EVIDENCE_SUPPORTED] == 1
+    assert summary["byEvidenceQuality"][EVIDENCE_PRELIMINARY] == 2
+    assert summary["byEvidenceQuality"][EVIDENCE_NOT_MEASURED] == 1
     assert summary["errors"] == {SOFTWARE: 1, OPERATIONAL: 1, DATA: 1, "total": 3}
 
 
@@ -256,6 +323,7 @@ def test_artifact_shape_and_determinism() -> None:
     assert first["schemaVersion"] == SCHEMA_VERSION
     assert first["kind"] == "DIA_D_AUTO_FEEDBACK"
     assert first["readOnly"] is True
+    assert first["matrixBasis"] == "entryDay"
     assert first["window"] == {"from": "2026-09-30", "to": "2026-09-30", "days": ["2026-09-30"]}
     assert first["values"][0]["symbol"] == "AAA"
     assert first["summary"]["errors"]["total"] == 1

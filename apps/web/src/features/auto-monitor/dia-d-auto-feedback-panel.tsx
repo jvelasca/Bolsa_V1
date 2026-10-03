@@ -2,7 +2,7 @@
  * DÍA-D AUTO · FEEDBACK — vista descriptiva + gráfica por valor.
  *
  * Read-only. Consume el artefacto que produce `v2_90_dia_d_feedback.py`: veredicto por
- * instrumento (CONFIRMED/MIXED/REFUTED/NOT_MEASURED), resumen global, tabla por valor,
+ * instrumento (OOS_SUPPORTED/MIXED/REFUTED/NOT_MEASURED), resumen global, tabla por valor,
  * heatmap valor × día, curva de R acumulado y catálogo de errores. Un valor no medido se
  * rotula `NO MEDIDO`; nunca se dibuja un 0 de relleno.
  */
@@ -24,16 +24,32 @@ type DiaDFeedbackDto = components["schemas"]["DiaDFeedbackDto"];
 type DiaDFeedbackValueDto = components["schemas"]["DiaDFeedbackValueDto"];
 
 const VERDICT_STYLE: Record<string, string> = {
-  CONFIRMED: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  OOS_SUPPORTED: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
   MIXED: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
   REFUTED: "bg-destructive/15 text-destructive",
   NOT_MEASURED: "bg-muted text-muted-foreground",
 };
 
+// `OOS_SUPPORTED` NO es "confirmado": es evidencia del REPLAY/OOS, no de la ejecución PAPER.
+// `CONFIRMED` queda reservado para evidencia PAPER y no se emite todavía.
 const VERDICT_LABEL: Record<string, string> = {
-  CONFIRMED: "Confirmado",
+  OOS_SUPPORTED: "Soportado OOS",
   MIXED: "Mixto",
   REFUTED: "Refutado",
+  NOT_MEASURED: "NO MEDIDO",
+};
+
+const EVIDENCE_STYLE: Record<string, string> = {
+  STRONG: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  SUPPORTED: "bg-sky-500/15 text-sky-600 dark:text-sky-400",
+  PRELIMINARY: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  NOT_MEASURED: "bg-muted text-muted-foreground",
+};
+
+const EVIDENCE_LABEL: Record<string, string> = {
+  STRONG: "Fuerte",
+  SUPPORTED: "Soportada",
+  PRELIMINARY: "Preliminar",
   NOT_MEASURED: "NO MEDIDO",
 };
 
@@ -63,6 +79,22 @@ function VerdictBadge({ verdict }: { verdict: string }) {
   );
 }
 
+function EvidenceBadge({ quality }: { quality: string }) {
+  return (
+    <span
+      data-testid="dia-d-auto-feedback-evidence"
+      data-evidence={quality}
+      className={cn(
+        "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+        EVIDENCE_STYLE[quality] ?? "bg-muted text-muted-foreground",
+      )}
+      title="Calidad de la muestra (NOT_MEASURED <5 · PRELIMINARY 5-19 · SUPPORTED 20-31 · STRONG >=32)"
+    >
+      {EVIDENCE_LABEL[quality] ?? quality}
+    </span>
+  );
+}
+
 function ValueRow({ value }: { value: DiaDFeedbackValueDto }) {
   return (
     <tr
@@ -76,6 +108,9 @@ function ValueRow({ value }: { value: DiaDFeedbackValueDto }) {
       </td>
       <td className="py-1.5 pr-3">
         <VerdictBadge verdict={value.verdict} />
+      </td>
+      <td className="py-1.5 pr-3">
+        <EvidenceBadge quality={value.evidenceQuality} />
       </td>
       <td
         className="py-1.5 pr-3 tabular-nums text-[11px]"
@@ -112,7 +147,6 @@ function NotAvailable({ detail }: { detail: DiaDFeedbackDto }) {
       "No hay artefacto de feedback para esta ventana. Ejecuta el barrido por CLI para generarlo.",
     no_account_scope: "Sin cuenta activa: no se puede resolver el artefacto.",
     invalid_window: "Ventana inválida.",
-    account_scope_mismatch: "El artefacto pertenece a otra cuenta.",
   };
   return (
     <Card
@@ -253,7 +287,7 @@ export function DiaDAutoFeedbackPanel() {
                     className="text-[10px] tabular-nums text-muted-foreground"
                     data-testid="dia-d-auto-feedback-summary"
                   >
-                    confirmados {artifact.summary.confirmed} · mixtos{" "}
+                    soportados OOS {artifact.summary.oosSupported} · mixtos{" "}
                     {artifact.summary.mixed} · refutados{" "}
                     {artifact.summary.refuted} · n/d{" "}
                     {artifact.summary.notMeasured}
@@ -277,6 +311,7 @@ export function DiaDAutoFeedbackPanel() {
                   <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">
                     <th className="pb-1 pr-3 font-semibold">Valor</th>
                     <th className="pb-1 pr-3 font-semibold">Veredicto</th>
+                    <th className="pb-1 pr-3 font-semibold">Evidencia</th>
                     <th className="pb-1 pr-3 font-semibold">R medio</th>
                     <th className="pb-1 pr-3 font-semibold">Hit</th>
                     <th className="pb-1 pr-3 font-semibold">n</th>
