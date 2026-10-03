@@ -88,15 +88,20 @@ def normalize_day(value: Any) -> str:
     return ""
 
 
-def _opt_number(value: Any) -> float | None:
-    """``float`` finito de un valor cuantificable; ``None`` si no lo es (nunca ``0``)."""
+def finite_number(value: Any) -> float | None:
+    """``float`` FINITO de un valor cuantificable; ``None`` si no lo es (nunca ``0``).
+
+    Un ``NaN`` **y** un ``+inf``/``-inf`` se declaran huecos: no son mediciones. Dejar pasar
+    un infinito contaminaría la esperanza, el hit-rate y el total de R y, además, produciría
+    JSON no estándar (``Infinity``) que rompe consumidores JavaScript.
+    """
     if value is None or isinstance(value, bool):
         return None
     try:
         number = float(value)
     except (TypeError, ValueError):
         return None
-    return None if number != number else number
+    return number if math.isfinite(number) else None
 
 
 def _comparable(value: Any) -> Any:
@@ -106,7 +111,7 @@ def _comparable(value: Any) -> Any:
     Un ``""``/``None`` NO es una medición: se devuelve ``None`` para que el paso se declare
     ``NOT_MEASURED`` en vez de "coincidir con cadena vacía".
     """
-    number = _opt_number(value)
+    number = finite_number(value)
     if number is not None:
         return number
     if value is None or isinstance(value, bool):
@@ -201,6 +206,17 @@ def summarize_comparison(comparison: Sequence[Mapping[str, Any]]) -> dict[str, A
     }
 
 
+def _cycle_id(value: Any) -> str | None:
+    """Identidad de ciclo normalizada o ``None``: ``None``/``""``/espacios NO son un id.
+
+    Fail-closed: un hueco no puede convertirse en el id literal ``"None"`` (hallazgo D35-02).
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 def cycle_closure_summary(
     opened_ids: Sequence[Any],
     closed_ids: Sequence[Any],
@@ -217,9 +233,12 @@ def cycle_closure_summary(
     * ``None`` (UNKNOWN) si no hay ninguna apertura reconstruible: no se puede afirmar ni
       cierre ni vida. Los conjuntos ``opened``/``closed``/``open`` acompañan al veredicto para
       que el detalle durable explique la decisión.
+
+    Un identificador ``None``/vacío se descarta (nunca se normaliza a ``"None"``): si todas
+    las aperturas se descartan, el paso es ``None``/UNKNOWN (fail-closed, D35-02).
     """
-    opened = sorted({str(value) for value in opened_ids if str(value).strip()})
-    closed = {str(value) for value in closed_ids if str(value).strip()}
+    opened = sorted({cid for value in opened_ids if (cid := _cycle_id(value)) is not None})
+    closed = {cid for value in closed_ids if (cid := _cycle_id(value)) is not None}
     if not opened:
         return {"step": None, "opened": [], "closed": [], "open": [], "unmeasured": True}
     closed_in = [cycle_id for cycle_id in opened if cycle_id in closed]
@@ -277,12 +296,12 @@ def _json_safe(value: Any) -> Any:
     if value is None or isinstance(value, (bool, int, str)):
         return value
     if isinstance(value, float):
-        return value if value == value else None
+        return value if math.isfinite(value) else None
     if isinstance(value, Mapping):
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_json_safe(item) for item in value]
-    number = _opt_number(value)
+    number = finite_number(value)
     if number is not None:
         return number
     to_dict = getattr(value, "to_dict", None)
@@ -303,6 +322,7 @@ __all__ = [
     "compare_declared_vs_executed",
     "compare_step",
     "cycle_closure_summary",
+    "finite_number",
     "normalize_day",
     "summarize_comparison",
     "values_equal",

@@ -7,9 +7,9 @@ Cinco números distintos. No son intercambiables. Una fila de docs no debe fingi
 
 | Verdad      | Qué es                                                                | Dónde vive                                | Valor vigente (AsOf)                            |
 | ----------- | --------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------- |
-| **Product** | Nombre de producto / slice de UX o dominio que lee el auditor         | AsOf de `CURRENT_SYSTEM.md`, relevos      | `V2.88.35-beta`                                 |
-| **Git tag** | Tip certificado para auditoría / CI-by-tag                            | `git tag` · GitHub Releases               | `v2.88.35-beta` → `5872891c` (commit `d59ef8ea`; anterior `v2.88.34-beta` → `a98996ed`)  |
-| **Package** | Semver npm del monorepo (workspaces `@bolsa/*` pueden seguir `0.1.0`) | raíz [`package.json`](../../package.json) | `2.11.35-beta`                                  |
+| **Product** | Nombre de producto / slice de UX o dominio que lee el auditor         | AsOf de `CURRENT_SYSTEM.md`, relevos      | `V2.88.36-beta`                                 |
+| **Git tag** | Tip certificado para auditoría / CI-by-tag                            | `git tag` · GitHub Releases               | `v2.88.35-beta` → `5872891c` (último tag; anterior `v2.88.34-beta` → `a98996ed`)  |
+| **Package** | Semver npm del monorepo (workspaces `@bolsa/*` pueden seguir `0.1.0`) | raíz [`package.json`](../../package.json) | `2.11.36-beta`                                  |
 | **Schema**  | Migraciones de persistencia                                           | Alembic en `packages/py` / `bolsa_v1`     | head `048_journal_entry_dedupe_key` (sin pendiente) |
 | **API**     | Contrato HTTP / OpenAPI si existe                                     | FastAPI · `apps/web/src/api/schema.d.ts`  | `contract:gen` al día (independiente del product) |
 

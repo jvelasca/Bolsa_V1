@@ -200,8 +200,8 @@ export function DiaDAutoFeedbackPanel() {
             DÍA-D AUTO · feedback por valor
           </CardTitle>
           <p className="text-[11px] text-muted-foreground">
-            Confirma o refuta la operativa de cada instrumento sobre una ventana
-            y cataloga los errores de software/operativa/dato. Advisory
+            Evalúa la evidencia OOS de cada instrumento sobre una ventana y
+            clasifica las incidencias de software, operativa y datos. Advisory
             read-only: no cambia el motor.
           </p>
         </CardHeader>

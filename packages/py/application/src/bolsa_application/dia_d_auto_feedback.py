@@ -48,6 +48,7 @@ from bolsa_application.auto_reason_codes import (
 )
 from bolsa_application.dia_d_auto import (
     VERDICT_DIVERGENT,
+    finite_number,
     normalize_day,
 )
 from bolsa_application.market_operability import (
@@ -153,7 +154,9 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "La matriz valor x dia atribuye por entryDay (dia de decision); exitDay es atributo de la "
     "operacion, no dimension del experimento.",
     "El watch derivado del catalogo actual puede introducir survivorship bias en estudios "
-    "historicos (ver meta.survivorBiasRisk).",
+    "historicos (ver meta.survivorBiasRisk). El contrato Universe(D) ya modela intervalo de "
+    "fin/delistado y elegibilidad DEMOSTRABLE, pero la fuente real sigue pendiente: el watch "
+    "no se construye con el.",
 )
 
 
@@ -242,17 +245,6 @@ def classify_error(
 # ── Veredicto por valor ──────────────────────────────────────────────────────────
 
 
-def _opt_number(value: Any) -> float | None:
-    """``float`` finito de un valor cuantificable; ``None`` si no lo es (nunca ``0``)."""
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    return None if number != number else number
-
-
 def _mean(values: Sequence[float]) -> float | None:
     return sum(values) / len(values) if values else None
 
@@ -305,7 +297,7 @@ def build_value_scorecard(
     by_day_cycles: dict[str, int] = {}
     realized: list[float] = []
     for trip in round_trips or ():
-        value = _opt_number(trip.get("realizedR"))
+        value = finite_number(trip.get("realizedR"))
         if value is None:
             continue
         realized.append(value)
@@ -433,7 +425,7 @@ def build_day_matrix(
         for day in window_days:
             cell = by_day.get(day) if isinstance(by_day, Mapping) else None
             cell_map = cell if isinstance(cell, Mapping) else {}
-            realized = _opt_number(cell_map.get("realizedR"))
+            realized = finite_number(cell_map.get("realizedR"))
             cycles = int(cell_map.get("cycles") or 0)
             errors = int(cell_map.get("errors") or 0)
             cells.append(

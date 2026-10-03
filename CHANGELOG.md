@@ -2,6 +2,18 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.36-beta] — `AUTO · DÍA-D`: consolidación del instrumento (contrato `Universe(D)` demostrable, identidad de ciclo None-safe, validación numérica finita, lenguaje UI)
+
+**Bump** `2.11.35-beta` → `2.11.36-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra los hallazgos **D35-01…D35-04** de la auditoría de `v2.88.35` sobre el instrumento **DÍA-D** (advisory, read-only) **sin tocar el motor** (`auto_simulation_worker.py`, `auto_v2_entry.py`, `sim_durable_store.py`, `market_operability.py`, `replay_oos.py`): **`Δ decisión motor = 0`**. Evidencia: [`docs/engineering/evidence/v2.88.36/README.md`](./docs/engineering/evidence/v2.88.36/README.md).
+
+- **(D35-01 🟠 PIT) `Universe(D)` gana intervalo de finalización.** `UniverseMember` declara `active_from`/`active_until` y `availability_from`/`availability_until`; nuevo predicado puro `eligible_at(member, day)` que exige que `D` caiga DENTRO de ambos intervalos (fin `None` = abierto), id presente y día legible, **fail-closed** si el inicio es desconocido. `universe_ids` filtra por elegibilidad, deduplica y ordena. Sigue siendo **contrato** (sin fuente real ni cambio del watch); el sesgo se sigue declarando en `meta.survivorBiasRisk`.
+- **(D35-02 🟡 robustez) `cycle_closure_summary` None-safe.** Un id `None`/`""`/solo-espacios ya no se normaliza al literal `"None"`: se descarta (`_cycle_id`), y si no queda ninguna apertura el paso es `None`/UNKNOWN.
+- **(D35-03 🟡 datos) Validación numérica FINITA.** `finite_number` (nuevo, exportado) usa `math.isfinite`: `NaN`, `+inf` y `-inf` se declaran huecos. `_json_safe` deja de emitir `Infinity` (JSON no estándar); `dia_d_auto_feedback` reutiliza la misma función (se elimina su `_opt_number` local).
+- **(D35-04 🟡 UX) Lenguaje de la UI.** El panel de feedback deja de decir «Confirma o refuta»: ahora «Evalúa la evidencia OOS ... y clasifica las incidencias».
+- **Contrato.** Sin cambios de DTO (el nuevo contrato PIT es Python puro, no viaja por OpenAPI).
+- **Verificación (este sello):** pytest DÍA-D **69 passed**; `ruff` → `All checks passed!`; `lint-imports` → **4 kept, 0 broken**; `mypy` → **no issues found in 522 source files**; `contract:check` OK; `tsc -b --noEmit` limpio; vitest `auto-monitor` → **14 passed**; `pnpm window:test` → **25/25**.
+- **Límites declarados (NO se cierran aquí):** **`Δ motor = 0`**; sin migración; `Universe(D)` sigue siendo **solo contrato** (no existe fuente real de fechas de delistado ni historial de sector); `CONFIRMED` sigue reservado a evidencia PAPER. **CI de tag PENDIENTE** (se cita tras el push del tag).
+
 ## [2.11.35-beta] — `AUTO · DÍA-D`: cierre de los **7 hallazgos** de la auditoría de `v2.88.34` (identidad de ciclo, atribución por `entryDay`, `OOS_SUPPORTED` + `evidenceQuality`, aislamiento de cuenta fail-closed, contrato `Universe(D)`)
 
 **Bump** `2.11.34-beta` → `2.11.35-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra los hallazgos **D34-01…D34-07** sobre el instrumento **DÍA-D** (advisory, read-only) **sin tocar el motor** (`auto_simulation_worker.py`, `auto_v2_entry.py`, `sim_durable_store.py`, `market_operability.py`, `replay_oos.py`): **`Δ decisión motor = 0`**. Evidencia: [`docs/engineering/evidence/v2.88.35/README.md`](./docs/engineering/evidence/v2.88.35/README.md).

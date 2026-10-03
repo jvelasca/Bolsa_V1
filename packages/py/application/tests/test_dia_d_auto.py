@@ -25,6 +25,7 @@ from bolsa_application.dia_d_auto import (
     compare_declared_vs_executed,
     compare_step,
     cycle_closure_summary,
+    finite_number,
     normalize_day,
     summarize_comparison,
     values_equal,
@@ -196,3 +197,54 @@ def test_cycle_closure_none_when_no_opening_is_reconstructible() -> None:
     assert summary["step"] is None
     assert summary["unmeasured"] is True
     assert summary["opened"] == []
+
+
+# ── Identidad de ciclo None-safe (D35-02) ───────────────────────────────────────
+
+
+def test_cycle_closure_treats_none_and_blank_ids_as_no_opening() -> None:
+    # Un hueco no puede convertirse en el id literal "None": si no hay apertura real,
+    # el paso es UNKNOWN (fail-closed), no un 0 ni un "None".
+    for bad in (None, "", "   "):
+        summary = cycle_closure_summary([bad], [bad])
+        assert summary["step"] is None, bad
+        assert summary["unmeasured"] is True, bad
+        assert summary["opened"] == [], bad
+
+
+def test_cycle_closure_discards_blank_ids_but_keeps_real_ones() -> None:
+    summary = cycle_closure_summary(["c1", None, "  "], ["c1", ""])
+    assert summary["step"] == 1
+    assert summary["opened"] == ["c1"]
+    assert summary["closed"] == ["c1"]
+
+
+# ── Validación numérica finita (D35-03) ─────────────────────────────────────────
+
+
+def test_finite_number_rejects_nan_and_infinities() -> None:
+    assert finite_number(float("inf")) is None
+    assert finite_number(float("-inf")) is None
+    assert finite_number(float("nan")) is None
+    assert finite_number(True) is None
+    assert finite_number(None) is None
+    assert finite_number("no-soy-un-numero") is None
+    assert finite_number("1.5") == 1.5
+    assert finite_number(2) == 2.0
+
+
+def test_artifact_declares_infinite_values_as_gaps_and_stays_deterministic() -> None:
+    # Un ±inf no puede viajar a JSON como Infinity ni contaminar la comparación.
+    artifact = build_dia_d_auto_artifact(
+        day="2026-09-30",
+        declared={"FILL": float("inf"), "ORDER": 1},
+        executed={"FILL": 1, "ORDER": 1},
+    )
+    assert artifact["declared"]["FILL"] is None
+    assert artifact["executed"]["FILL"] == 1.0
+    # FILL queda sin medir (hueco), ORDER coincide: el global es PARTIAL, no MATCH.
+    fill_row = next(row for row in artifact["comparison"] if row["step"] == "FILL")
+    assert fill_row["verdict"] == VERDICT_NOT_MEASURED
+    assert artifact["summary"]["verdict"] == VERDICT_PARTIAL
+    # JSON estándar: nada de Infinity.
+    assert "Infinity" not in json.dumps(artifact)

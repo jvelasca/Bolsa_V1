@@ -317,6 +317,11 @@ describe("DiaDAutoFeedbackPanel", () => {
     expect(api.getAutoDiaDFeedback).toHaveBeenCalledWith(
       "2026-09-29_2026-09-30",
     );
+
+    // D35-04: el encabezado evalúa evidencia OOS, ya no habla de "confirmar/refutar".
+    const panel = screen.getByTestId("dia-d-auto-feedback-panel");
+    expect(panel.textContent).toContain("Evalúa");
+    expect(panel.textContent).not.toContain("Confirma");
   });
 });
 

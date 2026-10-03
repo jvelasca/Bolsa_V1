@@ -169,6 +169,23 @@ def test_unreadable_realized_r_is_not_a_cycle() -> None:
     assert card["realizedRTotal"] == 1.0
 
 
+def test_infinite_realized_r_is_not_a_cycle() -> None:
+    # D35-03: un ±inf no es una medición; no debe contar como ciclo ni contaminar el total.
+    card = build_value_scorecard(
+        "AAA",
+        round_trips=[
+            {"entryDay": "2026-09-30", "exitDay": "2026-09-30", "realizedR": float("inf")},
+            {"entryDay": "2026-09-30", "exitDay": "2026-09-30", "realizedR": float("-inf")},
+            {"entryDay": "2026-09-30", "exitDay": "2026-09-30", "realizedR": 1.0},
+        ],
+        days=["2026-09-30"],
+    )
+    assert card["measuredCycles"] == 1
+    assert card["realizedRTotal"] == 1.0
+    assert card["byDay"]["2026-09-30"]["cycles"] == 1
+    assert "Infinity" not in json.dumps(card)
+
+
 # ── Catálogo de errores (aislado y reutilizando el vocabulario) ───────────────────
 
 
