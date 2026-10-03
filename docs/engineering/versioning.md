@@ -8,7 +8,7 @@ Cinco números distintos. No son intercambiables. Una fila de docs no debe fingi
 | Verdad      | Qué es                                                                | Dónde vive                                | Valor vigente (AsOf)                            |
 | ----------- | --------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------- |
 | **Product** | Nombre de producto / slice de UX o dominio que lee el auditor         | AsOf de `CURRENT_SYSTEM.md`, relevos      | `V2.88.40-beta`                                 |
-| **Git tag** | Tip certificado para auditoría / CI-by-tag                            | `git tag` · GitHub Releases               | `v2.88.40-beta` → `d113c3e7` (**tag LOCAL; push/CI PENDIENTE**; commit `8c971c00`. Anterior `v2.88.39-beta` → `8cacb75c`, commit `0648cd40`)  |
+| **Git tag** | Tip certificado para auditoría / CI-by-tag                            | `git tag` · GitHub Releases               | `v2.88.40-beta` → `d113c3e7` (commit `8c971c00`; **CI run `37132550660` VERDE**. Anterior `v2.88.39-beta` → `8cacb75c`, commit `0648cd40`)  |
 | **Package** | Semver npm del monorepo (workspaces `@bolsa/*` pueden seguir `0.1.0`) | raíz [`package.json`](../../package.json) | `2.11.40-beta`                                  |
 | **Schema**  | Migraciones de persistencia                                           | Alembic en `packages/py` / `bolsa_v1`     | head `048_journal_entry_dedupe_key` (sin pendiente) |
 | **API**     | Contrato HTTP / OpenAPI si existe                                     | FastAPI · `apps/web/src/api/schema.d.ts`  | `contract:gen` al día (independiente del product) |
