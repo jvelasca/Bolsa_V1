@@ -5897,6 +5897,690 @@
         "title": "DepositCashDto",
         "type": "object"
       },
+      "DiaDAutoOosDto": {
+        "properties": {
+          "closedCount": {
+            "default": 0,
+            "title": "Closedcount",
+            "type": "integer"
+          },
+          "open": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Open",
+            "type": "array"
+          },
+          "openCount": {
+            "default": 0,
+            "title": "Opencount",
+            "type": "integer"
+          },
+          "realized": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Realized",
+            "type": "array"
+          },
+          "realizedRTotal": {
+            "default": 0.0,
+            "title": "Realizedrtotal",
+            "type": "number"
+          },
+          "unmeasuredCount": {
+            "default": 0,
+            "title": "Unmeasuredcount",
+            "type": "integer"
+          }
+        },
+        "title": "DiaDAutoOosDto",
+        "type": "object"
+      },
+      "DiaDAutoReplayDto": {
+        "description": "Artefacto de un día. ``available = false`` cuando no existe (fail-closed).",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "executedDetail": {
+            "additionalProperties": true,
+            "title": "Executeddetail",
+            "type": "object"
+          },
+          "limits": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limits",
+            "type": "array"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "title": "Meta",
+            "type": "object"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "oos": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiaDAutoOosDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "readOnly": {
+            "default": true,
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "schemaVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schemaversion"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/DiaDAutoStepDto"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiaDAutoSummaryDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "available",
+          "day"
+        ],
+        "title": "DiaDAutoReplayDto",
+        "type": "object"
+      },
+      "DiaDAutoReplayListDto": {
+        "properties": {
+          "days": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "readOnly": {
+            "default": true,
+            "title": "Readonly",
+            "type": "boolean"
+          }
+        },
+        "title": "DiaDAutoReplayListDto",
+        "type": "object"
+      },
+      "DiaDAutoStepDto": {
+        "properties": {
+          "declared": {
+            "title": "Declared"
+          },
+          "executed": {
+            "title": "Executed"
+          },
+          "measurement": {
+            "title": "Measurement",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          },
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "verdict",
+          "measurement"
+        ],
+        "title": "DiaDAutoStepDto",
+        "type": "object"
+      },
+      "DiaDAutoSummaryDto": {
+        "properties": {
+          "divergent": {
+            "title": "Divergent",
+            "type": "integer"
+          },
+          "match": {
+            "title": "Match",
+            "type": "integer"
+          },
+          "notMeasured": {
+            "title": "Notmeasured",
+            "type": "integer"
+          },
+          "steps": {
+            "title": "Steps",
+            "type": "integer"
+          },
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verdict",
+          "match",
+          "divergent",
+          "notMeasured",
+          "steps"
+        ],
+        "title": "DiaDAutoSummaryDto",
+        "type": "object"
+      },
+      "DiaDFeedbackByDayDto": {
+        "properties": {
+          "cycles": {
+            "default": 0,
+            "title": "Cycles",
+            "type": "integer"
+          },
+          "errors": {
+            "default": 0,
+            "title": "Errors",
+            "type": "integer"
+          },
+          "realizedR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realizedr"
+          }
+        },
+        "title": "DiaDFeedbackByDayDto",
+        "type": "object"
+      },
+      "DiaDFeedbackCellDto": {
+        "properties": {
+          "cycles": {
+            "default": 0,
+            "title": "Cycles",
+            "type": "integer"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "errors": {
+            "default": 0,
+            "title": "Errors",
+            "type": "integer"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "realizedR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realizedr"
+          }
+        },
+        "required": [
+          "day",
+          "outcome"
+        ],
+        "title": "DiaDFeedbackCellDto",
+        "type": "object"
+      },
+      "DiaDFeedbackDto": {
+        "description": "Artefacto de una ventana. ``available = false`` cuando no existe (fail-closed).",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/DiaDFeedbackErrorDto"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "gate": {
+            "additionalProperties": true,
+            "title": "Gate",
+            "type": "object"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "limits": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limits",
+            "type": "array"
+          },
+          "matrix": {
+            "items": {
+              "$ref": "#/components/schemas/DiaDFeedbackMatrixRowDto"
+            },
+            "title": "Matrix",
+            "type": "array"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "title": "Meta",
+            "type": "object"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "readOnly": {
+            "default": true,
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "schemaVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schemaversion"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiaDFeedbackSummaryDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/DiaDFeedbackValueDto"
+            },
+            "title": "Values",
+            "type": "array"
+          },
+          "window": {
+            "$ref": "#/components/schemas/DiaDFeedbackWindowDto"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "DiaDFeedbackDto",
+        "type": "object"
+      },
+      "DiaDFeedbackErrorCountsDto": {
+        "properties": {
+          "DATA": {
+            "default": 0,
+            "title": "Data",
+            "type": "integer"
+          },
+          "OPERATIONAL": {
+            "default": 0,
+            "title": "Operational",
+            "type": "integer"
+          },
+          "SOFTWARE": {
+            "default": 0,
+            "title": "Software",
+            "type": "integer"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "title": "DiaDFeedbackErrorCountsDto",
+        "type": "object"
+      },
+      "DiaDFeedbackErrorDto": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "day": {
+            "default": "",
+            "title": "Day",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "symbol": {
+            "default": "",
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "code"
+        ],
+        "title": "DiaDFeedbackErrorDto",
+        "type": "object"
+      },
+      "DiaDFeedbackListDto": {
+        "properties": {
+          "artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiaDFeedbackDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "readOnly": {
+            "default": true,
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "windows": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Windows",
+            "type": "array"
+          }
+        },
+        "title": "DiaDFeedbackListDto",
+        "type": "object"
+      },
+      "DiaDFeedbackMatrixRowDto": {
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/DiaDFeedbackCellDto"
+            },
+            "title": "Cells",
+            "type": "array"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol"
+        ],
+        "title": "DiaDFeedbackMatrixRowDto",
+        "type": "object"
+      },
+      "DiaDFeedbackSummaryDto": {
+        "properties": {
+          "confirmed": {
+            "default": 0,
+            "title": "Confirmed",
+            "type": "integer"
+          },
+          "errors": {
+            "$ref": "#/components/schemas/DiaDFeedbackErrorCountsDto"
+          },
+          "measuredValues": {
+            "default": 0,
+            "title": "Measuredvalues",
+            "type": "integer"
+          },
+          "mixed": {
+            "default": 0,
+            "title": "Mixed",
+            "type": "integer"
+          },
+          "notMeasured": {
+            "default": 0,
+            "title": "Notmeasured",
+            "type": "integer"
+          },
+          "refuted": {
+            "default": 0,
+            "title": "Refuted",
+            "type": "integer"
+          },
+          "values": {
+            "default": 0,
+            "title": "Values",
+            "type": "integer"
+          }
+        },
+        "title": "DiaDFeedbackSummaryDto",
+        "type": "object"
+      },
+      "DiaDFeedbackValueDto": {
+        "properties": {
+          "byDay": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DiaDFeedbackByDayDto"
+            },
+            "title": "Byday",
+            "type": "object"
+          },
+          "daysCovered": {
+            "default": 0,
+            "title": "Dayscovered",
+            "type": "integer"
+          },
+          "errorTotal": {
+            "default": 0,
+            "title": "Errortotal",
+            "type": "integer"
+          },
+          "errors": {
+            "$ref": "#/components/schemas/DiaDFeedbackErrorCountsDto"
+          },
+          "expectancyR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectancyr"
+          },
+          "hitRate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hitrate"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/DiaDFeedbackValueLimitsDto"
+          },
+          "measuredCycles": {
+            "default": 0,
+            "title": "Measuredcycles",
+            "type": "integer"
+          },
+          "realizedRTotal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realizedrtotal"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          },
+          "verdictReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdictreason"
+          },
+          "windowDays": {
+            "default": 0,
+            "title": "Windowdays",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "symbol",
+          "verdict"
+        ],
+        "title": "DiaDFeedbackValueDto",
+        "type": "object"
+      },
+      "DiaDFeedbackValueLimitsDto": {
+        "properties": {
+          "minCycles": {
+            "default": 0,
+            "title": "Mincycles",
+            "type": "integer"
+          },
+          "minHitRate": {
+            "default": 0.0,
+            "title": "Minhitrate",
+            "type": "number"
+          }
+        },
+        "title": "DiaDFeedbackValueLimitsDto",
+        "type": "object"
+      },
+      "DiaDFeedbackWindowDto": {
+        "properties": {
+          "days": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "from": {
+            "default": "",
+            "title": "From",
+            "type": "string"
+          },
+          "to": {
+            "default": "",
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "title": "DiaDFeedbackWindowDto",
+        "type": "object"
+      },
       "DiaDSessionEvidencePersistRequestDto": {
         "description": "Persistir informe Evidence sesión C DÍA D → research_evidence (source=dia_d_session).",
         "properties": {
@@ -24187,6 +24871,224 @@
         "summary": "Auth Status",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/auto/dia-d-feedback": {
+      "get": {
+        "description": "Ventanas con feedback disponibles + el artefacto MÁS RECIENTE (read-only, fail-closed).",
+        "operationId": "list_auto_dia_d_feedback_api_auto_dia_d_feedback_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDFeedbackListDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Auto Dia D Feedback",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/dia-d-feedback/{window}": {
+      "get": {
+        "description": "Artefacto de feedback de ``window`` (``D0_D1``), read-only y fail-closed.",
+        "operationId": "get_auto_dia_d_feedback_api_auto_dia_d_feedback__window__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "window",
+            "required": true,
+            "schema": {
+              "title": "Window",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDFeedbackDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Dia D Feedback",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/dia-d-replay": {
+      "get": {
+        "description": "Días con artefacto DÍA-D AUTO disponibles (para el selector de fecha de la UI).",
+        "operationId": "list_auto_dia_d_replay_api_auto_dia_d_replay_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDAutoReplayListDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Auto Dia D Replay",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/dia-d-replay/{day}": {
+      "get": {
+        "description": "Artefacto DÍA-D AUTO de ``day`` (``YYYY-MM-DD``), read-only y fail-closed.",
+        "operationId": "get_auto_dia_d_replay_api_auto_dia_d_replay__day__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "title": "Day",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDAutoReplayDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Dia D Replay",
+        "tags": [
+          "auto"
         ]
       }
     },

@@ -39,15 +39,15 @@ export const LOCK_DIR_NAME = '.run.lock';
 export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
 
 /**
- * Configuracion pinneada de la ventana (arbol congelado `v2.88.30-beta`).
+ * Configuracion pinneada de la ventana (arbol congelado `v2.88.34-beta`).
  * Los hashes son de `git rev-parse "HEAD:apps" "HEAD:packages"`; si el arbol de
  * codigo se mueve, el runner declara `TREE_MOVED` y aborta (fail-closed).
  * `commit` nombra el sello de ingenieria cuyo arbol queda pinneado.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'v2.88.30-beta',
-  appsHash: '2237f0693f5102e74650ccad0309a9d7ae7bae35',
-  packagesHash: 'ce0a38b7e6f5a9f102490e5774f859d7f83aac4a',
+  commit: 'v2.88.34-beta',
+  appsHash: '69bd72d81c64d24937f6e6af325e866586d76a71',
+  packagesHash: '2c15ecb8b017793f38bfee307d3573398b9d6ead',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',

@@ -936,6 +936,34 @@ export const api = {
       }),
     ),
 
+  /** DÍA-D AUTO — días con artefacto sandbox disponible (selector de fecha del monitor). */
+  getAutoDiaDReplayDays: () =>
+    call<components["schemas"]["DiaDAutoReplayListDto"]>(() =>
+      client.GET("/api/auto/dia-d-replay", {}),
+    ),
+
+  /** DÍA-D AUTO — comparación declarado vs ejecutado de un día (read-only, fail-closed). */
+  getAutoDiaDReplay: (day: string) =>
+    call<components["schemas"]["DiaDAutoReplayDto"]>(() =>
+      client.GET("/api/auto/dia-d-replay/{day}", {
+        params: { path: { day } },
+      }),
+    ),
+
+  /** DÍA-D AUTO · FEEDBACK — ventanas con artefacto + el MÁS RECIENTE (read-only). */
+  getAutoDiaDFeedbackList: () =>
+    call<components["schemas"]["DiaDFeedbackListDto"]>(() =>
+      client.GET("/api/auto/dia-d-feedback", {}),
+    ),
+
+  /** DÍA-D AUTO · FEEDBACK — veredicto por valor de una ventana (read-only, fail-closed). */
+  getAutoDiaDFeedback: (window: string) =>
+    call<components["schemas"]["DiaDFeedbackDto"]>(() =>
+      client.GET("/api/auto/dia-d-feedback/{window}", {
+        params: { path: { window } },
+      }),
+    ),
+
   /** V1.92/V1.93 — outbox queue depth + SLA for Consola Operativa. */
   getLifecycleOutboxStats: (accountId: string) =>
     call<{

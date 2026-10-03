@@ -1,6 +1,6 @@
 # Premisas de proyecto — Bolsa V1
 
-> **AsOf:** 2026-08-22  
+> **AsOf:** 2026-08-22 · **AsOf (operativa §5):** 2026-10-03  
 > **Qué es:** reglas de producto y de ingeniería que aplican a **todo** el monorepo.  
 > **Para quién:** equipo, auditores externos, quien retome el código.  
 > No sustituye ADRs: las ADRs deciden arquitectura; estas premisas fijan _cómo se trabaja y se documenta_.
@@ -91,6 +91,7 @@ R-12 entregó Track A–C, R12-409, EXEC-B-CONC, R12-SCHED, R12-ACCOUNTS, R12-AU
 | LAB ≠ TRADING                                         | [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) · [diseño](./engineering/dual-universes-lab-trading-design-2026-08-02.md)                         |
 | Freeze post-auditorías                                | [post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md)                                                      |
 | Orquestación / relevo / anti-alucinación (R-8)        | §4 de este archivo · [plan R-8](./engineering/plan-r8-prevencion-riesgo-2026-08-20.md)                                                                  |
+| **Operativa AUTO/PAPER (ventana forward + `DÍA-D AUTO`)** | §5 de este archivo · [runbook de la ventana](./engineering/runbook-ventana-forward-v2.78-2026-09-27.md) · [criterio de salida `-beta`](./engineering/criterio-salida-beta-2026-10-01.md)                                                       |
 
 Entrada auditoría: [audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md).  
 Índice ingeniería (docs): [engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md).  
@@ -178,6 +179,55 @@ Secretos (`.env`, tokens, `.secrets/`) **nunca** van al remoto. Ver [github-cred
 2. No hay lectura de storage/localStorage que dependa del nombre.
 3. Battery / typecheck verdes tras quitar.
    (Patrón: `engineering/pending-delete/README.md`.)
+
+---
+
+## 5. Premisa — Operativa AUTO/PAPER (ventana forward + bucle de realimentación `DÍA-D AUTO`)
+
+> **Ratificada 2026-10-03** (tramo `v2.88.30`…`v2.88.34`). Gobierna **cómo se opera y se mide** el motor
+> AUTO en `PAPER` — **sin tocar el motor**. Comandos: [runbook de la ventana](./engineering/runbook-ventana-forward-v2.78-2026-09-27.md) §0/§10/§11 ·
+> entorno: [arranque de la ventana PAPER](./engineering/arranque-ventana-paper-operativa-2026-09-27.md).
+> Vía a **versión estable**: [criterio de salida de `-beta`](./engineering/criterio-salida-beta-2026-10-01.md) (`G1`–`G7`).
+
+### 5.1 Reglas duras
+
+1. **Operar ≠ programar.** La ventana `PAPER` es una fase **operativa**: **no** se bajan umbrales, **no** se
+   fuerza el gobernador, **no** se backdatea `created_at`.
+2. **El cubo de calendario sale del reloj de pared.** `sim_fill_finance_context.created_at` es material
+   **durable**; un replay/sandbox (reloj inyectado) **no** fabrica cubos ⇒ `≥4 días` / `≥2 episodios` /
+   `≥32 ciclos` (`P3-2`/`P3-3`) **solo** se acreditan **operando días reales**.
+3. **Freeze por hash, fail-closed.** El runner pinnea el **árbol de código** por hash
+   (`git rev-parse "HEAD:apps" "HEAD:packages"`); si el árbol se mueve declara `TREE_MOVED` y **aborta**.
+   Re-anclar el freeze es parte de **cada** sello que mueve el árbol.
+4. **Un hueco no es un cero.** Un dato no medido viaja `NO MEDIDO`/`None`, **nunca** `0` (`0` = «no pasó
+   nada», que **sí** es una medición). Aplica al Monitor AUTO, al `DÍA-D AUTO` y al feedback por valor.
+5. **Advisory.** El feedback y los paneles **informan**; el humano decide. No cambian motor, umbrales,
+   `TOP_N`, allocation ni pesos A/B. La detección de divergencia de software es **heurística** (pasos
+   deterministas), **no** una prueba de bug.
+6. **Nada peligroso armado por accidente.** `LIVE_EXECUTION_UNLOCKED` **off** · `PAPER_D_EXECUTE` **off** ·
+   thaw **no** · kill switch y `checkExitPermission` con sus suites verdes.
+7. **Interruptores solo en el `env` del proceso hijo.** `AUTO_ENGINE_SIM_REAL_PRICE` (**`1`** en la ventana
+   PAPER — precio real medido; **`0`** en el sandbox `DÍA-D AUTO` — precio inyectado) y
+   `AUTO_OPERATIONAL_AUDIT=1` (hechos durables) se inyectan **solo** en el entorno del proceso; exportarlos
+   en la shell contamina las suites PG (precio ausente ⇒ `HOLD` fail-closed ⇒ **falso rojo**).
+
+### 5.2 `DÍA-D AUTO` — bucle de realimentación por valor (advisory, read-only)
+
+El `DÍA-D AUTO` (`v2.88.33`/`v2.88.34`) sitúa el motor en una **ventana `D0..D1`** con reloj/precio
+inyectados y stores **en memoria** (cuarentena). Por cada instrumento agrega lo **declarado** (replay
+hermético), lo **ejecutado** (hechos durables, leídos read-only) y el **OOS real** posterior, emite un
+**veredicto** `CONFIRMED`/`MIXED`/`REFUTED`/`NOT_MEASURED` y un **catálogo de errores**
+`SOFTWARE`/`OPERATIONAL`/`DATA` (vocabulario existente de `auto_reason_codes`/`market_operability`), lo
+sirve por `GET /api/auto/dia-d-feedback[/{window}]` (read-only) y lo pinta en `/auto-monitor` (sub-vista
+**«Feedback por valor»**).
+
+- **`Δ motor = 0`:** no se edita `auto_simulation_worker.py` ni ningún módulo congelado; el barrido los
+  **conduce** con stores en memoria.
+- **El suelo de muestra se declara, no se relaja** (`MIN_VALUE_CYCLES = 5`): muestras pequeñas ⇒
+  `NOT_MEASURED` será **frecuente**.
+- **El veredicto se recalcula sin cambiar código** en cuanto la ventana PAPER opere esos `D`.
+- **El gate global `window_gate` sigue siendo la autoridad** sobre la ventana; el veredicto por valor es
+  un **complemento**, no un sustituto.
 
 ---
 

@@ -61,22 +61,23 @@ declarada para la deuda de correlación es **≥ 4 días** (`P3-2`), con el `≥
 
 ---
 
-## 3. Estado actual frente a las compuertas (2026-10-01, `v2.88.17.1-beta`)
+## 3. Estado actual frente a las compuertas (2026-10-03, `v2.88.34-beta`)
 
 | # | Estado | Por qué |
 | --- | --- | --- |
-| G1 | ❌ | Última auditoría externa emitida: **`v2.88.3`** (2026-09-29). `v2.88.4`…`v2.88.17.1` (**~14 versiones**) sin auditar. **Este tramo prepara el paquete** de `v2.88.17.1`, pero el informe **no existe todavía** |
-| G2 | ❌ | **`OBS-19` ATACADA en `v2.88.18-beta`:** el censo se **DERIVA** de los workflows (`scripts/ci/test_selection.py` + guarda de 5 tests) y el test de AUTO-23 **ya corre** (denominador de R derivado del fixture). **Sigue en rojo** porque quedan **53** ficheros que **ningún job ejecuta** — **34** `W-G2/2` (**PG**) + **19** `W-G2/3` (**red/E2E**) — **declarados con motivo y tanda** y con la guarda impidiendo que crezca ([`evidence/v2.88.18`](./evidence/v2.88.18/README.md)) |
-| G3 | ❌ | `W5` y `W6` sin sellar · regla direccional duplicada en 4 módulos · `P3-5` · `H-4` |
-| G4 | ❌ | `P3-2`/`P3-3` **sin arrancar**: el precio real está sellado pero **no medido en operación** |
-| G5 | ⚠️ | El par sellado se cita correctamente, pero la evidencia usa también un hash **local** de plataforma (`697526ED…`): declarado, pero es un imán de confusión para un tercero |
-| G6 | ✅ | `LIVE_EXECUTION_UNLOCKED` off · `PAPER_D_EXECUTE` off · XTB **PARKED** · sin thaw |
-| G7 | ⚠️ | `CURRENT_SYSTEM.md` se pone al día **en este mismo tramo**; `versioning.md` sigue con la tabla de las 5 verdades **congelada en `1.35.0`/`V1.48`** |
+| G1 | ❌ | La auditoría externa **APROBADA** de `v2.88.32-beta` (0 bloqueantes, 2026-10-03) **no** cubre el tag que se promovería: `v2.88.33`/`v2.88.34` (**DÍA-D AUTO + bucle de realimentación por valor**) están **sin auditar**. La auditoría se **mueve con cada sello de código** |
+| G2 | ❌ | `OBS-19`/`G2`: el censo se **DERIVA** de los workflows (`scripts/ci/test_selection.py` + guarda) y el agujero bajó de **205 a 53** ficheros (**34** `W-G2/2` PG + **19** `W-G2/3` red/E2E), pero **53 siguen sin ejecutarse en ningún job** ⇒ la compuerta **no** se cierra ([`evidence/v2.88.18`](./evidence/v2.88.18/README.md)) |
+| G3 | ❌ | `W5` y `W6` sin sellar · regla direccional duplicada en 4 módulos · `P3-5` · `H-4` · `OBS-14.b` (alcance del barrido de arranque) · **`OBS-15`** (techo de 1000 `APPLIED`) |
+| G4 | ❌ | `P3-2`/`P3-3` **sin arrancar**: el **runner** de la ventana PAPER está construido y blindado (`v2.88.30`…`v2.88.32`) y el precio real está medido en PG (`v2.88.29`), pero **no hay días reales con material** (el mercado ha vetado `LONG` por régimen) |
+| G5 | ⚠️ | El par sellado se cita correctamente; la evidencia de `v2.88.33`/`v2.88.34` cita además hashes **locales** de artefacto (`sha256` de `operability_runs/*`, **gitignored**): declarado, pero un tercero no puede reproducirlo desde el tag salvo **regenerándolo** |
+| G6 | ✅ | `LIVE_EXECUTION_UNLOCKED` off · `PAPER_D_EXECUTE` off · XTB **PARKED** · sin thaw (y el `DÍA-D AUTO` es **read-only** con stores en memoria) |
+| G7 | ✅ | En el tramo `v2.88.33`/`v2.88.34` se pone al día `CURRENT_SYSTEM.md` (**AsOf `V2.88.34`**, con el tramo `v2.88.20`…`v2.88.34`), la tabla de las **5 verdades** de `versioning.md`, y `PROJECT_PREMISES.md` gana la **§5 (operativa AUTO/PAPER)**. `versioning.md` regla 3 sigue **pendiente de enmienda** en el commit de promoción |
 
-⇒ **Lectura honesta: hoy no se cumple ninguna compuerta difícil (G1–G4).** El orden natural que se
-deduce de la tabla es: **G2** (es barato y es lo que un auditor mira primero) → **G1** (el paquete ya
-está preparado) → **G4** (la ventana PAPER, que es el único modo de que el precio real deje de ser una
-capacidad y pase a ser una **medida**) → **G3/G7**.
+⇒ **Lectura honesta (2026-10-03): sigue sin cumplirse ninguna compuerta difícil (G1–G4).** El tramo
+`v2.88.18`…`v2.88.34` ha **preparado** G2 (censo derivado), G4 (runner de la ventana) y G7 (gobernanza al
+día), pero **G4 solo se cierra operando** días reales y **G1 exige un auditor externo**. Orden natural:
+**G2** (barato, es lo primero que mira un auditor) → **G1** (auditar el tramo `v2.88.33`/`v2.88.34`) →
+**G4** (la ventana PAPER real) → **G3/G7**.
 
 ---
 

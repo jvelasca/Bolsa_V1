@@ -1,25 +1,34 @@
 # Arranque operativo de la ventana PAPER forward — semilla A/B y cuenta fija (2026-09-27)
 
-> **AsOf:** 2026-09-27 · **Re-anclaje:** 2026-10-02 (ver §0) · **Naturaleza:** **operación** (no es una fase de motor) ·
+> **AsOf:** 2026-09-27 · **Re-anclaje:** 2026-10-03 (ver §0) · **Naturaleza:** **operación** (no es una fase de motor) ·
 > **Objeto:** dejar listo el entorno para la ventana PAPER **≥4 días** de `AUTO-MATERIAL-12`
 > que persigue cerrar `P3-2`/`P3-3`. **No** se toca motor, gobernador, `TOP_N`, umbrales,
 > allocation, pesos A/B ni migraciones (arranque original con head `046_fill_reference_mid`;
 > head **hoy** `048_journal_entry_dedupe_key`).
 > Ejecutado por el script [`ops_seed_window_pair.py`](../../apps/api-python/scripts/ops_seed_window_pair.py).
 
-## 0. Re-anclaje al árbol congelado `v2.88.30-beta` (2026-10-02)
+## 0. Re-anclaje al árbol congelado `v2.88.34-beta` (2026-10-03)
 
 La ventana de `2026-09-28` (D1) se corrió sobre un árbol **anterior**; el head de migraciones
 avanzó de `046_fill_reference_mid` a `048_journal_entry_dedupe_key`. Antes de reiniciar la
-ventana, este documento se **re-pinnea** al árbol congelado del sello vigente:
+ventana, este documento se **re-pinnea** al árbol congelado del sello vigente (supera el
+re-anclaje previo a `v2.88.33-beta`, cuyo `packages` cambia al añadirse la lógica del bucle de
+realimentación):
 
 | Dato | Valor (comprobable) |
 |---|---|
-| Sello / tag | **`v2.88.30-beta`** · package `2.11.30-beta` |
+| Sello / tag | **`v2.88.34-beta`** · package `2.11.34-beta` · commit y cita POST-TAG **pendientes de sellar** (se completan al empujar el tag) |
 | Alembic head | **`048_journal_entry_dedupe_key`** (**sin** migración pendiente) |
-| Árbol de **código** congelado | `git rev-parse "HEAD:apps"` = `2237f0693f5102e74650ccad0309a9d7ae7bae35` · `git rev-parse "HEAD:packages"` = `ce0a38b7e6f5a9f102490e5774f859d7f83aac4a` |
+| Árbol de **código** congelado | `git rev-parse "HEAD:apps"` = `69bd72d81c64d24937f6e6af325e866586d76a71` · `git rev-parse "HEAD:packages"` = `2c15ecb8b017793f38bfee307d3573398b9d6ead` |
 | Identidad fija (sin cambios) | `$ACCOUNT` = `1484e253d2d54645945a6b1d7` · `$VERSION_A` = `v283-window-a` · `$VERSION_B` = `v283-window-b` · watch = **20** símbolos |
 | Configuración de operación | `AUTO_ENGINE_SIM_REAL_PRICE=1` (deja de fabricar `100.0`) y `AUTO_OPERATIONAL_AUDIT=1` (hechos durables para el monitor). **Ningún** cambio de motor/`TOP_N`/régimen/umbrales/A-B. |
+
+> **Freeze por hash (no por tag).** El runner pinnea el **árbol de código** por hash
+> (`69bd72d8…` / `2c15ecb8…`), **no** por tag. `v2.88.34-beta` **sí** mueve `apps`/`packages`
+> (bucle de realimentación por valor del `DÍA-D AUTO` read-only + vista en `/auto-monitor`;
+> **`Δ motor = 0`**), así que el pin del runner se **re-ancla** a los hashes de arriba y
+> `WINDOW_CONFIG.commit` pasa a `v2.88.34-beta`; con el sello commiteado, `run-day` **no** abortará
+> por `TREE_MOVED`.
 
 **Declaración:** el bloque §4.bis (D1 del `2026-09-28`) pertenece al árbol **previo** al re-anclaje
 y **no** cuenta para esta ventana; la ventana se reanuda sobre el árbol congelado de arriba. Si
@@ -30,7 +39,7 @@ incidente declarado en §4.bis).
 
 | Comprobación | Comando | Resultado |
 |---|---|---|
-| Árbol congelado vivo | `git rev-parse "HEAD:apps" "HEAD:packages"` | `25afb728…` / `ce0a38b7…` (**coinciden** con el sello) |
+| Árbol congelado vivo | `git rev-parse "HEAD:apps" "HEAD:packages"` | sello `v2.88.34`: `69bd72d8…` / `2c15ecb8…` (**exacto tras el commit del sello**, 2026-10-03; antes daba `2237f069…` / `ce0a38b7…`) |
 | Watch de 20 símbolos | `v2_76 … --preflight-only --watch-size 20` | `watch 20 símbolos` · `barras servidas 20` |
 | Régimen de hoy | idem | `{'trend_down': 10, 'range': 5, 'trend_up': 5}` ⇒ agregado `trend_down` ⇒ **`BEAR_TREND`** ⇒ **entradas LONG VETADAS** (`exit 2`) |
 | Versión B (`v283-window-b`) | `session.get(StrategyVersionRow, …)` | **existe** (`PAPER-WINDOW sma_crossover`) |
@@ -60,6 +69,23 @@ depósito. **Sólo** se forzó el id de la cuenta al valor fijo; el resto de ids
 (`BEAR_TREND`, LONG vetadas) ⇒ **no computa** y **no** se fuerza el gobernador. La ventana exige
 **≥4 días reales distintos** con material durable, así que `window-run`/`window-close` **avanzan solo
 en días futuros sin veto**. `P3-2`/`P3-3` siguen **abiertas** mientras no exista el material.
+
+### 0.3 Pre-vuelo (read-only, a ejecutar al lanzar la ventana)
+
+Antes de lanzar el primer día, ejecutar (desde la raíz del repo) y leer la salida con honestidad:
+
+| Comando | Lectura honesta |
+|---|---|
+| `pnpm window:test` | **`25/25`** regresiones puras del runner (lock / config de freeze / unlock / provenance). |
+| `pnpm window:status` | `NO_MEDIDO` mientras el ledger esté vacío; si aparece **`RUN EN CURSO`**, **no** lanzar otro `run-day`. |
+| `pnpm window:preflight` | Régimen de hoy: `exit 0` ⇒ LONG permitidas; `exit 2`/`BEAR_TREND` ⇒ día **no computable** (se declara `NO_MEDIDO_REGIMEN`, no se fuerza el gobernador). |
+| `node scripts/window-forward-runner.mjs --dry-run run-day` | `config FROZEN` · `freeze OK · apps 69bd72d8… · packages 2c15ecb8…` (valida cadena, config y freeze sin abrir el motor). |
+| `pnpm window:run-day` | Día completo (preflight → forward → v2_77 → v2_80 → v2_83) con **lock + freeze + provenance**. `--force` **sólo** re-ejecuta un día terminal; **no** salta un lock vivo. |
+
+**Nota:** si el preflight vetea (`BEAR_TREND`), el día se registra como `NO_MEDIDO_REGIMEN` y **no** se lanza el
+forward (§1/§5). El gate de evidencia sigue en **`NO MEDIDO`** hasta `≥4 días` / `≥2 episodios` / `≥32 ciclos`.
+El runner (`2.11.34`, sello `v2.88.34-beta`) es la herramienta vigente: `window:unlock` **no** borra un PID vivo
+(sólo reclama lo huérfano), de modo que no puede abrir una ventana de doble ejecución mientras el run-day corre.
 
 ## 1. Qué se ha hecho (una sola vez, antes de D1)
 

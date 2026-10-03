@@ -1064,6 +1064,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/dia-d-feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Auto Dia D Feedback
+         * @description Ventanas con feedback disponibles + el artefacto MÁS RECIENTE (read-only, fail-closed).
+         */
+        get: operations["list_auto_dia_d_feedback_api_auto_dia_d_feedback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/dia-d-feedback/{window}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Dia D Feedback
+         * @description Artefacto de feedback de ``window`` (``D0_D1``), read-only y fail-closed.
+         */
+        get: operations["get_auto_dia_d_feedback_api_auto_dia_d_feedback__window__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/dia-d-replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Auto Dia D Replay
+         * @description Días con artefacto DÍA-D AUTO disponibles (para el selector de fecha de la UI).
+         */
+        get: operations["list_auto_dia_d_replay_api_auto_dia_d_replay_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/dia-d-replay/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Dia D Replay
+         * @description Artefacto DÍA-D AUTO de ``day`` (``YYYY-MM-DD``), read-only y fail-closed.
+         */
+        get: operations["get_auto_dia_d_replay_api_auto_dia_d_replay__day__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/operational-monitor": {
         parameters: {
             query?: never;
@@ -5926,6 +6006,346 @@ export interface components {
             idempotencyKey: string;
             /** Note */
             note?: string | null;
+        };
+        /** DiaDAutoOosDto */
+        DiaDAutoOosDto: {
+            /**
+             * Closedcount
+             * @default 0
+             */
+            closedCount: number;
+            /** Open */
+            open?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Opencount
+             * @default 0
+             */
+            openCount: number;
+            /** Realized */
+            realized?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Realizedrtotal
+             * @default 0
+             */
+            realizedRTotal: number;
+            /**
+             * Unmeasuredcount
+             * @default 0
+             */
+            unmeasuredCount: number;
+        };
+        /**
+         * DiaDAutoReplayDto
+         * @description Artefacto de un día. ``available = false`` cuando no existe (fail-closed).
+         */
+        DiaDAutoReplayDto: {
+            /** Available */
+            available: boolean;
+            /** Day */
+            day: string;
+            /** Executeddetail */
+            executedDetail?: {
+                [key: string]: unknown;
+            };
+            /** Limits */
+            limits?: string[];
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes?: string[];
+            oos?: components["schemas"]["DiaDAutoOosDto"] | null;
+            /**
+             * Readonly
+             * @default true
+             */
+            readOnly: boolean;
+            /** Schemaversion */
+            schemaVersion?: string | null;
+            /** Steps */
+            steps?: components["schemas"]["DiaDAutoStepDto"][];
+            summary?: components["schemas"]["DiaDAutoSummaryDto"] | null;
+        };
+        /** DiaDAutoReplayListDto */
+        DiaDAutoReplayListDto: {
+            /** Days */
+            days?: string[];
+            /** Notes */
+            notes?: string[];
+            /**
+             * Readonly
+             * @default true
+             */
+            readOnly: boolean;
+        };
+        /** DiaDAutoStepDto */
+        DiaDAutoStepDto: {
+            /** Declared */
+            declared?: unknown;
+            /** Executed */
+            executed?: unknown;
+            /** Measurement */
+            measurement: string;
+            /** Step */
+            step: string;
+            /** Verdict */
+            verdict: string;
+        };
+        /** DiaDAutoSummaryDto */
+        DiaDAutoSummaryDto: {
+            /** Divergent */
+            divergent: number;
+            /** Match */
+            match: number;
+            /** Notmeasured */
+            notMeasured: number;
+            /** Steps */
+            steps: number;
+            /** Verdict */
+            verdict: string;
+        };
+        /** DiaDFeedbackByDayDto */
+        DiaDFeedbackByDayDto: {
+            /**
+             * Cycles
+             * @default 0
+             */
+            cycles: number;
+            /**
+             * Errors
+             * @default 0
+             */
+            errors: number;
+            /** Realizedr */
+            realizedR?: number | null;
+        };
+        /** DiaDFeedbackCellDto */
+        DiaDFeedbackCellDto: {
+            /**
+             * Cycles
+             * @default 0
+             */
+            cycles: number;
+            /** Day */
+            day: string;
+            /**
+             * Errors
+             * @default 0
+             */
+            errors: number;
+            /** Outcome */
+            outcome: string;
+            /** Realizedr */
+            realizedR?: number | null;
+        };
+        /**
+         * DiaDFeedbackDto
+         * @description Artefacto de una ventana. ``available = false`` cuando no existe (fail-closed).
+         */
+        DiaDFeedbackDto: {
+            /** Available */
+            available: boolean;
+            /** Errors */
+            errors?: components["schemas"]["DiaDFeedbackErrorDto"][];
+            /** Gate */
+            gate?: {
+                [key: string]: unknown;
+            };
+            /** Kind */
+            kind?: string | null;
+            /** Limits */
+            limits?: string[];
+            /** Matrix */
+            matrix?: components["schemas"]["DiaDFeedbackMatrixRowDto"][];
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes?: string[];
+            /**
+             * Readonly
+             * @default true
+             */
+            readOnly: boolean;
+            /** Schemaversion */
+            schemaVersion?: string | null;
+            summary?: components["schemas"]["DiaDFeedbackSummaryDto"] | null;
+            /** Values */
+            values?: components["schemas"]["DiaDFeedbackValueDto"][];
+            window?: components["schemas"]["DiaDFeedbackWindowDto"];
+        };
+        /** DiaDFeedbackErrorCountsDto */
+        DiaDFeedbackErrorCountsDto: {
+            /**
+             * Data
+             * @default 0
+             */
+            DATA: number;
+            /**
+             * Operational
+             * @default 0
+             */
+            OPERATIONAL: number;
+            /**
+             * Software
+             * @default 0
+             */
+            SOFTWARE: number;
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+        };
+        /** DiaDFeedbackErrorDto */
+        DiaDFeedbackErrorDto: {
+            /** Code */
+            code: string;
+            /**
+             * Day
+             * @default
+             */
+            day: string;
+            /** Detail */
+            detail?: string | null;
+            /** Kind */
+            kind: string;
+            /**
+             * Symbol
+             * @default
+             */
+            symbol: string;
+        };
+        /** DiaDFeedbackListDto */
+        DiaDFeedbackListDto: {
+            artifact?: components["schemas"]["DiaDFeedbackDto"] | null;
+            /** Latest */
+            latest?: string | null;
+            /** Notes */
+            notes?: string[];
+            /**
+             * Readonly
+             * @default true
+             */
+            readOnly: boolean;
+            /** Windows */
+            windows?: string[];
+        };
+        /** DiaDFeedbackMatrixRowDto */
+        DiaDFeedbackMatrixRowDto: {
+            /** Cells */
+            cells?: components["schemas"]["DiaDFeedbackCellDto"][];
+            /** Symbol */
+            symbol: string;
+        };
+        /** DiaDFeedbackSummaryDto */
+        DiaDFeedbackSummaryDto: {
+            /**
+             * Confirmed
+             * @default 0
+             */
+            confirmed: number;
+            errors?: components["schemas"]["DiaDFeedbackErrorCountsDto"];
+            /**
+             * Measuredvalues
+             * @default 0
+             */
+            measuredValues: number;
+            /**
+             * Mixed
+             * @default 0
+             */
+            mixed: number;
+            /**
+             * Notmeasured
+             * @default 0
+             */
+            notMeasured: number;
+            /**
+             * Refuted
+             * @default 0
+             */
+            refuted: number;
+            /**
+             * Values
+             * @default 0
+             */
+            values: number;
+        };
+        /** DiaDFeedbackValueDto */
+        DiaDFeedbackValueDto: {
+            /** Byday */
+            byDay?: {
+                [key: string]: components["schemas"]["DiaDFeedbackByDayDto"];
+            };
+            /**
+             * Dayscovered
+             * @default 0
+             */
+            daysCovered: number;
+            /**
+             * Errortotal
+             * @default 0
+             */
+            errorTotal: number;
+            errors?: components["schemas"]["DiaDFeedbackErrorCountsDto"];
+            /** Expectancyr */
+            expectancyR?: number | null;
+            /** Hitrate */
+            hitRate?: number | null;
+            limits?: components["schemas"]["DiaDFeedbackValueLimitsDto"];
+            /**
+             * Measuredcycles
+             * @default 0
+             */
+            measuredCycles: number;
+            /** Realizedrtotal */
+            realizedRTotal?: number | null;
+            /** Symbol */
+            symbol: string;
+            /** Verdict */
+            verdict: string;
+            /** Verdictreason */
+            verdictReason?: string | null;
+            /**
+             * Windowdays
+             * @default 0
+             */
+            windowDays: number;
+        };
+        /** DiaDFeedbackValueLimitsDto */
+        DiaDFeedbackValueLimitsDto: {
+            /**
+             * Mincycles
+             * @default 0
+             */
+            minCycles: number;
+            /**
+             * Minhitrate
+             * @default 0
+             */
+            minHitRate: number;
+        };
+        /** DiaDFeedbackWindowDto */
+        DiaDFeedbackWindowDto: {
+            /** Days */
+            days?: string[];
+            /**
+             * From
+             * @default
+             */
+            from: string;
+            /**
+             * To
+             * @default
+             */
+            to: string;
         };
         /**
          * DiaDSessionEvidencePersistRequestDto
@@ -12926,6 +13346,134 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthStatusResponseDto"];
+                };
+            };
+        };
+    };
+    list_auto_dia_d_feedback_api_auto_dia_d_feedback_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDFeedbackListDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_dia_d_feedback_api_auto_dia_d_feedback__window__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path: {
+                window: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDFeedbackDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_auto_dia_d_replay_api_auto_dia_d_replay_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDAutoReplayListDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_dia_d_replay_api_auto_dia_d_replay__day__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDAutoReplayDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

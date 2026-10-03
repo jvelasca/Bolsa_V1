@@ -5,6 +5,7 @@
  * ciclo + ownership de reservas + concurrencia + huecos declarados. No interpreta ni re-deriva.
  */
 
+import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,11 +13,17 @@ import { AutoConcurrencyPanel } from "@/features/auto-monitor/auto-concurrency-p
 import { AutoCycleTimeline } from "@/features/auto-monitor/auto-cycle-timeline";
 import { AutoMonitorHeader } from "@/features/auto-monitor/auto-monitor-header";
 import { AutoReservationPanel } from "@/features/auto-monitor/auto-reservation-panel";
+import { DiaDAutoPanel } from "@/features/auto-monitor/dia-d-auto-panel";
+import {
+  AutoMonitorModeToolbar,
+  type AutoMonitorMode,
+} from "@/features/auto-monitor/dia-d-auto-toolbar";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 
 export function AutoMonitorPage() {
   const { view, isLoading, isError, isFetching, refetch } =
     useAutoOperationalMonitor();
+  const [mode, setMode] = useState<AutoMonitorMode>("current");
 
   return (
     <div
@@ -41,19 +48,24 @@ export function AutoMonitorPage() {
             nunca se rellena con 0.
           </p>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => void refetch()}
-          disabled={isFetching}
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Actualizar
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <AutoMonitorModeToolbar mode={mode} onChange={setMode} />
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void refetch()}
+            disabled={isFetching}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Actualizar
+          </Button>
+        </div>
       </div>
 
-      {isLoading ? (
+      {mode === "dia-d" ? <DiaDAutoPanel /> : null}
+
+      {mode === "current" && isLoading ? (
         <p
           className="text-sm text-muted-foreground"
           data-testid="auto-monitor-loading"
@@ -62,7 +74,7 @@ export function AutoMonitorPage() {
         </p>
       ) : null}
 
-      {isError ? (
+      {mode === "current" && isError ? (
         <p
           className="text-sm text-destructive"
           data-testid="auto-monitor-error"
@@ -71,7 +83,7 @@ export function AutoMonitorPage() {
         </p>
       ) : null}
 
-      {view ? (
+      {mode === "current" && view ? (
         <>
           <AutoMonitorHeader header={view.header} />
 

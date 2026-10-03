@@ -12,7 +12,7 @@
 > **Regla dura:** esto es **operación**, no una fase de código. **No** se bajan umbrales, **no** se
 > fuerza el régimen, **no** se backdatea nada.
 
-## 0. Re-anclaje al árbol congelado `v2.88.29-beta` (2026-10-02)
+## 0. Re-anclaje al árbol congelado `v2.88.34-beta` (2026-10-03)
 
 El pin de la ventana se **re-ancla** al sello vigente (head `048_journal_entry_dedupe_key`; ver
 [arranque operativo §0](./arranque-ventana-paper-operativa-2026-09-27.md)). Identidad fija y
@@ -20,7 +20,7 @@ configuración **sin cambios** de motor:
 
 | Dato | Valor |
 |---|---|
-| Árbol de **código** congelado | `apps` = `25afb7282e11240c19c63f85f82273ea3b1440f4` · `packages` = `ce0a38b7e6f5a9f102490e5774f859d7f83aac4a` (commit `2b67a2fa`, tag `v2.88.29-beta`) |
+| Árbol de **código** congelado | `apps` = `69bd72d81c64d24937f6e6af325e866586d76a71` · `packages` = `2c15ecb8b017793f38bfee307d3573398b9d6ead` (pinneado por **hash**; el sello `v2.88.34-beta` **sí** mueve el árbol —bucle de realimentación por valor del `DÍA-D AUTO` read-only + vista en `/auto-monitor`— y el runner se re-ancla a estos hashes: `WINDOW_CONFIG.commit` pasa a `v2.88.34-beta`) |
 | `$ACCOUNT` / `$VERSION_A` / `$VERSION_B` | `1484e253d2d54645945a6b1d7` / `v283-window-a` / `v283-window-b` |
 | Watch | **20** símbolos (derivación determinista por `id`, ≥60 barras D1) |
 | Variables de operación | `AUTO_ENGINE_SIM_REAL_PRICE=1` y `AUTO_OPERATIONAL_AUDIT=1` en el entorno del forward |
@@ -377,3 +377,67 @@ Publica la tabla `D1..Dn` + **`TOTAL`** + funnel agregado + **tasas** + `AVISOS`
 - Códigos: `0` con ≥1 día · `2` sin material legible · `1` uso incorrecto.
 - **No sustituye** al gate: el veredicto de la ventana sigue siendo `READY`/`INCONCLUSIVE` por
   `window_gate` (≥4 días, ≥2 episodios, ≥32 ciclos).
+
+## 10. DÍA-D AUTO — sandbox read-only (`v2.88.33` / `AUTO-MATERIAL-21`)
+
+`v2.88.33` añade un modo **DÍA-D AUTO** para **probar la operativa y la APP antes** de correr los
+`≥4 días` reales: sitúa el motor AUTO en una **fecha pasada `D`** (reloj/precio inyectados, stores en
+memoria), captura lo **declarado**, lo compara con lo **ejecutado real** de `D` (hechos durables,
+leídos read-only) y con el **OOS real** posterior a `D`. Se sirve por `GET /api/auto/dia-d-replay` y se
+pinta en `/auto-monitor` (toggle `Ventana actual / DÍA-D AUTO`).
+
+```powershell
+# Sandbox read-only de un día D (NO escribe PG, NO sustituye el forward):
+uv run --no-sync python apps/api-python/scripts/v2_89_dia_d_auto_replay.py `
+    --at 2026-09-15 --history-days 90 --horizon-days 20
+#   -> operability_runs/dia-d-auto/dia-d-auto-2026-09-15.json  (gitignored)
+```
+
+**Reglas duras (se suman a §5):**
+
+- **Read-only:** el sandbox **no** escribe en la BD durable ni backdatea `created_at`. El motor corre
+  con stores en memoria; las únicas lecturas son barras, sectores y hechos durables de `D`.
+- **No sustituye la ventana PAPER**: el cubo de calendario sale del reloj de pared ⇒ un replay no
+  fabrica cubos durables. `P3-2`/`P3-3`/`H-4` siguen **abiertas**.
+- **Un paso sin hecho durable es `NO MEDIDO`**, nunca `0`. La columna `Ejecutado` deja de ser
+  `NO MEDIDO` **sin cambiar código** en cuanto la ventana PAPER haya operado ese `D`.
+- **Aproximación D1:** un día = un tick. `AUTO_ENGINE_SIM_REAL_PRICE=0` en el sandbox (precio =
+  `price_script` histórico inyectado). No se fuerza régimen.
+- **Freeze:** mover el árbol (`apps`/`packages`) exige re-anclar el hash del runner antes de la
+  próxima corrida de la ventana (`TREE_MOVED` si no), como cualquier sello de código.
+
+## 11. DÍA-D AUTO — bucle de realimentación por valor (`v2.88.34` / `AUTO-MATERIAL-22`)
+
+`v2.88.34` convierte el DÍA-D AUTO de `v2.88.33` (una foto por día) en un **bucle de realimentación
+POR VALOR** sobre una **ventana `D0..D1`**: por cada instrumento agrega lo **declarado** (replay
+hermético), lo **ejecutado** (hechos durables, leídos read-only) y el **OOS real** posterior, y emite
+un **veredicto** (`CONFIRMED`/`MIXED`/`REFUTED`/`NOT_MEASURED`) más un **catálogo de errores**
+(`SOFTWARE`/`OPERATIONAL`/`DATA`). Se sirve por `GET /api/auto/dia-d-feedback[/{window}]` y se pinta en
+`/auto-monitor` (sub-vista **«Feedback por valor»**).
+
+```powershell
+# Barrido read-only de una ventana D0..D1 (NO escribe PG, NO sustituye el forward):
+uv run --no-sync python apps/api-python/scripts/v2_90_dia_d_feedback.py `
+    --from 2026-09-14 --to 2026-09-15 --history-days 30 --horizon-days 5
+#   -> operability_runs/dia-d-auto/feedback-2026-09-14_2026-09-15.json  (gitignored)
+```
+
+**Reglas duras (se suman a §5 y §10):**
+
+- **Advisory y read-only.** El feedback **informa**, el humano decide: **no** cambia el motor, los
+  umbrales, `TOP_N`, la allocation ni los pesos A/B. **No** escribe en la BD durable: las únicas
+  lecturas son barras, sectores y hechos durables de cada `D`; el motor corre con stores en memoria.
+- **No fabrica cubos durables.** El cubo de calendario del forward sale del **reloj de pared**
+  (`sim_fill_finance_context.created_at`) ⇒ un barrido de replay **no** sustituye la ventana PAPER:
+  `≥4 días` / `≥2 episodios` / `≥32 ciclos` sigue **abierta** y el gate se declara, por ahora,
+  `INCONCLUSIVE`.
+- **Un hueco es `NO MEDIDO`**, nunca `0`: un valor sin ciclos medidos (`< MIN_VALUE_CYCLES`) o con
+  lados sin trazo durable viaja `None`/`NOT_MEASURED`; el suelo de muestra se **declara**, no se
+  relaja.
+- **El veredicto por valor es un complemento del gate**, no lo sustituye: el gate global
+  (`window_gate`) sigue siendo la autoridad de la ventana.
+- **La detección de divergencia de software es heurística** (pasos deterministas
+  `SIGNAL`/`ORDER`/`FILL`), no una prueba de bug.
+- **Freeze:** este sello mueve el árbol `apps`/`packages`; el runner ya está re-anclado a
+  `v2.88.34-beta` (§0). No se toca la ventana PAPER ni se backdatea nada.
+
