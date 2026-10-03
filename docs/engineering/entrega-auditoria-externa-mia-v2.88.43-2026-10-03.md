@@ -98,5 +98,5 @@ La deuda metodológica que señaló la auditoría de `v2.88.42` (`2023 × trend_
 - **Tag:** `v2.88.43-beta` **PENDIENTE** de push/CI (se cita aquí tras el `Release tag CI`).
 - **Ficheros añadidos:** módulo + test + `v2_95` + `evidence/v2.88.43/README.md`.
 - **Ficheros modificados:** `v2_89..v2_94` (`meta.bump`; `v2_93`/`v2_94` flags), bump guard, `package.json`, `CHANGELOG.md`, `CURRENT_SYSTEM.md`, `versioning.md`.
-- **Commits locales:** `<PENDIENTE>`.
+- **Commits locales:** funcional `4e8eec0f`; re-anclaje del freeze del runner `c71f85ba` (fijado al árbol de `4e8eec0f`).
 - **Tag:** `v2.88.43-beta` **PENDIENTE** de push/CI.

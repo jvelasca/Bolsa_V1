@@ -25,7 +25,7 @@
 
 | # | Afirmación | Cómo se rompe (falsación) | Evidencia |
 |---|---|---|---|
-| **1** | **La banda del venue no se mueve:** `v2_95` reconstruye la banda `v2.88.42` **byte a byte** (bands + validity + coverage), sin más cambio que `meta.bump`. | Que la reconstrucción difiera del sello del venue. | Comparación de `global`/`byYear`/`byRegime`/`byOperationalRegime`/`byYearByRegime`/`coverage` contra `multi-band-2021_2026.v2.88.42.bak.json` ⇒ **idénticos** (`True`). |
+| **1** | **La banda del venue no se mueve:** `v2_95` reconstruye la banda `v2.88.42` **byte a byte** (bands + validity + coverage), sin más cambio que `meta.bump`. | Que la reconstrucción difiera del sello del venue. | Comparación de `global`/`byYear`/`byRegime`/`byOperationalRegime`/`byYearByRegime`/`coverage` contra la banda del sello `v2.88.42` ⇒ **idénticos** (`True`). |
 | **2** | **Autochequeo `k=0`:** el sorteo 0 (producción) reproduce el sello `v2.88.41` (`expectancyR=-0.0094`, `93` ciclos, `REFUTED`, `STRONG`) y `venueBandCrossCheck.evidenceDrift=False`. | Que el sorteo 0 mida otra cosa. | `venueBandCrossCheck={available:true, evidenceDrift:false, driftedKeys:[]}`; `venue_cross_check` del sorteo 0 contra `multi-2021_2026.json`. |
 | **3** | **Varianza total declarada:** `totalVar = venueVar + samplingVar` y `varianceShare.venue + varianceShare.sampling = 1`. | Una descomposición que no cierre. | `test_total_variance_is_venue_plus_sampling_and_shares_sum_to_one`; GLOBAL `varianceShare = {venue 0.2734, sampling 0.7266}`. |
 | **4** | **El bootstrap no inventa ruido:** con sorteos de ciclos constantes, `samplingVar = 0` y la banda no se ensancha. | Un `samplingVar > 0` sin dispersión real. | `test_sampling_variance_is_zero_when_each_draw_is_constant`; celda `2023 × trend_down` (`n=2`, ciclos constantes) ⇒ `samplingVar = 0.0000`. |
@@ -180,5 +180,5 @@ uv run --no-sync python apps/api-python/scripts/v2_95_dia_d_multi_bootstrap.py \
 - **Ficheros añadidos:** `packages/py/application/src/bolsa_application/dia_d_multi_sampling.py`, `packages/py/application/tests/test_dia_d_multi_sampling.py`, `apps/api-python/scripts/v2_95_dia_d_multi_bootstrap.py`, `docs/engineering/evidence/v2.88.43/README.md`.
 - **Ficheros modificados:** `apps/api-python/scripts/v2_89|v2_90|v2_91|v2_92|v2_93|v2_94…` (`meta.bump`; `v2_93` +`--cycles-out`; `v2_94` +`--cycles`), `apps/api-python/tests/test_dia_d_bump_guard.py` (+`v2_95`), `package.json`, `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
 - **`Δ motor = 0`:** ningún fichero de motor tocado.
-- **Commits locales:** `<PENDIENTE>` (se publican en la cita del sello).
+- **Commits locales:** funcional **`4e8eec0f`**; re-anclaje del freeze del runner **`c71f85ba`** (`apps` `a969d896…` · `packages` `5cc2bc2b…`).
 - **Tag:** `v2.88.43-beta` **PENDIENTE** de push (se cita tras el CI de tag).
