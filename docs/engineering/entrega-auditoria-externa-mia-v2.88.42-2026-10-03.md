@@ -1,9 +1,9 @@
 # Entrega a auditoría externa MIA — `v2.88.42-beta` (DÍA-D · **DE PUNTO A BANDA**: incertidumbre del SORTEO del venue en la atribución multirregimen, 2026-10-03)
 
-> **Objeto auditado (sello LOCAL):** commit funcional **`4533b034`**, versión **`2.11.42-beta`**,
-> base del diff **`v2.88.41-beta`** → **`04397e12`**, Alembic head **`048_journal_entry_dedupe_key`**
-> (**sin migración**). **El tag anotado y el `Release tag CI` están PENDIENTES** (se citan POST-TAG);
-> este documento es el handover de un sello local.
+> **Objeto auditado:** tag anotado **`v2.88.42-beta`** → tag object **`d4edf937`** → commit **`0f08c99d`**
+> (producto funcional **`4533b034`**), versión **`2.11.42-beta`**, base del diff **`v2.88.41-beta`** →
+> **`04397e12`**, Alembic head **`048_journal_entry_dedupe_key`** (**sin migración**).
+> **`Release tag CI` VERDE:** run [`37140158600`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37140158600).
 >
 > **Identidad ESTABLE del producto:** el objeto se identifica por sus **árboles** `apps` `18d885fa…` /
 > `packages` `8fbd4e6c…`, y el runner de la ventana los tiene **pineados** (`WINDOW_CONFIG.commit` =
@@ -71,20 +71,21 @@ siguen **ABIERTAS**.
 
 ## 1. El objeto y cómo obtenerlo
 
-> **Dónde vive qué.** El **producto** auditado es el commit funcional **`4533b034`** (aún **sin tag**).
-> Esta **entrega** viaja en el commit de **re-anclaje del freeze** (el que contiene este documento),
-> porque el pin del runner vive en `scripts/` y se edita **después** de conocer los hashes del commit
-> funcional. Al empujar, `main` tendrá: funcional `4533b034` → re-anclaje (esta entrega) → tag.
+> **Dónde vive qué.** El **producto** auditado es el commit funcional **`4533b034`** (dentro del tag
+> `v2.88.42-beta`). Esta **entrega** viaja en el commit de **re-anclaje del freeze** (`0f08c99d`), que es
+> el commit que apunta el tag, porque el pin del runner vive en `scripts/` y se edita **después** de
+> conocer los hashes del commit funcional. Al clonar: `main` = `0f08c99d` con **tag anotado** apuntando ahí.
 
 ```bash
 git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1
-git log --oneline -3                       # re-anclaje (entrega) → 4533b034 (producto funcional)
+git checkout v2.88.42-beta                 # el objeto sellado
+git log --oneline -2                       # 0f08c99d (re-anclaje + entrega) → 4533b034 (producto funcional)
 git show --stat 4533b034                   # el producto del sello
 ```
 
 | Verdad | Valor |
 | --- | --- |
-| Commit funcional | **`4533b034`** (sello **local**; tag anotado **PENDIENTE**) |
+| Tag anotado | **`v2.88.42-beta`** (tag object `d4edf937`) → `0f08c99d` (producto funcional `4533b034`) |
 | Versión (`package.json`) | `2.11.42-beta` (base `2.11.41-beta`) |
 | Base del diff | `v2.88.41-beta` → `04397e12` |
 | Alembic head | `048_journal_entry_dedupe_key` — **SIN migración** |
@@ -92,7 +93,7 @@ git show --stat 4533b034                   # el producto del sello
 | Delta `packages/`+`apps/` | **9 ficheros, `+1053 / −5`** |
 | `Δ motor` | **ningún** fichero de motor en el diff (verificado, §2) |
 | `SCHEMA_VERSION` | (nuevo) **`dia-d-multi-band-v1`** · `KIND = DIA_D_AUTO_MULTI_BAND` |
-| CI del tag | **PENDIENTE** (sello local; se cita POST-TAG) |
+| CI del tag | `Release tag CI` run **`37140158600`** — **VERDE** (11 jobs `success` + `playwright` integrado `skipped` por diseño; `certify` `success`; `python` `4455 passed / 45 skipped` = **+9**; `replay-repro` `REPRODUCIDO` `1E3ADAC2…`) |
 
 **Composición del delta `packages/`+`apps/` (9 ficheros):**
 
@@ -129,7 +130,7 @@ git rev-parse "4533b034:apps" "4533b034:packages"                    # 18d885fa.
 | Ficheros de motor en el diff | **ausentes** |
 | Freeze del runner (`git rev-parse "4533b034:apps" "4533b034:packages"`) | `18d885faa7fc790ada9828efd0988399040eccc5` / `8fbd4e6c0871e86faa3114c1e6fcf8789110ac16` (el par del sello `v2.88.41-beta` era `b0cd0174…` / `35a37d56…`; el pin se **re-ancló**) |
 | Dry-run del runner | `freeze OK` |
-| CI del tag | **PENDIENTE** (sello local) |
+| CI del tag | **11 `success`** + `playwright (integrated E2E, opt-in)` `skipped` por diseño; `certify` `success` (`Release tag CI` run `37140158600`) |
 
 ### 2.1 Cobertura de la banda (`K = 12`, sobre 12 sorteos)
 
@@ -266,7 +267,7 @@ años / regímenes. ¿Cuál es **prerrequisito** de cuál antes de tocar el moto
   ([`criterio-salida-beta-2026-10-01.md`](./criterio-salida-beta-2026-10-01.md) §3).
 - **Artefactos locales gitignored:** los `sha256` de `operability_runs/dia-d-auto*` se citan en la
   evidencia; un tercero los **regenera** (comando en `evidence/v2.88.42/README.md` §5), no los hereda.
-- **Tag/CI del tag PENDIENTES:** sello local; la cita del `Release tag CI` se añade POST-TAG.
+- **Tag/CI del tag:** `v2.88.42-beta` (anotado) → `0f08c99d`, **empujado**; `Release tag CI` **VERDE** (`37140158600`).
 
 ---
 
@@ -286,8 +287,9 @@ la deuda **ya declarada** (§5); lo que **no** se pudo medir; y la **recomendaci
 Actúa como auditor externo independiente. Auditas un repositorio PÚBLICO de GitHub:
 https://github.com/jvelasca/Bolsa_V1
 
-OBJETO (sello LOCAL, SIN tag todavia): commit funcional 4533b034, version 2.11.42-beta, base del diff
-v2.88.41-beta (04397e12), Alembic head 048_journal_entry_dedupe_key (SIN migracion).
+OBJETO (sello): tag anotado v2.88.42-beta -> tag object d4edf937 -> commit 0f08c99d (producto funcional
+4533b034), version 2.11.42-beta, base del diff v2.88.41-beta (04397e12), Alembic head
+048_journal_entry_dedupe_key (SIN migracion). Release tag CI VERDE (37140158600).
 Clase: CAPACIDAD DEL INSTRUMENTO de investigacion sobre el motor AUTO (BANDA DEL SORTEO DEL VENUE sobre
 la atribucion multirregimen del DIA-D; K=12 re-sorteos del seed del fill, restauracion byte a byte).
 Advisory y read-only. NO es capacidad de motor y NO toca el motor (delta motor = 0). NO cierra PAPER.
@@ -328,5 +330,5 @@ REGLAS:
   - NO leas un puntoCitable=True con drawsWithCell=2 como solido: la banda es fragil y se declara.
   - NO leas un ano hueco como 0: 2021 medido vacio; 2026 no medido (sin_universo_pit).
   - El artefacto de la banda y los 12 sorteos son gitignored: regeneralo con el comando de evidence/v2.88.42 §5.
-  - El sello es LOCAL (commit funcional 4533b034); tag y CI del tag PENDIENTES.
+  - El sello es el tag anotado v2.88.42-beta (tag object d4edf937 -> commit 0f08c99d; producto funcional 4533b034).
 ```
