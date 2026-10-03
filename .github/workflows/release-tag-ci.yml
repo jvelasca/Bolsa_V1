@@ -241,15 +241,10 @@ jobs:
       # (`ASGITransport`) y sólo necesitan el catálogo sembrado, no un servidor levantado.
       # Verificado antes de cablear contra PG real con catálogo sembrado (76 passed).
       #
-      # Los 3 ficheros restantes de la tanda NO se cablean a propósito: su primera
-      # ejecución real es ROJA y el agujero los estaba ocultando (hallazgo del peaje):
-      #   - test_lists.py: exige listas sembradas (p. ej. "IBEX 35") y `db:seed` sólo
-      #     siembra instrumentos ⇒ premisa imposible en BD recién sembrada.
-      #   - test_workspaces.py: espera 400 al borrar el workspace por defecto y recibe 204.
-      #   - integration/test_tax_report.py: el trade de apertura devuelve 403.
-      # Quedan declarados en `scripts/ci/ci-test-selection-baseline.json` con su tanda de
-      # arreglo (W-G2/4). La guarda `tests/test_ci_test_selection_census.py` impide que
-      # vuelvan a quedar sin declarar.
+      # Los 3 ficheros restantes de la tanda quedaron declarados (tanda W-G2/4) porque su
+      # primera ejecución real era ROJA y el agujero los estaba ocultando. En la tanda
+      # W-G2/4 se corrigió la causa de cada uno y se cablean en el paso DEDICADO de abajo
+      # (verificado 4 passed contra PG sembrada).
       - name: Pytest W-G2/3 seeded API batch (16 files, OBS-19/G2)
         run: >
           uv run pytest
@@ -269,6 +264,26 @@ jobs:
           apps/api-python/tests/test_ai_authoring.py
           apps/api-python/tests/test_auth.py
           packages/py/infrastructure/tests/test_alert_channels.py
+          -q
+          --tb=short
+
+      # G2 / `OBS-19` (2026-10-03) — tanda W-G2/4: los 3 ficheros que faltaban, ARREGLADOS.
+      # Corren tras `db:seed` y con PG migrada, igual que W-G2/3. Causa de cada rojo y arreglo:
+      #   - test_lists.py: `/api/lists` devolvía una lista vacía (`estudio`) en la posición 0
+      #     y el test tomaba `[0]`; ahora selecciona por nombre la lista catálogo "IBEX 35",
+      #     que se siembra de forma DECLARATIVA (`packages/database/prisma/seed.ts`), cerrando
+      #     la deuda del incidente 2026-09-08 (BD recién sembrada sin `instrument_lists`).
+      #   - test_workspaces.py: el rojo era RESIDUO de workspaces de sesiones previas (la
+      #     guarda de borrado decide por CONTEO); el conftest ahora los purga a `is_default=false`.
+      #   - integration/test_tax_report.py: la venta humana de una posición abierta NO va por
+      #     `/portfolio/trade` (403 `position_exit_requires_confirm`, política V1.32), va por
+      #     Confirm SEMI (`/ai/intents/confirm`, reduce), que es la vía real del SELL del ledger.
+      - name: Pytest W-G2/4 lists/workspaces/tax batch (3 files, OBS-19/G2)
+        run: >
+          uv run pytest
+          apps/api-python/tests/test_lists.py
+          apps/api-python/tests/test_workspaces.py
+          apps/api-python/tests/integration/test_tax_report.py
           -q
           --tb=short
 

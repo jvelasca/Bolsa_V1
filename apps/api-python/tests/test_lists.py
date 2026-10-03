@@ -63,7 +63,14 @@ async def test_delete_list_with_items_does_not_violate_fk() -> None:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             lists_body = (await client.get("/api/lists")).json()["data"]
             assert lists_body, "premisa: hay listas sembradas"
-            list_id = lists_body[0]["id"]
+            # El catálogo IBEX 35 es la lista poblada garantizada (semilla declarativa).
+            # NO usar `lists_body[0]`: el orden incluye listas vacías legítimas (p. ej.
+            # `estudio`), y el test quedaría dependiente del orden de presentación.
+            ibex = next(
+                (item for item in lists_body if item["name"] == "IBEX 35"),
+                lists_body[0],
+            )
+            list_id = ibex["id"]
             quotes = (await client.get(f"/api/lists/{list_id}/quotes")).json()["data"]
             assert quotes, "premisa: la lista tiene instrumentos"
 

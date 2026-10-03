@@ -113,10 +113,16 @@ def test_the_declared_baseline_does_not_lie() -> None:
 
 
 def test_every_declared_entry_carries_a_reason_and_a_wave() -> None:
-    """(3) Declarar no es esconder: cada entrada dice por qué y cuándo se cablea."""
+    """(3) Declarar no es esconder: cada entrada dice por qué y cuándo se cablea.
+
+    Un baseline **vacío** es el estado META (``G2`` cerrado: ningún fichero de test existe
+    sin ejecutarse), y no hay entradas que validar; la comprobación es vacuamente cierta.
+    Mientras haya entradas, cada una debe llevar motivo y tanda.
+    """
     module, _data = _census()
     entries = module.declared_baseline().get("entries", {})
-    assert entries, "la línea base declarada está vacía o no se pudo leer"
+    if not entries:
+        return  # agujero cerrado: no queda ninguna declaración que auditar
     without_reason = [
         path
         for path, meta in entries.items()

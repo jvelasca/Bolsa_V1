@@ -1,19 +1,6 @@
 {
   "asOf": "2026-10-03",
-  "note": "Agujero DECLARADO del peaje OBS-19 (G2). El 2026-10-03 se cablearon 50 de los 53 ficheros: 34 en un paso dedicado de lifecycle-pg (release-tag-ci, tanda W-G2/2, verificados 200 passed/1 xfailed) y 16 en el job playwright-integrated (tanda W-G2/3, 76 passed con catálogo sembrado). Quedan 3, cuya PRIMERA ejecución real es ROJA: el agujero los estaba ocultando. No se cablean hasta arreglarlos (tanda W-G2/4). La guarda (test_ci_test_selection_census.py) falla si aparece un fichero NUEVO sin declarar: el agujero puede encogerse, nunca crecer. Nota: regenerar con --write-baseline sobrescribe estos motivos con el clasificador automático (genérico); si se regenera, volver a poner el motivo veraz.",
+  "note": "G2 / OBS-19 CERRADO (2026-10-03): el agujero DECLARADO del peaje de selección de tests quedó a 0. Los 572 ficheros del universo los ejecuta algún job. Cierre por tandas: W-G2/1 (pase de directorio offline), W-G2/2 (34 ficheros con PG real en lifecycle-pg), W-G2/3 (16 ficheros ASGI en playwright-integrated) y W-G2/4 (los 3 últimos —test_lists.py, test_workspaces.py, integration/test_tax_report.py— arreglados y cableados en playwright-integrated). `entries` queda VACÍO a propósito: no hay ningún fichero sin ejecutar. `maxUndeclared` sigue en 0: la política no se relaja; la guarda (test_ci_test_selection_census.py) vuelve a fallar si alguien añade un test que ningún job ejecute y no lo declara con motivo.",
   "maxUndeclared": 0,
-  "entries": {
-    "apps/api-python/tests/integration/test_tax_report.py": {
-      "reason": "ROJO en su primera ejecución real (el agujero lo ocultaba): el trade de apertura del round-trip devuelve 403 en vez de 200. Requiere diagnóstico del gate de apertura / autorización antes de cablearlo. Arreglo: W-G2/4.",
-      "wave": "W-G2/4"
-    },
-    "apps/api-python/tests/test_lists.py": {
-      "reason": "ROJO en su primera ejecución real (el agujero lo ocultaba): exige listas sembradas (p. ej. 'IBEX 35') pero `db:seed` sólo siembra instrumentos ⇒ la premisa `len(/api/lists) >= 1` es imposible en una BD recién sembrada. Decidir si se siembran listas o se corrige la premisa. Arreglo: W-G2/4.",
-      "wave": "W-G2/4"
-    },
-    "apps/api-python/tests/test_workspaces.py": {
-      "reason": "ROJO en su primera ejecución real (el agujero lo ocultaba): borrar el workspace por defecto devuelve 204 en vez del 400 que el contrato exige (la guarda vive en el caso de uso DeleteWorkspace). Arreglo: W-G2/4.",
-      "wave": "W-G2/4"
-    }
-  }
+  "entries": {}
 }

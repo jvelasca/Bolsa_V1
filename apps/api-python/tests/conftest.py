@@ -176,6 +176,7 @@ async def purge_all_residuals() -> None:
 
     Sobrevive únicamente lo que siembra el bootstrap/seed:
     - ``default-account-seed`` y su ``default-portfolio-seed``.
+    - El workspace marcado ``is_default`` (los demás se purgan: ver más abajo).
     - Los instrumentos del catálogo IBEX (los que tienen ``yahoo_symbol`` real, ``*.MC``).
 
     Los instrumentos sintéticos de tests se reconocen por su id ``inst-*`` (familias
@@ -230,6 +231,13 @@ async def purge_all_residuals() -> None:
                 )
             )
             await session.execute(text(f"DELETE FROM instruments WHERE {synthetic}"))
+            # Workspaces de test (la semilla `default` se conserva). La guarda de
+            # `DeleteWorkspace` decide por CONTEO (`count <= 1` ⇒ 400 al borrar el
+            # default); sin esta purga, el residuo de workspaces de sesiones previas
+            # dejaba el conteo > 1 y borrar el default **dejaba de vetarse** (204 en vez
+            # de 400) — la causa real del rojo intermitente de `test_workspaces.py`, que
+            # el agujero de `OBS-19` ocultaba. `workspaces` no tiene FKs entrantes.
+            await session.execute(text("DELETE FROM workspaces WHERE is_default = false"))
             await session.commit()
     finally:
         await engine.dispose()

@@ -199,14 +199,18 @@ reduce más riesgo por unidad de esfuerzo, y cuál es **prerrequisito** de cuál
 - **`P3-2`/`P3-3` (ventana PAPER real) — ABIERTAS.** El **runner** está construido y blindado
   (`v2.88.30`…`v2.88.32`) y el precio real está medido en PG (`v2.88.29`), pero **no hay días reales con
   material**. Aquí el gate se declara `INCONCLUSIVE`.
-- **`OBS-19`/`G2` — ABIERTA pero a 3 ficheros.** El censo **se deriva** de los workflows
-  (`scripts/ci/test_selection.py` + guarda, `maxUndeclared: 0`). Progresión **205 → 53 → 3**: el
+- **`OBS-19`/`G2` — CERRADA (572/572, 0 declarados).** El censo **se deriva** de los workflows
+  (`scripts/ci/test_selection.py` + guarda, `maxUndeclared: 0`). Progresión **205 → 53 → 3 → 0**: el
   2026-10-03 se cablearon **34** `W-G2/2` (paso dedicado en el job `lifecycle-pg` del tag) y **16**
-  `W-G2/3` (job integrado con catálogo sembrado). Los **3** que quedan se descubrieron **ROJOS** en su
-  primera ejecución real (el agujero los ocultaba): `test_lists` (exige listas sembradas que `db:seed`
-  no crea), `test_workspaces` (da **204** al borrar el workspace por defecto en vez de **400**) y
-  `test_tax_report` (el trade de apertura da **403**); declarados con tanda **`W-G2/4`**
-  ([informe](./obs-19-g2-cableado-50-de-53-2026-10-03.md) ·
+  `W-G2/3` (job integrado con catálogo sembrado). Los **3** últimos se descubrieron **ROJOS** en su
+  primera ejecución real (el agujero los ocultaba) y su **causa se corrigió** en `W-G2/4`:
+  `test_lists` (semilla **declarativa** de la lista catálogo `ibex35`; el test elige la lista **por
+  nombre**), `test_workspaces` (**no era bug**: era **residuo** de workspaces de sesiones previas, ahora
+  purgado en `conftest`) y `test_tax_report` (la venta humana de una posición abierta va por **Confirm
+  SEMI**, no por HTTP —el 403 es política V1.32). Cierre verificado **`4 passed`** y censo **572/572**;
+  la línea base queda **vacía** con `maxUndeclared: 0`. `G2` es la **única** compuerta que este sello
+  **cierra** ([cierre](./obs-19-g2-cierre-572-de-572-2026-10-03.md) ·
+  [cableado](./obs-19-g2-cableado-50-de-53-2026-10-03.md) ·
   [`evidence/v2.88.18`](./evidence/v2.88.18/README.md)).
 - **Compuertas `G1`–`G7` del criterio de salida:** `G6` ✅ (nada peligroso armado: `LIVE_EXECUTION_UNLOCKED`
   off · `PAPER_D_EXECUTE` off · XTB **PARKED** · este sello es read-only) y `G7` ✅ (gobernanza al día);
