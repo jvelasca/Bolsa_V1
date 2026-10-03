@@ -1,33 +1,31 @@
-"""V2.91 · DÍA-D AUTO — ventana LONGITUDINAL OOS sobre el universo point-in-time.
+"""V2.92 · DÍA-D AUTO — ATRIBUCIÓN del OOS 2022 por dimensión (read-only, sin tocar motor).
 
 Qué es
 ------
-Corre el MISMO harness hermético (``v2.86``/``v2.87``) **una sola vez** sobre una **ventana
-contigua y acotada** (por defecto el año natural 2022) usando el **universo point-in-time**
-(``--universe pit``), y agrega el OOS por día ``D`` para medir la **estabilidad** del edge:
-expectativa, acierto, series por cubo temporal y excursiones MAE/MFE por ciclo. El resultado es
-un artefacto JSON determinista.
+Corre el MISMO harness hermético (``v2.86``/``v2.87`` vía ``v2_91``) sobre una **ventana
+contigua acotada** (por defecto el año natural 2022) con el **universo point-in-time**, y
+**descompone** la expectativa OOS ya medida por ``v2_91``:
+
+* por **régimen** (agregado trial por día de ``census_operable_days``),
+* por **estrategia** (``strategyVersion`` del ciclo),
+* por **sector** (el del catálogo actual; declarado aproximado),
+* por **activo** (símbolo),
+* y estudia la **excursión** (captura de MFE / severidad de MAE) y la **concentración**.
+
+Responde *dónde* y *cómo* se pierde (o gana) el R de la ventana, no sólo *cuánto*. El artefacto
+es JSON determinista y **advisory**: no cambia el motor, los umbrales, ``TOP_N`` ni la
+allocation, y **no** escribe en PostgreSQL.
 
 Qué NO es (se declara, no se disfraza)
 --------------------------------------
-* **NO sustituye la ventana PAPER.** El cubo de calendario sale del reloj de pared, así que un
-  replay no fabrica cubos durables. ``P3-2``/``P3-3`` siguen ABIERTAS.
-* **NO escribe en PostgreSQL**: el motor corre con stores en memoria (cuarentena). Las únicas
-  lecturas son barras, sectores y el universo.
-* **MAE/MFE son extremos ENTRE DÍAS** (barras D1); el día de entrada puede incluir excursión
-  previa al fill. No se presentan como intradía.
+* **NO** sustituye la ventana PAPER: ``P3-2``/``P3-3`` siguen ABIERTAS.
+* **NO** es causal: la atribución es **descriptiva** sobre la muestra medida.
+* **NO** ejecuta ventanas nuevas ni otros años (eso es multirregimen).
 * Un hueco se declara ``None``/``NOT_MEASURED``; nunca se rellena con ``0``.
-
-Sonda de viabilidad (``probe``)
--------------------------------
-La corrida larga puede truncar (libro de compromisos pendientes): el artefacto publica la ventana
-**pedida** vs la **efectiva** y el ``truncationReason``. Si trunca y ``--fallback`` está activo,
-se reintenta una vez sobre el **tramo contiguo más largo operable** dentro de la ventana y se
-declara ``windowFallback`` (nunca se inventa la muestra).
 
 Uso::
 
-    uv run --no-sync python apps/api-python/scripts/v2_91_dia_d_longitudinal.py \
+    uv run --no-sync python apps/api-python/scripts/v2_92_dia_d_attribution.py \\
         --year 2022 --universe pit --json
 """
 
@@ -46,7 +44,7 @@ from typing import Any
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 _DOTENV = _REPO_ROOT / ".env"
 
-#: Cuenta y versión de la ventana PAPER (MISMOS valores que ``v2.86``/``v2.87``/``v2.89``).
+#: Cuenta y versión de la ventana PAPER (MISMOS valores que ``v2_86``/``v2_87``/``v2_89``/``v2_91``).
 _DEFAULT_ACCOUNT = "1484e253d2d54645945a6b1d7"
 _DEFAULT_VERSION_A = "v283-window-a"
 _DEFAULT_EDGE = 0.9
@@ -59,11 +57,11 @@ _DEFAULT_HORIZON_DAYS = 20
 #: Carpeta de artefactos (no versionada; mismos criterios que ``operability_runs/*``).
 _OUT_SUBDIR = pathlib.Path("operability_runs") / "dia-d-auto"
 
-logger = logging.getLogger("v2_91_dia_d_longitudinal")
+logger = logging.getLogger("v2_92_dia_d_attribution")
 
 
 def _load_module(filename: str, name: str) -> Any:
-    """Carga un runner hermano por ruta (mismo patrón que ``v2.89``→``v2.87``→``v2.86``)."""
+    """Carga un runner hermano por ruta (mismo patrón que ``v2.89``→``v2.90``→``v2.91``)."""
     path = pathlib.Path(__file__).with_name(filename)
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:  # pragma: no cover — el fichero vive al lado.
@@ -74,82 +72,76 @@ def _load_module(filename: str, name: str) -> Any:
     return module
 
 
-def _load_v89() -> Any:
-    return _load_module("v2_89_dia_d_auto_replay.py", "v2_89_dia_d_auto_replay")
+def _load_v91() -> Any:
+    return _load_module("v2_91_dia_d_longitudinal.py", "v2_91_dia_d_longitudinal")
 
 
-# ── Resolución de la ventana ─────────────────────────────────────────────────────
+def _load_cross_check(path: str | None) -> dict[str, Any] | None:
+    """Referencia sellada de ``v2_91`` para cruzar el resumen (o ``None`` si no se pidió).
 
-
-def _resolve_window(args: argparse.Namespace, days: list[str]) -> tuple[int, int]:
-    """Índices ``[d0, d1]`` (inclusivos) de la ventana pedida dentro del calendario de barras.
-
-    Acepta ``--year YYYY`` (año natural completo) o ``--from/--to``. Se toman la primera y la
-    última barra DENTRO del rango pedido: una ventana fuera del calendario se declara, no se
-    recorta en silencio a un día arbitrario.
+    Un fichero ausente o ilegible se declara, no se inventa: el artefacto publica el hueco.
     """
-    if args.year is not None:
-        year = int(args.year)
-        window_from, window_to = f"{year}-01-01", f"{year}-12-31"
-    else:
-        window_from, window_to = str(args.from_day or ""), str(args.to_day or "")
-    if not window_from or not window_to:
-        raise RuntimeError("indica --year o --from/--to")
-    if window_from > window_to:
-        raise RuntimeError(f"la ventana está invertida: {window_from} > {window_to}")
-
-    inside = [index for index, day in enumerate(days) if window_from <= day <= window_to]
-    if not inside:
-        raise RuntimeError(
-            f"la ventana {window_from}..{window_to} no tiene barras en el calendario "
-            f"({days[0]}..{days[-1]})"
-        )
-    return inside[0], inside[-1]
+    if not path:
+        return None
+    target = pathlib.Path(path)
+    if not target.is_absolute():
+        target = _REPO_ROOT / target
+    if not target.exists():
+        return {"source": str(target), "available": False, "note": "referencia no encontrada"}
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:  # noqa: BLE001 — un JSON roto es un hueco declarado.
+        return {"source": str(target), "available": False, "note": f"referencia ilegible: {error}"}
+    return {"source": str(target), "available": True, "reference": payload.get("summary") or {}}
 
 
-async def _run_pass(
+def _cross_check_summary(
+    reference: dict[str, Any] | None,
     *,
-    v87: Any,
-    args: argparse.Namespace,
-    watch: list[str],
-    bars_by_symbol: dict[str, list[Any]],
-    sectors: dict[str, str],
-    days: list[str],
-    operable_flags: list[bool],
-    history_days: int,
-    horizon_days: int,
-    d0_index: int,
-    d1_index: int,
+    current: dict[str, Any],
 ) -> dict[str, Any]:
-    """Una corrida del harness hermético sobre ``[d0_index, d1_index]`` (con historia/horizonte)."""
-    start_index = max(1, d0_index - max(1, history_days))
-    end_index = min(len(days), d1_index + 1 + max(0, horizon_days))
-    result: dict[str, Any] = await v87._run_durable_replay(  # noqa: SLF001 — harness hermético compartido.
-        watch=watch,
-        bars_by_symbol=bars_by_symbol,
-        sectors=sectors,
-        days=days,
-        start_index=start_index,
-        max_ticks=end_index - start_index,
-        edge=float(args.edge),
-        account_id=str(args.account_id),
-        version_a=str(args.version_a),
-        engine_id=f"dia-d-longitudinal-{os.urandom(3).hex()}",
-        operable_days=operable_flags,
-        durable_cycle=True,
-    )
-    return result
+    """Cruza el resumen de ventana con la referencia sellada y declara ``evidenceDrift``."""
+    if reference is None:
+        return {"source": None, "note": "no se cruzó contra un artefacto longitudinal"}
+    if not reference.get("available"):
+        return {
+            "source": reference.get("source"),
+            "available": False,
+            "note": reference.get("note") or "referencia no disponible",
+        }
+    expected = reference.get("reference") or {}
+    keys = ("expectancyR", "hitRate", "measuredCycles", "verdict", "evidenceQuality")
+    comparison = {
+        key: {"reference": expected.get(key), "current": current.get(key)}
+        for key in keys
+    }
+    drift = [
+        key
+        for key, row in comparison.items()
+        if row["reference"] != row["current"]
+    ]
+    return {
+        "source": reference.get("source"),
+        "available": True,
+        "comparison": comparison,
+        "evidenceDrift": bool(drift),
+        "driftedKeys": drift,
+        "note": (
+            "la BD local puede haber sincronizado barras después del sello: un drift se declara, "
+            "no se corrige"
+        ),
+    }
 
 
 async def _run(args: argparse.Namespace) -> dict[str, Any]:
     from dotenv import load_dotenv
 
     load_dotenv(_DOTENV, override=False)
-    from bolsa_application.dia_d_longitudinal import (
+    from bolsa_application.dia_d_attribution import (
         DEFAULT_LIMITS,
-        build_dia_d_longitudinal_artifact,
-        excursions,
+        build_dia_d_attribution_artifact,
     )
+    from bolsa_application.dia_d_longitudinal import excursions, longest_operable_run
     from bolsa_application.replay_oos import census_operable_days
     from bolsa_application.universe_point_in_time import universe_ids
     from bolsa_application.universe_point_in_time_catalog import CatalogPointInTimeUniverse
@@ -157,8 +149,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     from bolsa_infrastructure.database.migrations import ensure_migrated
     from bolsa_infrastructure.database.session import create_engine, create_session_factory
 
-    v89 = _load_v89()
-    v86 = v89._load_v86()  # noqa: SLF001 — MISMO harness.
+    v91 = _load_v91()
+    v89 = v91._load_v89()  # noqa: SLF001 — MISMO harness.
+    v86 = v89._load_v86()  # noqa: SLF001
     v87 = v89._load_v87()  # noqa: SLF001
 
     get_settings.cache_clear()
@@ -172,8 +165,6 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         universe_coverage: dict[str, Any] | None = None
         watch = explicit_watch
         if not watch and str(args.universe) == "pit":
-            # D35-01: fuente point-in-time REAL (disponibilidad desde barras) + aproximaciones
-            # DECLARADAS. Fail-closed: sin miembros NO se cae al catálogo actual.
             provider = await CatalogPointInTimeUniverse.load(
                 factory,
                 min_bars=int(args.min_bars),
@@ -208,17 +199,13 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         if not days:
             raise RuntimeError("no hay barras D1 para simular")
 
-        d0_index, d1_index = _resolve_window(args, days)
+        d0_index, d1_index = v91._resolve_window(args, days)  # noqa: SLF001
         census = census_operable_days(bars_by_symbol, days)
         operable_flags = [row.entries_allowed_long for row in census.days]
         operable_days = sum(1 for flag in operable_flags[d0_index : d1_index + 1] if flag)
-        regime_counts: dict[str, int] = {}
-        for row in census.days[d0_index : d1_index + 1]:
-            key = str(row.aggregate or "sin_regimen")
-            regime_counts[key] = regime_counts.get(key, 0) + 1
         sectors = await v86._load_sectors(factory, watch)  # noqa: SLF001
 
-        replay = await _run_pass(
+        replay = await v91._run_pass(  # noqa: SLF001 — harness hermético compartido.
             v87=v87,
             args=args,
             watch=watch,
@@ -234,8 +221,6 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         horizon = replay.get("horizon") or {}
         fallback: dict[str, Any] | None = None
         if horizon.get("truncationReason") and bool(args.fallback):
-            from bolsa_application.dia_d_longitudinal import longest_operable_run
-
             run = longest_operable_run(operable_flags, start_index=d0_index, end_index=d1_index)
             if run is not None and run != (d0_index, d1_index):
                 logger.warning(
@@ -244,7 +229,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                     days[run[0]],
                     days[run[1]],
                 )
-                effective = await _run_pass(
+                effective = await v91._run_pass(  # noqa: SLF001
                     v87=v87,
                     args=args,
                     watch=watch,
@@ -276,19 +261,13 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             raise RuntimeError("el replay no alcanzó ningún día de la ventana pedida")
         window_set = set(window_days)
         round_trips = [
-            row
+            dict(row)
             for row in score.get("roundTrips", [])
             if str(row.get("entryDay") or "") in window_set
         ]
-        open_positions = [
-            row
-            for row in score.get("openPositions", [])
-            if str(row.get("entryDay") or "") in window_set
-        ]
-        unmeasured = [
-            gap for gap in score.get("unmeasured", []) if str(gap).split(":", 1)[0] in window_set
-        ]
         excursion_rows = excursions(bars_by_symbol=bars_by_symbol, round_trips=round_trips)
+        regime_by_day = {row.day: row.aggregate for row in census.days if row.day in window_set}
+        operable_days = sum(1 for flag in operable_flags[d0_index : d1_index + 1] if flag)
 
         probe = {
             "requestedFrom": window_from if fallback is None else fallback["requestedFrom"],
@@ -300,6 +279,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             "cyclesMeasured": len(round_trips),
             "truncationReason": horizon.get("truncationReason"),
             "horizon": horizon,
+            "windowFallback": fallback,
         }
 
         limits = list(DEFAULT_LIMITS)
@@ -313,40 +293,42 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 "La corrida larga truncó; la ventana efectiva es el tramo operable declarado en probe/windowFallback."
             )
 
-        artifact = build_dia_d_longitudinal_artifact(
+        artifact = build_dia_d_attribution_artifact(
             window_from=fallback["requestedFrom"] if fallback else window_from,
             window_to=fallback["requestedTo"] if fallback else window_to,
             days=window_days,
             operable_days=operable_days,
             round_trips=round_trips,
-            open_positions=open_positions,
-            unmeasured=unmeasured,
             excursions_rows=excursion_rows,
-            regime_counts=regime_counts,
+            regime_by_day=regime_by_day,
+            sector_by_symbol=sectors,
             watch=watch,
             watch_source=watch_source,
             universe_coverage=universe_coverage,
-            probe={**probe, "windowFallback": fallback},
+            probe=probe,
             meta={
                 "bump": "2.11.39-beta",
-                "phase": "V2.91 DIA-D AUTO LONGITUDINAL",
+                "phase": "V2.92 DIA-D AUTO ATTRIBUTION",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
                 "versionA": str(args.version_a),
                 "venue": str(args.venue),
                 "historyDays": int(args.history_days),
                 "horizonDays": int(args.horizon_days),
+                "topK": int(args.attribution_top_k),
+                "pitHistorical": bool(args.pit_historical),
                 "replayStart": replay.get("startDay"),
                 "replayEnd": replay.get("endDay"),
                 "replayTicks": replay.get("ticks"),
-                "bucketPeriod": str(args.bucket),
                 "realPriceForcedOff": True,
             },
-            bucket_period=str(args.bucket),
+            top_k=int(args.attribution_top_k),
             limits=limits,
         )
         artifact["window"]["effectiveFrom"] = replay.get("startDay") or window_from
         artifact["window"]["effectiveTo"] = replay.get("endDay") or window_to
+        reference = _load_cross_check(args.check_against)
+        artifact["crossCheck"] = _cross_check_summary(reference, current=artifact["summary"])
         return artifact
     finally:
         await engine.dispose()
@@ -360,7 +342,8 @@ def _fmt(value: Any, spec: str = "+.3f") -> str:
 def _print_text(artifact: dict[str, Any]) -> None:
     window = artifact["window"]
     summary = artifact["summary"]
-    print(f"DÍA-D AUTO · LONGITUDINAL OOS · {window['from']}..{window['to']}")
+    decomposition = artifact["decomposition"]
+    print(f"DÍA-D AUTO · ATRIBUCIÓN OOS · {window['from']}..{window['to']}")
     print("=" * 72)
     print(f"veredicto                 {summary['verdict']} ({summary['verdictReason']})")
     print(f"calidad de evidencia      {summary['evidenceQuality']}")
@@ -368,17 +351,36 @@ def _print_text(artifact: dict[str, Any]) -> None:
         f"expectativa               {_fmt(summary['expectancyR'], '+.4f')} R/ciclo · "
         f"hit {_fmt(summary['hitRate'], '.2f')} · ciclos {summary['measuredCycles']}"
     )
-    stability = artifact["stability"]
     print(
-        f"estabilidad ({stability['bucketPeriod']})   cubos={stability['measuredBuckets']} "
-        f"+{stability['positiveBuckets']} −{stability['negativeBuckets']} · "
-        f"min {_fmt(stability['minExpectancyR'])} · max {_fmt(stability['maxExpectancyR'])}"
+        f"payoff                    win={_fmt(decomposition['avgWinR'])} "
+        f"loss={_fmt(decomposition['avgLossR'])} ratio={_fmt(decomposition['payoffRatio'], '.2f')} "
+        f"gap={_fmt(decomposition['identityGap'], '.2e')}"
     )
-    excursion = artifact["excursions"]
+    concentration = artifact["concentration"]
     print(
-        f"MAE/MFE                   medidos={excursion['measured']} n/d={excursion['unmeasured']} · "
-        f"MAE medio {_fmt(excursion['meanMaeR'])} · MFE medio {_fmt(excursion['meanMfeR'])}"
+        f"concentración             {concentration['classification']} "
+        f"(peor {_fmt(concentration['worstContributionR'])} · "
+        f"sin el peor {_fmt(concentration['expectancyWithoutWorstR'])})"
     )
+    capture = artifact["capture"]
+    print(
+        f"excursión                 captura mediana {_fmt(capture['medianCapture'], '.2f')} "
+        f"(media {_fmt(capture['meanCapture'], '.2f')}) · "
+        f"en la mesa {_fmt(capture['meanLeftOnTableR'])} R · vueltas {capture['reversedCount']}"
+    )
+    print()
+    for key, title in (
+        ("byRegime", "RÉGIMEN"),
+        ("byStrategy", "ESTRATEGIA"),
+        ("bySector", "SECTOR"),
+    ):
+        print(f"{title:<12} ETIQUETA                      R medio     hit      n")
+        print("-" * 72)
+        for row in artifact[key]:
+            print(
+                f"{'':<12} {row['label']:<28} {_fmt(row['expectancyR']):>8} "
+                f"{_fmt(row['hitRate'], '.2f'):>5} {row['cycles']:>5}"
+            )
     if artifact.get("limits"):
         print()
         print("LÍMITES DECLARADOS")
@@ -414,10 +416,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
-        "--history-days",
-        type=int,
-        default=_DEFAULT_HISTORY_DAYS,
-        help="días previos a D0 simulados",
+        "--history-days", type=int, default=_DEFAULT_HISTORY_DAYS, help="días previos a D0 simulados"
     )
     parser.add_argument(
         "--horizon-days",
@@ -425,20 +424,16 @@ def main(argv: list[str] | None = None) -> int:
         default=_DEFAULT_HORIZON_DAYS,
         help="días posteriores a D1 simulados",
     )
+    parser.add_argument("--edge", type=float, default=_DEFAULT_EDGE, help="valor declarado del seam de edge")
     parser.add_argument(
-        "--edge", type=float, default=_DEFAULT_EDGE, help="valor declarado del seam de edge"
+        "--attribution-top-k", type=int, default=5, help="mejores/peores ciclos de la concentración"
     )
     parser.add_argument(
-        "--account-id", default=_DEFAULT_ACCOUNT, help="cuenta de la ventana (etiqueta)"
+        "--check-against", default=None, help="artefacto longitudinal v2_91 para cruzar el resumen"
     )
+    parser.add_argument("--account-id", default=_DEFAULT_ACCOUNT, help="cuenta de la ventana (etiqueta)")
     parser.add_argument("--version-a", default=_DEFAULT_VERSION_A, help="versión A de la ventana")
     parser.add_argument("--venue", default="paper", choices=("paper", "simulated"))
-    parser.add_argument(
-        "--bucket",
-        default="month",
-        choices=("year", "quarter", "month"),
-        help="cubo de estabilidad",
-    )
     parser.add_argument(
         "--fallback",
         action=argparse.BooleanOptionalAction,
@@ -452,6 +447,9 @@ def main(argv: list[str] | None = None) -> int:
     if int(args.watch_size) <= 0 or int(args.min_bars) <= 0:
         print("# uso incorrecto: --watch-size y --min-bars deben ser > 0", file=sys.stderr)
         return 1
+    if int(args.attribution_top_k) < 1:
+        print("# uso incorrecto: --attribution-top-k debe ser >= 1", file=sys.stderr)
+        return 1
     if int(args.history_days) < 1 or int(args.horizon_days) < 0:
         print("# uso incorrecto: --history-days >= 1 y --horizon-days >= 0", file=sys.stderr)
         return 1
@@ -464,14 +462,14 @@ def main(argv: list[str] | None = None) -> int:
         artifact = asyncio.run(_run(args))
     except Exception as error:  # noqa: BLE001 — sin PG/mercado no hay evidencia: se DECLARA.
         print(
-            f"# BLOQUEADO: no se pudo construir el estudio longitudinal ({type(error).__name__}: {error})",
+            f"# BLOQUEADO: no se pudo construir la atribución ({type(error).__name__}: {error})",
             file=sys.stderr,
         )
         return 2
 
     payload = json.dumps(artifact, indent=2, sort_keys=True, ensure_ascii=False, default=str)
     window = artifact["window"]
-    default_name = f"longitudinal-{window['from']}_{window['to']}.json"
+    default_name = f"attribution-{window['from']}_{window['to']}.json"
     out_path = pathlib.Path(args.out) if args.out else _REPO_ROOT / _OUT_SUBDIR / default_name
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(payload + "\n", encoding="utf-8")
