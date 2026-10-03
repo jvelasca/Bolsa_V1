@@ -15,6 +15,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 _SCRIPTS = {
     "v2_89": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_89_dia_d_auto_replay.py",
     "v2_90": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_90_dia_d_feedback.py",
+    "v2_91": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_91_dia_d_longitudinal.py",
 }
 _BUMP_RE = re.compile(r'"bump"\s*:\s*"([^"]+)"')
 

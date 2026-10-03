@@ -117,7 +117,70 @@ def test_members_and_ids_are_deterministic_sorted_and_deduplicated() -> None:
 def test_coverage_declares_real_and_declared_provenance() -> None:
     coverage = _universe().coverage()
     assert coverage["provider"] == "CatalogPointInTimeUniverse"
+    assert coverage["historicalMode"] is False
     assert coverage["provenance"]["availability_from"].startswith("REAL")
     assert coverage["provenance"]["active_from"].startswith("DECLARADO")
     assert coverage["provenance"]["sector_at"].startswith("DECLARADO")
     assert coverage["instrumentsConsidered"] == 3
+
+
+def _historical_universe(*, historical: bool, min_bars: int = 60) -> CatalogPointInTimeUniverse:
+    """Caso D35: barras antiguas pero alta en catálogo reciente (``created_at`` posterior)."""
+    return CatalogPointInTimeUniverse.from_catalog_rows(
+        [
+            _bars("AAA", date(2018, 1, 2), date(2025, 12, 31)),
+            _bars("LATE", date(2012, 1, 3), date(2025, 12, 31)),
+        ],
+        [
+            ("AAA", "Tech", True, date(2025, 6, 1)),
+            ("LATE", "Energy", True, date(2026, 1, 2)),
+        ],
+        min_bars=min_bars,
+        historical=historical,
+    )
+
+
+def test_default_mode_floor_is_created_at_and_blocks_history_before_catalog() -> None:
+    universe = _historical_universe(historical=False)
+    # 2022 es anterior al alta en catálogo (2025/2026) ⇒ ningún elegible: el bloqueo original.
+    assert universe.ids("2022-06-30") == []
+    coverage = universe.coverage()
+    assert coverage["historicalMode"] is False
+    assert coverage["provenance"]["active_from"].startswith("DECLARADO: instruments.created_at")
+
+
+def test_historical_mode_uses_real_bar_availability_as_floor() -> None:
+    universe = _historical_universe(historical=True)
+    # 2022 es posterior a la primera barra REAL ⇒ elegible, sin inventar disponibilidad.
+    assert universe.ids("2022-06-30") == ["AAA", "LATE"]
+    members = {m.instrument_id: m for m in universe.members("2022-06-30")}
+    assert members["LATE"].active_from == "2012-01-03"  # suelo REAL, no created_at (2026)
+    assert members["LATE"].availability_from == "2012-01-03"
+    assert members["AAA"].active_from == "2018-01-02"
+    # ``active_until`` (cota de baja) NO cambia con el modo: sigue siendo la declarada.
+    assert members["AAA"].active_until is None
+
+
+def test_historical_mode_does_not_relax_the_upper_bound() -> None:
+    """El modo histórico corrige el suelo, no el techo: un delistado sigue cerrando."""
+    universe = CatalogPointInTimeUniverse.from_catalog_rows(
+        [_bars("OLD", date(2015, 1, 5), date(2023, 5, 31))],
+        [("OLD", "Tech", False, date(2026, 1, 2))],
+        min_bars=1,
+        historical=True,
+    )
+    assert universe.ids("2022-06-30") == ["OLD"]  # histórico accesible dentro de barras
+    assert universe.ids("2023-06-01") == []  # pero la baja declarada sigue cerrando
+
+
+def test_historical_mode_is_declared_in_coverage_provenance() -> None:
+    coverage = _historical_universe(historical=True).coverage()
+    assert coverage["historicalMode"] is True
+    assert coverage["provenance"]["active_from"].startswith("DECLARADO (modo histórico)")
+    assert coverage["provenance"]["availability_from"].startswith("REAL")
+
+
+def test_historical_mode_is_deterministic() -> None:
+    first = _historical_universe(historical=True).ids("2022-06-30")
+    second = _historical_universe(historical=True).ids("2022-06-30")
+    assert first == second == ["AAA", "LATE"]

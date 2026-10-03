@@ -49,6 +49,15 @@ _PROVENANCE: dict[str, str] = {
     "sector_at": "DECLARADO: instruments.sector actual (no point-in-time).",
 }
 
+#: Procedencia declarada de ``active_from`` en MODO HISTÓRICO (``historical=True``): el suelo
+#: de elegibilidad pasa a ser la disponibilidad REAL de barras, porque ``created_at`` es el
+#: alta en el catálogo (reciente) y NO una fecha de listado: usarlo como suelo haría
+#: inaccesible toda la historia anterior a la creación del catálogo.
+_HISTORICAL_ACTIVE_FROM = (
+    "DECLARADO (modo histórico): availability_from REAL (primera barra D1). El alta en el "
+    "catálogo (instruments.created_at) NO es fecha de listado y se declara aparte."
+)
+
 
 def _day(value: Any) -> str | None:
     """Día ``YYYY-MM-DD`` de un ``datetime``/``date``/texto legible, o ``None`` (no se adivina)."""
@@ -77,6 +86,7 @@ class CatalogPointInTimeUniverse:
     _excluded_insufficient_bars: int = 0
     _excluded_no_sector: int = 0
     _instruments_considered: int = 0
+    _historical: bool = False
 
     # ── Construcción ─────────────────────────────────────────────────────────
 
@@ -89,6 +99,7 @@ class CatalogPointInTimeUniverse:
         excluded_insufficient_bars: int = 0,
         excluded_no_sector: int = 0,
         instruments_considered: int | None = None,
+        historical: bool = False,
     ) -> CatalogPointInTimeUniverse:
         """Construye el universo con miembros ya calculados (sin BD; determinista)."""
         materialized = tuple(members)
@@ -100,6 +111,7 @@ class CatalogPointInTimeUniverse:
             _instruments_considered=(
                 len(materialized) if instruments_considered is None else int(instruments_considered)
             ),
+            _historical=bool(historical),
         )
 
     @classmethod
@@ -109,12 +121,15 @@ class CatalogPointInTimeUniverse:
         *,
         min_bars: int = 60,
         require_sector: bool = False,
+        historical: bool = False,
     ) -> CatalogPointInTimeUniverse:
         """Materializa el universo desde ``ohlcv_bars`` + ``instruments`` (read-only).
 
         ``min_bars`` exige un mínimo de barras D1 para considerar al instrumento medible
         (ATR/régimen); los instrumentos con menos se declaran excluidos, nunca se inventan
         barras. ``require_sector`` descarta además a los que no tienen sector en el catálogo.
+        ``historical`` (modo histórico) usa la disponibilidad REAL de barras como suelo de
+        elegibilidad en vez de ``created_at`` (ver ``from_catalog_rows``).
         """
         from sqlalchemy import func, select
 
@@ -148,7 +163,11 @@ class CatalogPointInTimeUniverse:
             ).all()
 
         return cls.from_catalog_rows(
-            bar_rows, instrument_rows, min_bars=min_bars, require_sector=require_sector
+            bar_rows,
+            instrument_rows,
+            min_bars=min_bars,
+            require_sector=require_sector,
+            historical=historical,
         )
 
     @classmethod
@@ -159,12 +178,19 @@ class CatalogPointInTimeUniverse:
         *,
         min_bars: int = 60,
         require_sector: bool = False,
+        historical: bool = False,
     ) -> CatalogPointInTimeUniverse:
         """Traduce las filas crudas de ``ohlcv_bars``/``instruments`` a ``UniverseMember``.
 
         Puro y determinista (sin BD): ``bar_rows`` = ``(instrument_id, min_ts, max_ts, count)``;
         ``instrument_rows`` = ``(id, sector, is_active, created_at)``. Aplica la procedencia
         real-vs-declarada descrita en el módulo y el predicado fail-closed del contrato.
+
+        ``historical`` (modo histórico): el suelo de elegibilidad ``active_from`` sale de la
+        disponibilidad REAL de barras (``availability_from``), no de ``created_at``. Éste es el
+        alta en el catálogo (reciente) y NO una fecha de listado: usarlo como suelo haría
+        inaccesible toda la historia anterior a la creación del catálogo. La cota SUPERIOR
+        (``active_until``, baja/delistado) NO cambia: es la que corrige el survivorship.
         """
         floor = max(0, int(min_bars))
         instruments = {
@@ -201,10 +227,12 @@ class CatalogPointInTimeUniverse:
             availability_until = _day(bars[1])
             # ``active_until``: abierto si sigue activo; cota declarada (última barra) si no.
             active_until = None if bool(meta["is_active"]) else availability_until
+            # Suelo de elegibilidad: REAL (barras) en modo histórico; si no, alta en catálogo.
+            active_from = availability_from if historical else _day(meta["created_at"])
             members.append(
                 UniverseMember(
                     instrument_id=instrument_id,
-                    active_from=_day(meta["created_at"]),
+                    active_from=active_from,
                     active_until=active_until,
                     availability_from=availability_from,
                     availability_until=availability_until,
@@ -219,6 +247,7 @@ class CatalogPointInTimeUniverse:
             _excluded_insufficient_bars=excluded_insufficient,
             _excluded_no_sector=excluded_no_sector,
             _instruments_considered=len(instruments),
+            _historical=bool(historical),
         )
 
     # ── Protocolo ``PointInTimeUniverse`` ────────────────────────────────────
@@ -240,9 +269,13 @@ class CatalogPointInTimeUniverse:
 
     def coverage(self) -> dict[str, Any]:
         """Procedencia y cobertura: qué es REAL, qué es DECLARADO y cuánto se excluyó."""
+        provenance = dict(_PROVENANCE)
+        if self._historical:
+            provenance["active_from"] = _HISTORICAL_ACTIVE_FROM
         return {
             "provider": "CatalogPointInTimeUniverse",
-            "provenance": dict(_PROVENANCE),
+            "historicalMode": self._historical,
+            "provenance": provenance,
             "instrumentsConsidered": self._instruments_considered,
             "membersMaterialized": len(self._members),
             "excludedNoBars": self._excluded_no_bars,
