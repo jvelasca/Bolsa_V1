@@ -36,6 +36,7 @@ import asyncio
 import importlib.util
 import json
 import logging
+import math
 import os
 import pathlib
 import sys
@@ -95,6 +96,35 @@ def _load_cross_check(path: str | None) -> dict[str, Any] | None:
     return {"source": str(target), "available": True, "reference": payload.get("summary") or {}}
 
 
+#: Claves del cross-check que son floats: se comparan con tolerancia, no por igualdad exacta.
+_FLOAT_DRIFT_KEYS = frozenset({"expectancyR", "hitRate"})
+#: Tolerancia relativa/absoluta del cross-check de floats (una diferencia material es DRIFT).
+_DRIFT_REL_TOL = 1e-12
+_DRIFT_ABS_TOL = 1e-12
+
+
+def _numbers_close(reference: Any, current: Any) -> bool:
+    """Compara dos valores como floats con tolerancia; si no son numéricos, igualdad exacta.
+
+    Un hueco (``None`` o texto) sólo coincide con su igual: si la referencia no es numérica NO se
+    declara drift por una resta imposible. Evita que ``-0.5011`` y ``-0.5011000000000001`` marquen
+    ``evidenceDrift`` sin diferencia material.
+    """
+    try:
+        ref = float(reference)
+        cur = float(current)
+    except (TypeError, ValueError):
+        return reference == current
+    return math.isclose(ref, cur, rel_tol=_DRIFT_REL_TOL, abs_tol=_DRIFT_ABS_TOL)
+
+
+def _summary_values_match(key: str, row: dict[str, Any]) -> bool:
+    """¿Coincide una clave del resumen con su referencia sellada? (float tolerante, resto exacto)."""
+    if key in _FLOAT_DRIFT_KEYS:
+        return _numbers_close(row.get("reference"), row.get("current"))
+    return row.get("reference") == row.get("current")
+
+
 def _cross_check_summary(
     reference: dict[str, Any] | None,
     *,
@@ -115,11 +145,7 @@ def _cross_check_summary(
         key: {"reference": expected.get(key), "current": current.get(key)}
         for key in keys
     }
-    drift = [
-        key
-        for key, row in comparison.items()
-        if row["reference"] != row["current"]
-    ]
+    drift = [key for key in keys if not _summary_values_match(key, comparison[key])]
     return {
         "source": reference.get("source"),
         "available": True,
@@ -307,7 +333,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             universe_coverage=universe_coverage,
             probe=probe,
             meta={
-                "bump": "2.11.39-beta",
+                "bump": "2.11.40-beta",
                 "phase": "V2.92 DIA-D AUTO ATTRIBUTION",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
@@ -364,9 +390,24 @@ def _print_text(artifact: dict[str, Any]) -> None:
     )
     capture = artifact["capture"]
     print(
-        f"excursión                 captura mediana {_fmt(capture['medianCapture'], '.2f')} "
-        f"(media {_fmt(capture['meanCapture'], '.2f')}) · "
-        f"en la mesa {_fmt(capture['meanLeftOnTableR'])} R · vueltas {capture['reversedCount']}"
+        f"excursión                 captura mediana {_fmt(capture['captureRatio']['median'], '.2f')} "
+        f"(media {_fmt(capture['captureRatio']['mean'], '.2f')} · máx {_fmt(capture['captureRatio']['max'], '.2f')} "
+        f"· >1 {capture['captureRatio']['aboveOneCount']})"
+    )
+    print(
+        f"                          capturado {_fmt(capture['capturedR']['mean'])} R · "
+        f"en la mesa {_fmt(capture['leftOnTableR']['mean'])} R · vueltas {capture['reversedCount']}"
+    )
+    severity = artifact["maeSeverity"]["populations"]
+
+    def _breach(population: str) -> str:
+        row = severity[population]
+        breach = row["breaches"]["-1.00"]
+        return f"{_fmt(breach['share'], '.2f')} ({breach['count']}/{row['cycles']})"
+
+    print(
+        f"                          MAE < -1R  todos {_breach('ALL')} · "
+        f"ganadores {_breach('WINNERS')} · perdedores {_breach('LOSERS')}"
     )
     print()
     for key, title in (

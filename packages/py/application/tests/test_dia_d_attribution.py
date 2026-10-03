@@ -6,8 +6,10 @@ Invariantes que se fijan aquí:
   (1 − winRate)·avgLossR`` (residuo ``identityGap`` ~ 0); sin muestra, todo extremo es ``None``.
 * La atribución es determinista y fail-closed: una etiqueta ausente cae en su cubo declarado
   ``sin_*``; un cubo sin ciclos medibles no aparece.
-* La captura de MFE sólo existe con premio positivo medible; sin él, es un hueco declarado.
-* La severidad de MAE publica recuento y fracción por umbral; sin muestra, la fracción es ``None``.
+* La captura de MFE sólo existe con premio positivo medible; se define sobre ``max(realizedR,0)``
+  (nunca negativa), declara ``captureRatio > 1`` aparte y mide el premio dejado en la mesa.
+* La severidad de MAE se publica por POBLACIÓN (ALL/WINNERS/LOSERS); sin muestra, la fracción es
+  ``None``. La fracción de TODOS los ciclos con MAE ``< -1R`` NO es la de perdedores.
 * La concentración clasifica ``concentrated`` cuando retirar el peor ciclo voltea el signo.
 * El artefacto es determinista, reutiliza el veredicto/`evidenceQuality` de ``dia_d_auto_feedback``
   y declara sus límites.
@@ -183,38 +185,115 @@ def test_capture_study_measures_and_flags_reversals():
     out = capture_study(trips, excursions_by_cycle=index_excursions(rows))
     assert out["measuredCycles"] == 2
     assert out["notMeasuredCycles"] == 1
-    assert out["meanCapture"] == pytest.approx((0.25 + (-0.5 / 1.5)) / 2)
-    assert out["meanLeftOnTableR"] == pytest.approx((1.5 + 2.0) / 2)
+    # AAA captura 0.5/2.0; BBB cierra en pérdida ⇒ captura 0 (NO -0.333) y deja el premio entero.
+    assert out["captureRatio"]["mean"] == pytest.approx(0.125)
+    assert out["captureRatio"]["median"] == pytest.approx(0.125)
+    assert out["captureRatio"]["max"] == pytest.approx(0.25)
+    assert out["captureRatio"]["aboveOneCount"] == 0
+    assert out["capturedR"]["mean"] == pytest.approx(0.25)
+    assert out["leftOnTableR"]["mean"] == pytest.approx(1.5)
     assert out["reversedCount"] == 1  # BBB llegó a +1.5R y cerró en -0.5R
+
+
+def test_capture_study_never_negative_and_declares_above_one():
+    trips = [
+        _trip(symbol="AAA", entry_day="2022-01-05", exit_day="2022-01-06", realized_r=-0.5),
+        _trip(symbol="BBB", entry_day="2022-01-05", exit_day="2022-01-06", realized_r=3.0),
+    ]
+    rows = [
+        # MFE diminuto con cierre en pérdida: antes explotaba a -500; ahora es captura 0.
+        _exc(symbol="AAA", entry_day="2022-01-05", exit_day="2022-01-06", mae_r=-0.5, mfe_r=0.001),
+        # Cierre por encima del MFE medido: ratio 1.5, se declara en aboveOneCount (no se recorta).
+        _exc(symbol="BBB", entry_day="2022-01-05", exit_day="2022-01-06", mae_r=-0.1, mfe_r=2.0),
+    ]
+    out = capture_study(trips, excursions_by_cycle=index_excursions(rows))
+    assert out["measuredCycles"] == 2
+    assert out["captureRatio"]["mean"] == pytest.approx(0.75)
+    assert out["captureRatio"]["max"] == pytest.approx(1.5)
+    assert out["captureRatio"]["aboveOneCount"] == 1
+    assert out["capturedR"]["mean"] == pytest.approx(1.5)
+    assert out["leftOnTableR"]["mean"] == pytest.approx(0.0005)  # (0.001 + 0.0) / 2
+
+
+def test_capture_study_winner_and_loser_with_positive_mfe():
+    trips = [
+        _trip(symbol="AAA", entry_day="2022-01-05", exit_day="2022-01-06", realized_r=2.0),
+        _trip(symbol="BBB", entry_day="2022-01-05", exit_day="2022-01-06", realized_r=-1.0),
+    ]
+    rows = [
+        _exc(symbol="AAA", entry_day="2022-01-05", exit_day="2022-01-06", mae_r=-0.3, mfe_r=3.0),
+        _exc(symbol="BBB", entry_day="2022-01-05", exit_day="2022-01-06", mae_r=-1.2, mfe_r=2.0),
+    ]
+    out = capture_study(trips, excursions_by_cycle=index_excursions(rows))
+    assert out["captureRatio"]["mean"] == pytest.approx((2 / 3 + 0.0) / 2)
+    assert out["capturedR"]["mean"] == pytest.approx(1.0)
+    assert out["leftOnTableR"]["mean"] == pytest.approx((1.0 + 2.0) / 2)
+    assert out["reversedCount"] == 1
 
 
 def test_capture_study_empty_declares_none():
     out = capture_study([])
     assert out["measuredCycles"] == 0
-    assert out["meanCapture"] is None and out["medianCapture"] is None
-    assert out["meanLeftOnTableR"] is None
+    assert out["captureRatio"]["mean"] is None and out["captureRatio"]["median"] is None
+    assert out["captureRatio"]["max"] is None
+    assert out["capturedR"]["mean"] is None
+    assert out["leftOnTableR"]["mean"] is None
     assert out["reversedCount"] == 0
 
 
-def test_mae_severity_thresholds_and_empty():
-    rows = [
-        _exc(symbol="AAA", mae_r=-0.5, mfe_r=1.0),
-        _exc(symbol="BBB", mae_r=-1.2, mfe_r=1.0),
-        _exc(symbol="CCC", mae_r=-1.6, mfe_r=1.0),
+def test_mae_severity_populations_split_winners_and_losers():
+    # W1 es GANADOR pero con MAE -1.6R: cuenta en WINNERS, no sólo en "perdedores".
+    trips = [
+        _trip(symbol="W1", entry_day="2022-01-05", exit_day="2022-01-06", realized_r=2.0),
+        _trip(symbol="W2", entry_day="2022-01-05", exit_day="2022-01-06", realized_r=1.0),
+        _trip(symbol="L1", entry_day="2022-01-07", exit_day="2022-01-08", realized_r=-1.0),
+        _trip(symbol="L2", entry_day="2022-01-07", exit_day="2022-01-08", realized_r=-2.0),
+        _trip(symbol="L3", entry_day="2022-01-07", exit_day="2022-01-08", realized_r=-1.0),
     ]
-    out = mae_severity(rows)
-    assert out["measured"] == 3
-    assert out["minMaeR"] == pytest.approx(-1.6)
-    assert out["breaches"]["-1.00"]["count"] == 2
-    assert out["breaches"]["-1.00"]["share"] == pytest.approx(2 / 3)
-    assert out["breaches"]["-1.25"]["count"] == 1
-    assert out["breaches"]["-1.50"]["count"] == 1
+    rows = [
+        _exc(symbol="W1", entry_day="2022-01-05", exit_day="2022-01-06", mae_r=-1.6, mfe_r=1.0),
+        _exc(symbol="W2", entry_day="2022-01-05", exit_day="2022-01-06", mae_r=-0.5, mfe_r=1.0),
+        _exc(symbol="L1", entry_day="2022-01-07", exit_day="2022-01-08", mae_r=-1.2, mfe_r=1.0),
+        _exc(symbol="L2", entry_day="2022-01-07", exit_day="2022-01-08", mae_r=-0.3, mfe_r=1.0),
+        _exc(symbol="L3", entry_day="2022-01-07", exit_day="2022-01-08", mae_r=-0.9, mfe_r=1.0),
+    ]
+    populations = mae_severity(trips, excursions_by_cycle=index_excursions(rows))["populations"]
 
-    empty = mae_severity([])
-    assert empty["measured"] == 0
-    assert empty["meanMaeR"] is None
-    assert empty["breaches"]["-1.00"]["count"] == 0
-    assert empty["breaches"]["-1.00"]["share"] is None
+    assert populations["ALL"]["cycles"] == 5
+    assert populations["ALL"]["breaches"]["-1.00"]["count"] == 2
+    assert populations["ALL"]["breaches"]["-1.00"]["share"] == pytest.approx(2 / 5)
+    assert populations["ALL"]["breaches"]["-1.25"]["count"] == 1
+    assert populations["ALL"]["breaches"]["-1.50"]["count"] == 1
+    assert populations["ALL"]["minMaeR"] == pytest.approx(-1.6)
+
+    assert populations["WINNERS"]["cycles"] == 2
+    assert populations["WINNERS"]["breaches"]["-1.00"]["count"] == 1
+    assert populations["WINNERS"]["breaches"]["-1.00"]["share"] == pytest.approx(0.5)
+
+    assert populations["LOSERS"]["cycles"] == 3
+    assert populations["LOSERS"]["breaches"]["-1.00"]["count"] == 1
+    assert populations["LOSERS"]["breaches"]["-1.00"]["share"] == pytest.approx(1 / 3)
+    assert populations["LOSERS"]["breaches"]["-1.25"]["count"] == 0
+    assert populations["LOSERS"]["minMaeR"] == pytest.approx(-1.2)
+
+
+def test_mae_severity_mae_without_realized_stays_in_all_only():
+    trips = [_trip(symbol="AAA", entry_day="2022-01-05", exit_day="2022-01-06", realized_r=None)]
+    rows = [_exc(symbol="AAA", entry_day="2022-01-05", exit_day="2022-01-06", mae_r=-1.5, mfe_r=1.0)]
+    populations = mae_severity(trips, excursions_by_cycle=index_excursions(rows))["populations"]
+    assert populations["ALL"]["cycles"] == 1 and populations["ALL"]["breaches"]["-1.00"]["count"] == 1
+    assert populations["WINNERS"]["cycles"] == 0
+    assert populations["LOSERS"]["cycles"] == 0
+
+
+def test_mae_severity_empty_declares_none():
+    populations = mae_severity([])["populations"]
+    assert populations["ALL"]["cycles"] == 0
+    assert populations["ALL"]["meanMaeR"] is None
+    assert populations["ALL"]["minMaeR"] is None
+    assert populations["ALL"]["breaches"]["-1.00"]["count"] == 0
+    assert populations["ALL"]["breaches"]["-1.00"]["share"] is None
+    assert populations["WINNERS"]["cycles"] == 0 and populations["LOSERS"]["cycles"] == 0
 
 
 # ── Concentración ────────────────────────────────────────────────────────────────
@@ -281,8 +360,11 @@ def test_artifact_is_deterministic_and_declares_dimensions():
     assert artifact["basis"] == "entryDay"
     assert [row["label"] for row in artifact["byRegime"]] == ["trend_up"]
     assert [row["label"] for row in artifact["bySector"]] == ["tecnologia"]
-    assert artifact["capture"]["meanCapture"] == pytest.approx(0.5)
-    assert artifact["maeSeverity"]["meanMaeR"] == pytest.approx(-0.5)
+    assert artifact["capture"]["captureRatio"]["mean"] == pytest.approx(0.5)
+    assert artifact["capture"]["captureRatio"]["aboveOneCount"] == 0
+    assert artifact["maeSeverity"]["populations"]["ALL"]["meanMaeR"] == pytest.approx(-0.5)
+    assert artifact["maeSeverity"]["populations"]["WINNERS"]["cycles"] == 20
+    assert artifact["maeSeverity"]["populations"]["LOSERS"]["cycles"] == 0
     assert artifact["concentration"]["cycles"] == 20
     assert artifact["limits"]
 
@@ -301,5 +383,5 @@ def test_artifact_declares_missing_sector_and_gap_not_zero():
     )
     assert [row["label"] for row in artifact["bySector"]] == [SIN_SECTOR]
     assert artifact["capture"]["measuredCycles"] == 0
-    assert artifact["capture"]["meanCapture"] is None
-    assert artifact["maeSeverity"]["meanMaeR"] is None
+    assert artifact["capture"]["captureRatio"]["mean"] is None
+    assert artifact["maeSeverity"]["populations"]["ALL"]["meanMaeR"] is None

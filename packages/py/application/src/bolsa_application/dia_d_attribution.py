@@ -13,8 +13,9 @@ Descompone la esperanza de la MISMA muestra de ciclos por:
 * **estrategia** (``strategyVersion`` que el scorer congela en el ciclo);
 * **sector** (el del catálogo actual; declarado aproximado, no point-in-time);
 * **activo** (símbolo);
-* **excursión** — cuánto MFE favorable se dejó sobre la mesa (``capture``/``leftOnTable``) y
-  cuántos perdedores atravesaron el stop (MAE peor que ``-1R``);
+* **excursión** — cuánto del MFE favorable se capturó (``captureRatio`` sobre el resultado NO
+  negativo), cuánto se dejó sobre la mesa (``leftOnTableR``) y cuántas excursiones positivas se
+  dieron la vuelta; y la severidad del MAE por POBLACIÓN (ALL/WINNERS/LOSERS), no sólo agregada;
 * **concentración** — si el signo de la ventana depende de unos pocos ciclos.
 
 Reglas duras (heredadas, no se relajan)
@@ -42,7 +43,7 @@ from bolsa_application.dia_d_auto_feedback import build_value_scorecard
 from bolsa_application.dia_d_longitudinal import Excursion, excursions
 
 #: Versión del esquema del artefacto de atribución. Un cambio de forma la sube.
-SCHEMA_VERSION = "dia-d-attribution-v1"
+SCHEMA_VERSION = "dia-d-attribution-v2"
 
 #: Cubos declarados para una etiqueta ausente (nunca se adivina la dimensión).
 SIN_REGIMEN = "sin_regimen"
@@ -67,6 +68,10 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "regimen colapsa byRegime y NO se sobreinterpreta como multirregimen.",
     "El sector es el del catalogo ACTUAL (no point-in-time); su atribucion es aproximada y se declara.",
     "MAE/MFE son extremos ENTRE DIAS (barras D1); el dia de entrada puede incluir excursion previa al fill.",
+    "La captura es capturedR/MFE con capturedR=max(realizedR,0): vive en [0,+inf) y NO cambia de "
+    "signo; un ratio > 1 (cierre por encima del MFE medido, ruido D1 intrabar) se declara, no se recorta.",
+    "La severidad de MAE se publica por POBLACION (ALL/WINNERS/LOSERS): la fraccion de TODOS los "
+    "ciclos con MAE < -1R NO es la fraccion de PERDEDORES con MAE < -1R (un ganador puede sufrirla).",
     "CONFIRMED sigue reservado a evidencia PAPER y NO se emite al observar el replay.",
 )
 
@@ -309,16 +314,23 @@ def capture_study(
     excursions_by_cycle: Mapping[tuple[str, str, str], Any] | None = None,
     reversal_mfe_min_r: float = REVERSAL_MFE_MIN_R,
 ) -> dict[str, Any]:
-    """Cuánto premio favorable (MFE) se capturó y cuánto se dejó sobre la mesa.
+    """Cuánto del premio favorable (MFE) se capturó, cuánto se dejó en la mesa y cuántas
+    excursiones positivas se dieron la vuelta.
 
     Sólo entran ciclos con MFE positivo y medible (``mfeR > 0``): sin premio previo, la
-    "captura" no está definida y se declara hueco (``None``). ``reversedCount`` cuenta los
-    ciclos que llegaron a ``+reversal_mfe_min_r`` y aun así cerraron en ``<= 0`` (premio dado
-    la vuelta). Muestra vacía ⇒ medias ``None``.
+    "captura" no está definida y se declara hueco (``None``). La captura se define sobre el
+    resultado NO negativo (``capturedR = max(realizedR, 0)``): así el ratio ``capturedR / MFE``
+    vive en ``[0, +inf)`` y **no** puede ser negativo ni explotar por un MFE diminuto con cierre
+    en pérdida. Un ``captureRatio > 1`` (el cierre superó el extremo favorable medido: ruido D1
+    intrabar) **no** se recorta: se cuenta aparte en ``captureRatio.aboveOneCount``.
+    ``reversedCount`` cuenta los ciclos que llegaron a ``+reversal_mfe_min_r`` y aun así cerraron
+    en ``<= 0`` (premio dado la vuelta). Muestra vacía ⇒ medias ``None``.
     """
     indexed = excursions_by_cycle or {}
-    captures: list[float] = []
+    ratios: list[float] = []
+    captured: list[float] = []
     left_on_table: list[float] = []
+    above_one = 0
     reversed_count = 0
     measured = 0
     not_measured = 0
@@ -332,38 +344,40 @@ def capture_study(
             not_measured += 1
             continue
         measured += 1
-        captures.append(realized / mfe)
-        left_on_table.append(mfe - realized)
+        captured_r = max(realized, 0.0)
+        ratio = captured_r / mfe
+        ratios.append(ratio)
+        captured.append(captured_r)
+        left_on_table.append(max(mfe - captured_r, 0.0))
+        if ratio > 1.0:
+            above_one += 1
         if mfe >= reversal_mfe_min_r and realized <= 0.0:
             reversed_count += 1
     return {
         "measuredCycles": measured,
         "notMeasuredCycles": not_measured,
-        "meanCapture": _mean(captures),
-        "medianCapture": _median(captures),
-        "meanLeftOnTableR": _mean(left_on_table),
-        "medianLeftOnTableR": _median(left_on_table),
-        "reversedCount": reversed_count,
         "reversalMfeMinR": reversal_mfe_min_r,
+        "captureRatio": {
+            "mean": _mean(ratios),
+            "median": _median(ratios),
+            "max": max(ratios) if ratios else None,
+            "aboveOneCount": above_one,
+        },
+        "capturedR": {"mean": _mean(captured), "median": _median(captured)},
+        "leftOnTableR": {"mean": _mean(left_on_table), "median": _median(left_on_table)},
+        "reversedCount": reversed_count,
     }
 
 
-def mae_severity(
-    excursion_rows: Sequence[Excursion | Mapping[str, Any]],
-    *,
-    thresholds: Sequence[float] = STOP_BREACH_THRESHOLDS,
+def _population_breaches(
+    maes: Sequence[float],
+    thresholds: Sequence[float],
 ) -> dict[str, Any]:
-    """Cuántos perdedores atravesaron el stop (MAE peor que cada umbral, en R).
+    """Severidad de MAE de UNA población: ciclos medidos, media/mínimo y brechas por umbral.
 
-    Un MAE ``< -1R`` significa que la excursión adversa superó el riesgo declarado (stop no
-    respetado / gap). Se publica el recuento y la fracción por umbral; sin muestra medida, la
-    fracción es ``None`` (nunca ``0``). Los cubos de umbral son deterministas y ordenados.
+    La fracción es ``None`` sin muestra (nunca ``0``); los cubos de umbral son deterministas y
+    ordenados de mayor a menor (de ``-1R`` a ``-1.5R``).
     """
-    maes: list[float] = []
-    for row in excursion_rows or ():
-        mae = _excursion_field(row, "mae")
-        if mae is not None:
-            maes.append(mae)
     measured = len(maes)
     breaches: dict[str, dict[str, Any]] = {}
     for threshold in sorted(set(float(t) for t in thresholds), reverse=True):
@@ -375,10 +389,51 @@ def mae_severity(
             "share": (count / measured) if measured else None,
         }
     return {
-        "measured": measured,
+        "cycles": measured,
         "meanMaeR": _mean(maes),
         "minMaeR": min(maes) if maes else None,
         "breaches": breaches,
+    }
+
+
+def mae_severity(
+    round_trips: Sequence[Mapping[str, Any]],
+    *,
+    excursions_by_cycle: Mapping[tuple[str, str, str], Any] | None = None,
+    thresholds: Sequence[float] = STOP_BREACH_THRESHOLDS,
+) -> dict[str, Any]:
+    """Severidad del MAE por POBLACIÓN: TODOS los ciclos, GANADORES y PERDEDORES.
+
+    Un MAE ``< -1R`` significa que la excursión adversa superó el riesgo declarado (stop no
+    respetado / gap). La pregunta "¿qué fracción de los PERDEDORES atravesó el stop?" **no** es la
+    misma que "¿qué fracción de TODOS los ciclos lo hizo": un ganador puede sufrir una excursión
+    adversa peor que ``-1R`` y aun así cerrar en positivo. Por eso se publican tres poblaciones con
+    la MISMA partición que ``payoff_decomposition`` (ganador ``realizedR > 0``; perdedor ``<= 0``),
+    uniendo el MAE a su ciclo por ``cycle_key``. Un ciclo con MAE medible pero ``realizedR``
+    ilegible entra en ``ALL`` pero no en ``WINNERS``/``LOSERS``. Sin muestra, la fracción es ``None``.
+    """
+    indexed = excursions_by_cycle or {}
+    all_maes: list[float] = []
+    winner_maes: list[float] = []
+    loser_maes: list[float] = []
+    for trip in round_trips or ():
+        row = indexed.get(cycle_key(trip))
+        if row is None:
+            continue
+        mae = _excursion_field(row, "mae")
+        if mae is None:
+            continue
+        all_maes.append(mae)
+        realized = finite_number(trip.get("realizedR"))
+        if realized is None:
+            continue
+        (winner_maes if realized > 0 else loser_maes).append(mae)
+    return {
+        "populations": {
+            "ALL": _population_breaches(all_maes, thresholds),
+            "WINNERS": _population_breaches(winner_maes, thresholds),
+            "LOSERS": _population_breaches(loser_maes, thresholds),
+        }
     }
 
 
@@ -514,7 +569,7 @@ def build_dia_d_attribution_artifact(
         "bySector": by_sector,
         "bySymbol": by_symbol,
         "capture": capture_study(ordered_trips, excursions_by_cycle=index),
-        "maeSeverity": mae_severity(excursions_rows),
+        "maeSeverity": mae_severity(ordered_trips, excursions_by_cycle=index),
         "concentration": concentration(ordered_trips, top_k=top_k),
         "meta": {
             "watch": [str(symbol) for symbol in watch],
