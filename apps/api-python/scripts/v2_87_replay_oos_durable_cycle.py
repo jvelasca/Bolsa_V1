@@ -363,7 +363,25 @@ async def _run_durable_replay(
     last_active_index: int | None = None
     end = len(days) if int(max_ticks) <= 0 else min(len(days), start_index + int(max_ticks))
 
+    # COSTURA INERTE (capa v4, Δ motor = 0): estado CONGELADO de cada posición ABIERTA al empezar el
+    # tick —incluida la que se cierra EN este tick— keyed por ``cycle_id``. Antes del cierre el stop
+    # vigente es el del último ratchet y el nivel de invalidación está congelado al nacer. NO toca el
+    # motor: sólo LEE lo que ya produjo; con ``capture_cycle_detail`` apagado el replay es idéntico.
+    invalidation_by_cycle: dict[str, dict[str, Any]] = {}
     for index in range(start_index, end):
+        if capture_cycle_detail:
+            for position in (getattr(worker, "_v2_positions", {}) or {}).values():
+                cid = str(getattr(position, "cycle_id", "") or "")
+                if not cid:
+                    continue
+                invalidation_by_cycle[cid] = {
+                    "invalidationPrice": getattr(position, "invalidation_price", None),
+                    "actualEntry": getattr(position, "actual_entry", None),
+                    "initialStop": getattr(position, "initial_stop", None),
+                    "initialRisk": getattr(position, "initial_risk", None),
+                    "currentStop": getattr(position, "current_stop", None),
+                    "direction": str(getattr(position, "direction", "") or ""),
+                }
         cursor.set_index(index)
         report = await worker.auto_turn()
         for key in totals:
@@ -551,6 +569,9 @@ async def _run_durable_replay(
     if capture_cycle_detail:
         cycle_detail = {
             "costRows": list(getattr(contexts, "order", ()) or ()),
+            # Capa v4: geometría de la invalidación por ciclo (nivel congelado + stop vigente al
+            # cierre), leída del estado de la posición. Aditiva y sin efecto en la decisión.
+            "invalidationByCycle": invalidation_by_cycle,
             "closeRows": [
                 {
                     "executionId": str(getattr(row, "execution_id", "") or ""),

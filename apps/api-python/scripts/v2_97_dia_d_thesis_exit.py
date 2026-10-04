@@ -6,7 +6,7 @@ El diagnóstico del origen de la pérdida (``v2_96``) aisló que el grueso del `
 vive en pocos ciclos cerrados por invalidación de tesis (``THESIS_EXIT``), pese a que el
 ``STOP_EJECUTADO`` domina en frecuencia con expectancy bruta ~0. Esta sonda abre esos ciclos:
 consume los ``K`` ledgers de ciclos que ``v2_94 --cycles --cycle-detail`` dejó por sorteo
-(``draw-XX/multi-cycles.json``, esquema ``dia-d-multi-cycle-ledger-v3``) y los pliega para saber
+(``draw-XX/multi-cycles.json``, esquema ``dia-d-multi-cycle-ledger-v4``) y los pliega para saber
 **dónde viven** —estrategia, dirección, año/régimen, edad, geometría (MAE/MFE/captura), calidad de
 entrada y coste— con su dispersión entre sorteos y su fragilidad.
 
@@ -177,7 +177,7 @@ def main(argv: list[str] | None = None) -> int:
     artifact = build_thesis_exit_artifact(
         draw_ledgers=ledgers,
         meta={
-            "bump": "2.11.45-beta",
+            "bump": "2.11.46-beta",
             "phase": "V2.97 DIA-D AUTO THESIS EXIT",
             "nature": "INVESTIGACION",
             "drawsDir": str(out_dir),

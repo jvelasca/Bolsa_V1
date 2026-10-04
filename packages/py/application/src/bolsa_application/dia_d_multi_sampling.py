@@ -59,6 +59,7 @@ from bolsa_application.dia_d_exit_mechanism import (
 from bolsa_application.dia_d_longitudinal import (
     DEFAULT_ENTRY_WINDOW_DAYS,
     LONG,
+    SHORT,
     Excursion,
     infer_direction,
 )
@@ -84,7 +85,12 @@ from bolsa_application.dia_d_multi_uncertainty import (
 #: v3 (V2.88.45) añade —también ADITIVA— la identidad de la ESTRATEGIA (``strategyVersion``) y la
 #: DIRECCIÓN inferida (``direction``) del ciclo, que el diagnóstico quirúrgico necesita para saber
 #: *dónde* vive cada cierre. Un lector de v1/v2 ignora los campos nuevos.
-LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v3"
+#: v4 (V2.88.46) añade —ADITIVA— la GEOMETRÍA de la INVALIDACIÓN DE LA TESIS (``invalidationPrice``,
+#: ``currentStopAtExit``, ``initialStop`` y sus distancias en R, más los booleanos
+#: ``levelEqualsInitialStop``/``maeReachedLevel`` y el token ``thesisExitCondition``). Responde a
+#: *qué condición* disparó un ``THESIS_EXIT``, sin tocar el motor (el nivel se lee del estado de la
+#: posición congelado al nacer y de la excursión ya medida). Un lector de v1/v2/v3 ignora lo nuevo.
+LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v4"
 
 #: Tipo del ledger de ciclos (la muestra cruda de UN sorteo).
 LEDGER_KIND = "DIA_D_AUTO_MULTI_CYCLE_LEDGER"
@@ -352,6 +358,130 @@ def _entry_slippage_bps(fills: Sequence[Any], entry_side: str | None) -> float |
     return weighted / weight
 
 
+# ── Geometría de la invalidación de la tesis (capa v4, aditiva) ───────────────────
+
+#: Tokens DECLARADOS de la condición de invalidación (contrato de observabilidad, cerrado).
+#: ``nivel_igual_stop``: el nivel congelado ES el stop inicial de la posición (hoy, la regla
+#: estructural: ningún productor manda un ``invalidationPrice`` distinto). ``nivel_distinto_stop``:
+#: el nivel congelado NO coincide con el stop inicial capturado — se declara, no se reconcilia.
+INVALIDATION_CONDITION_SIN_GEOMETRIA = "sin_geometria"
+INVALIDATION_CONDITION_NIVEL_DISTINTO_STOP = "nivel_distinto_stop"
+INVALIDATION_CONDITION_NIVEL_IGUAL_STOP = "nivel_igual_stop"
+INVALIDATION_CONDITIONS: frozenset[str] = frozenset(
+    {
+        INVALIDATION_CONDITION_SIN_GEOMETRIA,
+        INVALIDATION_CONDITION_NIVEL_DISTINTO_STOP,
+        INVALIDATION_CONDITION_NIVEL_IGUAL_STOP,
+    }
+)
+
+#: Tolerancia RELATIVA para afirmar "el nivel es el stop inicial" (nunca una igualdad de ``float``).
+_INVALIDATION_REL_TOL = 1e-9
+
+
+def _adverse_r(
+    price: Any,
+    *,
+    entry: float | None,
+    risk: float | None,
+    direction: str | None,
+) -> float | None:
+    """Distancia en R en la dirección ADVERSA (``<= 0`` en el lado de la pérdida).
+
+    El convenio es el MISMO que ``exit_plan.worst_adverse_price``: para un largo el precio adverso
+    está POR DEBAJO de la entrada (R negativo) y para un corto POR ENCIMA. ``None`` cuando falta
+    algún ancla (entrada, riesgo) o el riesgo no es positivo: la geometría no se inventa.
+    """
+    value = finite_number(price)
+    if value is None or entry is None or risk is None or risk <= 0.0:
+        return None
+    if direction == LONG:
+        return (value - entry) / risk
+    if direction == SHORT:
+        return (entry - value) / risk
+    return None
+
+
+def _invalidation_fields(
+    *,
+    entry: float | None,
+    initial_stop: float | None,
+    direction: str | None,
+    risk: float | None,
+    level: float | None,
+    current_stop: float | None,
+    mae_r: float | None,
+    position_entry: float | None = None,
+    position_initial_stop: float | None = None,
+    position_initial_risk: float | None = None,
+) -> dict[str, Any]:
+    """Geometría de la invalidación de UN ciclo (capa v4, aditiva; pura y determinista).
+
+    Publica el nivel congelado (``invalidationPrice``), el stop VIGENTE al cierre
+    (``currentStopAtExit``) y sus posiciones en R adverso, más los dos hechos que explican por qué
+    el cierre es ``THESIS_EXIT`` y no ``STRUCTURAL_STOP``: si el stop se apretó POR ENCIMA del nivel
+    congelado (``stopAboveLevelR``) y si el peor adverso alcanzó el nivel (``maeReachedLevel``, con
+    el MAE reconstruido D1 como APROXIMACIÓN declarada del persistido).
+
+    La normalización en R usa los anclajes PROPIOS de la POSICIÓN capturados por la costura
+    (``actual_entry``/``initial_risk`` al nacer), y sólo cae a los del round trip
+    (``entryPrice``/``stop``) si no llegaron: el nivel se congela contra el stop de la posición, no
+    contra la base de R que el ledger use para ``realizedR``. Cuando ambas bases difieren se
+    publica ``stopBasisMismatchR`` (>0 ⇒ discrepancia declarada, NO reconciliada aquí).
+
+    Un ancla ilegible queda ``None`` (nunca ``0``); sin nivel o sin stop vigente la condición es
+    ``sin_geometria`` y los booleanos son ``None``: la condición de invalidación NO se inventa.
+    """
+    basis_entry = position_entry if position_entry is not None else entry
+    basis_risk = (
+        position_initial_risk
+        if position_initial_risk is not None and position_initial_risk > 0.0
+        else risk
+    )
+    level_r = _adverse_r(level, entry=basis_entry, risk=basis_risk, direction=direction)
+    current_stop_r = _adverse_r(current_stop, entry=basis_entry, risk=basis_risk, direction=direction)
+    reference_stop = position_initial_stop if position_initial_stop is not None else initial_stop
+    level_equals_initial_stop: bool | None = None
+    if level is not None and reference_stop is not None:
+        level_equals_initial_stop = abs(level - reference_stop) <= _INVALIDATION_REL_TOL * max(
+            1.0, abs(reference_stop)
+        )
+    stop_above_level_r = (
+        current_stop_r - level_r
+        if current_stop_r is not None and level_r is not None
+        else None
+    )
+    mae_vs_level_r = level_r - mae_r if level_r is not None and mae_r is not None else None
+    mae_reached_level = mae_vs_level_r >= 0.0 if mae_vs_level_r is not None else None
+    stop_basis_mismatch_r: float | None = None
+    if (
+        position_initial_stop is not None
+        and initial_stop is not None
+        and basis_risk is not None
+        and basis_risk > 0.0
+    ):
+        stop_basis_mismatch_r = abs(initial_stop - position_initial_stop) / basis_risk
+    if level_r is None or current_stop_r is None:
+        condition = INVALIDATION_CONDITION_SIN_GEOMETRIA
+    elif level_equals_initial_stop:
+        condition = INVALIDATION_CONDITION_NIVEL_IGUAL_STOP
+    else:
+        condition = INVALIDATION_CONDITION_NIVEL_DISTINTO_STOP
+    return {
+        "invalidationPrice": level,
+        "initialStop": position_initial_stop,
+        "currentStopAtExit": current_stop,
+        "invalidationLevelR": level_r,
+        "currentStopAtExitR": current_stop_r,
+        "stopAboveLevelR": stop_above_level_r,
+        "levelEqualsInitialStop": level_equals_initial_stop,
+        "stopBasisMismatchR": stop_basis_mismatch_r,
+        "maeVsLevelR": mae_vs_level_r,
+        "maeReachedLevel": mae_reached_level,
+        "thesisExitCondition": condition,
+    }
+
+
 def build_cycle_ledger(
     *,
     round_trips: Sequence[Mapping[str, Any]],
@@ -361,6 +491,7 @@ def build_cycle_ledger(
     operational_regime_by_day: Mapping[str, Any] | None = None,
     cost_rows: Sequence[Any] = (),
     close_rows: Sequence[Any] = (),
+    invalidation_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
     entry_window_days: int = DEFAULT_ENTRY_WINDOW_DAYS,
     meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -373,7 +504,14 @@ def build_cycle_ledger(
     (``netRealizedR``) y la **excursión adversa temprana** post-entrada (``entryAdverseR``/
     ``entryAdverseWindowDays``/``entryAdverseGap``), además del desvío de entrada en bps. La capa
     v3 añade —también ADITIVA— la **estrategia** (``strategyVersion``) y la **dirección**
-    (``direction``, inferida de ``stop`` vs ``entry``; ``None`` si la geometría es imposible).
+    (``direction``, inferida de ``stop`` vs ``entry``; ``None`` si la geometría es imposible). La
+    capa v4 añade —ADITIVA— la **geometría de la invalidación de la tesis**: ``invalidationPrice``,
+    ``initialStop`` (el de la POSICIÓN), ``currentStopAtExit``, ``invalidationLevelR``/
+    ``currentStopAtExitR``/``stopAboveLevelR``/``stopBasisMismatchR``/``maeVsLevelR``, los booleanos
+    ``levelEqualsInitialStop``/``maeReachedLevel`` y el token ``thesisExitCondition``.
+    ``invalidation_by_cycle`` es la captura —opt-in, inerte— del estado congelado de la posición por
+    ``cycle_id`` (entrada real, stop y riesgo al nacer, nivel congelado y stop vigente); sin ella los
+    campos v4 quedan hueco declarado.
 
     Reglas duras: un valor ilegible queda ``None`` (nunca ``0``); el R neto sólo se afirma con
     fricción ``COMPLETE`` (con ``PARTIAL`` es un SUELO y se declara el hueco, jamás se publica el
@@ -439,6 +577,26 @@ def build_cycle_ledger(
         reason = reasons_by_cycle.get(cycle, "") if cycle else ""
         mechanism, evidence = classify_exit_mechanism(reason)
         slippage = _entry_slippage_bps(fills, entry_side)
+        capture = (invalidation_by_cycle.get(cycle) if (invalidation_by_cycle and cycle) else None) or {}
+        entry_price = finite_number(trip.get("entryPrice"))
+        initial_stop = finite_number(trip.get("stop"))
+        risk = (
+            abs(entry_price - initial_stop)
+            if entry_price is not None and initial_stop is not None and entry_price != initial_stop
+            else None
+        )
+        invalidation = _invalidation_fields(
+            entry=entry_price,
+            initial_stop=initial_stop,
+            direction=direction,
+            risk=risk,
+            level=finite_number(capture.get("invalidationPrice")),
+            current_stop=finite_number(capture.get("currentStop")),
+            mae_r=mae,
+            position_entry=finite_number(capture.get("actualEntry")),
+            position_initial_stop=finite_number(capture.get("initialStop")),
+            position_initial_risk=finite_number(capture.get("initialRisk")),
+        )
         cycles.append(
             {
                 "symbol": str(trip.get("symbol") or "").strip(),
@@ -458,6 +616,10 @@ def build_cycle_ledger(
                     else None
                 ),
                 "direction": direction,
+                # ── Capa v4 (condición de la invalidación): qué disparó el THESIS_EXIT ──
+                "entryPrice": entry_price,
+                "stop": initial_stop,
+                **invalidation,
                 # ── Capa v2 (diagnóstico de la pérdida) ────────────────────────────────
                 "exitMechanism": mechanism,
                 "exitReason": evidence or (EXIT_MECHANISM_SIN_MECANISMO if not reason else reason),
@@ -897,6 +1059,10 @@ __all__ = [
     "DEFAULT_LIMITS",
     "DEFAULT_RESAMPLES",
     "DEFAULT_SEED",
+    "INVALIDATION_CONDITIONS",
+    "INVALIDATION_CONDITION_NIVEL_DISTINTO_STOP",
+    "INVALIDATION_CONDITION_NIVEL_IGUAL_STOP",
+    "INVALIDATION_CONDITION_SIN_GEOMETRIA",
     "KIND",
     "LEDGER_KIND",
     "LEDGER_SCHEMA_VERSION",

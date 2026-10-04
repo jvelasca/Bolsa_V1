@@ -191,6 +191,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         all_entry_excursions: list[Any] = []
         all_cost_rows: list[Any] = []
         all_close_rows: list[Any] = []
+        # Capa v4: geometría de la invalidación por ciclo (una entrada por ``cycle_id``, acumulada
+        # entre ventanas). Sin ``--cycle-detail`` queda vacía y el ledger declara el hueco.
+        all_invalidation_by_cycle: dict[str, Any] = {}
         regime_all: dict[str, Any] = {}
         operational_all: dict[str, Any] = {}
 
@@ -299,6 +302,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             detail = replay.get("cycleDetail") or {}
             all_cost_rows.extend(detail.get("costRows") or [])
             all_close_rows.extend(detail.get("closeRows") or [])
+            all_invalidation_by_cycle.update(detail.get("invalidationByCycle") or {})
             operable_days = sum(1 for flag in operable_flags[d0_index : d1_index + 1] if flag)
             for row in census.days:
                 if row.day in window_set:
@@ -347,7 +351,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             regime_by_day=regime_all,
             operational_regime_by_day=operational_all,
             meta={
-                "bump": "2.11.45-beta",
+                "bump": "2.11.46-beta",
                 "phase": "V2.93 DIA-D AUTO MULTI ATTRIBUTION",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
@@ -378,6 +382,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 operational_regime_by_day=operational_all,
                 cost_rows=all_cost_rows,
                 close_rows=all_close_rows,
+                invalidation_by_cycle=all_invalidation_by_cycle,
                 entry_window_days=int(args.entry_window_days),
             )
             ledger_path = pathlib.Path(args.cycles_out)

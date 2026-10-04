@@ -22,6 +22,9 @@ import pytest
 
 from bolsa_application.dia_d_multi import build_dia_d_multi_artifact
 from bolsa_application.dia_d_multi_sampling import (
+    INVALIDATION_CONDITION_NIVEL_DISTINTO_STOP,
+    INVALIDATION_CONDITION_NIVEL_IGUAL_STOP,
+    INVALIDATION_CONDITION_SIN_GEOMETRIA,
     KIND,
     LEDGER_SCHEMA_VERSION,
     SCHEMA_VERSION,
@@ -129,7 +132,7 @@ def test_ledger_v3_is_additive_and_keeps_the_labels_the_fold_reads():
         regime_by_day={"2022-01-05": "range"},
         operational_regime_by_day={"2022-01-05": "SIDEWAYS"},
     )
-    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v3"
+    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v4"
     row = ledger["cycles"][0]
     # Campos v1 intactos (los que lee `_cell_cycles`).
     assert row["realizedR"] == 1.5
@@ -172,6 +175,125 @@ def test_ledger_v3_records_strategy_and_infers_direction_from_geometry():
     row = build_cycle_ledger(round_trips=[degenerate])["cycles"][0]
     assert row["direction"] is None
     assert row["strategyVersion"] is None
+
+
+# ── Ledger v4: geometría de la invalidación de la tesis ──────────────────────────
+
+
+def _invalidation_trip() -> dict[str, Any]:
+    return {
+        "symbol": "AAA",
+        "entryDay": "2022-01-05",
+        "exitDay": "2022-01-07",
+        "entryPrice": 10.0,
+        "exitPrice": 9.0,
+        "stop": 9.0,
+        "realizedR": -1.0,
+        "cycleId": "C1",
+        "strategyVersion": "v2.7",
+    }
+
+
+def test_ledger_v4_measures_the_frozen_level_and_the_stop_at_exit():
+    """El nivel congelado ES el stop inicial; el stop vigente y el MAE se miden en R adverso."""
+    ledger = build_cycle_ledger(
+        round_trips=[_invalidation_trip()],
+        excursions_rows=[
+            {"symbol": "AAA", "entryDay": "2022-01-05", "exitDay": "2022-01-07", "maeR": -1.2, "mfeR": 0.3}
+        ],
+        invalidation_by_cycle={
+            "C1": {
+                "invalidationPrice": 9.0,
+                "currentStop": 9.0,
+                "initialStop": 9.0,
+                "initialRisk": 1.0,
+                "actualEntry": 10.0,
+                "direction": "long",
+            }
+        },
+    )
+    row = ledger["cycles"][0]
+    assert row["entryPrice"] == 10.0
+    assert row["stop"] == 9.0
+    assert row["invalidationPrice"] == 9.0
+    assert row["initialStop"] == 9.0
+    assert row["currentStopAtExit"] == 9.0
+    # R adverso: el nivel y el stop están 1R por debajo de la entrada (largo).
+    assert row["invalidationLevelR"] == pytest.approx(-1.0)
+    assert row["currentStopAtExitR"] == pytest.approx(-1.0)
+    assert row["stopAboveLevelR"] == pytest.approx(0.0)
+    assert row["levelEqualsInitialStop"] is True
+    # La base de R del ledger coincide con el stop congelado de la posición: sin discrepancia.
+    assert row["stopBasisMismatchR"] == pytest.approx(0.0)
+    # El peor adverso (-1.2R) cruzó el nivel (-1.0R) por 0.2R.
+    assert row["maeVsLevelR"] == pytest.approx(0.2)
+    assert row["maeReachedLevel"] is True
+    assert row["thesisExitCondition"] == INVALIDATION_CONDITION_NIVEL_IGUAL_STOP
+
+
+def test_ledger_v4_records_a_stop_ratcheted_above_the_frozen_level():
+    """Un stop vigente por ENCIMA del nivel congelado es la firma de por qué no fue STRUCTURAL_STOP."""
+    ledger = build_cycle_ledger(
+        round_trips=[_invalidation_trip()],
+        invalidation_by_cycle={"C1": {"invalidationPrice": 9.0, "currentStop": 9.4}},
+    )
+    row = ledger["cycles"][0]
+    assert row["currentStopAtExitR"] == pytest.approx(-0.6)
+    assert row["stopAboveLevelR"] == pytest.approx(0.4)
+    assert row["levelEqualsInitialStop"] is True
+
+
+def test_ledger_v4_declares_a_distinct_thesis_level():
+    """Un nivel DISTINTO del stop inicial capturado deja de ser degenerado (se declara)."""
+    ledger = build_cycle_ledger(
+        round_trips=[_invalidation_trip()],
+        invalidation_by_cycle={"C1": {"invalidationPrice": 9.5, "currentStop": 9.0}},
+    )
+    row = ledger["cycles"][0]
+    assert row["invalidationLevelR"] == pytest.approx(-0.5)
+    assert row["levelEqualsInitialStop"] is False
+    assert row["thesisExitCondition"] == INVALIDATION_CONDITION_NIVEL_DISTINTO_STOP
+
+
+def test_ledger_v4_normalizes_with_the_position_anchors_and_declares_the_basis_mismatch():
+    """El R se mide con los anclajes de la POSICIÓN; si el stop del round trip difiere, se declara."""
+    ledger = build_cycle_ledger(
+        round_trips=[_invalidation_trip()],
+        invalidation_by_cycle={
+            "C1": {
+                "invalidationPrice": 8.0,
+                "currentStop": 8.0,
+                "initialStop": 8.0,
+                "initialRisk": 2.0,
+                "actualEntry": 10.0,
+            }
+        },
+    )
+    row = ledger["cycles"][0]
+    # El stop congelado de la posición (8.0) ES el nivel: la condición es estructural…
+    assert row["initialStop"] == 8.0
+    assert row["levelEqualsInitialStop"] is True
+    assert row["thesisExitCondition"] == INVALIDATION_CONDITION_NIVEL_IGUAL_STOP
+    # …y el R se normaliza con el riesgo de la POSICIÓN (2.0), no con el del round trip (1.0).
+    assert row["invalidationLevelR"] == pytest.approx(-1.0)
+    # El stop del round trip (9.0) queda 1R por debajo del stop congelado (8.0): discrepancia declarada.
+    assert row["stopBasisMismatchR"] == pytest.approx(0.5)
+
+
+def test_ledger_v4_without_capture_declares_the_gap_never_zero():
+    """Sin la costura (--cycle-detail apagado) la geometría es un hueco declarado, nunca 0."""
+    ledger = build_cycle_ledger(round_trips=[_invalidation_trip()])
+    row = ledger["cycles"][0]
+    assert row["invalidationPrice"] is None
+    assert row["initialStop"] is None  # la costura no aportó el stop de la posición.
+    assert row["currentStopAtExit"] is None
+    assert row["invalidationLevelR"] is None
+    assert row["currentStopAtExitR"] is None
+    assert row["stopAboveLevelR"] is None
+    assert row["levelEqualsInitialStop"] is None
+    assert row["stopBasisMismatchR"] is None
+    assert row["maeReachedLevel"] is None
+    assert row["thesisExitCondition"] == INVALIDATION_CONDITION_SIN_GEOMETRIA
 
 
 # ── Banda: descomposición venue / sampling / total ───────────────────────────────

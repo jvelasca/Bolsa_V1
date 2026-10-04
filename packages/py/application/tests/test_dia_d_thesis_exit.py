@@ -51,6 +51,14 @@ def _row(
     exit_day: str = "2022-01-07",
     symbol: str = "AAA",
     reason: str = "thesis_exit",
+    invalidation_level_r: float | None = None,
+    current_stop_at_exit_r: float | None = None,
+    stop_above_level_r: float | None = None,
+    level_equals_initial_stop: bool | None = None,
+    stop_basis_mismatch_r: float | None = None,
+    mae_vs_level_r: float | None = None,
+    mae_reached_level: bool | None = None,
+    thesis_condition: str | None = "sin_geometria",
 ) -> dict[str, Any]:
     return {
         "symbol": symbol,
@@ -73,6 +81,15 @@ def _row(
         "entryAdverseR": adverse,
         "entryAdverseWindowDays": 3,
         "entrySlippageBps": slip,
+        # ── Capa v4: geometría de la invalidación (hueco por defecto, nunca 0) ────
+        "invalidationLevelR": invalidation_level_r,
+        "currentStopAtExitR": current_stop_at_exit_r,
+        "stopAboveLevelR": stop_above_level_r,
+        "levelEqualsInitialStop": level_equals_initial_stop,
+        "stopBasisMismatchR": stop_basis_mismatch_r,
+        "maeVsLevelR": mae_vs_level_r,
+        "maeReachedLevel": mae_reached_level,
+        "thesisExitCondition": thesis_condition,
     }
 
 
@@ -247,6 +264,91 @@ def test_entry_quality_shares_are_declared():
     assert adverse["shareBelowOneR"] == pytest.approx(1 / 3)
 
 
+# ── Condición de la invalidación (capa v4) ───────────────────────────────────────
+
+
+def test_invalidation_block_measures_the_frozen_level_and_the_stop():
+    ledgers = [
+        _ledger(
+            [
+                _row(
+                    invalidation_level_r=-1.0,
+                    current_stop_at_exit_r=-0.6,
+                    stop_above_level_r=0.4,
+                    level_equals_initial_stop=True,
+                    stop_basis_mismatch_r=0.0,
+                    mae_vs_level_r=0.2,
+                    mae_reached_level=True,
+                    thesis_condition="nivel_igual_stop",
+                )
+            ]
+        )
+    ]
+    artifact = build_thesis_exit_artifact(draw_ledgers=ledgers)
+    invalidation = artifact["global"]["invalidation"]
+    assert invalidation["cycles"] == 1
+    assert invalidation["measured"] == 1
+    assert invalidation["levelEqualsInitialStop"]["count"] == 1
+    assert invalidation["levelEqualsInitialStop"]["share"] == pytest.approx(1.0)
+    assert invalidation["maeReachedLevel"]["count"] == 1
+    assert invalidation["invalidationLevelR"]["mean"] == pytest.approx(-1.0)
+    assert invalidation["currentStopAtExitR"]["mean"] == pytest.approx(-0.6)
+    assert invalidation["stopBasisMismatchR"]["measured"] == 1
+    assert invalidation["stopBasisMismatchR"]["shareNonZero"] == pytest.approx(0.0)
+    assert invalidation["condition"] == {"nivel_igual_stop": 1}
+
+
+def test_invalidation_block_declares_a_distinct_level_and_counts_the_basis_mismatch():
+    """Un nivel distinto del stop capturado y una base de R discrepante se declaran, no se ocultan."""
+    row = _row(
+        invalidation_level_r=-0.5,
+        current_stop_at_exit_r=-1.0,
+        stop_above_level_r=-0.5,
+        level_equals_initial_stop=False,
+        stop_basis_mismatch_r=0.75,
+        mae_vs_level_r=-1.1,
+        mae_reached_level=False,
+        thesis_condition="nivel_distinto_stop",
+    )
+    artifact = build_thesis_exit_artifact(draw_ledgers=[_ledger([row])])
+    invalidation = artifact["global"]["invalidation"]
+    assert invalidation["levelEqualsInitialStop"]["count"] == 0
+    assert invalidation["stopBasisMismatchR"]["mean"] == pytest.approx(0.75)
+    assert invalidation["stopBasisMismatchR"]["shareNonZero"] == pytest.approx(1.0)
+    assert invalidation["condition"] == {"nivel_distinto_stop": 1}
+
+
+def test_invalidation_block_without_geometry_declares_the_gap():
+    """Sin la costura capturada, la condición es un hueco declarado (nunca 0)."""
+    artifact = build_thesis_exit_artifact(draw_ledgers=[_ledger([_row(), _row()])])
+    invalidation = artifact["global"]["invalidation"]
+    assert invalidation["cycles"] == 2
+    assert invalidation["measured"] == 0
+    assert invalidation["levelEqualsInitialStop"]["share"] is None
+    assert invalidation["invalidationLevelR"]["mean"] is None
+    assert invalidation["stopBasisMismatchR"]["measured"] == 0
+    assert invalidation["stopBasisMismatchR"]["shareNonZero"] is None
+    assert invalidation["condition"] == {"sin_geometria": 2}
+
+
+def test_invalidation_block_distinguishes_a_measured_zero_from_a_gap():
+    """El MAE que NO alcanzó el nivel es un dato medido (``False``), no un hueco ``None``."""
+    row = _row(
+        invalidation_level_r=-1.0,
+        current_stop_at_exit_r=-1.0,
+        stop_above_level_r=0.0,
+        level_equals_initial_stop=True,
+        mae_vs_level_r=-0.2,
+        mae_reached_level=False,
+        thesis_condition="nivel_igual_stop",
+    )
+    artifact = build_thesis_exit_artifact(draw_ledgers=[_ledger([row])])
+    invalidation = artifact["global"]["invalidation"]
+    assert invalidation["maeReachedLevel"]["measured"] == 1
+    assert invalidation["maeReachedLevel"]["count"] == 0
+    assert invalidation["maeReachedLevel"]["share"] == pytest.approx(0.0)
+
+
 # ── Determinismo y contrato ──────────────────────────────────────────────────────
 
 
@@ -258,7 +360,7 @@ def test_artifact_is_deterministic_and_declares_its_contract():
     first = build_thesis_exit_artifact(draw_ledgers=ledgers)
     again = build_thesis_exit_artifact(draw_ledgers=ledgers)
     assert json.dumps(first, sort_keys=True) == json.dumps(again, sort_keys=True)
-    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-thesis-exit-v1"
+    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-thesis-exit-v2"
     assert first["kind"] == KIND == "DIA_D_AUTO_THESIS_EXIT"
     assert first["readOnly"] is True
     assert first["basis"] == "entryDay"

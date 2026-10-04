@@ -9,8 +9,9 @@ domina en frecuencia (``93,4 %``) con expectancy bruta ``~0``, mientras el grues
 negativo vive en pocos ``THESIS_EXIT`` (``38`` ciclos, ``expectancyR = -0.7087``, ``hitRate``
 ``8,3 %``). Este módulo **abre quirúrgicamente** esos ciclos: responde a *dónde viven* los
 ``THESIS_EXIT`` —estrategia, dirección, año/régimen, edad, geometría, entrada, coste— sin tocar el
-motor. **NO** responde a *por qué* se invalidó la tesis: el journal sólo publica el token colapsado
-``thesis_exit`` (ver límites).
+motor, y —capa v4— a *qué condición* los disparó: el **nivel de invalidación congelado** (que hoy
+**ES el stop inicial**, porque ningún productor manda un nivel de tesis distinto), el **stop vigente
+al cierre** y si el peor adverso alcanzó el nivel. Se mide; no se inventa una causa.
 
 Ejes de la descomposición
 -------------------------
@@ -19,6 +20,7 @@ Ejes de la descomposición
 * **cómo se movió** — excursión media/mediana ``maeR``/``mfeR``, captura del MFE y ``leftOnTableR``.
 * **cómo entró** — excursión adversa temprana + slippage señal→ejecución.
 * **cuánto costó** — fricción en ``R`` y ``R`` neto (suelo declarado si falta fricción ``COMPLETE``).
+* **qué la invalidó** (v4) — nivel congelado, stop vigente al cierre y alcance del peor adverso.
 * **cuánta concentración** — símbolos distintos y clusters (top símbolo / top semana ISO).
 
 Reglas duras (heredadas, no se relajan)
@@ -47,11 +49,14 @@ from typing import Any
 
 from bolsa_application.dia_d_auto import finite_number, normalize_day
 from bolsa_application.dia_d_exit_mechanism import EXIT_MECHANISM_THESIS
-from bolsa_application.dia_d_multi_sampling import MIN_CYCLES_FOR_SAMPLING
+from bolsa_application.dia_d_multi_sampling import (
+    INVALIDATION_CONDITION_SIN_GEOMETRIA,
+    MIN_CYCLES_FOR_SAMPLING,
+)
 from bolsa_application.dia_d_multi_uncertainty import MIN_DRAWS_FOR_BAND
 
-#: Versión del esquema del artefacto. Un cambio de forma la sube.
-SCHEMA_VERSION = "dia-d-thesis-exit-v1"
+#: Versión del esquema del artefacto. Un cambio de forma la sube (v2: bloque ``invalidation``).
+SCHEMA_VERSION = "dia-d-thesis-exit-v2"
 
 #: Tipo del artefacto.
 KIND = "DIA_D_AUTO_THESIS_EXIT"
@@ -75,9 +80,17 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "Un hueco es None/NOT_MEASURED; nunca se rellena con 0. La media de una muestra vacia es None.",
     "El R NETO solo se afirma con friccion COMPLETE; con PARTIAL es un SUELO declarado, jamas el "
     "bruto disfrazado de neto.",
-    "El motivo crudo de estos ciclos es el token COLAPSADO 'thesis_exit': no revela la condicion "
-    "de invalidacion (recuperarla exigiria capturar el contexto del plan, que hoy no llega al "
-    "journal); es una fase futura, no esta.",
+    "La CONDICION de invalidacion se mide (capa v4) desde el estado CONGELADO de la posicion: el "
+    "nivel de invalidacion ES hoy el stop inicial (ningun productor manda un nivel de tesis "
+    "distinto; deuda declarada), asi que un THESIS_EXIT es estructural. El booleano "
+    "maeReachedLevel usa el MAE RECONSTRUIDO D1 como APROXIMACION declarada del peor adverso "
+    "PERSISTIDO por el motor: no es el mismo numero y no se presenta como tal.",
+    "La capa v4 es OPT-IN: exige el estado capturado por la costura inerte (--cycle-detail). Sin "
+    "ella, invalidation.measured = 0 y los anclajes quedan None (hueco declarado, nunca 0).",
+    "El R de la capa v4 se normaliza con los anclajes PROPIOS de la POSICION (entrada real y riesgo "
+    "al nacer). Cuando el stop del round trip (base de R del ledger) difiere del stop congelado de "
+    "la posicion, se declara en stopBasisMismatchR: es una discrepancia MEDIDA y NO reconciliada "
+    "aqui (afecta a la normalizacion, no al hecho observado del cierre).",
     "La edad es en DIAS NATURALES entre entryDay y exitDay (el replay es D1): no son barras "
     "efectivas ni intradia, y el dia de entrada puede incluir movimiento previo al fill.",
     "La distancia al objetivo NO es medible (el round trip no guarda el target): se aproxima con "
@@ -205,6 +218,69 @@ def _left_on_table(row: Mapping[str, Any]) -> float | None:
     if realized is None or mfe is None or mfe <= 0.0:
         return None
     return max(mfe - max(realized, 0.0), 0.0)
+
+
+# ── Condición de la invalidación (capa v4): qué disparó el cierre por tesis ───────
+
+
+def _invalidation_fold(present: Sequence[Sequence[Mapping[str, Any]]]) -> dict[str, Any]:
+    """Bloque de la CONDICIÓN de invalidación de un conjunto de ciclos (capa v4, declarada).
+
+    Publica los anclajes EXACTOS leídos del estado congelado de la posición —el nivel
+    (``invalidationLevelR``), el stop vigente al cierre (``currentStopAtExitR``) y cuánto se apretó
+    por encima del nivel (``stopAboveLevelR``)—, el hecho APROXIMADO de si el peor adverso alcanzó
+    el nivel (``maeVsLevelR``/``maeReachedLevel``, con el MAE reconstruido D1 como aproximación
+    declarada), la discrepancia entre la base de R del ledger y el stop congelado de la posición
+    (``stopBasisMismatchR``) y el histograma del token ``thesisExitCondition``. Un hueco es
+    ``None``, nunca ``0``.
+    """
+    rows = [row for group in present for row in group]
+    levels = [value for row in rows if (value := finite_number(row.get("invalidationLevelR"))) is not None]
+    stops = [value for row in rows if (value := finite_number(row.get("currentStopAtExitR"))) is not None]
+    above = [value for row in rows if (value := finite_number(row.get("stopAboveLevelR"))) is not None]
+    mae_vs = [value for row in rows if (value := finite_number(row.get("maeVsLevelR"))) is not None]
+    mismatch = [
+        value for row in rows if (value := finite_number(row.get("stopBasisMismatchR"))) is not None
+    ]
+    equal = [
+        bool(row.get("levelEqualsInitialStop"))
+        for row in rows
+        if isinstance(row.get("levelEqualsInitialStop"), bool)
+    ]
+    reached = [
+        bool(row.get("maeReachedLevel"))
+        for row in rows
+        if isinstance(row.get("maeReachedLevel"), bool)
+    ]
+    conditions: dict[str, int] = {}
+    for row in rows:
+        token = str(row.get("thesisExitCondition") or "").strip() or INVALIDATION_CONDITION_SIN_GEOMETRIA
+        conditions[token] = conditions.get(token, 0) + 1
+    return {
+        "cycles": len(rows),
+        "measured": len(levels),
+        "levelEqualsInitialStop": {
+            "count": sum(equal),
+            "measured": len(equal),
+            "share": (sum(equal) / len(equal)) if equal else None,
+        },
+        "maeReachedLevel": {
+            "count": sum(reached),
+            "measured": len(reached),
+            "share": (sum(reached) / len(reached)) if reached else None,
+        },
+        "invalidationLevelR": {"mean": _mean(levels), "median": _median(levels), "measured": len(levels)},
+        "currentStopAtExitR": {"mean": _mean(stops), "median": _median(stops), "measured": len(stops)},
+        "stopAboveLevelR": {"mean": _mean(above), "median": _median(above), "measured": len(above)},
+        "maeVsLevelR": {"mean": _mean(mae_vs), "median": _median(mae_vs), "measured": len(mae_vs)},
+        "stopBasisMismatchR": {
+            "mean": _mean(mismatch),
+            "median": _median(mismatch),
+            "measured": len(mismatch),
+            "shareNonZero": _share(mismatch, lambda value: value > 0.0),
+        },
+        "condition": {token: conditions[token] for token in sorted(conditions)},
+    }
 
 
 # ── Plegado de un conjunto de ciclos (con dispersión entre sorteos + fragilidad) ──
@@ -362,6 +438,7 @@ def _fold(draw_rows: Sequence[Sequence[Mapping[str, Any]]], draws_total: int) ->
                 "meanAcrossDraws": _dispersion(slip_means),
             },
         },
+        "invalidation": _invalidation_fold(present),
         "fragility": {"fragile": bool(reasons), "reasons": reasons},
     }
 
@@ -490,12 +567,13 @@ def build_thesis_exit_artifact(
 ) -> dict[str, Any]:
     """Payload canónico del quirófano ``THESIS_EXIT`` (puro y determinista).
 
-    ``draw_ledgers`` son los ``K`` ledgers de ciclos (``dia-d-multi-cycle-ledger-v3``). Selecciona
+    ``draw_ledgers`` son los ``K`` ledgers de ciclos (``dia-d-multi-cycle-ledger-v4``). Selecciona
     los ciclos cerrados por invalidación de tesis y los pliega por **estrategia**, **dirección**,
     **año**, **régimen**, **régimen operativo** y **cubo de edad**, cada uno con su **dispersión
     entre sorteos** y su **fragilidad** declarada. Añade la geometría (MAE/MFE, captura,
-    ``leftOnTableR``), la calidad de entrada, el coste (bruto/neto/suelo), los motivos crudos y la
-    concentración. Un hueco queda ``None``, nunca ``0``.
+    ``leftOnTableR``), la calidad de entrada, el coste (bruto/neto/suelo), la **condición de la
+    invalidación** (capa v4: nivel congelado, stop vigente al cierre, alcance del peor adverso),
+    los motivos crudos y la concentración. Un hueco queda ``None``, nunca ``0``.
     """
     ordered = list(draw_ledgers or ())
     draws_total = len(ordered)
@@ -523,6 +601,7 @@ def build_thesis_exit_artifact(
             "excursion",
             "entry",
             "cost",
+            "invalidation",
         ],
         "coverage": resolved_coverage,
         "global": global_block,
@@ -566,9 +645,10 @@ def build_thesis_exit_artifact(
         "rawReasonTokens": _raw_reason_tokens(all_rows),
         "concentration": _concentration(all_rows),
         "recompileNote": (
-            "Este artefacto consume los ciclos con exitMechanism=THESIS_EXIT del ledger v3: exige "
-            "que el ledger traiga el detalle (--cycle-detail) y la identidad de estrategia/direccion. "
-            "Sin detalle, los ciclos quedan SIN_MECANISMO y no entran aqui (se declara, no se rellena)."
+            "Este artefacto consume los ciclos con exitMechanism=THESIS_EXIT del ledger v4: exige "
+            "que el ledger traiga el detalle (--cycle-detail), la identidad de estrategia/direccion y "
+            "la geometria de la invalidacion (invalidationByCycle). Sin detalle, los ciclos quedan "
+            "SIN_MECANISMO/la invalidation queda sin medir (se declara, no se rellena)."
         ),
         "meta": {str(key): value for key, value in (meta or {}).items()},
         "limits": [str(item) for item in (limits if limits is not None else DEFAULT_LIMITS)],
