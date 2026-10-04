@@ -130,13 +130,35 @@ instancia de este fichero **DENTRO** del tag la lleva como **PLACEHOLDER**.
 > (que sólo certifica que el bump de metadatos no rompe nada) se acredita en el commit POST-TAG en `main`
 > inmediatamente posterior al sello.
 
-**`Release tag CI` run del re-sello:** PENDIENTE DE TAG (se escribe en el commit POST-TAG).
+**`Release tag CI` run del re-sello:** [`37210471946`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37210471946) — cita en §6 (POST-TAG).
 
 ---
 
-## 6. Cita POST-TAG del re-sello `v2.88.46.1-beta`
+## 6. Cita POST-TAG del re-sello `v2.88.46.1-beta` — **TODO VERDE**
 
-PENDIENTE DE TAG — este apartado se completa en `main` tras empujar el tag, con el run del re-sello.
+`Release tag CI` run **[`37210471946`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37210471946)**
+(`ref=refs/tags/v2.88.46.1-beta`, HEAD `ce0ffbf3`, `event=push`, `attempt 1`, `2026-10-04T14:45:59Z` →
+`14:54:52Z`): **`success`** (`GREEN` en la **primera** pasada).
+
+| Job | Resultado |
+| --- | --- |
+| `security`, `shared`, `spine`, `frontend`, `python`, `playwright-mock`, `lifecycle-pg`, `replay-repro`, `dr-verify`, `a7-gate` | **`success`** (10) |
+| `playwright` (integrated E2E, opt-in) | `skipped` **por diseño** |
+| `certify` (aggregate + artifact) | **`success`** |
+
+**`ESPERADO = OBSERVADO`** (el re-sello **no** añade línea online — lo único que cambia es una cadena de
+metadatos):
+
+| Gate | Sello funcional `v2.88.46-beta` (run `37202334330`) | Re-sello `v2.88.46.1-beta` (run `37210471946`) | ¿Coincide? |
+| --- | --- | --- | --- |
+| `python` pytest | `4503 passed, 45 skipped` | **`4503 passed, 45 skipped, 7 warnings in 139.97s`** | **sí** (`Δ = 0`) |
+| `ruff` | `All checks passed!` | `All checks passed!` | sí |
+| `import-linter` | `Contracts: 4 kept, 0 broken.` | `Contracts: 4 kept, 0 broken.` | sí |
+| `mypy` | `Success: no issues found in 531 source files` | `Success: no issues found in 531 source files` | sí |
+| `replay-repro` | `REPRODUCIDO` `1E3ADAC2…` (`3 340 728 B` LF) | `REPRODUCIDO` `1E3ADAC2…` (`3 340 728 B` LF; 2ª corrida **IDÉNTICA**) | sí ⇒ **`Δ motor = 0` confirmado por CI** |
+
+⇒ **Cadena cerrada:** `v2.88.46-beta` (VERDE `37202334330`, **citado dentro** de este tag en §4) →
+**`v2.88.46.1-beta` TODO VERDE `37210471946`** (esta cita).
 
 ---
 
