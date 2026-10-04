@@ -42,6 +42,7 @@ from __future__ import annotations
 import hashlib
 import math
 from collections.abc import Mapping, Sequence
+from datetime import date
 from typing import Any
 
 from bolsa_application.applied_cost import applied_cost_from_fills
@@ -90,7 +91,14 @@ from bolsa_application.dia_d_multi_uncertainty import (
 #: ``levelEqualsInitialStop``/``maeReachedLevel`` y el token ``thesisExitCondition``). Responde a
 #: *qué condición* disparó un ``THESIS_EXIT``, sin tocar el motor (el nivel se lee del estado de la
 #: posición congelado al nacer y de la excursión ya medida). Un lector de v1/v2/v3 ignora lo nuevo.
-LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v4"
+#: v5 (V2.88.47) añade —ADITIVA— la DESAMBIGUACIÓN ``THESIS_EXIT`` vs ``STOP``: la SECUENCIA día a
+#: día por ciclo (mark, stop vigente y MAE/MFE persistido) y la RUTA por la que se invalidó la
+#: tesis (``thesisExitRoute``: ``ruta_mark``/``ruta_mae``/``ruta_ambas``/``sin_geometria``), más el
+#: primer día en que el MAE persistido alcanzó el nivel, si el cierre fue un stop ya tocado
+#: (``structuralStopCandidate``) y la huella del stop (``stopChanged``/``breakevenReached``). No
+#: toca el motor: sólo LEE la secuencia que la costura inerte (``--cycle-detail``) ya capturó. Un
+#: lector de v1/v2/v3/v4 ignora los campos nuevos.
+LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v5"
 
 #: Tipo del ledger de ciclos (la muestra cruda de UN sorteo).
 LEDGER_KIND = "DIA_D_AUTO_MULTI_CYCLE_LEDGER"
@@ -378,6 +386,18 @@ INVALIDATION_CONDITIONS: frozenset[str] = frozenset(
 #: Tolerancia RELATIVA para afirmar "el nivel es el stop inicial" (nunca una igualdad de ``float``).
 _INVALIDATION_REL_TOL = 1e-9
 
+#: Tokens DECLARADOS de la RUTA por la que un ``THESIS_EXIT`` quedó invalidado (capa v5, cerrado).
+#: ``ruta_mark``: el mark del día cruzó el nivel congelado (ruta directa). ``ruta_mae``: lo cruzó el
+#: MAE PERSISTIDO (``mfeMae.maeR``) —un stop ya tocado que el precio recuperó—. ``ruta_ambas``: los
+#: dos. ``sin_geometria``: falta el nivel o la secuencia (hueco declarado, nunca ``0``).
+THESIS_ROUTE_SIN_GEOMETRIA = "sin_geometria"
+THESIS_ROUTE_MARK = "ruta_mark"
+THESIS_ROUTE_MAE = "ruta_mae"
+THESIS_ROUTE_AMBAS = "ruta_ambas"
+THESIS_ROUTES: frozenset[str] = frozenset(
+    {THESIS_ROUTE_SIN_GEOMETRIA, THESIS_ROUTE_MARK, THESIS_ROUTE_MAE, THESIS_ROUTE_AMBAS}
+)
+
 
 def _adverse_r(
     price: Any,
@@ -482,6 +502,213 @@ def _invalidation_fields(
     }
 
 
+# ── Desambiguación THESIS_EXIT vs STOP (capa v5, aditiva) ─────────────────────────
+
+#: Bloque de huecos declarados de la capa v5 (nunca ``0``): se copia y se rellena por ciclo.
+_DISAMBIGUATION_EMPTY: dict[str, Any] = {
+    "thesisExitRoute": THESIS_ROUTE_SIN_GEOMETRIA,
+    "levelR": None,
+    "markAtExitR": None,
+    "minMarkR": None,
+    "persistedMaeR": None,
+    "persistedMaeAtExitR": None,
+    "firstTouchDay": None,
+    "markFirstTouchDay": None,
+    "daysToFirstTouch": None,
+    "touchBeforeExit": None,
+    "stopChanged": None,
+    "breakevenReached": None,
+    "stopAboveLevel": None,
+    "structuralStopCandidate": None,
+    "timelineDays": 0,
+}
+
+
+def _day_or_none(value: Any) -> str | None:
+    """Día ISO legible o ``None`` (un hueco declarado, nunca ``""`` disfrazado de fecha)."""
+    text = str(value or "").strip()
+    return text or None
+
+
+def _days_between(start: str | None, end: str | None) -> int | None:
+    """Días naturales entre dos fechas ISO (``None`` si falta alguna o no es legible)."""
+    if not start or not end:
+        return None
+    try:
+        return (date.fromisoformat(end) - date.fromisoformat(start)).days
+    except ValueError:
+        return None
+
+
+def _compact_sequence(sequence: Sequence[Mapping[str, Any]] | None) -> list[dict[str, Any]] | None:
+    """Proyección COMPACTA de la secuencia día a día (mark/stop/MAE/MFE); ``None`` si vacía.
+
+    Es la MATERIA PRIMA de la reconstrucción temporal: se publica en el ledger para que el
+    volcado ``--sequences`` la conserve sin re-ejecutar el harness. Sólo viaja lo mínimo para
+    fechar el toque del nivel; un hueco es ``None``, nunca ``0``.
+    """
+    rows = [row for row in (sequence or ()) if isinstance(row, Mapping)]
+    if not rows:
+        return None
+    return [
+        {
+            "day": _day_or_none(row.get("day")),
+            "mark": finite_number(row.get("mark")),
+            "currentStop": finite_number(row.get("currentStop")),
+            "maeR": finite_number(row.get("maeR")),
+            "mfeR": finite_number(row.get("mfeR")),
+        }
+        for row in rows
+    ]
+
+
+def _disambiguation_fields(
+    *,
+    timeline: Sequence[Mapping[str, Any]] | None,
+    direction: str | None,
+    level: float | None,
+    current_stop: float | None,
+    initial_stop: float | None,
+    position_initial_stop: float | None,
+    entry: float | None,
+    risk: float | None,
+    position_entry: float | None = None,
+    position_initial_risk: float | None = None,
+    exit_day: str | None = None,
+) -> dict[str, Any]:
+    """RUTA de la invalidación de UN ciclo (capa v5, aditiva; pura y determinista).
+
+    Reconstruye, desde la SECUENCIA día a día que la costura inerte capturó, **por qué** un cierre
+    ``THESIS_EXIT`` se separa de ``STOP_EJECUTADO`` pese a que el nivel congelado ES el stop inicial:
+
+    * ``ruta_mark`` — el mark del día cruzó el nivel congelado (ruta directa).
+    * ``ruta_mae`` — lo cruzó el MAE PERSISTIDO (``mfeMae.maeR``): un stop ya tocado que el precio
+      recuperó, y por eso el motor lo lee como invalidación de tesis y no como stop ejecutado.
+    * ``ruta_ambas`` — las dos señales.
+    * ``sin_geometria`` — falta el nivel o la secuencia (hueco declarado, nunca ``0``).
+
+    Publica además el primer día en que el MAE persistido alcanzó el nivel (``firstTouchDay``, con su
+    distancia al cierre), la huella del stop (``stopChanged``/``breakevenReached``/
+    ``stopAboveLevel``) y ``structuralStopCandidate``: si ALGÚN mark tocó el stop vigente. Para un
+    ``THESIS_EXIT`` ese booleano debe ser ``False`` (la precedencia del stop lo impediría); un
+    ``True`` señala una duplicidad semántica que se DECLARA, no se oculta. Un hueco es ``None``.
+    """
+    basis_entry = position_entry if position_entry is not None else entry
+    basis_risk = (
+        position_initial_risk
+        if position_initial_risk is not None and position_initial_risk > 0.0
+        else risk
+    )
+    rows = [row for row in (timeline or ()) if isinstance(row, Mapping)]
+    level_r = _adverse_r(level, entry=basis_entry, risk=basis_risk, direction=direction)
+    if level_r is None or not rows:
+        return {**_DISAMBIGUATION_EMPTY, "timelineDays": len(rows)}
+
+    direction_ok = direction in (LONG, SHORT)
+    mark_rs = [
+        value
+        for row in rows
+        if (
+            value := _adverse_r(
+                row.get("mark"), entry=basis_entry, risk=basis_risk, direction=direction
+            )
+        )
+        is not None
+    ]
+    mae_rs = [value for row in rows if (value := finite_number(row.get("maeR"))) is not None]
+    min_mark_r = min(mark_rs) if mark_rs else None
+    worst_mae = min(mae_rs) if mae_rs else None
+    mark_hit = min_mark_r is not None and min_mark_r <= level_r
+    mae_hit = worst_mae is not None and worst_mae <= level_r
+    if mark_hit and mae_hit:
+        route = THESIS_ROUTE_AMBAS
+    elif mark_hit:
+        route = THESIS_ROUTE_MARK
+    elif mae_hit:
+        route = THESIS_ROUTE_MAE
+    else:
+        route = THESIS_ROUTE_SIN_GEOMETRIA
+
+    first_touch_day: str | None = None
+    for row in rows:
+        mae = finite_number(row.get("maeR"))
+        if mae is not None and mae <= level_r:
+            first_touch_day = _day_or_none(row.get("day"))
+            break
+    mark_first_touch_day: str | None = None
+    for row in rows:
+        mark_r = _adverse_r(
+            row.get("mark"), entry=basis_entry, risk=basis_risk, direction=direction
+        )
+        if mark_r is not None and mark_r <= level_r:
+            mark_first_touch_day = _day_or_none(row.get("day"))
+            break
+
+    exit_label = _day_or_none(exit_day) or _day_or_none(rows[-1].get("day"))
+    exit_rows = [row for row in rows if _day_or_none(row.get("day")) == exit_label]
+    exit_row = exit_rows[-1] if exit_rows else rows[-1]
+    mark_at_exit_r = _adverse_r(
+        exit_row.get("mark"), entry=basis_entry, risk=basis_risk, direction=direction
+    )
+    mae_at_exit_r = finite_number(exit_row.get("maeR"))
+
+    current_stop_r = _adverse_r(
+        current_stop, entry=basis_entry, risk=basis_risk, direction=direction
+    )
+    reference_stop = position_initial_stop if position_initial_stop is not None else initial_stop
+    stop_at_exit = finite_number(exit_row.get("currentStop"))
+    stop_changed: bool | None = None
+    if stop_at_exit is not None and reference_stop is not None:
+        stop_changed = abs(stop_at_exit - reference_stop) > _INVALIDATION_REL_TOL * max(
+            1.0, abs(reference_stop)
+        )
+    breakeven: bool | None = None
+    if stop_at_exit is not None and basis_entry is not None and direction_ok:
+        breakeven = stop_at_exit >= basis_entry if direction == LONG else stop_at_exit <= basis_entry
+    stop_above = (
+        current_stop_r - level_r if current_stop_r is not None and level_r is not None else None
+    )
+    stop_above_level = stop_above > 0.0 if stop_above is not None else None
+
+    touched_stop = False
+    measured_stop = False
+    if direction_ok:
+        for row in rows:
+            mark = finite_number(row.get("mark"))
+            stop = finite_number(row.get("currentStop"))
+            if mark is None or stop is None:
+                continue
+            measured_stop = True
+            if direction == LONG and mark <= stop:
+                touched_stop = True
+            elif direction == SHORT and mark >= stop:
+                touched_stop = True
+    structural_candidate = touched_stop if measured_stop else None
+
+    if first_touch_day is None or exit_label is None:
+        touch_before: bool | None = None
+    else:
+        touch_before = first_touch_day != exit_label
+
+    return {
+        "thesisExitRoute": route,
+        "levelR": level_r,
+        "markAtExitR": mark_at_exit_r,
+        "minMarkR": min_mark_r,
+        "persistedMaeR": worst_mae,
+        "persistedMaeAtExitR": mae_at_exit_r,
+        "firstTouchDay": first_touch_day,
+        "markFirstTouchDay": mark_first_touch_day,
+        "daysToFirstTouch": _days_between(first_touch_day, exit_label),
+        "touchBeforeExit": touch_before,
+        "stopChanged": stop_changed,
+        "breakevenReached": breakeven,
+        "stopAboveLevel": stop_above_level,
+        "structuralStopCandidate": structural_candidate,
+        "timelineDays": len(rows),
+    }
+
+
 def build_cycle_ledger(
     *,
     round_trips: Sequence[Mapping[str, Any]],
@@ -492,6 +719,7 @@ def build_cycle_ledger(
     cost_rows: Sequence[Any] = (),
     close_rows: Sequence[Any] = (),
     invalidation_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
+    cycle_sequences_by_cycle: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
     entry_window_days: int = DEFAULT_ENTRY_WINDOW_DAYS,
     meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -511,7 +739,14 @@ def build_cycle_ledger(
     ``levelEqualsInitialStop``/``maeReachedLevel`` y el token ``thesisExitCondition``.
     ``invalidation_by_cycle`` es la captura —opt-in, inerte— del estado congelado de la posición por
     ``cycle_id`` (entrada real, stop y riesgo al nacer, nivel congelado y stop vigente); sin ella los
-    campos v4 quedan hueco declarado.
+    campos v4 quedan hueco declarado. La capa v5 añade —ADITIVA— la **desambiguación
+    ``THESIS_EXIT`` vs ``STOP``**: la ``thesisExitRoute`` (``ruta_mark``/``ruta_mae``/``ruta_ambas``/
+    ``sin_geometria``), el primer día en que el MAE persistido alcanzó el nivel (``firstTouchDay``/
+    ``daysToFirstTouch``/``touchBeforeExit``), el mark al cierre (``markAtExitR``/``minMarkR``), la
+    huella del stop (``stopChanged``/``breakevenReached``/``stopAboveLevel``) y
+    ``structuralStopCandidate`` (si algún mark tocó el stop vigente pese a clasificarse como tesis).
+    ``cycle_sequences_by_cycle`` es la SECUENCIA día a día por ``cycle_id`` capturada por la costura
+    (mark, stop vigente, MAE/MFE persistido); sin ella la capa v5 queda ``sin_geometria`` (hueco).
 
     Reglas duras: un valor ilegible queda ``None`` (nunca ``0``); el R neto sólo se afirma con
     fricción ``COMPLETE`` (con ``PARTIAL`` es un SUELO y se declara el hueco, jamás se publica el
@@ -597,8 +832,27 @@ def build_cycle_ledger(
             position_initial_stop=finite_number(capture.get("initialStop")),
             position_initial_risk=finite_number(capture.get("initialRisk")),
         )
+        sequence = (
+            cycle_sequences_by_cycle.get(cycle)
+            if (cycle_sequences_by_cycle and cycle)
+            else None
+        )
+        disambiguation = _disambiguation_fields(
+            timeline=sequence,
+            direction=direction,
+            level=finite_number(capture.get("invalidationPrice")),
+            current_stop=finite_number(capture.get("currentStop")),
+            initial_stop=initial_stop,
+            position_initial_stop=finite_number(capture.get("initialStop")),
+            entry=entry_price,
+            risk=risk,
+            position_entry=finite_number(capture.get("actualEntry")),
+            position_initial_risk=finite_number(capture.get("initialRisk")),
+            exit_day=normalize_day(trip.get("exitDay")),
+        )
         cycles.append(
             {
+                "cycleId": cycle or None,
                 "symbol": str(trip.get("symbol") or "").strip(),
                 "entryDay": normalize_day(trip.get("entryDay")) or "",
                 "exitDay": normalize_day(trip.get("exitDay")) or "",
@@ -620,6 +874,9 @@ def build_cycle_ledger(
                 "entryPrice": entry_price,
                 "stop": initial_stop,
                 **invalidation,
+                # ── Capa v5 (desambiguación THESIS_EXIT vs STOP) ──────────────────────
+                **disambiguation,
+                "sequence": _compact_sequence(sequence),
                 # ── Capa v2 (diagnóstico de la pérdida) ────────────────────────────────
                 "exitMechanism": mechanism,
                 "exitReason": evidence or (EXIT_MECHANISM_SIN_MECANISMO if not reason else reason),
@@ -1069,6 +1326,11 @@ __all__ = [
     "METRICS",
     "MIN_CYCLES_FOR_SAMPLING",
     "SCHEMA_VERSION",
+    "THESIS_ROUTES",
+    "THESIS_ROUTE_AMBAS",
+    "THESIS_ROUTE_MAE",
+    "THESIS_ROUTE_MARK",
+    "THESIS_ROUTE_SIN_GEOMETRIA",
     "build_cycle_ledger",
     "build_sampling_artifact",
 ]

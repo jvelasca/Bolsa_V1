@@ -28,6 +28,10 @@ from bolsa_application.dia_d_multi_sampling import (
     KIND,
     LEDGER_SCHEMA_VERSION,
     SCHEMA_VERSION,
+    THESIS_ROUTE_AMBAS,
+    THESIS_ROUTE_MAE,
+    THESIS_ROUTE_MARK,
+    THESIS_ROUTE_SIN_GEOMETRIA,
     build_cycle_ledger,
     build_sampling_artifact,
 )
@@ -132,7 +136,7 @@ def test_ledger_v3_is_additive_and_keeps_the_labels_the_fold_reads():
         regime_by_day={"2022-01-05": "range"},
         operational_regime_by_day={"2022-01-05": "SIDEWAYS"},
     )
-    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v4"
+    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v5"
     row = ledger["cycles"][0]
     # Campos v1 intactos (los que lee `_cell_cycles`).
     assert row["realizedR"] == 1.5
@@ -294,6 +298,128 @@ def test_ledger_v4_without_capture_declares_the_gap_never_zero():
     assert row["stopBasisMismatchR"] is None
     assert row["maeReachedLevel"] is None
     assert row["thesisExitCondition"] == INVALIDATION_CONDITION_SIN_GEOMETRIA
+
+
+# ── Ledger v5: desambiguación THESIS_EXIT vs STOP ────────────────────────────────
+
+
+def _sequence_trip() -> dict[str, Any]:
+    return _invalidation_trip()  # AAA, largo, entry 10.0 / stop 9.0 / ciclo C1
+
+
+def _v4_capture(**overrides: Any) -> dict[str, Any]:
+    base = {
+        "invalidationPrice": 9.0,
+        "currentStop": 9.0,
+        "initialStop": 9.0,
+        "initialRisk": 1.0,
+        "actualEntry": 10.0,
+    }
+    base.update(overrides)
+    return {"C1": base}
+
+
+def test_ledger_v5_route_is_mae_when_the_persisted_mae_crossed_the_level():
+    """La ruta de un THESIS_EXIT es el MAE PERSISTIDO: un stop ya tocado que el precio recuperó."""
+    ledger = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(),
+        cycle_sequences_by_cycle={
+            "C1": [
+                {"day": "2022-01-05", "mark": 10.0, "currentStop": 9.0, "maeR": -0.5, "mfeR": 0.2},
+                {"day": "2022-01-06", "mark": 10.1, "currentStop": 9.0, "maeR": -1.2, "mfeR": 0.3},
+                {"day": "2022-01-07", "mark": 10.2, "currentStop": 9.0, "maeR": -1.2, "mfeR": 0.4},
+            ]
+        },
+    )
+    row = ledger["cycles"][0]
+    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v5"
+    assert row["thesisExitRoute"] == THESIS_ROUTE_MAE
+    assert row["levelR"] == pytest.approx(-1.0)
+    assert row["minMarkR"] == pytest.approx(0.0)
+    assert row["markAtExitR"] == pytest.approx(0.2)
+    assert row["persistedMaeR"] == pytest.approx(-1.2)
+    # El MAE alcanzó el nivel el 06: el primer toque es ANTES del cierre declarado (07).
+    assert row["firstTouchDay"] == "2022-01-06"
+    assert row["daysToFirstTouch"] == 1
+    assert row["touchBeforeExit"] is True
+    # El mark nunca tocó el nivel ni el stop: no hay duplicidad con STRUCTURAL_STOP.
+    assert row["structuralStopCandidate"] is False
+    assert row["stopChanged"] is False
+    assert row["breakevenReached"] is False
+    assert row["timelineDays"] == 3
+    assert len(row["sequence"]) == 3
+
+
+def test_ledger_v5_route_is_mark_only_when_the_stop_is_below_the_level():
+    """La ruta del mark sólo aparece si el stop vigente quedó POR DEBAJO del nivel congelado."""
+    ledger = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(currentStop=8.5),
+        cycle_sequences_by_cycle={
+            "C1": [
+                {"day": "2022-01-05", "mark": 8.8, "currentStop": 8.5, "maeR": -0.9, "mfeR": 0.0},
+                {"day": "2022-01-07", "mark": 8.8, "currentStop": 8.5, "maeR": -0.9, "mfeR": 0.0},
+            ]
+        },
+    )
+    row = ledger["cycles"][0]
+    assert row["thesisExitRoute"] == THESIS_ROUTE_MARK
+    assert row["markFirstTouchDay"] == "2022-01-05"
+    # El mark (8.8) NO tocó el stop (8.5): sin duplicidad, aunque la ruta sea el mark.
+    assert row["structuralStopCandidate"] is False
+    assert row["stopAboveLevel"] is False
+
+
+def test_ledger_v5_flags_a_structural_stop_candidate_when_a_mark_touched_the_stop():
+    """Un mark que toca el stop vigente pese a clasificarse THESIS_EXIT se DECLARA (no se oculta)."""
+    ledger = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(),
+        cycle_sequences_by_cycle={
+            "C1": [
+                {"day": "2022-01-05", "mark": 9.0, "currentStop": 9.0, "maeR": -1.2, "mfeR": 0.1},
+                {"day": "2022-01-07", "mark": 9.4, "currentStop": 9.0, "maeR": -1.2, "mfeR": 0.1},
+            ]
+        },
+    )
+    row = ledger["cycles"][0]
+    assert row["structuralStopCandidate"] is True
+    assert row["thesisExitRoute"] == THESIS_ROUTE_AMBAS
+
+
+def test_ledger_v5_detects_a_ratcheted_stop_and_break_even():
+    ledger = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(currentStop=10.0),
+        cycle_sequences_by_cycle={
+            "C1": [
+                {"day": "2022-01-05", "mark": 10.3, "currentStop": 9.0, "maeR": -0.2},
+                {"day": "2022-01-07", "mark": 10.4, "currentStop": 10.0, "maeR": -0.2},
+            ]
+        },
+    )
+    row = ledger["cycles"][0]
+    assert row["stopChanged"] is True
+    assert row["breakevenReached"] is True
+    assert row["stopAboveLevel"] is True
+
+
+def test_ledger_v5_without_sequence_declares_the_gap_never_zero():
+    """Sin la secuencia capturada la capa v5 es un hueco declarado, nunca 0."""
+    ledger = build_cycle_ledger(round_trips=[_sequence_trip()], invalidation_by_cycle=_v4_capture())
+    row = ledger["cycles"][0]
+    assert row["thesisExitRoute"] == THESIS_ROUTE_SIN_GEOMETRIA
+    assert row["levelR"] is None
+    assert row["markAtExitR"] is None
+    assert row["persistedMaeR"] is None
+    assert row["firstTouchDay"] is None
+    assert row["daysToFirstTouch"] is None
+    assert row["touchBeforeExit"] is None
+    assert row["structuralStopCandidate"] is None
+    assert row["stopChanged"] is None
+    assert row["sequence"] is None
+    assert row["timelineDays"] == 0
 
 
 # ── Banda: descomposición venue / sampling / total ───────────────────────────────

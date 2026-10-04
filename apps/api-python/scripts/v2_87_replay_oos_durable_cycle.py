@@ -71,7 +71,7 @@ import logging
 import os
 import pathlib
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -363,17 +363,26 @@ async def _run_durable_replay(
     last_active_index: int | None = None
     end = len(days) if int(max_ticks) <= 0 else min(len(days), start_index + int(max_ticks))
 
-    # COSTURA INERTE (capa v4, Δ motor = 0): estado CONGELADO de cada posición ABIERTA al empezar el
+    # COSTURA INERTE (capa v5, Δ motor = 0): estado CONGELADO de cada posición ABIERTA al empezar el
     # tick —incluida la que se cierra EN este tick— keyed por ``cycle_id``. Antes del cierre el stop
     # vigente es el del último ratchet y el nivel de invalidación está congelado al nacer. NO toca el
     # motor: sólo LEE lo que ya produjo; con ``capture_cycle_detail`` apagado el replay es idéntico.
+    # La capa v5 ACUMULA además la SECUENCIA día a día por ciclo (mark, stop vigente y MAE/MFE
+    # persistido) para poder reconstruir POR QUÉ ruta se invalidó la tesis y no sólo el último
+    # fotograma. El ``set_index`` se adelanta al muestreo: sólo fija el día del cursor (no muta el
+    # estado del worker) y permite etiquetar cada fotograma con su día.
     invalidation_by_cycle: dict[str, dict[str, Any]] = {}
+    cycle_timeline: dict[str, list[dict[str, Any]]] = {}
     for index in range(start_index, end):
+        cursor.set_index(index)
         if capture_cycle_detail:
-            for position in (getattr(worker, "_v2_positions", {}) or {}).values():
+            day = cursor.current_day()
+            for symbol, position in (getattr(worker, "_v2_positions", {}) or {}).items():
                 cid = str(getattr(position, "cycle_id", "") or "")
                 if not cid:
                     continue
+                mfe_mae = getattr(position, "mfe_mae", None)
+                mfe_mae = mfe_mae if isinstance(mfe_mae, Mapping) else {}
                 invalidation_by_cycle[cid] = {
                     "invalidationPrice": getattr(position, "invalidation_price", None),
                     "actualEntry": getattr(position, "actual_entry", None),
@@ -382,7 +391,22 @@ async def _run_durable_replay(
                     "currentStop": getattr(position, "current_stop", None),
                     "direction": str(getattr(position, "direction", "") or ""),
                 }
-        cursor.set_index(index)
+                cycle_timeline.setdefault(cid, []).append(
+                    {
+                        "day": day,
+                        "symbol": str(symbol),
+                        "mark": cursor.price_script(str(symbol)),
+                        "currentStop": getattr(position, "current_stop", None),
+                        "invalidationPrice": getattr(position, "invalidation_price", None),
+                        "initialStop": getattr(position, "initial_stop", None),
+                        "actualEntry": getattr(position, "actual_entry", None),
+                        "initialRisk": getattr(position, "initial_risk", None),
+                        "direction": str(getattr(position, "direction", "") or ""),
+                        "maeR": mfe_mae.get("maeR"),
+                        "mfeR": mfe_mae.get("mfeR"),
+                        "remainingQty": getattr(position, "remaining_quantity", None),
+                    }
+                )
         report = await worker.auto_turn()
         for key in totals:
             totals[key] += int(getattr(report, key, 0) or 0)
@@ -572,6 +596,10 @@ async def _run_durable_replay(
             # Capa v4: geometría de la invalidación por ciclo (nivel congelado + stop vigente al
             # cierre), leída del estado de la posición. Aditiva y sin efecto en la decisión.
             "invalidationByCycle": invalidation_by_cycle,
+            # Capa v5: SECUENCIA día a día por ciclo. Permite saber el mark de cada día, cuándo
+            # el MAE persistido alcanzó el nivel y si el stop cambió (break-even/trailing), sin
+            # volver a mirar el motor. Un ciclo sin fotogramas es un hueco declarado.
+            "cycleTimeline": cycle_timeline,
             "closeRows": [
                 {
                     "executionId": str(getattr(row, "execution_id", "") or ""),
@@ -581,6 +609,26 @@ async def _run_durable_replay(
                 # (``journal_pairs()``, lectura pública); ``_v2_journal`` NO lo contiene.
                 for row in (worker.journal_pairs() or ())
                 if str(getattr(row, "kind", "") or "") == "position_close"
+            ],
+            # Cross-check de la ruta: los eventos RICOS de gestión (``auto_position_management``)
+            # declaran ``primaryReason``/``exitReasons``/``thesisInvalid``. Se proyectan de forma
+            # read-only para verificar que un ``THESIS_EXIT`` no trae ``structural_stop`` como
+            # motivo co-disparado (la precedencia lo impediría por construcción).
+            "managementRows": [
+                {
+                    "instrumentId": str(getattr(entry, "instrument_id", "") or ""),
+                    "day": str(getattr(entry, "created_at", "") or "")[:10],
+                    "reasonCodes": list(
+                        (getattr(entry, "payload", None) or {}).get("reasonCodes") or []
+                    ),
+                    "primaryReason": (getattr(entry, "payload", None) or {}).get("primaryReason"),
+                    "exitReasons": list(
+                        (getattr(entry, "payload", None) or {}).get("exitReasons") or []
+                    ),
+                    "thesisInvalid": (getattr(entry, "payload", None) or {}).get("thesisInvalid"),
+                }
+                for entry in (getattr(worker, "_v2_journal", ()) or ())
+                if str(getattr(entry, "event_type", "") or "") == "auto_position_management"
             ],
         }
 

@@ -6,9 +6,13 @@ El diagnóstico del origen de la pérdida (``v2_96``) aisló que el grueso del `
 vive en pocos ciclos cerrados por invalidación de tesis (``THESIS_EXIT``), pese a que el
 ``STOP_EJECUTADO`` domina en frecuencia con expectancy bruta ~0. Esta sonda abre esos ciclos:
 consume los ``K`` ledgers de ciclos que ``v2_94 --cycles --cycle-detail`` dejó por sorteo
-(``draw-XX/multi-cycles.json``, esquema ``dia-d-multi-cycle-ledger-v4``) y los pliega para saber
+(``draw-XX/multi-cycles.json``, esquema ``dia-d-multi-cycle-ledger-v5``) y los pliega para saber
 **dónde viven** —estrategia, dirección, año/régimen, edad, geometría (MAE/MFE/captura), calidad de
-entrada y coste— con su dispersión entre sorteos y su fragilidad.
+entrada y coste— con su dispersión entre sorteos y su fragilidad. La capa v5 añade la
+**desambiguación ``THESIS_EXIT`` vs ``STOP``**: por qué RUTA se invalidó la tesis (``ruta_mark`` vs
+``ruta_mae`` sobre el MAE PERSISTIDO), el primer día en que el nivel se alcanzó y la huella del stop.
+Con ``--sequences`` vuelca, además, la SECUENCIA día a día por ciclo (materia prima de la
+reconstrucción temporal).
 
 No re-ejecuta el harness: sólo LEE los artefactos ya producidos.
 
@@ -124,6 +128,29 @@ def _print_text(artifact: dict[str, Any]) -> None:
         print("-" * 100)
         for block in artifact[axis]:
             print(_fold_line(label_key, block))
+    disambiguation = (artifact["global"] or {}).get("disambiguation") or {}
+    if disambiguation:
+        print()
+        print("DESAMBIGUACIÓN THESIS_EXIT vs STOP (capa v5)")
+        print("-" * 100)
+        print(f"ruta                      {disambiguation.get('route')}")
+        print(f"ruta x MAE alcanzó nivel  {disambiguation.get('routeByMaeReached')}")
+        candidate = disambiguation.get("structuralStopCandidate") or {}
+        print(
+            f"candidato a stop tocado   {candidate.get('count')} de {candidate.get('measured')} "
+            f"({_fmt(candidate.get('share'), '.3f')})"
+        )
+        changed = disambiguation.get("stopChanged") or {}
+        breakeven = disambiguation.get("breakevenReached") or {}
+        print(
+            f"stop cambió / break-even  {changed.get('count')} / {breakeven.get('count')} "
+            f"(medidos {changed.get('measured')})"
+        )
+        first = disambiguation.get("daysToFirstTouch") or {}
+        print(
+            f"días hasta el primer toque media {_fmt(first.get('mean'), '.2f')} · "
+            f"mediana {_fmt(first.get('median'), '.2f')} · medidos {first.get('measured')}"
+        )
     print()
     print(f"motivos crudos            {artifact['rawReasonTokens']}")
     concentration = artifact["concentration"]
@@ -141,6 +168,79 @@ def _print_text(artifact: dict[str, Any]) -> None:
             print(f"  - {item}")
 
 
+#: Campos de la desambiguación v5 que viajan al volcado de secuencias (identidad estable).
+_DISAMBIGUATION_KEYS = (
+    "cycleId",
+    "symbol",
+    "entryDay",
+    "exitDay",
+    "realizedR",
+    "thesisExitRoute",
+    "levelR",
+    "markAtExitR",
+    "minMarkR",
+    "persistedMaeR",
+    "persistedMaeAtExitR",
+    "firstTouchDay",
+    "markFirstTouchDay",
+    "daysToFirstTouch",
+    "touchBeforeExit",
+    "stopChanged",
+    "breakevenReached",
+    "stopAboveLevel",
+    "structuralStopCandidate",
+)
+
+
+def _build_sequences_payload(ledgers: list[Any]) -> dict[str, Any]:
+    """Secuencia día a día de cada ``THESIS_EXIT`` (una fila por sorteo y ciclo).
+
+    La unidad es el CICLO POR SORTEO: el MISMO ciclo aparece en los ``K`` sorteos del venue, así
+    que el total es ``observaciones``, **no** ``K`` operaciones independientes. Se declara la
+    identidad única (símbolo + entrada + salida) para que la distinción nunca se pierda.
+    """
+    records: list[dict[str, Any]] = []
+    unique: set[tuple[str, str, str]] = set()
+    per_draw: dict[str, int] = {}
+    for draw_index, ledger in enumerate(ledgers):
+        count = 0
+        for row in ledger.get("cycles") or ():
+            if str(row.get("exitMechanism") or "") != "THESIS_EXIT":
+                continue
+            unique.add(
+                (
+                    str(row.get("symbol") or ""),
+                    str(row.get("entryDay") or ""),
+                    str(row.get("exitDay") or ""),
+                )
+            )
+            record = {key: row.get(key) for key in _DISAMBIGUATION_KEYS}
+            record["draw"] = draw_index
+            record["sequence"] = row.get("sequence")
+            records.append(record)
+            count += 1
+        per_draw[str(draw_index)] = count
+    return {
+        "kind": "DIA_D_AUTO_THESIS_STOP_SEQUENCES",
+        "schemaVersion": "dia-d-thesis-stop-sequences-v1",
+        "readOnly": True,
+        "basis": "entryDay",
+        "mechanism": "THESIS_EXIT",
+        "draws": len(ledgers),
+        "thesisExitObservations": len(records),
+        "uniqueCycleIdentities": len(unique),
+        "cyclesPerDraw": per_draw,
+        "limits": [
+            "La unidad es el CICLO POR SORTEO: el mismo ciclo aparece en los K sorteos del venue; "
+            "el total es OBSERVACIONES, no K operaciones financieras independientes.",
+            "La secuencia es el estado CAPTURADO al inicio de cada tick (mark/stop vigente/MAE "
+            "persistido); firstTouchDay es la fecha de la OBSERVACION, no el instante intrabar.",
+            "Advisory read-only: no cambia el motor, los umbrales, TOP_N ni la allocation.",
+        ],
+        "records": records,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -151,6 +251,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--draws", type=int, default=None, help="tope de sorteos a leer (por defecto, todos)")
     parser.add_argument("--json", action="store_true", help="emite el artefacto como JSON")
     parser.add_argument("--out", default=None, help="ruta del JSON del quirófano")
+    parser.add_argument(
+        "--sequences",
+        action="store_true",
+        help="volca la secuencia día a día de cada THESIS_EXIT (capa v5) además del quirófano",
+    )
+    parser.add_argument(
+        "--sequences-out",
+        default=None,
+        help="ruta del JSON de secuencias (por defecto, junto al quirófano)",
+    )
     args = parser.parse_args(argv)
 
     if args.draws is not None and int(args.draws) < 1:
@@ -177,7 +287,7 @@ def main(argv: list[str] | None = None) -> int:
     artifact = build_thesis_exit_artifact(
         draw_ledgers=ledgers,
         meta={
-            "bump": "2.11.46.1-beta",
+            "bump": "2.11.47-beta",
             "phase": "V2.97 DIA-D AUTO THESIS EXIT",
             "nature": "INVESTIGACION",
             "drawsDir": str(out_dir),
@@ -194,12 +304,29 @@ def main(argv: list[str] | None = None) -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(payload + "\n", encoding="utf-8")
 
+    sequences_path: pathlib.Path | None = None
+    if args.sequences:
+        sequences = _build_sequences_payload(ledgers)
+        sequences_payload = json.dumps(
+            sequences, indent=2, sort_keys=True, ensure_ascii=False, default=str
+        )
+        if args.sequences_out:
+            sequences_path = pathlib.Path(args.sequences_out)
+        else:
+            sequences_path = _REPO_ROOT / _OUT_SUBDIR / (
+                f"thesis-stop-sequences-{first_year}_{last_year}.json"
+            )
+        sequences_path.parent.mkdir(parents=True, exist_ok=True)
+        sequences_path.write_text(sequences_payload + "\n", encoding="utf-8")
+
     if args.json:
         print(payload)
     else:
         _print_text(artifact)
         print()
         print(f"quirófano                  {out_path}")
+        if sequences_path is not None:
+            print(f"secuencias                 {sequences_path}")
         print(f"sorteos leídos             {len(ledgers)} de {out_dir}")
     return 0
 

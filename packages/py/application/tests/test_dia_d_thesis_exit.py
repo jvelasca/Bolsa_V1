@@ -25,6 +25,7 @@ from bolsa_application.dia_d_thesis_exit import (
     KIND,
     MECHANISM,
     SCHEMA_VERSION,
+    STOP_PATHS,
     build_thesis_exit_artifact,
 )
 
@@ -59,6 +60,16 @@ def _row(
     mae_vs_level_r: float | None = None,
     mae_reached_level: bool | None = None,
     thesis_condition: str | None = "sin_geometria",
+    thesis_exit_route: str | None = None,
+    stop_changed: bool | None = None,
+    breakeven_reached: bool | None = None,
+    structural_stop_candidate: bool | None = None,
+    touch_before_exit: bool | None = None,
+    days_to_first_touch: int | None = None,
+    first_touch_day: str | None = None,
+    min_mark_r: float | None = None,
+    persisted_mae_r: float | None = None,
+    persisted_mae_at_exit_r: float | None = None,
 ) -> dict[str, Any]:
     return {
         "symbol": symbol,
@@ -90,6 +101,17 @@ def _row(
         "maeVsLevelR": mae_vs_level_r,
         "maeReachedLevel": mae_reached_level,
         "thesisExitCondition": thesis_condition,
+        # ── Capa v5: desambiguación THESIS_EXIT vs STOP (hueco por defecto, nunca 0) ──
+        "thesisExitRoute": thesis_exit_route,
+        "stopChanged": stop_changed,
+        "breakevenReached": breakeven_reached,
+        "structuralStopCandidate": structural_stop_candidate,
+        "touchBeforeExit": touch_before_exit,
+        "daysToFirstTouch": days_to_first_touch,
+        "firstTouchDay": first_touch_day,
+        "minMarkR": min_mark_r,
+        "persistedMaeR": persisted_mae_r,
+        "persistedMaeAtExitR": persisted_mae_at_exit_r,
     }
 
 
@@ -349,6 +371,60 @@ def test_invalidation_block_distinguishes_a_measured_zero_from_a_gap():
     assert invalidation["maeReachedLevel"]["share"] == pytest.approx(0.0)
 
 
+# ── Desambiguación THESIS_EXIT vs STOP (capa v5) ─────────────────────────────────
+
+
+def test_disambiguation_block_reports_the_mae_route_and_no_structural_candidate():
+    row = _row(
+        thesis_exit_route="ruta_mae",
+        stop_changed=False,
+        breakeven_reached=False,
+        structural_stop_candidate=False,
+        touch_before_exit=True,
+        days_to_first_touch=2,
+        first_touch_day="2022-01-06",
+        min_mark_r=0.0,
+        persisted_mae_r=-1.2,
+        persisted_mae_at_exit_r=-1.1,
+    )
+    artifact = build_thesis_exit_artifact(draw_ledgers=[_ledger([row])])
+    disambiguation = artifact["global"]["disambiguation"]
+    assert disambiguation["cycles"] == 1
+    assert disambiguation["route"] == {"ruta_mae": 1}
+    assert disambiguation["structuralStopCandidate"]["count"] == 0
+    assert disambiguation["structuralStopCandidate"]["measured"] == 1
+    assert disambiguation["structuralStopCandidate"]["share"] == pytest.approx(0.0)
+    assert disambiguation["touchBeforeExit"]["count"] == 1
+    assert disambiguation["daysToFirstTouch"]["mean"] == pytest.approx(2.0)
+    assert disambiguation["firstTouchMeasured"] == 1
+    assert disambiguation["persistedMaeR"]["mean"] == pytest.approx(-1.2)
+
+
+def test_disambiguation_flags_a_structural_stop_candidate_as_measured():
+    row = _row(thesis_exit_route="ruta_ambas", structural_stop_candidate=True)
+    artifact = build_thesis_exit_artifact(draw_ledgers=[_ledger([row])])
+    disambiguation = artifact["global"]["disambiguation"]
+    assert disambiguation["structuralStopCandidate"]["count"] == 1
+    assert disambiguation["routeByMaeReached"]["ruta_ambas"]["unknown"] == 1
+
+
+def test_disambiguation_by_route_and_stop_path_axes():
+    rows = [
+        _row(thesis_exit_route="ruta_mae", stop_changed=False, symbol="AAA"),
+        _row(thesis_exit_route="ruta_mae", stop_changed=True, breakeven_reached=True, symbol="BBB"),
+        _row(thesis_exit_route=None, symbol="CCC"),  # sin_geometria + stop path unknown
+    ]
+    artifact = build_thesis_exit_artifact(draw_ledgers=[_ledger(rows)])
+    by_route = {row["route"]: row["cycles"] for row in artifact["byRoute"]}
+    assert by_route == {"ruta_mae": 2, "sin_geometria": 1}
+    by_stop = {row["stopPath"]: row["cycles"] for row in artifact["byStopPath"]}
+    assert by_stop["sin_cambio"] == 1
+    assert by_stop["breakeven"] == 1
+    assert by_stop["unknown"] == 1
+    labels = [row["stopPath"] for row in artifact["byStopPath"]]
+    assert labels == [path for path in STOP_PATHS if path in by_stop]
+
+
 # ── Determinismo y contrato ──────────────────────────────────────────────────────
 
 
@@ -360,7 +436,7 @@ def test_artifact_is_deterministic_and_declares_its_contract():
     first = build_thesis_exit_artifact(draw_ledgers=ledgers)
     again = build_thesis_exit_artifact(draw_ledgers=ledgers)
     assert json.dumps(first, sort_keys=True) == json.dumps(again, sort_keys=True)
-    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-thesis-exit-v2"
+    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-thesis-exit-v3"
     assert first["kind"] == KIND == "DIA_D_AUTO_THESIS_EXIT"
     assert first["readOnly"] is True
     assert first["basis"] == "entryDay"
@@ -376,7 +452,12 @@ def test_empty_draws_declare_none_not_zero():
     assert artifact["global"]["realizedRGross"]["expectancyR"] is None
     assert artifact["global"]["realizedRNet"]["total"] is None
     assert artifact["global"]["excursion"]["maeR"]["mean"] is None
+    assert artifact["global"]["disambiguation"]["route"] == {}
+    assert artifact["global"]["disambiguation"]["daysToFirstTouch"]["mean"] is None
+    assert artifact["global"]["disambiguation"]["structuralStopCandidate"]["measured"] == 0
     assert artifact["byStrategy"] == []
+    assert artifact["byRoute"] == []
+    assert artifact["byStopPath"] == []
     assert artifact["concentration"]["distinctSymbols"] == 0
     assert artifact["concentration"]["topSymbol"] is None
 

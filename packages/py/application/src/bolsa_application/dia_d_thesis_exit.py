@@ -21,6 +21,9 @@ Ejes de la descomposición
 * **cómo entró** — excursión adversa temprana + slippage señal→ejecución.
 * **cuánto costó** — fricción en ``R`` y ``R`` neto (suelo declarado si falta fricción ``COMPLETE``).
 * **qué la invalidó** (v4) — nivel congelado, stop vigente al cierre y alcance del peor adverso.
+* **por qué ruta** (v5) — la ruta de la invalidación (``ruta_mark`` vs ``ruta_mae`` sobre el MAE
+  persistido), el primer día en que el nivel se alcanzó y la huella del stop (sin cambio / ratchet
+  / break-even). Responde a *por qué el mismo nivel produce* ``THESIS_EXIT`` *y no* ``STOP``.
 * **cuánta concentración** — símbolos distintos y clusters (top símbolo / top semana ISO).
 
 Reglas duras (heredadas, no se relajan)
@@ -52,11 +55,13 @@ from bolsa_application.dia_d_exit_mechanism import EXIT_MECHANISM_THESIS
 from bolsa_application.dia_d_multi_sampling import (
     INVALIDATION_CONDITION_SIN_GEOMETRIA,
     MIN_CYCLES_FOR_SAMPLING,
+    THESIS_ROUTE_SIN_GEOMETRIA,
 )
 from bolsa_application.dia_d_multi_uncertainty import MIN_DRAWS_FOR_BAND
 
-#: Versión del esquema del artefacto. Un cambio de forma la sube (v2: bloque ``invalidation``).
-SCHEMA_VERSION = "dia-d-thesis-exit-v2"
+#: Versión del esquema del artefacto. Un cambio de forma la sube (v2: bloque ``invalidation``;
+#: v3: bloque ``disambiguation`` + ejes ``byRoute``/``byStopPath``).
+SCHEMA_VERSION = "dia-d-thesis-exit-v3"
 
 #: Tipo del artefacto.
 KIND = "DIA_D_AUTO_THESIS_EXIT"
@@ -91,6 +96,24 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "al nacer). Cuando el stop del round trip (base de R del ledger) difiere del stop congelado de "
     "la posicion, se declara en stopBasisMismatchR: es una discrepancia MEDIDA y NO reconciliada "
     "aqui (afecta a la normalizacion, no al hecho observado del cierre).",
+    "La capa v5 (desambiguacion THESIS_EXIT vs STOP) es OPT-IN: exige la costura --cycle-detail con "
+    "la SECUENCIA dia a dia por ciclo. Sin ella, thesisExitRoute = sin_geometria y los booleanos "
+    "quedan None (hueco declarado, nunca 0).",
+    "thesisExitRoute distingue la RUTA de la invalidacion: ruta_mae = el MAE PERSISTIDO "
+    "(mfeMae.maeR) cruzo el nivel (un stop ya tocado que el precio recupero); ruta_mark = lo cruzo "
+    "el mark del dia. Para un THESIS_EXIT se espera ruta_mae: la precedencia del STRUCTURAL_STOP "
+    "sobre THESIS_INVALIDATION y la monotonia del ratchet (current_stop >= nivel) impiden la ruta "
+    "del mark. Es una RUTA de evaluacion medida, no una causa de mercado.",
+    "structuralStopCandidate=True en un THESIS_EXIT senala duplicidad semantica entre proteccion e "
+    "invalidacion de tesis: se DECLARA, no se reconcilia aqui.",
+    "firstTouchDay es el primer dia en que el MAE PERSISTIDO alcanzo el nivel (fecha de la "
+    "OBSERVACION, no necesariamente del minimo intrabar): es la mejor reconstruccion disponible en "
+    "D1 y no se presenta como el instante exacto del toque.",
+    "AUTO NO deja una orden STOP en reposo: el stop lo ejecuta el decider D1 (mark vs current_stop). "
+    "Por eso no se declara 'existia orden STOP': no aplica a este motor.",
+    "La distincion ciclos UNICOS (los THESIS_EXIT) vs observaciones pooled (ciclos x K sorteos) "
+    "sigue vigente: la unidad de remuestreo es el ciclo por sorteo; no se suman como operaciones "
+    "financieras independientes.",
     "La edad es en DIAS NATURALES entre entryDay y exitDay (el replay es D1): no son barras "
     "efectivas ni intradia, y el dia de entrada puede incluir movimiento previo al fill.",
     "La distancia al objetivo NO es medible (el round trip no guarda el target): se aproxima con "
@@ -283,6 +306,98 @@ def _invalidation_fold(present: Sequence[Sequence[Mapping[str, Any]]]) -> dict[s
     }
 
 
+# ── Desambiguación THESIS_EXIT vs STOP (capa v5): por qué ruta se invalidó ────────
+
+#: Orden declarado de las rutas de la parada (``byStopPath``); un hueco cae en ``unknown``.
+STOP_PATHS: tuple[str, ...] = ("sin_cambio", "ratchet", "breakeven", "unknown")
+
+
+def _boolean_block(values: Sequence[bool]) -> dict[str, Any]:
+    """Recuento de un booleano MEDIDO (``share`` ``None`` sin muestra; nunca ``0`` inventado)."""
+    return {
+        "count": sum(values),
+        "measured": len(values),
+        "share": (sum(values) / len(values)) if values else None,
+    }
+
+
+def _stop_path(row: Mapping[str, Any]) -> str:
+    """Ruta del STOP declarada: sin cambio, ratchet (subió sin break-even) o break-even.
+
+    Un hueco (``stopChanged`` no medido) cae en ``unknown``: no se inventa que el stop se movió.
+    """
+    changed = row.get("stopChanged")
+    if not isinstance(changed, bool):
+        return "unknown"
+    if not changed:
+        return "sin_cambio"
+    breakeven = row.get("breakevenReached")
+    if isinstance(breakeven, bool) and breakeven:
+        return "breakeven"
+    return "ratchet"
+
+
+def _disambiguation_fold(present: Sequence[Sequence[Mapping[str, Any]]]) -> dict[str, Any]:
+    """Bloque de la RUTA de invalidación de un conjunto de ciclos (capa v5, declarada).
+
+    Publica el histograma de ``thesisExitRoute`` (``ruta_mark``/``ruta_mae``/``ruta_ambas``/
+    ``sin_geometria``), su cruce con ``maeReachedLevel``, el primer día en que el MAE persistido
+    alcanzó el nivel (``daysToFirstTouch``), y los booleanos que separan un stop sin tocar de uno
+    ya ejecutado (``structuralStopCandidate``/``touchBeforeExit``/``stopChanged``/
+    ``breakevenReached``/``stopAboveLevel``). Un hueco es ``None``, nunca ``0``.
+    """
+    rows = [row for group in present for row in group]
+    routes: dict[str, int] = {}
+    cross: dict[str, dict[str, int]] = {}
+    for row in rows:
+        token = str(row.get("thesisExitRoute") or "").strip() or THESIS_ROUTE_SIN_GEOMETRIA
+        routes[token] = routes.get(token, 0) + 1
+        bucket = cross.setdefault(token, {"reached": 0, "notReached": 0, "unknown": 0})
+        reached = row.get("maeReachedLevel")
+        if isinstance(reached, bool):
+            bucket["reached" if reached else "notReached"] += 1
+        else:
+            bucket["unknown"] += 1
+
+    def _bools(key: str) -> list[bool]:
+        return [bool(row[key]) for row in rows if isinstance(row.get(key), bool)]
+
+    def _nums(key: str) -> list[float]:
+        return [value for row in rows if (value := finite_number(row.get(key))) is not None]
+
+    days = [
+        float(row["daysToFirstTouch"])
+        for row in rows
+        if isinstance(row.get("daysToFirstTouch"), int)
+    ]
+    min_marks = _nums("minMarkR")
+    maes = _nums("persistedMaeR")
+    mae_exit = _nums("persistedMaeAtExitR")
+    return {
+        "cycles": len(rows),
+        "route": {token: routes[token] for token in sorted(routes)},
+        "routeByMaeReached": {token: cross[token] for token in sorted(cross)},
+        "structuralStopCandidate": _boolean_block(_bools("structuralStopCandidate")),
+        "touchBeforeExit": _boolean_block(_bools("touchBeforeExit")),
+        "stopChanged": _boolean_block(_bools("stopChanged")),
+        "breakevenReached": _boolean_block(_bools("breakevenReached")),
+        "stopAboveLevel": _boolean_block(_bools("stopAboveLevel")),
+        "minMarkR": {"mean": _mean(min_marks), "median": _median(min_marks), "measured": len(min_marks)},
+        "persistedMaeR": {"mean": _mean(maes), "median": _median(maes), "measured": len(maes)},
+        "persistedMaeAtExitR": {
+            "mean": _mean(mae_exit),
+            "median": _median(mae_exit),
+            "measured": len(mae_exit),
+        },
+        "daysToFirstTouch": {
+            "mean": _mean(days),
+            "median": _median(days),
+            "measured": len(days),
+        },
+        "firstTouchMeasured": sum(1 for row in rows if row.get("firstTouchDay")),
+    }
+
+
 # ── Plegado de un conjunto de ciclos (con dispersión entre sorteos + fragilidad) ──
 
 
@@ -439,6 +554,7 @@ def _fold(draw_rows: Sequence[Sequence[Mapping[str, Any]]], draws_total: int) ->
             },
         },
         "invalidation": _invalidation_fold(present),
+        "disambiguation": _disambiguation_fold(present),
         "fragility": {"fragile": bool(reasons), "reasons": reasons},
     }
 
@@ -602,6 +718,9 @@ def build_thesis_exit_artifact(
             "entry",
             "cost",
             "invalidation",
+            "disambiguation",
+            "route",
+            "stopPath",
         ],
         "coverage": resolved_coverage,
         "global": global_block,
@@ -642,6 +761,20 @@ def build_thesis_exit_artifact(
             draws_total=draws_total,
             order=AGE_BUCKETS,
         ),
+        "byRoute": _fold_dimension(
+            per_draw_rows,
+            key_fn=lambda row: str(row.get("thesisExitRoute") or "").strip()
+            or THESIS_ROUTE_SIN_GEOMETRIA,
+            label_key="route",
+            draws_total=draws_total,
+        ),
+        "byStopPath": _fold_dimension(
+            per_draw_rows,
+            key_fn=_stop_path,
+            label_key="stopPath",
+            draws_total=draws_total,
+            order=STOP_PATHS,
+        ),
         "rawReasonTokens": _raw_reason_tokens(all_rows),
         "concentration": _concentration(all_rows),
         "recompileNote": (
@@ -663,5 +796,6 @@ __all__ = [
     "KIND",
     "MECHANISM",
     "SCHEMA_VERSION",
+    "STOP_PATHS",
     "build_thesis_exit_artifact",
 ]
