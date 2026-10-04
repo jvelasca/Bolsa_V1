@@ -142,6 +142,24 @@ def _management_rows_with_cycle(
     return rows
 
 
+def _minted_exit_cycles(
+    pre_exit_ids: set[str], exit_orders: Mapping[str, Any]
+) -> set[str]:
+    """Cycle ids que ESTRENARON un INTENT de salida en el tick (capa v7, read-only).
+
+    El spine mintea un ``ExitOrder`` durable por ciclo ANTES de liquidar (``_v2_reserve_exit``):
+    si el ciclo del toque estrena identidad en ``_v2_exit_orders`` este tick, la ORDEN llegó a
+    crearse; si no, un veto previo la dejó sin orden. Es la señal POR CICLO que ``dayOrders``
+    (global de DÍA) no puede dar. Sólo se comparan las claves NUEVAS respecto al pre-tick; un
+    ``cycle_id`` vacío no vota (hueco declarado, nunca un ciclo inventado).
+    """
+    return {
+        str(getattr(order, "cycle_id", "") or "")
+        for exit_id, order in (exit_orders or {}).items()
+        if exit_id not in pre_exit_ids
+    } - {""}
+
+
 # ── Espejos en memoria con instrumentación DECLARADA ─────────────────────────────
 
 
@@ -305,7 +323,10 @@ async def _run_durable_replay(
     ``capture_cycle_detail`` (default ``False``, INERTE: con él apagado el comportamiento es
     idéntico) captura, al terminar, los fills durables con su ``reference_mid``/``cycle_id`` y los
     motivos de cierre ``position_close`` del journal. Es la materia prima —ya producida por el
-    motor— del diagnóstico de dónde nace la pérdida; no cambia ninguna decisión de trading."""
+    motor— del diagnóstico de dónde nace la pérdida; no cambia ninguna decisión de trading. La
+    capa v7 añade, por fotograma, ``orderCreated`` (¿el tick ESTRENÓ el INTENT de salida del
+    ciclo?) leyendo el diff de ``_v2_exit_orders`` antes/después de ``auto_turn``: es la señal por
+    ciclo que separa «no se creó orden» de «orden sin fill» (``dayOrders`` es de DÍA, no de ciclo)."""
     capture_cycle_detail = bool(capture_cycle_detail)
     from bolsa_analytics.cognitive.measurement import MEASUREMENT_UNKNOWN
     from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
@@ -448,7 +469,20 @@ async def _run_durable_replay(
                 # decisión del tick (mismos campos del mismo día; no se crea un segundo frame).
                 open_frames[str(symbol)] = frame
                 cycle_by_symbol_day[(str(symbol), day)] = cid
+        # Capa v7 (DÍA-D-3h): identificar qué ciclos ESTRENARON un INTENT de salida en este tick
+        # (``_v2_exit_orders`` crece en ``_v2_reserve_exit`` antes de liquidar). El diff se toma
+        # ANTES de ``auto_turn`` y se resuelve tras él, PERO antes de ``close_tick`` (que corre
+        # ``_v2_sync_exit_orders`` y poda los INTENT cerrados). Sólo LEE; con la costura apagada
+        # no se ejecuta (Δ motor = 0).
+        pre_exit_ids = (
+            set(getattr(worker, "_v2_exit_orders", {}) or {}) if capture_cycle_detail else set()
+        )
         report = await worker.auto_turn()
+        minted_exit_cycles = (
+            _minted_exit_cycles(pre_exit_ids, getattr(worker, "_v2_exit_orders", {}) or {})
+            if capture_cycle_detail
+            else set()
+        )
         for key in totals:
             totals[key] += int(getattr(report, key, 0) or 0)
 
@@ -513,6 +547,9 @@ async def _run_durable_replay(
                     live is not None and str(getattr(live, "cycle_id", "") or "") == cid
                 )
                 frame["filledQty"] = filled_by_cycle.get(cid, 0.0)
+                # Capa v7 (DÍA-D-3h): ¿el tick ESTRENÓ el INTENT de salida del ciclo? Sólo se
+                # puede afirmar con un ``cycle_id`` conocido; sin él es un hueco declarado (None).
+                frame["orderCreated"] = (cid in minted_exit_cycles) if cid else None
                 # Señal de DÍA (declarada NO por-ciclo): el tick produjo órdenes/fills globales.
                 frame["dayOrders"] = int(getattr(report, "orders", 0) or 0)
                 frame["dayFills"] = int(getattr(report, "fills", 0) or 0)

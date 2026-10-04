@@ -136,7 +136,7 @@ def test_ledger_v3_is_additive_and_keeps_the_labels_the_fold_reads():
         regime_by_day={"2022-01-05": "range"},
         operational_regime_by_day={"2022-01-05": "SIDEWAYS"},
     )
-    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v6"
+    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v7"
     row = ledger["cycles"][0]
     # Campos v1 intactos (los que lee `_cell_cycles`).
     assert row["realizedR"] == 1.5
@@ -333,7 +333,7 @@ def test_ledger_v5_route_is_mae_when_the_persisted_mae_crossed_the_level():
         },
     )
     row = ledger["cycles"][0]
-    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v6"
+    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v7"
     assert row["thesisExitRoute"] == THESIS_ROUTE_MAE
     assert row["levelR"] == pytest.approx(-1.0)
     assert row["minMarkR"] == pytest.approx(0.0)
@@ -481,7 +481,7 @@ def test_ledger_v6_matches_the_structural_stop_token_case_insensitively():
 
 
 def test_ledger_v6_decision_route_evaluated_without_materialization():
-    """El stop DISPARÓ como motivo del tick pero no hubo fill: el toque no se materializó."""
+    """El stop DISPARÓ y NO se creó orden (``orderCreated=False``): caso A, sin orden."""
     ledger = build_cycle_ledger(
         round_trips=[_sequence_trip()],
         invalidation_by_cycle=_v4_capture(),
@@ -494,15 +494,74 @@ def test_ledger_v6_decision_route_evaluated_without_materialization():
                     decisionLabel="thesis_exit",
                     filledQty=0.0,
                     survived=True,
+                    orderCreated=False,
                 )
             ]
         },
     )
     row = ledger["cycles"][0]
-    assert row["decisionRoute"] == "stop_evaluado_sin_materializar"
+    assert row["decisionRoute"] == "stop_evaluado_sin_orden"
     assert row["stopEvaluatedOnTouch"] is True
     assert row["deciderRanOnTouch"] is True
     assert row["stopFiredNotFilled"] is True
+
+
+def test_ledger_v7_decision_route_order_created_without_fill_is_case_c():
+    """Capa v7: el stop disparó, se ESTRENÓ la orden (``orderCreated=True``) y no hubo fill (caso C)."""
+    ledger = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(),
+        cycle_sequences_by_cycle={
+            "C1": [
+                _decision_frame(
+                    "2022-01-07",
+                    mark=8.8,
+                    decisionReasons=["STRUCTURAL_STOP"],
+                    decisionLabel="thesis_exit",
+                    filledQty=0.0,
+                    survived=True,
+                    orderCreated=True,
+                )
+            ]
+        },
+    )
+    row = ledger["cycles"][0]
+    assert row["decisionRoute"] == "orden_creada_sin_fill"
+    assert row["stopEvaluatedOnTouch"] is True
+    assert row["stopFiredNotFilled"] is True
+
+
+def test_ledger_v7_decision_route_unmeasured_order_is_a_declared_hueco():
+    """Capa v7: si no se pudo MEDIR la orden (``None``) y ninguna se midió creada, es hueco."""
+    ledger = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(),
+        cycle_sequences_by_cycle={
+            "C1": [
+                _decision_frame(
+                    "2022-01-07",
+                    mark=8.8,
+                    decisionReasons=["STRUCTURAL_STOP"],
+                    decisionLabel="thesis_exit",
+                    filledQty=0.0,
+                    survived=True,
+                    # Sin ``orderCreated``: la costura no lo midió en este tick.
+                ),
+                _decision_frame(
+                    "2022-01-08",
+                    mark=8.7,
+                    decisionReasons=["STRUCTURAL_STOP"],
+                    decisionLabel="thesis_exit",
+                    filledQty=0.0,
+                    survived=True,
+                    orderCreated=False,
+                ),
+            ]
+        },
+    )
+    row = ledger["cycles"][0]
+    assert row["decisionRoute"] == "stop_evaluado_sin_materializar"
+    assert row["stopTouchDays"] == 2
 
 
 def test_ledger_v6_decision_route_not_evaluated_when_the_stop_never_fired():

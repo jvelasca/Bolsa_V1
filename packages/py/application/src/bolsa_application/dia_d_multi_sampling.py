@@ -106,7 +106,13 @@ from bolsa_application.dia_d_multi_uncertainty import (
 #: cierra la pregunta A/B/C de ``v2.88.47`` sin contrafactual. Declara además ``timelineStartsAt``
 #: (``D47-01``): la secuencia empieza en el PRIMER tick D1 COMPLETO post-entrada; el día de entrada
 #: no tiene fotograma. Sólo LEE lo que el worker ya produjo; ``Δ motor = 0``.
-LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v6"
+#: v7 (V2.88.49) añade —ADITIVA— la EXISTENCIA DE ORDEN por ciclo: la secuencia lleva
+#: ``orderCreated`` (¿el tick ESTRENÓ el INTENT durable de salida del ciclo?) y ``decisionRoute``
+#: SEPARA «no se creó orden» (``stop_evaluado_sin_orden``, caso A) de «orden sin fill»
+#: (``orden_creada_sin_fill``, caso C). ``stop_evaluado_sin_materializar`` queda SÓLO como hueco
+#: declarado cuando no se pudo medir si hubo orden (nunca ``0``). La señal es POR CICLO (diff de
+#: ``_v2_exit_orders``), no el agregado de DÍA ``dayOrders``. Sólo LEE; ``Δ motor = 0``.
+LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v7"
 
 #: Tipo del ledger de ciclos (la muestra cruda de UN sorteo).
 LEDGER_KIND = "DIA_D_AUTO_MULTI_CYCLE_LEDGER"
@@ -406,22 +412,29 @@ THESIS_ROUTES: frozenset[str] = frozenset(
     {THESIS_ROUTE_SIN_GEOMETRIA, THESIS_ROUTE_MARK, THESIS_ROUTE_MAE, THESIS_ROUTE_AMBAS}
 )
 
-#: Tokens DECLARADOS de la RUTA DE DECISIÓN del toque del stop (capa v6, cerrado). Responde a la
+#: Tokens DECLARADOS de la RUTA DE DECISIÓN del toque del stop (capa v6/v7, cerrado). Responde a la
 #: pregunta A/B/C de ``v2.88.47`` SIN contrafactual, desde la huella que el worker ya dejó:
 #: ``materializado`` — el stop se evaluó Y el tick produjo un fill del ciclo (el stop ejecutó);
-#: ``stop_evaluado_sin_materializar`` — el stop se evaluó (``STRUCTURAL_STOP`` disparado) pero el
-#: tick no materializó fill (aglutina «orden no materializada» y «sin fill por vetos»: no separable
-#: por-ciclo desde la costura); ``stop_no_evaluado`` — el toque ocurre pero ``STRUCTURAL_STOP`` no
-#: aparece en los motivos disparados (el decider no evaluó el stop ese tick); ``sin_toque`` — hay
-#: secuencia pero ningún fotograma alcanzó el stop vigente; ``sin_traza`` — sin secuencia capturada
-#: (hueco declarado, nunca ``0``).
+#: ``orden_creada_sin_fill`` (caso C, capa v7) — el stop se evaluó, el tick ESTRENÓ un INTENT de
+#: salida del ciclo y NO hubo fill (la orden existe; falla ejecución/venue aguas abajo);
+#: ``stop_evaluado_sin_orden`` (caso A, capa v7) — el stop se evaluó pero NO se creó orden (veto o
+#: corte del spine antes de ``_v2_reserve_exit``); ``stop_evaluado_sin_materializar`` (HUECO, capa
+#: v7) — el stop se evaluó y no se pudo MEDIR si hubo orden (``orderCreated`` ``None``): aglutina
+#: sólo lo no medido, nunca una clasificación inventada; ``stop_no_evaluado`` — el toque ocurre
+#: pero ``STRUCTURAL_STOP`` no aparece en los motivos disparados; ``sin_toque`` — hay secuencia
+#: pero ningún fotograma alcanzó el stop vigente; ``sin_traza`` — sin secuencia capturada (hueco
+#: declarado, nunca ``0``).
 DECISION_ROUTE_MATERIALIZADO = "materializado"
+DECISION_ROUTE_ORDEN_SIN_FILL = "orden_creada_sin_fill"
+DECISION_ROUTE_EVALUADO_SIN_ORDEN = "stop_evaluado_sin_orden"
 DECISION_ROUTE_EVALUADO_SIN_MATERIALIZAR = "stop_evaluado_sin_materializar"
 DECISION_ROUTE_NO_EVALUADO = "stop_no_evaluado"
 DECISION_ROUTE_SIN_TOQUE = "sin_toque"
 DECISION_ROUTE_SIN_TRAZA = "sin_traza"
 DECISION_ROUTES: tuple[str, ...] = (
     DECISION_ROUTE_MATERIALIZADO,
+    DECISION_ROUTE_ORDEN_SIN_FILL,
+    DECISION_ROUTE_EVALUADO_SIN_ORDEN,
     DECISION_ROUTE_EVALUADO_SIN_MATERIALIZAR,
     DECISION_ROUTE_NO_EVALUADO,
     DECISION_ROUTE_SIN_TOQUE,
@@ -612,6 +625,11 @@ def _compact_sequence(sequence: Sequence[Mapping[str, Any]] | None) -> list[dict
             "decisionLabel": _day_or_none(row.get("decisionLabel")),
             "filledQty": finite_number(row.get("filledQty")),
             "survived": bool(row["survived"]) if isinstance(row.get("survived"), bool) else None,
+            # Capa v7 (DÍA-D-3h): ¿el tick ESTRENÓ el INTENT de salida del ciclo? Señal POR CICLO
+            # (diff de ``_v2_exit_orders``), no el agregado de DÍA ``dayOrders``. Hueco declarado.
+            "orderCreated": (
+                bool(row["orderCreated"]) if isinstance(row.get("orderCreated"), bool) else None
+            ),
             "dayOrders": (
                 int(row["dayOrders"]) if isinstance(row.get("dayOrders"), int) else None
             ),
@@ -790,15 +808,22 @@ def _decision_correlation_fields(
     timeline: Sequence[Mapping[str, Any]] | None,
     direction: str | None,
 ) -> dict[str, Any]:
-    """Correlación DECISIÓN↔CICLO de UN ciclo (capa v6, pura y determinista).
+    """Correlación DECISIÓN↔CICLO de UN ciclo (capa v6/v7, pura y determinista).
 
     Cierra la pregunta A/B/C que ``v2.88.47`` dejó abierta SIN contrafactual: una vez medido que el
     mark tocó el stop vigente (``structuralStopCandidate``), aquí se lee —del mismo fotograma del
     día, capturado por la costura inerte— **qué hizo el decider** ese tick (``decisionReasons``/
-    ``decisionLabel``) y **si el toque se materializó** (``filledQty``/``survived``). Distingue:
+    ``decisionLabel``) y **si el toque se materializó** (``filledQty``/``survived``/``orderCreated``).
+    Distingue:
 
     * ``materializado`` — el stop disparó Y el tick produjo fill del ciclo (el stop ejecutó).
-    * ``stop_evaluado_sin_materializar`` — el stop disparó pero no hubo fill (A/C agrupadas).
+    * ``orden_creada_sin_fill`` (caso C, capa v7) — el stop disparó, el tick ESTRENÓ un INTENT de
+      salida del ciclo y NO hubo fill: la orden existe y falla ejecución/venue aguas abajo.
+    * ``stop_evaluado_sin_orden`` (caso A, capa v7) — el stop disparó pero NO se creó orden (veto o
+      corte del spine antes de ``_v2_reserve_exit``), medido en TODOS los ticks disparados.
+    * ``stop_evaluado_sin_materializar`` (HUECO, capa v7) — el stop disparó y no se pudo MEDIR si
+      hubo orden (``orderCreated`` ``None``): aglutina sólo lo NO MEDIDO, nunca una clasificación
+      inventada (antes agrupaba A y C; ahora sólo el hueco).
     * ``stop_no_evaluado`` — el toque ocurre pero el stop NO aparece en los motivos disparados.
     * ``sin_toque`` — hay secuencia pero ningún mark alcanzó el stop vigente.
     * ``sin_traza`` — sin secuencia (hueco declarado; nunca ``0``).
@@ -823,6 +848,8 @@ def _decision_correlation_fields(
     decider_ran = False
     fired_not_filled = False
     materialized = False
+    #: ``orderCreated`` de cada tick en que el stop DISPARÓ (``True``/``False``/``None`` = hueco).
+    fired_order_created: list[bool | None] = []
     for row in rows:
         mark = finite_number(row.get("mark"))
         stop = finite_number(row.get("currentStop"))
@@ -848,6 +875,9 @@ def _decision_correlation_fields(
             decider_ran = True
         if stop_fired:
             evaluated = True
+            fired_order_created.append(
+                row["orderCreated"] if isinstance(row.get("orderCreated"), bool) else None
+            )
         filled = finite_number(row.get("filledQty"))
         survived = row.get("survived") if isinstance(row.get("survived"), bool) else None
         if stop_fired and filled is not None and filled > 0.0:
@@ -859,7 +889,16 @@ def _decision_correlation_fields(
         route = DECISION_ROUTE_SIN_TOQUE
     elif materialized:
         route = DECISION_ROUTE_MATERIALIZADO
+    elif evaluated and any(created is True for created in fired_order_created):
+        # Caso C: la orden llegó a crearse en algún tick disparado y ningún tick llenó.
+        route = DECISION_ROUTE_ORDEN_SIN_FILL
+    elif evaluated and fired_order_created and all(
+        created is False for created in fired_order_created
+    ):
+        # Caso A: TODOS los ticks disparados se MIDIERON sin orden (veto/corte previo).
+        route = DECISION_ROUTE_EVALUADO_SIN_ORDEN
     elif evaluated:
+        # Hueco: hubo disparo pero algún ``orderCreated`` no se pudo medir (``None``) y ninguno True.
         route = DECISION_ROUTE_EVALUADO_SIN_MATERIALIZAR
     else:
         route = DECISION_ROUTE_NO_EVALUADO
@@ -916,7 +955,10 @@ def build_cycle_ledger(
     ``stopEvaluatedOnTouch``/``deciderRanOnTouch``/``stopFiredNotFilled``): la secuencia lleva la
     huella de decisión del tick (``decisionReasons``/``decisionLabel``/``filledQty``/``survived``/
     ``dayOrders``/``dayFills``) y el ciclo publica si el toque del stop fue no evaluado, evaluado sin
-    materializar o materializado. ``management_by_cycle`` es la proyección de los eventos de gestión
+    materializar o materializado. La capa v7 añade —ADITIVA— la **EXISTENCIA DE ORDEN por ciclo**
+    (``orderCreated`` en la secuencia): ``decisionRoute`` SEPARA el caso A (``stop_evaluado_sin_orden``)
+    del caso C (``orden_creada_sin_fill``) y deja ``stop_evaluado_sin_materializar`` SÓLO como hueco
+    declarado (no se pudo medir si hubo orden). ``management_by_cycle`` es la proyección de los eventos de gestión
     (``auto_position_management``) unidos a su ``cycle_id`` por la costura; sin ella el bloque
     ``management`` queda hueco declarado. Declara además ``timelineStartsAt`` (``D47-01``): la
     secuencia empieza en el primer tick D1 completo POST-ENTRADA, no en el día de entrada.
@@ -1503,8 +1545,10 @@ __all__ = [
     "AXES",
     "DECISION_ROUTES",
     "DECISION_ROUTE_EVALUADO_SIN_MATERIALIZAR",
+    "DECISION_ROUTE_EVALUADO_SIN_ORDEN",
     "DECISION_ROUTE_MATERIALIZADO",
     "DECISION_ROUTE_NO_EVALUADO",
+    "DECISION_ROUTE_ORDEN_SIN_FILL",
     "DECISION_ROUTE_SIN_TOQUE",
     "DECISION_ROUTE_SIN_TRAZA",
     "DECISION_STRUCTURAL_STOP_TOKEN",

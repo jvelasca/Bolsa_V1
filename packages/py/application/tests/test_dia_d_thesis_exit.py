@@ -485,6 +485,24 @@ def test_decision_correlation_by_route_axis_is_ordered_and_declared():
     assert labels == [route for route in DECISION_ROUTES if route in by_route]
 
 
+def test_decision_correlation_route_splits_the_a_and_c_cases():
+    """Capa v7: A (``stop_evaluado_sin_orden``) y C (``orden_creada_sin_fill``) se cuentan aparte."""
+    rows = [
+        _row(decision_route="stop_evaluado_sin_orden", symbol="AAA"),
+        _row(decision_route="orden_creada_sin_fill", symbol="BBB"),
+        _row(decision_route="stop_evaluado_sin_materializar", symbol="CCC"),  # hueco no medido
+    ]
+    artifact = build_thesis_exit_artifact(draw_ledgers=[_ledger(rows)])
+    correlation = artifact["global"]["decisionCorrelation"]
+    assert correlation["route"] == {
+        "orden_creada_sin_fill": 1,
+        "stop_evaluado_sin_materializar": 1,
+        "stop_evaluado_sin_orden": 1,
+    }
+    labels = [row["decisionRoute"] for row in artifact["byDecisionRoute"]]
+    assert labels == [route for route in DECISION_ROUTES if route in correlation["route"]]
+
+
 # ── Determinismo y contrato ──────────────────────────────────────────────────────
 
 
@@ -496,7 +514,7 @@ def test_artifact_is_deterministic_and_declares_its_contract():
     first = build_thesis_exit_artifact(draw_ledgers=ledgers)
     again = build_thesis_exit_artifact(draw_ledgers=ledgers)
     assert json.dumps(first, sort_keys=True) == json.dumps(again, sort_keys=True)
-    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-thesis-exit-v4"
+    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-thesis-exit-v5"
     assert first["kind"] == KIND == "DIA_D_AUTO_THESIS_EXIT"
     assert first["readOnly"] is True
     assert first["basis"] == "entryDay"

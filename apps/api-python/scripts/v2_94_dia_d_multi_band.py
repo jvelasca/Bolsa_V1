@@ -182,7 +182,7 @@ def _run_v93(
 #: capa aditiva (v2: fricción/mecanismo; v3: estrategia/dirección; v4: geometría de la invalidación;
 #: v5: desambiguación THESIS_EXIT vs STOP; v6: correlación decisión↔ciclo) para forzar la
 #: REEJECUCIÓN de un ledger antiguo y no mezclar esquemas en el diagnóstico.
-_DETAIL_LEDGER_SCHEMA = "dia-d-multi-cycle-ledger-v6"
+_DETAIL_LEDGER_SCHEMA = "dia-d-multi-cycle-ledger-v7"
 
 
 def _ledger_has_detail(cycles_path: pathlib.Path) -> bool:
@@ -430,7 +430,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         cross_check=cross_check,
         meta={
-            "bump": "2.11.48-beta",
+            "bump": "2.11.49-beta",
             "phase": "V2.94 DIA-D AUTO MULTI BAND",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),

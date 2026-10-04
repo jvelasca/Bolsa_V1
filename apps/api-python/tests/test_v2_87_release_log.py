@@ -221,3 +221,29 @@ def test_management_row_on_the_entry_day_declares_a_gap_never_an_invented_cycle(
     ]
     rows = _load_v87()._management_rows_with_cycle(journal, cycle_by_symbol_day={})
     assert rows[0]["cycleId"] is None
+
+
+# ── Capa v7 (DÍA-D-3h): existencia de orden por ciclo (A/C) ───────────────────────
+
+
+class _ExitOrder:
+    """Stub mínimo de un ``ExitOrder`` durable (lo que la costura LEE, sin motor)."""
+
+    def __init__(self, *, cycle_id: str) -> None:
+        self.cycle_id = cycle_id
+
+
+def test_minted_exit_cycles_only_reports_new_intents_by_cycle() -> None:
+    """Sólo los INTENT ESTRENADOS este tick votan; los preexistentes y el ``cycle_id`` vacío no."""
+    exit_orders = {
+        "EX-OLD": _ExitOrder(cycle_id="C-OLD"),
+        "EX-NEW-A": _ExitOrder(cycle_id="C-A"),
+        "EX-NEW-B": _ExitOrder(cycle_id=""),
+    }
+    minted = _load_v87()._minted_exit_cycles({"EX-OLD"}, exit_orders)
+    assert minted == {"C-A"}
+
+
+def test_minted_exit_cycles_is_empty_when_nothing_new() -> None:
+    exit_orders = {"EX-OLD": _ExitOrder(cycle_id="C-OLD")}
+    assert _load_v87()._minted_exit_cycles({"EX-OLD"}, exit_orders) == set()

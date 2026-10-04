@@ -6,7 +6,7 @@ El diagnóstico del origen de la pérdida (``v2_96``) aisló que el grueso del `
 vive en pocos ciclos cerrados por invalidación de tesis (``THESIS_EXIT``), pese a que el
 ``STOP_EJECUTADO`` domina en frecuencia con expectancy bruta ~0. Esta sonda abre esos ciclos:
 consume los ``K`` ledgers de ciclos que ``v2_94 --cycles --cycle-detail`` dejó por sorteo
-(``draw-XX/multi-cycles.json``, esquema ``dia-d-multi-cycle-ledger-v6``) y los pliega para saber
+(``draw-XX/multi-cycles.json``, esquema ``dia-d-multi-cycle-ledger-v7``) y los pliega para saber
 **dónde viven** —estrategia, dirección, año/régimen, edad, geometría (MAE/MFE/captura), calidad de
 entrada y coste— con su dispersión entre sorteos y su fragilidad. La capa v5 añade la
 **desambiguación ``THESIS_EXIT`` vs ``STOP``**: por qué RUTA se invalidó la tesis (``ruta_mark`` vs
@@ -15,8 +15,12 @@ Con ``--sequences`` vuelca, además, la SECUENCIA día a día por ciclo (materia
 reconstrucción temporal). La capa v6 añade la **correlación DECISIÓN↔CICLO**: una vez medido que el
 mark tocó el stop vigente, lee del MISMO fotograma qué hizo el decider ese tick
 (``decisionReasons``/``decisionLabel``) y si el toque se materializó (``filledQty``/``survived``),
-clasificando cada toque en ``materializado``/``stop_evaluado_sin_materializar``/``stop_no_evaluado``/
-``sin_toque``/``sin_traza`` (``decisionRoute``). Declara la frontera de la secuencia (``D47-01``:
+clasificando cada toque en ``materializado``/``orden_creada_sin_fill``/``stop_evaluado_sin_orden``/
+``stop_evaluado_sin_materializar``/``stop_no_evaluado``/``sin_toque``/``sin_traza``
+(``decisionRoute``). La capa v7 SEPARA el caso A (``stop_evaluado_sin_orden``) del caso C
+(``orden_creada_sin_fill``) leyendo la existencia del INTENT durable por ciclo (``orderCreated``);
+``stop_evaluado_sin_materializar`` queda SÓLO como hueco no medido. Declara la frontera de la
+secuencia (``D47-01``:
 primer tick D1 completo POST-ENTRADA; el día de entrada no tiene fotograma).
 
 No re-ejecuta el harness: sólo LEE los artefactos ya producidos.
@@ -159,7 +163,7 @@ def _print_text(artifact: dict[str, Any]) -> None:
     correlation = (artifact["global"] or {}).get("decisionCorrelation") or {}
     if correlation:
         print()
-        print("CORRELACIÓN DECISIÓN↔CICLO (capa v6)")
+        print("CORRELACIÓN DECISIÓN↔CICLO (capa v7: A/C separadas)")
         print("-" * 100)
         print(f"ruta de decisión          {correlation.get('route')}")
         print(f"ruta x stop candidato     {correlation.get('routeByStructuralStopCandidate')}")
@@ -217,7 +221,7 @@ _DISAMBIGUATION_KEYS = (
     "breakevenReached",
     "stopAboveLevel",
     "structuralStopCandidate",
-    # Capa v6 (DÍA-D-3g): correlación decisión↔ciclo.
+    # Capa v6/v7 (DÍA-D-3g/3h): correlación decisión↔ciclo + existencia de orden (A/C separadas).
     "decisionRoute",
     "stopTouchDays",
     "stopEvaluatedOnTouch",
@@ -257,7 +261,7 @@ def _build_sequences_payload(ledgers: list[Any]) -> dict[str, Any]:
         per_draw[str(draw_index)] = count
     return {
         "kind": "DIA_D_AUTO_THESIS_STOP_SEQUENCES",
-        "schemaVersion": "dia-d-thesis-stop-sequences-v1",
+        "schemaVersion": "dia-d-thesis-stop-sequences-v2",
         "readOnly": True,
         "basis": "entryDay",
         "mechanism": "THESIS_EXIT",
@@ -332,7 +336,7 @@ def main(argv: list[str] | None = None) -> int:
     artifact = build_thesis_exit_artifact(
         draw_ledgers=ledgers,
         meta={
-            "bump": "2.11.48-beta",
+            "bump": "2.11.49-beta",
             "phase": "V2.97 DIA-D AUTO THESIS EXIT",
             "nature": "INVESTIGACION",
             "drawsDir": str(out_dir),
