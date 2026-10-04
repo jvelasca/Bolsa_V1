@@ -95,6 +95,7 @@
 | `pnpm --filter @bolsa/web contract:check` | **OK** (sin cambios de DTO) |
 | `pnpm window:test` | **25/25** |
 | `git status --porcelain -- <motor>` | **vacío** ⇒ `Δ motor = 0` |
+| A/B de la costura `v2_87` (antiguo vs nuevo, mismo entorno+fixture) | **byte a byte idéntico** (`sha256 C208B2DE…`, `3 453 282 B`) ⇒ `capture_cycle_detail=False` es inerte |
 
 ---
 
@@ -118,5 +119,5 @@
 - **Tag:** `v2.88.44-beta` **PENDIENTE** de push/CI (se cita aquí tras el `Release tag CI`).
 - **Ficheros añadidos:** `dia_d_exit_mechanism.py`, `dia_d_loss_origin.py`, `v2_96_dia_d_loss_origin.py`, `test_dia_d_loss_origin.py`, `evidence/v2.88.44/README.md`.
 - **Ficheros modificados:** `dia_d_longitudinal.py`, `dia_d_multi_sampling.py`, `v2_87`/`v2_91`/`v2_93`/`v2_94` (costura + flags), `v2_89`/`v2_90`/`v2_92`/`v2_95` (`meta.bump`), bump guard, `test_dia_d_multi_sampling.py`, `package.json`, `CHANGELOG.md`, `CURRENT_SYSTEM.md`, `versioning.md`.
-- **Commits locales:** `<PENDIENTE>`.
+- **Commits locales:** funcional `50240f97`; re-anclaje del freeze del runner `7a1efac4` (fijado al árbol de `50240f97`).
 - **Tag:** `v2.88.44-beta` **PENDIENTE** de push/CI.

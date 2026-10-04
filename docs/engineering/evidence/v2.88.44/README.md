@@ -43,7 +43,7 @@
 | **7** | **El slippage señal→ejecución es siempre positivo (nunca favorable):** media `10.38 bps`, `shareAboveZero=1.0`. | Que algún ciclo tenga slippage `<= 0` (o que el campo sea `0` fabricado). | `entryQuality.entrySlippageBps`: `mean=10.3846`, `median=10.5148`, `shareAboveZero=1.0`. |
 | **8** | **Regla del hueco intacta:** un ciclo sin cierre medido es `SIN_MECANISMO`; con fricción no `COMPLETE` el neto es `None` + `netRealizedRGap`, **jamás** el bruto disfrazado de neto. | Un `netRealizedR` no nulo con `frictionMeasurement != COMPLETE`. | `SIN_MECANISMO` (5 ciclos) ⇒ `realizedRNet.total = None`, `cyclesUnmeasured = 5`; `test_friction_partial_yields_none_net_never_gross`. |
 | **9** | **Determinismo:** dos corridas de `v2_96` sobre el mismo `--out-dir` ⇒ JSON **byte a byte idéntico**. | Que dos corridas difieran. | `sha256 118DBF65DC8A0E2E573FE35B09D94138D6295DCFB260B8D418C1070467F063AA`, `11 089 B` (reproducido). |
-| **10** | **`Δ motor = 0`:** ningún fichero de trading se toca; la captura de detalle es una costura inerte con default `False`. | Que el árbol del motor cambie o que la costura altere el replay con `capture_cycle_detail=False`. | `git status` vacío sobre los 6 ficheros de motor; el artefacto congelado de `replay-repro` no se mueve. |
+| **10** | **`Δ motor = 0`:** ningún fichero de motor cambia de comportamiento; la captura de detalle es una costura inerte con default `False`. | Que el árbol del motor cambie o que la costura altere el replay con `capture_cycle_detail=False`. | `git status` vacío sobre los ficheros de motor (el runner `v2_87` sólo gana la costura inerte, default `False`); **A/B antiguo vs nuevo byte a byte idéntico** (`C208B2DE…`); el sha del artefacto congelado de `replay-repro` queda como gate de CI por tag. |
 
 ---
 
@@ -112,7 +112,8 @@ Cada uno de los tres ejes tiene respuesta con `n` suficiente (`1074` ciclos) y *
 | `pnpm window:test` | **25/25** |
 | `test_dia_d_bump_guard.py` | OK (incluye `v2_96`; `meta.bump` alineado a `2.11.44-beta`) |
 | Determinar. `v2_96` | byte a byte idéntico (`sha256 118DBF65…`, `11 089 B`) |
-| `Δ motor = 0` | `git status` vacío sobre los 6 ficheros de motor; `replay-repro` sin movimiento |
+| **Costura inerte (A/B)** | `v2_87` antiguo (`02607b2e`) vs nuevo (`50240f97`) con el MISMO entorno/fixture: artefacto **byte a byte idéntico** (`sha256 C208B2DE…`, `3 453 282 B`) ⇒ `capture_cycle_detail=False` no cambia la salida. |
+| `Δ motor = 0` | `git status` vacío sobre los ficheros de motor; costura `v2_87` inerte con default `False` (probado A/B) |
 
 ---
 
@@ -152,5 +153,5 @@ uv run --no-sync python apps/api-python/scripts/v2_96_dia_d_loss_origin.py \
 - **Añadidos:** [`dia_d_exit_mechanism.py`](../../../../packages/py/application/src/bolsa_application/dia_d_exit_mechanism.py), [`dia_d_loss_origin.py`](../../../../packages/py/application/src/bolsa_application/dia_d_loss_origin.py), [`v2_96_dia_d_loss_origin.py`](../../../../apps/api-python/scripts/v2_96_dia_d_loss_origin.py), [`test_dia_d_loss_origin.py`](../../../../packages/py/application/tests/test_dia_d_loss_origin.py), `docs/engineering/evidence/v2.88.44/README.md`.
 - **Modificados:** `dia_d_longitudinal.py` (`early_excursion_for_cycle`), `dia_d_multi_sampling.py` (ledger `-v2`), `v2_87` (costura `capture_cycle_detail`), `v2_91`/`v2_93`/`v2_94` (`--cycle-detail`/`--entry-window-days`), `v2_89`/`v2_90`/`v2_92`/`v2_95` (`meta.bump`), `test_dia_d_bump_guard.py`, `test_dia_d_multi_sampling.py`, `package.json`, `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
 - **`Δ motor = 0`:** ningún fichero de motor tocado.
-- **Commits locales:** `<PENDIENTE>` (se publican en la cita del sello).
+- **Commits locales:** funcional **`50240f97`**; re-anclaje del freeze del runner **`7a1efac4`** (`apps` `429229c9…` · `packages` `1bfb752c…`).
 - **Tag:** `v2.88.44-beta` **PENDIENTE** de push (se cita tras el CI de tag).
