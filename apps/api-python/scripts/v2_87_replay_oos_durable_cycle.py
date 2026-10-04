@@ -110,6 +110,38 @@ def _load_v86_module() -> Any:
     return module
 
 
+def _management_rows_with_cycle(
+    journal: Sequence[Any],
+    *,
+    cycle_by_symbol_day: Mapping[tuple[str, str], str],
+) -> list[dict[str, Any]]:
+    """Proyección read-only de los eventos de gestión, UNIDOS a su ``cycleId`` (capa v6).
+
+    El join es por ``(instrumento, día)``: en D1 hay UN solo ciclo abierto por símbolo, así que
+    el evento de gestión del tick pertenece a ese ciclo. Un evento del día de ENTRADA (sin
+    posición previa) queda ``cycleId = None``: es un hueco DECLARADO, nunca un ciclo inventado.
+    """
+    rows: list[dict[str, Any]] = []
+    for entry in journal:
+        if str(getattr(entry, "event_type", "") or "") != "auto_position_management":
+            continue
+        payload = getattr(entry, "payload", None) or {}
+        instrument = str(getattr(entry, "instrument_id", "") or "")
+        day = str(getattr(entry, "created_at", "") or "")[:10]
+        rows.append(
+            {
+                "cycleId": cycle_by_symbol_day.get((instrument, day)),
+                "instrumentId": instrument,
+                "day": day,
+                "reasonCodes": list(payload.get("reasonCodes") or []),
+                "primaryReason": payload.get("primaryReason"),
+                "exitReasons": list(payload.get("exitReasons") or []),
+                "thesisInvalid": payload.get("thesisInvalid"),
+            }
+        )
+    return rows
+
+
 # ── Espejos en memoria con instrumentación DECLARADA ─────────────────────────────
 
 
@@ -373,8 +405,14 @@ async def _run_durable_replay(
     # estado del worker) y permite etiquetar cada fotograma con su día.
     invalidation_by_cycle: dict[str, dict[str, Any]] = {}
     cycle_timeline: dict[str, list[dict[str, Any]]] = {}
+    # Capa v6 (DÍA-D-3g): mapa (símbolo, día) -> cycle_id del ciclo abierto al empezar el tick.
+    # Es la clave del join decisión↔ciclo: hay UN solo ciclo abierto por símbolo en D1, así que
+    # un evento de gestión journalizado en ese tick pertenece a ese ciclo. Sólo se puebla con la
+    # costura encendida; nunca se inventa un ciclo para un símbolo sin posición previa.
+    cycle_by_symbol_day: dict[tuple[str, str], str] = {}
     for index in range(start_index, end):
         cursor.set_index(index)
+        open_frames: dict[str, dict[str, Any]] = {}
         if capture_cycle_detail:
             day = cursor.current_day()
             for symbol, position in (getattr(worker, "_v2_positions", {}) or {}).items():
@@ -391,22 +429,25 @@ async def _run_durable_replay(
                     "currentStop": getattr(position, "current_stop", None),
                     "direction": str(getattr(position, "direction", "") or ""),
                 }
-                cycle_timeline.setdefault(cid, []).append(
-                    {
-                        "day": day,
-                        "symbol": str(symbol),
-                        "mark": cursor.price_script(str(symbol)),
-                        "currentStop": getattr(position, "current_stop", None),
-                        "invalidationPrice": getattr(position, "invalidation_price", None),
-                        "initialStop": getattr(position, "initial_stop", None),
-                        "actualEntry": getattr(position, "actual_entry", None),
-                        "initialRisk": getattr(position, "initial_risk", None),
-                        "direction": str(getattr(position, "direction", "") or ""),
-                        "maeR": mfe_mae.get("maeR"),
-                        "mfeR": mfe_mae.get("mfeR"),
-                        "remainingQty": getattr(position, "remaining_quantity", None),
-                    }
-                )
+                frame = {
+                    "day": day,
+                    "symbol": str(symbol),
+                    "mark": cursor.price_script(str(symbol)),
+                    "currentStop": getattr(position, "current_stop", None),
+                    "invalidationPrice": getattr(position, "invalidation_price", None),
+                    "initialStop": getattr(position, "initial_stop", None),
+                    "actualEntry": getattr(position, "actual_entry", None),
+                    "initialRisk": getattr(position, "initial_risk", None),
+                    "direction": str(getattr(position, "direction", "") or ""),
+                    "maeR": mfe_mae.get("maeR"),
+                    "mfeR": mfe_mae.get("mfeR"),
+                    "remainingQty": getattr(position, "remaining_quantity", None),
+                }
+                cycle_timeline.setdefault(cid, []).append(frame)
+                # Referencia al fotograma de HOY: tras ``auto_turn`` se le añade la huella de
+                # decisión del tick (mismos campos del mismo día; no se crea un segundo frame).
+                open_frames[str(symbol)] = frame
+                cycle_by_symbol_day[(str(symbol), day)] = cid
         report = await worker.auto_turn()
         for key in totals:
             totals[key] += int(getattr(report, key, 0) or 0)
@@ -444,6 +485,37 @@ async def _run_durable_replay(
 
         rows = contexts.order[consumed:]
         consumed = len(contexts.order)
+        # Capa v6 (DÍA-D-3g): huella de DECISIÓN del tick —¿el decider evaluó el stop?— anotada en
+        # el MISMO fotograma del día. Se LEE el estado que el worker ya dejó tras ``auto_turn``
+        # (``_v2_last_exit_reasons``/``_v2_last_exit_label``) y el resultado durable (fill por
+        # ciclo + posición viva). NO toca el motor; con la costura apagada no se ejecuta.
+        if capture_cycle_detail and open_frames:
+            reasons_map = getattr(worker, "_v2_last_exit_reasons", {}) or {}
+            label_map = getattr(worker, "_v2_last_exit_label", {}) or {}
+            live_positions = getattr(worker, "_v2_positions", {}) or {}
+            filled_by_cycle: dict[str, float] = {}
+            for row in rows:
+                cycle = str(getattr(row, "cycle_id", "") or "")
+                if not cycle:
+                    continue
+                filled_by_cycle[cycle] = filled_by_cycle.get(cycle, 0.0) + float(
+                    getattr(row, "quantity", 0.0) or 0.0
+                )
+            for symbol, frame in open_frames.items():
+                cid = cycle_by_symbol_day.get((symbol, cursor.current_day()), "")
+                live = live_positions.get(symbol)
+                frame["decisionReasons"] = [
+                    str(reason) for reason in (reasons_map.get(symbol, ()) or ())
+                ]
+                frame["decisionLabel"] = str(label_map.get(symbol, "") or "")
+                # Sobrevive si sigue viva la MISMA posición del ciclo (no una reapertura).
+                frame["survived"] = (
+                    live is not None and str(getattr(live, "cycle_id", "") or "") == cid
+                )
+                frame["filledQty"] = filled_by_cycle.get(cid, 0.0)
+                # Señal de DÍA (declarada NO por-ciclo): el tick produjo órdenes/fills globales.
+                frame["dayOrders"] = int(getattr(report, "orders", 0) or 0)
+                frame["dayFills"] = int(getattr(report, "fills", 0) or 0)
         fills = tuple(
             ReplayFill(
                 day=cursor.current_day(),
@@ -614,22 +686,14 @@ async def _run_durable_replay(
             # declaran ``primaryReason``/``exitReasons``/``thesisInvalid``. Se proyectan de forma
             # read-only para verificar que un ``THESIS_EXIT`` no trae ``structural_stop`` como
             # motivo co-disparado (la precedencia lo impediría por construcción).
-            "managementRows": [
-                {
-                    "instrumentId": str(getattr(entry, "instrument_id", "") or ""),
-                    "day": str(getattr(entry, "created_at", "") or "")[:10],
-                    "reasonCodes": list(
-                        (getattr(entry, "payload", None) or {}).get("reasonCodes") or []
-                    ),
-                    "primaryReason": (getattr(entry, "payload", None) or {}).get("primaryReason"),
-                    "exitReasons": list(
-                        (getattr(entry, "payload", None) or {}).get("exitReasons") or []
-                    ),
-                    "thesisInvalid": (getattr(entry, "payload", None) or {}).get("thesisInvalid"),
-                }
-                for entry in (getattr(worker, "_v2_journal", ()) or ())
-                if str(getattr(entry, "event_type", "") or "") == "auto_position_management"
-            ],
+            # Capa v6 (DÍA-D-3g): cada evento se une a su ``cycleId`` por ``(instrumento, día)``
+            # —el ciclo abierto del símbolo en ese tick— para poder reconstruir la DECISIÓN del
+            # día de un ciclo concreto. Un evento del día de ENTRADA (sin posición previa) queda
+            # con ``cycleId`` None (hueco declarado, nunca un ciclo inventado).
+            "managementRows": _management_rows_with_cycle(
+                getattr(worker, "_v2_journal", ()) or (),
+                cycle_by_symbol_day=cycle_by_symbol_day,
+            ),
         }
 
     payload: dict[str, Any] = {

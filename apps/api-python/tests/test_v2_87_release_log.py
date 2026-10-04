@@ -156,3 +156,68 @@ async def test_release_log_ignores_an_idempotent_release() -> None:
 
     assert again is None
     assert len(store.releases) == 1
+
+
+# ── Capa v6 (DÍA-D-3g): evento de gestión ↔ cycle_id ─────────────────────────────
+
+
+class _JournalEntry:
+    """Stub mínimo de una fila del journal (lo que la costura LEE, sin motor)."""
+
+    def __init__(
+        self,
+        *,
+        event_type: str,
+        instrument_id: str,
+        created_at: str,
+        payload: dict[str, Any],
+    ) -> None:
+        self.event_type = event_type
+        self.instrument_id = instrument_id
+        self.created_at = created_at
+        self.payload = payload
+
+
+def test_management_rows_join_the_open_cycle_by_instrument_and_day() -> None:
+    """Un evento de gestión pertenece al ciclo abierto de su símbolo en D1; se une y se declara."""
+    journal = [
+        _JournalEntry(
+            event_type="auto_position_management",
+            instrument_id="AAA",
+            created_at="2022-01-07T00:00:00Z",
+            payload={
+                "reasonCodes": ["thesis_exit"],
+                "primaryReason": "THESIS_INVALIDATION",
+                "exitReasons": ["STRUCTURAL_STOP", "THESIS_INVALIDATION"],
+                "thesisInvalid": True,
+            },
+        ),
+        # Evento no-gestión: no entra.
+        _JournalEntry(
+            event_type="position_close",
+            instrument_id="AAA",
+            created_at="2022-01-07T00:00:00Z",
+            payload={},
+        ),
+    ]
+    rows = _load_v87()._management_rows_with_cycle(
+        journal, cycle_by_symbol_day={("AAA", "2022-01-07"): "C1"}
+    )
+    assert len(rows) == 1
+    assert rows[0]["cycleId"] == "C1"
+    assert rows[0]["primaryReason"] == "THESIS_INVALIDATION"
+    assert rows[0]["exitReasons"] == ["STRUCTURAL_STOP", "THESIS_INVALIDATION"]
+
+
+def test_management_row_on_the_entry_day_declares_a_gap_never_an_invented_cycle() -> None:
+    """Sin ciclo abierto previo (día de ENTRADA) el ``cycleId`` es un hueco declarado, no inventado."""
+    journal = [
+        _JournalEntry(
+            event_type="auto_position_management",
+            instrument_id="BBB",
+            created_at="2022-01-05T00:00:00Z",
+            payload={"primaryReason": None, "reasonCodes": [], "exitReasons": []},
+        )
+    ]
+    rows = _load_v87()._management_rows_with_cycle(journal, cycle_by_symbol_day={})
+    assert rows[0]["cycleId"] is None

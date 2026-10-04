@@ -98,7 +98,15 @@ from bolsa_application.dia_d_multi_uncertainty import (
 #: (``structuralStopCandidate``) y la huella del stop (``stopChanged``/``breakevenReached``). No
 #: toca el motor: sólo LEE la secuencia que la costura inerte (``--cycle-detail``) ya capturó. Un
 #: lector de v1/v2/v3/v4 ignora los campos nuevos.
-LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v5"
+#: v6 (V2.88.48) añade —ADITIVA— la HUELLA DE DECISIÓN intra-tick por ciclo: la secuencia lleva
+#: ``decisionReasons``/``decisionLabel`` (qué motivos disparó el decider y cuál fue decisorio),
+#: ``filledQty``/``survived`` (si el toque del stop se materializó o la posición sobrevivió) y la
+#: señal de DÍA ``dayOrders``/``dayFills``; y el ciclo publica ``decisionRoute`` (si el toque del
+#: stop fue no evaluado, evaluado sin materializar, materializado, sin toque o sin traza), que
+#: cierra la pregunta A/B/C de ``v2.88.47`` sin contrafactual. Declara además ``timelineStartsAt``
+#: (``D47-01``): la secuencia empieza en el PRIMER tick D1 COMPLETO post-entrada; el día de entrada
+#: no tiene fotograma. Sólo LEE lo que el worker ya produjo; ``Δ motor = 0``.
+LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v6"
 
 #: Tipo del ledger de ciclos (la muestra cruda de UN sorteo).
 LEDGER_KIND = "DIA_D_AUTO_MULTI_CYCLE_LEDGER"
@@ -398,6 +406,38 @@ THESIS_ROUTES: frozenset[str] = frozenset(
     {THESIS_ROUTE_SIN_GEOMETRIA, THESIS_ROUTE_MARK, THESIS_ROUTE_MAE, THESIS_ROUTE_AMBAS}
 )
 
+#: Tokens DECLARADOS de la RUTA DE DECISIÓN del toque del stop (capa v6, cerrado). Responde a la
+#: pregunta A/B/C de ``v2.88.47`` SIN contrafactual, desde la huella que el worker ya dejó:
+#: ``materializado`` — el stop se evaluó Y el tick produjo un fill del ciclo (el stop ejecutó);
+#: ``stop_evaluado_sin_materializar`` — el stop se evaluó (``STRUCTURAL_STOP`` disparado) pero el
+#: tick no materializó fill (aglutina «orden no materializada» y «sin fill por vetos»: no separable
+#: por-ciclo desde la costura); ``stop_no_evaluado`` — el toque ocurre pero ``STRUCTURAL_STOP`` no
+#: aparece en los motivos disparados (el decider no evaluó el stop ese tick); ``sin_toque`` — hay
+#: secuencia pero ningún fotograma alcanzó el stop vigente; ``sin_traza`` — sin secuencia capturada
+#: (hueco declarado, nunca ``0``).
+DECISION_ROUTE_MATERIALIZADO = "materializado"
+DECISION_ROUTE_EVALUADO_SIN_MATERIALIZAR = "stop_evaluado_sin_materializar"
+DECISION_ROUTE_NO_EVALUADO = "stop_no_evaluado"
+DECISION_ROUTE_SIN_TOQUE = "sin_toque"
+DECISION_ROUTE_SIN_TRAZA = "sin_traza"
+DECISION_ROUTES: tuple[str, ...] = (
+    DECISION_ROUTE_MATERIALIZADO,
+    DECISION_ROUTE_EVALUADO_SIN_MATERIALIZAR,
+    DECISION_ROUTE_NO_EVALUADO,
+    DECISION_ROUTE_SIN_TOQUE,
+    DECISION_ROUTE_SIN_TRAZA,
+)
+
+#: Motivo DECISORIO del stop estructural (mismo token que ``exit_plan.EXIT_REASON_PRECEDENCE``): si
+#: aparece en los motivos disparados del tick, el decider EVALUÓ el stop (aunque no lo ejecutara).
+DECISION_STRUCTURAL_STOP_TOKEN = "STRUCTURAL_STOP"
+
+#: Frontera SEMÁNTICA declarada de la secuencia (``D47-01``): los fotogramas se capturan al INICIO de
+#: cada tick D1, así que el primer fotograma de un ciclo es el del PRIMER tick completo POSTERIOR al
+#: día de entrada; el día de ENTRADA no tiene fotograma. La secuencia NO es una historia intradía
+#: desde el nacimiento y no se presenta como tal.
+TIMELINE_START_FIRST_TICK_AFTER_ENTRY = "first_full_tick_after_entry"
+
 
 def _adverse_r(
     price: Any,
@@ -504,7 +544,7 @@ def _invalidation_fields(
 
 # ── Desambiguación THESIS_EXIT vs STOP (capa v5, aditiva) ─────────────────────────
 
-#: Bloque de huecos declarados de la capa v5 (nunca ``0``): se copia y se rellena por ciclo.
+#: Bloque de huecos declarados de la capa v5/v6 (nunca ``0``): se copia y se rellena por ciclo.
 _DISAMBIGUATION_EMPTY: dict[str, Any] = {
     "thesisExitRoute": THESIS_ROUTE_SIN_GEOMETRIA,
     "levelR": None,
@@ -521,6 +561,13 @@ _DISAMBIGUATION_EMPTY: dict[str, Any] = {
     "stopAboveLevel": None,
     "structuralStopCandidate": None,
     "timelineDays": 0,
+    # ── Capa v6 (correlación decisión↔ciclo): huecos declarados, nunca ``0`` ──────
+    "decisionRoute": DECISION_ROUTE_SIN_TRAZA,
+    "stopTouchDays": None,
+    "stopEvaluatedOnTouch": None,
+    "deciderRanOnTouch": None,
+    "stopFiredNotFilled": None,
+    "timelineStartsAt": TIMELINE_START_FIRST_TICK_AFTER_ENTRY,
 }
 
 
@@ -557,9 +604,38 @@ def _compact_sequence(sequence: Sequence[Mapping[str, Any]] | None) -> list[dict
             "currentStop": finite_number(row.get("currentStop")),
             "maeR": finite_number(row.get("maeR")),
             "mfeR": finite_number(row.get("mfeR")),
+            # Capa v6 (DÍA-D-3g): huella de DECISIÓN del tick, capturada por la costura inerte.
+            # Un hueco es ``None``/``[]``, nunca un ``0`` inventado.
+            "decisionReasons": [
+                str(reason) for reason in (row.get("decisionReasons") or []) if str(reason).strip()
+            ],
+            "decisionLabel": _day_or_none(row.get("decisionLabel")),
+            "filledQty": finite_number(row.get("filledQty")),
+            "survived": bool(row["survived"]) if isinstance(row.get("survived"), bool) else None,
+            "dayOrders": (
+                int(row["dayOrders"]) if isinstance(row.get("dayOrders"), int) else None
+            ),
+            "dayFills": int(row["dayFills"]) if isinstance(row.get("dayFills"), int) else None,
         }
         for row in rows
     ]
+
+
+def _compact_management_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Proyección COMPACTA de un evento de gestión (capa v6); un hueco es ``None``.
+
+    Conserva el rastro de POR QUÉ se pidió salir/proteger un día concreto (``primaryReason``/
+    ``exitReasons``/``reasonCodes``/``thesisInvalid``) para poder reconstruir la DECISIÓN de un ciclo.
+    """
+    return {
+        "day": _day_or_none(row.get("day")),
+        "primaryReason": row.get("primaryReason"),
+        "exitReasons": [str(reason) for reason in (row.get("exitReasons") or []) if str(reason).strip()],
+        "reasonCodes": [str(code) for code in (row.get("reasonCodes") or []) if str(code).strip()],
+        "thesisInvalid": (
+            bool(row["thesisInvalid"]) if isinstance(row.get("thesisInvalid"), bool) else None
+        ),
+    }
 
 
 def _disambiguation_fields(
@@ -709,6 +785,94 @@ def _disambiguation_fields(
     }
 
 
+def _decision_correlation_fields(
+    *,
+    timeline: Sequence[Mapping[str, Any]] | None,
+    direction: str | None,
+) -> dict[str, Any]:
+    """Correlación DECISIÓN↔CICLO de UN ciclo (capa v6, pura y determinista).
+
+    Cierra la pregunta A/B/C que ``v2.88.47`` dejó abierta SIN contrafactual: una vez medido que el
+    mark tocó el stop vigente (``structuralStopCandidate``), aquí se lee —del mismo fotograma del
+    día, capturado por la costura inerte— **qué hizo el decider** ese tick (``decisionReasons``/
+    ``decisionLabel``) y **si el toque se materializó** (``filledQty``/``survived``). Distingue:
+
+    * ``materializado`` — el stop disparó Y el tick produjo fill del ciclo (el stop ejecutó).
+    * ``stop_evaluado_sin_materializar`` — el stop disparó pero no hubo fill (A/C agrupadas).
+    * ``stop_no_evaluado`` — el toque ocurre pero el stop NO aparece en los motivos disparados.
+    * ``sin_toque`` — hay secuencia pero ningún mark alcanzó el stop vigente.
+    * ``sin_traza`` — sin secuencia (hueco declarado; nunca ``0``).
+
+    Un hueco es ``None``, nunca ``0``. ``timelineStartsAt`` declara la frontera (``D47-01``): la
+    secuencia empieza en el primer tick D1 completo POST-ENTRADA.
+    """
+    rows = [row for row in (timeline or ()) if isinstance(row, Mapping)]
+    base: dict[str, Any] = {
+        "decisionRoute": DECISION_ROUTE_SIN_TRAZA,
+        "stopTouchDays": None,
+        "stopEvaluatedOnTouch": None,
+        "deciderRanOnTouch": None,
+        "stopFiredNotFilled": None,
+        "timelineStartsAt": TIMELINE_START_FIRST_TICK_AFTER_ENTRY,
+    }
+    if not rows or direction not in (LONG, SHORT):
+        return base
+
+    touch_days: list[str] = []
+    evaluated = False
+    decider_ran = False
+    fired_not_filled = False
+    materialized = False
+    for row in rows:
+        mark = finite_number(row.get("mark"))
+        stop = finite_number(row.get("currentStop"))
+        touched = (
+            mark is not None
+            and stop is not None
+            and ((direction == LONG and mark <= stop) or (direction == SHORT and mark >= stop))
+        )
+        if not touched:
+            continue
+        day = _day_or_none(row.get("day"))
+        if day is not None:
+            touch_days.append(day)
+        reasons = [str(reason) for reason in (row.get("decisionReasons") or [])]
+        label = str(row.get("decisionLabel") or "").strip()
+        # El SIM worker emite los motivos en minúscula (``structural_stop``); el motor de análisis
+        # usa mayúscula (``STRUCTURAL_STOP``). La comparación es por tanto INSENSIBLE a mayúsculas:
+        # el token canónico se declara una vez y se normaliza al comparar (nunca se inventa).
+        stop_fired = any(
+            reason.strip().upper() == DECISION_STRUCTURAL_STOP_TOKEN for reason in reasons
+        ) or label.upper() == DECISION_STRUCTURAL_STOP_TOKEN
+        if reasons or label:
+            decider_ran = True
+        if stop_fired:
+            evaluated = True
+        filled = finite_number(row.get("filledQty"))
+        survived = row.get("survived") if isinstance(row.get("survived"), bool) else None
+        if stop_fired and filled is not None and filled > 0.0:
+            materialized = True
+        if stop_fired and (filled is None or filled == 0.0) and survived is True:
+            fired_not_filled = True
+
+    if not touch_days:
+        route = DECISION_ROUTE_SIN_TOQUE
+    elif materialized:
+        route = DECISION_ROUTE_MATERIALIZADO
+    elif evaluated:
+        route = DECISION_ROUTE_EVALUADO_SIN_MATERIALIZAR
+    else:
+        route = DECISION_ROUTE_NO_EVALUADO
+    return {
+        "decisionRoute": route,
+        "stopTouchDays": len(touch_days),
+        "stopEvaluatedOnTouch": evaluated,
+        "deciderRanOnTouch": decider_ran,
+        "stopFiredNotFilled": fired_not_filled,
+        "timelineStartsAt": TIMELINE_START_FIRST_TICK_AFTER_ENTRY,
+    }
+
+
 def build_cycle_ledger(
     *,
     round_trips: Sequence[Mapping[str, Any]],
@@ -720,6 +884,7 @@ def build_cycle_ledger(
     close_rows: Sequence[Any] = (),
     invalidation_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
     cycle_sequences_by_cycle: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
+    management_by_cycle: Mapping[str, Sequence[Mapping[str, Any]]] | None = None,
     entry_window_days: int = DEFAULT_ENTRY_WINDOW_DAYS,
     meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -747,6 +912,14 @@ def build_cycle_ledger(
     ``structuralStopCandidate`` (si algún mark tocó el stop vigente pese a clasificarse como tesis).
     ``cycle_sequences_by_cycle`` es la SECUENCIA día a día por ``cycle_id`` capturada por la costura
     (mark, stop vigente, MAE/MFE persistido); sin ella la capa v5 queda ``sin_geometria`` (hueco).
+    La capa v6 añade —ADITIVA— la **correlación DECISIÓN↔CICLO** (``decisionRoute``/``stopTouchDays``/
+    ``stopEvaluatedOnTouch``/``deciderRanOnTouch``/``stopFiredNotFilled``): la secuencia lleva la
+    huella de decisión del tick (``decisionReasons``/``decisionLabel``/``filledQty``/``survived``/
+    ``dayOrders``/``dayFills``) y el ciclo publica si el toque del stop fue no evaluado, evaluado sin
+    materializar o materializado. ``management_by_cycle`` es la proyección de los eventos de gestión
+    (``auto_position_management``) unidos a su ``cycle_id`` por la costura; sin ella el bloque
+    ``management`` queda hueco declarado. Declara además ``timelineStartsAt`` (``D47-01``): la
+    secuencia empieza en el primer tick D1 completo POST-ENTRADA, no en el día de entrada.
 
     Reglas duras: un valor ilegible queda ``None`` (nunca ``0``); el R neto sólo se afirma con
     fricción ``COMPLETE`` (con ``PARTIAL`` es un SUELO y se declara el hueco, jamás se publica el
@@ -850,6 +1023,20 @@ def build_cycle_ledger(
             position_initial_risk=finite_number(capture.get("initialRisk")),
             exit_day=normalize_day(trip.get("exitDay")),
         )
+        # Capa v6: correlación DECISIÓN↔CICLO (misma secuencia; añade qué hizo el decider y si el
+        # toque se materializó). ``management`` son los eventos ricos unidos al ciclo por la costura.
+        disambiguation.update(
+            _decision_correlation_fields(timeline=sequence, direction=direction)
+        )
+        management_rows = (
+            [
+                _compact_management_row(row)
+                for row in (management_by_cycle.get(cycle) or ())
+                if isinstance(row, Mapping)
+            ]
+            if (management_by_cycle is not None and cycle)
+            else None
+        )
         cycles.append(
             {
                 "cycleId": cycle or None,
@@ -877,6 +1064,7 @@ def build_cycle_ledger(
                 # ── Capa v5 (desambiguación THESIS_EXIT vs STOP) ──────────────────────
                 **disambiguation,
                 "sequence": _compact_sequence(sequence),
+                "managementRows": management_rows,
                 # ── Capa v2 (diagnóstico de la pérdida) ────────────────────────────────
                 "exitMechanism": mechanism,
                 "exitReason": evidence or (EXIT_MECHANISM_SIN_MECANISMO if not reason else reason),
@@ -1313,6 +1501,13 @@ def _venue_band_cross_check(
 
 __all__ = [
     "AXES",
+    "DECISION_ROUTES",
+    "DECISION_ROUTE_EVALUADO_SIN_MATERIALIZAR",
+    "DECISION_ROUTE_MATERIALIZADO",
+    "DECISION_ROUTE_NO_EVALUADO",
+    "DECISION_ROUTE_SIN_TOQUE",
+    "DECISION_ROUTE_SIN_TRAZA",
+    "DECISION_STRUCTURAL_STOP_TOKEN",
     "DEFAULT_LIMITS",
     "DEFAULT_RESAMPLES",
     "DEFAULT_SEED",
@@ -1331,6 +1526,7 @@ __all__ = [
     "THESIS_ROUTE_MAE",
     "THESIS_ROUTE_MARK",
     "THESIS_ROUTE_SIN_GEOMETRIA",
+    "TIMELINE_START_FIRST_TICK_AFTER_ENTRY",
     "build_cycle_ledger",
     "build_sampling_artifact",
 ]

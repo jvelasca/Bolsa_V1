@@ -20,6 +20,7 @@ from typing import Any
 import pytest
 
 from bolsa_application.dia_d_attribution import capture_study, cycle_key
+from bolsa_application.dia_d_multi_sampling import DECISION_ROUTES
 from bolsa_application.dia_d_thesis_exit import (
     AGE_BUCKETS,
     KIND,
@@ -70,6 +71,11 @@ def _row(
     min_mark_r: float | None = None,
     persisted_mae_r: float | None = None,
     persisted_mae_at_exit_r: float | None = None,
+    decision_route: str | None = None,
+    stop_touch_days: int | None = None,
+    stop_evaluated_on_touch: bool | None = None,
+    decider_ran_on_touch: bool | None = None,
+    stop_fired_not_filled: bool | None = None,
 ) -> dict[str, Any]:
     return {
         "symbol": symbol,
@@ -112,6 +118,13 @@ def _row(
         "minMarkR": min_mark_r,
         "persistedMaeR": persisted_mae_r,
         "persistedMaeAtExitR": persisted_mae_at_exit_r,
+        # ── Capa v6: correlación decisión↔ciclo (hueco por defecto, nunca 0) ──────
+        "decisionRoute": decision_route,
+        "stopTouchDays": stop_touch_days,
+        "stopEvaluatedOnTouch": stop_evaluated_on_touch,
+        "deciderRanOnTouch": decider_ran_on_touch,
+        "stopFiredNotFilled": stop_fired_not_filled,
+        "timelineStartsAt": "first_full_tick_after_entry",
     }
 
 
@@ -425,6 +438,53 @@ def test_disambiguation_by_route_and_stop_path_axes():
     assert labels == [path for path in STOP_PATHS if path in by_stop]
 
 
+# ── Correlación DECISIÓN↔CICLO (capa v6) ─────────────────────────────────────────
+
+
+def test_decision_correlation_block_reports_routes_and_booleans():
+    rows = [
+        _row(
+            decision_route="stop_evaluado_sin_materializar",
+            structural_stop_candidate=True,
+            stop_touch_days=1,
+            stop_evaluated_on_touch=True,
+            decider_ran_on_touch=True,
+            stop_fired_not_filled=True,
+            symbol="AAA",
+        ),
+        _row(
+            decision_route="materializado",
+            structural_stop_candidate=True,
+            stop_touch_days=1,
+            stop_evaluated_on_touch=True,
+            decider_ran_on_touch=True,
+            stop_fired_not_filled=False,
+            symbol="BBB",
+        ),
+    ]
+    artifact = build_thesis_exit_artifact(draw_ledgers=[_ledger(rows)])
+    correlation = artifact["global"]["decisionCorrelation"]
+    assert correlation["cycles"] == 2
+    assert correlation["route"] == {"materializado": 1, "stop_evaluado_sin_materializar": 1}
+    assert correlation["stopEvaluatedOnTouch"] == {"count": 2, "measured": 2, "share": 1.0}
+    assert correlation["stopFiredNotFilled"]["count"] == 1
+    assert correlation["stopTouchDays"]["mean"] == pytest.approx(1.0)
+    assert correlation["timelineStartsAt"] == "first_full_tick_after_entry"
+    assert correlation["routeByStructuralStopCandidate"]["materializado"]["candidate"] == 1
+
+
+def test_decision_correlation_by_route_axis_is_ordered_and_declared():
+    rows = [
+        _row(decision_route="materializado", symbol="AAA"),
+        _row(decision_route=None, symbol="BBB"),  # hueco => sin_traza
+    ]
+    artifact = build_thesis_exit_artifact(draw_ledgers=[_ledger(rows)])
+    by_route = {row["decisionRoute"]: row["cycles"] for row in artifact["byDecisionRoute"]}
+    assert by_route == {"materializado": 1, "sin_traza": 1}
+    labels = [row["decisionRoute"] for row in artifact["byDecisionRoute"]]
+    assert labels == [route for route in DECISION_ROUTES if route in by_route]
+
+
 # ── Determinismo y contrato ──────────────────────────────────────────────────────
 
 
@@ -436,7 +496,7 @@ def test_artifact_is_deterministic_and_declares_its_contract():
     first = build_thesis_exit_artifact(draw_ledgers=ledgers)
     again = build_thesis_exit_artifact(draw_ledgers=ledgers)
     assert json.dumps(first, sort_keys=True) == json.dumps(again, sort_keys=True)
-    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-thesis-exit-v3"
+    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-thesis-exit-v4"
     assert first["kind"] == KIND == "DIA_D_AUTO_THESIS_EXIT"
     assert first["readOnly"] is True
     assert first["basis"] == "entryDay"
@@ -455,9 +515,12 @@ def test_empty_draws_declare_none_not_zero():
     assert artifact["global"]["disambiguation"]["route"] == {}
     assert artifact["global"]["disambiguation"]["daysToFirstTouch"]["mean"] is None
     assert artifact["global"]["disambiguation"]["structuralStopCandidate"]["measured"] == 0
+    assert artifact["global"]["decisionCorrelation"]["route"] == {}
+    assert artifact["global"]["decisionCorrelation"]["stopEvaluatedOnTouch"]["measured"] == 0
     assert artifact["byStrategy"] == []
     assert artifact["byRoute"] == []
     assert artifact["byStopPath"] == []
+    assert artifact["byDecisionRoute"] == []
     assert artifact["concentration"]["distinctSymbols"] == 0
     assert artifact["concentration"]["topSymbol"] is None
 

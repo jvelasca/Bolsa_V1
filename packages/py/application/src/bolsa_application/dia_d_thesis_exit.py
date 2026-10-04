@@ -24,6 +24,10 @@ Ejes de la descomposición
 * **por qué ruta** (v5) — la ruta de la invalidación (``ruta_mark`` vs ``ruta_mae`` sobre el MAE
   persistido), el primer día en que el nivel se alcanzó y la huella del stop (sin cambio / ratchet
   / break-even). Responde a *por qué el mismo nivel produce* ``THESIS_EXIT`` *y no* ``STOP``.
+* **qué hizo el decider** (v6) — la huella de DECISIÓN del toque del stop (``decisionRoute``:
+  materializado / evaluado sin materializar / no evaluado / sin toque / sin traza), leída del MISMO
+  fotograma del día (``decisionReasons``/``decisionLabel``/``filledQty``/``survived``). Cierra la
+  pregunta A/B/C de ``v2.88.47`` sin contrafactual.
 * **cuánta concentración** — símbolos distintos y clusters (top símbolo / top semana ISO).
 
 Reglas duras (heredadas, no se relajan)
@@ -53,15 +57,19 @@ from typing import Any
 from bolsa_application.dia_d_auto import finite_number, normalize_day
 from bolsa_application.dia_d_exit_mechanism import EXIT_MECHANISM_THESIS
 from bolsa_application.dia_d_multi_sampling import (
+    DECISION_ROUTE_SIN_TRAZA,
+    DECISION_ROUTES,
     INVALIDATION_CONDITION_SIN_GEOMETRIA,
     MIN_CYCLES_FOR_SAMPLING,
     THESIS_ROUTE_SIN_GEOMETRIA,
+    TIMELINE_START_FIRST_TICK_AFTER_ENTRY,
 )
 from bolsa_application.dia_d_multi_uncertainty import MIN_DRAWS_FOR_BAND
 
 #: Versión del esquema del artefacto. Un cambio de forma la sube (v2: bloque ``invalidation``;
-#: v3: bloque ``disambiguation`` + ejes ``byRoute``/``byStopPath``).
-SCHEMA_VERSION = "dia-d-thesis-exit-v3"
+#: v3: bloque ``disambiguation`` + ejes ``byRoute``/``byStopPath``; v4: bloque
+#: ``decisionCorrelation`` + eje ``byDecisionRoute``).
+SCHEMA_VERSION = "dia-d-thesis-exit-v4"
 
 #: Tipo del artefacto.
 KIND = "DIA_D_AUTO_THESIS_EXIT"
@@ -127,6 +135,19 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "estrategia); NO es el bootstrap de ciclos ni la incertidumbre de mercado.",
     "n pequeno (los THESIS_EXIT son pocos ciclos): los cubos pueden quedar fragility; ninguna "
     "celda con n pequeno se cita como evidencia fuerte.",
+    "La capa v6 (correlacion DECISION<->CICLO) es OPT-IN: exige la costura --cycle-detail; sin ella "
+    "decisionRoute = sin_traza y los booleanos quedan None (hueco declarado, nunca 0).",
+    "decisionRoute NO es contrafactual: materializado = el stop disparo Y el tick produjo fill del "
+    "ciclo; stop_evaluado_sin_materializar = el stop disparo (STRUCTURAL_STOP en los motivos del "
+    "tick) pero no hubo fill; stop_no_evaluado = el toque ocurre pero el stop NO aparece en los "
+    "motivos disparados. Agrupa 'orden no materializada' y 'sin fill downstream' en el segundo "
+    "termino: no son separables por-ciclo desde la costura (dayOrders/dayFills son senal de DIA).",
+    "D47-01 - FRONTERA DE LA SECUENCIA: los fotogramas se capturan al INICIO de cada tick D1, asi "
+    "que la secuencia empieza en el PRIMER tick D1 COMPLETO POSTERIOR al dia de entrada "
+    "(timelineStartsAt = first_full_tick_after_entry); el dia de ENTRADA NO tiene fotograma. La "
+    "secuencia NO es una historia intradia desde el nacimiento y no se presenta como tal.",
+    "La huella de decision (decisionReasons/decisionLabel/filledQty/survived) se LEE del estado ya "
+    "producido por el worker tras auto_turn; no re-ejecuta la decision ni la altera (Delta motor = 0).",
     "CONFIRMED NO se emite: sigue reservado a evidencia PAPER.",
 )
 
@@ -398,6 +419,52 @@ def _disambiguation_fold(present: Sequence[Sequence[Mapping[str, Any]]]) -> dict
     }
 
 
+def _decision_correlation_fold(present: Sequence[Sequence[Mapping[str, Any]]]) -> dict[str, Any]:
+    """Bloque de la CORRELACIÓN DECISIÓN↔CICLO de un conjunto de ciclos (capa v6, declarada).
+
+    Publica el histograma de ``decisionRoute`` (``materializado``/``stop_evaluado_sin_materializar``/
+    ``stop_no_evaluado``/``sin_toque``/``sin_traza``), su cruce con ``structuralStopCandidate`` y los
+    booleanos que separan «el decider evaluó el stop» (``stopEvaluatedOnTouch``) de «el decider
+    corrió sin tocar el stop» (``deciderRanOnTouch``) y «el stop disparó sin materializar»
+    (``stopFiredNotFilled``), más los días con toque del stop (``stopTouchDays``). Declara la
+    frontera de la secuencia (``timelineStartsAt``, ``D47-01``). Un hueco es ``None``, nunca ``0``.
+    """
+    rows = [row for group in present for row in group]
+    routes: dict[str, int] = {}
+    cross: dict[str, dict[str, int]] = {}
+    for row in rows:
+        token = str(row.get("decisionRoute") or "").strip() or DECISION_ROUTE_SIN_TRAZA
+        routes[token] = routes.get(token, 0) + 1
+        bucket = cross.setdefault(token, {"candidate": 0, "notCandidate": 0, "unknown": 0})
+        candidate = row.get("structuralStopCandidate")
+        if isinstance(candidate, bool):
+            bucket["candidate" if candidate else "notCandidate"] += 1
+        else:
+            bucket["unknown"] += 1
+
+    def _bools(key: str) -> list[bool]:
+        return [bool(row[key]) for row in rows if isinstance(row.get(key), bool)]
+
+    def _nums(key: str) -> list[float]:
+        return [value for row in rows if (value := finite_number(row.get(key))) is not None]
+
+    touch_days = _nums("stopTouchDays")
+    return {
+        "cycles": len(rows),
+        "route": {token: routes[token] for token in sorted(routes)},
+        "routeByStructuralStopCandidate": {token: cross[token] for token in sorted(cross)},
+        "stopEvaluatedOnTouch": _boolean_block(_bools("stopEvaluatedOnTouch")),
+        "deciderRanOnTouch": _boolean_block(_bools("deciderRanOnTouch")),
+        "stopFiredNotFilled": _boolean_block(_bools("stopFiredNotFilled")),
+        "stopTouchDays": {
+            "mean": _mean(touch_days),
+            "median": _median(touch_days),
+            "measured": len(touch_days),
+        },
+        "timelineStartsAt": TIMELINE_START_FIRST_TICK_AFTER_ENTRY,
+    }
+
+
 # ── Plegado de un conjunto de ciclos (con dispersión entre sorteos + fragilidad) ──
 
 
@@ -555,6 +622,7 @@ def _fold(draw_rows: Sequence[Sequence[Mapping[str, Any]]], draws_total: int) ->
         },
         "invalidation": _invalidation_fold(present),
         "disambiguation": _disambiguation_fold(present),
+        "decisionCorrelation": _decision_correlation_fold(present),
         "fragility": {"fragile": bool(reasons), "reasons": reasons},
     }
 
@@ -683,13 +751,15 @@ def build_thesis_exit_artifact(
 ) -> dict[str, Any]:
     """Payload canónico del quirófano ``THESIS_EXIT`` (puro y determinista).
 
-    ``draw_ledgers`` son los ``K`` ledgers de ciclos (``dia-d-multi-cycle-ledger-v4``). Selecciona
+    ``draw_ledgers`` son los ``K`` ledgers de ciclos (``dia-d-multi-cycle-ledger-v6``). Selecciona
     los ciclos cerrados por invalidación de tesis y los pliega por **estrategia**, **dirección**,
     **año**, **régimen**, **régimen operativo** y **cubo de edad**, cada uno con su **dispersión
     entre sorteos** y su **fragilidad** declarada. Añade la geometría (MAE/MFE, captura,
     ``leftOnTableR``), la calidad de entrada, el coste (bruto/neto/suelo), la **condición de la
     invalidación** (capa v4: nivel congelado, stop vigente al cierre, alcance del peor adverso),
-    los motivos crudos y la concentración. Un hueco queda ``None``, nunca ``0``.
+    la **desambiguación** de la ruta (capa v5) y la **correlación DECISIÓN↔CICLO** (capa v6:
+    ``decisionRoute`` y la huella de decisión del toque del stop), los motivos crudos y la
+    concentración. Un hueco queda ``None``, nunca ``0``.
     """
     ordered = list(draw_ledgers or ())
     draws_total = len(ordered)
@@ -719,8 +789,10 @@ def build_thesis_exit_artifact(
             "cost",
             "invalidation",
             "disambiguation",
+            "decisionCorrelation",
             "route",
             "stopPath",
+            "decisionRoute",
         ],
         "coverage": resolved_coverage,
         "global": global_block,
@@ -775,13 +847,23 @@ def build_thesis_exit_artifact(
             draws_total=draws_total,
             order=STOP_PATHS,
         ),
+        "byDecisionRoute": _fold_dimension(
+            per_draw_rows,
+            key_fn=lambda row: str(row.get("decisionRoute") or "").strip()
+            or DECISION_ROUTE_SIN_TRAZA,
+            label_key="decisionRoute",
+            draws_total=draws_total,
+            order=DECISION_ROUTES,
+        ),
         "rawReasonTokens": _raw_reason_tokens(all_rows),
         "concentration": _concentration(all_rows),
         "recompileNote": (
-            "Este artefacto consume los ciclos con exitMechanism=THESIS_EXIT del ledger v4: exige "
-            "que el ledger traiga el detalle (--cycle-detail), la identidad de estrategia/direccion y "
-            "la geometria de la invalidacion (invalidationByCycle). Sin detalle, los ciclos quedan "
-            "SIN_MECANISMO/la invalidation queda sin medir (se declara, no se rellena)."
+            "Este artefacto consume los ciclos con exitMechanism=THESIS_EXIT del ledger v6: exige "
+            "que el ledger traiga el detalle (--cycle-detail), la identidad de estrategia/direccion, "
+            "la geometria de la invalidacion (invalidationByCycle), la secuencia (cycleTimeline) y la "
+            "huella de decision (decisionReasons/decisionLabel/filledQty/survived). Sin detalle, los "
+            "ciclos quedan SIN_MECANISMO/la invalidation y la decision quedan sin medir (se declara, "
+            "no se rellena)."
         ),
         "meta": {str(key): value for key, value in (meta or {}).items()},
         "limits": [str(item) for item in (limits if limits is not None else DEFAULT_LIMITS)],

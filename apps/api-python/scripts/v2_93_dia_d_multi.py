@@ -197,6 +197,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         # Capa v5: secuencia día a día por ciclo (mark/stop/MAE persistido), acumulada entre
         # ventanas. Es la materia prima de la desambiguación THESIS_EXIT vs STOP.
         all_cycle_sequences_by_cycle: dict[str, Any] = {}
+        # Capa v6 (DÍA-D-3g): eventos de gestión (``auto_position_management``) unidos a su
+        # ``cycle_id`` (join por instrumento+día hecho en la costura). Acumulados entre ventanas.
+        all_management_by_cycle: dict[str, list[dict[str, Any]]] = {}
         regime_all: dict[str, Any] = {}
         operational_all: dict[str, Any] = {}
 
@@ -307,6 +310,17 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             all_close_rows.extend(detail.get("closeRows") or [])
             all_invalidation_by_cycle.update(detail.get("invalidationByCycle") or {})
             all_cycle_sequences_by_cycle.update(detail.get("cycleTimeline") or {})
+            # Capa v6: agrupa los eventos de gestión por ``cycle_id`` (los del día de entrada
+            # sin ciclo previo quedan fuera: hueco declarado, nunca un ciclo inventado).
+            for management_row in detail.get("managementRows") or []:
+                management_cycle = str(
+                    (management_row or {}).get("cycleId") or ""
+                ).strip()
+                if not management_cycle:
+                    continue
+                all_management_by_cycle.setdefault(management_cycle, []).append(
+                    dict(management_row)
+                )
             operable_days = sum(1 for flag in operable_flags[d0_index : d1_index + 1] if flag)
             for row in census.days:
                 if row.day in window_set:
@@ -355,7 +369,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             regime_by_day=regime_all,
             operational_regime_by_day=operational_all,
             meta={
-                "bump": "2.11.47-beta",
+                "bump": "2.11.48-beta",
                 "phase": "V2.93 DIA-D AUTO MULTI ATTRIBUTION",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
@@ -388,6 +402,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 close_rows=all_close_rows,
                 invalidation_by_cycle=all_invalidation_by_cycle,
                 cycle_sequences_by_cycle=all_cycle_sequences_by_cycle,
+                management_by_cycle=all_management_by_cycle,
                 entry_window_days=int(args.entry_window_days),
             )
             ledger_path = pathlib.Path(args.cycles_out)

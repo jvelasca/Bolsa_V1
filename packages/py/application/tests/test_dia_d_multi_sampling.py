@@ -136,7 +136,7 @@ def test_ledger_v3_is_additive_and_keeps_the_labels_the_fold_reads():
         regime_by_day={"2022-01-05": "range"},
         operational_regime_by_day={"2022-01-05": "SIDEWAYS"},
     )
-    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v5"
+    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v6"
     row = ledger["cycles"][0]
     # Campos v1 intactos (los que lee `_cell_cycles`).
     assert row["realizedR"] == 1.5
@@ -333,7 +333,7 @@ def test_ledger_v5_route_is_mae_when_the_persisted_mae_crossed_the_level():
         },
     )
     row = ledger["cycles"][0]
-    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v5"
+    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v6"
     assert row["thesisExitRoute"] == THESIS_ROUTE_MAE
     assert row["levelR"] == pytest.approx(-1.0)
     assert row["minMarkR"] == pytest.approx(0.0)
@@ -420,6 +420,159 @@ def test_ledger_v5_without_sequence_declares_the_gap_never_zero():
     assert row["stopChanged"] is None
     assert row["sequence"] is None
     assert row["timelineDays"] == 0
+
+
+# ── Ledger v6: correlación DECISIÓN↔CICLO (THESIS_EXIT vs STOP) ──────────────────
+
+
+def _decision_frame(day: str, *, mark: float, stop: float = 9.0, **decision: Any) -> dict[str, Any]:
+    """Fotograma de un ciclo con la huella de decisión del tick (capa v6)."""
+    return {"day": day, "mark": mark, "currentStop": stop, "maeR": -1.2, **decision}
+
+
+def test_ledger_v6_decision_route_materialized_when_the_stop_fired_and_filled():
+    ledger = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(),
+        cycle_sequences_by_cycle={
+            "C1": [
+                _decision_frame(
+                    "2022-01-07",
+                    mark=8.8,
+                    decisionReasons=["STRUCTURAL_STOP"],
+                    decisionLabel="structural_stop",
+                    filledQty=100.0,
+                    survived=False,
+                    dayOrders=1,
+                    dayFills=1,
+                )
+            ]
+        },
+    )
+    row = ledger["cycles"][0]
+    assert row["decisionRoute"] == "materializado"
+    assert row["stopTouchDays"] == 1
+    assert row["stopEvaluatedOnTouch"] is True
+    assert row["stopFiredNotFilled"] is False
+    assert row["timelineStartsAt"] == "first_full_tick_after_entry"
+
+
+def test_ledger_v6_matches_the_structural_stop_token_case_insensitively():
+    """El SIM worker emite ``structural_stop`` en minúscula; el match NO puede depender del caso."""
+    ledger = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(),
+        cycle_sequences_by_cycle={
+            "C1": [
+                _decision_frame(
+                    "2022-01-07",
+                    mark=8.8,
+                    decisionReasons=["structural_stop", "thesis_invalidation"],
+                    decisionLabel="structural_stop",
+                    filledQty=0.0,
+                    survived=True,
+                )
+            ]
+        },
+    )
+    row = ledger["cycles"][0]
+    assert row["stopEvaluatedOnTouch"] is True
+    assert row["decisionRoute"] == "stop_evaluado_sin_materializar"
+
+
+def test_ledger_v6_decision_route_evaluated_without_materialization():
+    """El stop DISPARÓ como motivo del tick pero no hubo fill: el toque no se materializó."""
+    ledger = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(),
+        cycle_sequences_by_cycle={
+            "C1": [
+                _decision_frame(
+                    "2022-01-07",
+                    mark=8.8,
+                    decisionReasons=["STRUCTURAL_STOP", "THESIS_INVALIDATION"],
+                    decisionLabel="thesis_exit",
+                    filledQty=0.0,
+                    survived=True,
+                )
+            ]
+        },
+    )
+    row = ledger["cycles"][0]
+    assert row["decisionRoute"] == "stop_evaluado_sin_materializar"
+    assert row["stopEvaluatedOnTouch"] is True
+    assert row["deciderRanOnTouch"] is True
+    assert row["stopFiredNotFilled"] is True
+
+
+def test_ledger_v6_decision_route_not_evaluated_when_the_stop_never_fired():
+    """El toque ocurre pero el stop NO aparece en los motivos del tick: no se evaluó el stop."""
+    ledger = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(),
+        cycle_sequences_by_cycle={
+            "C1": [
+                _decision_frame(
+                    "2022-01-07",
+                    mark=8.8,
+                    decisionReasons=["THESIS_INVALIDATION"],
+                    decisionLabel="thesis_exit",
+                    filledQty=0.0,
+                    survived=True,
+                )
+            ]
+        },
+    )
+    row = ledger["cycles"][0]
+    assert row["decisionRoute"] == "stop_no_evaluado"
+    assert row["stopEvaluatedOnTouch"] is False
+    assert row["deciderRanOnTouch"] is True
+
+
+def test_ledger_v6_decision_route_sin_toque_and_sin_traza_are_distinct():
+    touchedless = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(),
+        cycle_sequences_by_cycle={
+            "C1": [_decision_frame("2022-01-07", mark=10.4, decisionReasons=["TARGET_1"])]
+        },
+    )
+    assert touchedless["cycles"][0]["decisionRoute"] == "sin_toque"
+    assert touchedless["cycles"][0]["stopTouchDays"] == 0
+
+    no_trace = build_cycle_ledger(round_trips=[_sequence_trip()], invalidation_by_cycle=_v4_capture())
+    row = no_trace["cycles"][0]
+    assert row["decisionRoute"] == "sin_traza"
+    assert row["stopTouchDays"] is None
+    assert row["stopEvaluatedOnTouch"] is None
+    assert row["stopFiredNotFilled"] is None
+    assert row["timelineStartsAt"] == "first_full_tick_after_entry"
+
+
+def test_ledger_v6_management_rows_are_attached_by_cycle_and_hueco_is_none():
+    management = {
+        "C1": [
+            {
+                "day": "2022-01-07",
+                "primaryReason": "THESIS_INVALIDATION",
+                "exitReasons": ["STRUCTURAL_STOP", "THESIS_INVALIDATION"],
+                "reasonCodes": ["thesis_exit"],
+                "thesisInvalid": True,
+            }
+        ]
+    }
+    ledger = build_cycle_ledger(
+        round_trips=[_sequence_trip()],
+        invalidation_by_cycle=_v4_capture(),
+        management_by_cycle=management,
+    )
+    row = ledger["cycles"][0]
+    assert row["managementRows"][0]["primaryReason"] == "THESIS_INVALIDATION"
+    assert row["managementRows"][0]["reasonCodes"] == ["thesis_exit"]
+
+    no_management = build_cycle_ledger(round_trips=[_sequence_trip()])
+    # Sin la costura el bloque es un hueco declarado, nunca una lista vacía disfrazada.
+    assert no_management["cycles"][0]["managementRows"] is None
 
 
 # ── Banda: descomposición venue / sampling / total ───────────────────────────────

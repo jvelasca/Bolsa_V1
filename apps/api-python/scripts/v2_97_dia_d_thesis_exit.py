@@ -6,13 +6,18 @@ El diagnóstico del origen de la pérdida (``v2_96``) aisló que el grueso del `
 vive en pocos ciclos cerrados por invalidación de tesis (``THESIS_EXIT``), pese a que el
 ``STOP_EJECUTADO`` domina en frecuencia con expectancy bruta ~0. Esta sonda abre esos ciclos:
 consume los ``K`` ledgers de ciclos que ``v2_94 --cycles --cycle-detail`` dejó por sorteo
-(``draw-XX/multi-cycles.json``, esquema ``dia-d-multi-cycle-ledger-v5``) y los pliega para saber
+(``draw-XX/multi-cycles.json``, esquema ``dia-d-multi-cycle-ledger-v6``) y los pliega para saber
 **dónde viven** —estrategia, dirección, año/régimen, edad, geometría (MAE/MFE/captura), calidad de
 entrada y coste— con su dispersión entre sorteos y su fragilidad. La capa v5 añade la
 **desambiguación ``THESIS_EXIT`` vs ``STOP``**: por qué RUTA se invalidó la tesis (``ruta_mark`` vs
 ``ruta_mae`` sobre el MAE PERSISTIDO), el primer día en que el nivel se alcanzó y la huella del stop.
 Con ``--sequences`` vuelca, además, la SECUENCIA día a día por ciclo (materia prima de la
-reconstrucción temporal).
+reconstrucción temporal). La capa v6 añade la **correlación DECISIÓN↔CICLO**: una vez medido que el
+mark tocó el stop vigente, lee del MISMO fotograma qué hizo el decider ese tick
+(``decisionReasons``/``decisionLabel``) y si el toque se materializó (``filledQty``/``survived``),
+clasificando cada toque en ``materializado``/``stop_evaluado_sin_materializar``/``stop_no_evaluado``/
+``sin_toque``/``sin_traza`` (``decisionRoute``). Declara la frontera de la secuencia (``D47-01``:
+primer tick D1 completo POST-ENTRADA; el día de entrada no tiene fotograma).
 
 No re-ejecuta el harness: sólo LEE los artefactos ya producidos.
 
@@ -151,6 +156,29 @@ def _print_text(artifact: dict[str, Any]) -> None:
             f"días hasta el primer toque media {_fmt(first.get('mean'), '.2f')} · "
             f"mediana {_fmt(first.get('median'), '.2f')} · medidos {first.get('measured')}"
         )
+    correlation = (artifact["global"] or {}).get("decisionCorrelation") or {}
+    if correlation:
+        print()
+        print("CORRELACIÓN DECISIÓN↔CICLO (capa v6)")
+        print("-" * 100)
+        print(f"ruta de decisión          {correlation.get('route')}")
+        print(f"ruta x stop candidato     {correlation.get('routeByStructuralStopCandidate')}")
+        for key, label in (
+            ("stopEvaluatedOnTouch", "stop evaluado en toque"),
+            ("deciderRanOnTouch", "decider corrió en toque"),
+            ("stopFiredNotFilled", "stop disparó sin fill"),
+        ):
+            block = correlation.get(key) or {}
+            print(
+                f"{label:<25} {block.get('count')} de {block.get('measured')} "
+                f"({_fmt(block.get('share'), '.3f')})"
+            )
+        touch = correlation.get("stopTouchDays") or {}
+        print(
+            f"días con toque del stop   media {_fmt(touch.get('mean'), '.2f')} · "
+            f"mediana {_fmt(touch.get('median'), '.2f')} · medidos {touch.get('measured')}"
+        )
+        print(f"frontera de la secuencia  {correlation.get('timelineStartsAt')}")
     print()
     print(f"motivos crudos            {artifact['rawReasonTokens']}")
     concentration = artifact["concentration"]
@@ -189,6 +217,13 @@ _DISAMBIGUATION_KEYS = (
     "breakevenReached",
     "stopAboveLevel",
     "structuralStopCandidate",
+    # Capa v6 (DÍA-D-3g): correlación decisión↔ciclo.
+    "decisionRoute",
+    "stopTouchDays",
+    "stopEvaluatedOnTouch",
+    "deciderRanOnTouch",
+    "stopFiredNotFilled",
+    "timelineStartsAt",
 )
 
 
@@ -241,6 +276,14 @@ def _build_sequences_payload(ledgers: list[Any]) -> dict[str, Any]:
     }
 
 
+def _use_utf8_console() -> None:
+    """Fuerza UTF-8 en stdout/stderr: la salida lleva «↔» y acentos (consola cp1252 la rompería)."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):  # pragma: no cover — consola real de Windows.
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -262,6 +305,8 @@ def main(argv: list[str] | None = None) -> int:
         help="ruta del JSON de secuencias (por defecto, junto al quirófano)",
     )
     args = parser.parse_args(argv)
+
+    _use_utf8_console()
 
     if args.draws is not None and int(args.draws) < 1:
         print("# uso incorrecto: --draws debe ser >= 1", file=sys.stderr)
@@ -287,7 +332,7 @@ def main(argv: list[str] | None = None) -> int:
     artifact = build_thesis_exit_artifact(
         draw_ledgers=ledgers,
         meta={
-            "bump": "2.11.47-beta",
+            "bump": "2.11.48-beta",
             "phase": "V2.97 DIA-D AUTO THESIS EXIT",
             "nature": "INVESTIGACION",
             "drawsDir": str(out_dir),
