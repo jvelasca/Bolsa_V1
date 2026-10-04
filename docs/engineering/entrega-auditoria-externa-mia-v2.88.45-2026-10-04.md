@@ -130,4 +130,4 @@
 - **Producto:** `V2.88.45-beta`. **Package:** `2.11.45-beta`. **Sin migración.**
 - **Ficheros añadidos:** `dia_d_thesis_exit.py`, `v2_97_dia_d_thesis_exit.py`, `test_dia_d_thesis_exit.py`, `evidence/v2.88.45/README.md`, esta entrega.
 - **Ficheros modificados:** `dia_d_multi_sampling.py` (ledger `-v3`), `v2_94` (`_DETAIL_LEDGER_SCHEMA`), `v2_89`/`v2_90`/`v2_91`/`v2_92`/`v2_93`/`v2_94`/`v2_95`/`v2_96`/`v2_97` (`meta.bump`), bump guard, `test_dia_d_multi_sampling.py`, `test_dia_d_loss_origin.py`, `package.json`, `CHANGELOG.md`, `CURRENT_SYSTEM.md`, `versioning.md`.
-- **Tag / commits / CI:** se publican en el commit de docs de este sello (el CI de tag se cita al publicar).
+- **Commits:** funcional `a9ee8d25` → re-anclaje del freeze `023a1683` → docs (este). **Tag `v2.88.45-beta` PENDIENTE** de publicar; el `Release tag CI` se cita al publicar.
