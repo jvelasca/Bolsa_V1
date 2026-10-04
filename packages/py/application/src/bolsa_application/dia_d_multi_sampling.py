@@ -44,6 +44,7 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from bolsa_application.applied_cost import applied_cost_from_fills
 from bolsa_application.dia_d_attribution import (
     SIN_REGIMEN,
     cycle_key,
@@ -51,7 +52,16 @@ from bolsa_application.dia_d_attribution import (
     regime_key_reader,
 )
 from bolsa_application.dia_d_auto import finite_number, normalize_day
-from bolsa_application.dia_d_longitudinal import Excursion
+from bolsa_application.dia_d_exit_mechanism import (
+    EXIT_MECHANISM_SIN_MECANISMO,
+    classify_exit_mechanism,
+)
+from bolsa_application.dia_d_longitudinal import (
+    DEFAULT_ENTRY_WINDOW_DAYS,
+    LONG,
+    Excursion,
+    infer_direction,
+)
 from bolsa_application.dia_d_multi import (
     SIN_OPERATIONAL,
     SIN_YEAR,
@@ -69,7 +79,9 @@ from bolsa_application.dia_d_multi_uncertainty import (
 )
 
 #: Versión del esquema del ledger de ciclos (una fila por ciclo; sin agregados).
-LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v1"
+#: v2 (V2.88.44) añade —de forma ADITIVA— el mecanismo de salida, la fricción aplicada en R, el
+#: R neto y la excursión adversa TEMPRANA post-entrada. Un lector de v1 ignora los campos nuevos.
+LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v2"
 
 #: Tipo del ledger de ciclos (la muestra cruda de UN sorteo).
 LEDGER_KIND = "DIA_D_AUTO_MULTI_CYCLE_LEDGER"
@@ -230,21 +242,141 @@ def _excursion_mae_mfe(row: Any) -> tuple[float | None, float | None]:
     return None, None
 
 
+def _cycle_id(trip: Mapping[str, Any]) -> str:
+    """Identidad del ciclo financiero del round trip (``""`` si no la trae)."""
+    return str(trip.get("cycleId") or trip.get("cycle_id") or "").strip()
+
+
+def _fill_cycle_id(fill: Any) -> str:
+    return str(getattr(fill, "cycle_id", None) or "").strip()
+
+
+def _fills_by_cycle(cost_rows: Sequence[Any]) -> dict[str, list[Any]]:
+    """``{cycle_id: [fills]}`` de los fills que declaran su ciclo (nunca se inventa uno)."""
+    grouped: dict[str, list[Any]] = {}
+    for fill in cost_rows or ():
+        cycle = _fill_cycle_id(fill)
+        if cycle:
+            grouped.setdefault(cycle, []).append(fill)
+    return grouped
+
+
+def _reason_by_cycle(cost_rows: Sequence[Any], close_rows: Sequence[Any]) -> dict[str, str]:
+    """``{cycle_id: reason}`` uniendo el motivo de cierre por ``executionId`` (jamás por símbolo).
+
+    La fila ``position_close`` del journal NO trae el ciclo: trae el ``executionId`` de la primera
+    pata aplicada de la salida. El fill durable de esa pata SÍ trae el ``cycle_id`` (heredado de la
+    posición), así que el emparejamiento es por identidad de ejecución. Sin esa pata el motivo
+    queda sin ciclo y se declara hueco, no se reparte a ciegas.
+    """
+    cycle_by_execution: dict[str, str] = {}
+    for fill in cost_rows or ():
+        execution = str(getattr(fill, "execution_id", None) or "").strip()
+        fill_cycle = _fill_cycle_id(fill)
+        if execution and fill_cycle:
+            cycle_by_execution[execution] = fill_cycle
+    reasons: dict[str, str] = {}
+    for row in close_rows or ():
+        reason: Any
+        if isinstance(row, Mapping):
+            execution = str(row.get("executionId") or row.get("execution_id") or "").strip()
+            reason = row.get("reason")
+        else:
+            execution = str(getattr(row, "execution_id", None) or "").strip()
+            reason = getattr(row, "reason", None)
+        close_cycle = cycle_by_execution.get(execution)
+        if close_cycle and close_cycle not in reasons:
+            reasons[close_cycle] = str(reason or "")
+    return reasons
+
+
+def _entry_side(trip: Mapping[str, Any]) -> str | None:
+    """Lado de ENTRADA inferido de la geometría (largo⇒``buy``; corto⇒``sell``)."""
+    direction = infer_direction(entry=trip.get("entryPrice"), stop=trip.get("stop"))
+    if direction == LONG:
+        return "buy"
+    if direction is None:
+        return None
+    return "sell"
+
+
+def _risk_cash(trip: Mapping[str, Any], fills: Sequence[Any], entry_side: str | None) -> float | None:
+    """Riesgo al nacer en MONEDA (``|entry − stop| × qty``) para pasar fricción de moneda a R."""
+    entry = finite_number(trip.get("entryPrice"))
+    stop = finite_number(trip.get("stop"))
+    if entry is None or stop is None or entry_side is None:
+        return None
+    qty = 0.0
+    measured = False
+    for fill in fills:
+        if str(getattr(fill, "side", None) or "").strip().lower() != entry_side:
+            continue
+        quantity = finite_number(getattr(fill, "quantity", None))
+        if quantity is None or quantity <= 0:
+            continue
+        qty += quantity
+        measured = True
+    if not measured or qty <= 0:
+        return None
+    return abs(entry - stop) * qty
+
+
+def _entry_slippage_bps(fills: Sequence[Any], entry_side: str | None) -> float | None:
+    """Desvío medio (bps, ponderado por cantidad) del precio de entrada contra su mid.
+
+    Mide la fricción de ENTRADA que este simulador aplicó (``|price − reference_mid| / mid``), la
+    misma magnitud que ``applied_cost`` pero por pata de entrada. Sin referencia utilizable es un
+    hueco declarado (nunca ``0``: diría "entrada sin coste").
+    """
+    if entry_side is None:
+        return None
+    weighted = 0.0
+    weight = 0.0
+    measured = False
+    for fill in fills:
+        if str(getattr(fill, "side", None) or "").strip().lower() != entry_side:
+            continue
+        price = finite_number(getattr(fill, "price", None))
+        reference = finite_number(getattr(fill, "reference_mid", None))
+        quantity = finite_number(getattr(fill, "quantity", None))
+        if price is None or reference is None or reference <= 0 or quantity is None or quantity <= 0:
+            continue
+        measured = True
+        weighted += abs(price - reference) / reference * 10_000.0 * quantity
+        weight += quantity
+    if not measured or weight <= 0:
+        return None
+    return weighted / weight
+
+
 def build_cycle_ledger(
     *,
     round_trips: Sequence[Mapping[str, Any]],
     excursions_rows: Sequence[Excursion | Mapping[str, Any]] = (),
+    entry_excursions_rows: Sequence[Excursion | Mapping[str, Any]] = (),
     regime_by_day: Mapping[str, Any] | None = None,
     operational_regime_by_day: Mapping[str, Any] | None = None,
+    cost_rows: Sequence[Any] = (),
+    close_rows: Sequence[Any] = (),
+    entry_window_days: int = DEFAULT_ENTRY_WINDOW_DAYS,
     meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Ledger de ciclos de UN sorteo (puro y determinista: sin reloj ni azar).
 
     Una fila por ciclo con su ``realizedR`` y su excursión (MAE/MFE) unida por ``cycle_key``, más
-    las etiquetas declaradas (``year``/``regime``/``operationalRegime``). Un valor ilegible queda
-    ``None`` (nunca ``0``). El orden es determinista por ``(entryDay, symbol, exitDay)``.
+    las etiquetas declaradas (``year``/``regime``/``operationalRegime``). La capa v2 añade —de
+    forma ADITIVA— el **mecanismo de salida** (``exitMechanism``/``exitReason``), la **fricción
+    aplicada** (``frictionCost``/``frictionR``/``frictionMeasurement``), el **R neto**
+    (``netRealizedR``) y la **excursión adversa temprana** post-entrada (``entryAdverseR``/
+    ``entryAdverseWindowDays``/``entryAdverseGap``), además del desvío de entrada en bps.
+
+    Reglas duras: un valor ilegible queda ``None`` (nunca ``0``); el R neto sólo se afirma con
+    fricción ``COMPLETE`` (con ``PARTIAL`` es un SUELO y se declara el hueco, jamás se publica el
+    R bruto haciéndolo pasar por neto); un motivo de cierre ausente es ``SIN_MECANISMO``. El orden
+    es determinista por ``(entryDay, symbol, exitDay)``.
     """
     indexed = index_excursions(excursions_rows)
+    entry_indexed = index_excursions(entry_excursions_rows)
     year_reader = year_key_reader()
     trial_reader = regime_key_reader(regime_by_day or {})
     operational_reader = operational_regime_key_reader(operational_regime_by_day or {})
@@ -256,20 +388,78 @@ def build_cycle_ledger(
             normalize_day(trip.get("exitDay")) or "",
         ),
     )
+    fills_by_cycle = _fills_by_cycle(cost_rows)
+    reasons_by_cycle = _reason_by_cycle(cost_rows, close_rows)
+    measured_cycle_ids = [cycle for trip in ordered if (cycle := _cycle_id(trip))]
+    costs = applied_cost_from_fills(
+        measured_cycle_ids,
+        cost_rows or (),
+        closed_cycle_ids=measured_cycle_ids,
+    )
+    window_days = max(1, int(entry_window_days))
     cycles: list[dict[str, Any]] = []
     for trip in ordered:
         mae, mfe = _excursion_mae_mfe(indexed.get(cycle_key(trip)))
+        early = entry_indexed.get(cycle_key(trip))
+        early_mae, _early_mfe = _excursion_mae_mfe(early)
+        early_reason = None
+        if early is None:
+            early_reason = "sin_excursion_temprana"
+        else:
+            record = early.to_dict() if isinstance(early, Excursion) else early
+            if early_mae is None:
+                early_reason = str(record.get("reason") or "").strip() or "sin_excursion_temprana"
+
+        realized = finite_number(trip.get("realizedR"))
+        cycle = _cycle_id(trip)
+        cost = costs.get(cycle) if cycle else None
+        friction = finite_number(cost.friction) if cost is not None else None
+        entry_side = _entry_side(trip)
+        fills = fills_by_cycle.get(cycle, []) if cycle else []
+        risk_cash = _risk_cash(trip, fills, entry_side)
+        friction_r = None
+        if friction is not None and risk_cash is not None and risk_cash > 0:
+            friction_r = friction / risk_cash
+        # El R NETO sólo se afirma con fricción COMPLETE: con PARTIAL lo medido es un SUELO, y
+        # publicar ``bruto − suelo`` como neto lo haría pasar por completo. Se declara el hueco.
+        net = None
+        if (
+            realized is not None
+            and friction_r is not None
+            and cost is not None
+            and cost.measurement == "COMPLETE"
+        ):
+            net = realized - friction_r
+        reason = reasons_by_cycle.get(cycle, "") if cycle else ""
+        mechanism, evidence = classify_exit_mechanism(reason)
+        slippage = _entry_slippage_bps(fills, entry_side)
         cycles.append(
             {
                 "symbol": str(trip.get("symbol") or "").strip(),
                 "entryDay": normalize_day(trip.get("entryDay")) or "",
                 "exitDay": normalize_day(trip.get("exitDay")) or "",
-                "realizedR": finite_number(trip.get("realizedR")),
+                "realizedR": realized,
                 "maeR": mae,
                 "mfeR": mfe,
                 "year": year_reader(trip) or "",
                 "regime": trial_reader(trip) or "",
                 "operationalRegime": operational_reader(trip) or "",
+                # ── Capa v2 (diagnóstico de la pérdida) ────────────────────────────────
+                "exitMechanism": mechanism,
+                "exitReason": evidence or (EXIT_MECHANISM_SIN_MECANISMO if not reason else reason),
+                "frictionCost": friction,
+                "frictionR": friction_r,
+                "frictionMeasurement": str(cost.measurement) if cost is not None else "UNKNOWN",
+                "netRealizedR": net,
+                "entryAdverseR": early_mae,
+                "entryAdverseWindowDays": window_days,
+                "entryAdverseGap": early_reason,
+                "entrySlippageBps": slippage,
+                "entrySlippageGap": (
+                    None
+                    if slippage is not None
+                    else ("sin_fills_del_ciclo" if not fills else "sin_referencia_entrada")
+                ),
             }
         )
     return {

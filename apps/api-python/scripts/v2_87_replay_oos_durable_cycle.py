@@ -266,8 +266,15 @@ async def _run_durable_replay(
     engine_id: str,
     operable_days: Sequence[bool] = (),
     durable_cycle: bool = True,
+    capture_cycle_detail: bool = False,
 ) -> dict[str, Any]:
-    """Replay hermético con el ciclo durable de reservas CERRADO en cada tick."""
+    """Replay hermético con el ciclo durable de reservas CERRADO en cada tick.
+
+    ``capture_cycle_detail`` (default ``False``, INERTE: con él apagado el comportamiento es
+    idéntico) captura, al terminar, los fills durables con su ``reference_mid``/``cycle_id`` y los
+    motivos de cierre ``position_close`` del journal. Es la materia prima —ya producida por el
+    motor— del diagnóstico de dónde nace la pérdida; no cambia ninguna decisión de trading."""
+    capture_cycle_detail = bool(capture_cycle_detail)
     from bolsa_analytics.cognitive.measurement import MEASUREMENT_UNKNOWN
     from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
     from bolsa_application.auto_forward_deciders import build_forward_pair_decider, split_watch
@@ -537,7 +544,26 @@ async def _run_durable_replay(
     releases = tally_releases([], reservations.releases)
     live_max = max((int(row["liveReservations"]) for row in book_rows), default=0)
 
-    return {
+    # Diagnóstico de la pérdida (inerte por defecto): los fills durables (con ``cycle_id`` y
+    # ``reference_mid``) y el motivo de cada cierre. La costura NO toca el motor: sólo LEE lo que
+    # ya se produjo. El emparejamiento motivo↔ciclo se resuelve por ``executionId`` en el ledger.
+    cycle_detail: dict[str, Any] | None = None
+    if capture_cycle_detail:
+        cycle_detail = {
+            "costRows": list(getattr(contexts, "order", ()) or ()),
+            "closeRows": [
+                {
+                    "executionId": str(getattr(row, "execution_id", "") or ""),
+                    "reason": str(getattr(row, "reason", "") or ""),
+                }
+                # El motivo del cierre viaja en la fila ``position_close`` del journal del día
+                # (``journal_pairs()``, lectura pública); ``_v2_journal`` NO lo contiene.
+                for row in (worker.journal_pairs() or ())
+                if str(getattr(row, "kind", "") or "") == "position_close"
+            ],
+        }
+
+    payload: dict[str, Any] = {
         "startDay": days[start_index] if 0 <= start_index < len(days) else None,
         "endDay": ticks[-1].day if ticks else None,
         "ticks": len(ticks),
@@ -581,6 +607,11 @@ async def _run_durable_replay(
         "horizon": horizon.to_dict(),
         "refusedDay": refused_day,
     }
+    if capture_cycle_detail:
+        # Costura INERTE (Δ motor = 0): con `capture_cycle_detail` apagado —el default— la clave
+        # NO se añade, de modo que el artefacto congelado de `replay-repro` sale byte a byte igual.
+        payload["cycleDetail"] = cycle_detail
+    return payload
 
 
 # ── Informe ──────────────────────────────────────────────────────────────────────

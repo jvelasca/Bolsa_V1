@@ -120,8 +120,13 @@ async def _run_pass(
     horizon_days: int,
     d0_index: int,
     d1_index: int,
+    capture_cycle_detail: bool = False,
 ) -> dict[str, Any]:
-    """Una corrida del harness hermético sobre ``[d0_index, d1_index]`` (con historia/horizonte)."""
+    """Una corrida del harness hermético sobre ``[d0_index, d1_index]`` (con historia/horizonte).
+
+    ``capture_cycle_detail`` (default ``False``) se propaga al harness para el diagnóstico de la
+    pérdida; con él apagado el comportamiento es idéntico (costura inerte).
+    """
     start_index = max(1, d0_index - max(1, history_days))
     end_index = min(len(days), d1_index + 1 + max(0, horizon_days))
     result: dict[str, Any] = await v87._run_durable_replay(  # noqa: SLF001 — harness hermético compartido.
@@ -137,6 +142,7 @@ async def _run_pass(
         engine_id=f"dia-d-longitudinal-{os.urandom(3).hex()}",
         operable_days=operable_flags,
         durable_cycle=True,
+        capture_cycle_detail=bool(capture_cycle_detail),
     )
     return result
 
@@ -328,7 +334,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             universe_coverage=universe_coverage,
             probe={**probe, "windowFallback": fallback},
             meta={
-                "bump": "2.11.43-beta",
+                "bump": "2.11.44-beta",
                 "phase": "V2.91 DIA-D AUTO LONGITUDINAL",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),

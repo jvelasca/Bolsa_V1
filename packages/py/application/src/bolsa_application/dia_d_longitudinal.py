@@ -211,6 +211,85 @@ def excursions(
     return rows
 
 
+#: Ventana declarada (en barras D1) de la excursión TEMPRANA post-entrada.
+DEFAULT_ENTRY_WINDOW_DAYS = 3
+
+
+def early_excursion_for_cycle(
+    *,
+    bars_by_symbol: Mapping[str, Sequence[Any]],
+    round_trip: Mapping[str, Any],
+    window_days: int = DEFAULT_ENTRY_WINDOW_DAYS,
+) -> Excursion:
+    """Excursión ADVERSO/FAVORABLE de los primeros ``window_days`` días tras la entrada.
+
+    Es la MISMA geometría que ``excursion_for_cycle`` (dirección inferida de ``stop`` vs
+    ``entry``, R sobre el riesgo al nacer), pero acotando la ventana a las primeras
+    ``window_days`` barras D1 dentro de ``[entryDay, exitDay]``. Responde *cómo de pronto* fue
+    adversa la entrada, no cuánto sufrió el ciclo entero. Un hueco (sin geometría, sin riesgo o
+    sin barras en el rango) se declara con su motivo, nunca se inventa un extremo.
+    """
+    symbol = str(round_trip.get("symbol") or "")
+    entry_day = normalize_day(round_trip.get("entryDay")) or ""
+    exit_day = normalize_day(round_trip.get("exitDay")) or ""
+    entry_price = finite_number(round_trip.get("entryPrice"))
+    stop = finite_number(round_trip.get("stop"))
+
+    def _gap(reason: str, direction: str | None = None, risk: float | None = None) -> Excursion:
+        return Excursion(
+            symbol=symbol,
+            entry_day=entry_day,
+            exit_day=exit_day,
+            direction=direction,
+            risk=risk,
+            mae_r=None,
+            mfe_r=None,
+            measured=False,
+            reason=reason,
+        )
+
+    if not entry_day or not exit_day:
+        return _gap(REASON_NO_BARS)
+    direction = infer_direction(entry=entry_price, stop=stop)
+    if direction is None:
+        return _gap(REASON_NO_DIRECTION)
+    risk = risk_distance(entry=entry_price, stop=stop, direction=direction)
+    if risk is None:
+        return _gap(REASON_RISK_UNMEASURABLE, direction=direction)
+
+    table = _bars_by_day(bars_by_symbol.get(symbol, ()))
+    window = [
+        table[day]
+        for day in sorted(day for day in table if entry_day <= day <= exit_day)[
+            : max(1, int(window_days))
+        ]
+    ]
+    if not window:
+        return _gap(REASON_NO_BARS, direction=direction, risk=risk)
+
+    min_low = min(low for _high, low in window)
+    max_high = max(high for high, _low in window)
+    if direction == LONG:
+        adverse_price, favorable_price = min_low, max_high
+    else:
+        adverse_price, favorable_price = max_high, min_low
+    mae_r = signed_r(direction=direction, entry=entry_price, risk=risk, price=adverse_price)
+    mfe_r = signed_r(direction=direction, entry=entry_price, risk=risk, price=favorable_price)
+    if mae_r is None or mfe_r is None:
+        return _gap(REASON_RISK_UNMEASURABLE, direction=direction, risk=risk)
+    return Excursion(
+        symbol=symbol,
+        entry_day=entry_day,
+        exit_day=exit_day,
+        direction=direction,
+        risk=risk,
+        mae_r=mae_r,
+        mfe_r=mfe_r,
+        measured=True,
+        reason=None,
+    )
+
+
 def summarize_excursions(rows: Sequence[Excursion | Mapping[str, Any]]) -> dict[str, Any]:
     """Resumen de MAE/MFE: medias y extremos sobre los ciclos MEDIDOS, huecos por motivo."""
     measured: list[tuple[float, float]] = []
@@ -448,6 +527,7 @@ def build_dia_d_longitudinal_artifact(
 
 __all__ = [
     "BUCKET_PERIODS",
+    "DEFAULT_ENTRY_WINDOW_DAYS",
     "DEFAULT_LIMITS",
     "Excursion",
     "LONG",
@@ -459,6 +539,7 @@ __all__ = [
     "bucket_key",
     "bucket_series",
     "build_dia_d_longitudinal_artifact",
+    "early_excursion_for_cycle",
     "excursion_for_cycle",
     "excursions",
     "infer_direction",

@@ -61,6 +61,8 @@ _DEFAULT_VERSION_A = "v283-window-a"
 _DEFAULT_EDGE = 0.9
 #: Sorteos declarados (``k = 0`` es producción y NO se parchea). ``K`` = ``--draws``.
 _DEFAULT_DRAWS = 12
+#: Ventana por defecto de la excursión adversa TEMPRANA (misma que ``DEFAULT_ENTRY_WINDOW_DAYS``).
+_DEFAULT_ENTRY_WINDOW_DAYS = 3
 
 #: Carpeta de artefactos (no versionada; mismos criterios que ``operability_runs/*``).
 _OUT_SUBDIR = pathlib.Path("operability_runs") / "dia-d-auto"
@@ -144,6 +146,9 @@ def _v93_command(
     command += ["--out", str(out_path)]
     if cycles_out is not None:
         command += ["--cycles-out", str(cycles_out)]
+    if bool(getattr(args, "cycle_detail", False)):
+        # Costura inerte (Δ motor = 0): sólo se propaga cuando el diagnóstico lo pide.
+        command += ["--cycle-detail", "--entry-window-days", str(int(args.entry_window_days))]
     return command
 
 
@@ -173,11 +178,27 @@ def _run_v93(
     return json.loads(out_path.read_text(encoding="utf-8"))
 
 
+def _ledger_has_detail(cycles_path: pathlib.Path) -> bool:
+    """True si el ledger existente ya trae el detalle v2 (fricción/mecanismo). Si no, se re-corre."""
+    if not cycles_path.is_file():
+        return False
+    try:
+        payload = json.loads(cycles_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return str(payload.get("schemaVersion") or "") == "dia-d-multi-cycle-ledger-v2"
+
+
 def _draw(args: argparse.Namespace, *, k: int, out_dir: pathlib.Path, mutations: Any) -> dict[str, Any]:
     """Un sorteo: parchea el seed (si ``k > 0``), corre ``v2_93``, restaura byte a byte."""
     draw_path = out_dir / f"draw-{k:02d}" / "multi.json"
     cycles_path = out_dir / f"draw-{k:02d}" / "multi-cycles.json"
-    if args.reuse and draw_path.is_file() and (not args.cycles or cycles_path.is_file()):
+    # Con ``--cycle-detail`` sólo se reutiliza un sorteo cuyo ledger YA es v2: un ledger v1 (sin
+    # detalle) se re-corre para no mezclar esquemas en el diagnóstico.
+    reusable = args.reuse and draw_path.is_file() and (
+        not args.cycles or (cycles_path.is_file() and (not args.cycle_detail or _ledger_has_detail(cycles_path)))
+    )
+    if reusable:
         print(f"### draw {k:02d}  (reutilizado de {draw_path.name})")
         return json.loads(draw_path.read_text(encoding="utf-8"))
     draw_path.parent.mkdir(parents=True, exist_ok=True)
@@ -319,6 +340,22 @@ def main(argv: list[str] | None = None) -> int:
         help="persiste el ledger de ciclos por sorteo (multi-cycles.json) para el bootstrap de v2_95",
     )
     parser.add_argument(
+        "--cycle-detail",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "captura el detalle por ciclo (fricción/reference_mid + motivo de cierre) que consume "
+            "el diagnóstico de la pérdida (v2_96); INERTE por defecto (Δ motor = 0). Con --reuse, "
+            "un sorteo cuyo ledger sea v1 (sin detalle) se re-corre para no mezclar esquemas"
+        ),
+    )
+    parser.add_argument(
+        "--entry-window-days",
+        type=int,
+        default=_DEFAULT_ENTRY_WINDOW_DAYS,
+        help="barras D1 de la ventana de excursión adversa TEMPRANA post-entrada",
+    )
+    parser.add_argument(
         "--check-against", default=None, help="artefacto multirregimen sellado para cruzar el sorteo 0"
     )
     parser.add_argument(
@@ -335,6 +372,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if int(args.draws) < 1:
         print("# uso incorrecto: --draws debe ser >= 1", file=sys.stderr)
+        return 1
+    if int(args.entry_window_days) < 1:
+        print("# uso incorrecto: --entry-window-days debe ser >= 1", file=sys.stderr)
         return 1
     if int(args.watch_size) <= 0 or int(args.min_bars) <= 0:
         print("# uso incorrecto: --watch-size y --min-bars deben ser > 0", file=sys.stderr)
@@ -383,7 +423,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         cross_check=cross_check,
         meta={
-            "bump": "2.11.43-beta",
+            "bump": "2.11.44-beta",
             "phase": "V2.94 DIA-D AUTO MULTI BAND",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),

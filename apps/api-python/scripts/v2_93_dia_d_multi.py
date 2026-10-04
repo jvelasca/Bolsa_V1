@@ -53,6 +53,10 @@ _DEFAULT_HISTORY_DAYS = 90
 #: Días posteriores a ``D1`` que se simulan para medir el OOS real del ciclo abierto en ``D1``.
 _DEFAULT_HORIZON_DAYS = 20
 
+#: Barras D1 de la ventana de excursión adversa TEMPRANA post-entrada (diagnóstico de la pérdida).
+#: MISMO valor que ``dia_d_longitudinal.DEFAULT_ENTRY_WINDOW_DAYS`` (lo fija el guardián).
+_DEFAULT_ENTRY_WINDOW_DAYS = 3
+
 #: Carpeta de artefactos (no versionada; mismos criterios que ``operability_runs/*``).
 _OUT_SUBDIR = pathlib.Path("operability_runs") / "dia-d-auto"
 
@@ -131,7 +135,11 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     from dotenv import load_dotenv
 
     load_dotenv(_DOTENV, override=False)
-    from bolsa_application.dia_d_longitudinal import excursions, longest_operable_run
+    from bolsa_application.dia_d_longitudinal import (
+        early_excursion_for_cycle,
+        excursions,
+        longest_operable_run,
+    )
     from bolsa_application.dia_d_multi import (
         DEFAULT_LIMITS,
         build_dia_d_multi_artifact,
@@ -180,6 +188,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         windows: list[dict[str, Any]] = []
         all_trips: list[dict[str, Any]] = []
         all_excursions: list[Any] = []
+        all_entry_excursions: list[Any] = []
+        all_cost_rows: list[Any] = []
+        all_close_rows: list[Any] = []
         regime_all: dict[str, Any] = {}
         operational_all: dict[str, Any] = {}
 
@@ -224,6 +235,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 horizon_days=int(args.horizon_days),
                 d0_index=d0_index,
                 d1_index=d1_index,
+                capture_cycle_detail=bool(args.cycle_detail),
             )
             horizon = replay.get("horizon") or {}
             fallback: dict[str, Any] | None = None
@@ -249,6 +261,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                         horizon_days=int(args.horizon_days),
                         d0_index=run[0],
                         d1_index=run[1],
+                        capture_cycle_detail=bool(args.cycle_detail),
                     )
                     fallback = {
                         "reason": str(horizon.get("truncationReason")),
@@ -275,6 +288,17 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 if str(row.get("entryDay") or "") in window_set
             ]
             excursion_rows = excursions(bars_by_symbol=bars_by_symbol, round_trips=round_trips)
+            entry_excursion_rows = [
+                early_excursion_for_cycle(
+                    bars_by_symbol=bars_by_symbol,
+                    round_trip=trip,
+                    window_days=int(args.entry_window_days),
+                )
+                for trip in round_trips
+            ]
+            detail = replay.get("cycleDetail") or {}
+            all_cost_rows.extend(detail.get("costRows") or [])
+            all_close_rows.extend(detail.get("closeRows") or [])
             operable_days = sum(1 for flag in operable_flags[d0_index : d1_index + 1] if flag)
             for row in census.days:
                 if row.day in window_set:
@@ -283,6 +307,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
 
             all_trips.extend(round_trips)
             all_excursions.extend(excursion_rows)
+            all_entry_excursions.extend(entry_excursion_rows)
             windows.append(
                 {
                     "year": year_label,
@@ -322,7 +347,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             regime_by_day=regime_all,
             operational_regime_by_day=operational_all,
             meta={
-                "bump": "2.11.43-beta",
+                "bump": "2.11.44-beta",
                 "phase": "V2.93 DIA-D AUTO MULTI ATTRIBUTION",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
@@ -348,8 +373,12 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             ledger = build_cycle_ledger(
                 round_trips=all_trips,
                 excursions_rows=all_excursions,
+                entry_excursions_rows=all_entry_excursions,
                 regime_by_day=regime_all,
                 operational_regime_by_day=operational_all,
+                cost_rows=all_cost_rows,
+                close_rows=all_close_rows,
+                entry_window_days=int(args.entry_window_days),
             )
             ledger_path = pathlib.Path(args.cycles_out)
             if not ledger_path.is_absolute():
@@ -467,7 +496,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--cycles-out",
         default=None,
-        help="ruta del ledger de ciclos (dia-d-multi-cycle-ledger-v1) que consume v2_95",
+        help="ruta del ledger de ciclos (dia-d-multi-cycle-ledger-v2) que consumen v2_95/v2_96",
+    )
+    parser.add_argument(
+        "--cycle-detail",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "captura el detalle por ciclo (fricción/reference_mid + motivo de cierre) que consume "
+            "el diagnóstico de la pérdida (v2_96); INERTE por defecto (Δ motor = 0)"
+        ),
+    )
+    parser.add_argument(
+        "--entry-window-days",
+        type=int,
+        default=_DEFAULT_ENTRY_WINDOW_DAYS,
+        help="barras D1 de la ventana de excursión adversa TEMPRANA post-entrada",
     )
     args = parser.parse_args(argv)
 
@@ -479,6 +523,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if int(args.history_days) < 1 or int(args.horizon_days) < 0:
         print("# uso incorrecto: --history-days >= 1 y --horizon-days >= 0", file=sys.stderr)
+        return 1
+    if int(args.entry_window_days) < 1:
+        print("# uso incorrecto: --entry-window-days debe ser >= 1", file=sys.stderr)
         return 1
 
     if sys.platform == "win32":  # pragma: no cover — psycopg async no soporta ProactorEventLoop.

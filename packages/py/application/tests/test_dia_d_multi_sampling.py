@@ -121,6 +121,32 @@ def test_ledger_attaches_measured_excursion_by_cycle_key():
     assert row["mfeR"] == 3.0
 
 
+def test_ledger_v2_is_additive_and_keeps_the_labels_the_fold_reads():
+    """El ledger v2 añade el diagnóstico sin romper lo que la banda (v2_95) ya consumía."""
+    trips = _trips([("2022", 1.5)])
+    ledger = build_cycle_ledger(
+        round_trips=trips,
+        regime_by_day={"2022-01-05": "range"},
+        operational_regime_by_day={"2022-01-05": "SIDEWAYS"},
+    )
+    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v2"
+    row = ledger["cycles"][0]
+    # Campos v1 intactos (los que lee `_cell_cycles`).
+    assert row["realizedR"] == 1.5
+    assert row["year"] == "2022"
+    assert row["regime"] == "range"
+    assert row["operationalRegime"] == "SIDEWAYS"
+    # Campos v2 aditivos: sin detalle capturado se declaran huecos, nunca 0.
+    assert row["exitMechanism"] == "SIN_MECANISMO"
+    assert row["frictionMeasurement"] == "UNKNOWN"
+    assert row["frictionR"] is None
+    assert row["netRealizedR"] is None
+    assert row["entryAdverseR"] is None
+    # Y la banda sigue leyendo el mismo ledger con el MISMO resultado agregado.
+    artifact = build_sampling_artifact(draw_ledgers=[ledger, ledger], resamples=20)
+    assert artifact["global"]["metrics"]["expectancyR"]["mean"] == 1.5
+
+
 # ── Banda: descomposición venue / sampling / total ───────────────────────────────
 
 
