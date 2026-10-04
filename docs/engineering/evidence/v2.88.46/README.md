@@ -163,5 +163,6 @@ uv run --no-sync python apps/api-python/scripts/v2_97_dia_d_thesis_exit.py \
 - **Añadidos:** `docs/engineering/evidence/v2.88.46/README.md`.
 - **Modificados:** `dia_d_multi_sampling.py` (ledger `-v4`: geometría de la invalidación + normalización por anclajes de la posición + `stopBasisMismatchR`), `dia_d_thesis_exit.py` (`dia-d-thesis-exit-v2`: bloque `global.invalidation` + eje `invalidation` + límites), `v2_87_replay_oos_durable_cycle.py` (costura inerte: `cycleDetail.invalidationByCycle`), `v2_93_dia_d_multi.py` (acumula y pasa la captura), `v2_94_dia_d_multi_band.py` (`_DETAIL_LEDGER_SCHEMA` exige v4), `v2_97_dia_d_thesis_exit.py` (docstring v4), `v2_89`/`v2_90`/`v2_91`/`v2_92`/`v2_93`/`v2_94`/`v2_95`/`v2_96`/`v2_97` (`meta.bump`), `test_dia_d_bump_guard.py`, `test_dia_d_multi_sampling.py`, `test_dia_d_thesis_exit.py`, `test_dia_d_loss_origin.py`, `package.json`, `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
 - **`Δ motor = 0`:** ningún fichero de motor tocado (la costura `capture_cycle_detail` sólo lee estado ya producido y su default sigue `False`).
-- **Tag:** `v2.88.46-beta` → PENDIENTE.
-- **Commits:** PENDIENTE.
+- **Tag:** `v2.88.46-beta` → objeto `b728fd33`, commit `9658a5cb`.
+- **Commits:** funcional `20a77ded` → re-anclaje del freeze `5ebd85aa` → docs `9658a5cb`.
+- **`Release tag CI` run [`37202334330`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37202334330) VERDE:** `11 jobs success` + `playwright` integrado `skipped` por diseño; `certify` `success`; `python` `4503 passed / 45 skipped` (**+9** sobre `v2.88.45`); `replay-repro` `REPRODUCIDO` `1E3ADAC2…` (`3 340 728 B` LF / sello `3 445 622 B` CRLF) ⇒ el artefacto congelado no se movió.
