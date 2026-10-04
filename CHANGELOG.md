@@ -2,6 +2,18 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.46.1-beta] — `AUTO · RE-SELLO docs-only`: **la cita del CI de `v2.88.46` viaja DENTRO del tag** (auditabilidad autocontenida desde GitHub)
+
+**Bump** `2.11.46-beta` → `2.11.46.1-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Re-sello **`DOCS-ONLY`** (patrón `OBS-3`/`OBS-4`, precedentes `v2.83.1` / `v2.88.10` / `v2.88.17.1`): el sello `v2.88.46-beta` es **correcto** y su CI está **VERDE**, pero un auditor que trabaje **sobre el tag aislado** no podía acreditarlo desde el propio objeto sellado.
+
+- **El hueco (medido al auditar desde GitHub):** (a) la evidencia **dentro** del tag `v2.88.46-beta` declaraba su propia cita como `PENDIENTE` —el commit que la escribe (`9ab04e60`) es **POST-TAG**—; (b) **no** había GitHub **Release** publicado (`2.88.33`–`2.88.46` sólo tenían tag; el último Release era `v2.88.32-beta`); (c) **no** había dossier de **entrega MIA** para `v2.88.46` (la serie `v2.88.40`…`v2.88.45` sí lo tenía).
+- **Qué cambia (y qué no):** el **único** cambio no documental es la cadena `meta.bump` de los CLI DÍA-D (`v2_89`–`v2_97`) y el `version` del monorepo (`2.11.46-beta` → `2.11.46.1-beta`), **obligados** por `test_dia_d_bump_guard.py` (el `meta.bump` de los CLI DÍA-D **debe** igualar el `version` del monorepo). El pin del runner de la ventana se re-ancla (`commit` `734fbfbe`; `apps` `ea169f26…` → `5a3e7080…`; `packages` `519bcdb8…` **intacto**). El tag `v2.88.46-beta` **NO** se reescribe.
+- **`Δ motor = 0`:** ni una línea de motor, gobernador, `TOP_N`, umbrales, allocation ni costuras; el artefacto congelado de `replay-repro` queda intacto **por construcción**.
+- **Cita que viaja dentro del tag:** `Release tag CI` run [`37202334330`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37202334330) (sello `v2.88.46-beta`, `attempt 1`, `12:30:22Z` → `12:38:39Z`) **VERDE**: `11 jobs success` + `playwright` integrado `skipped`; `certify` `success`; `python` `4503 passed / 45 skipped` (`ruff` `All checks passed!`, `imports` `4 kept, 0 broken`, `mypy` `531` ficheros); `replay-repro` `REPRODUCIDO` `1E3ADAC2…`.
+- **Límite estructural declarado:** `Release tag CI` **sólo** corre al **empujar** el tag ⇒ **ningún tag puede contener su propio resultado de CI**; la cita del re-sello se escribe en un commit **POST-TAG** y la instancia dentro del tag la lleva como **placeholder** (con nota explícita para el auditor).
+- **Guardián / gates:** `test_dia_d_bump_guard.py` **1 passed**; `pnpm window:test` **25/25**; `ruff` limpio; `mypy` limpio (`531` ficheros).
+- **Documentos:** `docs/engineering/evidence/v2.88.46.1/README.md` (re-sello), `docs/engineering/evidence/v2.88.46/README.md` (puntero), `docs/engineering/entrega-auditoria-externa-mia-v2.88.46-2026-10-04.md` (dossier MIA `DÍA-D-3e`), `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
+
 ## [2.11.46-beta] — `AUTO · DÍA-D-3e`: **condición de la invalidación del `THESIS_EXIT`** — el nivel congelado ES el stop inicial (medido), sin tocar motor
 
 **Bump** `2.11.45-beta` → `2.11.46-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra la deuda declarada en `v2.88.45`: el journal sólo publica el token **COLAPSADO** `thesis_exit`, de modo que *qué condición* invalidó la tesis no llegaba al artefacto. Esta fase la **mide** —sin inventarla— desde el estado de la posición que la **costura inerte** `capture_cycle_detail` ya capturaba, la persiste en un **ledger aditivo v4** y la pliega en un nuevo bloque `invalidation` del quirófano. **`Δ decisión motor = 0`** (la costura sigue inerte por defecto; sólo se añade lectura).
