@@ -44,18 +44,19 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * codigo se mueve, el runner declara `TREE_MOVED` y aborta (fail-closed).
  * `commit` nombra el commit cuyo arbol queda pinneado.
  *
- * RE-ANCLAJE 2026-10-03 (sello `v2.88.43-beta`): el BOOTSTRAP DE CICLOS de DIA-D
- * (`dia_d_multi_sampling.py` + tests + CLI `v2_95`; flags `--cycles-out`/`--cycles`
- * en `v2_93`/`v2_94`) toco `src`/tests bajo `packages/` y scripts bajo `apps/`
- * (`Δ motor = 0`: CERO ficheros de motor). El arbol pinneado es el del commit
- * funcional `4e8eec0f`. Editar el pin NO mueve a su vez el arbol porque este
- * modulo vive en `scripts/`. Pin anterior (sello `v2.88.42-beta`, commit `4533b034`):
- * `apps` `18d885fa…` / `packages` `8fbd4e6c…`.
+ * RE-ANCLAJE 2026-10-04 (sello `v2.88.44-beta`): el ORIGEN DE LA PERDIDA de DIA-D
+ * (`dia_d_exit_mechanism.py` + `dia_d_loss_origin.py` + tests + CLI `v2_96`; ledger
+ * `-v2` y `--cycle-detail` en `v2_87`/`v2_91`/`v2_93`/`v2_94`) toco `src`/tests bajo
+ * `packages/` y scripts bajo `apps/` (`Δ motor = 0`: CERO ficheros de motor; la costura
+ * de captura en `v2_87` es inerte con default `False`). El arbol pinneado es el del
+ * commit funcional `50240f97`. Editar el pin NO mueve a su vez el arbol porque este
+ * modulo vive en `scripts/`. Pin anterior (sello `v2.88.43-beta`, commit `4e8eec0f`):
+ * `apps` `a969d896…` / `packages` `5cc2bc2b…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '4e8eec0f',
-  appsHash: 'a969d896288c96a8833ffc1ed5f0f5a8ab40ef24',
-  packagesHash: '5cc2bc2beec569bea242e1c9e53cf1e3490562e4',
+  commit: '50240f97',
+  appsHash: '429229c9dcc3c3f5b750002986a75fe58a16023b',
+  packagesHash: '1bfb752c517f341e0f308d24b02934c20a434ffe',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
