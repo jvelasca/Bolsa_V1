@@ -130,4 +130,6 @@
 - **Producto:** `V2.88.45-beta`. **Package:** `2.11.45-beta`. **Sin migración.**
 - **Ficheros añadidos:** `dia_d_thesis_exit.py`, `v2_97_dia_d_thesis_exit.py`, `test_dia_d_thesis_exit.py`, `evidence/v2.88.45/README.md`, esta entrega.
 - **Ficheros modificados:** `dia_d_multi_sampling.py` (ledger `-v3`), `v2_94` (`_DETAIL_LEDGER_SCHEMA`), `v2_89`/`v2_90`/`v2_91`/`v2_92`/`v2_93`/`v2_94`/`v2_95`/`v2_96`/`v2_97` (`meta.bump`), bump guard, `test_dia_d_multi_sampling.py`, `test_dia_d_loss_origin.py`, `package.json`, `CHANGELOG.md`, `CURRENT_SYSTEM.md`, `versioning.md`.
-- **Commits:** funcional `a9ee8d25` → re-anclaje del freeze `023a1683` → docs (este). **Tag `v2.88.45-beta` PENDIENTE** de publicar; el `Release tag CI` se cita al publicar.
+- **Tag:** `v2.88.45-beta` → objeto `369a6b9e`, commit `d3b42970` (tip `main`).
+- **Commits:** funcional `a9ee8d25` → re-anclaje del freeze `023a1683` → docs `d3b42970` (tag publicado).
+- **`Release tag CI` run [`37196539718`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37196539718) VERDE:** `11 jobs success` + `playwright` integrado `skipped` por diseño; `certify` `success`; `python` `4494 passed / 45 skipped` (**+15** sobre `v2.88.44`); `replay-repro` `REPRODUCIDO` `1E3ADAC2…` (`3 340 728 B`) ⇒ el artefacto congelado no se movió (**`Δ motor = 0`** confirmado por CI).

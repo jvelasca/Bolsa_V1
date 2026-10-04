@@ -152,4 +152,6 @@ uv run --no-sync python apps/api-python/scripts/v2_97_dia_d_thesis_exit.py \
 - **Añadidos:** [`dia_d_thesis_exit.py`](../../../../packages/py/application/src/bolsa_application/dia_d_thesis_exit.py), [`v2_97_dia_d_thesis_exit.py`](../../../../apps/api-python/scripts/v2_97_dia_d_thesis_exit.py), [`test_dia_d_thesis_exit.py`](../../../../packages/py/application/tests/test_dia_d_thesis_exit.py), `docs/engineering/evidence/v2.88.45/README.md`.
 - **Modificados:** `dia_d_multi_sampling.py` (ledger `-v3`: `strategyVersion`/`direction`), `v2_94` (`_DETAIL_LEDGER_SCHEMA` exige v3 ⇒ re-corre y no mezcla esquemas), `v2_89`/`v2_90`/`v2_91`/`v2_92`/`v2_93`/`v2_94`/`v2_95`/`v2_96` (`meta.bump`), `test_dia_d_bump_guard.py`, `test_dia_d_multi_sampling.py`, `test_dia_d_loss_origin.py`, `package.json`, `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
 - **`Δ motor = 0`:** ningún fichero de motor tocado; la capa v3 del ledger es aditiva.
-- **Commits:** funcional `a9ee8d25` → re-anclaje del freeze `023a1683` → docs (este). **Tag `v2.88.45-beta`: pendiente de publicar** (el CI de tag se cita al publicar).
+- **Tag:** `v2.88.45-beta` → objeto `369a6b9e`, commit `d3b42970`.
+- **Commits:** funcional `a9ee8d25` → re-anclaje del freeze `023a1683` → docs `d3b42970`.
+- **`Release tag CI` run [`37196539718`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37196539718) VERDE:** `11 jobs success` + `playwright` integrado `skipped`; `python` `4494 passed / 45 skipped` (**+15**); `replay-repro` `REPRODUCIDO` `1E3ADAC2…`.
