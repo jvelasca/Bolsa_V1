@@ -44,19 +44,19 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * codigo se mueve, el runner declara `TREE_MOVED` y aborta (fail-closed).
  * `commit` nombra el commit cuyo arbol queda pinneado.
  *
- * RE-ANCLAJE 2026-10-04 (sello `v2.88.45-beta`): el QUIRÓFANO DEL THESIS_EXIT de DIA-D
- * (`dia_d_thesis_exit.py` + tests + CLI `v2_97`; ledger aditivo `-v3` con
- * `strategyVersion`/`direction` y `_DETAIL_LEDGER_SCHEMA` en `v2_94`; `meta.bump` en
- * `v2_89`–`v2_96`) toco `src`/tests bajo `packages/` y scripts bajo `apps/`
- * (`Δ motor = 0`: CERO ficheros de motor; la captura del MFE calca `capture_study`
- * `A39-01`). El arbol pinneado es el del commit funcional `a9ee8d25`. Editar el pin NO
- * mueve a su vez el arbol porque este modulo vive en `scripts/`. Pin anterior (sello
- * `v2.88.44-beta`, commit `50240f97`): `apps` `429229c9…` / `packages` `1bfb752c…`.
+ * RE-ANCLAJE 2026-10-04 (sello `v2.88.46-beta`): la CONDICIÓN DE LA INVALIDACIÓN del `THESIS_EXIT`
+ * de DIA-D (capa v4: `dia_d_multi_sampling.py` + `dia_d_thesis_exit.py` + tests; costura inerte de
+ * sólo lectura en `v2_87`/`v2_93`; `_DETAIL_LEDGER_SCHEMA` v4 en `v2_94`; `meta.bump` en
+ * `v2_89`–`v2_97`) tocó `src`/tests bajo `packages/` y scripts bajo `apps/` (`Δ motor = 0`: CERO
+ * ficheros de motor; la costura sólo LEE el estado ya producido y sigue inerte por defecto). El
+ * arbol pinneado es el del commit funcional `20a77ded`. Editar el pin NO mueve a su vez el arbol
+ * porque este modulo vive en `scripts/`. Pin anterior (sello `v2.88.45-beta`, commit `a9ee8d25`):
+ * `apps` `6da66755…` / `packages` `f9a507c4…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'a9ee8d25',
-  appsHash: '6da667550b94f14aa4399e56dcd0f2133412ba3b',
-  packagesHash: 'f9a507c4dbf381c1f47af6500273817bb5312657',
+  commit: '20a77ded',
+  appsHash: 'ea169f262602aa6407fd7f5962b9bab5d68e9118',
+  packagesHash: '519bcdb818652da315149829102723d81900b06f',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
