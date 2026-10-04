@@ -44,19 +44,21 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * codigo se mueve, el runner declara `TREE_MOVED` y aborta (fail-closed).
  * `commit` nombra el commit cuyo arbol queda pinneado.
  *
- * RE-ANCLAJE 2026-10-04 (re-sello `v2.88.46.1-beta`): el re-sello del sello `v2.88.46-beta` sólo
- * mueve la CADENA `meta.bump` de los CLI DÍA-D (`v2_89`–`v2_97`) y el `version` del monorepo, para
- * que el objeto sellado incorpore la cita del CI de la fase (patrón `OBS-3`/`OBS-4`). El cambio de
- * `meta.bump` vive bajo `apps/`, así que el árbol `apps` SÍ se mueve y el pin se re-ancla al commit
- * `734fbfbe`. NO cambia motor ni comportamiento (`Δ motor = 0`: ningún fichero de motor, ninguna
- * costura, ningún umbral). `packages` queda intacto. Editar el pin NO mueve a su vez el arbol porque
- * este modulo vive en `scripts/`. Pin anterior (sello `v2.88.46-beta`, commit `20a77ded`):
- * `apps` `ea169f26…` / `packages` `519bcdb8…`.
+ * RE-ANCLAJE 2026-10-04 (sello `v2.88.47-beta`): la DESAMBIGUACIÓN `THESIS_EXIT` vs `STOP` de DIA-D
+ * (ledger `dia-d-multi-cycle-ledger-v5` en `dia_d_multi_sampling.py`; bloque `global.disambiguation` +
+ * ejes `byRoute`/`byStopPath` en `dia_d_thesis_exit.py`; costura inerte de SÓLO LECTURA en `v2_87`
+ * (`cycleDetail.cycleTimeline`/`managementRows`) acumulada en `v2_93`; `_DETAIL_LEDGER_SCHEMA` v5 en
+ * `v2_94`; `--sequences` en `v2_97`; `meta.bump` en `v2_89`–`v2_97`) tocó `src`/tests bajo `packages/`
+ * y scripts bajo `apps/` (`Δ motor = 0`: CERO ficheros de motor; la costura sólo LEE el estado ya
+ * producido y sigue inerte por defecto con `capture_cycle_detail=False`). El arbol pinneado es el del
+ * commit funcional `8ca0d5d4`. Editar el pin NO mueve a su vez el arbol porque este modulo vive en
+ * `scripts/`. Pin anterior (re-sello `v2.88.46.1-beta`, commit `734fbfbe`): `apps` `5a3e7080…` /
+ * `packages` `519bcdb8…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '734fbfbe',
-  appsHash: '5a3e70807c05f07230a6a4b47bc17e4f4daa4f14',
-  packagesHash: '519bcdb818652da315149829102723d81900b06f',
+  commit: '8ca0d5d4',
+  appsHash: '6ec36c72b8f4a6abc500b8a8c60deed1e6460f12',
+  packagesHash: '0953b186b493491b4c23a987664409af5e4b624b',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
