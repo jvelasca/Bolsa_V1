@@ -116,8 +116,8 @@
 ## 6. Sello
 
 - **Producto:** `V2.88.44-beta`. **Package:** `2.11.44-beta`. **Sin migración.**
-- **Tag:** `v2.88.44-beta` **PENDIENTE** de push/CI (se cita aquí tras el `Release tag CI`).
+- **Tag:** `v2.88.44-beta` → objeto `ffd88e67`, commit `c1646d3a` (tip `main`).
+- **`Release tag CI` run [`37191651360`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37191651360) VERDE:** `11 jobs success` + `playwright` integrado `skipped` por diseño; `certify` `success`; `python` `4479 passed / 45 skipped` (**+10** sobre `v2.88.43`); `replay-repro` `REPRODUCIDO` `1E3ADAC2…` (`3 340 728 B` LF / sello `3 445 622 B` CRLF) ⇒ el artefacto congelado no se movió. `main`: [`Frontend`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37191649993) · [`Python`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37191650010) · [`Fase 2`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37191649991) · [`Optimize`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37191649995) · [`Gitleaks`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37191650016) VERDE.
 - **Ficheros añadidos:** `dia_d_exit_mechanism.py`, `dia_d_loss_origin.py`, `v2_96_dia_d_loss_origin.py`, `test_dia_d_loss_origin.py`, `evidence/v2.88.44/README.md`.
 - **Ficheros modificados:** `dia_d_longitudinal.py`, `dia_d_multi_sampling.py`, `v2_87`/`v2_91`/`v2_93`/`v2_94` (costura + flags), `v2_89`/`v2_90`/`v2_92`/`v2_95` (`meta.bump`), bump guard, `test_dia_d_multi_sampling.py`, `package.json`, `CHANGELOG.md`, `CURRENT_SYSTEM.md`, `versioning.md`.
-- **Commits locales:** funcional `50240f97`; re-anclaje del freeze del runner `7a1efac4` (fijado al árbol de `50240f97`).
-- **Tag:** `v2.88.44-beta` **PENDIENTE** de push/CI.
+- **Commits:** funcional `50240f97` → re-anclaje del freeze `7a1efac4` → docs `c1646d3a` (tag publicado).
