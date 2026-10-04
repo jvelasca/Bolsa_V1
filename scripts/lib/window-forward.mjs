@@ -44,22 +44,23 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * codigo se mueve, el runner declara `TREE_MOVED` y aborta (fail-closed).
  * `commit` nombra el commit cuyo arbol queda pinneado.
  *
- * RE-ANCLAJE 2026-10-04 (sello `v2.88.48-beta`): la CORRELACIÓN DECISIÓN↔CICLO (`THESIS_EXIT` vs
- * `STOP`) de DIA-D (ledger `dia-d-multi-cycle-ledger-v6` en `dia_d_multi_sampling.py`; bloque
- * `global.decisionCorrelation` + eje `byDecisionRoute` en `dia_d_thesis_exit.py`; costura inerte de
- * SÓLO LECTURA en `v2_87` —huella de decisión intra-tick por `cycle_id` y `managementRows` con
- * `cycleId`— acumulada en `v2_93`; `_DETAIL_LEDGER_SCHEMA` v6 en `v2_94`; impresión en `v2_97`;
- * `meta.bump` en `v2_89`–`v2_97`) tocó `src`/tests bajo `packages/` y scripts bajo `apps/`
- * (`Δ motor = 0`: CERO ficheros de motor; la costura sólo LEE el estado ya producido y sigue inerte
- * por defecto con `capture_cycle_detail=False`; `replay-repro` reproducido byte a byte). El arbol
- * pinneado es el del commit funcional `814c9392`. Editar el pin NO mueve a su vez el arbol porque
- * este modulo vive en `scripts/`. Pin anterior (sello `v2.88.47-beta`, commit `8ca0d5d4`): `apps`
- * `6ec36c72…` / `packages` `0953b186…`.
+ * RE-ANCLAJE 2026-10-04 (sello `v2.88.49-beta`): el CIERRE A/C del DIA-D-3h (`THESIS_EXIT` vs
+ * `STOP`: separar `stop_evaluado_sin_orden` (A) de `orden_creada_sin_fill` (C) midiendo la
+ * EXISTENCIA del INTENT durable de salida por ciclo) tocó `src`/tests bajo `packages/` y scripts
+ * bajo `apps/` (ledger `dia-d-multi-cycle-ledger-v7` con `orderCreated` en la secuencia compacta en
+ * `dia_d_multi_sampling.py`; artefacto `dia-d-thesis-exit-v5` en `dia_d_thesis_exit.py`; costura
+ * inerte de SÓLO LECTURA en `v2_87` —helper `_minted_exit_cycles` y `diff` de `_v2_exit_orders`
+ * antes/después de `auto_turn`, antes de `close_tick`—; secuencias v2 en `v2_97`;
+ * `_DETAIL_LEDGER_SCHEMA` v7 en `v2_94`; `meta.bump` en `v2_89`–`v2_97`). `Δ motor = 0`: CERO
+ * ficheros de motor; la costura sólo LEE el estado ya producido y sigue inerte por defecto con
+ * `capture_cycle_detail=False`. El arbol pinneado es el del commit funcional `e70b23fa`. Editar el
+ * pin NO mueve a su vez el arbol porque este modulo vive en `scripts/`. Pin anterior (sello
+ * `v2.88.48-beta`, commit `814c9392`): `apps` `080dc4ba…` / `packages` `ca4fdd84…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '814c9392',
-  appsHash: '080dc4ba8502254ae07c96ed41c27885cb7b2534',
-  packagesHash: 'ca4fdd8474dd66a67807b4a9cbfdea3139001e69',
+  commit: 'e70b23fa',
+  appsHash: 'cc0fdda6898a99be2ff3a2b0caa44ee705d445ac',
+  packagesHash: 'a706e3570496fb76e44a5c276b47ead9c9556ec7',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
