@@ -121,15 +121,15 @@ def test_ledger_attaches_measured_excursion_by_cycle_key():
     assert row["mfeR"] == 3.0
 
 
-def test_ledger_v2_is_additive_and_keeps_the_labels_the_fold_reads():
-    """El ledger v2 añade el diagnóstico sin romper lo que la banda (v2_95) ya consumía."""
+def test_ledger_v3_is_additive_and_keeps_the_labels_the_fold_reads():
+    """El ledger v3 añade el quirófano sin romper lo que la banda (v2_95) ya consumía."""
     trips = _trips([("2022", 1.5)])
     ledger = build_cycle_ledger(
         round_trips=trips,
         regime_by_day={"2022-01-05": "range"},
         operational_regime_by_day={"2022-01-05": "SIDEWAYS"},
     )
-    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v2"
+    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v3"
     row = ledger["cycles"][0]
     # Campos v1 intactos (los que lee `_cell_cycles`).
     assert row["realizedR"] == 1.5
@@ -142,9 +142,36 @@ def test_ledger_v2_is_additive_and_keeps_the_labels_the_fold_reads():
     assert row["frictionR"] is None
     assert row["netRealizedR"] is None
     assert row["entryAdverseR"] is None
+    # Campos v3 aditivos: sin estrategia/geometría se declaran huecos, nunca se inventan.
+    assert row["strategyVersion"] is None
+    assert row["direction"] is None
     # Y la banda sigue leyendo el mismo ledger con el MISMO resultado agregado.
     artifact = build_sampling_artifact(draw_ledgers=[ledger, ledger], resamples=20)
     assert artifact["global"]["metrics"]["expectancyR"]["mean"] == 1.5
+
+
+def test_ledger_v3_records_strategy_and_infers_direction_from_geometry():
+    """La estrategia viaja tal cual y la dirección se infiere de `stop` vs `entry` (nunca se asume)."""
+    trip = {
+        "symbol": "AAA",
+        "entryDay": "2022-01-05",
+        "exitDay": "2022-01-07",
+        "entryPrice": 10.0,
+        "exitPrice": 11.0,
+        "stop": 9.0,
+        "realizedR": 1.0,
+        "cycleId": "C1",
+        "strategyVersion": "v2.7",
+    }
+    ledger = build_cycle_ledger(round_trips=[trip])
+    row = ledger["cycles"][0]
+    assert row["strategyVersion"] == "v2.7"
+    assert row["direction"] == "long"
+    # Geometría imposible (stop == entry): dirección NO inferible, se declara hueco.
+    degenerate = {**trip, "stop": 10.0, "strategyVersion": None}
+    row = build_cycle_ledger(round_trips=[degenerate])["cycles"][0]
+    assert row["direction"] is None
+    assert row["strategyVersion"] is None
 
 
 # ── Banda: descomposición venue / sampling / total ───────────────────────────────

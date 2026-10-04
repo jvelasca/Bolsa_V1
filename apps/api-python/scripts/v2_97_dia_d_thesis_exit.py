@@ -1,15 +1,14 @@
-"""V2.96 · DÍA-D AUTO — DIAGNÓSTICO DE DÓNDE NACE LA PÉRDIDA (read-only).
+"""V2.97 · DÍA-D AUTO — QUIRÓFANO DEL ``THESIS_EXIT`` (read-only).
 
 Qué es
 ------
-La banda TOTAL (``v2_95``) midió cuánta varianza aporta el sorteo del venue y cuánta el muestreo
-de ciclos. Esta sonda responde a la pregunta siguiente: **¿por qué se cierra cada ciclo y cuánto
-pesa cada causa?** Consume los ``K`` ledgers de ciclos que ``v2_94 --cycles --cycle-detail`` dejó
-por sorteo (``draw-XX/multi-cycles.json``) y los pliega en tres ejes:
-
-* **mecanismo de salida** — R bruto (y neto) por clase de cierre, con su dispersión entre sorteos;
-* **coste aplicado** — R bruto vs neto y cuánto come la fricción del simulador;
-* **calidad de entrada** — excursión adversa TEMPRANA y desvío de ejecución (bps).
+El diagnóstico del origen de la pérdida (``v2_96``) aisló que el grueso del ``R`` bruto negativo
+vive en pocos ciclos cerrados por invalidación de tesis (``THESIS_EXIT``), pese a que el
+``STOP_EJECUTADO`` domina en frecuencia con expectancy bruta ~0. Esta sonda abre esos ciclos:
+consume los ``K`` ledgers de ciclos que ``v2_94 --cycles --cycle-detail`` dejó por sorteo
+(``draw-XX/multi-cycles.json``, esquema ``dia-d-multi-cycle-ledger-v3``) y los pliega para saber
+**dónde viven** —estrategia, dirección, año/régimen, edad, geometría (MAE/MFE/captura), calidad de
+entrada y coste— con su dispersión entre sorteos y su fragilidad.
 
 No re-ejecuta el harness: sólo LEE los artefactos ya producidos.
 
@@ -17,14 +16,15 @@ Qué NO es (se declara, no se disfraza)
 --------------------------------------
 * **NO** sustituye la ventana PAPER: ``P3-2``/``P3-3`` siguen ABIERTAS.
 * **NO** decide: descompone la muestra medida; **no** cambia motor ni umbrales.
-* **Δ motor = 0:** no toca ningún fichero de motor; el detalle se captura con la costura inerte.
-* La banda por mecanismo es la **dispersión entre sorteos del venue**, no el bootstrap de ciclos.
-* Un hueco es ``None``/``NOT_MEASURED``; nunca se rellena con ``0``.
-* Sin ``--cycle-detail`` en la generación, el coste queda ``UNKNOWN`` (declarado, no en blanco).
+* **NO** es causal: el motivo crudo es el token colapsado ``thesis_exit``, no la condición que lo
+  disparó (recuperarla exigiría capturar el contexto del plan, que hoy no llega al journal).
+* **Δ motor = 0:** no toca ningún fichero de motor; consume la costura inerte ya existente.
+* Un hueco es ``None``/``NOT_MEASURED``; nunca se rellena con ``0``. El R neto sólo se afirma con
+  fricción ``COMPLETE`` (con ``PARTIAL`` es un SUELO y se declara).
 
 Uso::
 
-    uv run --no-sync python apps/api-python/scripts/v2_96_dia_d_loss_origin.py \\
+    uv run --no-sync python apps/api-python/scripts/v2_97_dia_d_thesis_exit.py \\
         --out-dir operability_runs/dia-d-auto-band
 """
 
@@ -43,7 +43,7 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 _OUT_SUBDIR = pathlib.Path("operability_runs") / "dia-d-auto"
 _DRAWS_SUBDIR = pathlib.Path("operability_runs") / "dia-d-auto-band"
 
-logger = logging.getLogger("v2_96_dia_d_loss_origin")
+logger = logging.getLogger("v2_97_dia_d_thesis_exit")
 
 
 def _draw_dirs(out_dir: pathlib.Path) -> list[pathlib.Path]:
@@ -84,44 +84,56 @@ def _disp(value: Any, spec: str = "+.4f") -> str:
     return f"{_fmt(value.get('mean'), spec)} [{_fmt(value.get('min'), spec)}, {_fmt(value.get('max'), spec)}]"
 
 
+def _fold_line(label_key: str, block: dict[str, Any], width: int = 22) -> str:
+    """Una línea de un cubo: etiqueta, ciclos, expectancy bruta, MAE/media y fragilidad."""
+    gross = (block["realizedRGross"]["expectancyR"] or {})
+    mae = (block["excursion"]["maeR"].get("mean") if block.get("excursion") else None)
+    fragility = block["fragility"]
+    return (
+        f"{str(block[label_key]):<{width}} {block['drawsWithCell']:>2}/{block['drawsTotal']:<2} "
+        f"n={block['cycles']:>3}  exp {_fmt(gross.get('mean'))}  "
+        f"MAE {_fmt(mae)}  {','.join(fragility['reasons']) or '-'}"
+    )
+
+
 def _print_text(artifact: dict[str, Any]) -> None:
     coverage = artifact["coverage"]
     print()
-    print(f"DÍA-D AUTO · DÓNDE NACE LA PÉRDIDA · K = {artifact['draws']} sorteos")
-    print("=" * 96)
+    print(f"DÍA-D AUTO · QUIRÓFANO THESIS_EXIT · K = {artifact['draws']} sorteos")
+    print("=" * 100)
     print(f"años pedidos              {coverage['yearsRequested']}")
     print(
         f"detalle capturado         {'sí' if coverage.get('detailCaptured') else 'NO'} · "
-        f"ciclos {coverage.get('cyclesTotal')} · con fricción COMPLETE "
+        f"ciclos THESIS_EXIT {coverage.get('cyclesTotal')} · con fricción COMPLETE "
         f"{coverage.get('cyclesWithCompleteFriction')}"
     )
     print()
-    print(f"{'MECANISMO':<18} {'n':>3} {'ciclos':>7} {'R bruto (media [min,max])':>28}  frágil")
-    print("-" * 96)
-    for row in artifact["byExitMechanism"]:
-        gross = (row["realizedRGross"]["total"] or {})
-        fragility = row["fragility"]
-        print(
-            f"{row['mechanism']:<18} {row['drawsWithCell']:>3} {row['cycles']:>7} "
-            f"{_disp(gross):>28}  {','.join(fragility['reasons']) or '-'}"
-        )
+    print("GLOBAL")
+    print("-" * 100)
+    print(_fold_line("label", artifact["global"]))
+    for axis, label_key in (
+        ("byStrategy", "strategy"),
+        ("byDirection", "direction"),
+        ("byYear", "year"),
+        ("byRegime", "regime"),
+        ("byOperationalRegime", "operationalRegime"),
+        ("byAgeBucket", "ageBucket"),
+    ):
+        print()
+        print(axis.upper())
+        print("-" * 100)
+        for block in artifact[axis]:
+            print(_fold_line(label_key, block))
     print()
-    costs = artifact["costImpact"]
-    print(f"R bruto total (por sorteo)   {_disp(costs['realizedRGrossTotal'])}")
-    print(f"R neto total (por sorteo)    {_disp(costs['realizedRNetTotal'])}"
-          f"{'  [SUELO: hay ciclos sin fricción COMPLETE]' if costs['netIsLowerBound'] else ''}")
-    print(f"fricción total (moneda)      {_disp(costs['frictionCostTotal'])}")
-    print(f"fricción total (R)           {_disp(costs['frictionRTotal'])}")
-    print(f"medición de fricción         {costs['frictionMeasurement']}")
-    print()
-    entry = artifact["entryQuality"]
-    adverse = entry["adverseExcursion"]
-    print(f"excursión adversa temprana   ventana {entry['windowDays']} días D1 · "
-          f"medidos {adverse['measured']} · media {_fmt(adverse['meanR'])} R · "
-          f"< -0.5R {_fmt(adverse['shareBelowHalfR'], '.2f')} · < -1R {_fmt(adverse['shareBelowOneR'], '.2f')}")
-    slip = entry["entrySlippageBps"]
-    print(f"desvío de entrada            medidos {slip['measured']} · media {_fmt(slip['mean'], '.2f')} bps "
-          f"· >0 {_fmt(slip['shareAboveZero'], '.2f')}")
+    print(f"motivos crudos            {artifact['rawReasonTokens']}")
+    concentration = artifact["concentration"]
+    print(
+        f"concentración             símbolos {concentration['distinctSymbols']} · "
+        f"top símbolo {concentration['topSymbol']} "
+        f"({_fmt(concentration['topSymbolShare'], '.2f')}) · "
+        f"top semana {concentration['topWeek']} "
+        f"({_fmt(concentration['topWeekShare'], '.2f')})"
+    )
     if artifact.get("limits"):
         print()
         print("LÍMITES DECLARADOS")
@@ -138,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--draws", type=int, default=None, help="tope de sorteos a leer (por defecto, todos)")
     parser.add_argument("--json", action="store_true", help="emite el artefacto como JSON")
-    parser.add_argument("--out", default=None, help="ruta del JSON del diagnóstico")
+    parser.add_argument("--out", default=None, help="ruta del JSON del quirófano")
     args = parser.parse_args(argv)
 
     if args.draws is not None and int(args.draws) < 1:
@@ -147,9 +159,9 @@ def main(argv: list[str] | None = None) -> int:
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
 
-    from bolsa_application.dia_d_loss_origin import (
+    from bolsa_application.dia_d_thesis_exit import (
         DEFAULT_LIMITS,
-        build_loss_origin_artifact,
+        build_thesis_exit_artifact,
     )
 
     out_dir = pathlib.Path(args.out_dir)
@@ -162,11 +174,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"# BLOQUEADO: no se pudo leer los sorteos ({type(error).__name__}: {error})", file=sys.stderr)
         return 2
 
-    artifact = build_loss_origin_artifact(
+    artifact = build_thesis_exit_artifact(
         draw_ledgers=ledgers,
         meta={
             "bump": "2.11.45-beta",
-            "phase": "V2.96 DIA-D AUTO LOSS ORIGIN",
+            "phase": "V2.97 DIA-D AUTO THESIS EXIT",
             "nature": "INVESTIGACION",
             "drawsDir": str(out_dir),
         },
@@ -177,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     years = (artifact.get("coverage") or {}).get("yearsRequested") or []
     first_year = str(years[0]) if years else "all"
     last_year = str(years[-1]) if years else "all"
-    default_name = f"loss-origin-{first_year}_{last_year}.json"
+    default_name = f"thesis-exit-{first_year}_{last_year}.json"
     out_path = pathlib.Path(args.out) if args.out else _REPO_ROOT / _OUT_SUBDIR / default_name
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(payload + "\n", encoding="utf-8")
@@ -187,7 +199,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         _print_text(artifact)
         print()
-        print(f"diagnóstico                {out_path}")
+        print(f"quirófano                  {out_path}")
         print(f"sorteos leídos             {len(ledgers)} de {out_dir}")
     return 0
 

@@ -423,7 +423,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             errors=errors,
             gate=gate,
             meta={
-                "bump": "2.11.44-beta",
+                "bump": "2.11.45-beta",
                 "phase": "V2.90 DIA-D AUTO FEEDBACK",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),

@@ -178,15 +178,21 @@ def _run_v93(
     return json.loads(out_path.read_text(encoding="utf-8"))
 
 
+#: Esquema del ledger que se considera "con detalle" para reutilizar un sorteo. Se sube con cada
+#: capa aditiva (v2: fricción/mecanismo; v3: estrategia/dirección) para forzar la REEJECUCIÓN de un
+#: ledger antiguo y no mezclar esquemas en el diagnóstico.
+_DETAIL_LEDGER_SCHEMA = "dia-d-multi-cycle-ledger-v3"
+
+
 def _ledger_has_detail(cycles_path: pathlib.Path) -> bool:
-    """True si el ledger existente ya trae el detalle v2 (fricción/mecanismo). Si no, se re-corre."""
+    """True si el ledger existente ya trae el detalle vigente (v3). Si no, se re-corre."""
     if not cycles_path.is_file():
         return False
     try:
         payload = json.loads(cycles_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return False
-    return str(payload.get("schemaVersion") or "") == "dia-d-multi-cycle-ledger-v2"
+    return str(payload.get("schemaVersion") or "") == _DETAIL_LEDGER_SCHEMA
 
 
 def _draw(args: argparse.Namespace, *, k: int, out_dir: pathlib.Path, mutations: Any) -> dict[str, Any]:
@@ -423,7 +429,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         cross_check=cross_check,
         meta={
-            "bump": "2.11.44-beta",
+            "bump": "2.11.45-beta",
             "phase": "V2.94 DIA-D AUTO MULTI BAND",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),

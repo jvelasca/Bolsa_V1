@@ -81,7 +81,10 @@ from bolsa_application.dia_d_multi_uncertainty import (
 #: Versión del esquema del ledger de ciclos (una fila por ciclo; sin agregados).
 #: v2 (V2.88.44) añade —de forma ADITIVA— el mecanismo de salida, la fricción aplicada en R, el
 #: R neto y la excursión adversa TEMPRANA post-entrada. Un lector de v1 ignora los campos nuevos.
-LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v2"
+#: v3 (V2.88.45) añade —también ADITIVA— la identidad de la ESTRATEGIA (``strategyVersion``) y la
+#: DIRECCIÓN inferida (``direction``) del ciclo, que el diagnóstico quirúrgico necesita para saber
+#: *dónde* vive cada cierre. Un lector de v1/v2 ignora los campos nuevos.
+LEDGER_SCHEMA_VERSION = "dia-d-multi-cycle-ledger-v3"
 
 #: Tipo del ledger de ciclos (la muestra cruda de UN sorteo).
 LEDGER_KIND = "DIA_D_AUTO_MULTI_CYCLE_LEDGER"
@@ -368,7 +371,9 @@ def build_cycle_ledger(
     forma ADITIVA— el **mecanismo de salida** (``exitMechanism``/``exitReason``), la **fricción
     aplicada** (``frictionCost``/``frictionR``/``frictionMeasurement``), el **R neto**
     (``netRealizedR``) y la **excursión adversa temprana** post-entrada (``entryAdverseR``/
-    ``entryAdverseWindowDays``/``entryAdverseGap``), además del desvío de entrada en bps.
+    ``entryAdverseWindowDays``/``entryAdverseGap``), además del desvío de entrada en bps. La capa
+    v3 añade —también ADITIVA— la **estrategia** (``strategyVersion``) y la **dirección**
+    (``direction``, inferida de ``stop`` vs ``entry``; ``None`` si la geometría es imposible).
 
     Reglas duras: un valor ilegible queda ``None`` (nunca ``0``); el R neto sólo se afirma con
     fricción ``COMPLETE`` (con ``PARTIAL`` es un SUELO y se declara el hueco, jamás se publica el
@@ -415,6 +420,7 @@ def build_cycle_ledger(
         cost = costs.get(cycle) if cycle else None
         friction = finite_number(cost.friction) if cost is not None else None
         entry_side = _entry_side(trip)
+        direction = infer_direction(entry=trip.get("entryPrice"), stop=trip.get("stop"))
         fills = fills_by_cycle.get(cycle, []) if cycle else []
         risk_cash = _risk_cash(trip, fills, entry_side)
         friction_r = None
@@ -444,6 +450,14 @@ def build_cycle_ledger(
                 "year": year_reader(trip) or "",
                 "regime": trial_reader(trip) or "",
                 "operationalRegime": operational_reader(trip) or "",
+                # ── Capa v3 (quirófano de la pérdida): dónde vive el ciclo ────────────
+                "strategyVersion": (
+                    str(trip.get("strategyVersion")).strip()
+                    if trip.get("strategyVersion") is not None
+                    and str(trip.get("strategyVersion")).strip()
+                    else None
+                ),
+                "direction": direction,
                 # ── Capa v2 (diagnóstico de la pérdida) ────────────────────────────────
                 "exitMechanism": mechanism,
                 "exitReason": evidence or (EXIT_MECHANISM_SIN_MECANISMO if not reason else reason),

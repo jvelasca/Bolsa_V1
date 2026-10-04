@@ -112,7 +112,7 @@ def test_ledger_v2_records_mechanism_friction_net_and_entry_quality():
         close_rows=[{"executionId": "E-SELL", "reason": "structural_stop"}],
     )
     row = ledger["cycles"][0]
-    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v2"
+    assert ledger["schemaVersion"] == "dia-d-multi-cycle-ledger-v3"
     assert row["exitMechanism"] == EXIT_MECHANISM_STOP
     assert row["exitReason"] == "structural_stop"
     # Friccion total = |11-10|*100 + |10-9|*100 = 200; riesgo = |11-10|*100 = 100 => 2R.
