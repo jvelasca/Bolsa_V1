@@ -108,9 +108,9 @@ E2E_RUN=1 pnpm --filter @bolsa/web e2e -- gp-e2e-v28856
 
 | Rol | Commit | Árboles |
 | --- | --- | --- |
-| **Sello funcional** (`feat`) | `PENDIENTE` (se fija en `docs(seal)`) | `apps` `PENDIENTE` / `packages` `PENDIENTE` |
-| Re-anclaje del freeze de la ventana (`chore`) | `PENDIENTE` | pin `commit: <funcional>` (no mueve árbol) |
-| **Commit del tag** (`docs(seal)`) | `PENDIENTE` | (mismos árboles que el funcional) |
+| **Sello funcional** (`feat`) | `f6286e6e` | `apps` `13d5bdc4…` / `packages` `95cb0d69…` |
+| Re-anclaje del freeze de la ventana (`chore`) | `c307bb5d` | pin `commit: f6286e6e` (no mueve árbol) |
+| **Commit del tag** (`docs(seal)`) | `(este commit)` | (mismos árboles que el funcional) |
 | Cita **POST-TAG** (evidencia `§7`) | _(posterior)_ | — |
 
 ---

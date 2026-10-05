@@ -90,12 +90,12 @@ Sin cambio de motor **ni de muestra**, este sello no re-corre el pipeline. Se **
 
 | Rol | Commit | Árboles |
 | --- | --- | --- |
-| **Sello funcional** (`feat`) | `PENDIENTE` (se fija en `docs(seal)`) | `apps` `PENDIENTE` / `packages` `PENDIENTE` |
-| Re-anclaje del freeze de la ventana (`chore`) | `PENDIENTE` | pin `commit: <funcional>` (no mueve árbol) |
-| **Commit del tag** (`docs(seal)`) | `PENDIENTE` | (mismos árboles que el funcional) |
+| **Sello funcional** (`feat`) | `f6286e6e` | `apps` `13d5bdc4…` / `packages` `95cb0d69…` |
+| Re-anclaje del freeze de la ventana (`chore`) | `c307bb5d` | pin `commit: f6286e6e` (no mueve árbol) |
+| **Commit del tag** (`docs(seal)`) | `(este commit)` | (mismos árboles que el funcional) |
 | Cita **POST-TAG** (evidencia `§7`) | _(posterior)_ | — |
 
-- **Tag:** `v2.88.56-beta` — `Release tag CI` **PENDIENTE** (se cita tras el push). Dentro del tag, la evidencia lo declara como `POST-TAG`.
+- **Tag:** `v2.88.56-beta` (anotado sobre el commit del sello; funcional `f6286e6e` + `chore(window)` `c307bb5d` que re-ancla el freeze) — `Release tag CI` **PENDIENTE** (se cita tras el push). Dentro del tag, la evidencia lo declara como `POST-TAG`.
 
 ---
 
