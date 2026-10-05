@@ -131,4 +131,11 @@ console.table(r.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.node
 
 ## 7. Cita del CI (POST-TAG)
 
-> **Pendiente de escribir tras el tag** (ningún tag contiene su propio resultado de CI: límite estructural declarado, como en `v2.88.46`…`v2.88.53`). Se anotará aquí el `Release tag CI` del tag `v2.88.54-beta` y la URL del `GitHub Release`, junto con el resultado de `replay-repro` (`Δ motor = 0` confirmado por CI).
+> **`Release tag CI`** del tag `v2.88.54-beta` ([run `37328334494`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37328334494)): **VERDE** — 11 `success` + `playwright (integrated E2E, opt-in)` `skipped` y `certify` `success` (`8m03s`, `14:53:07Z → 15:01:10Z`).
+>
+> - `replay-repro`: **REPRODUCIDO** — `sha256` `1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (idéntico al sello de `v2.88.53`; el sello está en CRLF y el fichero en LF, mismo CONTENIDO) y `DIGEST igual en las dos corridas` ⇒ **`Δ motor = 0` confirmado por CI**. Artefacto `replay-oos-durable-v2.88.7` (`sha256:30383be9a27a30599c809964aa372fdaeb908196d9352e78ae9368084c50eb05`).
+> - `frontend` (typecheck/lint/test/build + `contract:check`), `shared` (build/typecheck/test), `python` (ruff/imports/mypy/pytest offline), `lifecycle-pg` (Alembic + auth + golden restart), `a7-gate`, `dr-verify`, `decision-spine`, `security` y `playwright (mock E2E)` VERDE.
+>
+> **`GitHub Release`** publicado: [`v2.88.54-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.54-beta).
+>
+> Cita escrita en `main` **después** del tag (ningún tag contiene su propio resultado de CI: límite estructural declarado, como en `v2.88.46`…`v2.88.53`). El tag anotado `v2.88.54-beta` (`b1db0d09`) apunta a `c36e3658` (sello funcional `425292fd` + `chore(window)` `5a680084`).

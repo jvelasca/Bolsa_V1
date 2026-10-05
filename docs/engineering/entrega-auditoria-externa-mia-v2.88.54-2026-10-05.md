@@ -100,7 +100,7 @@ Sin cambio de motor **ni de muestra**, este sello no re-corre el pipeline. Se **
 | --- | --- | --- |
 | **Sello funcional** (`feat`) | `425292fd` | `apps` `b5babdb2…` / `packages` `95cb0d69…` |
 | Re-anclaje del freeze de la ventana (`chore`) | `5a680084` | pin `commit: 425292fd` (no mueve árbol) |
-| **Commit del tag** | _(a rellenar)_ | (mismos árboles que el funcional) |
+| **Commit del tag** | `c36e3658` (tag anotado `b1db0d09`) | (mismos árboles que el funcional) |
 | Cita **POST-TAG** (evidencia `§7`) | _(posterior)_ | — |
 
-- **Tag:** `v2.88.54-beta` (anotado) — **cita POST-TAG** del `Release tag CI` y del `GitHub Release` (pendiente de escribir tras el tag).
+- **Tag:** `v2.88.54-beta` (anotado) — `Release tag CI` [`37328334494`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37328334494) **VERDE** (`replay-repro` **REPRODUCIDO** `sha256 1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI). `GitHub Release` [`v2.88.54-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.54-beta) **publicado**.
