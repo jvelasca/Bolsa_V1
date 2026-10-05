@@ -145,10 +145,20 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * `Delta motor = 0`: CERO ficheros de motor. El arbol pinneado es el del commit funcional
  * `287a15b5`. Pin anterior (sello `v2.88.56-beta`, commit `f6286e6e`):
  * `apps` `13d5bdc4…` / `packages` `95cb0d69…`.
+ *
+ * RE-ANCLAJE 2026-10-05 (sello `v2.88.58-beta`): AUTO COCKPIT 1.0 (usuario basico) — F1 semaforo de
+ * realidad monetaria fail-closed (`auto-reality.ts` + `auto-reality-strip.tsx` sobre el `<Outlet />`),
+ * F2 identidad legible de operacion (`auto-operation-identity.ts`), F3 cockpit OPERAR con estados
+ * error/vacio distinguibles, F4 lenguaje plano (`auto-copy.ts`/`auto-story-plain-labels.ts`),
+ * reconciliacion no duplicada y tablist WAI-ARIA de DIA-D. UI/read-model puro: toca `apps/` (web);
+ * `packages/` NO cambia (mismo arbol que `v2.88.57`); `scripts/` no participa del pin.
+ * `Delta motor = 0`: CERO ficheros de motor. El arbol pinneado es el del commit funcional
+ * `dd3af96d`. Pin anterior (sello `v2.88.57-beta`, commit `287a15b5`):
+ * `apps` `0556be2f…` / `packages` `95cb0d69…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '287a15b5',
-  appsHash: '0556be2f23015ab7509e7460fce8d3bdbbb971e9',
+  commit: 'dd3af96d',
+  appsHash: '6f24ce2858413c47273fcaef49b998a49f38460b',
   packagesHash: '95cb0d698a708635e0594a5c85bacfb0a7538c20',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
