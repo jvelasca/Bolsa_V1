@@ -10,7 +10,7 @@ import type {
   AutoMonitorCycleViewV1,
   AutoMonitorStepViewV1,
 } from "@bolsa/shared";
-import { formatMonitorFactValue } from "@bolsa/shared";
+import { formatMeasurementLabel, formatMonitorFactValue } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 
 function StepRow({ step }: { step: AutoMonitorStepViewV1 }) {
@@ -85,6 +85,11 @@ function CycleCard({ cycle }: { cycle: AutoMonitorCycleViewV1 }) {
     cycle.closed !== null &&
     cycle.closed !== undefined &&
     (cycle.closedMeasurement ?? "COMPLETE") === "COMPLETE";
+  // La cifra de PnL hereda la medición del cierre: con un cierre no afirmable (`PARTIAL`/
+  // `UNKNOWN`) NO se presenta el número como medido — se rotula la medición. El valor se
+  // publica sólo con evidencia `COMPLETE` (regla de la casa: un hueco nunca es una cifra).
+  const pnl = cycle.result?.pnl;
+  const pnlMeasurement = cycle.closedMeasurement ?? "UNKNOWN";
   return (
     <Card
       className="rounded-xl border border-border bg-card"
@@ -122,9 +127,16 @@ function CycleCard({ cycle }: { cycle: AutoMonitorCycleViewV1 }) {
         </div>
         <p className="text-[10px] text-muted-foreground">
           <code>{cycle.cycleId}</code>
-          {cycle.result?.pnl !== null && cycle.result?.pnl !== undefined ? (
-            <span className="ml-2 tabular-nums">
-              PnL: {formatMonitorFactValue(cycle.result.pnl, "COMPLETE")}
+          {pnl !== null && pnl !== undefined ? (
+            <span
+              className="ml-2 tabular-nums"
+              data-testid="auto-monitor-cycle-pnl"
+              data-pnl-measurement={pnlMeasurement}
+            >
+              PnL:{" "}
+              {pnlMeasurement === "COMPLETE"
+                ? formatMonitorFactValue(pnl, "COMPLETE")
+                : formatMeasurementLabel(pnlMeasurement)}
             </span>
           ) : null}
         </p>

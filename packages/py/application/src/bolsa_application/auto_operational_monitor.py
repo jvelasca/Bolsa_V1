@@ -720,9 +720,13 @@ def _build_cycle(
         "steps": steps,
         # El PnL reconstruido sale de la ventana de fills: truncada, un suelo no es un
         # resultado. Se declara ausente antes que publicar una cifra sobre evidencia parcial.
+        # La condición NO repite sólo ``window_truncated``: un ``side`` no clasificable también
+        # degrada el cierre a ``PARTIAL`` (arriba), así que ``result`` se rige por la MISMA
+        # medición ya calculada (``closed_measurement``) y deja de publicar una cifra de dinero
+        # cuando el cierre no se puede afirmar.
         "result": (
             None
-            if closed is None or window_truncated
+            if closed is None or closed_measurement != MEASUREMENT_COMPLETE
             else {
                 "pnl": closed.get("pnl"),
                 "closedAt": closed.get("closedAt"),

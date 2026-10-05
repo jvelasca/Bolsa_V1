@@ -406,7 +406,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             },
             executed_detail=executed_detail,
             meta={
-                "bump": "2.11.50-beta",
+                "bump": "2.11.51-beta",
                 "phase": "V2.89 DIA-D AUTO SANDBOX",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),

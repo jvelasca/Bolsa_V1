@@ -774,6 +774,33 @@ def test_fill_with_unclassifiable_side_is_declared_partial_not_dropped() -> None
     assert dto["cycles"][0]["closedMeasurement"] == "PARTIAL"
 
 
+def test_cycle_result_not_published_when_close_is_partial_by_unclassified_side() -> None:
+    """Regresión: un cierre ``PARTIAL`` por ``side`` no clasificable NO publica el PnL.
+
+    Hueco de ``v2.88.50``: ``closed`` se degradaba a ``None``/``PARTIAL`` pero el bloque
+    ``result`` sólo miraba ``window_truncated``. Con un ciclo que CIERRA (``buy``+``sell``)
+    más un fill de ``side`` ilegible, ``cycles_from_fills`` sí reconstruye un ``pnl`` y el
+    ``result`` lo publicaba junto a un cierre que no se puede afirmar. La cifra de dinero
+    desaparece cuando ``closed_measurement != COMPLETE``.
+    """
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100),
+            _fill(side="sell", qty=10, price=110),
+            _fill(side="", qty=5, price=101),
+        ],
+    )
+    cycle = dto["cycles"][0]
+    # El PnL reconstruido existe (100) pero el cierre NO se puede afirmar: no se publica.
+    assert cycle["closed"] is None
+    assert cycle["closedMeasurement"] == "PARTIAL"
+    assert cycle["result"] is None
+    # Control: sin el ``side`` ilegible el MISMO ciclo SÍ publica su PnL (ver
+    # ``test_closed_cycle_reuses_cycles_from_fills_for_pnl``).
+
+
 def test_fill_window_full_is_declared_partial() -> None:
     """Con la ventana de fills LLENA el paso FILL declara ``PARTIAL`` (pudo truncarse)."""
     dto = build_operational_monitor(

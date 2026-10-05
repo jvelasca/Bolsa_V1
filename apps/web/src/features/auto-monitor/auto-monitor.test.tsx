@@ -157,6 +157,44 @@ describe("AutoCycleTimeline", () => {
     expect(card.getAttribute("data-cycle-closed")).toBe("unknown");
     expect(card.textContent).toContain("NO MEDIDO");
   });
+
+  it("no publica la cifra de PnL cuando el cierre es PARCIAL", () => {
+    const partial = buildAutoOperationalMonitorView({
+      ...dtoFixture(),
+      cycles: [
+        {
+          ...dtoFixture().cycles[0]!,
+          closed: null,
+          closedMeasurement: "PARTIAL",
+          result: { pnl: 100, closedAt: "2026-09-30T23:00:00Z" },
+        },
+      ],
+    });
+    render(<AutoCycleTimeline cycles={partial.cycles} />);
+    const pnl = screen.getByTestId("auto-monitor-cycle-pnl");
+    expect(pnl.getAttribute("data-pnl-measurement")).toBe("PARTIAL");
+    expect(pnl.textContent).toContain("PARCIAL");
+    // La cifra concreta NO se presenta como medida junto a un cierre no afirmable.
+    expect(pnl.textContent).not.toContain("100");
+  });
+
+  it("publica la cifra de PnL solo con cierre COMPLETE", () => {
+    const complete = buildAutoOperationalMonitorView({
+      ...dtoFixture(),
+      cycles: [
+        {
+          ...dtoFixture().cycles[0]!,
+          closed: true,
+          closedMeasurement: "COMPLETE",
+          result: { pnl: 100, closedAt: "2026-09-30T23:00:00Z" },
+        },
+      ],
+    });
+    render(<AutoCycleTimeline cycles={complete.cycles} />);
+    const pnl = screen.getByTestId("auto-monitor-cycle-pnl");
+    expect(pnl.getAttribute("data-pnl-measurement")).toBe("COMPLETE");
+    expect(pnl.textContent).toContain("100");
+  });
 });
 
 describe("AutoConcurrencyPanel", () => {

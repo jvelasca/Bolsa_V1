@@ -2,6 +2,24 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.51-beta] — `AUTO · UI`: **fix del PnL `PARTIAL` + congelación del AUTO UI SEMANTIC MODEL 1.0**
+
+**Bump** `2.11.50-beta` → `2.11.51-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello dirigido, sin tocar el motor: **Δ AUTO decision/execution motor = 0**. **NO** re-mide `DÍA-D` ni reabre la investigación `THESIS_EXIT` (A/C cerrada en `v2.88.50`; las cifras se **heredan y citan**, no se reutilizan como nuevas).
+
+### Fase 1 — Fix del PnL que se publicaba `COMPLETE` con cierre `PARTIAL`
+- **Backend** `packages/py/application/src/bolsa_application/auto_operational_monitor.py` (`_build_cycle`): el bloque `result` sólo miraba `closed is None or window_truncated`, así que un cierre degradado a `None`/`PARTIAL` por un `side` no clasificable (`unclassified_fills > 0`) **seguía publicando una cifra de PnL**. Ahora se rige por la **misma** medición ya calculada (`closed_measurement != MEASUREMENT_COMPLETE`) ⇒ sin cierre afirmable **no** se publica cifra de dinero.
+- **Frontend** `apps/web/src/features/auto-monitor/auto-cycle-timeline.tsx`: la cifra de PnL usa `cycle.closedMeasurement` (en vez de `"COMPLETE"` a fuego) y, cuando la medición no es `COMPLETE`, **rotula la medición** (`PARCIAL`/`NO MEDIDO`) en vez de presentar el número sin ambigüedad. Test de UI: un ciclo `PARTIAL` no muestra la cifra como medida.
+- **Tests de regresión (fallan sin el fix):** `test_auto_operational_monitor.py::test_cycle_result_not_published_when_close_is_partial_by_unclassified_side` (el caso `buy`+`sell`+`side` ilegible publicaba `pnl` con el cierre no afirmable) y `auto-monitor.test.tsx` (ciclo `PARTIAL` exige `PARCIAL`, nunca el número).
+
+### Fase 2 — `AUTO UI SEMANTIC MODEL 1.0` (diseño congelado, sin tocar pantallas)
+- Nuevo `docs/engineering/spec-auto-ui-semantic-model-1-2026-10-05.md`: congela qué es cada una de las **14 etapas** (`OPORTUNIDAD → … → EXPLICACIÓN`), su clase (hecho / derivado / contexto / explicación), los **dos ejes** (estado de etapa vs medición del hecho), las definiciones duras y la navegación objetivo (`OPERAR · CARTERA · RIESGO · ANÁLISIS · SISTEMA`), resolviendo los tres problemas conceptuales del piloto: **`TOP_N ≠ DECISIÓN`**, **`SALIDA ≠ LIQUIDACIÓN`** y **`OPORTUNIDAD` como contexto** (no un `NO MEDIDO` suelto). Incluye el plan de migración post-1.0 y sus límites declarados.
+- **No** sustituye pantallas, **no** re-deriva cifras y **no** toca el view-model `buildAutoOperationStory` (la migración del piloto al modelo es trabajo posterior, declarado).
+
+### Fase 3 — Sello
+- **Versión:** `package.json` → `2.11.51-beta`; `meta.bump` alineado en `v2_89`…`v2_97` (guard `test_dia_d_bump_guard.py`).
+- **Evidencia:** `docs/engineering/evidence/v2.88.51/README.md`. **NO** se corre el pipeline `DÍA-D`: la evidencia **cita** lo medido en `v2.88.50` (`route A=0/C=23`, `42/42`, `n=42`, `expectancy -0.7150`).
+- **Gates:** ver evidencia (§2).
+
 ## [2.11.50-beta] — `AUTO · DÍA-D-4`: **cierre PIT/UI, re-pipeline único y arranque AUTO UI 1.0** (absorbe `2.11.49-beta`)
 
 **Bump** `2.11.49-beta` → `2.11.50-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Se **absorbe** el sello `v2.88.49-beta` (separación A/C `DÍA-D-3h`), que estaba **commiteado** (`e70b23fa`) pero **sin tag ni medición** (su evidencia declaraba la medición PENDIENTE), y se corrige el **sesgo de universo punto-en-el-tiempo (PIT)** que contaminaba la muestra de los re-pipelines multianuales. **`Δ decisión motor = 0`** (ninguna línea de motor/gobernador/umbrales/costuras de decisión; sólo lectura, agregación pura y UI). La absorción se registra en `docs/engineering/versioning.md`.
