@@ -86,11 +86,21 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * `scripts/` no participa del pin. `Δ motor = 0`: CERO ficheros de motor. El arbol pinneado es
  * el del commit funcional `b05de1b5`. Pin anterior (sello `v2.88.50-beta`, 2º re-anclaje):
  * `apps` `e683160a…` / `packages` `7633be63…`.
+ *
+ * RE-ANCLAJE 2026-10-05 (sello `v2.88.52-beta`): AUTO UI Refactor 1.0 — view-model semantico de
+ * 14 etapas con `kind`/`group` (`SELECTION` ← `TOP_N` y `DECISION` `NOT_MEASURED` separadas;
+ * `EXIT` `DERIVED` de `SETTLEMENT`; `OPPORTUNITY` movida al bloque `context`), `MeasurementValue`
+ * unificado en los 4 paneles AUTO, modo `operation` por defecto con seleccion en la URL
+ * (`mode`/`cycle`/`day`/`window`/`symbol`) y enlace `EXPLANATION` → DÍA-D, mas el bump de
+ * `package.json`/`meta.bump`. Tocan `apps/` y `packages/`; `scripts/` no participa del pin.
+ * `Δ motor = 0`: CERO ficheros de motor. El arbol pinneado es el del commit funcional
+ * `cdedd3e2`. Pin anterior (sello `v2.88.51-beta`, commit `b05de1b5`):
+ * `apps` `f931a357…` / `packages` `28d2faf4…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'b05de1b5',
-  appsHash: 'f931a357d3070648d1a0fe69efb844ca532472f0',
-  packagesHash: '28d2faf4bc685cb73a604ef2b58506910a2340e5',
+  commit: 'cdedd3e2',
+  appsHash: '41fb4a97808ff08e2e6923f5f381566515a0ea12',
+  packagesHash: '2dc97daf7fdbdce6b197561a9ecf61f4ccc802dd',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
