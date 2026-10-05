@@ -92,10 +92,10 @@ Sin cambio de motor **ni de muestra**, este sello no re-corre el pipeline. Se **
 | --- | --- | --- |
 | **Sello funcional** (`feat`) | `f6286e6e` | `apps` `13d5bdc4…` / `packages` `95cb0d69…` |
 | Re-anclaje del freeze de la ventana (`chore`) | `c307bb5d` | pin `commit: f6286e6e` (no mueve árbol) |
-| **Commit del tag** (`docs(seal)`) | `(este commit)` | (mismos árboles que el funcional) |
+| **Commit del tag** (`docs(seal)`) | `54a3a7f2` (tag anotado `b1325545`) | (mismos árboles que el funcional) |
 | Cita **POST-TAG** (evidencia `§7`) | _(posterior)_ | — |
 
-- **Tag:** `v2.88.56-beta` (anotado sobre el commit del sello; funcional `f6286e6e` + `chore(window)` `c307bb5d` que re-ancla el freeze) — `Release tag CI` **PENDIENTE** (se cita tras el push). Dentro del tag, la evidencia lo declara como `POST-TAG`.
+- **Tag:** `v2.88.56-beta` (anotado sobre el commit del sello `54a3a7f2`, tag `b1325545`; funcional `f6286e6e` + `chore(window)` `c307bb5d` que re-ancla el freeze) — `Release tag CI` [`37339483917`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37339483917) **VERDE** (`replay-repro` `REPRODUCIDO` `sha256 1E3ADAC2…` ⇒ `Δ motor = 0`); **`GitHub Release` `v2.88.56-beta` publicado** (pre-release). Dentro del tag, la evidencia lo declara como `POST-TAG`.
 
 ---
 
