@@ -156,6 +156,9 @@ async def _count_scoped_ledger(factory: async_sessionmaker[AsyncSession], accoun
 # determinista (``_filling_instrument_id``) ⇒ mismo id y mismo día en cada ejecución. El
 # aislamiento entre runs lo siguen dando la cuenta SIM (id aleatorio) y el ``engine_id``;
 # el instrumento se siembra solo si no existe.
+# ``v2.88.50``: la barrida del DÍA COMPLETO exige el viaje completo (entrada Y salida) —
+# el ruido se sortea por lado, así que la entrada sola dejaba el cierre del día a una
+# moneda al aire por barra (ver ``_filling_instrument_id(round_trip=True)``).
 _CERT_INSTRUMENT_PREFIX = "inst-a9proc-"
 _CERT_SYMBOL = "A9CERT"
 _RESTART_INSTRUMENT_PREFIX = "inst-a9restart-"
@@ -163,7 +166,7 @@ _RESTART_INSTRUMENT_PREFIX = "inst-a9restart-"
 _CERT_FILL_CHUNKS = 4
 
 
-def _filling_instrument_id(prefix: str, *, side: str) -> str:
+def _filling_instrument_id(prefix: str, *, side: str, round_trip: bool = False) -> str:
     """Instrumento determinista cuya orden ``side`` NO topa con una costa terminal.
 
     ``W3`` (v2.88.16): el venue SIM ancla su ruido a la BARRA
@@ -176,6 +179,19 @@ def _filling_instrument_id(prefix: str, *, side: str) -> str:
     el spine determinista ya no vuelve a proponer entrada en ese proceso y el día AUTO nunca
     ocurre.
 
+    ``v2.88.50`` — ``round_trip``: el ruido de cola se sortea POR ``(barra, instrumento,
+    lado)`` (``draw_queue_noise(seed, side, instrument_id)``), así que un id cuya ENTRADA
+    llena puede tener la SALIDA terminal (``noise_reject``/``noise_timeout``) para la barra
+    de hoy. La barrida de la entrada sola dejaba el gate «el día cierra BUY→SELL» a una
+    moneda al aire por día: medido el **2026-10-05 UTC**, el primer candidato que llenaba el
+    BUY (``inst-a9proc-0000000000``) tenía el schedule de SELL VACÍO en la barra ``20731`` y
+    llenaba en ``20730``/``20732`` ⇒ rojo determinista de ``lifecycle-pg`` con
+    ``lados=['buy']`` (117 ticks) sobre el MISMO árbol que el día anterior dio verde. Con
+    ``round_trip=True`` se exige que AMBOS lados llenen en las barras probadas (el día
+    completo); el restart NO lo pide porque retiene la posición
+    (``AUTO_ENGINE_SIM_EXIT_AFTER_TICKS=1000``). No se relaja ninguna aserción: el día
+    sigue teniendo que cerrar su ciclo.
+
     La barrida es pura (sin BD, sin proceso) y determinista: mismo id en cada ejecución del
     mismo día simulado. Si ningún candidato llenara, el test falla con diagnóstico propio en
     vez de quedarse esperando 120 s.
@@ -187,24 +203,29 @@ def _filling_instrument_id(prefix: str, *, side: str) -> str:
 
     now = datetime.now(UTC)
     ticks = (bar_tick(now, "1d"), bar_tick(now + timedelta(days=1), "1d"))
-    for n in range(64):
-        candidate = f"{prefix}{n:010d}"
-        if all(
+    probe_sides = (side, "sell" if side == "buy" else "buy") if round_trip else (side,)
+
+    def _fills(probe_side: str, candidate: str, tick: int) -> bool:
+        return bool(
             simulated_fill_schedule(
                 instrument_id=candidate,
-                side=side,
+                side=probe_side,
                 quantity=Decimal("100"),
-                venue_order_id=f"probe-{side}-{candidate}-{tick}",
+                venue_order_id=f"probe-{probe_side}-{candidate}-{tick}",
                 seed=fill_seed(tick, candidate),
                 fill_chunks=_CERT_FILL_CHUNKS,
                 base_mid=100.0,
             ).fills
-            for tick in ticks
-        ):
+        )
+
+    for n in range(64):
+        candidate = f"{prefix}{n:010d}"
+        if all(_fills(probe_side, candidate, tick) for tick in ticks for probe_side in probe_sides):
             return candidate
     raise AssertionError(
-        f"ningún instrumento determinista de {prefix} llena en la cola SIM ({side}); "
-        "revisar los umbrales de draw_queue_noise o la familia de ids"
+        f"ningún instrumento determinista de {prefix} llena en la cola SIM "
+        f"({'/'.join(probe_sides)}); revisar los umbrales de draw_queue_noise o la familia "
+        "de ids"
     )
 
 
@@ -487,7 +508,7 @@ async def test_a9_scheduler_process_full_day_pg_zero_human(
     (``_filling_instrument_id``).
     """
 
-    instrument_id = _filling_instrument_id(_CERT_INSTRUMENT_PREFIX, side="buy")
+    instrument_id = _filling_instrument_id(_CERT_INSTRUMENT_PREFIX, side="buy", round_trip=True)
     engine_id = f"auto-a9proc-{uuid.uuid4().hex[:8]}"
     account_id: str | None = None
     log_path = Path(tempfile.gettempdir()) / f"a9proc-{engine_id}.log"

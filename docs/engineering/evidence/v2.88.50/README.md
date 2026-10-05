@@ -106,6 +106,7 @@ Cobertura: **`42` observaciones** `THESIS_EXIT` (pooled sobre sorteos), `11/12` 
 | `ruff check packages/py apps/api-python --config pyproject.toml` | **All checks passed!** |
 | `lint-imports --config packages/py/.importlinter` | **4 kept / 0 broken** (`659` ficheros) |
 | `mypy` (gate CI: `domain/market/infrastructure/application/src` + `api-python/src`, `--follow-imports=silent`) | **Success: no issues found in 531 source files** |
+| `pytest apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py` (PG real, local; el test que rompió el attempt 1 del CI) | **2 passed** — `full_day` **`8.02 s`** (el día cierra `BUY→SELL` con el arnés de viaje completo, §7) + `restart` `22.63 s` |
 | Web `vitest` (`src/features/auto-monitor`) | **22 passed** (7 ficheros) |
 | `@bolsa/shared` build | limpio |
 | `@bolsa/web` `typecheck` (`tsc -b --noEmit`) | limpio |
@@ -116,7 +117,7 @@ Cobertura: **`42` observaciones** `THESIS_EXIT` (pooled sobre sorteos), `11/12` 
 | **Determinismo del plegado** | `sha256 thesis-exit-v5 = F865106DCA7C4D05F605A1B11D2B75F68DFCCFF067551AA3AB0456F03CDBBF6F` (`184 445 B`); `sequences = 2268FA79F4A1151C23EABF7655B70866C8F375A9795906B048B7209DC6DBC2B3` (`291 275 B`) |
 | **`Δ motor = 0` (`replay-repro` LOCAL)** | **`REPRODUCIDO`** — fixture congelado (`20` instrumentos, `25 700` barras) re-sembrado en una **BD efímera** (`bolsa_v1_repro`, `DROP/CREATE` antes de cada corrida); `assert-artifact` ⇒ `240662250347A2AAD0F8E9F0101185D8ACC80C1D4BD1B4BBFF02D4766D9F54F0` (`3 445 622 B` CRLF) / `1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (LF) = **idéntico al sello**; **dos** corridas ⇒ **byte a byte idénticas** |
 | **`Δ motor = 0` (árbol)** | `git diff` de `auto_simulation_worker.py`/`simulated_broker.py`/`replay_oos.py`/`sim_durable_store.py`/`market_operability.py`/`auto_v2_entry.py`/`v2_87_…` = **vacío**; la inyección de seed de `v2_94` se **restaura byte a byte** tras cada sorteo |
-| **`Δ motor = 0` (confirmado por CI)** | `Release tag CI` del tag `v2.88.50-beta` — ver §6 (cita POST-TAG) |
+| **`Δ motor = 0` (confirmado por CI)** | `Release tag CI` del tag `v2.88.50-beta` — **attempt 1 ROJO** en `lifecycle-pg` por un flake del **arnés** (§7) con `replay-repro` **verde**; el CI del tag **re-anclado** se cita en §6/§7 (cita POST-TAG) |
 
 > **Nota de método (auditable).** Durante el primer intento, el `replay-repro` local dio artefactos **distintos** del sello. La causa **medida** fue que la corrida **run2** de `v2_94` estaba **en vuelo** e inyectaba temporalmente `seed=fill_seed(bar_tick_now + k, symbol)` en `auto_simulation_worker.py` (la inyección que restaura byte a byte al terminar cada sorteo): el replay importaba el worker con el seed desplazado. Una vez terminó `v2_94` (árbol restaurado), el replay reprodujo el sello **byte a byte** en dos corridas. Se declara para que un auditor no repita el falso negativo.
 
@@ -177,6 +178,33 @@ uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py \
 ## 6. Sello
 
 - **Añadidos:** `packages/shared/src/cognitive/auto-operation-story.ts` (+ test), `apps/web/src/features/auto-monitor/auto-operation-story-panel.tsx` (+ test), `apps/web/src/features/auto-monitor/dia-d-auto-feedback-heatmap.test.ts`, `apps/web/src/features/auto-monitor/auto-reservation-panel.test.tsx`, `apps/api-python/tests/test_v2_93_pit_watch.py`, `docs/engineering/evidence/v2.88.50/README.md`.
-- **Modificados:** `packages/py/application/src/bolsa_application/universe_point_in_time.py` (`candidate_ids`/`ids_by_day`/`eligible_days_by_symbol`), `universe_point_in_time_catalog.py` (`all_members`), `v2_91`/`v2_92`/`v2_93` (watch PIT por día + poda), `auto_operational_monitor.py` (`_reservation_view` con las `5` banderas), ruta `auto_operational_monitor.py` (DTO), `packages/shared/src/cognitive/auto-operational-monitor.ts`, `auto-monitor-page.tsx` (`enabled: mode === "current"` + pestaña «Operación»), `dia-d-auto-toolbar.tsx`, `auto-reservation-panel.tsx`, `dia-d-auto-feedback-heatmap.tsx` (`formatCellTooltip`), `dia-d-auto-feedback-panel.test.tsx` (`waitFor`), `packages/shared/src/cognitive/index.ts`, `apps/web/api/openapi.json`, `apps/web/src/api/schema.d.ts`, `v2_89`…`v2_97` (`meta.bump`), `package.json` (`2.11.50-beta`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
+- **Modificados:** `packages/py/application/src/bolsa_application/universe_point_in_time.py` (`candidate_ids`/`ids_by_day`/`eligible_days_by_symbol`), `universe_point_in_time_catalog.py` (`all_members`), `v2_91`/`v2_92`/`v2_93` (watch PIT por día + poda), `auto_operational_monitor.py` (`_reservation_view` con las `5` banderas), ruta `auto_operational_monitor.py` (DTO), `packages/shared/src/cognitive/auto-operational-monitor.ts`, `auto-monitor-page.tsx` (`enabled: mode === "current"` + pestaña «Operación»), `dia-d-auto-toolbar.tsx`, `auto-reservation-panel.tsx`, `dia-d-auto-feedback-heatmap.tsx` (`formatCellTooltip`), `dia-d-auto-feedback-panel.test.tsx` (`waitFor`), `packages/shared/src/cognitive/index.ts`, `apps/web/api/openapi.json`, `apps/web/src/api/schema.d.ts`, `v2_89`…`v2_97` (`meta.bump`), `package.json` (`2.11.50-beta`), `apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py` (arnés determinista con **viaje completo**, §7), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
 - **`Δ motor = 0`:** ningún fichero de motor tocado; la costura `capture_cycle_detail` sólo **lee** estado ya producido y su default sigue `False`; `replay-repro` **reproducido byte a byte** contra el fixture congelado (§3).
 - **Tag:** `v2.88.50-beta` — ver el re-sello POST-TAG con la cita del `Release tag CI`.
+
+---
+
+## 7. Incidencia de sello (declarada): rojo de `lifecycle-pg` por un flake del ARNÉS, y re-anclaje del tag
+
+**Qué pasó.** El primer `Release tag CI` del tag `v2.88.50-beta` (run [`37277722008`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37277722008), **attempt 1**) cerró **ROJO**: `10` jobs en verde — incluido **`replay-repro`**, la certificación de `Δ motor = 0` en Linux —, `playwright` integrado `skipped` por diseño, y **`lifecycle-pg` en rojo**, que arrastra al agregado `certify`. El rojo es **un único test**:
+
+```
+FAILED apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py::test_a9_scheduler_process_full_day_pg_zero_human
+AssertionError: el día AUTO del proceso debe cerrar el ciclo BUY→SELL (lados=['buy'], ticks=117, events=4, ledger=9)
+```
+
+**La causa es del ARNÉS de certificación, NO del sello.** El venue SIM sortea su ruido **por `(barra, instrumento, lado)`** (`draw_queue_noise(seed, side, instrument_id)`), pero la barrida determinista `_filling_instrument_id` sólo exigía que llenara la **entrada** (`side="buy"`) ⇒ el cierre del día quedaba a una **moneda al aire por barra**. Medición pura (sin BD ni proceso) con la MISMA derivación que el motor (`fill_seed(bar_tick(now, "1d"), id)` sobre `side=buy`/`side=sell`, `fill_chunks=_FILL_CHUNKS`, `qty=100`):
+
+| Barra | `inst-a9proc-0000000000` BUY | `inst-a9proc-0000000000` SELL | Candidatos `0..63` que llenan BUY | Candidatos con **viaje completo** |
+| --- | --- | --- | --- | --- |
+| `20730` (`2026-10-04 UTC`) | llena | llena | `59` | `52` |
+| `20731` (`2026-10-05 UTC`) | llena | **NO llena** (`fills=()`) | `54` | `45` |
+| `20732` (`2026-10-06 UTC`) | llena | llena | `60` | `44` |
+
+El candidato que elige la barrida es el **primero** (`inst-a9proc-0000000000`): el `2026-10-05` llenaba el **BUY** y tenía el **schedule de SELL VACÍO** ⇒ en la barra corriente **ninguna** salida podía materializarse y el gate «ciclo BUY→SELL» **no podía** pasar: de ahí `lados=['buy']` con `117` ticks y `0` ventas. El **mismo árbol** dio `lifecycle-pg` **VERDE** el `2026-10-04` (run [`37221439959`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37221439959)): **no** es una regresión de `v2.88.50`, es la **fecha**.
+
+**Fix (la causa, no la aserción).** `_filling_instrument_id(..., round_trip=True)` exige que **AMBOS lados** llenen en las barras probadas. El **día completo** lo pide (⇒ elige `inst-a9proc-0000000002`, con viaje completo en `20731`/`20732`); el **restart** NO (retiene la posición con `AUTO_ENGINE_SIM_EXIT_AFTER_TICKS=1000`: sólo necesita la entrada). **Ninguna aserción se relaja** — el día sigue teniendo que cerrar `BUY→SELL`, quedar **plano** y con `pending == 0` —; el arnés queda documentado en el propio fichero con las cifras de esta tabla.
+
+> **Nota de alcance:** el cambio vive en `apps/api-python/tests/` (**arnés**), no en `packages/` ni en el motor. El freeze del runner se **re-ancla** porque `appsHash` cambia con el fichero de test.
+
+**Re-anclaje del tag (declarado).** El tag `v2.88.50-beta` ya estaba empujado y su `Release tag CI` era **rojo**, así que el tag se **re-ancló UNA vez**: `d0acc7ab` (freeze previo) → commit del freeze re-anclado (el commit POST-TAG publica el SHA exacto). **Ningún `Release` de GitHub se había publicado** (el sello no estaba cerrado) y la corrección es **sólo del arnés**. El CI del tag re-anclado, en verde, se cita en el commit POST-TAG (§6).
