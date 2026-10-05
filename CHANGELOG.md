@@ -2,6 +2,31 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.53-beta] — `AUTO · UI`: **AUTO UI REFACTOR 1.1** (operación única consolidada)
+
+**Bump** `2.11.52-beta` → `2.11.53-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello dirigido **de UI/read-model**: **Δ AUTO decision/execution motor = 0** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS se **heredan y citan** de `v2.88.51`/`v2.88.50`. **NO** se implementa `PortfolioDecision` (`UI52-02`) ni la navegación global (`UI52-04`).
+
+Cierra, en frontend/shared, dos de los tres `P3` de la auditoría externa (MIA) de `v2.88.52` — `UI52-01` y `UI52-03` — y consolida la operación única.
+
+### Parte A — `EXIT` plegado en `SETTLEMENT` (`UI52-01`)
+
+- `packages/shared/src/cognitive/auto-operation-story.ts`: `AutoOperationStoryStage` gana `foldedInto` (etapa que absorbe la fila); `EXIT` declara `foldedInto: "SETTLEMENT"` mientras no exista traza durable propia de salida (`ownExit ? null : "SETTLEMENT"`, falsable). La rama `EXIT` **no** copia los `facts` de la liquidación; su intención se agrega como **nota** de `SETTLEMENT` (una sola fila `REACHED` por hecho, spec §4.2). El modelo sigue teniendo las 14 etapas; el plegado es de presentación.
+
+### Parte B — Identidad de la explicación (`UI52-03`, frontend-only)
+
+- Nuevo `AutoOperationStoryExplanationIdentity` (`cycleId` · `instrument` · `strategyVersion` · `direction` · `entryDay` · `timeframe` · `regime`) y campo `identity` en `AutoOperationStoryExplanationInput`. `buildExplanationStage` expone los ejes como hechos (los no materiales ⇒ `NO MEDIDO`) y declara la nota «resuelta por instrumento (DÍA-D)». El panel construye la identidad desde el ciclo (`entryDay` copiado del sello de la SEÑAL). **NO** se toca el contrato HTTP.
+
+### Parte C — Operación única consolidada
+
+- `apps/web/src/features/auto-monitor/auto-operation-story-panel.tsx`: se elimina el doble montaje de `AutoReservationPanel`/`AutoConcurrencyPanel` en modo `operation`; botón «Detalle técnico (ventana actual)» (`data-testid="auto-operation-story-open-technical"`) que fija `mode=current`. El panel filtra `group === "OPERATION" && foldedInto === null` ⇒ **12 filas**. Nomenclatura fijada: **14 conceptos del modelo** (no «14 etapas»).
+
+### Parte D — Tests y sello
+
+- `@bolsa/shared`: `auto-operation-story.test.ts` (`12`; pliega EXIT, despliega EXIT con traza propia, identidad de la explicación).
+- `@bolsa/web`: `auto-operation-story-panel.test.tsx` (`5`; 12 filas sin EXIT, nota de liquidación, identidad, detalle técnico) + `auto-monitor-page.test.tsx` (`6`). Suite web **1386 passed**.
+- **Versión:** `package.json` → `2.11.53-beta`; `meta.bump` alineado en `v2_89`…`v2_97` (guard `test_dia_d_bump_guard.py`).
+- **Evidencia:** `docs/engineering/evidence/v2.88.53/README.md`. **Entrega a auditoría externa (MIA):** `docs/engineering/entrega-auditoria-externa-mia-v2.88.53-2026-10-05.md`. Re-anclaje del freeze en `scripts/lib/window-forward.mjs`.
+
 ## [2.11.52-beta] — `AUTO · UI`: **AUTO UI REFACTOR 1.0** (modelo semántico implementado)
 
 **Bump** `2.11.51-beta` → `2.11.52-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello dirigido **de UI/read-model**: **Δ AUTO decision/execution motor = 0** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS se **heredan y citan** de `v2.88.51`/`v2.88.50`. **No** se borra ninguna pantalla y **no** se reestructura la navegación global (queda como objetivo post-1.0 en el spec).

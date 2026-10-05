@@ -30,9 +30,11 @@ Este documento **congela la semántica** de la interfaz AUTO *antes* de extender
 
 ---
 
-## 2. Las 14 etapas y su clasificación
+## 2. Los 14 conceptos del modelo y su clasificación
 
-| # | Etapa | Clase | Fuente canónica | Traza durable hoy |
+> **Nomenclatura (AUTO UI REFACTOR 1.1).** `OPPORTUNITY` es **contexto**, no una etapa operacional: este documento habla de los **14 conceptos del modelo**, no de «14 etapas». La UI pinta 12 filas de hechos (`EXIT` se pliega en `SETTLEMENT`, §4.2).
+
+| # | Concepto | Clase | Fuente canónica | Traza durable hoy |
 | --- | --- | --- | --- | --- |
 | 1 | **Oportunidad** | **Contexto** | watch PIT + estrategia + régimen | **No por ciclo** (universo de la ventana) |
 | 2 | **Señal** | Hecho durable | paso `SIGNAL` | Sí (`auto_entry_decision`) |
@@ -86,6 +88,8 @@ Este documento **congela la semántica** de la interfaz AUTO *antes* de extender
 - `LIQUIDACIÓN` = **hecho financiero** (qué se liquidó y a qué precio).
 - Si **no** existe traza específica de `SALIDA`, **no** se presentan como dos eventos independientes: se muestra una sola fila con la intención como **nota derivada** (`derivedNote`), no como etapa alcanzada por duplicado.
 
+**RESUELTO en `v2.88.53` (AUTO UI REFACTOR 1.1).** El view-model declara `EXIT.foldedInto = "SETTLEMENT"` mientras no exista traza durable propia de salida: la UI no pinta una segunda fila `REACHED`; la intención de salida queda como **nota** de la liquidación. Si algún día el spine expone un paso durable `EXIT`, `foldedInto = null` y vuelve a ser fila independiente (falsable).
+
 ### 4.3 `OPORTUNIDAD` debe ser **contexto**, no un `NO MEDIDO` suelto (P3 UX)
 
 **Problema.** `OPPORTUNITY` se declara `NOT_MEASURED` porque la oportunidad PIT no se materializa por ciclo. Correcto en integridad, confuso en UX: el usuario quiere saber **de dónde salió** la operación, y la respuesta existe en otra parte (PIT universe, señal, ranking, estrategia).
@@ -95,6 +99,8 @@ Este documento **congela la semántica** de la interfaz AUTO *antes* de extender
 - **Contexto que la originó:** `UNIVERSO PIT · ESTRATEGIA · RÉGIMEN · RANKING · MOTIVO DE SELECCIÓN`.
 
 `OPORTUNIDAD` deja de ser una etapa `NO MEDIDO` dentro de la historia de hechos; pasa a encabezar el bloque de contexto.
+
+**Implementado en `v2.88.52`.**
 
 ### 4.4 El bug del PnL `PARTIAL` como caso de estudio del principio 2
 
@@ -124,6 +130,8 @@ cycleId · instrument · strategy · strategyVersion · timeframe · entryDay ·
 ```
 
 Así la explicación responde **«¿por qué esta operación?»**, no sólo **«¿qué dice DÍA-D de este símbolo?»** — necesario cuando coexistan varias estrategias o versiones sobre el mismo instrumento. `cycleId` es la clave primaria; el resto, ejes de desambiguación.
+
+**Formalizado (frontend-only) en `v2.88.53` (AUTO UI REFACTOR 1.1).** El view-model expone la identidad de la explicación (`AutoOperationStoryExplanationIdentity`): `cycleId`, `instrument`, `strategyVersion`, `direction`, `entryDay` (copiado del sello temporal de la SEÑAL) y declara `timeframe`/`regime` como `NO MEDIDO` (el artefacto DÍA-D no los materializa). La resolución sigue siendo por instrumento; **migrar el contrato** para indexar por `cycleId` + ejes es deuda declarada (fuera de 1.1, que no toca `openapi.json`/`schema.d.ts`).
 
 ---
 
@@ -215,7 +223,7 @@ Cada paso es **aditivo**: no se borra ninguna pantalla antes de que su sustituto
 | Fill | `FILL` | Correcto |
 | Posición | — (derivada de `FILL`) | Correcto (declara `derivedNote`) |
 | Protección | `PROTECTION` | Correcto |
-| Salida | — (intención; hoy compartida con `SETTLEMENT`) | Duplicada (a plegar) |
+| Salida | — (intención; se pliega en `SETTLEMENT`) | Plegada en la Liquidación (1.1); sin doble `REACHED` |
 | Liquidación | `SETTLEMENT` | Correcto |
 | Resultado | `CYCLE_CLOSED` | Correcto |
-| Explicación | — (DÍA-D/OOS) | Indexada por `symbol` (a evolucionar, §6) |
+| Explicación | — (DÍA-D/OOS) | Identidad formalizada por instrumento + ejes (1.1); migrar a `cycleId` (§6) |

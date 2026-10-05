@@ -168,7 +168,7 @@ afterEach(() => {
 });
 
 describe("AutoOperationStoryPanel", () => {
-  it("pinta las 13 etapas de operación en orden (OPPORTUNITY fuera)", async () => {
+  it("pinta las 12 filas de operación (OPPORTUNITY fuera, EXIT plegado)", async () => {
     renderPanel();
 
     // El selector de ciclos sólo aparece con el monitor cargado: esperar a él evita asertar
@@ -188,7 +188,6 @@ describe("AutoOperationStoryPanel", () => {
       "FILL",
       "POSITION",
       "PROTECTION",
-      "EXIT",
       "SETTLEMENT",
       "RESULT",
       "EXPLANATION",
@@ -197,15 +196,15 @@ describe("AutoOperationStoryPanel", () => {
     expect(
       stages.every((stage) => stage.getAttribute("data-group") === "OPERATION"),
     ).toBe(true);
-    expect(
-      stages
-        .find((stage) => stage.getAttribute("data-stage") === "EXIT")
-        ?.getAttribute("data-kind"),
-    ).toBe("DERIVED");
 
     const byStage = new Map(
       stages.map((stage) => [stage.getAttribute("data-stage"), stage]),
     );
+    // EXIT se pliega en SETTLEMENT: no es una fila independiente…
+    expect(byStage.has("EXIT")).toBe(false);
+    // …y deja su intención como NOTA de la liquidación (una sola fila por hecho).
+    expect(byStage.get("SETTLEMENT")?.textContent).toContain("liquidación");
+
     expect(byStage.get("SIGNAL")?.getAttribute("data-state")).toBe("REACHED");
     expect(byStage.get("SELECTION")?.getAttribute("data-state")).toBe(
       "REACHED",
@@ -249,6 +248,11 @@ describe("AutoOperationStoryPanel", () => {
       .getAllByTestId("auto-operation-story-stage")
       .find((stage) => stage.getAttribute("data-stage") === "EXPLANATION");
     expect(explanation?.textContent).toContain("OOS_SUPPORTED");
+    // Identidad de la operación: ejes copiados del ciclo + NO MEDIDO en lo no material.
+    expect(explanation?.textContent).toContain("cycleId");
+    expect(explanation?.textContent).toContain("cyc-1");
+    expect(explanation?.textContent).toContain("2026-09-29");
+    expect(explanation?.textContent).toContain("NO MEDIDO");
   });
 
   it("enlaza la EXPLICACIÓN al heatmap DÍA-D con símbolo y ventana", async () => {
@@ -269,5 +273,21 @@ describe("AutoOperationStoryPanel", () => {
     expect(search).toContain("view=feedback");
     expect(search).toContain("symbol=AAA");
     expect(search).toContain("window=2026-09-29_2026-09-30");
+  });
+
+  it("lleva al detalle técnico (ventana actual) sin duplicar paneles", async () => {
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("auto-operation-story-open-technical"),
+      ).toBeTruthy(),
+    );
+
+    fireEvent.click(screen.getByTestId("auto-operation-story-open-technical"));
+    await waitFor(() =>
+      expect(screen.getByTestId("story-location").textContent).toContain(
+        "mode=current",
+      ),
+    );
   });
 });

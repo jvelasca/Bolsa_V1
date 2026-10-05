@@ -430,7 +430,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             regime_by_day=regime_all,
             operational_regime_by_day=operational_all,
             meta={
-                "bump": "2.11.52-beta",
+                "bump": "2.11.53-beta",
                 "phase": "V2.93 DIA-D AUTO MULTI ATTRIBUTION",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),

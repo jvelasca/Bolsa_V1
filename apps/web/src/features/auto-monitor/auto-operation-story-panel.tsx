@@ -22,17 +22,17 @@ import {
 import { cn } from "@/lib/utils";
 import {
   buildAutoOperationStory,
+  type AutoOperationStoryExplanationIdentity,
   type AutoOperationStoryExplanationInput,
 } from "@bolsa/shared";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 import { useAutoDiaDFeedbackList } from "@/features/auto-monitor/use-auto-dia-d-feedback";
-import { AutoReservationPanel } from "@/features/auto-monitor/auto-reservation-panel";
-import { AutoConcurrencyPanel } from "@/features/auto-monitor/auto-concurrency-panel";
 
 type DiaDFeedbackValueDto = components["schemas"]["DiaDFeedbackValueDto"];
 
 function toExplanation(
   value: DiaDFeedbackValueDto | undefined,
+  identity: AutoOperationStoryExplanationIdentity,
 ): AutoOperationStoryExplanationInput | null {
   if (!value) return null;
   return {
@@ -43,6 +43,7 @@ function toExplanation(
     hitRate: value.hitRate ?? null,
     measuredCycles: value.measuredCycles ?? null,
     errorTotal: value.errorTotal ?? null,
+    identity,
   };
 }
 
@@ -70,9 +71,23 @@ export function AutoOperationStoryPanel() {
   const explanation = useMemo(() => {
     const artifact = feedbackList.data?.artifact;
     const symbol = selected?.instrumentId ?? null;
-    if (!artifact?.available || !symbol) return null;
+    if (!artifact?.available || !symbol || !selected) return null;
+    // Identidad explícita: a QUÉ operación responde la explicación. `entryDay` se copia del sello
+    // temporal de la SEÑAL (no se re-deriva); timeframe/régimen no los materializa el artefacto.
+    const signalAt =
+      selected.steps.find((step) => step.id === "SIGNAL")?.at ?? null;
+    const identity: AutoOperationStoryExplanationIdentity = {
+      cycleId: selected.cycleId ?? null,
+      instrument: symbol,
+      strategyVersion: selected.strategyVersion ?? null,
+      direction: selected.direction ?? null,
+      entryDay: signalAt ? signalAt.slice(0, 10) : null,
+      timeframe: null,
+      regime: null,
+    };
     return toExplanation(
       (artifact.values ?? []).find((item) => item.symbol === symbol),
+      identity,
     );
   }, [feedbackList.data, selected]);
 
@@ -81,9 +96,10 @@ export function AutoOperationStoryPanel() {
     [selected, explanation],
   );
 
-  // Los hechos de la operación (sin OPPORTUNITY) vs el contexto que la originó.
+  // Los hechos de la operación (sin OPPORTUNITY) vs el contexto que la originó. Una etapa plegada
+  // (EXIT → SETTLEMENT) no se pinta como fila propia: una sola fila por hecho.
   const operationStages = story.stages.filter(
-    (stage) => stage.group === "OPERATION",
+    (stage) => stage.group === "OPERATION" && stage.foldedInto === null,
   );
   const opportunity = story.stages.find((stage) => stage.id === "OPPORTUNITY");
 
@@ -104,15 +120,40 @@ export function AutoOperationStoryPanel() {
     );
   };
 
+  // La operación es el resumen/interpretación; el crudo (header, timeline, reservas,
+  // concurrencia) vive en la vista experta `current`, sin duplicar paneles.
+  const openTechnicalDetail = () => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.set("mode", "current");
+        return params;
+      },
+      { replace: false },
+    );
+  };
+
   return (
     <div className="space-y-4" data-testid="auto-operation-story-panel">
       <Card className="rounded-xl border border-border bg-card">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Operación única</CardTitle>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <CardTitle className="text-sm">Operación única</CardTitle>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              data-testid="auto-operation-story-open-technical"
+              className="h-6 rounded px-2 text-[10px]"
+              onClick={openTechnicalDetail}
+            >
+              Detalle técnico (ventana actual)
+            </Button>
+          </div>
           <p className="text-[11px] text-muted-foreground">
-            Una historia, catorce etapas. Cada etapa se copia de su traza
-            durable o se declara <strong>NO MEDIDO</strong>; nunca se rellena
-            con 0.
+            Una historia: catorce conceptos del modelo. Los hechos de la
+            operación se copian de su traza durable o se declaran{" "}
+            <strong>NO MEDIDO</strong>; nunca se rellenan con 0.
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -266,13 +307,6 @@ export function AutoOperationStoryPanel() {
           </dl>
         </CardContent>
       </Card>
-
-      {view ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <AutoReservationPanel reservations={view.reservations} />
-          <AutoConcurrencyPanel concurrency={view.concurrency} />
-        </div>
-      ) : null}
     </div>
   );
 }

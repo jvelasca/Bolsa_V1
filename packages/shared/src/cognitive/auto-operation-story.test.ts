@@ -126,17 +126,44 @@ describe("buildAutoOperationStory", () => {
     );
   });
 
-  it("deriva EXIT de SETTLEMENT sin duplicar el hecho financiero", () => {
+  it("pliega EXIT en SETTLEMENT sin duplicar el hecho financiero", () => {
     const story = buildAutoOperationStory({ cycle: cycle() });
     const byId = new Map(story.stages.map((stage) => [stage.id, stage]));
 
     expect(byId.get("SETTLEMENT")?.kind).toBe("FACT");
     expect(byId.get("SETTLEMENT")?.state).toBe("REACHED");
+    // La intención de salida queda como NOTA de la liquidación (una sola fila REACHED).
+    expect(byId.get("SETTLEMENT")?.note).toContain("liquidación");
 
     expect(byId.get("EXIT")?.kind).toBe("DERIVED");
     expect(byId.get("EXIT")?.sourceStepId).toBe("SETTLEMENT");
-    expect(byId.get("EXIT")?.state).toBe("REACHED");
+    // Se pliega: sin traza durable propia de salida no se pinta como evento independiente.
+    expect(byId.get("EXIT")?.foldedInto).toBe("SETTLEMENT");
+    // Y NO copia los hechos financieros de la liquidación.
+    expect(byId.get("EXIT")?.facts).toEqual([]);
     expect(byId.get("EXIT")?.note).toContain("liquidación");
+  });
+
+  it("despliega EXIT como fila propia si existe una traza durable de salida", () => {
+    const withExit = cycle();
+    withExit.steps = [
+      ...withExit.steps,
+      {
+        id: "EXIT",
+        state: "reached",
+        at: "2026-10-01T14:00:00Z",
+        measurement: "COMPLETE",
+        facts: [{ key: "reason", value: "STOP", measurement: "COMPLETE" }],
+        note: null,
+      },
+    ];
+    const story = buildAutoOperationStory({ cycle: withExit });
+    const exit = story.stages.find((stage) => stage.id === "EXIT");
+
+    expect(exit?.foldedInto).toBeNull();
+    expect(exit?.facts).toEqual([
+      { label: "reason", value: "STOP", measurement: "COMPLETE" },
+    ]);
   });
 
   it("expone OPPORTUNITY y el resto del universo en el bloque context", () => {
@@ -200,6 +227,47 @@ describe("buildAutoOperationStory", () => {
     expect(explanation?.facts.find((fact) => fact.label === "errores")).toEqual(
       { label: "errores", value: 0, measurement: "COMPLETE" },
     );
+  });
+
+  it("expone la identidad de la explicación y declara NO MEDIDO lo no material", () => {
+    const story = buildAutoOperationStory({
+      cycle: cycle(),
+      explanation: {
+        verdict: "OOS_SUPPORTED",
+        evidenceQuality: "PRELIMINARY",
+        identity: {
+          cycleId: "cyc-1",
+          instrument: "AAA",
+          strategyVersion: "strat-3",
+          direction: "long",
+          entryDay: "2026-09-29",
+          timeframe: null,
+          regime: null,
+        },
+      },
+    });
+    const explanation = story.stages.find(
+      (stage) => stage.id === "EXPLANATION",
+    );
+    const byLabel = new Map(
+      (explanation?.facts ?? []).map((fact) => [fact.label, fact]),
+    );
+
+    expect(byLabel.get("cycleId")).toEqual({
+      label: "cycleId",
+      value: "cyc-1",
+      measurement: "COMPLETE",
+    });
+    expect(byLabel.get("estrategia")?.value).toBe("strat-3");
+    expect(byLabel.get("día entrada")?.value).toBe("2026-09-29");
+    // Ejes que el artefacto DÍA-D no materializa ⇒ NO MEDIDO (null + UNKNOWN), nunca inventados.
+    expect(byLabel.get("timeframe")).toEqual({
+      label: "timeframe",
+      value: null,
+      measurement: "UNKNOWN",
+    });
+    expect(byLabel.get("régimen")?.measurement).toBe("UNKNOWN");
+    expect(explanation?.note).toContain("instrumento");
   });
 
   it("un ciclo ausente deja todas las trazas en NOT_MEASURED", () => {

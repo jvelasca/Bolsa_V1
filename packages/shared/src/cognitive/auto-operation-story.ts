@@ -95,6 +95,12 @@ export type AutoOperationStoryStage = {
   group: AutoOperationStoryGroup;
   /** Paso durable del que se copia la etapa (``null`` = etapa derivada/contextual). */
   sourceStepId: string | null;
+  /**
+   * Etapa en la que esta se PLIEGA visualmente (``null`` = fila propia). `EXIT` se pliega en
+   * `SETTLEMENT` mientras no exista una traza durable propia de intención de salida: la UI no
+   * pinta dos etapas `REACHED` a partir del MISMO hecho financiero (spec §4.2).
+   */
+  foldedInto: AutoOperationStoryStageId | null;
   state: AutoOperationStoryState;
   stateLabel: string;
   tone: string;
@@ -103,6 +109,22 @@ export type AutoOperationStoryStage = {
   measurement: string;
   facts: AutoOperationStoryFact[];
   note: string | null;
+};
+
+/**
+ * Identidad de la explicación: a QUÉ operación responde. Hoy el artefacto DÍA-D sólo materializa
+ * `instrument`, así que `cycleId` y los demás ejes se copian del ciclo y los que el artefacto no
+ * expone (`timeframe`, `regime`) se declaran `null` (⇒ `NO MEDIDO`). La clave primaria objetivo es
+ * `cycleId` + ejes de desambiguación (spec §6); migrar el contrato es deuda declarada.
+ */
+export type AutoOperationStoryExplanationIdentity = {
+  cycleId: string | null;
+  instrument: string | null;
+  strategyVersion: string | null;
+  direction: string | null;
+  entryDay: string | null;
+  timeframe: string | null;
+  regime: string | null;
 };
 
 /** Explicación OOS/DÍA-D del instrumento (se copia tal cual: NO se re-deriva). */
@@ -114,6 +136,8 @@ export type AutoOperationStoryExplanationInput = {
   hitRate?: number | null;
   measuredCycles?: number | null;
   errorTotal?: number | null;
+  /** Ejes que desambiguan a qué operación responde la explicación. */
+  identity?: AutoOperationStoryExplanationIdentity | null;
 };
 
 /** Contexto que ORIGINÓ la operación (no es un hecho del ciclo). */
@@ -152,6 +176,8 @@ type StageSpec = {
   group: AutoOperationStoryGroup;
   sourceStepId: string | null;
   derivedNote?: string;
+  /** Etapa que absorbe esta fila en la vista (mientras no tenga traza propia). */
+  foldedInto?: AutoOperationStoryStageId | null;
 };
 
 /** Mapa explícito etapa → paso durable (o ``null`` si la etapa no tiene traza por ciclo). */
@@ -231,12 +257,14 @@ const STORY_STAGE_SPECS: readonly StageSpec[] = [
     sourceStepId: "PROTECTION",
   },
   {
-    // SALIDA = intención/motivo; el hecho financiero durable es la LIQUIDACIÓN.
+    // SALIDA = intención/motivo; el hecho financiero durable es la LIQUIDACIÓN. Mientras no
+    // exista traza propia de salida, esta fila se PLIEGA en `SETTLEMENT` (no se duplica el hecho).
     id: "EXIT",
     label: "Salida",
     kind: "DERIVED",
     group: "OPERATION",
     sourceStepId: "SETTLEMENT",
+    foldedInto: "SETTLEMENT",
     derivedNote:
       "salida = intención/motivo; el hecho durable es la liquidación",
   },
@@ -303,6 +331,7 @@ function baseStage(
     kind: spec.kind,
     group: spec.group,
     sourceStepId: spec.sourceStepId,
+    foldedInto: spec.foldedInto ?? null,
     state,
     stateLabel: STORY_STATE_LABELS[state],
     tone: STORY_STATE_TONES[state],
@@ -322,6 +351,22 @@ function measuredFact(label: string, value: unknown): AutoOperationStoryFact {
     value: measured ? value : null,
     measurement: measured ? "COMPLETE" : "UNKNOWN",
   };
+}
+
+/** Ejes de identidad de la explicación: los que el artefacto no materializa se declaran `NO MEDIDO`. */
+function buildExplanationIdentityFacts(
+  identity: AutoOperationStoryExplanationIdentity | null | undefined,
+): AutoOperationStoryFact[] {
+  if (!identity) return [];
+  return [
+    measuredFact("cycleId", identity.cycleId),
+    measuredFact("instrumento", identity.instrument),
+    measuredFact("estrategia", identity.strategyVersion),
+    measuredFact("dirección", identity.direction),
+    measuredFact("día entrada", identity.entryDay),
+    measuredFact("timeframe", identity.timeframe),
+    measuredFact("régimen", identity.regime),
+  ];
 }
 
 function buildExplanationStage(
@@ -352,7 +397,12 @@ function buildExplanationStage(
       measuredFact("hit", explanation.hitRate ?? null),
       measuredFact("n", explanation.measuredCycles ?? null),
       measuredFact("errores", explanation.errorTotal ?? null),
+      // A QUÉ operación responde: `cycleId` + ejes; los no materiales se declaran NO MEDIDO.
+      ...buildExplanationIdentityFacts(explanation.identity),
     ],
+    note: explanation.identity
+      ? "resuelta por instrumento (DÍA-D); ejes no materiales por ciclo = NO MEDIDO"
+      : null,
   };
 }
 
@@ -423,6 +473,30 @@ export function buildAutoOperationStory(input: {
     if (spec.id === "EXPLANATION") {
       return buildExplanationStage(spec, index, input.explanation ?? null);
     }
+    if (spec.id === "EXIT") {
+      // Intención/motivo de salida: NO fabrica un hecho financiero propio. Sin traza durable de
+      // salida se PLIEGA en `SETTLEMENT`; con traza propia vuelve a ser fila independiente.
+      const ownExit = stepsById.get("EXIT");
+      const settlement = stepsById.get("SETTLEMENT");
+      const evidence = ownExit ?? settlement;
+      const foldedInto: AutoOperationStoryStageId | null = ownExit
+        ? null
+        : "SETTLEMENT";
+      return {
+        ...baseStage(spec, index, mapStepState(evidence)),
+        at: evidence?.at ?? null,
+        measurement: evidence?.measurement ?? "UNKNOWN",
+        facts: ownExit
+          ? ownExit.facts.map((fact) => ({
+              label: fact.key,
+              value: fact.value,
+              measurement: fact.measurement,
+            }))
+          : [],
+        foldedInto,
+        note: joinNote(spec.derivedNote, ownExit),
+      };
+    }
     const step = spec.sourceStepId
       ? stepsById.get(spec.sourceStepId)
       : undefined;
@@ -439,6 +513,19 @@ export function buildAutoOperationStory(input: {
       note: joinNote(spec.derivedNote, step),
     };
   });
+
+  // Una etapa plegada deja su nota (la intención de salida) en la fila que la absorbe: una sola
+  // fila `REACHED`, sin duplicar el mismo hecho (spec §4.2).
+  for (const stage of stages) {
+    if (stage.foldedInto === null) continue;
+    const target = stages.find(
+      (candidate) => candidate.id === stage.foldedInto,
+    );
+    if (target) {
+      target.note =
+        [target.note, stage.note].filter(Boolean).join(" · ") || null;
+    }
+  }
 
   return {
     cycleId: cycle?.cycleId ?? null,
