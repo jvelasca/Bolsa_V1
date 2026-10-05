@@ -54,10 +54,20 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * El arbol pinneado es el del commit funcional `6915ef66`. Editar el pin NO mueve a su vez el
  * arbol porque este modulo vive en `scripts/`. Pin anterior (sello `v2.88.49-beta`, commit
  * `e70b23fa`): `apps` `cc0fdda6…` / `packages` `a706e357…`.
+ *
+ * RE-ANCLAJE 2026-10-05 (2º, DENTRO del mismo sello `v2.88.50-beta`): el arnes de certificacion
+ * `apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py` pasa a exigir el VIAJE
+ * COMPLETO en la barrida determinista (`_filling_instrument_id(..., round_trip=True)`) porque el
+ * venue SIM sortea su ruido POR LADO (`draw_queue_noise(seed, side, instrument_id)`): la barrida
+ * de la entrada sola dejaba el cierre del dia a una moneda al aire por barra. El primer
+ * `Release tag CI` del sello (run `37277722008`, attempt 1) cayo por ese flake
+ * determinista-por-fecha (diagnostico + tabla en la evidencia `v2.88.50` §7); `replay-repro` fue
+ * VERDE. Es un fichero de TEST bajo `apps/` (Δ motor = 0 intacto): el arbol pinneado pasa a
+ * `356aaf2a` y `packages` NO cambia.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '6915ef66',
-  appsHash: 'fc2b754043b7c022f15dcaf0feddc7bd7cd76fc0',
+  commit: '356aaf2a',
+  appsHash: 'd1e0969755359f6948ab6ddc42450de112d3ee24',
   packagesHash: 'e11f12c699e9cc3fb48e222d240f70e528b4c675',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
