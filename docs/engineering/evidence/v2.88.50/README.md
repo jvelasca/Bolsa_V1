@@ -1,0 +1,182 @@
+# Evidencia `v2.88.50-beta` — `AUTO · DÍA-D-4`: **cierre PIT por día, proyección de mediciones en reservas, 2 fixes de UI y arranque AUTO UI 1.0** (absorbe `v2.88.49-beta`)
+
+**Objeto:** el **siguiente chat, un auditor externo, o un Cursor distinto**. No es el historial (`PROJECT_STATE.md`).
+
+**Producto:** `V2.88.50-beta` · **Package:** `2.11.50-beta` · **AsOf:** 2026-10-05 · **Nature:** `INVESTIGACION` · **Fase:** `V2.93…V2.97 DIA-D AUTO` · **Δ motor = 0**.
+
+**Schemas:** `dia-d-multi-band-v1` (`KIND = "DIA_D_AUTO_MULTI_BAND"`), `dia-d-thesis-exit-v5` (`KIND = "DIA_D_AUTO_THESIS_EXIT"`), `dia-d-multi-cycle-ledger-v7` (aditivo sobre `-v6`) y `dia-d-thesis-stop-sequences-v2` (`KIND = "DIA_D_AUTO_THESIS_STOP_SEQUENCES"`). **Alembic:** head `048_journal_entry_dedupe_key` — **SIN migración** (leer no escribe esquema). **Contrato HTTP:** `AutoMonitorReconciliationDto` gana 5 campos (`reasonMeasurement`/`callerMeasurement`/`agedMeasurement`/`graceWindowMeasurement`/`reconciliationMeasurement`); `openapi.json` y `schema.d.ts` regenerados (`contract:check` OK).
+
+**Padres:** [`v2.88.49`](../v2.88.49/README.md) (**absorbido**: separación A/C del `THESIS_EXIT`, commit `e70b23fa`, **sin tag ni medición**) → [`v2.88.48`](../v2.88.48/README.md) (huella de decisión por ciclo) → [`v2.88.47`](../v2.88.47/README.md) (el nivel tocado no ejecutado) → [`v2.88.46`](../v2.88.46/README.md) (el nivel congelado ES el stop inicial) → [`v2.88.45`](../v2.88.45/README.md) (dónde viven los `THESIS_EXIT`).
+
+**Decisión de versionado (declarada).** `v2.88.49-beta` estaba **commiteado** (`e70b23fa`) pero **sin tag ni medición**; su evidencia declaraba la medición como PENDIENTE. Se **absorbe** en un único sello `v2.88.50-beta` para no correr dos veces el pipeline: el **mismo** re-pipeline (a) corrige el **sesgo de universo punto-en-el-tiempo (PIT)** y (b) mide A/C sobre el universo corregido. La absorción queda registrada en `docs/engineering/versioning.md` (fila Git tag) y `docs/CURRENT_SYSTEM.md`. **Consecuencia esperada y cumplida:** las cifras citadas de `v2.88.41`…`v2.88.49` (38/38, 19/19, `expectancy`) **cambian**; se documenta el delta, no se reutilizan.
+
+**Packages de evidencia (no versionados, `.gitignore`):**
+
+- `operability_runs/dia-d-auto-pit-run1/` · `…-run2/` — `12` ledgers `dia-d-multi-cycle-ledger-v7` (secuencia + huella de decisión + `orderCreated`) por corrida.
+- `operability_runs/dia-d-auto/multi-band-pit-run1.json` (`52 798 B`) · `multi-band-pit-run2.json` (`51 931 B`) — los plegados `v2_94` del universo PIT corregido.
+- `operability_runs/dia-d-auto/thesis-exit-pit-run1a.json` (`184 445 B`) — el artefacto `dia-d-thesis-exit-v5`.
+- `operability_runs/dia-d-auto/thesis-stop-sequences-2022_2026.json` (`291 275 B`) — el volcado `--sequences`.
+- `artifacts/repro/replay-1.json` · `replay-2.json` — el replay regenerado en BD efímera (`3 445 622 B` cada uno).
+
+---
+
+## 0. Qué añade este sello (y qué NO)
+
+Cinco bloques, todos **sin tocar el motor**:
+
+1. **PIT por día (raíz del sesgo de muestra).** El watch multianual se anclaba al **último día del año** (`YYYY-12-31`). Un año **incompleto** (`2026`) tiene ese ancla en el futuro ⇒ **ningún** instrumento elegible ⇒ la muestra se declaraba `sin_universo_pit`. Peor: dentro de un año, anclar a `31-dic` **excluía** a los instrumentos **deslistados a mitad de año**. Ahora `candidate_ids(ene-01, dic-31)` resuelve la **ventana de elegibilidad** de cada instrumento y `bars_by_symbol` se **poda** a sus días elegibles (`eligible_days_by_symbol`), cinturón y tirantes.
+2. **5 banderas de medición en reservas.** `reason`/`caller`/`aged`/`grace`/`reconciliation` viajan del audit al monitor, al DTO y a la UI; un `UNKNOWN` deja de ser indistinguible de `"?"` (se pinta `NO MEDIDO`).
+3. **Dos fixes de UI:** la pestaña DÍA-D **deja de sondear** `/auto/operational-monitor` cada `20 s` (`enabled: mode === "current"`), y el tooltip de una celda `NOT_MEASURED` del heatmap pinta **`sin dato`** (no `0 ciclos · 0 errores`).
+4. **Rojo de `main`:** `dia-d-auto-feedback-panel.test.tsx` asertaba la query de detalle antes de que el efecto la disparara; se arregla la **causa** (`waitFor`), no se relaja el test.
+5. **AUTO UI REFACTOR 1.0 (piloto).** View-model puro `buildAutoOperationStory` (`@bolsa/shared`) que pliega los DTO existentes en **una operación** de `13` etapas, + pestaña «Operación». **No** se elimina ninguna pantalla.
+
+**NO** toca el motor, los umbrales, `TOP_N`, la allocation ni las costuras de decisión (§3: `Δ motor = 0` demostrado). **NO** introduce contrafactuales. **NO** cierra la deuda de `stopBasisMismatchR` ni declara `CONFIRMED`.
+
+> **Modelo de ejecución declarado:** `AUTO` **no deja una orden STOP en reposo**; el stop lo ejecuta el decider `D1`. La huella `decisionRoute`/`orderCreated` se **LEE** del estado ya producido por el worker; **no** re-ejecuta la decisión.
+
+---
+
+## 1. Afirmaciones falsables (cada una con su forma de romperse)
+
+| # | Afirmación | Cómo se rompe (falsación) | Evidencia |
+| --- | --- | --- | --- |
+| **1** | **El sesgo PIT era el ancla al `31-dic`.** Con PIT por día, `2026` pasa de `NOT_MEASURED (sin_universo_pit) 12/12` a **medido `12/12`**, y los años completos (`2022`–`2025`) **no cambian**. | Que `2026` siga sin medir, o que cualquiera de `2022`–`2025` mueva su `expectancy`/ciclos. | `coverage.perYear`: `2026` `{notMeasured: 0, measured: 12}`; `byYear` `2022 -0.4363` / `2023 +0.3658` / `2024 +1.2856` / `2025 +0.2477` **idénticos** al anclaje a `31-dic`. `2021` sigue **vacío `12/12`** (sin barras PIT en la ventana). |
+| **2** | **El delta PIT es ADITIVO a la banda:** el global sólo suma los `22.25` ciclos/año de `2026`. | Que el global cambie por otra causa (se movería un año ya medido). | Global `bands.cycles.mean` `89.5 → 111.75` (**+22.25** = `2026`); `expectancyR.mean` `-0.0283 → +0.0111`; `se` `2.501 → 3.228`. |
+| **3** | **El punto global NO es citable** ni antes ni después: la banda sigue cruzando el cero. | Que `crossesZeroR` pase a `false`. | `global.validity = {crossesZeroR: true, pointCitable: false, se: 3.228, ci95HalfWidth: 6.327}`; banda de R `[-17.290, +19.328]`. |
+| **4** | **La capa v7 SEPARA el caso A del C sobre datos reales.** `decisionRoute = {materializado: 19, orden_creada_sin_fill: 23}` ⇒ **A (`stop_evaluado_sin_orden`) = `0`**. | Que aparezca cualquier ciclo en `stop_evaluado_sin_orden` o en `stop_evaluado_sin_materializar` (hueco). | `route` del artefacto v5; `stop_no_evaluado`/`sin_toque`/`sin_traza` = `0`. |
+| **5** | **El decider SIEMPRE corrió:** `stopEvaluatedOnTouch` y `deciderRanOnTouch` = `42/42`. | Que algún toque no deje ni motivos ni etiqueta. | `stop evaluado en toque 42/42 (1.000)`; `decider corrió en toque 42/42 (1.000)`. |
+| **6** | **La medición A/C cambia la muestra** de `38` a `42` observaciones `THESIS_EXIT` (universo PIT corregido), y la expectancy pasa a `-0.7150`. | Que `38` siga siendo el `n` global. | `detalle capturado sí · ciclos THESIS_EXIT 42 · con fricción COMPLETE 42`; `GLOBAL n= 42 exp -0.7150`. |
+| **7** | **Determinismo del re-pipeline:** dos corridas `v2_94` ⇒ los `12` ledgers de ciclos **byte a byte idénticos**. | Que un `draw-XX` difiera. | `draw-00…draw-11` `IDÉNTICO` (§3). |
+| **8** | **Determinismo del plegado:** dos corridas `v2_97` y dos `--sequences` ⇒ mismo `sha256`. | Que dos corridas difieran. | `thesis-exit-v5 = F865106D…` (`184 445 B`); `sequences = 2268FA79…` (`291 275 B`). |
+| **9** | **Un hueco es `None`/`NOT_MEASURED`, nunca `0`:** las `5` banderas de reserva viajan como `"UNKNOWN"` salvo medición real; el tooltip de celda vacía dice `sin dato`. | Que aparezca un `0`/`"sí"` donde falta el dato. | Tests de `auto-reservation-panel` (`NO MEDIDO`) y `dia-d-auto-feedback-heatmap` (`sin dato`). |
+| **10** | **`Δ motor = 0` DEMOSTRADO LOCALMENTE:** ninguna línea de motor cambia y el artefacto congelado **se reproduce byte a byte**. | Que el árbol del motor cambie o que el replay difiera del sello. | `git diff` de motor vacío; `replay-repro` **`REPRODUCIDO`** `24066225…` (`3 445 622 B`) en **dos** corridas (§3). |
+
+---
+
+## 2. Medición real (`PostgreSQL`, `K = 12` sorteos, años `2021-2026`)
+
+### 2.1 Delta PIT (banda multirregimen, `dia-d-multi-band-v1`)
+
+| Cubo | Anclaje `31-dic` (OLD) | PIT por día (NEW) | Lectura |
+| --- | --- | --- | --- |
+| `2021` | vacío `12/12` | vacío `12/12` | sin barras PIT en la ventana (declarado) |
+| `2022` | `-0.4363` (`49.5` ciclo/sorteo) `citable` | **idéntico** | año completo ⇒ el ancla a `31-dic` ya era correcta |
+| `2023` | `+0.3658` (`12.25`) no citable | **idéntico** | ídem |
+| `2024` | `+1.2856` (`7.42`) `citable` | **idéntico** | ídem |
+| `2025` | `+0.2477` (`20.33`) no citable | **idéntico** | ídem |
+| `2026` | `NOT_MEASURED 12/12` (`sin_universo_pit`) | **`+0.1819` (`22.25`) no citable** | año **incompleto**: el ancla a `31-dic` era futura |
+| **GLOBAL** | `-0.0283` · ciclos `89.5` · `[-0.1813, +0.1248]` | **`+0.0111`** · ciclos **`111.75`** · `[-0.1503, +0.1695]` | banda de R `[-17.290, +19.328]`, `crossesZeroR=true`, `pointCitable=false` |
+
+`crossCheck.evidenceDrift=true` contra el plegado anterior, con `driftedKeys = [expectancyR, hitRate, measuredCycles, verdict, evidenceQuality]` — **esperado** y es exactamente el delta que este sello documenta.
+
+> **Nota declarada (la corrección es más estrecha de lo que el plan arriesgaba).** Para el provider actual `active_until` = **última barra**, así que la **poda** por día suele ser **no-op**; el efecto REAL del arreglo es **incluir en el watch** a los que no sobrevivieron al cierre del año. Sobre años completos eso ya lo hacía el ancla a `31-dic`; el agujero medido estaba en el año **incompleto** (`2026`). La capacidad queda instalada para cuando exista un `active_until` real (delistados).
+
+### 2.2 Correlación DECISIÓN↔CICLO con A/C separadas (`dia-d-thesis-exit-v5`, capa v7)
+
+Cobertura: **`42` observaciones** `THESIS_EXIT` (pooled sobre sorteos), `11/12` sorteos con celda, `42` con fricción `COMPLETE`, una estrategia (`v283-window-a`) y una dirección (`long`), `9` símbolos.
+
+| Métrica | Valor | Lectura |
+| --- | --- | --- |
+| `route` | `{materializado: 19, orden_creada_sin_fill: 23}` | **caso C = `23`**, caso **A = `0`**; `stop_evaluado_sin_materializar`/`stop_no_evaluado`/`sin_toque`/`sin_traza` = `0` |
+| `routeByStructuralStopCandidate` | `materializado {candidate 19}` · `orden_creada_sin_fill {candidate 23}` | **`candidate 42/42`**: el nivel fue tocado en todos (reproduce `v2.88.47`/`v2.88.48`) |
+| `stopEvaluatedOnTouch` | **`42/42` (`1.000`)** | `STRUCTURAL_STOP` en los motivos de **todos** los toques |
+| `deciderRanOnTouch` | **`42/42` (`1.000`)** | el decider dejó huella en todos los toques |
+| `stopFiredNotFilled` | `26/42` (`0.619`) | el stop disparó sin materializar: los `23` del caso C **+** `3` que sí materializaron en otro tick |
+| Desambiguación (capa v5) | `{ruta_ambas: 38, ruta_mae: 4}` | `ruta_mark = 0`: la ruta es el **MAE persistido** |
+| `stop cambió / break-even` | `7 / 6` | el trailing apretó el stop en una minoría |
+| `días hasta el primer toque` | media `5.24` · mediana `0.00` | el toque suele ser el propio día del cierre |
+| Concentración | `9` símbolos · top `0.33` · top semana `2025-W12` `0.19` | — |
+
+**Desglose por año** (todos `fragile` o `insufficient_draws`): `2022 n=19 -0.7800` · `2023 n=2 -0.5783` · `2024 n=2 -0.5251` · `2025 n=15 -0.7091` · `2026 n=4 -0.7702`. **Por edad:** `1-3 n=1 -0.8236` · `4-10 n=24 -0.8136` · `11-30 n=14 -0.8767` · `>30 n=3 +0.7375`.
+
+### 2.3 Lectura honesta
+
+- **La separación A/C de `v2.88.49` FUNCIONA sobre datos reales.** El añadido de `v2.88.49`-absorbido era la ruta `orden_creada_sin_fill` (leer el INTENT durable por ciclo). Medido: **`A = 0`**, **`C = 23`**. Es decir, en los `42` `THESIS_EXIT` el stop disparó, el spine **creó siempre** el `ExitOrder` durable del ciclo, y lo que falló fue la **ejecución aguas abajo** (no hubo fill). La hipótesis "el stop se evaluó pero no se creó orden" queda **descartada en esta muestra**.
+- **El hallazgo de `v2.88.47`/`v2.88.48` se reproduce** con el universo corregido: `candidate 42/42`, `stopEvaluatedOnTouch 42/42`, `deciderRanOnTouch 42/42`. La duplicidad semántica nivel↔stop sigue vigente (deuda).
+- **La corrección PIT cambia la muestra y por tanto reescribe conclusiones.** El `n` global de `THESIS_EXIT` pasa de `38` a `42` sólo porque `2026` entra en el universo; la expectancy bruta pasa de `-0.7087` a `-0.7150`. Las cifras viejas **no** se reutilizan.
+- **Nada de esto es citable como punto.** La banda global de R cruza el cero (`pointCitable=false`); los cubos son `fragile` por `n` pequeño.
+
+---
+
+## 3. Verificación (gates)
+
+| Gate | Resultado |
+| --- | --- |
+| `pytest` DÍA-D + guards + PIT + monitor (`test_dia_d_*`, `test_dia_d_bump_guard`, `test_v2_87_release_log`, `test_v2_93_pit_watch`, `test_universe_point_in_time*`, `test_auto_operational_monitor/audit`) | **277 passed** |
+| `ruff check packages/py apps/api-python --config pyproject.toml` | **All checks passed!** |
+| `lint-imports --config packages/py/.importlinter` | **4 kept / 0 broken** (`659` ficheros) |
+| `mypy` (gate CI: `domain/market/infrastructure/application/src` + `api-python/src`, `--follow-imports=silent`) | **Success: no issues found in 531 source files** |
+| Web `vitest` (`src/features/auto-monitor`) | **22 passed** (7 ficheros) |
+| `@bolsa/shared` build | limpio |
+| `@bolsa/web` `typecheck` (`tsc -b --noEmit`) | limpio |
+| `@bolsa/web` `lint` | **0 errores** (`24` warnings pre-existentes) |
+| `@bolsa/web` `contract:check` | **OK** — `openapi.json`/`schema.d.ts` coinciden |
+| `@bolsa/shared` `vitest` (`auto-operation-story.test.ts`) | **6 passed** |
+| **Determinismo del re-pipeline** | `draw-00…draw-11` **byte a byte idénticos** entre `v2_94` run1 y run2; band artifact igual salvo `crossCheck` (run1 con `--check-against`): `sha256` normalizado `42A77E8F780CE9617848EB7AA09AFAF58E3FC0F914F164BEC45047685D2C9BBD` |
+| **Determinismo del plegado** | `sha256 thesis-exit-v5 = F865106DCA7C4D05F605A1B11D2B75F68DFCCFF067551AA3AB0456F03CDBBF6F` (`184 445 B`); `sequences = 2268FA79F4A1151C23EABF7655B70866C8F375A9795906B048B7209DC6DBC2B3` (`291 275 B`) |
+| **`Δ motor = 0` (`replay-repro` LOCAL)** | **`REPRODUCIDO`** — fixture congelado (`20` instrumentos, `25 700` barras) re-sembrado en una **BD efímera** (`bolsa_v1_repro`, `DROP/CREATE` antes de cada corrida); `assert-artifact` ⇒ `240662250347A2AAD0F8E9F0101185D8ACC80C1D4BD1B4BBFF02D4766D9F54F0` (`3 445 622 B` CRLF) / `1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (LF) = **idéntico al sello**; **dos** corridas ⇒ **byte a byte idénticas** |
+| **`Δ motor = 0` (árbol)** | `git diff` de `auto_simulation_worker.py`/`simulated_broker.py`/`replay_oos.py`/`sim_durable_store.py`/`market_operability.py`/`auto_v2_entry.py`/`v2_87_…` = **vacío**; la inyección de seed de `v2_94` se **restaura byte a byte** tras cada sorteo |
+| **`Δ motor = 0` (confirmado por CI)** | `Release tag CI` del tag `v2.88.50-beta` — ver §6 (cita POST-TAG) |
+
+> **Nota de método (auditable).** Durante el primer intento, el `replay-repro` local dio artefactos **distintos** del sello. La causa **medida** fue que la corrida **run2** de `v2_94` estaba **en vuelo** e inyectaba temporalmente `seed=fill_seed(bar_tick_now + k, symbol)` en `auto_simulation_worker.py` (la inyección que restaura byte a byte al terminar cada sorteo): el replay importaba el worker con el seed desplazado. Una vez terminó `v2_94` (árbol restaurado), el replay reprodujo el sello **byte a byte** en dos corridas. Se declara para que un auditor no repita el falso negativo.
+
+---
+
+## 4. Límites declarados (NO se cierran aquí)
+
+- **El arreglo PIT es real pero estrecho:** para el provider actual la **poda** por día es casi siempre **no-op** (`active_until` = última barra); sólo cambia la muestra del año **incompleto** (`2026`). La capacidad queda instalada para un `active_until` real (delistados), no ejercitada por el dato actual.
+- **A vs C separados, causa NO nombrada:** se mide que en `C` se creó el INTENT y no hubo fill, pero **no** se nombra *por qué* no hubo fill (rechazo de cola, corte de parcial, latencia). `orderCreated` mide **existencia** de INTENT, no desenlace.
+- **`decisionRoute` NO es contrafactual** y se **LEE**, no se re-ejecuta.
+- **El nivel congelado SIGUE siendo el stop inicial** (deuda de `v2.88.45`…`v2.88.48`); `stopBasisMismatchR` sigue `P3`.
+- **`n` pequeño:** `42` observaciones pooled (no `42` operaciones independientes); todos los cubos `fragile`.
+- **REPLAY/OOS ≠ PAPER:** no sustituye la ventana PAPER real (`P3-2`/`P3-3` **ABIERTAS**); `CONFIRMED` **NO** se emite.
+- **AUTO UI 1.0 es un PILOTO:** el view-model es puro y no re-deriva cifras; **no** toca motor ni **borra** pantallas. La migración del resto de vistas queda como trabajo posterior.
+- **La banda mide ruido del SORTEO del venue**, no incertidumbre de mercado ni del futuro; el determinismo (byte a byte) **no** es validez.
+
+---
+
+## 5. Cómo se reproduce
+
+```bash
+# 1) Re-pipeline del universo PIT corregido (12 sorteos con detalle v7), DOS corridas.
+uv run --no-sync python apps/api-python/scripts/v2_94_dia_d_multi_band.py \
+  --reuse --cycles --cycle-detail --from-year 2021 --to-year 2026 \
+  --out-dir operability_runs/dia-d-auto-pit-run1 \
+  --out operability_runs/dia-d-auto/multi-band-pit-run1.json
+uv run --no-sync python apps/api-python/scripts/v2_94_dia_d_multi_band.py \
+  --reuse --cycles --cycle-detail --from-year 2021 --to-year 2026 \
+  --out-dir operability_runs/dia-d-auto-pit-run2 \
+  --out operability_runs/dia-d-auto/multi-band-pit-run2.json
+#    Los 12 draw-XX/multi-cycles.json deben ser byte a byte idénticos entre run1 y run2.
+
+# 2) Plegar los THESIS_EXIT al artefacto v5 + volcar secuencias (dos veces = mismo sha256).
+uv run --no-sync python apps/api-python/scripts/v2_97_dia_d_thesis_exit.py \
+  --out-dir operability_runs/dia-d-auto-pit-run1 \
+  --out operability_runs/dia-d-auto/thesis-exit-pit-run1a.json --sequences
+
+# 3) Δ motor = 0 contra el fixture congelado (BD EFÍMERA, no se toca la BD de desarrollo).
+#    El replay ESCRIBE estado durable, así que cada corrida parte de una BD recién sembrada:
+#    se crea `bolsa_v1_repro` en el mismo PostgreSQL del `.env`, se apunta DATABASE_URL a ella,
+#    se siembra el fixture y se corre v2_87. Repetir ⇒ MISMO sha256 (se ofusca la credencial).
+export DATABASE_URL="<postgresql+psycopg>…/bolsa_v1_repro"   # BD efímera creada para la prueba
+uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py seed \
+  --fixture docs/engineering/evidence/v2.88.7/replay-input-fixture.ndjson   # ⇒ 20 instr · 25 700 barras
+WATCH="$(uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py \
+  watch --fixture docs/engineering/evidence/v2.88.7/replay-input-fixture.ndjson)"
+uv run --no-sync python apps/api-python/scripts/v2_87_replay_oos_durable_cycle.py \
+  --json --watch "$WATCH" --out artifacts/repro/replay-1.json
+uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py \
+  assert-artifact --file artifacts/repro/replay-1.json   # ⇒ REPRODUCIDO (24066225…)
+#    Repetir el bloque desde el DROP/CREATE ⇒ replay-2.json byte a byte idéntico.
+#    (El orquestador que automatiza DROP/CREATE + siembra + dos corridas fue ad-hoc y vive
+#     en `artifacts/repro/`, gitignored; el CI del tag corre la versión canónica.)
+```
+
+---
+
+## 6. Sello
+
+- **Añadidos:** `packages/shared/src/cognitive/auto-operation-story.ts` (+ test), `apps/web/src/features/auto-monitor/auto-operation-story-panel.tsx` (+ test), `apps/web/src/features/auto-monitor/dia-d-auto-feedback-heatmap.test.ts`, `apps/web/src/features/auto-monitor/auto-reservation-panel.test.tsx`, `apps/api-python/tests/test_v2_93_pit_watch.py`, `docs/engineering/evidence/v2.88.50/README.md`.
+- **Modificados:** `packages/py/application/src/bolsa_application/universe_point_in_time.py` (`candidate_ids`/`ids_by_day`/`eligible_days_by_symbol`), `universe_point_in_time_catalog.py` (`all_members`), `v2_91`/`v2_92`/`v2_93` (watch PIT por día + poda), `auto_operational_monitor.py` (`_reservation_view` con las `5` banderas), ruta `auto_operational_monitor.py` (DTO), `packages/shared/src/cognitive/auto-operational-monitor.ts`, `auto-monitor-page.tsx` (`enabled: mode === "current"` + pestaña «Operación»), `dia-d-auto-toolbar.tsx`, `auto-reservation-panel.tsx`, `dia-d-auto-feedback-heatmap.tsx` (`formatCellTooltip`), `dia-d-auto-feedback-panel.test.tsx` (`waitFor`), `packages/shared/src/cognitive/index.ts`, `apps/web/api/openapi.json`, `apps/web/src/api/schema.d.ts`, `v2_89`…`v2_97` (`meta.bump`), `package.json` (`2.11.50-beta`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
+- **`Δ motor = 0`:** ningún fichero de motor tocado; la costura `capture_cycle_detail` sólo **lee** estado ya producido y su default sigue `False`; `replay-repro` **reproducido byte a byte** contra el fixture congelado (§3).
+- **Tag:** `v2.88.50-beta` — ver el re-sello POST-TAG con la cita del `Release tag CI`.

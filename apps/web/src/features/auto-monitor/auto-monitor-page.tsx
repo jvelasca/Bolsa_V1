@@ -13,6 +13,7 @@ import { AutoConcurrencyPanel } from "@/features/auto-monitor/auto-concurrency-p
 import { AutoCycleTimeline } from "@/features/auto-monitor/auto-cycle-timeline";
 import { AutoMonitorHeader } from "@/features/auto-monitor/auto-monitor-header";
 import { AutoReservationPanel } from "@/features/auto-monitor/auto-reservation-panel";
+import { AutoOperationStoryPanel } from "@/features/auto-monitor/auto-operation-story-panel";
 import { DiaDAutoPanel } from "@/features/auto-monitor/dia-d-auto-panel";
 import {
   AutoMonitorModeToolbar,
@@ -21,9 +22,11 @@ import {
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 
 export function AutoMonitorPage() {
-  const { view, isLoading, isError, isFetching, refetch } =
-    useAutoOperationalMonitor();
   const [mode, setMode] = useState<AutoMonitorMode>("current");
+  // La pestaña DÍA-D no debe seguir sondeando `/auto/operational-monitor` cada 20 s: el hook
+  // sólo se habilita en la pestaña actual (su `refetch` manual sigue disponible).
+  const { view, isLoading, isError, isFetching, refetch } =
+    useAutoOperationalMonitor({ enabled: mode === "current" });
 
   return (
     <div
@@ -62,6 +65,8 @@ export function AutoMonitorPage() {
           </Button>
         </div>
       </div>
+
+      {mode === "operation" ? <AutoOperationStoryPanel /> : null}
 
       {mode === "dia-d" ? <DiaDAutoPanel /> : null}
 

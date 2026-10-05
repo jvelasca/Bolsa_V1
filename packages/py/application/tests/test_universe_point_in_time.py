@@ -15,7 +15,10 @@ from collections.abc import Sequence
 
 from bolsa_application.universe_point_in_time import (
     UniverseMember,
+    candidate_ids,
     eligible_at,
+    eligible_days_by_symbol,
+    ids_by_day,
     universe_ids,
 )
 
@@ -93,3 +96,67 @@ def test_universe_ids_filters_ineligible_deduplicates_and_sorts() -> None:
         ]
     )
     assert universe_ids(universe, "2025-06-01") == ["AAA", "BBB"]
+
+
+def test_candidate_ids_keeps_intra_year_delisted_member() -> None:
+    # El sesgo que esta capa corrige: anclar el universo al 31-dic EXCLUYE a un instrumento
+    # deslistado a mitad de año, aunque sí era elegible (y operable) en enero-mayo.
+    members = [
+        _member("SURVIVOR", active_from="2018-01-01"),
+        _member("LEFT", active_from="2018-01-01", active_until="2023-05-31"),
+    ]
+    assert candidate_ids(members, "2023-01-01", "2023-12-31") == ["LEFT", "SURVIVOR"]
+    # El anclaje de fin de año (el defecto) solo ve al superviviente.
+    assert universe_ids(_FakeUniverse(members), "2023-12-31") == ["SURVIVOR"]
+
+
+def test_candidate_ids_drops_member_outside_window_and_undemonstrable() -> None:
+    members = [
+        _member("BEFORE", active_from="2010-01-01", active_until="2012-12-31"),
+        _member("AFTER", active_from="2030-01-01"),
+        _member("NOSTART", active_from=None),
+        _member("NODISP", availability_from=None),
+        _member(""),
+    ]
+    assert candidate_ids(members, "2023-01-01", "2023-12-31") == []
+
+
+def test_candidate_ids_rejects_inverted_or_unreadable_window() -> None:
+    members = [_member("AAA")]
+    assert candidate_ids(members, "2023-12-31", "2023-01-01") == []
+    assert candidate_ids(members, "no-es-fecha", "2023-12-31") == []
+
+
+def test_candidate_ids_respects_availability_bounds_within_window() -> None:
+    # Un miembro cuya disponibilidad REAL termina antes de la ventana no es candidato, aunque
+    # su actividad siga abierta: la elegibilidad exige AMBOS intervalos.
+    members = [
+        _member("AAA", availability_until="2022-12-31"),
+        _member("BBB", availability_from="2024-06-01"),
+    ]
+    assert candidate_ids(members, "2023-01-01", "2023-12-31") == []
+
+
+def test_ids_by_day_materializes_universe_per_day() -> None:
+    universe = _FakeUniverse(
+        [
+            _member("SURVIVOR"),
+            _member("LEFT", active_until="2023-05-31"),
+        ]
+    )
+    per_day = ids_by_day(universe, ["2023-03-01", "2023-12-31"])
+    assert per_day["2023-03-01"] == ["LEFT", "SURVIVOR"]
+    assert per_day["2023-12-31"] == ["SURVIVOR"]
+
+
+def test_eligible_days_by_symbol_inverts_ids_by_day() -> None:
+    universe = _FakeUniverse(
+        [
+            _member("SURVIVOR"),
+            _member("LEFT", active_until="2023-05-31"),
+        ]
+    )
+    per_symbol = eligible_days_by_symbol(universe, ["2023-03-01", "2023-12-31"])
+    assert per_symbol["SURVIVOR"] == {"2023-03-01", "2023-12-31"}
+    assert per_symbol["LEFT"] == {"2023-03-01"}
+    assert "ABSENT" not in per_symbol

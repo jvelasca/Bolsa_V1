@@ -4422,16 +4422,41 @@ export interface components {
         AutoMonitorReconciliationDto: {
             /** Aged */
             aged?: unknown;
+            /**
+             * Agedmeasurement
+             * @default UNKNOWN
+             */
+            agedMeasurement: string;
             /** At */
             at?: string | null;
             /** Caller */
             caller?: string | null;
+            /**
+             * Callermeasurement
+             * @default UNKNOWN
+             */
+            callerMeasurement: string;
             /** Decision */
             decision?: string | null;
+            /**
+             * Gracewindowmeasurement
+             * @default UNKNOWN
+             */
+            graceWindowMeasurement: string;
             /** Gracewindowseconds */
             graceWindowSeconds?: unknown;
             /** Reason */
             reason?: string | null;
+            /**
+             * Reasonmeasurement
+             * @default UNKNOWN
+             */
+            reasonMeasurement: string;
+            /**
+             * Reconciliationmeasurement
+             * @default UNKNOWN
+             */
+            reconciliationMeasurement: string;
         };
         /** AutoMonitorReservationDto */
         AutoMonitorReservationDto: {

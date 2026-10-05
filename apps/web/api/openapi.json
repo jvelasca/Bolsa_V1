@@ -1083,6 +1083,11 @@
           "aged": {
             "title": "Aged"
           },
+          "agedMeasurement": {
+            "default": "UNKNOWN",
+            "title": "Agedmeasurement",
+            "type": "string"
+          },
           "at": {
             "anyOf": [
               {
@@ -1105,6 +1110,11 @@
             ],
             "title": "Caller"
           },
+          "callerMeasurement": {
+            "default": "UNKNOWN",
+            "title": "Callermeasurement",
+            "type": "string"
+          },
           "decision": {
             "anyOf": [
               {
@@ -1115,6 +1125,11 @@
               }
             ],
             "title": "Decision"
+          },
+          "graceWindowMeasurement": {
+            "default": "UNKNOWN",
+            "title": "Gracewindowmeasurement",
+            "type": "string"
           },
           "graceWindowSeconds": {
             "title": "Gracewindowseconds"
@@ -1129,6 +1144,16 @@
               }
             ],
             "title": "Reason"
+          },
+          "reasonMeasurement": {
+            "default": "UNKNOWN",
+            "title": "Reasonmeasurement",
+            "type": "string"
+          },
+          "reconciliationMeasurement": {
+            "default": "UNKNOWN",
+            "title": "Reconciliationmeasurement",
+            "type": "string"
           }
         },
         "title": "AutoMonitorReconciliationDto",

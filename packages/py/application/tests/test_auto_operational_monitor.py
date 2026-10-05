@@ -319,6 +319,72 @@ def test_concurrency_counts_audit_entries_when_present() -> None:
     assert "reconciliation_not_durable" not in dto["notes"]
 
 
+def test_reconciliation_projection_keeps_the_five_measurement_flags() -> None:
+    """Las 5 banderas de medición SOBREVIVEN a la proyección hacia la UI (§14).
+
+    El backend las calcula con rigor en ``build_reservation_reconciliation_entry``; la
+    proyección las perdía, así que un ``reason`` NO MEDIDO y uno vacío se veían iguales.
+    """
+    from bolsa_application.auto_operational_audit import (
+        build_reservation_reconciliation_entry,
+    )
+
+    entry = build_reservation_reconciliation_entry(
+        reservation_id="res-1",
+        cycle_id="cyc-1",
+        decision="KEEP",
+        reason=None,  # NO medido: debe llegar UNKNOWN, nunca COMPLETE.
+        mine=True,
+        aged=None,
+        grace_window_seconds=None,
+        actor="sweep",
+        session_id="sess-a",
+        as_of="2026-01-03T00:00:00Z",
+    )
+    assert entry is not None
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        reconciliation_entries=[entry],
+    )
+    event = dto["reservations"][0]["reconciliations"][0]
+    assert event["reason"] is None
+    assert event["reasonMeasurement"] == "UNKNOWN"
+    assert event["callerMeasurement"] == "COMPLETE"
+    assert event["agedMeasurement"] == "UNKNOWN"
+    assert event["graceWindowMeasurement"] == "UNKNOWN"
+    assert event["reconciliationMeasurement"] == "COMPLETE"
+
+
+def test_reconciliation_projection_declares_unknown_without_measurement_keys() -> None:
+    """Un payload antiguo SIN banderas se declara UNKNOWN (nunca se asume COMPLETE)."""
+    legacy = SimpleNamespace(
+        decision_id="dec-1",
+        created_at="2026-01-03T00:00:00Z",
+        session_id="sess-a",
+        payload={
+            "reservation_id": "res-1",
+            "caller": "sess-a",
+            "decision": "KEEP",
+            "reason": "grace_window_keep",
+        },
+    )
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        reconciliation_entries=[legacy],
+    )
+    event = dto["reservations"][0]["reconciliations"][0]
+    for key in (
+        "reasonMeasurement",
+        "callerMeasurement",
+        "agedMeasurement",
+        "graceWindowMeasurement",
+        "reconciliationMeasurement",
+    ):
+        assert event[key] == "UNKNOWN"
+
+
 def test_concurrency_separates_lost_claims_from_declared_race_conflicts() -> None:
     """``claimed=False`` NO equivale a carrera: solo cuenta como tal si el productor la declara."""
     lost_but_not_race = SimpleNamespace(

@@ -8,7 +8,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type AutoMonitorMode = "current" | "dia-d";
+export type AutoMonitorMode = "current" | "operation" | "dia-d";
 
 export function AutoMonitorModeToolbar({
   mode,
@@ -27,6 +27,7 @@ export function AutoMonitorModeToolbar({
       {(
         [
           { id: "current", label: "Ventana actual" },
+          { id: "operation", label: "Operación" },
           { id: "dia-d", label: "DÍA-D AUTO" },
         ] as const
       ).map((option) => (

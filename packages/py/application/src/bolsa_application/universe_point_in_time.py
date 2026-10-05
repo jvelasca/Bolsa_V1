@@ -20,6 +20,13 @@ cuándo** (``active_until``), de modo que ser elegible en ``D`` es una propiedad
 (``eligible_at``), no una suposición. Un intervalo de fin ``None`` se interpreta como
 **abierto** (sin fin registrado): es una suposición declarada, no una certeza. Un inicio
 desconocido NO se puede demostrar y por tanto el miembro queda **inelegible** (fail-closed).
+
+Ventana (evita el sesgo de anclaje)
+-----------------------------------
+``universe_ids`` resuelve UN día. Para una VENTANA multi-día se ofrecen dos helpers puros:
+``candidate_ids`` (ids con al menos un día elegible en el rango: superconjunto que NO pierde a
+los instrumentos que no sobreviven al cierre) e ``ids_by_day`` (universo día a día). Son
+advisory/read-only: NO implementan la consulta ni cambian el watch por defecto del motor.
 """
 
 from __future__ import annotations
@@ -127,9 +134,93 @@ def universe_ids(universe: PointInTimeUniverse, day: str) -> list[str]:
     )
 
 
+def _eligibility_interval(member: UniverseMember) -> tuple[str, str | None] | None:
+    """Intervalo DEMOSTRABLE de elegibilidad ``[start, end]`` (``end`` abierto si ``None``).
+
+    Es la intersección de la ventana de ACTIVIDAD y la de DISPONIBILIDAD: fuera de ella
+    ``eligible_at`` es ``False``. Un inicio no demostrable (actividad o disponibilidad) ⇒
+    ``None`` (fail-closed); un intervalo vacío (fin anterior al inicio) también ⇒ ``None``.
+    """
+    active_from = _opt_day(member.active_from)
+    availability_from = _opt_day(member.availability_from)
+    if active_from is None or availability_from is None:
+        return None
+    start = max(active_from, availability_from)
+    ends = [
+        end
+        for end in (_opt_day(member.active_until), _opt_day(member.availability_until))
+        if end is not None
+    ]
+    end = min(ends) if ends else None
+    if end is not None and end < start:
+        return None
+    return start, end
+
+
+def candidate_ids(
+    members: Sequence[UniverseMember],
+    window_start: str,
+    window_end: str,
+) -> list[str]:
+    """Ids con AL MENOS un día elegible dentro de ``[window_start, window_end]``.
+
+    Es el SUPERCONJUNTO del universo de un día: incluye a los instrumentos que existieron
+    dentro de la ventana aunque no sobrevivan a su último día (el sesgo de anclar el universo
+    al cierre de la ventana). Un id inválido, un miembro no demostrable o una ventana
+    ilegible/invertida se descartan (fail-closed). Orden y deduplicación deterministas.
+    """
+    start_day = _opt_day(window_start)
+    end_day = _opt_day(window_end)
+    if start_day is None or end_day is None or start_day > end_day:
+        return []
+    out: set[str] = set()
+    for member in members:
+        member_id = _clean_id(member.instrument_id)
+        if member_id is None:
+            continue
+        interval = _eligibility_interval(member)
+        if interval is None:
+            continue
+        start, end = interval
+        if start > end_day:
+            continue
+        if end is not None and end < start_day:
+            continue
+        out.add(member_id)
+    return sorted(out)
+
+
+def ids_by_day(universe: PointInTimeUniverse, days: Sequence[str]) -> dict[str, list[str]]:
+    """``{day: ids elegibles}`` para cada día pedido (determinista; día ilegible ⇒ lista vacía).
+
+    Materializa el universo DÍA A DÍA para poder contrastar cada símbolo contra su ventana REAL
+    de elegibilidad, en vez de fijar el universo de toda la ventana a un solo día de anclaje.
+    """
+    return {str(day): universe_ids(universe, str(day)) for day in days}
+
+
+def eligible_days_by_symbol(
+    universe: PointInTimeUniverse, days: Sequence[str]
+) -> dict[str, set[str]]:
+    """``{id: {días elegibles}}`` invertido de ``ids_by_day`` (determinista).
+
+    Es la forma que necesita la poda POR SÍMBOLO: cada instrumento conserva sólo las barras de
+    los días en que era elegible. Un id que no aparece en ningún día no se incluye (no se
+    inventa una ventana).
+    """
+    out: dict[str, set[str]] = {}
+    for day, ids in ids_by_day(universe, days).items():
+        for instrument_id in ids:
+            out.setdefault(instrument_id, set()).add(day)
+    return out
+
+
 __all__ = [
     "PointInTimeUniverse",
     "UniverseMember",
+    "candidate_ids",
     "eligible_at",
+    "eligible_days_by_symbol",
+    "ids_by_day",
     "universe_ids",
 ]

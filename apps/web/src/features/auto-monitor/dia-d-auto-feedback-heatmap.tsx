@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 type DiaDFeedbackMatrixRowDto =
   components["schemas"]["DiaDFeedbackMatrixRowDto"];
+type DiaDFeedbackCellDto = components["schemas"]["DiaDFeedbackCellDto"];
 
 const OUTCOME_CLASS: Record<string, string> = {
   GAIN: "bg-emerald-500/70",
@@ -31,6 +32,26 @@ const OUTCOME_LABEL: Record<string, string> = {
 export function formatOutcomeR(value: number | null | undefined): string {
   if (value === null || value === undefined) return "NO MEDIDO";
   return `${value > 0 ? "+" : ""}${value.toFixed(2)}R`;
+}
+
+/**
+ * Tooltip de una celda valor × día. Un día NO MEDIDO (o sin celda) NO declara ciclos/errores:
+ * pintar `0 ciclo(s) · 0 error(es)` fingía una medición. `sin dato` es honesto.
+ */
+export function formatCellTooltip(
+  symbol: string,
+  day: string,
+  cell: DiaDFeedbackCellDto | undefined,
+): string {
+  const outcome = cell?.outcome ?? "NOT_MEASURED";
+  const label = OUTCOME_LABEL[outcome] ?? outcome;
+  const base = `${symbol} · ${day} · ${label} · ${formatOutcomeR(
+    cell?.realizedR ?? null,
+  )}`;
+  if (cell === undefined || outcome === "NOT_MEASURED") {
+    return `${base} · sin dato`;
+  }
+  return `${base} · ${cell.cycles ?? 0} ciclo(s) · ${cell.errors ?? 0} error(es)`;
 }
 
 export function DiaDAutoFeedbackHeatmap({
@@ -92,11 +113,7 @@ export function DiaDAutoFeedbackHeatmap({
                   data-outcome={outcome}
                   data-day={day}
                   data-symbol={row.symbol}
-                  title={`${row.symbol} · ${day} · ${
-                    OUTCOME_LABEL[outcome] ?? outcome
-                  } · ${formatOutcomeR(cell?.realizedR ?? null)} · ${
-                    cell?.cycles ?? 0
-                  } ciclo(s) · ${cell?.errors ?? 0} error(es)`}
+                  title={formatCellTooltip(row.symbol, day, cell)}
                   className={cn(
                     "h-4 min-w-[1.6rem] rounded-[2px]",
                     OUTCOME_CLASS[outcome] ?? "bg-muted/30",

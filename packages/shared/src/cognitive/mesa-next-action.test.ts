@@ -6,7 +6,6 @@ import {
   mapCandidateNextAction,
   mapMesaNextAction,
   mapPositionNextAction,
-  sumPortfolioUnrealizedR,
 } from "./mesa-next-action.js";
 
 describe("mapMesaNextAction", () => {

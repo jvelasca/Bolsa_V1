@@ -100,6 +100,7 @@ vi.mock("@/features/accounts/use-active-account", () => ({
 
 import { api } from "@/lib/api";
 import { AutoMonitorPage } from "@/features/auto-monitor/auto-monitor-page";
+import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 
 function renderPage() {
   const client = new QueryClient({
@@ -140,5 +141,24 @@ describe("AutoMonitorPage — consume el DTO directo del endpoint", () => {
     );
 
     expect(api.getAutoOperationalMonitor).toHaveBeenCalledTimes(1);
+  });
+});
+
+function _DisabledProbe() {
+  useAutoOperationalMonitor({ enabled: false });
+  return null;
+}
+
+describe("useAutoOperationalMonitor — enabled", () => {
+  it("no dispara la query con enabled=false (la pestaña DÍA-D deja de sondear)", () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <_DisabledProbe />
+      </QueryClientProvider>,
+    );
+    expect(api.getAutoOperationalMonitor).not.toHaveBeenCalled();
   });
 });

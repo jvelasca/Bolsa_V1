@@ -113,6 +113,12 @@ export type AutoMonitorReservationV1 = {
     reason?: string | null;
     aged?: unknown;
     graceWindowSeconds?: unknown;
+    // Medición DECLARADA por campo: un valor NO MEDIDO se rotula, nunca se confunde con vacío.
+    reasonMeasurement?: string;
+    callerMeasurement?: string;
+    agedMeasurement?: string;
+    graceWindowMeasurement?: string;
+    reconciliationMeasurement?: string;
   }>;
 };
 

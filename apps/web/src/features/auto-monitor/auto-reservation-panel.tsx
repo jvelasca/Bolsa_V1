@@ -106,8 +106,26 @@ function ReservationRow({
           <ul className="mt-1 space-y-0.5 text-[10px] text-muted-foreground">
             {reservation.reconciliations.map((row, index) => (
               <li key={`${reservation.reservationId}-recon-${index}`}>
-                {row.decision ?? "?"} · {row.reason ?? "?"} · caller{" "}
-                {row.caller ?? NO_MEASUREMENT_LABEL}
+                {row.decision ?? NO_MEASUREMENT_LABEL} ·{" "}
+                {row.reason ??
+                  formatMeasurementLabel(
+                    row.reasonMeasurement ?? "UNKNOWN",
+                  )}{" "}
+                · caller{" "}
+                {row.caller ??
+                  formatMeasurementLabel(
+                    row.callerMeasurement ?? "UNKNOWN",
+                  )}{" "}
+                · aged{" "}
+                {formatMonitorFactValue(
+                  row.aged,
+                  row.agedMeasurement ?? "UNKNOWN",
+                )}{" "}
+                · gracia{" "}
+                {formatMonitorFactValue(
+                  row.graceWindowSeconds,
+                  row.graceWindowMeasurement ?? "UNKNOWN",
+                )}
               </li>
             ))}
           </ul>

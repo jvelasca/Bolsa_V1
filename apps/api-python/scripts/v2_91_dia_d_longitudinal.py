@@ -107,6 +107,44 @@ def _resolve_window(args: argparse.Namespace, days: list[str]) -> tuple[int, int
     return inside[0], inside[-1]
 
 
+def _prune_bars_to_eligibility(
+    bars_by_symbol: dict[str, list[Any]],
+    *,
+    window_from: str,
+    window_to: str,
+    provider: Any,
+    days: list[str],
+) -> tuple[dict[str, list[Any]], int]:
+    """Poda las barras IN-WINDOW de cada símbolo a sus días point-in-time elegibles.
+
+    Devuelve ``(bars_by_symbol, días_medidos)``. Cinturón y tirantes del watch por día: un
+    símbolo del watch no debe operar con una barra de un día en que NO era elegible. Las barras
+    FUERA de la ventana (historia/horizonte) se conservan intactas. Un símbolo cuya
+    elegibilidad no se pudo medir no se poda (no se inventa una ventana).
+    """
+    from bolsa_application.closed_bars import bar_day
+    from bolsa_application.universe_point_in_time import eligible_days_by_symbol
+
+    if not window_from or not window_to or window_from > window_to:
+        return bars_by_symbol, 0
+    window_days = [day for day in days if window_from <= day <= window_to]
+    if not window_days:
+        return bars_by_symbol, 0
+    allowed_by_symbol = eligible_days_by_symbol(provider, window_days)
+    pruned: dict[str, list[Any]] = {}
+    for symbol, bars in bars_by_symbol.items():
+        allowed = allowed_by_symbol.get(str(symbol))
+        if allowed is None:
+            pruned[str(symbol)] = list(bars)
+            continue
+        pruned[str(symbol)] = [
+            bar
+            for bar in bars
+            if not (window_from <= bar_day(bar) <= window_to) or bar_day(bar) in allowed
+        ]
+    return pruned, len(window_days)
+
+
 async def _run_pass(
     *,
     v87: Any,
@@ -157,7 +195,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         excursions,
     )
     from bolsa_application.replay_oos import census_operable_days
-    from bolsa_application.universe_point_in_time import universe_ids
+    from bolsa_application.universe_point_in_time import candidate_ids
     from bolsa_application.universe_point_in_time_catalog import CatalogPointInTimeUniverse
     from bolsa_infrastructure.config import get_settings
     from bolsa_infrastructure.database.migrations import ensure_migrated
@@ -176,6 +214,8 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     try:
         explicit_watch = [s.strip() for s in (args.watch or "").split(",") if s.strip()]
         universe_coverage: dict[str, Any] | None = None
+        provider: Any = None
+        pit_from, pit_to = "", ""
         watch = explicit_watch
         if not watch and str(args.universe) == "pit":
             # D35-01: fuente point-in-time REAL (disponibilidad desde barras) + aproximaciones
@@ -186,8 +226,15 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 historical=bool(args.pit_historical),
             )
             universe_coverage = provider.coverage()
-            anchor = str(args.to_day or (f"{int(args.year)}-12-31" if args.year else ""))
-            watch = universe_ids(provider, anchor)[: max(1, int(args.watch_size))]
+            if args.year is not None:
+                pit_from, pit_to = f"{int(args.year)}-01-01", f"{int(args.year)}-12-31"
+            else:
+                pit_from, pit_to = str(args.from_day or ""), str(args.to_day or "")
+            # Universo de la VENTANA (candidatos con algún día elegible), no de un solo día:
+            # anclar al cierre excluía a los deslistados a mitad de ventana (D34-05/D35-01).
+            watch = candidate_ids(provider.all_members, pit_from, pit_to)[
+                : max(1, int(args.watch_size))
+            ]
             if not watch:
                 raise RuntimeError(
                     "el universo point-in-time no aportó ningún instrumento elegible en la ventana"
@@ -213,6 +260,16 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         days = v86._trading_days(bars_by_symbol)  # noqa: SLF001
         if not days:
             raise RuntimeError("no hay barras D1 para simular")
+        if provider is not None:
+            # Watch por DÍA (PIT): poda in-window cada símbolo a sus días elegibles; las barras
+            # fuera de la ventana (historia/horizonte) quedan intactas.
+            bars_by_symbol, _eligible_days = _prune_bars_to_eligibility(
+                bars_by_symbol,
+                window_from=pit_from,
+                window_to=pit_to,
+                provider=provider,
+                days=days,
+            )
 
         d0_index, d1_index = _resolve_window(args, days)
         census = census_operable_days(bars_by_symbol, days)
@@ -311,8 +368,11 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         limits = list(DEFAULT_LIMITS)
         if watch_source == "pit":
             limits.append(
-                "Universe(D) point-in-time: availability_from/until son REALES (barras D1); "
-                "active_from/active_until y sector_at son aproximaciones DECLARADAS. Ver meta.universeCoverage."
+                "Universe(D) point-in-time POR DIA en la ventana: el watch es el superconjunto "
+                "de candidatos con algun dia elegible (candidate_ids) y las barras IN-WINDOW se "
+                "podan a los dias elegibles (ids_by_day); availability_from/until son REALES "
+                "(barras D1); active_from/active_until y sector_at son aproximaciones DECLARADAS. "
+                "Ver meta.universeCoverage."
             )
         if fallback is not None:
             limits.append(
@@ -334,7 +394,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             universe_coverage=universe_coverage,
             probe={**probe, "windowFallback": fallback},
             meta={
-                "bump": "2.11.49-beta",
+                "bump": "2.11.50-beta",
                 "phase": "V2.91 DIA-D AUTO LONGITUDINAL",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
@@ -346,6 +406,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 "replayEnd": replay.get("endDay"),
                 "replayTicks": replay.get("ticks"),
                 "bucketPeriod": str(args.bucket),
+                "pitAnchoring": "per_day" if provider is not None else "not_applicable",
                 "realPriceForcedOff": True,
             },
             bucket_period=str(args.bucket),

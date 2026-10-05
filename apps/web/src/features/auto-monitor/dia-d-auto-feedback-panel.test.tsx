@@ -314,8 +314,12 @@ describe("DiaDAutoFeedbackPanel", () => {
     expect(screen.getByTestId("dia-d-auto-error-list").textContent).toContain(
       "FILL",
     );
-    expect(api.getAutoDiaDFeedback).toHaveBeenCalledWith(
-      "2026-09-29_2026-09-30",
+    // El panel pinta primero el artefacto del listado (fallback) y sólo después dispara la
+    // query de detalle: la aserción debe esperar al EFECTO, no al primer render con valores.
+    await waitFor(() =>
+      expect(api.getAutoDiaDFeedback).toHaveBeenCalledWith(
+        "2026-09-29_2026-09-30",
+      ),
     );
 
     // D35-04: el encabezado evalúa evidencia OOS, ya no habla de "confirmar/refutar".

@@ -3,7 +3,9 @@
 Qué es
 ------
 Corre el MISMO harness hermético (``v2.86``/``v2.87`` vía ``v2_91``) **una vez por año** sobre
-una ventana acotada (por defecto 2021-2026) con el **universo point-in-time derivado por año**,
+una ventana acotada (por defecto 2021-2026) con el **universo point-in-time derivado POR DÍA**
+dentro de cada año (superconjunto de candidatos + poda in-window de barras a los días
+elegibles),
 y pliega la atribución por:
 
 * **año** (``byYear``), **régimen** (``byRegime``/``byOperationalRegime``) y **celda año ×
@@ -120,15 +122,62 @@ def _year_watch(
     explicit_watch: list[str],
     catalog_watch: list[str] | None,
 ) -> tuple[str, list[str], dict[str, Any] | None]:
-    """Watch del año y su procedencia declarada (``explicit``/``pit``/``catalog``)."""
+    """Watch del año y su procedencia declarada (``explicit``/``pit``/``catalog``).
+
+    Con ``pit`` el watch es el SUPERCONJUNTO de candidatos con algún día elegible dentro del
+    año (``candidate_ids``), NO el universo del ÚLTIMO día: anclar al cierre excluía a los
+    instrumentos deslistados a mitad de año (el sesgo D34-05/D35-01 a granularidad anual). El
+    filtro por día concreto lo aplica después la poda de barras (``ids_by_day``).
+    """
     if explicit_watch:
         return "explicit", explicit_watch, None
     if provider is not None:
-        from bolsa_application.universe_point_in_time import universe_ids
+        from bolsa_application.universe_point_in_time import candidate_ids
 
-        watch = universe_ids(provider, f"{int(year)}-12-31")[: max(1, int(args.watch_size))]
+        candidates = candidate_ids(
+            provider.all_members, f"{int(year)}-01-01", f"{int(year)}-12-31"
+        )
+        watch = candidates[: max(1, int(args.watch_size))]
         return "pit", watch, provider.coverage()
     return "catalog", list(catalog_watch or []), None
+
+
+def _prune_bars_to_eligibility(
+    bars_by_symbol: dict[str, list[Any]],
+    *,
+    year: int,
+    provider: Any,
+    days: list[str],
+) -> tuple[dict[str, list[Any]], int]:
+    """Poda las barras IN-WINDOW de cada símbolo a sus días point-in-time elegibles.
+
+    Devuelve ``(bars_by_symbol, días_medidos)``. Cinturón y tirantes del watch por día: un
+    símbolo incluido en el watch del año no debe operar con una barra de un día del año en que
+    NO era elegible. Las barras FUERA del año (historia/horizonte) se conservan intactas: la
+    ventana de elegibilidad sólo se aplica DENTRO del año evaluado. Un símbolo cuya
+    elegibilidad no se pudo medir no se poda (no se inventa una ventana).
+    """
+    from bolsa_application.closed_bars import bar_day
+    from bolsa_application.universe_point_in_time import eligible_days_by_symbol
+
+    year_from, year_to = f"{int(year)}-01-01", f"{int(year)}-12-31"
+    window_days = [day for day in days if year_from <= day <= year_to]
+    if not window_days:
+        return bars_by_symbol, 0
+    allowed_by_symbol = eligible_days_by_symbol(provider, window_days)
+
+    pruned: dict[str, list[Any]] = {}
+    for symbol, bars in bars_by_symbol.items():
+        allowed = allowed_by_symbol.get(str(symbol))
+        if allowed is None:
+            pruned[str(symbol)] = list(bars)
+            continue
+        pruned[str(symbol)] = [
+            bar
+            for bar in bars
+            if not (year_from <= bar_day(bar) <= year_to) or bar_day(bar) in allowed
+        ]
+    return pruned, len(window_days)
 
 
 async def _run(args: argparse.Namespace) -> dict[str, Any]:
@@ -221,6 +270,14 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             if not days:
                 windows.append({"year": year_label, "measured": False, "reason": "sin_barras"})
                 continue
+            # Watch por DÍA (PIT): el universo del año es el superconjunto de candidatos; aquí
+            # se poda in-window cada símbolo a los días del año en que SÍ era elegible. Las
+            # barras fuera del año (historia/horizonte) quedan intactas.
+            eligible_days = 0
+            if provider is not None:
+                bars_by_symbol, eligible_days = _prune_bars_to_eligibility(
+                    bars_by_symbol, year=int(year), provider=provider, days=days
+                )
             window = _resolve_year_window(int(year), days)
             if window is None:
                 windows.append(
@@ -346,15 +403,19 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                     "watchSource": watch_source,
                     "universeCoverage": universe_coverage,
                     "watch": watch,
+                    # Días del año con elegibilidad PIT materializada (watch por día).
+                    "pitEligibleDays": eligible_days,
                 }
             )
 
         limits = list(DEFAULT_LIMITS)
         if provider is not None:
             limits.append(
-                "Universe(D) point-in-time POR ANO: availability_from/until son REALES (barras D1); "
-                "active_from/active_until y sector_at son aproximaciones DECLARADAS. Un ano sin "
-                "miembros elegibles no cae al catalogo actual (fail-closed)."
+                "Universe(D) point-in-time POR DIA dentro del ano: el watch es el superconjunto "
+                "de candidatos con algun dia elegible (candidate_ids) y las barras IN-WINDOW se "
+                "podan a los dias elegibles (ids_by_day); availability_from/until son REALES "
+                "(barras D1); active_from/active_until y sector_at son aproximaciones DECLARADAS. "
+                "Un ano sin miembros elegibles no cae al catalogo actual (fail-closed)."
             )
         if any(window.get("windowFallback") for window in windows):
             limits.append(
@@ -369,7 +430,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             regime_by_day=regime_all,
             operational_regime_by_day=operational_all,
             meta={
-                "bump": "2.11.49-beta",
+                "bump": "2.11.50-beta",
                 "phase": "V2.93 DIA-D AUTO MULTI ATTRIBUTION",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
@@ -379,6 +440,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 "horizonDays": int(args.horizon_days),
                 "topK": int(args.attribution_top_k),
                 "universe": str(args.universe),
+                "pitAnchoring": "per_day" if provider is not None else "not_applicable",
                 "realPriceForcedOff": True,
             },
             top_k=int(args.attribution_top_k),

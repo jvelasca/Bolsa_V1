@@ -260,6 +260,16 @@ class CatalogPointInTimeUniverse:
         """Ids elegibles en ``day`` (deduplicados y ordenados), vía ``universe_ids``."""
         return universe_ids(self, day)
 
+    @property
+    def all_members(self) -> tuple[UniverseMember, ...]:
+        """Todos los miembros materializados SIN filtrar por día (base del universo candidato).
+
+        El protocolo ``PointInTimeUniverse`` solo expone ``members(day)`` (elegibles ESE día);
+        para resolver el universo de una VENTANA sin anclarlo a un único día hace falta la
+        lista completa (``candidate_ids`` la filtra por intersección de intervalos).
+        """
+        return self._members
+
     # ── Declaración de cobertura ─────────────────────────────────────────────
 
     @property

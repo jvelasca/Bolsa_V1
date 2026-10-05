@@ -91,6 +91,13 @@ class AutoMonitorReconciliationDto(BaseModel):
     reason: str | None = None
     aged: Any = None
     graceWindowSeconds: Any = None
+    # Medición DECLARADA de cada campo (COMPLETE/PARTIAL/UNKNOWN): sin ella la UI no puede
+    # distinguir un valor NO MEDIDO de un valor vacío. Nunca se asume COMPLETE por defecto.
+    reasonMeasurement: str = "UNKNOWN"
+    callerMeasurement: str = "UNKNOWN"
+    agedMeasurement: str = "UNKNOWN"
+    graceWindowMeasurement: str = "UNKNOWN"
+    reconciliationMeasurement: str = "UNKNOWN"
 
 
 class AutoMonitorReservationDto(BaseModel):

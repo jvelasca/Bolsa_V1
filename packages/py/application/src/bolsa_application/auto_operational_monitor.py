@@ -802,6 +802,18 @@ def _reservation_view(
                 "reason": payload.get("reason"),
                 "aged": payload.get("aged"),
                 "graceWindowSeconds": payload.get("graceWindowSeconds"),
+                # Medición DECLARADA de cada campo (la calcula ``build_reservation_reconciliation_entry``):
+                # sin ella la UI no puede distinguir un valor NO MEDIDO de un valor vacío/`0`.
+                # Si el payload no la trae se declara UNKNOWN, nunca se asume COMPLETE.
+                "reasonMeasurement": payload.get("reasonMeasurement") or MEASUREMENT_UNKNOWN,
+                "callerMeasurement": payload.get("callerMeasurement") or MEASUREMENT_UNKNOWN,
+                "agedMeasurement": payload.get("agedMeasurement") or MEASUREMENT_UNKNOWN,
+                "graceWindowMeasurement": (
+                    payload.get("graceWindowMeasurement") or MEASUREMENT_UNKNOWN
+                ),
+                "reconciliationMeasurement": (
+                    payload.get("reconciliationMeasurement") or MEASUREMENT_UNKNOWN
+                ),
             }
         )
     owner_session, owner_measurement = _claim_owner(claims, reservation_id)
