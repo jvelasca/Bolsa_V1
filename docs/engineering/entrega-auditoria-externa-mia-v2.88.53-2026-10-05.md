@@ -98,9 +98,9 @@ Sin cambio de motor **ni de muestra**, este sello no re-corre el pipeline. Se **
 
 | Rol | Commit | Árboles |
 | --- | --- | --- |
-| **Sello funcional** (`feat`) | _(a rellenar al commitear)_ | `apps`/`packages` del sello |
-| Re-anclaje del freeze de la ventana (`chore`) | _(a rellenar)_ | pin `commit: <funcional>` (no mueve árbol) |
-| **Commit del tag** | _(a rellenar)_ | (mismos árboles que el funcional) |
+| **Sello funcional** (`feat`) | `2b7f1940` | `apps` `9fcd4452…` / `packages` `371105fc…` |
+| Re-anclaje del freeze de la ventana (`chore`) | `b41ec173` | pin `commit: 2b7f1940` (no mueve árbol) |
+| **Commit del tag** | _(pendiente de crear el tag)_ | (mismos árboles que el funcional) |
 | Cita **POST-TAG** (evidencia `§7`) | _(posterior)_ | — |
 
 - **Tag:** `v2.88.53-beta` (**anotado**) — **pendiente** de creación/empuje; `Release tag CI` **PENDIENTE** (cita POST-TAG). `GitHub Release` **pendiente**.
