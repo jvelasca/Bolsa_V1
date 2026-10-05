@@ -5,8 +5,8 @@
  * ciclo + ownership de reservas + concurrencia + huecos declarados. No interpreta ni re-deriva.
  */
 
-import { useState } from "react";
 import { RefreshCw } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AutoConcurrencyPanel } from "@/features/auto-monitor/auto-concurrency-panel";
@@ -21,12 +21,42 @@ import {
 } from "@/features/auto-monitor/dia-d-auto-toolbar";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 
+const AUTO_MONITOR_MODES: readonly AutoMonitorMode[] = [
+  "current",
+  "operation",
+  "dia-d",
+];
+
+/**
+ * Lee el modo del monitor desde la URL. Por defecto `operation` (la historia única es la
+ * vista de trabajo); `current` queda como vista cruda/experta y `dia-d` como sandbox.
+ */
+export function readAutoMonitorMode(
+  searchParams: URLSearchParams,
+): AutoMonitorMode {
+  const raw = searchParams.get("mode");
+  return (AUTO_MONITOR_MODES as readonly string[]).includes(raw ?? "")
+    ? (raw as AutoMonitorMode)
+    : "operation";
+}
+
 export function AutoMonitorPage() {
-  const [mode, setMode] = useState<AutoMonitorMode>("current");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mode = readAutoMonitorMode(searchParams);
+  const setMode = (next: AutoMonitorMode) => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.set("mode", next);
+        return params;
+      },
+      { replace: true },
+    );
+  };
   // La pestaña DÍA-D no debe seguir sondeando `/auto/operational-monitor` cada 20 s: el hook
-  // sólo se habilita en la pestaña actual (su `refetch` manual sigue disponible).
+  // sólo se habilita fuera de DÍA-D (su `refetch` manual sigue disponible).
   const { view, isLoading, isError, isFetching, refetch } =
-    useAutoOperationalMonitor({ enabled: mode === "current" });
+    useAutoOperationalMonitor({ enabled: mode !== "dia-d" });
 
   return (
     <div

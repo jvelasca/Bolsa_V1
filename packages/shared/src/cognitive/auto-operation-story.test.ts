@@ -1,9 +1,10 @@
 /**
  * AUTO UI REFACTOR 1.0 — view model de "operación única".
  *
- * Invariantes: orden fijo de 13 etapas; una etapa sin traza es `NOT_MEASURED` (nunca `0`);
- * los hechos se copian del paso durable con su medición; la explicación OOS se pliega sólo si
- * se aporta.
+ * Invariantes: orden fijo de las 14 etapas del modelo; `SELECTION` (TOP-N) ≠ `DECISION`
+ * (no hay traza durable de decisión de cartera ⇒ `NOT_MEASURED`); `EXIT` es DERIVADA de
+ * `SETTLEMENT`; `OPPORTUNITY` vive en el bloque `context`; una etapa sin traza es
+ * `NOT_MEASURED` (nunca `0`) y los hechos se copian del paso durable con su medición.
  */
 
 import { describe, expect, it } from "vitest";
@@ -18,6 +19,7 @@ function cycle(): AutoMonitorCycleV1 {
   return {
     cycleId: "cyc-1",
     instrumentId: "AAA",
+    strategyVersion: "strat-3",
     direction: "long",
     closed: true,
     closedMeasurement: "COMPLETE",
@@ -39,6 +41,14 @@ function cycle(): AutoMonitorCycleV1 {
         note: null,
       },
       {
+        id: "SETTLEMENT",
+        state: "reached",
+        at: "2026-10-01T15:00:00Z",
+        measurement: "COMPLETE",
+        facts: [{ key: "closedQty", value: 10, measurement: "COMPLETE" }],
+        note: null,
+      },
+      {
         id: "FILL",
         state: "reached",
         at: "2026-09-30T09:00:00Z",
@@ -56,11 +66,35 @@ function cycle(): AutoMonitorCycleV1 {
 }
 
 describe("buildAutoOperationStory", () => {
-  it("respeta el orden fijo de las 13 etapas", () => {
+  it("respeta el orden fijo de las catorce etapas del modelo", () => {
     const story = buildAutoOperationStory({ cycle: cycle() });
     expect(story.stages.map((stage) => stage.id)).toEqual([
       ...AUTO_OPERATION_STORY_ORDER,
     ]);
+    expect(story.stages).toHaveLength(14);
+    // `index` es la posición real: la UI no re-ordena.
+    expect(story.stages.map((stage) => stage.index)).toEqual([
+      ...AUTO_OPERATION_STORY_ORDER.keys(),
+    ]);
+  });
+
+  it("clasifica cada etapa por `kind` y `group`", () => {
+    const story = buildAutoOperationStory({ cycle: cycle() });
+    const byId = new Map(story.stages.map((stage) => [stage.id, stage]));
+
+    expect(byId.get("OPPORTUNITY")?.kind).toBe("CONTEXT");
+    expect(byId.get("OPPORTUNITY")?.group).toBe("CONTEXT");
+    expect(byId.get("POSITION")?.kind).toBe("DERIVED");
+    expect(byId.get("EXIT")?.kind).toBe("DERIVED");
+    expect(byId.get("EXPLANATION")?.kind).toBe("EXPLANATION");
+    expect(byId.get("SIGNAL")?.kind).toBe("FACT");
+    expect(byId.get("EXIT")?.group).toBe("OPERATION");
+
+    // Sólo OPPORTUNITY es contexto; el resto son hechos de la operación.
+    const contextStages = story.stages.filter(
+      (stage) => stage.group === "CONTEXT",
+    );
+    expect(contextStages.map((stage) => stage.id)).toEqual(["OPPORTUNITY"]);
   });
 
   it("copia los pasos durables con su estado y sus hechos", () => {
@@ -69,12 +103,57 @@ describe("buildAutoOperationStory", () => {
 
     expect(byId.get("SIGNAL")?.state).toBe("REACHED");
     expect(byId.get("SIGNAL")?.at).toBe("2026-09-29T20:00:00Z");
-    expect(byId.get("DECISION")?.sourceStepId).toBe("TOP_N");
-    expect(byId.get("DECISION")?.state).toBe("REACHED");
     expect(byId.get("FILL")?.facts).toEqual([
-      { label: "qty", value: "10", measurement: "COMPLETE" },
-      { label: "avgPrice", value: "NO MEDIDO", measurement: "UNKNOWN" },
+      { label: "qty", value: 10, measurement: "COMPLETE" },
+      { label: "avgPrice", value: null, measurement: "UNKNOWN" },
     ]);
+  });
+
+  it("separa SELECTION (TOP-N) de DECISION (no medible)", () => {
+    const story = buildAutoOperationStory({ cycle: cycle() });
+    const byId = new Map(story.stages.map((stage) => [stage.id, stage]));
+
+    // Selección = TOP-N, con su hecho durable.
+    expect(byId.get("SELECTION")?.sourceStepId).toBe("TOP_N");
+    expect(byId.get("SELECTION")?.label).toBe("Selección · TOP-N");
+    expect(byId.get("SELECTION")?.state).toBe("REACHED");
+
+    // Decisión de cartera NO se iguala a TOP_N: no hay traza durable por ciclo.
+    expect(byId.get("DECISION")?.sourceStepId).toBeNull();
+    expect(byId.get("DECISION")?.state).toBe("NOT_MEASURED");
+    expect(byId.get("DECISION")?.note).toContain(
+      "no hay traza durable de decisión de cartera",
+    );
+  });
+
+  it("deriva EXIT de SETTLEMENT sin duplicar el hecho financiero", () => {
+    const story = buildAutoOperationStory({ cycle: cycle() });
+    const byId = new Map(story.stages.map((stage) => [stage.id, stage]));
+
+    expect(byId.get("SETTLEMENT")?.kind).toBe("FACT");
+    expect(byId.get("SETTLEMENT")?.state).toBe("REACHED");
+
+    expect(byId.get("EXIT")?.kind).toBe("DERIVED");
+    expect(byId.get("EXIT")?.sourceStepId).toBe("SETTLEMENT");
+    expect(byId.get("EXIT")?.state).toBe("REACHED");
+    expect(byId.get("EXIT")?.note).toContain("liquidación");
+  });
+
+  it("expone OPPORTUNITY y el resto del universo en el bloque context", () => {
+    const story = buildAutoOperationStory({ cycle: cycle() });
+    const context = new Map(story.context.map((item) => [item.id, item]));
+
+    expect(context.get("INSTRUMENT")?.value).toBe("AAA");
+    expect(context.get("INSTRUMENT")?.measurement).toBe("COMPLETE");
+    expect(context.get("STRATEGY")?.value).toBe("strat-3");
+    expect(context.get("DIRECTION")?.value).toBe("long");
+
+    // El universo PIT / régimen / ranking NO se materializan por ciclo ⇒ NO MEDIDO.
+    expect(context.get("PIT_UNIVERSE")?.measurement).toBe("UNKNOWN");
+    expect(context.get("PIT_UNIVERSE")?.value).toBe("NO MEDIDO");
+    expect(context.get("PIT_UNIVERSE")?.note).toContain("watch PIT");
+    expect(context.get("REGIME")?.measurement).toBe("UNKNOWN");
+    expect(context.get("RANKING")?.measurement).toBe("UNKNOWN");
   });
 
   it("una etapa sin traza es NOT_MEASURED y nunca un 0", () => {
@@ -84,6 +163,7 @@ describe("buildAutoOperationStory", () => {
     // PROTECTION no viene en el ciclo ⇒ NO MEDIDO (no `reached`, no `0`).
     expect(byId.get("PROTECTION")?.state).toBe("NOT_MEASURED");
     expect(byId.get("PROTECTION")?.measurement).toBe("UNKNOWN");
+    expect(byId.get("PROTECTION")?.facts).toEqual([]);
 
     // OPPORTUNITY es contextual: siempre NO MEDIDO con su nota declarada.
     expect(byId.get("OPPORTUNITY")?.state).toBe("NOT_MEASURED");
@@ -115,16 +195,25 @@ describe("buildAutoOperationStory", () => {
     ).toBe("OOS_SUPPORTED");
     expect(
       explanation?.facts.find((fact) => fact.label === "R medio")?.value,
-    ).toBe("0.5");
+    ).toBe(0.5);
+    // `0` medido es MEDIDO y viaja como `0` (no se confunde con un hueco).
+    expect(explanation?.facts.find((fact) => fact.label === "errores")).toEqual(
+      { label: "errores", value: 0, measurement: "COMPLETE" },
+    );
   });
 
   it("un ciclo ausente deja todas las trazas en NOT_MEASURED", () => {
     const story = buildAutoOperationStory({ cycle: null });
     expect(story.cycleId).toBeNull();
-    expect(story.stages).toHaveLength(AUTO_OPERATION_STORY_ORDER.length);
+    expect(story.stages).toHaveLength(14);
     for (const stage of story.stages) {
       expect(stage.state).toBe("NOT_MEASURED");
       expect(stage.facts).toEqual([]);
+    }
+    // El contexto tampoco se inventa: todo NO MEDIDO salvo la declaración.
+    for (const item of story.context) {
+      expect(item.value).toBe("NO MEDIDO");
+      expect(item.measurement).toBe("UNKNOWN");
     }
   });
 

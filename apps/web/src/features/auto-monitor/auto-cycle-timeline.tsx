@@ -6,11 +6,14 @@
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  MeasurementBadge,
+  MeasurementValue,
+} from "@/components/measurement-value";
 import type {
   AutoMonitorCycleViewV1,
   AutoMonitorStepViewV1,
 } from "@bolsa/shared";
-import { formatMeasurementLabel, formatMonitorFactValue } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 
 function StepRow({ step }: { step: AutoMonitorStepViewV1 }) {
@@ -40,16 +43,10 @@ function StepRow({ step }: { step: AutoMonitorStepViewV1 }) {
         >
           {step.stateLabel}
         </span>
-        <span
-          className={cn(
-            "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-            step.measurement === "UNKNOWN"
-              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-              : "bg-muted text-muted-foreground",
-          )}
-        >
-          {step.measurementLabel}
-        </span>
+        <MeasurementBadge
+          measurement={step.measurement}
+          testId="auto-monitor-step-measurement"
+        />
         {step.at ? (
           <span className="text-[10px] tabular-nums text-muted-foreground">
             {step.at}
@@ -69,8 +66,11 @@ function StepRow({ step }: { step: AutoMonitorStepViewV1 }) {
           {step.facts.map((fact) => (
             <div key={fact.key} className="flex items-baseline gap-1">
               <dt className="text-muted-foreground">{fact.key}:</dt>
-              <dd className="tabular-nums text-foreground/80">
-                {formatMonitorFactValue(fact.value, fact.measurement)}
+              <dd>
+                <MeasurementValue
+                  value={fact.value}
+                  measurement={fact.measurement}
+                />
               </dd>
             </div>
           ))}
@@ -129,14 +129,16 @@ function CycleCard({ cycle }: { cycle: AutoMonitorCycleViewV1 }) {
           <code>{cycle.cycleId}</code>
           {pnl !== null && pnl !== undefined ? (
             <span
-              className="ml-2 tabular-nums"
+              className="ml-2"
               data-testid="auto-monitor-cycle-pnl"
               data-pnl-measurement={pnlMeasurement}
             >
               PnL:{" "}
-              {pnlMeasurement === "COMPLETE"
-                ? formatMonitorFactValue(pnl, "COMPLETE")
-                : formatMeasurementLabel(pnlMeasurement)}
+              <MeasurementValue
+                value={pnl}
+                measurement={pnlMeasurement}
+                incomplete="withhold"
+              />
             </span>
           ) : null}
         </p>

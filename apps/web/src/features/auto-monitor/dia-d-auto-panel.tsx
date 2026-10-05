@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,14 +114,29 @@ function NotAvailable({ detail }: { detail: DiaDAutoReplayDto }) {
 
 export function DiaDAutoSandbox() {
   const daysQuery = useAutoDiaDReplayDays();
-  const [day, setDay] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [day, setDayState] = useState<string | null>(searchParams.get("day"));
   const days = useMemo(() => daysQuery.data?.days ?? [], [daysQuery.data]);
 
   useEffect(() => {
     if (!day && days.length > 0) {
-      setDay(days[0] ?? null);
+      setDayState(days[0] ?? null);
     }
   }, [day, days]);
+
+  // El día D vive en la URL: cambiar de vista (o compartir el enlace) no lo pierde.
+  const setDay = (next: string | null) => {
+    setDayState(next);
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (next) params.set("day", next);
+        else params.delete("day");
+        return params;
+      },
+      { replace: true },
+    );
+  };
 
   const detailQuery = useAutoDiaDReplay(day);
   const detail = detailQuery.data;
@@ -315,6 +331,16 @@ export function DiaDAutoSandbox() {
 
 export type DiaDAutoView = "sandbox" | "feedback";
 
+const DIA_D_VIEWS: readonly DiaDAutoView[] = ["sandbox", "feedback"];
+
+/** Lee la sub-vista DÍA-D de la URL (por defecto `sandbox`). */
+export function readDiaDAutoView(searchParams: URLSearchParams): DiaDAutoView {
+  const raw = searchParams.get("view");
+  return (DIA_D_VIEWS as readonly string[]).includes(raw ?? "")
+    ? (raw as DiaDAutoView)
+    : "sandbox";
+}
+
 function DiaDAutoViewToolbar({
   view,
   onChange,
@@ -359,7 +385,18 @@ function DiaDAutoViewToolbar({
 }
 
 export function DiaDAutoPanel() {
-  const [view, setView] = useState<DiaDAutoView>("sandbox");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = readDiaDAutoView(searchParams);
+  const setView = (next: DiaDAutoView) => {
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        params.set("view", next);
+        return params;
+      },
+      { replace: true },
+    );
+  };
   return (
     <div className="space-y-4" data-testid="dia-d-auto-root" data-view={view}>
       <DiaDAutoViewToolbar view={view} onChange={setView} />

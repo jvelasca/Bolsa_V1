@@ -4,15 +4,14 @@
  * En `M1` la sesión dueña NO es durable: viaja `ownerSession = null` con
  * `ownerMeasurement = UNKNOWN` y la UI lo rotula `NO MEDIDO`. Con `M2` (sumidero de
  * auditoría) el panel pasa a datos reales sin cambiar el DTO.
+ *
+ * Todo valor con su medición se pinta con `MeasurementValue`: un hueco se rotula, nunca se
+ * degrada a `?` ni a una cifra fingida.
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  formatMeasurementLabel,
-  formatMonitorFactValue,
-  NO_MEASUREMENT_LABEL,
-  type AutoMonitorReservationV1,
-} from "@bolsa/shared";
+import { MeasurementValue } from "@/components/measurement-value";
+import type { AutoMonitorReservationV1 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 
 function ReservationRow({
@@ -20,7 +19,6 @@ function ReservationRow({
 }: {
   reservation: AutoMonitorReservationV1;
 }) {
-  const ownerMeasured = reservation.ownerMeasurement !== "UNKNOWN";
   return (
     <li
       data-testid="auto-monitor-reservation"
@@ -51,51 +49,50 @@ function ReservationRow({
       <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-muted-foreground sm:grid-cols-3">
         <span data-testid="auto-monitor-reservation-owner">
           owner:{" "}
-          <span
-            className={
-              ownerMeasured
-                ? "text-foreground/80"
-                : "text-amber-600 dark:text-amber-400"
-            }
-          >
-            {reservation.ownerSession ?? NO_MEASUREMENT_LABEL}
-          </span>
+          <MeasurementValue
+            value={reservation.ownerSession}
+            measurement={reservation.ownerMeasurement}
+          />
         </span>
         <span>
           qty:{" "}
-          <span className="tabular-nums text-foreground/80">
-            {formatMonitorFactValue(reservation.quantity, "COMPLETE")}
-          </span>
+          <MeasurementValue
+            value={reservation.quantity}
+            measurement="COMPLETE"
+          />
         </span>
         <span>
           fill:{" "}
-          <span className="tabular-nums text-foreground/80">
-            {formatMonitorFactValue(
-              reservation.fillProgress.filled,
-              reservation.fillProgress.measurement,
-            )}{" "}
-            / {formatMonitorFactValue(reservation.quantity, "COMPLETE")}
-          </span>
+          <MeasurementValue
+            value={reservation.fillProgress.filled}
+            measurement={reservation.fillProgress.measurement}
+          />{" "}
+          /{" "}
+          <MeasurementValue
+            value={reservation.quantity}
+            measurement="COMPLETE"
+          />
         </span>
         <span>
           created:{" "}
-          <span className="tabular-nums text-foreground/80">
-            {reservation.created ?? NO_MEASUREMENT_LABEL}
-          </span>
+          <MeasurementValue
+            value={reservation.created}
+            measurement={reservation.created ? "COMPLETE" : "UNKNOWN"}
+          />
         </span>
         <span>
           expira:{" "}
-          <span className="tabular-nums text-foreground/80">
-            {reservation.expires ??
-              formatMeasurementLabel(reservation.expiresMeasurement)}
-          </span>
+          <MeasurementValue
+            value={reservation.expires}
+            measurement={reservation.expiresMeasurement}
+          />
         </span>
         <span>
           liberación:{" "}
-          <span className="text-foreground/80">
-            {reservation.releaseReason ??
-              formatMeasurementLabel(reservation.releaseReasonMeasurement)}
-          </span>
+          <MeasurementValue
+            value={reservation.releaseReason}
+            measurement={reservation.releaseReasonMeasurement}
+          />
         </span>
       </div>
       {reservation.reconciliations.length > 0 ? (
@@ -106,26 +103,30 @@ function ReservationRow({
           <ul className="mt-1 space-y-0.5 text-[10px] text-muted-foreground">
             {reservation.reconciliations.map((row, index) => (
               <li key={`${reservation.reservationId}-recon-${index}`}>
-                {row.decision ?? NO_MEASUREMENT_LABEL} ·{" "}
-                {row.reason ??
-                  formatMeasurementLabel(
-                    row.reasonMeasurement ?? "UNKNOWN",
-                  )}{" "}
+                <MeasurementValue
+                  value={row.decision}
+                  measurement={row.reconciliationMeasurement ?? "UNKNOWN"}
+                />{" "}
+                ·{" "}
+                <MeasurementValue
+                  value={row.reason}
+                  measurement={row.reasonMeasurement ?? "UNKNOWN"}
+                />{" "}
                 · caller{" "}
-                {row.caller ??
-                  formatMeasurementLabel(
-                    row.callerMeasurement ?? "UNKNOWN",
-                  )}{" "}
+                <MeasurementValue
+                  value={row.caller}
+                  measurement={row.callerMeasurement ?? "UNKNOWN"}
+                />{" "}
                 · aged{" "}
-                {formatMonitorFactValue(
-                  row.aged,
-                  row.agedMeasurement ?? "UNKNOWN",
-                )}{" "}
+                <MeasurementValue
+                  value={row.aged}
+                  measurement={row.agedMeasurement ?? "UNKNOWN"}
+                />{" "}
                 · gracia{" "}
-                {formatMonitorFactValue(
-                  row.graceWindowSeconds,
-                  row.graceWindowMeasurement ?? "UNKNOWN",
-                )}
+                <MeasurementValue
+                  value={row.graceWindowSeconds}
+                  measurement={row.graceWindowMeasurement ?? "UNKNOWN"}
+                />
               </li>
             ))}
           </ul>

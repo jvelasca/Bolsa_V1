@@ -12,6 +12,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 
 vi.mock("@/lib/api", () => ({
   // El mock devuelve el DTO directo (como el endpoint), NO `{ data: dto }`.
@@ -86,6 +87,18 @@ vi.mock("@/lib/api", () => ({
       },
       notes: ["decision_journal_not_durable"],
     })),
+    getAutoDiaDFeedbackList: vi.fn(async () => ({
+      readOnly: true,
+      windows: ["2026-09-29_2026-09-30"],
+      latest: "2026-09-29_2026-09-30",
+      artifact: { available: false, notes: ["artifact_not_found"] },
+      notes: [],
+    })),
+    getAutoDiaDFeedback: vi.fn(async () => ({
+      available: false,
+      readOnly: true,
+      notes: ["artifact_not_found"],
+    })),
   },
 }));
 
@@ -99,16 +112,21 @@ vi.mock("@/features/accounts/use-active-account", () => ({
 }));
 
 import { api } from "@/lib/api";
-import { AutoMonitorPage } from "@/features/auto-monitor/auto-monitor-page";
+import {
+  AutoMonitorPage,
+  readAutoMonitorMode,
+} from "@/features/auto-monitor/auto-monitor-page";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 
-function renderPage() {
+function renderPage(entry = "/auto-monitor?mode=current") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <AutoMonitorPage />
+      <MemoryRouter initialEntries={[entry]}>
+        <AutoMonitorPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -144,7 +162,52 @@ describe("AutoMonitorPage — consume el DTO directo del endpoint", () => {
   });
 });
 
-function _DisabledProbe() {
+describe("AutoMonitorPage — modo y selección en la URL", () => {
+  it("por defecto abre Operación (no la ventana cruda)", () => {
+    renderPage("/auto-monitor");
+    expect(
+      screen
+        .getByTestId("auto-monitor-mode-operation")
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(screen.getByTestId("auto-operation-story-panel")).toBeTruthy();
+  });
+
+  it("lee el ciclo seleccionado de la URL", async () => {
+    renderPage("/auto-monitor?mode=operation&cycle=cyc-1");
+    await waitFor(() =>
+      expect(screen.getByTestId("auto-operation-story-cycle")).toBeTruthy(),
+    );
+    expect(
+      screen
+        .getByTestId("auto-operation-story-cycle")
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+  });
+
+  it("lee la ventana DÍA-D de la URL (mode=dia-d&view=feedback&window=…)", async () => {
+    renderPage(
+      "/auto-monitor?mode=dia-d&view=feedback&window=2026-09-29_2026-09-30",
+    );
+    await waitFor(() =>
+      expect(api.getAutoDiaDFeedback).toHaveBeenCalledWith(
+        "2026-09-29_2026-09-30",
+      ),
+    );
+  });
+
+  it("readAutoMonitorMode cae a `operation` con valores inválidos", () => {
+    expect(readAutoMonitorMode(new URLSearchParams(""))).toBe("operation");
+    expect(readAutoMonitorMode(new URLSearchParams("mode=dia-d"))).toBe(
+      "dia-d",
+    );
+    expect(readAutoMonitorMode(new URLSearchParams("mode=basura"))).toBe(
+      "operation",
+    );
+  });
+});
+
+function DisabledProbe() {
   useAutoOperationalMonitor({ enabled: false });
   return null;
 }
@@ -156,7 +219,7 @@ describe("useAutoOperationalMonitor — enabled", () => {
     });
     render(
       <QueryClientProvider client={client}>
-        <_DisabledProbe />
+        <DisabledProbe />
       </QueryClientProvider>,
     );
     expect(api.getAutoOperationalMonitor).not.toHaveBeenCalled();

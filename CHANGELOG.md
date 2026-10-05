@@ -2,6 +2,45 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.52-beta] — `AUTO · UI`: **AUTO UI REFACTOR 1.0** (modelo semántico implementado)
+
+**Bump** `2.11.51-beta` → `2.11.52-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello dirigido **de UI/read-model**: **Δ AUTO decision/execution motor = 0** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS se **heredan y citan** de `v2.88.51`/`v2.88.50`. **No** se borra ninguna pantalla y **no** se reestructura la navegación global (queda como objetivo post-1.0 en el spec).
+
+Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** congelado en `docs/engineering/spec-auto-ui-semantic-model-1-2026-10-05.md`.
+
+### Parte A — View-model semántico (`@bolsa/shared`, `auto-operation-story.ts`)
+
+- **14 etapas** (`OPPORTUNITY → SIGNAL → SELECTION → DECISION → RISK → RESERVATION → ORDER → FILL → POSITION → PROTECTION → EXIT → SETTLEMENT → RESULT → EXPLANATION`), cada una con `kind` (`FACT`/`DERIVED`/`CONTEXT`/`EXPLANATION`) y `group` (`OPERATION`/`CONTEXT`).
+- **`SELECTION` ≠ `DECISION`**: `SELECTION` se copia de `TOP_N` («Selección · TOP-N»); `DECISION` pasa a `sourceStepId: null`, `NOT_MEASURED`, con `derivedNote` «no hay traza durable de decisión de cartera» — **nunca** igualada a `TOP_N`.
+- **`EXIT` (DERIVED) ≠ `SETTLEMENT` (FACT)**: la salida es intención/motivo derivada de la liquidación; el hecho financiero durable es `SETTLEMENT`. No se pintan como dos `REACHED` independientes.
+- **`OPPORTUNITY` sale de los hechos**: bloque `context` separado (`instrumento`/`estrategia`/`dirección` del DTO; `universo PIT`/`régimen`/`ranking` declarados `NO MEDIDO` porque no se materializan por ciclo). La historia expone `stages` (14) y `context` separados; regla `UNKNOWN ≠ 0` intacta.
+- Los hechos viajan **CRUDOS** (`value: unknown` + `measurement`): el formateo honesto se centraliza en la UI (`MeasurementValue`), no se pre-formatea en el view-model.
+
+### Parte B — `MeasurementValue` unificado (web)
+
+- Nuevo `apps/web/src/components/measurement-value.tsx`: `MeasurementValue` (valor + medición) y `MeasurementBadge` (sólo medición) sobre `formatMeasurementLabel`/`formatMonitorFactValue` de `@bolsa/shared`. Un valor sin muestra se rotula `PARCIAL`/`NO MEDIDO`; `incomplete="withhold"` retiene una cifra no afirmable (PnL junto a cierre `PARTIAL`). **Hace el bug del PnL de `v2.88.50` imposible por accidente.**
+- Refactor de `auto-cycle-timeline.tsx`, `auto-reservation-panel.tsx`, `auto-concurrency-panel.tsx` y `auto-operation-story-panel.tsx` para consumirlo.
+
+### Parte C — Operación por defecto + selección en URL
+
+- `auto-monitor-page.tsx`: `useSearchParams` para `mode`/`cycle`/`day`/`window`/`symbol`; **modo por defecto `operation`** (`current` queda como vista cruda/experta). El hook pasa a `enabled: mode !== "dia-d"`.
+- `dia-d-auto-toolbar.tsx` (modo), selector de ciclo del story panel y selectores de `day`/`window` escriben en la URL (sobrevive el cambio de pestaña y permite compartir «este ciclo, este día»). `dia-d-auto-panel.tsx` y `dia-d-auto-feedback-panel.tsx` aceptan `view`/`window` iniciales desde la URL.
+
+### Parte D — Enlace EXPLICACIÓN → DÍA-D
+
+- En la etapa `EXPLANATION` de `auto-operation-story-panel.tsx`, botón «Ver heatmap de {symbol}» que navega a `?mode=dia-d&view=feedback&window=<latest>&symbol=<symbol>` (preselecciona símbolo y ventana; la fila del símbolo se resalta en el feedback).
+
+### Parte E — Tests
+
+- `@bolsa/shared`: `auto-operation-story.test.ts` (10) — 14 etapas en orden, `kind`/`group`, `SELECTION` ← `TOP_N`, `DECISION` `NOT_MEASURED`, `EXIT` `DERIVED`, `OPPORTUNITY` en `context`, `UNKNOWN ≠ 0`.
+- `@bolsa/web`: nuevo `measurement-value.test.tsx` (8; un valor sin medición nunca se pinta medido); `auto-operation-story-panel.test.tsx` (4; 13 etapas de operación + contexto + enlace DÍA-D); `auto-monitor-page.test.tsx` (modo por defecto `operation` + lectura de `cycle`/`window`/`view` desde la URL); `dia-d-auto-*` (día/ventana/símbolo desde la URL).
+
+### Parte F — Sello
+
+- **Versión:** `package.json` → `2.11.52-beta`; `meta.bump` alineado en `v2_89`…`v2_97` (guard `test_dia_d_bump_guard.py`).
+- **Evidencia:** `docs/engineering/evidence/v2.88.52/README.md`. **Entrega a auditoría externa (MIA):** `docs/engineering/entrega-auditoria-externa-mia-v2.88.52-2026-10-05.md`. Re-anclaje del freeze de la ventana en `scripts/lib/window-forward.mjs` (convención de la casa).
+- **Gates:** ver evidencia (§2).
+
 ## [2.11.51-beta] — `AUTO · UI`: **fix del PnL `PARTIAL` + congelación del AUTO UI SEMANTIC MODEL 1.0**
 
 **Bump** `2.11.50-beta` → `2.11.51-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello dirigido, sin tocar el motor: **Δ AUTO decision/execution motor = 0**. **NO** re-mide `DÍA-D` ni reabre la investigación `THESIS_EXIT` (A/C cerrada en `v2.88.50`; las cifras se **heredan y citan**, no se reutilizan como nuevas).

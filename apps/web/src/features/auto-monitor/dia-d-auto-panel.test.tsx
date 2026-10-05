@@ -8,6 +8,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 
 vi.mock("@/lib/api", () => ({
   api: {
@@ -72,13 +73,15 @@ vi.mock("@/features/accounts/use-active-account", () => ({
 import { api } from "@/lib/api";
 import { DiaDAutoPanel } from "@/features/auto-monitor/dia-d-auto-panel";
 
-function renderPanel() {
+function renderPanel(entry = "/auto-monitor?mode=dia-d") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <DiaDAutoPanel />
+      <MemoryRouter initialEntries={[entry]}>
+        <DiaDAutoPanel />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -134,6 +137,13 @@ describe("DiaDAutoPanel", () => {
 
     // Cambiar de fecha vuelve a consultar el artefacto del día elegido.
     screen.getByRole("button", { name: "2026-09-29" }).click();
+    await waitFor(() =>
+      expect(api.getAutoDiaDReplay).toHaveBeenCalledWith("2026-09-29"),
+    );
+  });
+
+  it("lee el día D de la URL", async () => {
+    renderPanel("/auto-monitor?mode=dia-d&day=2026-09-29");
     await waitFor(() =>
       expect(api.getAutoDiaDReplay).toHaveBeenCalledWith("2026-09-29"),
     );

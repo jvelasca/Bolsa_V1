@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,13 +96,23 @@ function EvidenceBadge({ quality }: { quality: string }) {
   );
 }
 
-function ValueRow({ value }: { value: DiaDFeedbackValueDto }) {
+function ValueRow({
+  value,
+  focused,
+}: {
+  value: DiaDFeedbackValueDto;
+  focused: boolean;
+}) {
   return (
     <tr
       data-testid="dia-d-auto-feedback-value"
       data-symbol={value.symbol}
       data-verdict={value.verdict}
-      className="border-t border-border/50"
+      data-focused={focused ? "true" : "false"}
+      className={cn(
+        "border-t border-border/50",
+        focused && "bg-sky-500/10 outline outline-1 outline-sky-500/40",
+      )}
     >
       <td className="py-1.5 pr-3 font-mono text-[11px] text-foreground/90">
         {value.symbol}
@@ -175,13 +186,32 @@ export function DiaDAutoFeedbackPanel() {
     [listQuery.data],
   );
   const latest = listQuery.data?.latest ?? null;
-  const [window, setWindow] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [window, setWindowState] = useState<string | null>(
+    searchParams.get("window"),
+  );
+  // Símbolo preseleccionado por el enlace de EXPLICACIÓN → DÍA-D.
+  const focusSymbol = searchParams.get("symbol");
 
   useEffect(() => {
     if (!window && latest) {
-      setWindow(latest);
+      setWindowState(latest);
     }
   }, [window, latest]);
+
+  // La ventana vive en la URL: sobrevive el cambio de vista y permite compartirla.
+  const setWindow = (next: string | null) => {
+    setWindowState(next);
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (next) params.set("window", next);
+        else params.delete("window");
+        return params;
+      },
+      { replace: true },
+    );
+  };
 
   const detailQuery = useAutoDiaDFeedback(window);
   const artifact =
@@ -321,7 +351,11 @@ export function DiaDAutoFeedbackPanel() {
                 </thead>
                 <tbody>
                   {(artifact.values ?? []).map((value) => (
-                    <ValueRow key={value.symbol} value={value} />
+                    <ValueRow
+                      key={value.symbol}
+                      value={value}
+                      focused={value.symbol === focusSymbol}
+                    />
                   ))}
                 </tbody>
               </table>

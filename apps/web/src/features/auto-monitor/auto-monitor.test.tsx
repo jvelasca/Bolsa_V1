@@ -5,6 +5,7 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import {
   buildAutoOperationalMonitorView,
   type AutoOperationalMonitorV1,
@@ -291,7 +292,11 @@ describe("AutoMonitorPage", () => {
     }));
     const { AutoMonitorPage } =
       await import("@/features/auto-monitor/auto-monitor-page");
-    render(<AutoMonitorPage />);
+    render(
+      <MemoryRouter initialEntries={["/auto-monitor?mode=current"]}>
+        <AutoMonitorPage />
+      </MemoryRouter>,
+    );
     expect(screen.getByTestId("auto-monitor-page")).toBeTruthy();
     expect(screen.getByTestId("auto-monitor-execution").textContent).toContain(
       "next_bar_open",

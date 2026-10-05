@@ -10,6 +10,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 
 vi.mock("lightweight-charts", () => ({
   createChart: () => ({
@@ -253,12 +254,17 @@ import { api } from "@/lib/api";
 import { DiaDAutoFeedbackPanel } from "@/features/auto-monitor/dia-d-auto-feedback-panel";
 import { DiaDAutoPanel } from "@/features/auto-monitor/dia-d-auto-panel";
 
-function renderWithClient(ui: React.ReactElement) {
+function renderWithClient(
+  ui: React.ReactElement,
+  entry = "/auto-monitor?mode=dia-d&view=feedback",
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
-    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[entry]}>{ui}</MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -327,11 +333,27 @@ describe("DiaDAutoFeedbackPanel", () => {
     expect(panel.textContent).toContain("Evalúa");
     expect(panel.textContent).not.toContain("Confirma");
   });
+
+  it("preselecciona el símbolo de la URL (enlace de EXPLICACIÓN)", async () => {
+    renderWithClient(
+      <DiaDAutoFeedbackPanel />,
+      "/auto-monitor?mode=dia-d&view=feedback&window=2026-09-29_2026-09-30&symbol=BBB",
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("dia-d-auto-feedback-values")).toBeTruthy(),
+    );
+    const focused = screen
+      .getAllByTestId("dia-d-auto-feedback-value")
+      .filter((row) => row.getAttribute("data-focused") === "true");
+    expect(focused.map((row) => row.getAttribute("data-symbol"))).toEqual([
+      "BBB",
+    ]);
+  });
 });
 
 describe("DiaDAutoPanel view switching", () => {
   it("no dispara queries de feedback en el modo sandbox", async () => {
-    renderWithClient(<DiaDAutoPanel />);
+    renderWithClient(<DiaDAutoPanel />, "/auto-monitor?mode=dia-d");
 
     await waitFor(() =>
       expect(screen.getByTestId("dia-d-auto-steps")).toBeTruthy(),

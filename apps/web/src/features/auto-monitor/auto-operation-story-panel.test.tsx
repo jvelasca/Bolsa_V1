@@ -1,13 +1,16 @@
 /**
  * AUTO UI REFACTOR 1.0 — piloto de la "operación única".
  *
- * Monta el panel real con la API mockeada y comprueba que las 13 etapas se pintan en orden,
- * que un paso sin traza se rotula NO MEDIDO y que la explicación OOS se pliega cuando existe.
+ * Monta el panel real con la API mockeada y comprueba que las 13 etapas de OPERACIÓN se pintan en
+ * orden (sin OPPORTUNITY, que va al bloque `context`), que un paso sin traza se rotula NO MEDIDO y
+ * que la etapa EXPLANATION enlaza al heatmap DÍA-D con símbolo/ventana preseleccionados.
  */
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 vi.mock("@/lib/api", () => ({
   api: {
@@ -140,13 +143,21 @@ vi.mock("@/features/accounts/use-active-account", () => ({
 
 import { AutoOperationStoryPanel } from "@/features/auto-monitor/auto-operation-story-panel";
 
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="story-location">{location.search}</span>;
+}
+
 function renderPanel() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <AutoOperationStoryPanel />
+      <MemoryRouter initialEntries={["/auto-monitor?mode=operation"]}>
+        <AutoOperationStoryPanel />
+        <LocationProbe />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -157,7 +168,7 @@ afterEach(() => {
 });
 
 describe("AutoOperationStoryPanel", () => {
-  it("pinta las 13 etapas en orden, con NO MEDIDO donde no hay traza", async () => {
+  it("pinta las 13 etapas de operación en orden (OPPORTUNITY fuera)", async () => {
     renderPanel();
 
     // El selector de ciclos sólo aparece con el monitor cargado: esperar a él evita asertar
@@ -168,8 +179,8 @@ describe("AutoOperationStoryPanel", () => {
 
     const stages = screen.getAllByTestId("auto-operation-story-stage");
     expect(stages.map((stage) => stage.getAttribute("data-stage"))).toEqual([
-      "OPPORTUNITY",
       "SIGNAL",
+      "SELECTION",
       "DECISION",
       "RISK",
       "RESERVATION",
@@ -182,26 +193,49 @@ describe("AutoOperationStoryPanel", () => {
       "RESULT",
       "EXPLANATION",
     ]);
+    // Todas son hechos de la operación: OPPORTUNITY vive en el bloque `context`.
+    expect(
+      stages.every((stage) => stage.getAttribute("data-group") === "OPERATION"),
+    ).toBe(true);
+    expect(
+      stages
+        .find((stage) => stage.getAttribute("data-stage") === "EXIT")
+        ?.getAttribute("data-kind"),
+    ).toBe("DERIVED");
 
     const byStage = new Map(
       stages.map((stage) => [stage.getAttribute("data-stage"), stage]),
     );
     expect(byStage.get("SIGNAL")?.getAttribute("data-state")).toBe("REACHED");
+    expect(byStage.get("SELECTION")?.getAttribute("data-state")).toBe(
+      "REACHED",
+    );
     // PROTECTION no está en el ciclo ⇒ NO MEDIDO (jamás `reached` ni `0`).
     expect(byStage.get("PROTECTION")?.getAttribute("data-state")).toBe(
       "NOT_MEASURED",
     );
-    expect(byStage.get("OPPORTUNITY")?.getAttribute("data-state")).toBe(
+    // DECISION no se iguala a TOP_N: no hay traza durable ⇒ NO MEDIDO.
+    expect(byStage.get("DECISION")?.getAttribute("data-state")).toBe(
       "NOT_MEASURED",
     );
+  });
+
+  it("declara el contexto que originó la operación (universo PIT sin medir)", async () => {
+    renderPanel();
+    await waitFor(() =>
+      expect(screen.getByTestId("auto-operation-story-cycles")).toBeTruthy(),
+    );
+
+    const pit = screen
+      .getAllByTestId("auto-operation-story-context-item")
+      .find((item) => item.getAttribute("data-context-id") === "PIT_UNIVERSE");
+    expect(pit?.getAttribute("data-measurement")).toBe("UNKNOWN");
+    expect(pit?.textContent).toContain("NO MEDIDO");
   });
 
   it("pliega la explicación OOS del instrumento", async () => {
     renderPanel();
 
-    await waitFor(() =>
-      expect(screen.getByTestId("auto-operation-story-cycles")).toBeTruthy(),
-    );
     await waitFor(() =>
       expect(
         screen
@@ -214,7 +248,26 @@ describe("AutoOperationStoryPanel", () => {
     const explanation = screen
       .getAllByTestId("auto-operation-story-stage")
       .find((stage) => stage.getAttribute("data-stage") === "EXPLANATION");
-    expect(explanation?.getAttribute("data-state")).toBe("REACHED");
     expect(explanation?.textContent).toContain("OOS_SUPPORTED");
+  });
+
+  it("enlaza la EXPLICACIÓN al heatmap DÍA-D con símbolo y ventana", async () => {
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("auto-operation-story-open-heatmap"),
+      ).toBeTruthy(),
+    );
+
+    fireEvent.click(screen.getByTestId("auto-operation-story-open-heatmap"));
+    await waitFor(() =>
+      expect(screen.getByTestId("story-location").textContent).toContain(
+        "mode=dia-d",
+      ),
+    );
+    const search = screen.getByTestId("story-location").textContent ?? "";
+    expect(search).toContain("view=feedback");
+    expect(search).toContain("symbol=AAA");
+    expect(search).toContain("window=2026-09-29_2026-09-30");
   });
 });

@@ -5,16 +5,16 @@
  * paso durable del monitor (con su medición) o se declara `NOT_MEASURED` cuando no existe traza
  * por ciclo. Regla intacta: un valor NO MEDIDO nunca es `0`.
  *
- * Orden fijo de la operación:
- *
- *   OPPORTUNITY → SIGNAL → DECISION → RISK → RESERVATION → ORDER → FILL → POSITION →
- *   PROTECTION → EXIT → SETTLEMENT → RESULT → EXPLANATION
+ * Modelo semántico (`docs/engineering/spec-auto-ui-semantic-model-1-2026-10-05.md`): cada etapa
+ * declara su `kind` (hecho / derivada / contexto / explicación) y su `group`. Las 14 etapas del
+ * modelo son `OPPORTUNITY → SIGNAL → SELECTION → DECISION → RISK → RESERVATION → ORDER → FILL →
+ * POSITION → PROTECTION → EXIT → SETTLEMENT → RESULT → EXPLANATION`; `OPPORTUNITY` es CONTEXTO
+ * (no un hecho de la operación) y `SELECTION` (TOP-N) es distinto de `DECISION` (cartera).
  *
  * @see packages/py/application/src/bolsa_application/auto_operational_monitor.py
  */
 
 import {
-  formatMonitorFactValue,
   NO_MEASUREMENT_LABEL,
   type AutoMonitorCycleV1,
   type AutoMonitorStepV1,
@@ -23,6 +23,7 @@ import {
 export const AUTO_OPERATION_STORY_ORDER = [
   "OPPORTUNITY",
   "SIGNAL",
+  "SELECTION",
   "DECISION",
   "RISK",
   "RESERVATION",
@@ -44,6 +45,16 @@ export type AutoOperationStoryState =
   | "PENDING"
   | "ABSENT"
   | "NOT_MEASURED";
+
+/** Qué ES la etapa (criterio de admisión del modelo semántico). */
+export type AutoOperationStoryKind =
+  | "FACT"
+  | "DERIVED"
+  | "CONTEXT"
+  | "EXPLANATION";
+
+/** Bloque al que pertenece: hechos de la operación vs contexto que la originó. */
+export type AutoOperationStoryGroup = "OPERATION" | "CONTEXT";
 
 const STORY_STATE_LABELS: Record<AutoOperationStoryState, string> = {
   REACHED: "alcanzado",
@@ -68,7 +79,8 @@ const STORY_STATE_DOTS: Record<AutoOperationStoryState, string> = {
 
 export type AutoOperationStoryFact = {
   label: string;
-  value: string;
+  /** Valor CRUDO: el formateo honesto (y su medición) lo aplica la capa de UI. */
+  value: unknown;
   measurement: string;
 };
 
@@ -77,6 +89,10 @@ export type AutoOperationStoryStage = {
   /** Posición en la historia (0-based): la UI no re-ordena. */
   index: number;
   label: string;
+  /** Qué ES la etapa: hecho durable / derivada / contexto / explicación. */
+  kind: AutoOperationStoryKind;
+  /** Bloque: hechos de la operación (`OPERATION`) o contexto (`CONTEXT`). */
+  group: AutoOperationStoryGroup;
   /** Paso durable del que se copia la etapa (``null`` = etapa derivada/contextual). */
   sourceStepId: string | null;
   state: AutoOperationStoryState;
@@ -100,6 +116,15 @@ export type AutoOperationStoryExplanationInput = {
   errorTotal?: number | null;
 };
 
+/** Contexto que ORIGINÓ la operación (no es un hecho del ciclo). */
+export type AutoOperationStoryContextItem = {
+  id: string;
+  label: string;
+  value: string;
+  measurement: string;
+  note: string | null;
+};
+
 export type AutoOperationStoryResult = {
   pnl: unknown;
   closedAt: string | null;
@@ -112,7 +137,10 @@ export type AutoOperationStoryV1 = {
   direction: string | null;
   closed: boolean | null;
   closedMeasurement: string | null;
+  /** Las 14 etapas del modelo, con su `kind`/`group` (la UI no re-ordena). */
   stages: AutoOperationStoryStage[];
+  /** Contexto que originó la operación (universo PIT, estrategia, régimen, …). */
+  context: AutoOperationStoryContextItem[];
   result: AutoOperationStoryResult | null;
   notes: string[];
 };
@@ -120,6 +148,8 @@ export type AutoOperationStoryV1 = {
 type StageSpec = {
   id: AutoOperationStoryStageId;
   label: string;
+  kind: AutoOperationStoryKind;
+  group: AutoOperationStoryGroup;
   sourceStepId: string | null;
   derivedNote?: string;
 };
@@ -129,31 +159,108 @@ const STORY_STAGE_SPECS: readonly StageSpec[] = [
   {
     id: "OPPORTUNITY",
     label: "Oportunidad",
+    kind: "CONTEXT",
+    group: "CONTEXT",
     sourceStepId: null,
     derivedNote: "la oportunidad (watch PIT) no se materializa por ciclo",
   },
-  { id: "SIGNAL", label: "Señal", sourceStepId: "SIGNAL" },
-  { id: "DECISION", label: "Decisión", sourceStepId: "TOP_N" },
-  { id: "RISK", label: "Riesgo", sourceStepId: "RISK" },
-  { id: "RESERVATION", label: "Reserva", sourceStepId: "RESERVATION" },
-  { id: "ORDER", label: "Orden", sourceStepId: "ORDER" },
-  { id: "FILL", label: "Fill", sourceStepId: "FILL" },
+  {
+    id: "SIGNAL",
+    label: "Señal",
+    kind: "FACT",
+    group: "OPERATION",
+    sourceStepId: "SIGNAL",
+  },
+  {
+    id: "SELECTION",
+    label: "Selección · TOP-N",
+    kind: "FACT",
+    group: "OPERATION",
+    sourceStepId: "TOP_N",
+  },
+  {
+    // `TOP_N` NO es la decisión de cartera: es la SELECCIÓN/ranking del instrumento.
+    id: "DECISION",
+    label: "Decisión",
+    kind: "FACT",
+    group: "OPERATION",
+    sourceStepId: null,
+    derivedNote: "no hay traza durable de decisión de cartera",
+  },
+  {
+    id: "RISK",
+    label: "Riesgo",
+    kind: "FACT",
+    group: "OPERATION",
+    sourceStepId: "RISK",
+  },
+  {
+    id: "RESERVATION",
+    label: "Reserva",
+    kind: "FACT",
+    group: "OPERATION",
+    sourceStepId: "RESERVATION",
+  },
+  {
+    id: "ORDER",
+    label: "Orden",
+    kind: "FACT",
+    group: "OPERATION",
+    sourceStepId: "ORDER",
+  },
+  {
+    id: "FILL",
+    label: "Fill",
+    kind: "FACT",
+    group: "OPERATION",
+    sourceStepId: "FILL",
+  },
   {
     id: "POSITION",
     label: "Posición",
+    kind: "DERIVED",
+    group: "OPERATION",
     sourceStepId: "FILL",
     derivedNote: "posición derivada de los fills (no hay paso durable propio)",
   },
-  { id: "PROTECTION", label: "Protección", sourceStepId: "PROTECTION" },
   {
+    id: "PROTECTION",
+    label: "Protección",
+    kind: "FACT",
+    group: "OPERATION",
+    sourceStepId: "PROTECTION",
+  },
+  {
+    // SALIDA = intención/motivo; el hecho financiero durable es la LIQUIDACIÓN.
     id: "EXIT",
     label: "Salida",
+    kind: "DERIVED",
+    group: "OPERATION",
     sourceStepId: "SETTLEMENT",
-    derivedNote: "el hecho de salida es la liquidación durable",
+    derivedNote:
+      "salida = intención/motivo; el hecho durable es la liquidación",
   },
-  { id: "SETTLEMENT", label: "Liquidación", sourceStepId: "SETTLEMENT" },
-  { id: "RESULT", label: "Resultado", sourceStepId: "CYCLE_CLOSED" },
-  { id: "EXPLANATION", label: "Explicación", sourceStepId: null },
+  {
+    id: "SETTLEMENT",
+    label: "Liquidación",
+    kind: "FACT",
+    group: "OPERATION",
+    sourceStepId: "SETTLEMENT",
+  },
+  {
+    id: "RESULT",
+    label: "Resultado",
+    kind: "FACT",
+    group: "OPERATION",
+    sourceStepId: "CYCLE_CLOSED",
+  },
+  {
+    id: "EXPLANATION",
+    label: "Explicación",
+    kind: "EXPLANATION",
+    group: "OPERATION",
+    sourceStepId: null,
+  },
 ];
 
 function mapStepState(
@@ -193,6 +300,8 @@ function baseStage(
     id: spec.id,
     index,
     label: spec.label,
+    kind: spec.kind,
+    group: spec.group,
     sourceStepId: spec.sourceStepId,
     state,
     stateLabel: STORY_STATE_LABELS[state],
@@ -208,11 +317,10 @@ function baseStage(
 /** Hecho cuya medición se deduce del valor: sin valor NUNCA se declara MEDIDO. */
 function measuredFact(label: string, value: unknown): AutoOperationStoryFact {
   const measured = value !== null && value !== undefined;
-  const measurement = measured ? "COMPLETE" : "UNKNOWN";
   return {
     label,
-    value: formatMonitorFactValue(value, measurement),
-    measurement,
+    value: measured ? value : null,
+    measurement: measured ? "COMPLETE" : "UNKNOWN",
   };
 }
 
@@ -249,6 +357,49 @@ function buildExplanationStage(
 }
 
 /**
+ * Contexto que ORIGINÓ la operación. Instrumento/estrategia/dirección se copian del ciclo (o se
+ * declaran `NO MEDIDO`); universo PIT / régimen / ranking NO se materializan por ciclo, así que
+ * se declaran `NO MEDIDO` — nunca un valor de relleno.
+ */
+function buildContext(
+  cycle: AutoMonitorCycleV1 | null,
+): AutoOperationStoryContextItem[] {
+  const item = (
+    id: string,
+    label: string,
+    raw: string | null | undefined,
+    note: string | null = null,
+  ): AutoOperationStoryContextItem => {
+    const value = raw ?? null;
+    return {
+      id,
+      label,
+      value: value ?? NO_MEASUREMENT_LABEL,
+      measurement: value ? "COMPLETE" : "UNKNOWN",
+      note,
+    };
+  };
+  return [
+    item("INSTRUMENT", "Instrumento", cycle?.instrumentId ?? null),
+    item("STRATEGY", "Estrategia", cycle?.strategyVersion ?? null),
+    item("DIRECTION", "Dirección", cycle?.direction ?? null),
+    item(
+      "PIT_UNIVERSE",
+      "Universo PIT",
+      null,
+      "el watch PIT no se materializa por ciclo",
+    ),
+    item("REGIME", "Régimen", null, "sin régimen durable por ciclo"),
+    item(
+      "RANKING",
+      "Motivo de selección",
+      null,
+      "no hay motivo de selección durable por ciclo (ver Selección · TOP-N)",
+    ),
+  ];
+}
+
+/**
  * Pliega un ciclo del monitor (y, si existe, su explicación OOS/DÍA-D) en la historia única.
  *
  * ``cycle`` ausente ⇒ todas las etapas de traza quedan `NOT_MEASURED` (nunca `0`/`REACHED`).
@@ -282,7 +433,7 @@ export function buildAutoOperationStory(input: {
       measurement: step?.measurement ?? "UNKNOWN",
       facts: (step?.facts ?? []).map((fact) => ({
         label: fact.key,
-        value: formatMonitorFactValue(fact.value, fact.measurement),
+        value: fact.value,
         measurement: fact.measurement,
       })),
       note: joinNote(spec.derivedNote, step),
@@ -296,6 +447,7 @@ export function buildAutoOperationStory(input: {
     closed: cycle?.closed ?? null,
     closedMeasurement: cycle?.closedMeasurement ?? null,
     stages,
+    context: buildContext(cycle),
     result: cycle?.result
       ? {
           pnl: cycle.result.pnl ?? null,

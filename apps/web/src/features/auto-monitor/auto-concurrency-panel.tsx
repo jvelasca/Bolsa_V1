@@ -5,15 +5,17 @@
  * reconciliaciones y ventanas de gracia) viajan `null` + `UNKNOWN` y la UI los rotula
  * `NO MEDIDO`. `forcedReleases` sí se mide desde las reservas durables. Con `M2` el resto
  * pasa a datos reales del spine.
+ *
+ * Todo valor con su medición se pinta con `MeasurementValue`: un `PARTIAL` (suelo medido, no
+ * total) se distingue de un `COMPLETE` y un hueco se rotula, nunca se finge `0`.
  */
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MeasurementValue } from "@/components/measurement-value";
 import {
   formatLastConflict,
-  formatMeasurementLabel,
   type AutoMonitorConcurrencyV1,
 } from "@bolsa/shared";
-import { cn } from "@/lib/utils";
 
 function Metric({
   label,
@@ -26,29 +28,15 @@ function Metric({
   measurement: string;
   testId: string;
 }) {
-  const measured = value !== null && value !== undefined;
-  // Un ``PARTIAL`` SÍ trae valor (es un suelo medido), pero no es un total demostrado: se
-  // pinta distinto de un ``COMPLETE`` para que la UI no degrade la honestidad del DTO.
-  const partial = measured && measurement === "PARTIAL";
   return (
     <div className="flex items-baseline justify-between gap-2 border-b border-border/40 py-1 last:border-b-0">
       <span className="text-[11px] text-muted-foreground">{label}</span>
-      <span
-        data-testid={testId}
-        data-measurement={measurement}
-        className={cn(
-          "text-xs font-medium tabular-nums",
-          measured && !partial
-            ? "text-foreground/80"
-            : "text-amber-600 dark:text-amber-400",
-        )}
-      >
-        {!measured
-          ? formatMeasurementLabel(measurement)
-          : partial
-            ? `${value} · ${formatMeasurementLabel(measurement)}`
-            : value}
-      </span>
+      <MeasurementValue
+        testId={testId}
+        value={value}
+        measurement={measurement}
+        className="text-xs font-medium"
+      />
     </div>
   );
 }
@@ -125,26 +113,15 @@ export function AutoConcurrencyPanel({
           <span className="text-[11px] text-muted-foreground">
             Último conflicto
           </span>
-          <span
-            data-testid="auto-monitor-last-conflict"
-            data-measurement={concurrency.lastConflictMeasurement}
-            className={cn(
-              "text-xs font-medium",
-              concurrency.lastConflict == null ||
-                concurrency.lastConflictMeasurement === "PARTIAL"
-                ? "text-amber-600 dark:text-amber-400"
-                : "text-foreground/80",
-            )}
-          >
-            {formatLastConflict(
-              concurrency.lastConflict,
-              concurrency.lastConflictMeasurement,
-            )}
-            {concurrency.lastConflict != null &&
-            concurrency.lastConflictMeasurement === "PARTIAL"
-              ? ` · ${formatMeasurementLabel("PARTIAL")}`
-              : ""}
-          </span>
+          <MeasurementValue
+            testId="auto-monitor-last-conflict"
+            value={concurrency.lastConflict}
+            measurement={concurrency.lastConflictMeasurement}
+            formatValue={(value) =>
+              formatLastConflict(value, concurrency.lastConflictMeasurement)
+            }
+            className="text-xs font-medium"
+          />
         </div>
       </CardContent>
     </Card>
