@@ -199,7 +199,7 @@ export function NextActionHero({
       data-cabin-density="v2.25"
       data-cabin-visual={CABIN_VISUAL_VERSION}
     >
-      <p className={cn(CABIN_TYPE.eyebrow, "opacity-80")}>Próxima acción</p>
+      <p className={CABIN_TYPE.eyebrow}>Próxima acción</p>
       <p className={CABIN_TYPE.hero} data-testid="next-action-title">
         {action.title}
       </p>
@@ -263,7 +263,7 @@ export function NextActionHero({
       ) : null}
       {action.ctaHint ? (
         <p
-          className={cn("mt-1 font-medium opacity-80", CABIN_TYPE.meta)}
+          className={cn("mt-1 font-medium", CABIN_TYPE.meta)}
           data-testid="next-action-cta-hint"
         >
           {action.ctaHint}

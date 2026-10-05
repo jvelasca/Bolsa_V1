@@ -124,12 +124,13 @@ export function PlatformShell() {
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {trading ? (
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <h1 className="sr-only">Trading</h1>
                 <TradingLayout>
                   <Outlet />
                 </TradingLayout>
                 <TradingStatusBar />
-              </div>
+              </main>
             ) : !onBacktests ? (
               <main
                 className={cn(
@@ -151,6 +152,7 @@ export function PlatformShell() {
                     : "pointer-events-none fixed left-0 top-0 h-px w-px overflow-hidden opacity-0",
                 )}
                 aria-hidden={!onBacktests}
+                inert={!onBacktests}
                 data-testid="backtests-keepalive-host"
                 data-list-auto-keepalive={
                   listAutoActive && !onBacktests ? "1" : "0"

@@ -71,7 +71,8 @@ export function UniverseChip({
         className,
       )}
       title={title}
-      aria-label={title}
+      role={density === "icon" ? "img" : undefined}
+      aria-label={density === "icon" ? title : undefined}
       data-testid="universe-chip"
       data-universe={universe}
     >

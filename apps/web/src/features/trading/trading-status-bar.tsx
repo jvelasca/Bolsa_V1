@@ -143,7 +143,7 @@ export function TradingStatusBar() {
           <StatusSeparator />
 
           <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-            <span className="shrink-0 uppercase tracking-wide text-muted-foreground/70">
+            <span className="shrink-0 uppercase tracking-wide text-muted-foreground">
               Activa
             </span>
             {account ? (
@@ -176,7 +176,7 @@ export function TradingStatusBar() {
                     {OPERATIVA_MODE_LABEL[bookPrefs.mode]}
                   </span>
                 </Link>
-                <span className="hidden shrink-0 text-muted-foreground/60 sm:inline">
+                <span className="hidden shrink-0 text-muted-foreground sm:inline">
                   {account.currency}
                 </span>
               </>
@@ -193,7 +193,7 @@ export function TradingStatusBar() {
               key={id}
               className="flex shrink-0 items-center gap-1 whitespace-nowrap"
             >
-              <span className="text-muted-foreground/80">
+              <span className="text-muted-foreground">
                 <span className="trading-status-label-full">
                   {STATUS_LABELS[id]}:
                 </span>

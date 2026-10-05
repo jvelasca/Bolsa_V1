@@ -1,8 +1,9 @@
 /**
- * DÍA-D AUTO — selector de vista del monitor (`Ventana actual` / `DÍA-D AUTO`).
+ * AUTO — selector de vista del monitor (`Ventana actual` / `Operación` / `DÍA-D AUTO`).
  *
- * El modo por defecto es la ventana actual: la vista DÍA-D solo consulta artefactos cuando
- * el usuario la abre (no añade trabajo al monitor de producción).
+ * El modo por defecto es `Operación` (la historia única es la vista de trabajo); `current` queda
+ * como crudo/experto y `DÍA-D AUTO` como sandbox, que solo consulta artefactos cuando el usuario
+ * lo abre (no añade trabajo al monitor de producción).
  */
 
 import { Button } from "@/components/ui/button";

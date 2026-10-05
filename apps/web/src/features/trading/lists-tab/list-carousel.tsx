@@ -269,7 +269,7 @@ export function ListCarousel({
             >
               <span className="max-w-[96px] truncate">{list.name}</span>
 
-              <span className="ml-1 opacity-60">{list.itemCount}</span>
+              <span className="ml-1">{list.itemCount}</span>
             </button>
           );
         })}

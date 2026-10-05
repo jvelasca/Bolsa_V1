@@ -52,7 +52,7 @@ export function StrategyFilterCarousel({
   return (
     <div
       className={cn("flex min-w-0 items-center gap-0.5", className)}
-      role="tablist"
+      role="group"
       aria-label={ariaLabel}
     >
       <IconButton
@@ -81,9 +81,7 @@ export function StrategyFilterCarousel({
             <button
               key={chip.id}
               type="button"
-              role="tab"
-              aria-selected={isActive}
-              aria-pressed={hasSelection || undefined}
+              aria-pressed={isActive}
               disabled={chip.disabled}
               title={titleParts.join(" · ")}
               onClick={() => onChange(chip.id)}
@@ -99,9 +97,7 @@ export function StrategyFilterCarousel({
               )}
             >
               <span className="max-w-[9rem] truncate">{chip.label}</span>
-              <span className="ml-1 tabular-nums opacity-70">
-                ({chip.count})
-              </span>
+              <span className="ml-1 tabular-nums">({chip.count})</span>
               {hasSelection && selectedN > 0 ? (
                 <span className="ml-1 tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
                   ·{selectedN}

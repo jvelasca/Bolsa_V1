@@ -211,10 +211,10 @@ export function TaxReportPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <FileSpreadsheet className="h-6 w-6 text-primary" />
             Informe fiscal
-          </h2>
+          </h1>
           <p className="text-sm text-muted-foreground">
             Plusvalías realizadas y posiciones abiertas — simulación según
             perfil de la cuenta.
@@ -230,7 +230,10 @@ export function TaxReportPage() {
           <CardTitle className="text-base">Parámetros</CardTitle>
           <CardDescription>
             Método de coste y jurisdicción definidos en la cuenta ·{" "}
-            <Link to="/accounts" className="text-primary hover:underline">
+            <Link
+              to="/accounts"
+              className="text-primary underline hover:underline"
+            >
               editar perfil fiscal
             </Link>
           </CardDescription>

@@ -175,9 +175,9 @@ export function HistoryPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight">
             Libro · Historial
-          </h2>
+          </h1>
           <p className="text-sm text-muted-foreground">
             Ledger y fills del Libro
             {account ? ` · ${account.name}` : ""}.

@@ -38,7 +38,7 @@ export function ConfirmContent({
       <div>
         <div className="flex flex-wrap items-center gap-1.5">
           {!compact ? (
-            <h2 className="text-2xl font-semibold tracking-tight">Confirmar</h2>
+            <h1 className="text-2xl font-semibold tracking-tight">Confirmar</h1>
           ) : null}
           <MesaTipButton tip="confirm-firmar" />
           {showFullPageLink ? (

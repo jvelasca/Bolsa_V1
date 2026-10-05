@@ -2,6 +2,36 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.54-beta] — `UI`: **Auditoría UI / accesibilidad de las 15 rutas** (críticos a 0)
+
+**Bump** `2.11.53-beta` → `2.11.54-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello **de UI** (accesibilidad y estructura): **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS se **heredan y citan** de `v2.88.51`/`v2.88.50`.
+
+Auditoría con **navegador real** (`vite dev` + API) y **`axe-core 4.10.2`** inyectado en la página, sobre las **15 rutas de nivel 1**, más sondas de texto (`undefined`/`NaN`/`null`) y diagnóstico de `main`/`h1` por ruta. Informe falsable completo: [`docs/engineering/auditoria-ui-v2.88.54-2026-10-05.md`](docs/engineering/auditoria-ui-v2.88.54-2026-10-05.md).
+
+### Parte A — Críticos a 0
+
+- **`button-name` (`critical`, 2 nodos, `/screeners`)**: dos botones *icon-only* del panel de rastreadores (`trackers-panel.tsx`) sin nombre accesible → `title` + `aria-label` («Ejecutar rastreador ahora», «Eliminar rastreador»).
+- **`select-name` (`critical`, 1 nodo en `/screeners` y `/alerts`)**: los `<select>` de preset/estrategia guardada colgaban de un `<fieldset><legend>Estrategia</legend>` que **no** etiqueta al control → `aria-label="Estrategia preset"` / `"Estrategia guardada"` en `scan-runner-form.tsx` y `signal-alerts-section.tsx`.
+
+### Parte B — Interactividad anidada y *landmarks*
+
+- **`nested-interactive` (`serious`, 506 nodos) a 0**: (a) las filas del hub de `/instruments` eran `div[role="button"][tabindex=0]` **con botones dentro** (`303` nodos) → se elimina el rol/tabIndex redundante y se conserva la vía de teclado por el `<button>` interno; (b) la pestaña de gráfico (`charts-zone.tsx`) era `div[role="button"]` con el botón de cerrar dentro (`203` nodos) → pasa a contenedor no interactivo con **dos botones hermanos**.
+- **`landmark-one-main` + `region` (`200` nodos) a 0 en `/trading`**: en `platform-shell.tsx` la rama de Trading montaba un `<div>` (la única `main` del DOM era el *keepalive* de Backtests, `aria-hidden` + `inert`) → ahora `<main>`, con `<h1 class="sr-only">Trading</h1>`. Verificado: `main = 1` en las 15 rutas. El efecto colateral (`landmark-complementary-is-top-level` por el `<aside>` del rail de dibujo) se cierra aquí: `chart-drawing-sidebar.tsx` pasa a `<div>` ⇒ **`/trading` 0 violaciones**.
+- **`page-has-heading-one` (`moderate`, 10 rutas) a 0**: el título de página pasa a `<h1>` en las 9 vistas que lo marcaban como `<h2>` (`dashboard-page`, `backtests-page`, `instruments-page`, `accounts-page`, `screeners-page`, `alerts-page`, `tax-report-page`, `confirm-content`, `history-page`).
+
+### Parte C — Contraste y enlaces de prosa
+
+- **`color-contrast` (`serious`, 25 nodos) a 0**: causa raíz **única** — apilar modificadores de opacidad sobre `--bolsa-muted-foreground` (`#8b98a8`, que por sí solo da ≈6:1) hundía el texto meta de 8–12 px a **2.72–4.36:1**. Se retira la opacidad apilada (`/55`…`/90`, `opacity-60/70`); **el token de tema no se toca**.
+- **`link-in-text-block` (`serious`, 7 nodos) a 0**: enlaces `text-primary` sobre prosa `text-muted-foreground` con contraste enlace/contexto **1.17:1** (mínimo 3:1) y subrayado solo en `hover` → subrayado permanente en los enlaces de prosa de `screeners-page`, `research-page`, `tax-report-page` y `operational-console-page`.
+
+### Parte D — Hallazgo abierto declarado y sello
+
+- **Abierto:** `heading-order` (best-practice, `moderate`, **1 nodo**) en **11 rutas** — el primer encabezado de tarjeta es `h3` y salta el `h2`. Remediación acotada (promover ese nodo a `h2`) en el informe §3. Se declara explícitamente que este sello **sustituye** `page-has-heading-one` (10 rutas) por `heading-order` (11 rutas) al dotar a las páginas de un `h1` real: ambos `moderate`/best-practice, y el `h1` es prerequisito de un árbol correcto.
+- **Sin fugas de valor**: ninguna ruta pinta `undefined`/`NaN`/`null` de JavaScript; la única coincidencia textual (`/overview`: «…llega vacío; cobertura uneven en bancos (null-if-incomplete)») es copy honesta.
+- **Tests/gates:** bump guard **passed**; `window-forward` **25/25**; `@bolsa/shared` build limpio + **810 passed · 1 todo** (`97` ficheros); `@bolsa/web` **1386 passed** (`241` ficheros); `typecheck` limpio; `lint` **0 errores** (`23` warnings pre-existentes); `contract:check` **OK**.
+- **Versión:** `package.json` → `2.11.54-beta`; `meta.bump` alineado en `v2_89`…`v2_97` (guard `test_dia_d_bump_guard.py`).
+- **Evidencia:** [`docs/engineering/evidence/v2.88.54/README.md`](docs/engineering/evidence/v2.88.54/README.md). **Entrega a auditoría externa (MIA):** `docs/engineering/entrega-auditoria-externa-mia-v2.88.54-2026-10-05.md`. Re-anclaje del freeze en `scripts/lib/window-forward.mjs`.
+
 ## [2.11.53-beta] — `AUTO · UI`: **AUTO UI REFACTOR 1.1** (operación única consolidada)
 
 **Bump** `2.11.52-beta` → `2.11.53-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello dirigido **de UI/read-model**: **Δ AUTO decision/execution motor = 0** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS se **heredan y citan** de `v2.88.51`/`v2.88.50`. **NO** se implementa `PortfolioDecision` (`UI52-02`) ni la navegación global (`UI52-04`).

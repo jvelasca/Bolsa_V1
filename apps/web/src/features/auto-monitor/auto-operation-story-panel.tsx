@@ -2,7 +2,7 @@
  * AUTO UI REFACTOR 1.0 — PILOTO de la "operación única".
  *
  * Pinta la historia ordenada de UN ciclo y reutiliza los paneles actuales como detalle experto.
- * Separa los HECHOS de la operación (`group: OPERATION`, 13 etapas) del CONTEXTO que la originó
+ * Separa los HECHOS de la operación (`group: OPERATION`, 13 conceptos; 12 filas con `EXIT` plegado en `SETTLEMENT`) del CONTEXTO que la originó
  * (`OPPORTUNITY` + universo PIT/régimen/ranking declarados `NO MEDIDO`). Read-only: NO re-deriva
  * cifras ni completa pasos; un hueco se rotula `NO MEDIDO` (nunca `0`).
  *

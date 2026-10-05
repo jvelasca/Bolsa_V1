@@ -106,7 +106,7 @@ function FilterChip({
     >
       <span className="truncate">{label}</span>
       {badge != null && badge !== "" ? (
-        <span className="ml-1 tabular-nums opacity-70">{badge}</span>
+        <span className="ml-1 tabular-nums">{badge}</span>
       ) : null}
     </button>
   );

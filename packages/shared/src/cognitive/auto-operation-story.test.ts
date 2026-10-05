@@ -1,7 +1,7 @@
 /**
  * AUTO UI REFACTOR 1.0 — view model de "operación única".
  *
- * Invariantes: orden fijo de las 14 etapas del modelo; `SELECTION` (TOP-N) ≠ `DECISION`
+ * Invariantes: orden fijo de los 14 conceptos del modelo; `SELECTION` (TOP-N) ≠ `DECISION`
  * (no hay traza durable de decisión de cartera ⇒ `NOT_MEASURED`); `EXIT` es DERIVADA de
  * `SETTLEMENT`; `OPPORTUNITY` vive en el bloque `context`; una etapa sin traza es
  * `NOT_MEASURED` (nunca `0`) y los hechos se copian del paso durable con su medición.
@@ -66,7 +66,7 @@ function cycle(): AutoMonitorCycleV1 {
 }
 
 describe("buildAutoOperationStory", () => {
-  it("respeta el orden fijo de las catorce etapas del modelo", () => {
+  it("respeta el orden fijo de los catorce conceptos del modelo", () => {
     const story = buildAutoOperationStory({ cycle: cycle() });
     expect(story.stages.map((stage) => stage.id)).toEqual([
       ...AUTO_OPERATION_STORY_ORDER,

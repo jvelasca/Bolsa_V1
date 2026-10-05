@@ -189,6 +189,7 @@ export function SignalAlertsSection() {
             {strategySource === "preset" && (
               <select
                 value={presetKey}
+                aria-label="Estrategia preset"
                 onChange={(e) =>
                   setPresetKey(e.target.value as BacktestStrategyType)
                 }
@@ -212,6 +213,7 @@ export function SignalAlertsSection() {
             {strategySource === "saved" && (
               <select
                 value={savedStrategyId}
+                aria-label="Estrategia guardada"
                 onChange={(e) => setSavedStrategyId(e.target.value)}
                 className="ml-6 w-[calc(100%-1.5rem)] rounded-md border border-border bg-background px-2 py-1.5 text-sm"
               >

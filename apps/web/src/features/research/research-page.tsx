@@ -175,11 +175,14 @@ export function ResearchPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Capa de explicación: ¿por qué esta tesis, este riesgo, esta acción? No
           es una mesa de operaciones. Actuar en{" "}
-          <Link to="/trading" className="text-primary hover:underline">
+          <Link
+            to="/trading"
+            className="text-primary underline hover:underline"
+          >
             Mercado
           </Link>{" "}
           · excepciones en{" "}
-          <Link to="/mesa" className="text-primary hover:underline">
+          <Link to="/mesa" className="text-primary underline hover:underline">
             Hoy
           </Link>{" "}
           · firmar en Confirm.

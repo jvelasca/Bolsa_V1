@@ -138,10 +138,10 @@ export function AlertsPage() {
   return (
     <div className="space-y-6 p-4">
       <div>
-        <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <Bell className="h-6 w-6 text-primary" />
           Alertas de precio
-        </h2>
+        </h1>
         <p className="text-sm text-muted-foreground">
           Notificaciones por cierre diario (Yahoo) o cotización XTB en tiempo
           real.

@@ -446,6 +446,7 @@ export function ScanRunnerForm({
           {config.scanSource === "preset" && (
             <select
               value={config.presetKey}
+              aria-label="Estrategia preset"
               onChange={(e) =>
                 onChange({ presetKey: e.target.value as BacktestStrategyType })
               }
@@ -488,6 +489,7 @@ export function ScanRunnerForm({
           {config.scanSource === "saved" && (
             <select
               value={config.savedStrategyId}
+              aria-label="Estrategia guardada"
               onChange={(e) => onChange({ savedStrategyId: e.target.value })}
               className="ml-6 w-[calc(100%-1.5rem)] rounded-md border border-border bg-background px-3 py-2 text-sm"
             >

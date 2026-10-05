@@ -252,10 +252,7 @@ function ScoreCell({
         ? "text-destructive"
         : "text-foreground";
   return (
-    <span
-      className={cn("tabular-nums font-medium", tone, warn && "opacity-70")}
-      title={title}
-    >
+    <span className={cn("tabular-nums font-medium", tone)} title={title}>
       {Math.round(value)}
       {warn ? (
         <span className="ml-0.5 text-[9px] font-normal text-amber-700">·</span>
@@ -321,7 +318,7 @@ function SeguimientoCell({
           )}
         >
           {hubTrackerChipLabel(chip)}
-          <span className="ml-0.5 opacity-70">{chip.modeShort}</span>
+          <span className="ml-0.5">{chip.modeShort}</span>
         </Link>
       ))}
       {overflow > 0 ? (
@@ -783,7 +780,7 @@ export function InstrumentsPage() {
             <p className="truncate text-[10px] text-muted-foreground">
               {instrument.name}
               {instrument.sector ? (
-                <span className="ml-1 opacity-70">· {instrument.sector}</span>
+                <span className="ml-1">· {instrument.sector}</span>
               ) : null}
             </p>
           </button>
@@ -915,7 +912,7 @@ export function InstrumentsPage() {
     <div className="flex h-[calc(100dvh-3.5rem)] min-h-[480px] flex-col gap-3 overflow-hidden p-4 md:p-6">
       <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Instrumentos</h2>
+          <h1 className="text-xl font-semibold tracking-tight">Instrumentos</h1>
           <p className="text-xs text-muted-foreground">
             Lista + detalle colapsable · secciones apiladas · layout persistente
             por navegador
@@ -1286,18 +1283,9 @@ export function InstrumentsPage() {
                   {rows.map((instrument) => (
                     <div
                       key={instrument.id}
-                      role="button"
-                      tabIndex={0}
                       onClick={() => {
                         setSelectedId(instrument.id);
                         setDetailPanelOpen(layoutMode, true);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setSelectedId(instrument.id);
-                          setDetailPanelOpen(layoutMode, true);
-                        }
                       }}
                       className={cn(
                         "grid cursor-pointer items-center py-1.5 hover:bg-muted/30",

@@ -68,7 +68,7 @@ export function TradingAppThreads() {
       data-testid="trading-status-threads"
       title="Procesos / colas en curso"
     >
-      <span className="hidden shrink-0 px-0.5 text-[8px] uppercase tracking-wide text-muted-foreground/55 sm:inline">
+      <span className="hidden shrink-0 px-0.5 text-[8px] uppercase tracking-wide text-muted-foreground sm:inline">
         Colas
       </span>
 

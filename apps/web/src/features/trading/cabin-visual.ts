@@ -23,7 +23,7 @@ export const CABIN_TYPE = {
   operativa: "cabin-type-operativa text-foreground",
   meta: "cabin-type-meta text-muted-foreground",
   eyebrow:
-    "cabin-type-meta font-semibold uppercase tracking-wider text-muted-foreground/90",
+    "cabin-type-meta font-semibold uppercase tracking-wider text-muted-foreground",
   /** @deprecated V2.31 — alias de `hero`. */
   heroTitle: "cabin-type-hero text-foreground",
   /** @deprecated V2.31 — alias de `operativa`. */

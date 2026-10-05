@@ -124,12 +124,12 @@ export function BacktestsPage() {
           <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
             <div className="flex min-w-0 flex-wrap items-end gap-2.5 sm:gap-3">
               <UniverseChip force="lab" className="mb-1" />
-              <h2
+              <h1
                 className="text-2xl font-semibold tracking-tight"
                 title="Prueba una estrategia sobre un valor y un periodo. El resto de pestañas es secundario. En Probar, arrastra los separadores entre paneles para adaptar el espacio; se guarda en este dispositivo."
               >
                 Backtesting
-              </h2>
+              </h1>
               <BacktestDiaDOriginControl
                 diaD={diaD}
                 onDiaDChange={handleDiaDChange}

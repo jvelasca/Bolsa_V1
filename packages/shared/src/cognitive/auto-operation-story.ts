@@ -5,8 +5,8 @@
  * paso durable del monitor (con su medición) o se declara `NOT_MEASURED` cuando no existe traza
  * por ciclo. Regla intacta: un valor NO MEDIDO nunca es `0`.
  *
- * Modelo semántico (`docs/engineering/spec-auto-ui-semantic-model-1-2026-10-05.md`): cada etapa
- * declara su `kind` (hecho / derivada / contexto / explicación) y su `group`. Las 14 etapas del
+ * Modelo semántico (`docs/engineering/spec-auto-ui-semantic-model-1-2026-10-05.md`): cada concepto
+ * declara su `kind` (hecho / derivada / contexto / explicación) y su `group`. Los 14 conceptos del
  * modelo son `OPPORTUNITY → SIGNAL → SELECTION → DECISION → RISK → RESERVATION → ORDER → FILL →
  * POSITION → PROTECTION → EXIT → SETTLEMENT → RESULT → EXPLANATION`; `OPPORTUNITY` es CONTEXTO
  * (no un hecho de la operación) y `SELECTION` (TOP-N) es distinto de `DECISION` (cartera).
@@ -98,7 +98,7 @@ export type AutoOperationStoryStage = {
   /**
    * Etapa en la que esta se PLIEGA visualmente (``null`` = fila propia). `EXIT` se pliega en
    * `SETTLEMENT` mientras no exista una traza durable propia de intención de salida: la UI no
-   * pinta dos etapas `REACHED` a partir del MISMO hecho financiero (spec §4.2).
+   * pinta dos filas `REACHED` a partir del MISMO hecho financiero (spec §4.2).
    */
   foldedInto: AutoOperationStoryStageId | null;
   state: AutoOperationStoryState;
@@ -161,7 +161,7 @@ export type AutoOperationStoryV1 = {
   direction: string | null;
   closed: boolean | null;
   closedMeasurement: string | null;
-  /** Las 14 etapas del modelo, con su `kind`/`group` (la UI no re-ordena). */
+  /** Los 14 conceptos del modelo, con su `kind`/`group` (la UI no re-ordena). */
   stages: AutoOperationStoryStage[];
   /** Contexto que originó la operación (universo PIT, estrategia, régimen, …). */
   context: AutoOperationStoryContextItem[];
@@ -452,7 +452,7 @@ function buildContext(
 /**
  * Pliega un ciclo del monitor (y, si existe, su explicación OOS/DÍA-D) en la historia única.
  *
- * ``cycle`` ausente ⇒ todas las etapas de traza quedan `NOT_MEASURED` (nunca `0`/`REACHED`).
+ * ``cycle`` ausente ⇒ todos los conceptos de traza quedan `NOT_MEASURED` (nunca `0`/`REACHED`).
  */
 export function buildAutoOperationStory(input: {
   cycle?: AutoMonitorCycleV1 | null;

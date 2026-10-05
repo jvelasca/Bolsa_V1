@@ -14,7 +14,7 @@ import {
   type InstrumentWithMetaDto,
 } from "@bolsa/shared";
 import { LayoutList, Search, Shapes } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { LIST_AUTO_BATCH_SIZE } from "@/features/backtests/backtest-list-auto";
 import {
@@ -122,6 +122,7 @@ export function BacktestUniversePicker({
   }, [listMembers, listFilter]);
 
   const showDropdown = mode === "single" && query.trim().length > 0;
+  const listboxId = useId();
 
   const statusCounts = useMemo(() => {
     let withTop = 0;
@@ -186,13 +187,17 @@ export function BacktestUniversePicker({
               placeholder="Buscar ticker o nombre…"
               className="w-full rounded-md border border-border bg-background py-1.5 pl-7 pr-2 text-xs outline-none ring-primary focus:ring-1"
               autoComplete="off"
+              role="combobox"
+              aria-haspopup="listbox"
               aria-autocomplete="list"
               aria-expanded={showDropdown}
+              aria-controls={listboxId}
             />
           </div>
 
           {showDropdown && (
             <div
+              id={listboxId}
               className="scroll-area max-h-36 overflow-auto rounded border border-border bg-background text-xs"
               role="listbox"
               aria-label="Coincidencias en BD"

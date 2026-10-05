@@ -20,37 +20,35 @@ export function ChartsZone({ children }: { children: ReactNode }) {
           {charts.map((tab) => (
             <div
               key={tab.id}
-              role="button"
-              tabIndex={tab.id === activeChartId ? 0 : -1}
               data-testid={
                 tab.id === activeChartId ? "chart-active-tab" : undefined
               }
               data-instrument-id={tab.instrumentId}
               data-symbol={tab.label}
               data-active={tab.id === activeChartId ? "true" : undefined}
-              onClick={() => {
-                selectChartTab(tab.id);
-                requestChartReflow();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") selectChartTab(tab.id);
-              }}
               className={cn(
-                "group flex max-w-[140px] cursor-pointer items-center gap-0.5 rounded px-2 py-0.5 text-[11px]",
+                "group flex max-w-[140px] items-center gap-0.5 rounded px-2 py-0.5 text-[11px]",
                 tab.id === activeChartId
                   ? "bg-accent text-primary"
                   : "hover:bg-accent/60",
               )}
             >
-              <span className="truncate">{tab.label}</span>
+              <button
+                type="button"
+                title={tab.label}
+                onClick={() => {
+                  selectChartTab(tab.id);
+                  requestChartReflow();
+                }}
+                className="min-w-0 truncate text-left"
+              >
+                {tab.label}
+              </button>
               <button
                 type="button"
                 title="Cerrar gráfico"
                 aria-label="Cerrar gráfico"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeChartTab(tab.id);
-                }}
+                onClick={() => closeChartTab(tab.id)}
                 className="rounded p-0.5 opacity-60 hover:bg-background hover:opacity-100"
               >
                 <X className="h-3 w-3" />

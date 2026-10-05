@@ -521,7 +521,7 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
       ref={rootRef}
       className="chart-drawing-sidebar relative z-40 flex shrink-0"
     >
-      <aside
+      <div
         className={cn(
           "chart-drawing-sidebar-rail flex w-9 flex-col items-center gap-1 border-r border-border bg-card/40 py-1 sm:w-10",
           openFlyout && "relative z-[202]",
@@ -634,7 +634,7 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
         >
           <Eraser className="h-3.5 w-3.5" />
         </button>
-      </aside>
+      </div>
       {isShapeDrawTool(tool) && !openFlyout && (
         <div className="absolute left-9 top-1 z-20 sm:left-10">
           <ChartDrawToolStyleBar tool={tool} />

@@ -517,7 +517,7 @@ export function OverviewPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl space-y-1">
-          <h2 className="text-2xl font-semibold tracking-tight">Overview</h2>
+          <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
           <p className="text-sm text-muted-foreground">
             Cuenta activa, patrimonio y atajos a Trading, Backtesting y análisis
             fundamental.

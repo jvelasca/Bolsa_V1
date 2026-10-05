@@ -485,6 +485,8 @@ export function TrackersPanel({
                       type="button"
                       size="sm"
                       variant="outline"
+                      title="Ejecutar rastreador ahora"
+                      aria-label="Ejecutar rastreador ahora"
                       disabled={isRunning}
                       onClick={() => runMutation.mutate(tracker.id)}
                     >
@@ -510,6 +512,8 @@ export function TrackersPanel({
                       size="sm"
                       variant="ghost"
                       className="text-destructive"
+                      title="Eliminar rastreador"
+                      aria-label="Eliminar rastreador"
                       disabled={deleteMutation.isPending}
                       onClick={() => deleteMutation.mutate(tracker.id)}
                     >

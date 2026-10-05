@@ -87,7 +87,7 @@ export function OperationalConsolePage() {
             Posiciones y CTAs de desriesgo en{" "}
             <Link
               to="/mesa?view=posiciones"
-              className="text-primary hover:underline"
+              className="text-primary underline hover:underline"
             >
               Libro · Operaciones
             </Link>
