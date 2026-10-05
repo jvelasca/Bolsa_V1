@@ -70,4 +70,21 @@ describe("AutoOperacionPage", () => {
     expect(singleH1()).toHaveLength(1);
     expect(singleH1()[0]?.textContent).toContain("MSFT");
   });
+
+  it("un cycleId inexistente se declara con el id pedido, sin inventar otro ciclo", () => {
+    render(
+      <MemoryRouter initialEntries={["/auto/operar/operacion/does-not-exist"]}>
+        <Routes>
+          <Route
+            path="/auto/operar/operacion/:cycleId"
+            element={<AutoOperacionPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(singleH1()).toHaveLength(1);
+    expect(singleH1()[0]?.textContent).toContain("does-not-exist");
+    expect(singleH1()[0]?.textContent).not.toContain("AAPL");
+    expect(singleH1()[0]?.textContent).not.toContain("MSFT");
+  });
 });

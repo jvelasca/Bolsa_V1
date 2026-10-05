@@ -68,3 +68,9 @@ flowchart LR
 - **`PortfolioDecision` durable (`UI52-02`)** y **contrato de explicación por `cycleId`**: abiertas (spine/backend).
 - **PIT histórico institucional** y **Execution Analysis** (`23 orden_creada_sin_fill`): P3 abiertas.
 - **No** se toca motor ni se re-mide DÍA-D.
+
+---
+
+## 6. Addendum `2.1.1` (sello `v2.88.57-beta`) — cierre del **deep-link inválido (P2)**
+
+El hueco de integridad detectado en la auditoría externa de `v2.88.56` («Deep-link inválido») queda **CERRADO** en [spec 2.1.1](./spec-auto-ui-refactor-2-1-1-2026-10-05.md): un `cycleId` explícito (ruta o `?cycle=`) que no existe en la ventana **no** cae a `cycles[0]`; el `AutoOperationStoryPanel` declara «Operación no encontrada» sin pintar la historia de otra operación.

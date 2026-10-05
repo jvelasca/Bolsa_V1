@@ -141,7 +141,10 @@ vi.mock("@/features/accounts/use-active-account", () => ({
   }),
 }));
 
-import { AutoOperationStoryPanel } from "@/features/auto-monitor/auto-operation-story-panel";
+import {
+  AutoOperationStoryPanel,
+  resolveAutoOperationSelection,
+} from "@/features/auto-monitor/auto-operation-story-panel";
 
 function LocationProbe() {
   const location = useLocation();
@@ -153,14 +156,21 @@ function LocationProbe() {
   );
 }
 
-function renderPanel() {
+function renderPanel(options?: {
+  cycleIdOverride?: string | null;
+  initialEntries?: string[];
+}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={["/auto-monitor?mode=operation"]}>
-        <AutoOperationStoryPanel />
+      <MemoryRouter
+        initialEntries={
+          options?.initialEntries ?? ["/auto-monitor?mode=operation"]
+        }
+      >
+        <AutoOperationStoryPanel cycleIdOverride={options?.cycleIdOverride} />
         <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -302,5 +312,119 @@ describe("AutoOperationStoryPanel", () => {
     const params = new URLSearchParams(location.split("?")[1] ?? "");
     expect(params.get("mode")).toBe("current");
     expect(params.get("cycle")).toBe("cyc-1");
+  });
+
+  it("un cycleId de ruta inexistente NO cae a cycles[0] (declara 'no encontrada')", async () => {
+    renderPanel({ cycleIdOverride: "does-not-exist" });
+
+    const notFound = await screen.findByTestId(
+      "auto-operation-story-not-found",
+    );
+    expect(notFound.getAttribute("data-cycle-id")).toBe("does-not-exist");
+    expect(notFound.textContent).toContain("does-not-exist");
+
+    // Jamás se pinta la historia de OTRO ciclo real.
+    expect(screen.queryAllByTestId("auto-operation-story-stage")).toHaveLength(
+      0,
+    );
+    expect(screen.queryByText("OOS_SUPPORTED")).toBeNull();
+    expect(screen.queryByTestId("auto-operation-story-context")).toBeNull();
+    // Sin ciclo válido no hay destino técnico que ofrecer.
+    expect(
+      screen.queryByTestId("auto-operation-story-open-technical"),
+    ).toBeNull();
+    // El selector sigue como vía de recuperación, sin ningún ciclo presionado.
+    expect(
+      screen
+        .getAllByTestId("auto-operation-story-cycle")
+        .every((button) => button.getAttribute("aria-pressed") === "false"),
+    ).toBe(true);
+  });
+
+  it("un ?cycle= explícito inexistente tampoco cae a cycles[0]", async () => {
+    renderPanel({
+      initialEntries: ["/auto-monitor?mode=operation&cycle=does-not-exist"],
+    });
+
+    const notFound = await screen.findByTestId(
+      "auto-operation-story-not-found",
+    );
+    expect(notFound.getAttribute("data-cycle-id")).toBe("does-not-exist");
+    expect(screen.queryAllByTestId("auto-operation-story-stage")).toHaveLength(
+      0,
+    );
+  });
+});
+
+describe("resolveAutoOperationSelection", () => {
+  const cycles = [
+    { cycleId: "cyc-1", instrumentId: "AAA" },
+    { cycleId: "cyc-2", instrumentId: "BBB" },
+  ];
+
+  it("sin selección explícita conserva el fallback a cycles[0]", () => {
+    const result = resolveAutoOperationSelection({ cycles, hasLoaded: true });
+    expect(result.requestedCycleId).toBeNull();
+    expect(result.notFound).toBe(false);
+    expect(result.selectedCycle?.cycleId).toBe("cyc-1");
+  });
+
+  it("un override válido selecciona ese ciclo (no el primero)", () => {
+    const result = resolveAutoOperationSelection({
+      cycles,
+      overrideCycleId: "cyc-2",
+      hasLoaded: true,
+    });
+    expect(result.selectedCycle?.cycleId).toBe("cyc-2");
+    expect(result.notFound).toBe(false);
+  });
+
+  it("un id explícito inexistente NO cae a cycles[0]", () => {
+    const result = resolveAutoOperationSelection({
+      cycles,
+      overrideCycleId: "does-not-exist",
+      hasLoaded: true,
+    });
+    expect(result.requestedCycleId).toBe("does-not-exist");
+    expect(result.notFound).toBe(true);
+    expect(result.selectedCycle).toBeNull();
+  });
+
+  it("un ?cycle= explícito inexistente se comporta igual", () => {
+    const result = resolveAutoOperationSelection({
+      cycles,
+      queryCycleId: "does-not-exist",
+      hasLoaded: true,
+    });
+    expect(result.notFound).toBe(true);
+    expect(result.selectedCycle).toBeNull();
+  });
+
+  it("durante la carga NO declara notFound (evita un falso negativo)", () => {
+    const result = resolveAutoOperationSelection({
+      cycles,
+      overrideCycleId: "does-not-exist",
+      hasLoaded: false,
+    });
+    expect(result.notFound).toBe(false);
+  });
+
+  it("la ruta canónica tiene prioridad sobre ?cycle=", () => {
+    const result = resolveAutoOperationSelection({
+      cycles,
+      overrideCycleId: "cyc-2",
+      queryCycleId: "cyc-1",
+      hasLoaded: true,
+    });
+    expect(result.selectedCycle?.cycleId).toBe("cyc-2");
+  });
+
+  it("recorta espacios alrededor de un id válido", () => {
+    const result = resolveAutoOperationSelection({
+      cycles,
+      overrideCycleId: "  cyc-1  ",
+      hasLoaded: true,
+    });
+    expect(result.selectedCycle?.cycleId).toBe("cyc-1");
   });
 });
