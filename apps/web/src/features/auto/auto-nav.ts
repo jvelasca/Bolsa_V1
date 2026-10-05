@@ -26,6 +26,13 @@ export const AUTO_SISTEMA_PATH = "/auto/sistema" as const;
 /** Base de la operación canónica (selección por `cycleId` en la URL). */
 export const AUTO_OPERACION_BASE_PATH = "/auto/operar/operacion" as const;
 
+/**
+ * Monitor experto (ventana cruda). Vive FUERA del espacio `/auto/*` (ADR-044): es la
+ * superficie técnica del monitor, no una sexta sección. Los deep-links de la operación
+ * canónica apuntan aquí para el "detalle técnico".
+ */
+export const AUTO_MONITOR_PATH = "/auto-monitor" as const;
+
 export const AUTO_SECTION = {
   operar: "operar",
   cartera: "cartera",
@@ -86,6 +93,34 @@ export function autoOperacionHref(cycleId?: string | null): string {
   return id
     ? `${AUTO_OPERACION_BASE_PATH}/${encodeURIComponent(id)}`
     : AUTO_OPERAR_PATH;
+}
+
+/**
+ * Deep-link al detalle técnico (ventana actual del monitor experto). El `cycle`
+ * preselecciona y enfoca el ciclo en la vista `current` (no es un parámetro inerte).
+ */
+export function autoTechnicalDetailHref(cycleId?: string | null): string {
+  const params = new URLSearchParams({ mode: "current" });
+  const id = cycleId?.trim();
+  if (id) params.set("cycle", id);
+  return `${AUTO_MONITOR_PATH}?${params.toString()}`;
+}
+
+/**
+ * Deep-link a la explicación DÍA-D (Análisis · pestaña DÍA-D · sub-vista feedback).
+ * Mueve el destino al workspace AUTO (`/auto/analisis`), no a la URL del monitor.
+ * Preselecciona la ventana y enfoca el símbolo si se conocen.
+ */
+export function autoDiaDHref(input?: {
+  window?: string | null;
+  symbol?: string | null;
+}): string {
+  const params = new URLSearchParams({ tab: "dia-d", view: "feedback" });
+  const window = input?.window?.trim();
+  const symbol = input?.symbol?.trim();
+  if (window) params.set("window", window);
+  if (symbol) params.set("symbol", symbol);
+  return `${AUTO_ANALISIS_PATH}?${params.toString()}`;
 }
 
 /**

@@ -162,7 +162,179 @@ export type E2eMockRouteOpts = {
    * ≠ flip capital / ≠ Accept LIVE / ≠ PAPER_D_EXECUTE.
    */
   liveVenue?: boolean;
+  /**
+   * V2.88.56 — espacio AUTO (`/auto/*`): monitor operativo + artefactos DÍA-D de
+   * feedback, para certificar la navegación `Operación → detalle técnico/DÍA-D`.
+   */
+  auto?: boolean;
 };
+
+/** Ciclo AUTO mínimo y determinista para el mock de navegación UI 2.1. */
+const E2E_AUTO_CYCLE_A = "e2e-cycle-aaa";
+const E2E_AUTO_CYCLE_B = "e2e-cycle-bbb";
+const E2E_AUTO_SYMBOL = "AAA";
+const E2E_AUTO_WINDOW = "2026-09-29_2026-09-30";
+
+function autoMonitorCycle(
+  cycleId: string,
+  instrumentId: string,
+  closed: boolean,
+) {
+  return {
+    cycleId,
+    instrumentId,
+    strategyVersion: "sv-e2e",
+    direction: "long",
+    closed,
+    closedMeasurement: "COMPLETE",
+    steps: [
+      {
+        id: "SIGNAL",
+        state: "reached",
+        at: "2026-09-29T20:00:00Z",
+        measurement: "COMPLETE",
+        facts: [{ key: "rank", value: 1, measurement: "COMPLETE" }],
+        note: null,
+      },
+      {
+        id: "TOP_N",
+        state: "reached",
+        at: "2026-09-29T20:00:01Z",
+        measurement: "COMPLETE",
+        facts: [],
+        note: null,
+      },
+      {
+        id: "FILL",
+        state: "reached",
+        at: "2026-09-30T09:00:00Z",
+        measurement: "COMPLETE",
+        facts: [],
+        note: null,
+      },
+    ],
+    result: { pnl: 250, closedAt: "2026-09-30T15:00:00Z" },
+    notes: [],
+  };
+}
+
+function autoOperationalMonitorMock() {
+  return {
+    key: "auto_operational_monitor_v1",
+    readOnly: true,
+    accountId: E2E_ACCOUNT_ID,
+    asOf: "2026-10-01T00:00:00Z",
+    header: {
+      engineId: "auto-e2e",
+      state: "RUNNING",
+      venue: "paper",
+      granularity: { decision: "1d", execution: "signal_bar" },
+      decisionClock: "CLOSED BAR",
+      executionDeclared: "next_bar_open",
+      executionEnabled: false,
+      protectionModel: "bar_ohlc",
+      heartbeatSeconds: 60,
+      graceSeconds: 61,
+      lastHeartbeatAt: "2026-10-01T09:00:00Z",
+      lastHeartbeatMeasurement: "COMPLETE",
+      lastDecisionAt: "2026-09-30T23:00:00Z",
+      lastDecisionMeasurement: "COMPLETE",
+      nextDecisionAt: "2026-10-01T00:01:00Z",
+      realPriceEnabled: false,
+      heartbeatsPersisted: 42,
+      asOf: "2026-10-01T00:00:00Z",
+    },
+    cycles: [
+      autoMonitorCycle(E2E_AUTO_CYCLE_A, E2E_AUTO_SYMBOL, true),
+      autoMonitorCycle(E2E_AUTO_CYCLE_B, "BBB", false),
+    ],
+    reservations: [],
+    concurrency: {
+      activeSessions: 0,
+      activeSessionsMeasurement: "COMPLETE",
+      heartbeatsPersisted: 42,
+      claimAttempts: 0,
+      claimAttemptsMeasurement: "COMPLETE",
+      successfulClaims: 0,
+      successfulClaimsMeasurement: "COMPLETE",
+      lostClaims: 0,
+      lostClaimsMeasurement: "COMPLETE",
+      raceConflicts: 0,
+      raceConflictsMeasurement: "COMPLETE",
+      reconciliations: 0,
+      reconciliationsMeasurement: "COMPLETE",
+      graceWindowKeeps: 0,
+      graceWindowKeepsMeasurement: "COMPLETE",
+      forcedReleases: 0,
+      forcedReleasesMeasurement: "COMPLETE",
+      lastConflict: null,
+      lastConflictMeasurement: "COMPLETE",
+    },
+    notes: [],
+  };
+}
+
+function autoDiaDFeedbackArtifact() {
+  return {
+    available: true,
+    readOnly: true,
+    matrixBasis: "entryDay",
+    window: {
+      from: "2026-09-29",
+      to: "2026-09-30",
+      days: ["2026-09-29", "2026-09-30"],
+    },
+    values: [
+      {
+        symbol: E2E_AUTO_SYMBOL,
+        verdict: "OOS_SUPPORTED",
+        verdictReason: "positive_expectancy",
+        evidenceQuality: "PRELIMINARY",
+        expectancyR: 0.5,
+        hitRate: 0.67,
+        measuredCycles: 6,
+        daysCovered: 1,
+        windowDays: 2,
+        errorTotal: 0,
+      },
+      {
+        symbol: "BBB",
+        verdict: "MIXED",
+        verdictReason: "mixed_evidence",
+        evidenceQuality: "PRELIMINARY",
+        expectancyR: -0.1,
+        hitRate: 0.5,
+        measuredCycles: 5,
+        daysCovered: 1,
+        windowDays: 2,
+        errorTotal: 1,
+      },
+    ],
+    matrix: [],
+    errors: [],
+    limits: [],
+    gate: { verdict: "GREEN", days: 2, episodes: 2, cycles: 4 },
+    summary: {
+      measuredValues: 2,
+      mixed: 1,
+      notMeasured: 0,
+      oosSupported: 1,
+      refuted: 0,
+      byEvidenceQuality: { PRELIMINARY: 2 },
+      errors: { SOFTWARE: 0, OPERATIONAL: 0, DATA: 0 },
+    },
+  };
+}
+
+function autoDiaDFeedbackListMock() {
+  return {
+    readOnly: true,
+    windows: [E2E_AUTO_WINDOW],
+    latest: E2E_AUTO_WINDOW,
+    artifact: autoDiaDFeedbackArtifact(),
+    notes: [],
+  };
+}
 
 /** Cola mínima para hidratar SupervisedF3 en smoke LIVE VIRTUAL. */
 function liveVirtualSupervisedF3Bundle() {
@@ -346,6 +518,24 @@ export function routeBody(
   }
   if (path === "/api/accounts") {
     return { data: [demoAccount] };
+  }
+  // V2.88.56 — espacio AUTO: monitor operativo + artefactos DÍA-D de feedback.
+  if (opts?.auto === true) {
+    if (path === "/api/auto/operational-monitor") {
+      return autoOperationalMonitorMock();
+    }
+    if (path === "/api/auto/dia-d-feedback") {
+      return autoDiaDFeedbackListMock();
+    }
+    if (path.startsWith("/api/auto/dia-d-feedback/")) {
+      return autoDiaDFeedbackArtifact();
+    }
+    if (path === "/api/auto/dia-d-replay") {
+      return { readOnly: true, days: [], notes: [] };
+    }
+    if (path.startsWith("/api/auto/dia-d-replay/")) {
+      return { available: false, notes: ["artifact_not_found"] };
+    }
   }
   if (path === "/api/portfolio") {
     const lifecycleSnap = resolveLifecycleSnap();

@@ -43,6 +43,8 @@ export function readAutoMonitorMode(
 export function AutoMonitorPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const mode = readAutoMonitorMode(searchParams);
+  // Deep-link desde la operación canónica: `?cycle=` enfoca el ciclo en la vista `current`.
+  const focusCycleId = searchParams.get("cycle");
   const setMode = (next: AutoMonitorMode) => {
     setSearchParams(
       (prev) => {
@@ -142,7 +144,7 @@ export function AutoMonitorPage() {
             </Card>
           ) : null}
 
-          <AutoCycleTimeline cycles={view.cycles} />
+          <AutoCycleTimeline cycles={view.cycles} focusCycleId={focusCycleId} />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <AutoReservationPanel reservations={view.reservations} />

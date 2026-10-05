@@ -7,11 +7,13 @@
  * cifras ni completa pasos; un hueco se rotula `NO MEDIDO` (nunca `0`).
  *
  * La etapa `EXPLANATION` enlaza directo al heatmap DÍA-D del instrumento (un clic en vez de tres
- * saltos), preseleccionando símbolo y ventana en la URL.
+ * saltos), preseleccionando símbolo y ventana en la URL. Los deep-links son **canónicos**
+ * (`/auto/analisis?tab=dia-d...` y `/auto-monitor?mode=current&cycle=...`): no escriben parámetros
+ * sobre la ruta actual (era inerte desde `/auto/operar/operacion/:cycleId`).
  */
 
 import { useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +29,10 @@ import {
 } from "@bolsa/shared";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 import { useAutoDiaDFeedbackList } from "@/features/auto-monitor/use-auto-dia-d-feedback";
+import {
+  autoDiaDHref,
+  autoTechnicalDetailHref,
+} from "@/features/auto/auto-nav";
 
 type DiaDFeedbackValueDto = components["schemas"]["DiaDFeedbackValueDto"];
 
@@ -59,6 +65,7 @@ export function AutoOperationStoryPanel({
   const { view, isLoading, isError } = useAutoOperationalMonitor();
   const feedbackList = useAutoDiaDFeedbackList();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const cycles = view?.cycles ?? [];
   const cycleParam = searchParams.get("cycle");
@@ -122,32 +129,18 @@ export function AutoOperationStoryPanel({
 
   const symbol = selected?.instrumentId ?? null;
   const latestWindow = feedbackList.data?.latest ?? null;
+  // Destino canónico: el DÍA-D vive en el workspace AUTO (`/auto/analisis?tab=dia-d`),
+  // NO en la URL del monitor. Escribir `mode=dia-d` sobre la ruta actual era inerte.
   const openDiaDHeatmap = () => {
     if (!symbol) return;
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        params.set("mode", "dia-d");
-        params.set("view", "feedback");
-        if (latestWindow) params.set("window", latestWindow);
-        params.set("symbol", symbol);
-        return params;
-      },
-      { replace: false },
-    );
+    navigate(autoDiaDHref({ window: latestWindow, symbol }));
   };
 
   // La operación es el resumen/interpretación; el crudo (header, timeline, reservas,
-  // concurrencia) vive en la vista experta `current`, sin duplicar paneles.
+  // concurrencia) vive en la vista experta `current` del monitor experto, sin duplicar
+  // paneles. El `cycle` viaja para que el monitor enfoque el ciclo de esta operación.
   const openTechnicalDetail = () => {
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        params.set("mode", "current");
-        return params;
-      },
-      { replace: false },
-    );
+    navigate(autoTechnicalDetailHref(selected?.cycleId));
   };
 
   return (

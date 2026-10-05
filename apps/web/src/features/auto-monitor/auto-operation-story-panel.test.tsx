@@ -145,7 +145,12 @@ import { AutoOperationStoryPanel } from "@/features/auto-monitor/auto-operation-
 
 function LocationProbe() {
   const location = useLocation();
-  return <span data-testid="story-location">{location.search}</span>;
+  return (
+    <span data-testid="story-location">
+      {location.pathname}
+      {location.search}
+    </span>
+  );
 }
 
 function renderPanel() {
@@ -255,7 +260,7 @@ describe("AutoOperationStoryPanel", () => {
     expect(explanation?.textContent).toContain("NO MEDIDO");
   });
 
-  it("enlaza la EXPLICACIÓN al heatmap DÍA-D con símbolo y ventana", async () => {
+  it("enlaza la EXPLICACIÓN al heatmap DÍA-D canónico (workspace AUTO) con símbolo y ventana", async () => {
     renderPanel();
     await waitFor(() =>
       expect(
@@ -266,28 +271,36 @@ describe("AutoOperationStoryPanel", () => {
     fireEvent.click(screen.getByTestId("auto-operation-story-open-heatmap"));
     await waitFor(() =>
       expect(screen.getByTestId("story-location").textContent).toContain(
-        "mode=dia-d",
+        "/auto/analisis",
       ),
     );
-    const search = screen.getByTestId("story-location").textContent ?? "";
-    expect(search).toContain("view=feedback");
-    expect(search).toContain("symbol=AAA");
-    expect(search).toContain("window=2026-09-29_2026-09-30");
+    const location = screen.getByTestId("story-location").textContent ?? "";
+    const params = new URLSearchParams(location.split("?")[1] ?? "");
+    expect(params.get("tab")).toBe("dia-d");
+    expect(params.get("view")).toBe("feedback");
+    expect(params.get("symbol")).toBe("AAA");
+    expect(params.get("window")).toBe("2026-09-29_2026-09-30");
   });
 
-  it("lleva al detalle técnico (ventana actual) sin duplicar paneles", async () => {
+  it("lleva al detalle técnico canónico (monitor experto) con el ciclo de la operación", async () => {
     renderPanel();
+    // La cabecera (y su botón) se pinta antes de que cargue el monitor: hay que esperar a
+    // que el ciclo seleccionado exista para que el deep-link lleve su `cycleId`.
     await waitFor(() =>
-      expect(
-        screen.getByTestId("auto-operation-story-open-technical"),
-      ).toBeTruthy(),
+      expect(screen.getByTestId("auto-operation-story-cycles")).toBeTruthy(),
     );
 
     fireEvent.click(screen.getByTestId("auto-operation-story-open-technical"));
+    // El entry inicial ya es `/auto-monitor?mode=operation`: hay que esperar al CAMBIO.
     await waitFor(() =>
       expect(screen.getByTestId("story-location").textContent).toContain(
         "mode=current",
       ),
     );
+    const location = screen.getByTestId("story-location").textContent ?? "";
+    expect(location).toContain("/auto-monitor");
+    const params = new URLSearchParams(location.split("?")[1] ?? "");
+    expect(params.get("mode")).toBe("current");
+    expect(params.get("cycle")).toBe("cyc-1");
   });
 });

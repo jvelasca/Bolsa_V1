@@ -31,11 +31,13 @@ function readAnalisisTab(searchParams: URLSearchParams): AnalisisTabId {
     : "dia-d";
 }
 
+const TAB_IDS = ANALISIS_TABS.map((item) => item.id);
+
 export function AutoAnalisisPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = readAnalisisTab(searchParams);
 
-  const setTab = (next: AnalisisTabId) => {
+  const setTab = (next: AnalisisTabId, focus = false) => {
     setSearchParams(
       (prev) => {
         const params = new URLSearchParams(prev);
@@ -44,6 +46,30 @@ export function AutoAnalisisPage() {
       },
       { replace: true },
     );
+    if (focus) {
+      // Foco tras el commit de estado: patrón WAI-ARIA de tabs.
+      requestAnimationFrame(() => {
+        document.getElementById(`auto-analisis-tab-${next}`)?.focus();
+      });
+    }
+  };
+
+  const onTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const index = TAB_IDS.indexOf(tab);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") {
+      nextIndex = (index + 1) % TAB_IDS.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + TAB_IDS.length) % TAB_IDS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = TAB_IDS.length - 1;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const next = TAB_IDS[nextIndex]!;
+    setTab(next, true);
   };
 
   return (
@@ -61,11 +87,15 @@ export function AutoAnalisisPage() {
         {ANALISIS_TABS.map((item) => (
           <button
             key={item.id}
+            id={`auto-analisis-tab-${item.id}`}
             type="button"
             role="tab"
             aria-selected={tab === item.id}
+            aria-controls={`auto-analisis-panel-${item.id}`}
+            tabIndex={tab === item.id ? 0 : -1}
             data-testid={`auto-analisis-tab-${item.id}`}
             onClick={() => setTab(item.id)}
+            onKeyDown={onTabKeyDown}
             className={cn(
               "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground",
               tab === item.id && "bg-accent text-primary",
@@ -77,7 +107,13 @@ export function AutoAnalisisPage() {
       </div>
 
       {tab === "dia-d" ? (
-        <section className="space-y-2" aria-labelledby="auto-analisis-dia-d">
+        <section
+          role="tabpanel"
+          id="auto-analisis-panel-dia-d"
+          aria-labelledby="auto-analisis-tab-dia-d"
+          tabIndex={0}
+          className="space-y-2"
+        >
           <AutoSectionBlockHeading id="auto-analisis-dia-d">
             DÍA-D · feedback OOS
           </AutoSectionBlockHeading>
@@ -87,8 +123,11 @@ export function AutoAnalisisPage() {
 
       {tab === "evidencia" ? (
         <section
+          role="tabpanel"
+          id="auto-analisis-panel-evidencia"
+          aria-labelledby="auto-analisis-tab-evidencia"
+          tabIndex={0}
           className="space-y-2"
-          aria-labelledby="auto-analisis-evidencia"
         >
           <AutoSectionBlockHeading id="auto-analisis-evidencia">
             Evidencia AUTO
@@ -99,8 +138,11 @@ export function AutoAnalisisPage() {
 
       {tab === "estrategias" ? (
         <section
+          role="tabpanel"
+          id="auto-analisis-panel-estrategias"
+          aria-labelledby="auto-analisis-tab-estrategias"
+          tabIndex={0}
           className="space-y-2"
-          aria-labelledby="auto-analisis-estrategias"
         >
           <AutoSectionBlockHeading id="auto-analisis-estrategias">
             Estrategias
@@ -120,8 +162,11 @@ export function AutoAnalisisPage() {
 
       {tab === "investigacion" ? (
         <section
+          role="tabpanel"
+          id="auto-analisis-panel-investigacion"
+          aria-labelledby="auto-analisis-tab-investigacion"
+          tabIndex={0}
           className="space-y-2"
-          aria-labelledby="auto-analisis-investigacion"
         >
           <AutoSectionBlockHeading id="auto-analisis-investigacion">
             Investigación

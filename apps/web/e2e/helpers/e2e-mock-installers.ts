@@ -105,3 +105,13 @@ export async function installLiveVirtualConfirmMocks(
   resetE2eMockRuntimeFlags();
   await installApiMocks(page, { liveVenue: true });
 }
+
+/**
+ * V2.88.56 — espacio AUTO (`/auto/*`): monitor operativo + artefactos DÍA-D de
+ * feedback. Certifica la navegación `Operación → detalle técnico / DÍA-D`.
+ */
+export async function installAutoWorkspaceMocks(page: Page): Promise<void> {
+  setMercadoMockWorkspaceDocument(null);
+  resetE2eMockRuntimeFlags();
+  await installApiMocks(page, { auto: true });
+}

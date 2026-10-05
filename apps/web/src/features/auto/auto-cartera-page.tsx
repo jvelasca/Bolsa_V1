@@ -2,7 +2,8 @@
  * AUTO · CARTERA (ADR-044) — posiciones, órdenes e historial.
  *
  * Compone la superficie existente de operaciones (misma que el Libro en Hoy)
- * y enlaza historial, cuentas y riesgo. Confirm es la única firma.
+ * y enlaza historial, cuentas y riesgo. **NO** es una superficie read-only: incluye
+ * acciones operativas (reducir / salir) que **encolan** Confirm; Confirm es la única firma.
  */
 
 import { Link } from "react-router-dom";
@@ -18,7 +19,7 @@ export function AutoCarteraPage() {
     <div className="space-y-6" data-testid="auto-cartera-page">
       <AutoSectionHeading
         title="Cartera"
-        description="Posiciones, órdenes e historial. Reducir / salir encolan Confirm; Confirm es la única firma."
+        description="Estado y supervisión de posiciones, órdenes e historial. Reducir / salir encolan Confirm; Confirm es la única firma."
       />
 
       <section className="space-y-2" aria-labelledby="auto-cartera-ops-heading">

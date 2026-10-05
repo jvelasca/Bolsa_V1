@@ -5,6 +5,7 @@
  * pinta los pasos en el orden que trae el DTO y rotula los huecos como `NO MEDIDO`.
  */
 
+import { useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   MeasurementBadge,
@@ -80,7 +81,21 @@ function StepRow({ step }: { step: AutoMonitorStepViewV1 }) {
   );
 }
 
-function CycleCard({ cycle }: { cycle: AutoMonitorCycleViewV1 }) {
+function CycleCard({
+  cycle,
+  focused = false,
+}: {
+  cycle: AutoMonitorCycleViewV1;
+  focused?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  // El deep-link `?cycle=` de la operación canónica llega hasta aquí: se marca y se
+  // desplaza a la tarjeta del ciclo pedido (si el parámetro fuera inerte, sería el mismo
+  // defecto que el de los botones de `AutoOperationStoryPanel`).
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView({ block: "start" });
+  }, [focused]);
+
   const closedAsserted =
     cycle.closed !== null &&
     cycle.closed !== undefined &&
@@ -91,73 +106,82 @@ function CycleCard({ cycle }: { cycle: AutoMonitorCycleViewV1 }) {
   const pnl = cycle.result?.pnl;
   const pnlMeasurement = cycle.closedMeasurement ?? "UNKNOWN";
   return (
-    <Card
-      className="rounded-xl border border-border bg-card"
-      data-testid="auto-monitor-cycle"
-      data-cycle-id={cycle.cycleId}
-      data-cycle-closed={
-        closedAsserted ? (cycle.closed ? "true" : "false") : "unknown"
-      }
-    >
-      <CardHeader className="pb-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-sm">
-            {cycle.instrumentId ?? cycle.cycleId}
-            <span className="ml-2 text-[10px] font-normal text-muted-foreground">
-              {cycle.strategyVersion ?? "sin versión"}
-            </span>
-          </CardTitle>
-          <div className="flex items-center gap-2 text-[10px]">
-            <span className="rounded bg-muted px-1.5 py-0.5 uppercase tracking-wide text-muted-foreground">
-              {cycle.directionLabel}
-            </span>
-            <span
-              className={cn(
-                "rounded px-1.5 py-0.5 font-semibold uppercase tracking-wide",
-                !closedAsserted
-                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                  : cycle.closed
-                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                    : "bg-muted text-muted-foreground",
-              )}
-            >
-              {cycle.statusLabel}
-            </span>
+    <div ref={ref} data-cycle-focused={focused ? "true" : "false"}>
+      <Card
+        className={cn(
+          "rounded-xl border bg-card",
+          focused ? "border-primary ring-1 ring-primary/40" : "border-border",
+        )}
+        data-testid="auto-monitor-cycle"
+        data-cycle-id={cycle.cycleId}
+        data-cycle-focused={focused ? "true" : "false"}
+        data-cycle-closed={
+          closedAsserted ? (cycle.closed ? "true" : "false") : "unknown"
+        }
+      >
+        <CardHeader className="pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-sm">
+              {cycle.instrumentId ?? cycle.cycleId}
+              <span className="ml-2 text-[10px] font-normal text-muted-foreground">
+                {cycle.strategyVersion ?? "sin versión"}
+              </span>
+            </CardTitle>
+            <div className="flex items-center gap-2 text-[10px]">
+              <span className="rounded bg-muted px-1.5 py-0.5 uppercase tracking-wide text-muted-foreground">
+                {cycle.directionLabel}
+              </span>
+              <span
+                className={cn(
+                  "rounded px-1.5 py-0.5 font-semibold uppercase tracking-wide",
+                  !closedAsserted
+                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                    : cycle.closed
+                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                      : "bg-muted text-muted-foreground",
+                )}
+              >
+                {cycle.statusLabel}
+              </span>
+            </div>
           </div>
-        </div>
-        <p className="text-[10px] text-muted-foreground">
-          <code>{cycle.cycleId}</code>
-          {pnl !== null && pnl !== undefined ? (
-            <span
-              className="ml-2"
-              data-testid="auto-monitor-cycle-pnl"
-              data-pnl-measurement={pnlMeasurement}
-            >
-              PnL:{" "}
-              <MeasurementValue
-                value={pnl}
-                measurement={pnlMeasurement}
-                incomplete="withhold"
-              />
-            </span>
-          ) : null}
-        </p>
-      </CardHeader>
-      <CardContent>
-        <ol className="space-y-0" data-testid="auto-monitor-timeline">
-          {cycle.steps.map((step) => (
-            <StepRow key={`${cycle.cycleId}-${step.id}`} step={step} />
-          ))}
-        </ol>
-      </CardContent>
-    </Card>
+          <p className="text-[10px] text-muted-foreground">
+            <code>{cycle.cycleId}</code>
+            {pnl !== null && pnl !== undefined ? (
+              <span
+                className="ml-2"
+                data-testid="auto-monitor-cycle-pnl"
+                data-pnl-measurement={pnlMeasurement}
+              >
+                PnL:{" "}
+                <MeasurementValue
+                  value={pnl}
+                  measurement={pnlMeasurement}
+                  incomplete="withhold"
+                />
+              </span>
+            ) : null}
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ol className="space-y-0" data-testid="auto-monitor-timeline">
+            {cycle.steps.map((step) => (
+              <StepRow key={`${cycle.cycleId}-${step.id}`} step={step} />
+            ))}
+          </ol>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
 export function AutoCycleTimeline({
   cycles,
+  focusCycleId,
 }: {
   cycles: AutoMonitorCycleViewV1[];
+  /** Ciclo a enfocar/desplazar (deep-link `?cycle=` desde la operación canónica). */
+  focusCycleId?: string | null;
 }) {
   if (cycles.length === 0) {
     return (
@@ -176,7 +200,11 @@ export function AutoCycleTimeline({
   return (
     <div className="space-y-3" data-testid="auto-monitor-cycles">
       {cycles.map((cycle) => (
-        <CycleCard key={cycle.cycleId} cycle={cycle} />
+        <CycleCard
+          key={cycle.cycleId}
+          cycle={cycle}
+          focused={Boolean(focusCycleId) && cycle.cycleId === focusCycleId}
+        />
       ))}
     </div>
   );

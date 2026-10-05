@@ -50,7 +50,8 @@ describe("AutoOperarPage", () => {
     const links = screen.getAllByTestId("auto-operar-operation-link");
     expect(links).toHaveLength(2);
     expect(links[0]?.getAttribute("href")).toBe("/auto/operar/operacion/cyc-1");
-    expect(screen.getByTestId("story-stub")).toBeTruthy();
+    // Una sola fuente de selección: la lista. La historia vive en su ruta canónica.
+    expect(screen.queryByTestId("story-stub")).toBeNull();
   });
 });
 

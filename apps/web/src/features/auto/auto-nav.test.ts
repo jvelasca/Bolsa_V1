@@ -10,15 +10,18 @@ import {
   AUTO_ANALISIS_PATH,
   AUTO_CARTERA_PATH,
   AUTO_LABEL,
+  AUTO_MONITOR_PATH,
   AUTO_NAV,
   AUTO_OPERACION_BASE_PATH,
   AUTO_OPERAR_PATH,
   AUTO_RIESGO_PATH,
   AUTO_ROOT_PATH,
   AUTO_SISTEMA_PATH,
+  autoDiaDHref,
   autoOperacionHref,
   autoSectionFromPathname,
   autoSectionLabel,
+  autoTechnicalDetailHref,
 } from "@/features/auto/auto-nav";
 import { DAILY_NAV_ORDER, MESA_LABEL } from "@/features/confirm/daily-nav";
 
@@ -64,6 +67,37 @@ describe("auto-nav — contrato de secciones", () => {
     expect(autoOperacionHref("a/b c")).toBe(
       `${AUTO_OPERACION_BASE_PATH}/a%2Fb%20c`,
     );
+  });
+
+  it("construye el detalle técnico apuntando al monitor experto", () => {
+    expect(AUTO_MONITOR_PATH).toBe("/auto-monitor");
+    expect(autoTechnicalDetailHref()).toBe("/auto-monitor?mode=current");
+    expect(autoTechnicalDetailHref("")).toBe("/auto-monitor?mode=current");
+    expect(autoTechnicalDetailHref("cyc-1")).toBe(
+      "/auto-monitor?mode=current&cycle=cyc-1",
+    );
+    // El ciclo vive en la query ⇒ se codifica (no rompe la URL).
+    const href = autoTechnicalDetailHref("a/b c");
+    const params = new URLSearchParams(href.split("?")[1]);
+    expect(params.get("mode")).toBe("current");
+    expect(params.get("cycle")).toBe("a/b c");
+  });
+
+  it("construye el deep-link DÍA-D hacia el workspace AUTO", () => {
+    const base = autoDiaDHref();
+    expect(base.startsWith(`${AUTO_ANALISIS_PATH}?`)).toBe(true);
+    const baseParams = new URLSearchParams(base.split("?")[1]);
+    expect(baseParams.get("tab")).toBe("dia-d");
+    expect(baseParams.get("view")).toBe("feedback");
+    expect(baseParams.get("symbol")).toBeNull();
+
+    const full = new URLSearchParams(
+      autoDiaDHref({ window: "2026-09-29_2026-09-30", symbol: "a/b c" }).split(
+        "?",
+      )[1],
+    );
+    expect(full.get("window")).toBe("2026-09-29_2026-09-30");
+    expect(full.get("symbol")).toBe("a/b c");
   });
 
   it("resuelve la sección activa desde el pathname", () => {

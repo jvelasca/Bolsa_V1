@@ -27,4 +27,5 @@ export {
   installHoyStaleNoExecuteMocks,
   installUnknownOrderMocks,
   installLiveVirtualConfirmMocks,
+  installAutoWorkspaceMocks,
 } from "./helpers/e2e-mock-installers";

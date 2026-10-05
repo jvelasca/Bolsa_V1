@@ -2,6 +2,20 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.56-beta] — `AUTO · UI`: **AUTO UI REFACTOR 2.1** (navegación canónica y pulido UX)
+
+**Bump** `2.11.55-beta` → `2.11.56-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello **de UI/read-model**: **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS de `v2.88.50`/`v2.88.51` se **heredan y citan**. Addendum de diseño: [spec 2.1](docs/engineering/spec-auto-ui-refactor-2-1-2026-10-05.md) (hereda de [spec 2.0](docs/engineering/spec-auto-ui-refactor-2-0-2026-10-05.md) + [ADR-044](docs/adr/044-auto-workspace-information-architecture.md)).
+
+- **Corrige el defecto P2 de la auditoría de `v2.88.55`.** Los botones «Detalle técnico (ventana actual)» y «Ver heatmap de `<symbol>`» del `AutoOperationStoryPanel` escribían `mode=current`/`mode=dia-d` con `setSearchParams` sobre la **ruta actual**, pero esos parámetros sólo los consumen `AutoMonitorPage`/`DiaDAutoPanel`: montado en `/auto/operar` o `/auto/operar/operacion/:cycleId` eran **inertes**. Ahora navegan a destinos **canónicos** con helpers puros en `auto-nav.ts` (`autoTechnicalDetailHref` → `/auto-monitor?mode=current&cycle=…`; `autoDiaDHref` → `/auto/analisis?tab=dia-d&view=feedback&window=…&symbol=…`).
+- **`cycle` deja de ser inerte.** `AutoMonitorPage` lee `?cycle=` en `mode=current` y `AutoCycleTimeline` enfoca/desplaza la `CycleCard` correspondiente (`data-cycle-focused="true"` + anillo).
+- **OPERAR sin doble selección (P3).** La lista de operaciones (`/auto/operar/operacion/:cycleId`) queda como **única** fuente de selección; se retira el `AutoOperationStoryPanel` embebido y su encabezado.
+- **Tabs WAI-ARIA completas (P3)** en ANÁLISIS: `id`/`aria-controls`/roving `tabIndex` en cada `role="tab"`, `role="tabpanel"` con `id`/`aria-labelledby`/`tabIndex`, y teclado `ArrowLeft`/`ArrowRight`/`Home`/`End`.
+- **CARTERA honesta (P3).** Se retira el «Read-only» de la descripción (la superficie contiene acciones operativas de reducir/salir que **encolan** Confirm).
+- **E2E de navegación** `gp-e2e-v28856-auto-ui-navigation-mock.spec.ts` (mock): `Operar → Operación → detalle técnico/DÍA-D` + un `<main>`/`h1` por ruta AUTO.
+- **Deuda declarada (abierta):** `PortfolioDecision` durable (`UI52-02`), contrato de explicación por `cycleId`, PIT histórico institucional y Execution Analysis.
+- **Gates:** bump guard **passed** (`2.11.56-beta`); `@bolsa/web` **1402 passed** (`245` ficheros) + `typecheck` limpio + `lint` **0 errores** (`23` warnings pre-existentes) + `contract:check` **OK**; E2E AUTO **3 passed**.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.56/README.md`](docs/engineering/evidence/v2.88.56/README.md). **Entrega a auditoría externa (MIA):** `docs/engineering/entrega-auditoria-externa-mia-v2.88.56-2026-10-05.md`.
+
 ## [2.11.55-beta] — `AUTO · UI`: **AUTO UI REFACTOR 2.0** (espacio AUTO con sub-navegación propia)
 
 **Bump** `2.11.54-beta` → `2.11.55-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello **de UI/read-model**: **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS de `v2.88.50`/`v2.88.51` se **heredan y citan**. Diseño congelado en [ADR-044](docs/adr/044-auto-workspace-information-architecture.md) + [spec](docs/engineering/spec-auto-ui-refactor-2-0-2026-10-05.md).
