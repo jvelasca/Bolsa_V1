@@ -64,11 +64,25 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * determinista-por-fecha (diagnostico + tabla en la evidencia `v2.88.50` §7); `replay-repro` fue
  * VERDE. Es un fichero de TEST bajo `apps/` (Δ motor = 0 intacto): el arbol pinneado pasa a
  * `356aaf2a` y `packages` NO cambia.
+ *
+ * RE-ANCLAJE 2026-10-05 (3º, DENTRO del mismo sello `v2.88.50-beta`): el SEGUNDO `Release tag CI`
+ * del sello (run `37282852860`) cayo en el paso Golden Day 2.0 por el test CON PRECIO REAL
+ * (`PermanentRejectionError: No tienes suficientes acciones. En cartera: 4e-06`, dia sin cerrar;
+ * reproducido en local el mismo dia). Defecto latente del ledger de posicion: cuantizaba las
+ * CANTIDADES de los fills aplicados a 4 dp (quantum de la CASA) cuando viven como `Numeric(18, 6)`
+ * (quantum del DINERO): el libro publicaba `490.0001` sobre una cartera de `490.000024` y la salida
+ * pedia mas de lo que habia. Fix `round6` en
+ * `packages/py/analytics/src/bolsa_analytics/cognitive/position_ledger.py` (cantidades; precio/P&L
+ * siguen en `round4`) y notional por fill al quantum del dinero en
+ * `apps/api-python/tests/applied_fill_equity.py`. Ablacion declarada: la variante que tocaba
+ * `position_state.py` DESCARTADA por romper el motor; `replay-repro` sigue `REPRODUCIDO` byte a
+ * byte (`Δ motor = 0`). Evidencia `v2.88.50` §8. El arbol pinneado pasa a `40876dac` (`apps` y
+ * `packages` cambian; `scripts/` no participa del pin).
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '356aaf2a',
-  appsHash: 'd1e0969755359f6948ab6ddc42450de112d3ee24',
-  packagesHash: 'e11f12c699e9cc3fb48e222d240f70e528b4c675',
+  commit: '40876dac',
+  appsHash: 'e683160a2213aa2722e646823ee6558748f78b7c',
+  packagesHash: '7633be63849cc4cb860cacc2e4a4bdb6fa58847f',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
