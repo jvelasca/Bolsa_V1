@@ -78,11 +78,19 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * `position_state.py` DESCARTADA por romper el motor; `replay-repro` sigue `REPRODUCIDO` byte a
  * byte (`Δ motor = 0`). Evidencia `v2.88.50` §8. El arbol pinneado pasa a `40876dac` (`apps` y
  * `packages` cambian; `scripts/` no participa del pin).
+ *
+ * RE-ANCLAJE 2026-10-05 (sello `v2.88.51-beta`): fix del PnL `PARTIAL` en el read-model
+ * `bolsa_application.auto_operational_monitor` (`result` sigue la medicion del cierre) + la UI
+ * `auto-cycle-timeline` (rotula la medicion) + el documento `AUTO UI SEMANTIC MODEL 1.0` +
+ * el bump de `package.json`/`meta.bump`. Tocan `apps/` (scripts + web) y `packages/`;
+ * `scripts/` no participa del pin. `Δ motor = 0`: CERO ficheros de motor. El arbol pinneado es
+ * el del commit funcional `b05de1b5`. Pin anterior (sello `v2.88.50-beta`, 2º re-anclaje):
+ * `apps` `e683160a…` / `packages` `7633be63…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '40876dac',
-  appsHash: 'e683160a2213aa2722e646823ee6558748f78b7c',
-  packagesHash: '7633be63849cc4cb860cacc2e4a4bdb6fa58847f',
+  commit: 'b05de1b5',
+  appsHash: 'f931a357d3070648d1a0fe69efb844ca532472f0',
+  packagesHash: '28d2faf4bc685cb73a604ef2b58506910a2340e5',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
