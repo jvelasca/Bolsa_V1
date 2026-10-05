@@ -15,6 +15,7 @@ import {
   MESA_PATH,
 } from "@/features/confirm/daily-nav";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
+import { AUTO_LABEL, AUTO_NAV, AUTO_ROOT_PATH } from "@/features/auto/auto-nav";
 import type { PlatformConfigTab } from "@/stores/ui-store";
 import {
   nextUiDensity,
@@ -44,6 +45,24 @@ export type PlatformCommand = {
 };
 
 export const LABORATORIO_PATH = "/backtests" as const;
+
+/** Comandos del espacio AUTO (ADR-044). No son puertas L1: agrupan superficies. */
+const AUTO_COMMANDS: PlatformCommand[] = [
+  {
+    id: "nav-auto",
+    label: `Ir a ${AUTO_LABEL}`,
+    keywords: ["auto", "monitor", "operar", "cartera", "riesgo", "sistema"],
+    group: "nav",
+    run: (ctx) => ctx.navigate(AUTO_ROOT_PATH),
+  },
+  ...AUTO_NAV.items.map((item) => ({
+    id: `nav-auto-${item.id}`,
+    label: `AUTO · ${item.label}`,
+    keywords: ["auto", item.id, item.label.toLowerCase()],
+    group: "nav" as const,
+    run: (ctx: CommandRunContext) => ctx.navigate(item.path),
+  })),
+];
 
 export const PLATFORM_COMMANDS: PlatformCommand[] = [
   {
@@ -88,6 +107,7 @@ export const PLATFORM_COMMANDS: PlatformCommand[] = [
     group: "nav",
     run: (ctx) => ctx.navigate(CONFIRM_PATH),
   },
+  ...AUTO_COMMANDS,
   {
     id: "config-general",
     label: "Abrir Configuración",

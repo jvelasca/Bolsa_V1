@@ -27,6 +27,7 @@ import {
   OPERATIONAL_CONSOLE_LABEL,
   OPERATIONAL_CONSOLE_PATH,
 } from "@/features/confirm/daily-nav";
+import { AUTO_LABEL, AUTO_ROOT_PATH } from "@/features/auto/auto-nav";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 
@@ -86,11 +87,11 @@ const NAV_ITEMS: AdminNavItem[] = [
 const TRAILING_NAV: AdminNavItem[] = [
   {
     kind: "nav",
-    id: "auto-monitor",
-    label: "Monitor AUTO",
-    href: "/auto-monitor",
+    id: "auto",
+    label: AUTO_LABEL,
+    href: AUTO_ROOT_PATH,
     icon: Radar,
-    hint: "Cadena AUTO read-only: señal → ciclo cerrado",
+    hint: "Espacio AUTO: operar · cartera · riesgo · análisis · sistema",
   },
   {
     kind: "nav",

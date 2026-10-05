@@ -2,6 +2,18 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.55-beta] — `AUTO · UI`: **AUTO UI REFACTOR 2.0** (espacio AUTO con sub-navegación propia)
+
+**Bump** `2.11.54-beta` → `2.11.55-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello **de UI/read-model**: **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS de `v2.88.50`/`v2.88.51` se **heredan y citan**. Diseño congelado en [ADR-044](docs/adr/044-auto-workspace-information-architecture.md) + [spec](docs/engineering/spec-auto-ui-refactor-2-0-2026-10-05.md).
+
+- **Espacio AUTO `/auto/*`** con sub-navegación propia (`Operar · Cartera · Riesgo · Análisis · Sistema`) y shell persistente (`auto-workspace-layout.tsx`). **No** es una sexta puerta L1: ADR-040 intacto. Entry point en la `AdminRail` (`AUTO` → `/auto`) + comandos de command palette; `/auto-monitor` se conserva.
+- **OPERAR canónico** `/auto/operar/operacion/:cycleId` con la operación única y selección en la URL; lectura causal (qué pasó → por qué → riesgo → broker → resultado → DÍA-D).
+- **Secciones** que **componen** superficies existentes por enlace (Cartera → operaciones; Riesgo → integridad/recon; Análisis → DÍA-D/evidencia/estrategias/investigación; Sistema → salud AUTO/recon/auditoría).
+- **Jerarquía de encabezados** `h1` página · `h2` bloque · `h3` tarjeta en el shell nuevo (cierra de raíz el `heading-order` de `v2.88.54` en el espacio AUTO).
+- **Deuda declarada (abierta):** `PortfolioDecision` durable (`UI52-02`) y contrato de explicación por `cycleId` (spine/backend).
+- **Gates:** bump guard **passed** (`2.11.55-beta`); `@bolsa/web` **1397 passed** (`244` ficheros) + `typecheck` limpio + `lint` **0 errores** (`23` warnings pre-existentes) + `contract:check` **OK**.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.55/README.md`](docs/engineering/evidence/v2.88.55/README.md). **Entrega a auditoría externa (MIA):** `docs/engineering/entrega-auditoria-externa-mia-v2.88.55-2026-10-05.md`.
+
 ## [2.11.54-beta] — `UI`: **Auditoría UI / accesibilidad de las 15 rutas** (críticos a 0)
 
 **Bump** `2.11.53-beta` → `2.11.54-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello **de UI** (accesibilidad y estructura): **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS se **heredan y citan** de `v2.88.51`/`v2.88.50`.

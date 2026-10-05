@@ -9,3 +9,8 @@ export function isTradingRoute(pathname: string) {
 export function isFillHubRoute(pathname: string) {
   return pathname.startsWith("/backtests") || pathname.startsWith("/screeners");
 }
+
+/** Espacio AUTO (ADR-044): workspace con sub-navegación propia. */
+export function isAutoRoute(pathname: string) {
+  return pathname === "/auto" || pathname.startsWith("/auto/");
+}

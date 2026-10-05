@@ -47,7 +47,15 @@ function toExplanation(
   };
 }
 
-export function AutoOperationStoryPanel() {
+export function AutoOperationStoryPanel({
+  cycleIdOverride,
+  onSelectCycle,
+}: {
+  /** Fuerza el ciclo mostrado (ruta canónica `/auto/operar/operacion/:cycleId`). */
+  cycleIdOverride?: string | null;
+  /** Sustituye la escritura de `?cycle=` (p. ej. navegar a la ruta canónica). */
+  onSelectCycle?: (cycleId: string) => void;
+} = {}) {
   const { view, isLoading, isError } = useAutoOperationalMonitor();
   const feedbackList = useAutoDiaDFeedbackList();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -55,9 +63,18 @@ export function AutoOperationStoryPanel() {
   const cycles = view?.cycles ?? [];
   const cycleParam = searchParams.get("cycle");
   const selected =
-    cycles.find((cycle) => cycle.cycleId === cycleParam) ?? cycles[0] ?? null;
+    (cycleIdOverride
+      ? cycles.find((cycle) => cycle.cycleId === cycleIdOverride)
+      : undefined) ??
+    cycles.find((cycle) => cycle.cycleId === cycleParam) ??
+    cycles[0] ??
+    null;
 
   const selectCycle = (cycleId: string) => {
+    if (onSelectCycle) {
+      onSelectCycle(cycleId);
+      return;
+    }
     setSearchParams(
       (prev) => {
         const params = new URLSearchParams(prev);

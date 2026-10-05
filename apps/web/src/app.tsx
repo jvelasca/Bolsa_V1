@@ -32,6 +32,14 @@ import { HistoryPage } from "@/features/history/history-page";
 import { TaxReportPage } from "@/features/fiscal/tax-report-page";
 import { OperationalConsolePage } from "@/features/operational-console/operational-console-page";
 import { AutoMonitorPage } from "@/features/auto-monitor/auto-monitor-page";
+import { AutoWorkspaceLayout } from "@/components/layout/auto-workspace-layout";
+import { AUTO_OPERAR_PATH } from "@/features/auto/auto-nav";
+import { AutoOperarPage } from "@/features/auto/auto-operar-page";
+import { AutoOperacionPage } from "@/features/auto/auto-operacion-page";
+import { AutoCarteraPage } from "@/features/auto/auto-cartera-page";
+import { AutoRiesgoPage } from "@/features/auto/auto-riesgo-page";
+import { AutoAnalisisPage } from "@/features/auto/auto-analisis-page";
+import { AutoSistemaPage } from "@/features/auto/auto-sistema-page";
 import { DecisionJournalPage } from "@/features/decision-journal/decision-journal-page";
 import { MesaHoyPage } from "@/features/mesa/mesa-hoy-page";
 import { ConfirmPage } from "@/features/confirm/confirm-page";
@@ -95,6 +103,23 @@ const router = createBrowserRouter([
       { path: "operational-console", element: <OperationalConsolePage /> },
 
       { path: "auto-monitor", element: <AutoMonitorPage /> },
+
+      {
+        path: "auto",
+        element: <AutoWorkspaceLayout />,
+        children: [
+          { index: true, element: <Navigate to={AUTO_OPERAR_PATH} replace /> },
+          { path: "operar", element: <AutoOperarPage /> },
+          {
+            path: "operar/operacion/:cycleId",
+            element: <AutoOperacionPage />,
+          },
+          { path: "cartera", element: <AutoCarteraPage /> },
+          { path: "riesgo", element: <AutoRiesgoPage /> },
+          { path: "analisis", element: <AutoAnalisisPage /> },
+          { path: "sistema", element: <AutoSistemaPage /> },
+        ],
+      },
 
       {
         path: "decision-board",

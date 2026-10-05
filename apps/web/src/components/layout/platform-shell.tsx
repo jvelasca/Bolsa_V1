@@ -57,7 +57,7 @@ import {
   CONFIRM_PATH,
   isConfirmNavigateTarget,
 } from "@/features/confirm/confirm-nav";
-import { isFillHubRoute, isTradingRoute } from "@/lib/routes";
+import { isAutoRoute, isFillHubRoute, isTradingRoute } from "@/lib/routes";
 import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
 import { useUiStore } from "@/stores/ui-store";
 import { cn } from "@/lib/utils";
@@ -95,7 +95,7 @@ export function PlatformShell() {
   }, [navigate]);
 
   const trading = isTradingRoute(pathname);
-  const fillHub = isFillHubRoute(pathname);
+  const fillHub = isFillHubRoute(pathname) || isAutoRoute(pathname);
   const onBacktests = pathname.startsWith("/backtests");
   const listAutoActive = useListAutoActivityStore((s) => s.active);
   const supervisionArmed = useEstudioSupervisionArmed();
