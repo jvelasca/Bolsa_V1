@@ -140,4 +140,14 @@ pnpm --filter @bolsa/web contract:check
 
 ## 7. Cita del CI (POST-TAG)
 
-> **`Release tag CI` `PENDIENTE`** de crear/empujar el tag `v2.88.52-beta`. La cita del run (id, `ref=refs/tags/v2.88.52-beta`, `attempt`, ventana temporal, `jobs` en verde y `python: N passed / M skipped`) se escribe aquí en el commit **POST-TAG** de `main` tras el `push` del tag, junto con la URL del `GitHub Release` publicado.
+> **`Release tag CI` **VERDE** — run [`37319677455`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37319677455)** (`ref=refs/tags/v2.88.52-beta` → commit `2fccbf538a187159a04eb2b25779517d3d988b32`, `attempt 1`, `2026-10-05T13:48:37Z → 13:56:53Z`).
+>
+> - **`12` jobs: `11` `success` + `1` `skipped`** por diseño (`playwright (integrated E2E, opt-in)`); **`certify (aggregate + artifact)` `success`**.
+> - `python (ruff/imports/mypy/pytest offline)` — **`4538 passed, 45 skipped, 7 warnings in 80.85 s`** (`ruff` `All checks passed!`).
+> - `lifecycle-pg (Alembic + auth + golden restart)` — `success`; **`Pytest Golden Day 2.0 (proceso scheduler V2 + PG, fail if skipped)` → `2 passed in 20.23 s`** (el paso que cayó en `v2.88.50`).
+> - `frontend (typecheck/lint/test/build + contract:check)` — **`241` ficheros / `1385 passed`**.
+> - `shared (build/typecheck/test)` — `success`.
+> - **`replay-repro (regenera el artefacto del sello desde el fixture)` → `REPRODUCIDO`**: `sha256 LF 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (`3 340 728 B` LF; sello `3 445 622 B` CRLF, **mismo CONTENIDO**), 2ª corrida **`IDÉNTICA (el runner es determinista consigo mismo)`** ⇒ **`Δ motor = 0` CONFIRMADO POR CI**.
+> - **`GitHub Release` `v2.88.52-beta` publicado** (pre-release): [`releases/tag/v2.88.52-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.52-beta).
+>
+> Comprobación directa: `gh run view 37319677455` → `Release tag CI | completed | success`; `gh run view --job 111795245965 --log` → `VEREDICTO REPRODUCIDO`.

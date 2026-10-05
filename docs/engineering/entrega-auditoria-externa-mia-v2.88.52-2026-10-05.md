@@ -105,12 +105,12 @@ Sin cambio de motor **ni de muestra**, este sello no re-corre el pipeline. Se **
 
 | Rol | Commit | Árboles |
 | --- | --- | --- |
-| **Sello funcional** (`feat`) | _(hash del commit funcional)_ | `apps` `…` / `packages` `…` |
-| Re-anclaje del freeze de la ventana (`chore`) | _(hash del chore)_ | pin `commit: <funcional>` (no mueve árbol) |
-| **Commit del tag** | _(hash del tag)_ | (mismos árboles que el funcional) |
-| Cita **POST-TAG** (evidencia `§7`) | _(hash POST-TAG)_ | — |
+| **Sello funcional** (`feat`) | `cdedd3e2` | `apps` `41fb4a97…` / `packages` `2dc97daf…` |
+| Re-anclaje del freeze de la ventana (`chore`) | `2fccbf53` | pin `commit: cdedd3e2` (no mueve árbol) |
+| **Commit del tag** | `2fccbf53` | (mismos árboles que el funcional) |
+| Cita **POST-TAG** (evidencia `§7`) | _(este commit)_ | — |
 
-- **Tag:** `v2.88.52-beta` (**anotado**) → **PENDIENTE** de crear/empujar; la cita del `Release tag CI` y del `GitHub Release` se añade aquí en el commit **POST-TAG** de `main`.
+- **Tag:** `v2.88.52-beta` (**anotado**) → **creado y empujado** (`tag` → `2fccbf53`); `Release tag CI` run [`37319677455`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37319677455) **VERDE** y `GitHub Release` **publicado** (pre-release). Cita larga en la evidencia `§7` (commit POST-TAG de `main`).
 
 ---
 
