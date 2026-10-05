@@ -117,7 +117,11 @@ Cobertura: **`42` observaciones** `THESIS_EXIT` (pooled sobre sorteos), `11/12` 
 | **Determinismo del plegado** | `sha256 thesis-exit-v5 = F865106DCA7C4D05F605A1B11D2B75F68DFCCFF067551AA3AB0456F03CDBBF6F` (`184 445 B`); `sequences = 2268FA79F4A1151C23EABF7655B70866C8F375A9795906B048B7209DC6DBC2B3` (`291 275 B`) |
 | **`Δ motor = 0` (`replay-repro` LOCAL)** | **`REPRODUCIDO`** — fixture congelado (`20` instrumentos, `25 700` barras) re-sembrado en una **BD efímera** (`bolsa_v1_repro`, `DROP/CREATE` antes de cada corrida); `assert-artifact` ⇒ `240662250347A2AAD0F8E9F0101185D8ACC80C1D4BD1B4BBFF02D4766D9F54F0` (`3 445 622 B` CRLF) / `1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (LF) = **idéntico al sello**; **dos** corridas ⇒ **byte a byte idénticas** |
 | **`Δ motor = 0` (árbol)** | `git diff` de `auto_simulation_worker.py`/`simulated_broker.py`/`replay_oos.py`/`sim_durable_store.py`/`market_operability.py`/`auto_v2_entry.py`/`v2_87_…` = **vacío**; la inyección de seed de `v2_94` se **restaura byte a byte** tras cada sorteo |
-| **`Δ motor = 0` (confirmado por CI)** | `Release tag CI` del tag `v2.88.50-beta` — **attempt 1 ROJO** en `lifecycle-pg` por un flake del **arnés** (§7) con `replay-repro` **verde**; el CI del tag **re-anclado** se cita en §6/§7 (cita POST-TAG) |
+| **`Δ motor = 0` (confirmado por CI)** | `Release tag CI` del tag `v2.88.50-beta` — **attempt 1 ROJO** en `lifecycle-pg` por un flake del **arnés** (§7) con `replay-repro` **verde**; `attempt 2` (`935c76a0`) **ROJO** en `lifecycle-pg` por el **Golden Day 2.0 con precio real** (§8), también con `replay-repro` **verde**; el CI del tag **re-anclado** se cita en §6/§7/§8 (cita POST-TAG) |
+| **Golden Day 2.0 (precio real) tras el fix** | `pytest apps/api-python/tests/test_golden_day_v2_process_pg.py` ⇒ **2 passed** en `17 s` (antes: `1 failed` en `136 s`; el día **no** cerraba y el test agotaba los `_CLOSE_POLLS`) |
+| **Suites PG del invariante de equity (`applied_fill_equity`)** | `test_a9_scheduler_process_pg_zero_human.py` + `test_auto_scheduler_real_pg_zero_human_intervention.py` ⇒ **4 passed** en `32 s` |
+| **Unitarios puros (`packages/py`)** | `domain` + `market` + `analytics` + `application` + `ai` ⇒ **4006 passed, 1 skipped** (`test_vectorbt_optuna.py` no colecta: DLL de `numba` bloqueada por Smart App Control en el host de medición, ajeno al sello) |
+| **`apps/api-python/tests` (pase de directorio completo)** | **922 passed** (`test_workspaces.py::test_workspaces_crud` sólo rojo por contaminación de BD entre tests del pase completo; aislado ⇒ **1 passed**) |
 
 > **Nota de método (auditable).** Durante el primer intento, el `replay-repro` local dio artefactos **distintos** del sello. La causa **medida** fue que la corrida **run2** de `v2_94` estaba **en vuelo** e inyectaba temporalmente `seed=fill_seed(bar_tick_now + k, symbol)` en `auto_simulation_worker.py` (la inyección que restaura byte a byte al terminar cada sorteo): el replay importaba el worker con el seed desplazado. Una vez terminó `v2_94` (árbol restaurado), el replay reprodujo el sello **byte a byte** en dos corridas. Se declara para que un auditor no repita el falso negativo.
 
@@ -178,8 +182,8 @@ uv run --no-sync python apps/api-python/scripts/replay_oos_input_fixture.py \
 ## 6. Sello
 
 - **Añadidos:** `packages/shared/src/cognitive/auto-operation-story.ts` (+ test), `apps/web/src/features/auto-monitor/auto-operation-story-panel.tsx` (+ test), `apps/web/src/features/auto-monitor/dia-d-auto-feedback-heatmap.test.ts`, `apps/web/src/features/auto-monitor/auto-reservation-panel.test.tsx`, `apps/api-python/tests/test_v2_93_pit_watch.py`, `docs/engineering/evidence/v2.88.50/README.md`.
-- **Modificados:** `packages/py/application/src/bolsa_application/universe_point_in_time.py` (`candidate_ids`/`ids_by_day`/`eligible_days_by_symbol`), `universe_point_in_time_catalog.py` (`all_members`), `v2_91`/`v2_92`/`v2_93` (watch PIT por día + poda), `auto_operational_monitor.py` (`_reservation_view` con las `5` banderas), ruta `auto_operational_monitor.py` (DTO), `packages/shared/src/cognitive/auto-operational-monitor.ts`, `auto-monitor-page.tsx` (`enabled: mode === "current"` + pestaña «Operación»), `dia-d-auto-toolbar.tsx`, `auto-reservation-panel.tsx`, `dia-d-auto-feedback-heatmap.tsx` (`formatCellTooltip`), `dia-d-auto-feedback-panel.test.tsx` (`waitFor`), `packages/shared/src/cognitive/index.ts`, `apps/web/api/openapi.json`, `apps/web/src/api/schema.d.ts`, `v2_89`…`v2_97` (`meta.bump`), `package.json` (`2.11.50-beta`), `apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py` (arnés determinista con **viaje completo**, §7), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
-- **`Δ motor = 0`:** ningún fichero de motor tocado; la costura `capture_cycle_detail` sólo **lee** estado ya producido y su default sigue `False`; `replay-repro` **reproducido byte a byte** contra el fixture congelado (§3).
+- **Modificados:** `packages/py/analytics/src/bolsa_analytics/cognitive/position_ledger.py` (`round6` para **cantidades**: el fold y `coerce_applied_fill_fact` dejan de cuantizar a 4 decimales; el **precio** y el `realized_pnl` siguen en `round4` — §8), `packages/py/application/src/bolsa_application/universe_point_in_time.py` (`candidate_ids`/`ids_by_day`/`eligible_days_by_symbol`), `universe_point_in_time_catalog.py` (`all_members`), `v2_91`/`v2_92`/`v2_93` (watch PIT por día + poda), `auto_operational_monitor.py` (`_reservation_view` con las `5` banderas), ruta `auto_operational_monitor.py` (DTO), `packages/shared/src/cognitive/auto-operational-monitor.ts`, `auto-monitor-page.tsx` (`enabled: mode === "current"` + pestaña «Operación»), `dia-d-auto-toolbar.tsx`, `auto-reservation-panel.tsx`, `dia-d-auto-feedback-heatmap.tsx` (`formatCellTooltip`), `dia-d-auto-feedback-panel.test.tsx` (`waitFor`), `packages/shared/src/cognitive/index.ts`, `apps/web/api/openapi.json`, `apps/web/src/api/schema.d.ts`, `v2_89`…`v2_97` (`meta.bump`), `package.json` (`2.11.50-beta`), `apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py` (arnés determinista con **viaje completo**, §7), `apps/api-python/tests/applied_fill_equity.py` (notional al **quantum del dinero**, §8), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
+- **`Δ motor = 0`:** ningún fichero de motor tocado; la costura `capture_cycle_detail` sólo **lee** estado ya producido y su default sigue `False`; el `round6` del ledger vive en un **read-model** (sólo se consume en `readopt`/reconciliación, que en el replay parten de una BD recién sembrada) y su inercia sobre el artefacto está **medida** por ablación (§8.4); `replay-repro` **reproducido byte a byte** contra el fixture congelado (§3/§8.4, dos veces).
 - **Tag:** `v2.88.50-beta` — ver el re-sello POST-TAG con la cita del `Release tag CI`.
 
 ---
@@ -208,3 +212,71 @@ El candidato que elige la barrida es el **primero** (`inst-a9proc-0000000000`): 
 > **Nota de alcance:** el cambio vive en `apps/api-python/tests/` (**arnés**), no en `packages/` ni en el motor. El freeze del runner se **re-ancla** porque `appsHash` cambia con el fichero de test.
 
 **Re-anclaje del tag (declarado).** El tag `v2.88.50-beta` ya estaba empujado y su `Release tag CI` era **rojo**, así que el tag se **re-ancló UNA vez**: `d0acc7ab` (freeze previo) → commit del freeze re-anclado (el commit POST-TAG publica el SHA exacto). **Ningún `Release` de GitHub se había publicado** (el sello no estaba cerrado) y la corrección es **sólo del arnés**. El CI del tag re-anclado, en verde, se cita en el commit POST-TAG (§6).
+
+---
+
+## 8. Incidencia de sello (declarada): `lifecycle-pg` ROJO en el `attempt 2` por el Golden Day 2.0 con PRECIO REAL, y el defecto real que destapa
+
+### 8.1 Qué pasó (citado)
+
+El **segundo** `Release tag CI` del tag (`d0acc7ab` → re-anclaje `935c76a0`), run [`37282852860`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37282852860), cerró **ROJO**: `11` jobs en verde — incluido **`replay-repro`** y el arnés A9 ya corregido (§7) — y **`lifecycle-pg` en rojo**, que arrastra al agregado `certify`. El rojo esta vez **no** es del arnés: es el paso dedicado del **Golden Day 2.0** y cae **el segundo** de los dos tests del fichero (el primero pasó: `.F`):
+
+```
+FAILED apps/api-python/tests/test_golden_day_v2_process_pg.py::test_golden_day_v2_real_price_process_opens_and_closes_the_book_pg
+AssertionError: el día con precio real debe cerrar los planes durables (time_exit); barras presentes al cierre=9
+  ...
+  bolsa_domain.errors.PermanentRejectionError: No tienes suficientes acciones. En cartera: 4e-06
+```
+
+**Reproducido en local el MISMO día y sobre el MISMO árbol** (`2 failed`→`1 failed, 1 passed` en `136 s`): **no** es un artefacto del runner, es un rojo **determinista del día** sobre el árbol sellado.
+
+### 8.2 La causa raíz (medida, no supuesta): el libro publicaba MÁS posición que la cartera
+
+El modo **precio real** (`AUTO_ENGINE_SIM_REAL_PRICE=1`) produce **tamaños fraccionarios** y el `SIMULATED` venue llena en **tranchas**. Las cantidades viven en `execution_events.qty` / `sim_fill_finance_context.quantity` como `Numeric(18, 6)` — el **quantum del dinero** —, pero el ledger de posición (`position_ledger.py`) **cuantizaba a 4 decimales** (`round4`, el quantum de la *casa*) tanto en `coerce_applied_fill_fact` como en el **fold**. Consecuencia medida en la fase de cierre:
+
+| Vista | Cantidad |
+| --- | --- |
+| Cartera real (`positions.quantity`) = Σ tranchas aplicadas | **`490.000024`** |
+| Posición canónica del libro (fold a 4 dp) | **`490.0001`** |
+
+Al reiniciar (FASE 2 del test), el worker **re-adopta** la posición del libro canónico y **re-ancla** el `remaining_quantity` del plan durable a esa cantidad: la salida pide `490.0001` contra una cartera de `490.000024` ⇒ el **último chunk** muere con `PermanentRejectionError: … En cartera: 4e-06`, la posición **nunca** queda plana y el día **no cierra**. El `4e-06` del mensaje es exactamente el residuo `490.0001 − 490.000024` (`0,000076`) partido por el tamaño de chunk.
+
+**Por qué el 04 salió verde y el 05 rojo (mismo árbol).** El arnés del Golden Day elige su instrumento con la barrida determinista `_filling_instrument_id`, que **depende de la barra corriente**; la barra cambia el **schedule de tranchas** del venue y por tanto **el residuo sub-4dp** de la suma aplicada. El mismo árbol dio `lifecycle-pg` **VERDE** el `2026-10-04` (run [`37221439959`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37221439959), tag `v2.88.48-beta`) y **ROJO** el `2026-10-05` (run `37282852860`). Es un **defecto latente del motor destapado por el dato**, no una regresión de `v2.88.50`: el ledger venía redondeando a 4 dp desde `v2.40.5`.
+
+### 8.3 El fix (la causa, no la aserción)
+
+1. **`packages/py/analytics/src/bolsa_analytics/cognitive/position_ledger.py`** — nuevo `round6` (6 decimales) y uso en **cantidades** (`quantity`, `realized_qty`, `sold_qty`, `unmatched_exit_qty`, `remaining_qty`) y en `coerce_applied_fill_fact(quantity=…)`. Los **precios** (`round4(px)`) y el **P&L** (`realized_pnl=round4(…)`, magnitudes monetarias) **no** cambian: la cantidad es del mundo del DINERO (`Numeric(18,6)`), el precio y el P&L del de la casa. Efecto: `Σ fills aplicados` **es** la posición de la cartera, la salida pide exactamente lo que hay y el día cierra.
+2. **`apps/api-python/tests/applied_fill_equity.py`** — el notional de cada fill se mide con el **quantum del dinero** (`ROUND_HALF_UP` a `0.000001`), porque `ledger_entries.amount`/`transactions.total` son `NUMERIC(18, 6)`: sumar los productos de 12 decimales dejaba un residuo de `≈2e-6` en una jornada real de `22` fills que el invariante de equity (tol `1e-6`) leía como descuadre. Medido así el invariante certifica el dinero al último decimal representable y sigue siendo una fuente **independiente** del `cash` (sale de eventos + contexto, no de las filas del ledger). **Medido sin este cambio: `equity 99641.830608 != initial+realized+unrealized 99641.830610`.**
+
+**Ninguna aserción se relaja**: el día sigue teniendo que abrir, cerrar `BUY→SELL`, quedar **plano** (`positions = 0`), con `pending = 0` y sin fills sin materializar, y el invariante de equity sigue con la misma tolerancia.
+
+### 8.4 Ablación declarada (qué NO se aplicó, y por qué): `position_state.py` NO se toca
+
+Se probaron **tres** variantes y se midió cada una contra el fixture congelado (`assert-artifact`, `replay-repro` local, BD efímera `bolsa_v1_repro` `DROP/CREATE`):
+
+| Variante | Golden Day 2.0 real | `replay-repro` | Veredicto |
+| --- | --- | --- | --- |
+| `position_ledger.py` (`round6` en cantidades) | **2 passed** | **`REPRODUCIDO`** `24066225…` (`3 445 622 B`) | **APLICADA** |
+| `position_state.py` (`_round6` en `quantity`/`remaining_quantity`) | 2 passed | **NO reproducido** `1FC2CAF2…` (`3 755 749 B`): `book.cancelReleaseDays` `57 → 109` y la primera divergencia en `perDay[99]` (`RELEASE` `fill`↔`cancel`) | **DESCARTADA** (rompe `Δ motor = 0`) |
+| Ambas | 2 passed | **NO reproducido** (idéntico a la anterior: el `position_state` explica **todo** el delta) | — |
+
+La segunda variante cambia el **camino caliente de salida** (`remaining_quantity` a 6 dp ⇒ otra partición de tranchas, otra contabilidad de liberación de reservas) ⇒ `Δ motor ≠ 0`. La primera es inerte por construcción **y medido**: el ledger es un **read-model** que sólo se consume en `readopt`/reconciliación de posición, y el replay arranca de una BD **recién sembrada** (sin fills aplicados) ⇒ la lectura canónica es vacía y el artefacto sale **byte a byte** igual. Se declara porque un auditor debe saber que la inercia está **medida** (dos corridas) y no argumentada.
+
+### 8.5 Verificación local (PG real)
+
+```
+pytest apps/api-python/tests/test_golden_day_v2_process_pg.py                         2 passed  (17 s)
+pytest apps/api-python/tests/test_a9_scheduler_process_pg_zero_human.py \
+       apps/api-python/tests/test_auto_scheduler_real_pg_zero_human_intervention.py   4 passed  (32 s)
+pytest packages/py/analytics packages/py/application packages/py/domain \
+       packages/py/market packages/py/ai --ignore=…/test_vectorbt_optuna.py           4006 passed, 1 skipped
+pytest apps/api-python/tests                                                       922 passed
+ruff check packages/py apps/api-python --config pyproject.toml                     All checks passed!
+lint-imports --config packages/py/.importlinter                                    4 kept, 0 broken (659 ficheros)
+mypy (gate CI)                                                                     Success: no issues found in 531 source files
+replay-repro local (fixture v2.88.7, BD efímera, 2 corridas)                       REPRODUCIDO 24066225… (3 445 622 B)
+```
+
+### 8.6 Segundo re-anclaje del tag (declarado)
+
+El tag `v2.88.50-beta` se **re-ancló una segunda vez** (el primer re-anclaje lo describe §7): el árbol del fix de este §8 pasa a ser el tip y el freeze del runner de la ventana se re-ancla en un commit `chore(window)` posterior (los SHAs exactos los publica el commit POST-TAG). **Sigue sin publicarse ningún `Release` de GitHub**: el sello no está cerrado hasta que el `Release tag CI` del tag re-anclado salga **VERDE** con `replay-repro`, `lifecycle-pg`, `python`, `frontend` y `certify` en verde. El cambio de §8.3 **no** es del arnés (toca `packages/py/analytics` y un helper de tests), así que se declara como **fix de producto**: el ledger deja de publicar más posición que la cartera cuando el tamaño es fraccionario.

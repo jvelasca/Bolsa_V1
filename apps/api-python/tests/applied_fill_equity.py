@@ -20,7 +20,7 @@ Compartido por las suites PG de jornada completa
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from sqlalchemy import select
@@ -32,6 +32,20 @@ from bolsa_infrastructure.database.models.tables import (
 
 # Tolerancia de comparación evento↔contexto (NUMERIC(18,6) en ambas columnas).
 _QTY_EPS = Decimal("0.000001")
+
+#: Quantum del DINERO (``NUMERIC(18, 6)`` en ``transactions.total``/``ledger_entries.amount``).
+#: Cada fill mueve ``round6(qty × price)``, no el producto de 12 decimales.
+_MONEY_SCALE = Decimal("0.000001")
+
+
+def _money(value: Decimal) -> Decimal:
+    """Redondeo del dinero a su quantum, como lo hace PostgreSQL ``NUMERIC(18, 6)``.
+
+    ``ROUND_HALF_UP`` es el redondeo de Postgres (mitad fuera de cero); el default de
+    ``Decimal.quantize`` (``ROUND_HALF_EVEN``) discreparía en el caso — improbable pero
+    posible— de que el producto caiga justo en la mitad del sexto decimal.
+    """
+    return value.quantize(_MONEY_SCALE, rounding=ROUND_HALF_UP)
 
 
 async def realized_notional_from_applied_fills(session: Any, account_id: str) -> Decimal:
@@ -92,7 +106,17 @@ async def realized_notional_from_applied_fills(session: Any, account_id: str) ->
             f"cantidad divergente entre execution_events ({qty}) y contexto "
             f"({context_qty}) para {execution_id}"
         )
-        notional = qty * Decimal(str(price))
+        # El notional se mide con el QUANTUM DEL DINERO, fill a fill, no con la aritmética
+        # de 12 decimales de ``qty × price``: el ledger aplica ``cash ± (qty × price)`` sobre
+        # una columna ``NUMERIC(18, 6)`` (``ledger_entries.amount``/``transactions.total``),
+        # así que cada fill mueve su notional redondeado. Sumar en 12 decimales y comparar
+        # contra un ledger de 6 deja un residuo de hasta 5e-7 por fill (≈2e-6 medidos en una
+        # jornada de precio real con tamaño fraccionario) que NO es una fuga de dinero sino
+        # aritmética de precisión distinta: el invariante de equity (tol 1e-6) se ponía rojo
+        # por ella. Medido así certifica el dinero al último decimal representable y sigue
+        # siendo una fuente INDEPENDIENTE del ``cash`` (sale de los eventos + contexto, no de
+        # las filas del ledger).
+        notional = _money(qty * Decimal(str(price)))
         closed_pnl += notional if (side or "").strip().lower() == "sell" else -notional
 
     # Un contexto SIN fill aplicado es capital planificado (RETRY): no es realizado y

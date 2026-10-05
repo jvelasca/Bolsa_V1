@@ -47,8 +47,23 @@ _QTY_EPS = 1e-9
 
 
 def round4(value: float) -> float:
-    """Redondeo de la casa (4 decimales) para cantidades y precios."""
+    """Redondeo de la casa (4 decimales) para PRECIOS y magnitudes monetarias."""
     return round(value * 10000) / 10000
+
+
+def round6(value: float) -> float:
+    """Redondeo de CANTIDAD (6 decimales): el quantum del DINERO, no el de la casa.
+
+    ``execution_events``/``sim_fill_finance_context`` persisten la cantidad como
+    ``Numeric(18, 6)`` y el broker de simulación cuantiza a ``Decimal("0.000001")``, así
+    que ``Σ fills aplicados`` solo vale la posición que la cartera tiene de verdad si la
+    cantidad conserva sus 6 decimales. Redondearla a 4 (``round4``) hacía que la posición
+    canónica del libro valiera MÁS que la cartera cuando el tamaño es fraccionario
+    (precio real): la salida pedía ``490,0001`` contra ``490,000024`` reales, el último
+    chunk moría con ``PermanentRejectionError`` y el ciclo quedaba en bucle de salida
+    parcial. Los PRECIOS y el P&L (magnitudes monetarias) siguen en ``round4``.
+    """
+    return round(value * 1000000) / 1000000
 
 
 def _finite(value: Any) -> float | None:
@@ -315,11 +330,11 @@ def _fold_instrument(facts: list[AppliedFillFact]) -> LedgerPosition:
     return LedgerPosition(
         instrument_id=instrument_id,
         account_id=account_id,
-        quantity=round4(quantity),
-        realized_qty=round4(realized_qty),
-        sold_qty=round4(sold_qty),
-        unmatched_exit_qty=round4(max(0.0, sold_qty - realized_qty)),
-        remaining_qty=round4(remaining),
+        quantity=round6(quantity),
+        realized_qty=round6(realized_qty),
+        sold_qty=round6(sold_qty),
+        unmatched_exit_qty=round6(max(0.0, sold_qty - realized_qty)),
+        remaining_qty=round6(remaining),
         average_entry=avg_entry,
         realized_pnl=round4(realized_pnl),
         fills=tuple(facts),
@@ -502,7 +517,7 @@ def coerce_applied_fill_fact(
         execution_id=trimmed_id,
         instrument_id=trimmed_instrument,
         side=normalized,
-        quantity=round4(qty),
+        quantity=round6(qty),
         price=round4(px),
         applied_at=_instant_text(applied_at),
         strategy_version_id=(
