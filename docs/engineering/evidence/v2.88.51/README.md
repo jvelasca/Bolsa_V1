@@ -142,3 +142,5 @@ pnpm --filter @bolsa/shared exec vitest run
 - **`GitHub Release` `v2.88.51-beta` publicado** (pre-release): <https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.51-beta>.
 
 > **Límite estructural (declarado):** `Release tag CI` **sólo** corre al **empujar** el tag ⇒ **ningún tag puede contener su propio resultado de CI**. El fichero **dentro** del tag declara la cita como `POST-TAG`; la cita real viaja en **esta** §7 (escrita en `main` **después** del tag) y en el **`Release`**.
+
+- **Entrega a auditoría externa (MIA):** [`docs/engineering/entrega-auditoria-externa-mia-v2.88.51-2026-10-05.md`](../../entrega-auditoria-externa-mia-v2.88.51-2026-10-05.md) — pack autocontenido (§7 = guion de auditoría desde GitHub: tag → evidencia → `Release` → artefacto del replay → reproducción).
