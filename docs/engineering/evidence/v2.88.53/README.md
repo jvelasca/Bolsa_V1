@@ -117,6 +117,11 @@ pnpm --filter @bolsa/web contract:check
 
 ## 7. Cita del CI (POST-TAG)
 
-> **`Release tag CI`** del tag `v2.88.53-beta`: **POST-TAG** (pendiente de creación/empuje del tag).
+> **`Release tag CI`** del tag `v2.88.53-beta` ([run `37323748100`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37323748100)): **VERDE** — 11 `success` + `playwright (integrated E2E, opt-in)` `skipped` y `certify` `success`.
 >
-> Como en `v2.88.46`…`v2.88.52`, el job sólo corre al empujar el tag ⇒ **ningún tag contiene su propio resultado de CI** (límite estructural declarado). La cita larga se añadirá en `main` tras el tag: `replay-repro` debe reproducir el `sha256` del árbol congelado ⇒ **`Δ motor = 0` confirmado por CI**.
+> - `replay-repro`: **REPRODUCIDO** — `sha256` `1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (mismo contenido; sello en CRLF, fichero en LF) ⇒ **`Δ motor = 0` confirmado por CI**.
+> - `lifecycle-pg` (6m9s), `a7-gate`, `dr-verify`, `decision-spine`, `python` (ruff/mypy/pytest offline), `shared`, `frontend` y `security` VERDE; `playwright (mock E2E)` VERDE.
+>
+> **`GitHub Release`** publicado: [`v2.88.53-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.53-beta).
+>
+> Cita escrita en `main` **después** del tag (ningún tag contiene su propio resultado de CI: límite estructural declarado, como en `v2.88.46`…`v2.88.52`). El tag anotado `v2.88.53-beta` (`d780f44f`) apunta a `c5e6354c`.
