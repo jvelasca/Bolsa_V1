@@ -104,11 +104,11 @@ E2E_RUN=1 pnpm --filter @bolsa/web e2e -- gp-e2e-v28857
 | --- | --- | --- |
 | **Sello funcional** (`feat`) | `287a15b5` | `apps` `0556be2f…` / `packages` `95cb0d69…` |
 | Re-anclaje del freeze de la ventana (`chore`) | `a30acb07` | pin `commit: 287a15b5` (no mueve árbol) |
-| **Commit del tag** (`docs(seal)`) | _(pendiente)_ | (mismos árboles que el funcional) |
-| Cita **POST-TAG** (evidencia §7) | _(posterior)_ | — |
+| **Commit del tag** (`docs(seal)`) | `d44e00c9` (tag anotado `8af24105`) | (mismos árboles que el funcional) |
+| Cita **POST-TAG** (evidencia §7) | `91cf61e1`… _(posterior)_ | — |
 
 ---
 
 ## 7. Cita del CI (POST-TAG)
 
-> Pendiente de publicar el tag `v2.88.57-beta` y su `Release tag CI`.
+> **`Release tag CI`** del tag `v2.88.57-beta`: run [`37344802844`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37344802844) **VERDE** (`attempt 1`, `16:57:35Z → 17:05:40Z`; `10` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `security`/`shared`/`decision-spine`/`frontend` (typecheck/lint/test/build + `contract:check`)/`python`/`playwright-mock`/`lifecycle-pg`/`dr-verify`/`a7-gate` `success`; `replay-repro` `success` **`REPRODUCIDO`** `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` = sello ⇒ **`Δ motor = 0` confirmado por CI**; `lifecycle-pg` certifica Golden Day 2.0, Crash/Recovery, Concurrent AUTO, HardKill, crash-injection y multiprocess con gate fail-if-skipped). `frontend` `vitest` **1412 passed** (`245` ficheros). **`GitHub Release` [`v2.88.57-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.57-beta) publicado** (pre-release). Ningún tag contiene su propio resultado de CI — límite estructural declarado, como en `v2.88.46`…`v2.88.56`.

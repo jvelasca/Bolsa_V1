@@ -12,6 +12,7 @@ All notable releases of Bolsa V1.
 - **Tests.** `auto-operation-story-panel.test.tsx` (estado «no encontrada» por ruta y por `?cycle=`, + tests del helper), `auto-pages.test.tsx` (h1 con el id pedido, sin inventar otro ciclo) y E2E mock `gp-e2e-v28857-auto-operacion-invalida-mock.spec.ts` (ruta inválida, `?cycle=` inválido y ruta válida de regresión).
 - **Deuda declarada (abierta):** `PortfolioDecision` durable (`UI52-02`), explicación DÍA-D verdaderamente `cycle_id`-resolutiva, PIT histórico institucional y Execution Analysis.
 - **Gates:** bump guard **passed** (`2.11.57-beta`); `@bolsa/web` **1412 passed** (`245` ficheros) + `typecheck` limpio + `lint` **0 errores** (`23` warnings pre-existentes) + `contract:check` **OK**; E2E AUTO **6 passed** (`gp-e2e-v28856` + `gp-e2e-v28857`).
+- **Sello:** funcional `287a15b5` + `chore(window)` `a30acb07`; tag anotado `v2.88.57-beta` (`8af24105` → commit del sello `d44e00c9`); `Release tag CI` [`37344802844`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37344802844) **VERDE** (`replay-repro` `REPRODUCIDO` `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI); **GitHub Release** publicado (pre-release).
 - **Evidencia:** [`docs/engineering/evidence/v2.88.57/README.md`](docs/engineering/evidence/v2.88.57/README.md). **Entrega a auditoría externa (MIA):** `docs/engineering/entrega-auditoria-externa-mia-v2.88.57-2026-10-05.md`.
 
 ## [2.11.56-beta] — `AUTO · UI`: **AUTO UI REFACTOR 2.1** (navegación canónica y pulido UX)
