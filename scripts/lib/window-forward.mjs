@@ -105,11 +105,23 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * `packages/`; `scripts/` no participa del pin. `Δ motor = 0`: CERO ficheros de motor. El arbol
  * pinneado es el del commit funcional `2b7f1940`. Pin anterior (sello `v2.88.52-beta`, commit
  * `cdedd3e2`): `apps` `41fb4a97…` / `packages` `2dc97daf…`.
+ *
+ * RE-ANCLAJE 2026-10-05 (sello `v2.88.54-beta`): auditoria UI de las 15 rutas de nivel 1 con
+ * navegador real + `axe-core` 4.10.2 — criticos a 0 (nombres accesibles de 2 botones icon-only y
+ * de 1 `select`), serious a 0 (`nested-interactive` 506 nodos —`role="button"` envolviendo
+ * `<button>`/`<a>` en `/instruments` y en las pestanas de `/trading`—, `color-contrast` 25 nodos y
+ * `link-in-text-block` 7 nodos), `landmark-one-main`+`region` a 0 en `/trading` (`<main>` +
+ * `<h1 class="sr-only">`, y el rail de dibujo pasa de `<aside>` a `<div>`) y
+ * `page-has-heading-one` a 0 en 10 rutas (`h2` -> `h1`). Queda declarado un unico hallazgo
+ * best-practice `heading-order` (1 nodo) en 11 rutas. Toca `apps/` (web) y `packages/`
+ * (`auto-operation-story` + tests); `scripts/` no participa del pin. `Δ motor = 0`: CERO ficheros
+ * de motor. El arbol pinneado es el del commit funcional `425292fd`. Pin anterior (sello
+ * `v2.88.53-beta`, commit `2b7f1940`): `apps` `9fcd4452…` / `packages` `371105fc…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '2b7f1940',
-  appsHash: '9fcd4452e3b5584fc08baff8807f6dfe26a20eb8',
-  packagesHash: '371105fc7a50d0f01401378d0cf3c1378e7ad34e',
+  commit: '425292fd',
+  appsHash: 'b5babdb2510c584ec11498e9f54852306c1359c7',
+  packagesHash: '95cb0d698a708635e0594a5c85bacfb0a7538c20',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
