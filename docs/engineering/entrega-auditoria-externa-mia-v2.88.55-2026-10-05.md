@@ -89,9 +89,9 @@ Sin cambio de motor **ni de muestra**, este sello no re-corre el pipeline. Se **
 
 | Rol | Commit | Árboles |
 | --- | --- | --- |
-| **Sello funcional** (`feat`) | `<pendiente>` | `<pendiente>` |
-| Re-anclaje del freeze de la ventana (`chore`) | `<pendiente>` | pin `commit: <pendiente>` (no mueve árbol) |
-| **Commit del tag** | `<pendiente>` (tag anotado) | (mismos árboles que el funcional) |
+| **Sello funcional** (`feat`) | `714863c9` | `apps` `451fa1c9…` / `packages` `95cb0d69…` |
+| Re-anclaje del freeze de la ventana (`chore`) | `f915934e` | pin `commit: 714863c9` (no mueve árbol) |
+| **Commit del tag** (`docs(seal)`) | _(este commit)_ | (mismos árboles que el funcional) |
 | Cita **POST-TAG** (evidencia `§7`) | _(posterior)_ | — |
 
 - **Tag:** `v2.88.55-beta` (anotado) — `Release tag CI`: **PENDIENTE** (se cita POST-TAG). `GitHub Release`: **PENDIENTE**.
