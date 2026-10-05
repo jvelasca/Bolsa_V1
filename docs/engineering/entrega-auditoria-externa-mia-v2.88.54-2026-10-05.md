@@ -93,6 +93,14 @@ Sin cambio de motor **ni de muestra**, este sello no re-corre el pipeline. Se **
 ## 6. Sello
 
 - **Producto:** `V2.88.54-beta`. **Package:** `2.11.54-beta`. **Sin migración** (Alembic head `048_journal_entry_dedupe_key`). **Sin cambio de contrato HTTP.**
-- **Ficheros modificados:** 18 ficheros de UI (`apps/web/src/**`), `package.json` (`2.11.54-beta`), `v2_89`…`v2_97` (`meta.bump`), `scripts/lib/window-forward.mjs` (re-anclaje del freeze), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
+- **Ficheros modificados (46 en el commit funcional `425292fd`):** 28 ficheros de UI (`apps/web/src/**`), `packages/shared/src/cognitive/auto-operation-story.ts` (+ su test), `package.json` (`2.11.54-beta`), `v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md` y los 3 documentos de auditoría.
 - **Añadidos:** `docs/engineering/evidence/v2.88.54/README.md`, `docs/engineering/auditoria-ui-v2.88.54-2026-10-05.md`, `docs/engineering/entrega-auditoria-externa-mia-v2.88.54-2026-10-05.md`.
+
+| Rol | Commit | Árboles |
+| --- | --- | --- |
+| **Sello funcional** (`feat`) | `425292fd` | `apps` `b5babdb2…` / `packages` `95cb0d69…` |
+| Re-anclaje del freeze de la ventana (`chore`) | `5a680084` | pin `commit: 425292fd` (no mueve árbol) |
+| **Commit del tag** | _(a rellenar)_ | (mismos árboles que el funcional) |
+| Cita **POST-TAG** (evidencia `§7`) | _(posterior)_ | — |
+
 - **Tag:** `v2.88.54-beta` (anotado) — **cita POST-TAG** del `Release tag CI` y del `GitHub Release` (pendiente de escribir tras el tag).

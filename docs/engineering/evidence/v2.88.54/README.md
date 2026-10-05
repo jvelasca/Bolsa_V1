@@ -122,8 +122,9 @@ console.table(r.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.node
 ## 6. Sello
 
 - **Añadidos:** `docs/engineering/evidence/v2.88.54/README.md`, `docs/engineering/auditoria-ui-v2.88.54-2026-10-05.md`, `docs/engineering/entrega-auditoria-externa-mia-v2.88.54-2026-10-05.md`.
-- **Modificados:** 18 ficheros de UI (`apps/web/src/**`, detalle en el informe §5), `package.json` (`2.11.54-beta`), `v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`, `scripts/lib/window-forward.mjs` (re-anclaje del freeze).
-- **`Δ AUTO decision/execution motor = 0`:** ningún fichero de motor tocado; el cambio vive en UI (JSX/atributos accesibles/clases) y en documentación.
+- **Modificados (46 ficheros en el commit funcional `425292fd`):** 28 ficheros de UI (`apps/web/src/**`, detalle en el informe §5), `packages/shared/src/cognitive/auto-operation-story.ts` (+ su test) — aserción de `Δ motor = 0`; 9 scripts `v2_89`…`v2_97` (`meta.bump`), `package.json` (`2.11.54-beta`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md` y los 3 documentos de auditoría.
+- **`Δ AUTO decision/execution motor = 0`:** ningún fichero de motor tocado; el cambio vive en UI (JSX/atributos accesibles/clases), en el docstring del view-model AUTO y en documentación.
+- **Freeze re-anclado** en `scripts/lib/window-forward.mjs` (commit `chore` `5a680084`, posterior al funcional porque `scripts/` no participa del pin): `commit` `425292fd`, `apps` `b5babdb2510c584ec11498e9f54852306c1359c7`, `packages` `95cb0d698a708635e0594a5c85bacfb0a7538c20`. Pin anterior (`v2.88.53-beta`, commit `2b7f1940`): `apps` `9fcd4452…` / `packages` `371105fc…`.
 - **Tag:** `v2.88.54-beta` (anotado) — **cita POST-TAG** del `Release tag CI` (escrita en `main` **después** del tag) y del `GitHub Release`.
 
 ---
