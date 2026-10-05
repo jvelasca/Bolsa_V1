@@ -127,10 +127,19 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * del pin. `Delta motor = 0`: CERO ficheros de motor. El arbol pinneado es el del commit funcional
  * `714863c9`. Pin anterior (sello `v2.88.54-beta`, commit `425292fd`):
  * `apps` `b5babdb2…` / `packages` `95cb0d69…`.
+ *
+ * RE-ANCLAJE 2026-10-05 (sello `v2.88.56-beta`): AUTO UI REFACTOR 2.1 — navegacion canonica del
+ * `AutoOperationStoryPanel` (helpers puros `autoTechnicalDetailHref`/`autoDiaDHref` -> `/auto-monitor`
+ * y `/auto/analisis`), `?cycle=` no inerte en el monitor, OPERAR sin doble seleccion, tabs WAI-ARIA
+ * de ANALISIS y wording de CARTERA; + E2E mock `gp-e2e-v28856`. UI/read-model puro: toca `apps/`
+ * (web/e2e); `packages/` NO cambia (mismo arbol que `v2.88.55`); `scripts/` no participa del pin.
+ * `Delta motor = 0`: CERO ficheros de motor. El arbol pinneado es el del commit funcional
+ * `f6286e6e`. Pin anterior (sello `v2.88.55-beta`, commit `714863c9`):
+ * `apps` `451fa1c9…` / `packages` `95cb0d69…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '714863c9',
-  appsHash: '451fa1c92a28c11d3f9b2af6dbb0b9384c0566ce',
+  commit: 'f6286e6e',
+  appsHash: '13d5bdc42500f49684d45c7df85717790ca92d93',
   packagesHash: '95cb0d698a708635e0594a5c85bacfb0a7538c20',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
