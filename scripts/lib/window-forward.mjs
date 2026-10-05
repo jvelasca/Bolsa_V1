@@ -117,10 +117,20 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * (`auto-operation-story` + tests); `scripts/` no participa del pin. `Δ motor = 0`: CERO ficheros
  * de motor. El arbol pinneado es el del commit funcional `425292fd`. Pin anterior (sello
  * `v2.88.53-beta`, commit `2b7f1940`): `apps` `9fcd4452…` / `packages` `371105fc…`.
+ *
+ * RE-ANCLAJE 2026-10-05 (sello `v2.88.55-beta`): AUTO UI REFACTOR 2.0 — espacio AUTO con
+ * sub-navegacion propia (`Operar`/`Cartera`/`Riesgo`/`Analisis`/`Sistema`) en `/auto/*`, shell
+ * `auto-workspace-layout.tsx` (sin anidar `<main>`; un `h1` por ruta y jerarquia `h1`/`h2`/`h3`),
+ * OPERAR canonico `/auto/operar/operacion/:cycleId`, secciones que componen superficies existentes
+ * y entry point `AdminRail` -> `/auto` + command palette. ADR-044 + spec `AUTO UI REFACTOR 2.0`.
+ * Toca `apps/` (web) y `packages/` (`@bolsa/shared` sin cambios de motor); `scripts/` no participa
+ * del pin. `Delta motor = 0`: CERO ficheros de motor. El arbol pinneado es el del commit funcional
+ * `714863c9`. Pin anterior (sello `v2.88.54-beta`, commit `425292fd`):
+ * `apps` `b5babdb2…` / `packages` `95cb0d69…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '425292fd',
-  appsHash: 'b5babdb2510c584ec11498e9f54852306c1359c7',
+  commit: '714863c9',
+  appsHash: '451fa1c92a28c11d3f9b2af6dbb0b9384c0566ce',
   packagesHash: '95cb0d698a708635e0594a5c85bacfb0a7538c20',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
