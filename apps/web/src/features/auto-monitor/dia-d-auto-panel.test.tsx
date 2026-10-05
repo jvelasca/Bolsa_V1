@@ -5,7 +5,13 @@
  * DTO directo del endpoint (sin envoltorio `data`).
  */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
@@ -68,6 +74,10 @@ vi.mock("@/features/accounts/use-active-account", () => ({
     isLoading: false,
     accounts: [],
   }),
+}));
+
+vi.mock("@/features/auto-monitor/dia-d-auto-feedback-panel", () => ({
+  DiaDAutoFeedbackPanel: () => <div data-testid="feedback-stub" />,
 }));
 
 import { api } from "@/lib/api";
@@ -147,5 +157,68 @@ describe("DiaDAutoPanel", () => {
     await waitFor(() =>
       expect(api.getAutoDiaDReplay).toHaveBeenCalledWith("2026-09-29"),
     );
+  });
+
+  it("completa el patrón WAI-ARIA: tab ↔ tabpanel y roving tabIndex", () => {
+    renderPanel();
+
+    const tablist = screen.getByTestId("dia-d-auto-view-toolbar");
+    expect(tablist.getAttribute("role")).toBe("tablist");
+
+    const sandbox = screen.getByTestId("dia-d-auto-view-sandbox");
+    expect(sandbox.getAttribute("role")).toBe("tab");
+    expect(sandbox.getAttribute("aria-selected")).toBe("true");
+    expect(sandbox.getAttribute("tabIndex")).toBe("0");
+    expect(sandbox.getAttribute("aria-controls")).toBe(
+      "dia-d-auto-view-panel-sandbox",
+    );
+
+    // La pestaña inactiva no participa del orden de tabulación (roving).
+    expect(
+      screen.getByTestId("dia-d-auto-view-feedback").getAttribute("tabIndex"),
+    ).toBe("-1");
+
+    const panel = screen.getByRole("tabpanel");
+    expect(panel.getAttribute("id")).toBe("dia-d-auto-view-panel-sandbox");
+    expect(panel.getAttribute("aria-labelledby")).toBe(
+      "dia-d-auto-view-tab-sandbox",
+    );
+  });
+
+  it("cambia de vista con flechas y Home/End", () => {
+    renderPanel();
+
+    // ArrowRight ⇒ feedback.
+    fireEvent.keyDown(screen.getByTestId("dia-d-auto-view-sandbox"), {
+      key: "ArrowRight",
+    });
+    expect(
+      screen
+        .getByTestId("dia-d-auto-view-feedback")
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(screen.getByRole("tabpanel").getAttribute("id")).toBe(
+      "dia-d-auto-view-panel-feedback",
+    );
+
+    // Home ⇒ vuelve a sandbox.
+    fireEvent.keyDown(screen.getByTestId("dia-d-auto-view-feedback"), {
+      key: "Home",
+    });
+    expect(
+      screen
+        .getByTestId("dia-d-auto-view-sandbox")
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+
+    // End ⇒ última pestaña (feedback).
+    fireEvent.keyDown(screen.getByTestId("dia-d-auto-view-sandbox"), {
+      key: "End",
+    });
+    expect(
+      screen
+        .getByTestId("dia-d-auto-view-feedback")
+        .getAttribute("aria-selected"),
+    ).toBe("true");
   });
 });

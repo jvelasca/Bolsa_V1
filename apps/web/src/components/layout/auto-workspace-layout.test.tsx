@@ -7,9 +7,15 @@
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AutoWorkspaceLayout } from "@/components/layout/auto-workspace-layout";
+
+// El semáforo de realidad tiene su propio test; aquí se aísla para verificar que
+// el layout lo monta sin arrastrar I/O de red al test de navegación.
+vi.mock("@/features/auto/auto-reality-strip", () => ({
+  AutoRealityStrip: () => <div data-testid="auto-reality-strip" />,
+}));
 
 function renderAt(entry: string) {
   return render(
@@ -55,5 +61,10 @@ describe("AutoWorkspaceLayout", () => {
   it("la sección activa aporta exactamente un h1", () => {
     renderAt("/auto/operar");
     expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("monta el semáforo de realidad sobre la sección activa", () => {
+    renderAt("/auto/operar");
+    expect(screen.getByTestId("auto-reality-strip")).toBeTruthy();
   });
 });

@@ -7,7 +7,7 @@
  * `NO MEDIDO`; nunca se dibuja un 0 de relleno.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
@@ -346,8 +346,26 @@ function DiaDAutoViewToolbar({
   onChange,
 }: {
   view: DiaDAutoView;
-  onChange: (view: DiaDAutoView) => void;
+  /** `focus` pide mover el foco a la pestaña activa tras el commit (patrón WAI-ARIA). */
+  onChange: (view: DiaDAutoView, focus?: boolean) => void;
 }) {
+  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const index = DIA_D_VIEWS.indexOf(view);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") {
+      nextIndex = (index + 1) % DIA_D_VIEWS.length;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + DIA_D_VIEWS.length) % DIA_D_VIEWS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = DIA_D_VIEWS.length - 1;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    onChange(DIA_D_VIEWS[nextIndex]!, true);
+  };
+
   return (
     <div
       role="tablist"
@@ -366,10 +384,14 @@ function DiaDAutoViewToolbar({
           type="button"
           size="sm"
           variant="ghost"
+          id={`dia-d-auto-view-tab-${option.id}`}
           role="tab"
           aria-selected={view === option.id}
+          aria-controls={`dia-d-auto-view-panel-${option.id}`}
+          tabIndex={view === option.id ? 0 : -1}
           data-testid={`dia-d-auto-view-${option.id}`}
           onClick={() => onChange(option.id)}
+          onKeyDown={onTabKeyDown}
           className={cn(
             "h-7 rounded-md px-3 text-xs",
             view === option.id
@@ -387,7 +409,7 @@ function DiaDAutoViewToolbar({
 export function DiaDAutoPanel() {
   const [searchParams, setSearchParams] = useSearchParams();
   const view = readDiaDAutoView(searchParams);
-  const setView = (next: DiaDAutoView) => {
+  const setView = (next: DiaDAutoView, focus = false) => {
     setSearchParams(
       (prev) => {
         const params = new URLSearchParams(prev);
@@ -396,11 +418,24 @@ export function DiaDAutoPanel() {
       },
       { replace: true },
     );
+    if (focus) {
+      // Foco tras el commit de estado: patrón WAI-ARIA de tabs.
+      requestAnimationFrame(() => {
+        document.getElementById(`dia-d-auto-view-tab-${next}`)?.focus();
+      });
+    }
   };
   return (
     <div className="space-y-4" data-testid="dia-d-auto-root" data-view={view}>
       <DiaDAutoViewToolbar view={view} onChange={setView} />
-      {view === "feedback" ? <DiaDAutoFeedbackPanel /> : <DiaDAutoSandbox />}
+      <section
+        role="tabpanel"
+        id={`dia-d-auto-view-panel-${view}`}
+        aria-labelledby={`dia-d-auto-view-tab-${view}`}
+        tabIndex={0}
+      >
+        {view === "feedback" ? <DiaDAutoFeedbackPanel /> : <DiaDAutoSandbox />}
+      </section>
     </div>
   );
 }

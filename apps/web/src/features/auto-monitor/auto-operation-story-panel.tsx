@@ -29,6 +29,8 @@ import {
 } from "@bolsa/shared";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 import { useAutoDiaDFeedbackList } from "@/features/auto-monitor/use-auto-dia-d-feedback";
+import { buildOperationIdentity } from "@/features/auto/auto-operation-identity";
+import { plainStageLabel } from "@/features/auto/auto-story-plain-labels";
 import {
   autoDiaDHref,
   autoTechnicalDetailHref,
@@ -218,24 +220,28 @@ export function AutoOperationStoryPanel({
               className="flex flex-wrap gap-1.5"
               data-testid="auto-operation-story-cycles"
             >
-              {cycles.map((cycle) => (
-                <button
-                  key={cycle.cycleId}
-                  type="button"
-                  data-testid="auto-operation-story-cycle"
-                  data-cycle-id={cycle.cycleId}
-                  aria-pressed={selected?.cycleId === cycle.cycleId}
-                  onClick={() => selectCycle(cycle.cycleId)}
-                  className={cn(
-                    "h-6 rounded border px-2 text-[10px] tabular-nums",
-                    selected?.cycleId === cycle.cycleId
-                      ? "border-foreground/30 bg-background text-foreground shadow-sm"
-                      : "border-border text-muted-foreground",
-                  )}
-                >
-                  {cycle.instrumentId ?? cycle.cycleId}
-                </button>
-              ))}
+              {cycles.map((cycle) => {
+                const identity = buildOperationIdentity(cycle);
+                return (
+                  <button
+                    key={cycle.cycleId}
+                    type="button"
+                    data-testid="auto-operation-story-cycle"
+                    data-cycle-id={cycle.cycleId}
+                    title={identity.label}
+                    aria-pressed={selected?.cycleId === cycle.cycleId}
+                    onClick={() => selectCycle(cycle.cycleId)}
+                    className={cn(
+                      "h-6 rounded border px-2 text-[10px] tabular-nums",
+                      selected?.cycleId === cycle.cycleId
+                        ? "border-foreground/30 bg-background text-foreground shadow-sm"
+                        : "border-border text-muted-foreground",
+                    )}
+                  >
+                    {identity.label}
+                  </button>
+                );
+              })}
             </div>
           ) : null}
 
@@ -293,8 +299,11 @@ export function AutoOperationStoryPanel({
                       stage.dotTone,
                     )}
                   />
-                  <span className="w-28 shrink-0 font-medium">
-                    {stage.label}
+                  <span
+                    className="w-28 shrink-0 font-medium"
+                    title={stage.label}
+                  >
+                    {plainStageLabel(stage.id, stage.label)}
                   </span>
                   <span className={cn("uppercase tracking-wide", stage.tone)}>
                     {stage.stateLabel}

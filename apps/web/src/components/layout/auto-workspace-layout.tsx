@@ -14,6 +14,7 @@
 
 import { NavLink, Outlet } from "react-router-dom";
 import { AUTO_NAV } from "@/features/auto/auto-nav";
+import { AutoRealityStrip } from "@/features/auto/auto-reality-strip";
 import { cn } from "@/lib/utils";
 
 export function AutoWorkspaceLayout() {
@@ -46,6 +47,7 @@ export function AutoWorkspaceLayout() {
 
       <div className="min-h-0 flex-1 overflow-auto">
         <div className="mx-auto max-w-6xl p-4 sm:p-6">
+          <AutoRealityStrip />
           <Outlet />
         </div>
       </div>

@@ -13,13 +13,14 @@ import {
 } from "@/components/layout/auto-workspace-layout";
 import { OperationsPanel } from "@/features/trading/operations-panel";
 import { CARTERA_RIESGO_PATH } from "@/features/confirm/daily-nav";
+import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
 
 export function AutoCarteraPage() {
   return (
     <div className="space-y-6" data-testid="auto-cartera-page">
       <AutoSectionHeading
-        title="Cartera"
-        description="Estado y supervisión de posiciones, órdenes e historial. Reducir / salir encolan Confirm; Confirm es la única firma."
+        title={AUTO_SECTION_COPY.cartera.title}
+        description={AUTO_SECTION_COPY.cartera.description}
       />
 
       <section className="space-y-2" aria-labelledby="auto-cartera-ops-heading">

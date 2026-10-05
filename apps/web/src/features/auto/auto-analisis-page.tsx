@@ -13,6 +13,7 @@ import {
 } from "@/components/layout/auto-workspace-layout";
 import { DiaDAutoPanel } from "@/features/auto-monitor/dia-d-auto-panel";
 import { OpsAutoEvidenceSection } from "@/features/operational-console/auto-evidence-section";
+import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
 import { cn } from "@/lib/utils";
 
 const ANALISIS_TABS = [
@@ -75,8 +76,8 @@ export function AutoAnalisisPage() {
   return (
     <div className="space-y-6" data-testid="auto-analisis-page">
       <AutoSectionHeading
-        title="Análisis"
-        description="Conocimiento cross-ciclo: DÍA-D, evidencia, estrategias e investigación. Explica; no opera."
+        title={AUTO_SECTION_COPY.analisis.title}
+        description={AUTO_SECTION_COPY.analisis.description}
       />
 
       <div

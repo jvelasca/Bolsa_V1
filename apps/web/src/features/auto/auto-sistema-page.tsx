@@ -23,6 +23,7 @@ import {
 } from "@/features/operational-console/operational-console-sections";
 import { useLifecycleReconciliation } from "@/features/operational-console/use-lifecycle-reconciliation";
 import { useOpsSelfEval } from "@/features/operational-console/use-ops-self-eval";
+import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
 
 export function AutoSistemaPage() {
   const { view, isLoading, isError } = useAutoOperationalMonitor();
@@ -33,8 +34,8 @@ export function AutoSistemaPage() {
   return (
     <div className="space-y-6" data-testid="auto-sistema-page">
       <AutoSectionHeading
-        title="Sistema"
-        description="Salud del motor AUTO, broker/ejecución, reconciliación y auditoría. Read-only."
+        title={AUTO_SECTION_COPY.sistema.title}
+        description={AUTO_SECTION_COPY.sistema.description}
       />
 
       <section className="space-y-3" aria-labelledby="auto-sistema-salud">
