@@ -136,10 +136,19 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * `Delta motor = 0`: CERO ficheros de motor. El arbol pinneado es el del commit funcional
  * `f6286e6e`. Pin anterior (sello `v2.88.55-beta`, commit `714863c9`):
  * `apps` `451fa1c9…` / `packages` `95cb0d69…`.
+ *
+ * RE-ANCLAJE 2026-10-05 (sello `v2.88.57-beta`): AUTO UI REFACTOR 2.1.1 — integridad del deep-link
+ * de la operacion: el `AutoOperationStoryPanel` resuelve la seleccion explicita (ruta o `?cycle=`)
+ * con `resolveAutoOperationSelection`; un id inexistente declara "Operacion no encontrada" y NO cae
+ * a `cycles[0]`; + E2E mock `gp-e2e-v28857`. UI/read-model puro: toca `apps/` (web/e2e);
+ * `packages/` NO cambia (mismo arbol que `v2.88.56`); `scripts/` no participa del pin.
+ * `Delta motor = 0`: CERO ficheros de motor. El arbol pinneado es el del commit funcional
+ * `287a15b5`. Pin anterior (sello `v2.88.56-beta`, commit `f6286e6e`):
+ * `apps` `13d5bdc4…` / `packages` `95cb0d69…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'f6286e6e',
-  appsHash: '13d5bdc42500f49684d45c7df85717790ca92d93',
+  commit: '287a15b5',
+  appsHash: '0556be2f23015ab7509e7460fce8d3bdbbb971e9',
   packagesHash: '95cb0d698a708635e0594a5c85bacfb0a7538c20',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
