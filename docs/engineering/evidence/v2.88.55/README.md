@@ -104,11 +104,11 @@ pnpm --filter @bolsa/web contract:check
 | --- | --- | --- |
 | **Sello funcional** (`feat`) | `714863c9` | `apps` `451fa1c9…` / `packages` `95cb0d69…` |
 | Re-anclaje del freeze de la ventana (`chore`) | `f915934e` | pin `commit: 714863c9` (no mueve árbol) |
-| **Commit del tag** (`docs(seal)`) | _(este commit)_ | (mismos árboles que el funcional) |
+| **Commit del tag** (`docs(seal)`) | `3c7601b5` (tag anotado `811f9b1f`) | (mismos árboles que el funcional) |
 | Cita **POST-TAG** (evidencia `§7`) | _(posterior)_ | — |
 
 ---
 
 ## 7. Cita del CI (POST-TAG)
 
-> **`Release tag CI`** del tag `v2.88.55-beta`: **PENDIENTE** (se cita aquí tras empujar el tag; ningún tag contiene su propio resultado de CI — límite estructural declarado, como en `v2.88.46`…`v2.88.54`).
+> **`Release tag CI`** del tag `v2.88.55-beta`: run [`37333856914`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37333856914) **VERDE** (`attempt 1`, `15:33:59Z → 15:41:33Z`; `12` jobs = `11` `success` + `playwright` integrado `skipped`; `certify` `success`; `python` `success` (ruff/imports/mypy/pytest offline); `frontend` `success` (typecheck/lint/test/build + `contract:check`); `shared` `success`; `decision-spine` `success`; `lifecycle-pg` `success`; `security (gitleaks)` `success`; `dr-verify` `success`; `a7-gate` `success`; `replay-repro` `success` **`REPRODUCIDO`** `sha256 1E3ADAC2…` = sello ⇒ **`Δ motor = 0` confirmado por CI**). **`GitHub Release` [`v2.88.55-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.55-beta) publicado** (pre-release). Ningún tag contiene su propio resultado de CI — límite estructural declarado, como en `v2.88.46`…`v2.88.54`.
