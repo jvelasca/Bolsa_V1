@@ -2,6 +2,18 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.57-beta] — `AUTO · UI`: **AUTO UI REFACTOR 2.1.1** (integridad del deep-link de operación)
+
+**Bump** `2.11.56-beta` → `2.11.57-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello **de UI/read-model**: **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS de `v2.88.50`/`v2.88.51` se **heredan y citan**. Addendum de diseño: [spec 2.1.1](docs/engineering/spec-auto-ui-refactor-2-1-1-2026-10-05.md) (cierra el defecto de la [auditoría `v2.88.56`](docs/engineering/entrega-auditoria-externa-mia-v2.88.56-2026-10-05.md)).
+
+- **Cierra el «Deep-link inválido» (P2 de integridad) de la auditoría de `v2.88.56`.** Un `cycleId` explícito (ruta `/auto/operar/operacion/:cycleId` o `?cycle=` en `/auto-monitor?mode=operation`) que **no existe** en la ventana dejaba de resolverse y caía silenciosamente a `cycles[0]`: mostraba el encabezado del id pedido con la historia de **otra** operación. Ahora declara **«Operación no encontrada»** y **no** pinta etapas ni contexto de otro ciclo.
+- **Resolución explícita y pura.** `resolveAutoOperationSelection` (en `auto-operation-story-panel.tsx`) distingue «sin selección» de «selección no resuelta»: `notFound = id explícito ∧ datos cargados ∧ sin coincidencia`; durante la carga NO declara ausencia (evita un falso negativo). Sin id explícito se conserva el fallback histórico a `cycles[0]`.
+- **Render honesto.** El `<ol>` de la operación y el bloque «Contexto que la originó» solo se montan con un ciclo válido; el botón «Detalle técnico» se oculta sin ciclo; el selector de ciclos queda como vía de recuperación.
+- **Tests.** `auto-operation-story-panel.test.tsx` (estado «no encontrada» por ruta y por `?cycle=`, + tests del helper), `auto-pages.test.tsx` (h1 con el id pedido, sin inventar otro ciclo) y E2E mock `gp-e2e-v28857-auto-operacion-invalida-mock.spec.ts` (ruta inválida, `?cycle=` inválido y ruta válida de regresión).
+- **Deuda declarada (abierta):** `PortfolioDecision` durable (`UI52-02`), explicación DÍA-D verdaderamente `cycle_id`-resolutiva, PIT histórico institucional y Execution Analysis.
+- **Gates:** bump guard **passed** (`2.11.57-beta`); `@bolsa/web` **1412 passed** (`245` ficheros) + `typecheck` limpio + `lint` **0 errores** (`23` warnings pre-existentes) + `contract:check` **OK**; E2E AUTO **6 passed** (`gp-e2e-v28856` + `gp-e2e-v28857`).
+- **Evidencia:** [`docs/engineering/evidence/v2.88.57/README.md`](docs/engineering/evidence/v2.88.57/README.md). **Entrega a auditoría externa (MIA):** `docs/engineering/entrega-auditoria-externa-mia-v2.88.57-2026-10-05.md`.
+
 ## [2.11.56-beta] — `AUTO · UI`: **AUTO UI REFACTOR 2.1** (navegación canónica y pulido UX)
 
 **Bump** `2.11.55-beta` → `2.11.56-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello **de UI/read-model**: **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS de `v2.88.50`/`v2.88.51` se **heredan y citan**. Addendum de diseño: [spec 2.1](docs/engineering/spec-auto-ui-refactor-2-1-2026-10-05.md) (hereda de [spec 2.0](docs/engineering/spec-auto-ui-refactor-2-0-2026-10-05.md) + [ADR-044](docs/adr/044-auto-workspace-information-architecture.md)).
