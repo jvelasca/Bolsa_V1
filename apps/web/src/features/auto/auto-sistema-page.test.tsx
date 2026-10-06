@@ -98,7 +98,7 @@ describe("AutoSistemaPage", () => {
       "Funcionando",
     );
     expect(screen.getByTestId("auto-sistema-doing").textContent).toBe(
-      "Funcionando",
+      "Sin dato todavía",
     );
     expect(screen.getByTestId("auto-sistema-last-activity").textContent).toBe(
       "Última decisión: 09:42 · Próxima decisión: 10:00",
@@ -109,6 +109,23 @@ describe("AutoSistemaPage", () => {
     expect(
       screen.getByTestId("auto-sistema-last-activity").textContent,
     ).not.toContain("análisis");
+  });
+
+  it("la fase operacional del tick se pinta sin inventar desde RUNNING", () => {
+    monitorState.view = {
+      ...monitorState.view,
+      header: {
+        state: "RUNNING",
+        currentActivity: "ANALYZING",
+      },
+    };
+    renderPage();
+    expect(screen.getByTestId("auto-sistema-doing").textContent).toBe(
+      "Analizando",
+    );
+    expect(screen.getByTestId("auto-sistema-doing").textContent).not.toBe(
+      "Funcionando",
+    );
   });
 
   it("el monitor crudo vive en un detalle técnico plegado", () => {

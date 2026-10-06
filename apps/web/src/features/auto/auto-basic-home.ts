@@ -9,6 +9,7 @@
 
 import {
   AUTO_HOME_NO_DATA_LABEL,
+  activityLabel,
   engineStateLabel,
   isOperationInCourse,
 } from "@/features/auto/auto-home-summary";
@@ -44,7 +45,11 @@ export type AutoBasicHomeInput = {
   isLoading?: boolean;
   isError?: boolean;
   /** `null` = el monitor no trajo cabecera. */
-  header?: { state?: string | null } | null;
+  header?: {
+    state?: string | null;
+    /** Fase operacional real del último tick (telemetría); ausente = «Sin dato todavía». */
+    currentActivity?: string | null;
+  } | null;
   cycles?: readonly AutoBasicCycle[] | null;
 };
 
@@ -175,7 +180,9 @@ export function buildAutoBasicHome(input: AutoBasicHomeInput): AutoBasicHomeV1 {
     workingLabel: loaded
       ? engineStateLabel(input.header?.state)
       : AUTO_HOME_NO_DATA_LABEL,
-    doingLabel: AUTO_HOME_NO_DATA_LABEL,
+    doingLabel: loaded
+      ? activityLabel(input.header?.currentActivity)
+      : AUTO_HOME_NO_DATA_LABEL,
     assetLabel: loaded ? assetLabel : AUTO_HOME_NO_DATA_LABEL,
     decisionLabel: AUTO_HOME_NO_DATA_LABEL,
     happenedLabel,

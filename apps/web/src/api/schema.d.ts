@@ -4360,6 +4360,13 @@ export interface components {
         AutoMonitorHeaderDto: {
             /** Asof */
             asOf: string;
+            /** Currentactivity */
+            currentActivity?: string | null;
+            /**
+             * Currentactivitymeasurement
+             * @default UNKNOWN
+             */
+            currentActivityMeasurement: string;
             /**
              * Decisionclock
              * @default CLOSED BAR

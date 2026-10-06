@@ -865,6 +865,10 @@ def _header(
     # por separado (``lastHeartbeatAt`` vs ``lastDecisionAt``): mezclarlos haría pasar un
     # heartbeat por una decisión. La próxima decisión solo se deriva si hay decisión durable.
     last_tick = _parse_instant(_get(engine, "last_tick_at", "lastTickAt")) if engine else None
+    # ``activity`` es la fase operacional REAL del último tick (telemetría). Se expone con su
+    # medición: un valor presente es ``COMPLETE``; su ausencia (fila anterior al sello o motor
+    # que no la emite) es ``UNKNOWN`` y la UI la declara «Sin dato todavía», nunca una fase.
+    activity = _get(engine, "activity") if engine else None
     next_decision = (
         last_decision_at + timedelta(seconds=interval_seconds)
         if last_decision_at is not None and interval_seconds is not None
@@ -890,6 +894,10 @@ def _header(
             MEASUREMENT_COMPLETE if last_decision_at is not None else MEASUREMENT_UNKNOWN
         ),
         "nextDecisionAt": _iso(next_decision),
+        "currentActivity": activity,
+        "currentActivityMeasurement": (
+            MEASUREMENT_COMPLETE if activity is not None else MEASUREMENT_UNKNOWN
+        ),
         "realPriceEnabled": real_price_enabled,
         "heartbeatsPersisted": engine_ticks,
         "asOf": as_of,

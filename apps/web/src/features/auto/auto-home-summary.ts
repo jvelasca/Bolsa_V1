@@ -41,6 +41,8 @@ export type AutoHomeHeaderFacts = {
   /** El resumen no lo copia: un latido no es una decisión. */
   lastHeartbeatAt?: string | null;
   nextDecisionAt?: string | null;
+  /** Fase operacional real del último tick (telemetría); ausente = «Sin dato todavía». */
+  currentActivity?: string | null;
 };
 
 export type AutoHomeSummaryInput = {
@@ -73,6 +75,8 @@ export type AutoHomeSummaryV1 = {
   lastActivityLabel: string;
   /** `Próxima decisión: HH:mm` | `Sin dato todavía`. Un reloj ausente no es una fase. */
   nextStepLabel: string;
+  /** Fase operacional real del motor, o `Sin dato todavía`. No se inventa desde `RUNNING`. */
+  activityLabel: string;
   inCourseOperationsCount: number;
   /** `3 en curso` | `1 en curso` | `Sin operaciones en curso`. */
   inCourseOperationsLabel: string;
@@ -122,6 +126,27 @@ export function engineStateLabel(state: string | null | undefined): string {
   return (
     ENGINE_STATE_LABELS[state.trim().toUpperCase()] ?? AUTO_HOME_NO_DATA_LABEL
   );
+}
+
+/** Fases operacionales REALES del último tick (telemetría), traducidas a lenguaje de usuario. */
+const ACTIVITY_LABELS: Readonly<Record<string, string>> = {
+  ANALYZING: "Analizando",
+  WAITING_SIGNAL: "Esperando señal",
+  PREPARING_OPERATION: "Preparando operación",
+  WAITING_EXECUTION: "Esperando ejecución",
+  APPLYING_RESULT: "Aplicando resultado",
+  NO_ACTIVITY: "Sin actividad",
+  BLOCKED: "Bloqueado",
+};
+
+/**
+ * Traduce `currentActivity` solo si el token está en el conjunto cerrado.
+ * Un valor ausente o fuera de la tabla es «Sin dato todavía». NUNCA se deriva de
+ * `RUNNING`: «Sin actividad» (``NO_ACTIVITY``) es un hecho, no un hueco.
+ */
+export function activityLabel(value: string | null | undefined): string {
+  if (value == null) return AUTO_HOME_NO_DATA_LABEL;
+  return ACTIVITY_LABELS[value.trim().toUpperCase()] ?? AUTO_HOME_NO_DATA_LABEL;
 }
 
 /**
@@ -183,6 +208,7 @@ export function buildAutoHomeSummary(
     : AUTO_HOME_NO_DATA_LABEL;
   const lastDecisionAt = loaded ? header?.lastDecisionAt : null;
   const nextDecisionAt = loaded ? header?.nextDecisionAt : null;
+  const currentActivity = loaded ? header?.currentActivity : null;
 
   const inCourseOperationsCount = (input.cycles ?? []).filter(
     isOperationInCourse,
@@ -202,6 +228,7 @@ export function buildAutoHomeSummary(
     nextStepLabel: nextDecisionAt
       ? `Próxima decisión: ${formatActivityTime(nextDecisionAt)}`
       : AUTO_HOME_NO_DATA_LABEL,
+    activityLabel: activityLabel(currentActivity),
     inCourseOperationsCount,
     inCourseOperationsLabel: inCourseOperationsLabel(inCourseOperationsCount),
     hasOperationsInCourse: inCourseOperationsCount > 0,

@@ -200,7 +200,7 @@ async def test_migration_048_roundtrip_creates_and_drops_the_dedupe_key(
     assert url is not None
     url = url.replace("postgresql://", "postgresql+psycopg://", 1).split("?", 1)[0]
 
-    assert alembic_head() == "050_idem_key_not_null"
+    assert alembic_head() == "051_auto_engine_activity"
 
     engine = create_engine(url)
     cfg = _alembic_config()

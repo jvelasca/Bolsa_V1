@@ -16,6 +16,7 @@ import pytest
 
 from bolsa_api.background.auto_simulation_worker import (
     AutoSimulationWorker,
+    derive_activity,
     step_minute_clock,
 )
 from bolsa_application.auto_daily_journal import build_auto_daily_report
@@ -247,6 +248,22 @@ def _sell_decider(to_close: set[str]) -> _Prov:
 
 
 # ── V2.28 / A10 (P1-02 real): atribución del fill a la versión de estrategia ────────
+
+
+def test_derive_activity_maps_real_tick_facts() -> None:
+    """La fase operacional solo responde a hechos que el motor ya calculó."""
+    assert derive_activity(kill_active=True, decided=0, proposals=0, orders=0, fills=0) == "BLOCKED"
+    assert derive_activity(kill_active=False, decided=3, proposals=1, orders=1, fills=2) == "APPLYING_RESULT"
+    assert derive_activity(kill_active=False, decided=3, proposals=1, orders=1, fills=0) == "WAITING_EXECUTION"
+    assert derive_activity(kill_active=False, decided=3, proposals=1, orders=0, fills=0) == "PREPARING_OPERATION"
+    assert derive_activity(kill_active=False, decided=3, proposals=0, orders=0, fills=0) == "ANALYZING"
+    assert derive_activity(kill_active=False, decided=0, proposals=0, orders=0, fills=0) == "NO_ACTIVITY"
+
+
+def test_derive_activity_never_infers_from_running() -> None:
+    """Un tick vivo sin actividad concreta es ``NO_ACTIVITY``, no «analizando»."""
+    assert derive_activity(kill_active=False, decided=0, proposals=0, orders=0, fills=0) == "NO_ACTIVITY"
+    assert derive_activity(kill_active=False, decided=0, proposals=0, orders=0, fills=0) != "ANALYZING"
 
 
 def test_strategy_version_from_source_extracts_active_version() -> None:

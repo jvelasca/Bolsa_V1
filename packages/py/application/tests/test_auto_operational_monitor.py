@@ -714,6 +714,19 @@ def test_header_heartbeats_persisted_is_not_an_operational_event_count() -> None
     assert dto["concurrency"]["heartbeatsPersisted"] == 1234
 
 
+def test_header_activity_is_declared_and_never_inferred_from_running() -> None:
+    """``currentActivity`` copia el hecho durable del tick; sin él es UNKNOWN, nunca ``RUNNING``."""
+    dto = build_operational_monitor(account_id="acc-1", engine=_engine())
+    assert dto["header"]["currentActivity"] is None
+    assert dto["header"]["currentActivityMeasurement"] == "UNKNOWN"
+
+    dto2 = build_operational_monitor(
+        account_id="acc-1", engine=_engine(activity="ANALYZING")
+    )
+    assert dto2["header"]["currentActivity"] == "ANALYZING"
+    assert dto2["header"]["currentActivityMeasurement"] == "COMPLETE"
+
+
 def test_facts_without_value_are_never_declared_measured() -> None:
     """Un hecho SIN valor no puede viajar ``COMPLETE``: la UI lo rotularía ``MEDIDO``."""
     dto = build_operational_monitor(

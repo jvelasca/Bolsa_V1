@@ -2161,6 +2161,10 @@ class AutoEngineRunRow(Base):
         default=0,
     )
     last_reason: Mapped[str | None] = mapped_column("last_reason", Text, nullable=True)
+    # v2.88.79 — fase operacional REAL del último tick (telemetría, no inferencia de
+    # ``RUNNING``). ``NULL`` = fila anterior al sello o tick sin actividad medida; la UI
+    # lo declara «Sin dato todavía», nunca una fase inventada.
+    activity: Mapped[str | None] = mapped_column("activity", String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         DateTime(timezone=True),
@@ -2205,6 +2209,8 @@ class AutoEngineTickRow(Base):
         default=0,
     )
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # v2.88.79 — fase operacional REAL del tick matriculado (traza append-only).
+    activity: Mapped[str | None] = mapped_column("activity", String(32), nullable=True)
     tick_at: Mapped[datetime] = mapped_column(
         "tick_at",
         DateTime(timezone=True),

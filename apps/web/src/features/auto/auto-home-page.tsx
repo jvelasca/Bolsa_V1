@@ -236,7 +236,7 @@ export function AutoHomePage() {
         {summary.loaded ? (
           <div className="space-y-1 text-sm">
             <p className="font-medium" data-testid="auto-home-doing">
-              {summary.statusLabel}
+              {summary.activityLabel}
             </p>
             <p
               className="text-muted-foreground"

@@ -2,6 +2,16 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.79-beta] — `AUTO · UI`: **«¿Qué está haciendo?» con telemetría real**
+
+**Bump** `2.11.78-beta` → `2.11.79-beta`. **Con migración** `051_auto_engine_activity`. **Contrato HTTP con cambio** (`currentActivity` + `currentActivityMeasurement`). **Motor financiero sin cambio** (`ExecuteTrade`, ledger, posiciones, settlement intactos); el worker solo emite telemetría. Tag no creado.
+
+- Nuevo hecho durable `currentActivity`: el worker emite en cada tick la fase operacional REAL derivada de sus propios contadores (`derive_activity`), persistida en `auto_engine_runs.activity` y su traza en `auto_engine_ticks`.
+    10|- Vocabulario cerrado de fases: `ANALYZING`, `WAITING_SIGNAL`, `PREPARING_OPERATION`, `WAITING_EXECUTION`, `APPLYING_RESULT`, `NO_ACTIVITY`, `BLOCKED`. Un token fuera del conjunto o ausente es «Sin dato todavía»; `NO_ACTIVITY` es «Sin actividad», distinto del hueco.
+- «¿Qué está haciendo?» en HOME y Sistema ya no se inventa ni queda «Sin dato todavía»: copia `currentActivity`. NUNCA se deriva de `RUNNING` (un motor vivo no es «analizando»).
+- El heartbeat y la decisión siguen separados: `currentActivity` no contamina `lastActivityLabel`/`nextStepLabel`.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.79/README.md`](docs/engineering/evidence/v2.88.79/README.md).
+
 ## [2.11.78-beta] — `AUTO · UI`: **un reloj ausente no es una fase**
 
 **Bump** `2.11.77-beta` → `2.11.78-beta`. **SIN migración**. **`Δ motor = 0`**. Contrato HTTP sin cambio. Tag no creado. El tag `v2.88.76-beta` no se mueve. `v2.88.77-beta` sigue sin tag.

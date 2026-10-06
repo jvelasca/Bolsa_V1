@@ -126,6 +126,29 @@ describe("buildAutoBasicHome", () => {
     expect(home.moneyLabel).toBe(AUTO_SIMULATION_BANNER);
   });
 
+  it("la fase operacional del tick se traduce y no se inventa desde RUNNING", () => {
+    const home = buildAutoBasicHome({
+      header: { state: "RUNNING", currentActivity: "ANALYZING" },
+      cycles: [],
+    });
+    expect(home.doingLabel).toBe("Analizando");
+    expect(home.doingLabel).not.toBe(AUTO_HOME_NO_DATA_LABEL);
+
+    const noActivity = buildAutoBasicHome({
+      header: { state: "RUNNING" },
+      cycles: [],
+    });
+    expect(noActivity.doingLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(noActivity.doingLabel).not.toBe("Analizando");
+
+    const idle = buildAutoBasicHome({
+      header: { state: "RUNNING", currentActivity: "NO_ACTIVITY" },
+      cycles: [],
+    });
+    expect(idle.doingLabel).toBe("Sin actividad");
+    expect(idle.doingLabel).not.toBe(AUTO_HOME_NO_DATA_LABEL);
+  });
+
   it("una reserva o un cierre no medido no son una operación en curso", () => {
     const home = buildAutoBasicHome({
       header: { state: "RUNNING" },

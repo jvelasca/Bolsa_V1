@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AUTO_HOME_NO_DATA_LABEL,
+  activityLabel,
   buildAutoHomeSummary,
   decisionClockCopy,
   engineStateLabel,
@@ -26,6 +27,31 @@ describe("formatActivityTime", () => {
     expect(formatActivityTime(null)).toBe(AUTO_HOME_NO_DATA_LABEL);
     expect(formatActivityTime("")).toBe(AUTO_HOME_NO_DATA_LABEL);
     expect(formatActivityTime("ayer")).toBe("ayer");
+  });
+});
+
+describe("activityLabel", () => {
+  it("traduce solo el conjunto cerrado de fases operacionales", () => {
+    expect(activityLabel("ANALYZING")).toBe("Analizando");
+    expect(activityLabel("WAITING_SIGNAL")).toBe("Esperando señal");
+    expect(activityLabel("PREPARING_OPERATION")).toBe("Preparando operación");
+    expect(activityLabel("WAITING_EXECUTION")).toBe("Esperando ejecución");
+    expect(activityLabel("APPLYING_RESULT")).toBe("Aplicando resultado");
+    expect(activityLabel("NO_ACTIVITY")).toBe("Sin actividad");
+    expect(activityLabel("BLOCKED")).toBe("Bloqueado");
+  });
+
+  it("un token fuera del conjunto o ausente es Sin dato todavía", () => {
+    expect(activityLabel(null)).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel(undefined)).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel("")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel("RUNNING")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel("SLEEPING")).toBe(AUTO_HOME_NO_DATA_LABEL);
+  });
+
+  it("Sin actividad es un hecho, no un hueco", () => {
+    expect(activityLabel("NO_ACTIVITY")).toBe("Sin actividad");
+    expect(activityLabel("NO_ACTIVITY")).not.toBe(AUTO_HOME_NO_DATA_LABEL);
   });
 });
 
@@ -225,6 +251,38 @@ describe("buildAutoHomeSummary", () => {
     expect(phrase).toBe(AUTO_HOME_NO_DATA_LABEL);
     expect(phrase).not.toContain("11:11");
     expect(phrase).not.toContain("Última actividad");
+  });
+
+  it("la fase operacional se copia del hecho durable y no contamina la decisión", () => {
+    const withActivity = buildAutoHomeSummary({
+      header: {
+        state: "RUNNING",
+        currentActivity: "ANALYZING",
+        lastDecisionAt: "2026-10-06T09:42:00Z",
+      },
+      cycles: [],
+    });
+    expect(withActivity.activityLabel).toBe("Analizando");
+    expect(withActivity.activityLabel).not.toBe(AUTO_HOME_NO_DATA_LABEL);
+    // ``currentActivity`` no rellena la decisión: sin ``nextDecisionAt`` sigue siendo hueco.
+    expect(withActivity.lastActivityLabel).toBe("09:42");
+    expect(withActivity.nextStepLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+
+    const withoutActivity = buildAutoHomeSummary({
+      header: { state: "RUNNING" },
+      cycles: [],
+    });
+    expect(withoutActivity.activityLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+  });
+
+  it("un RUNNING no se traduce a Analizando", () => {
+    const summary = buildAutoHomeSummary({
+      header: { state: "RUNNING" },
+      cycles: [],
+    });
+    expect(summary.autoLabel).toBe("Funcionando");
+    expect(summary.activityLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(summary.activityLabel).not.toBe("Analizando");
   });
 
   it("traduce solo el conjunto cerrado del motor", () => {

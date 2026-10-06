@@ -83,7 +83,7 @@ export function AutoSistemaPage() {
               AUTO: {status.autoLabel}
             </p>
             <p className="font-medium" data-testid="auto-sistema-doing">
-              {status.statusLabel}
+              {status.activityLabel}
             </p>
             <p
               className="text-muted-foreground"

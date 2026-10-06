@@ -14,6 +14,7 @@ import asyncio
 from bolsa_application.auto_engine_state_store import (
     AutoEngineTickInput,
     InMemoryAutoEngineStore,
+    _activity_of,
     crash_restart_readopts,
     next_tick_input,
 )
@@ -23,7 +24,13 @@ def _run(coro):
     return asyncio.run(coro)
 
 
-def _tick(*, seq: int, proposals: int = 2, engine_id: str = "eng-a") -> AutoEngineTickInput:
+def _tick(
+    *,
+    seq: int,
+    proposals: int = 2,
+    engine_id: str = "eng-a",
+    activity: str | None = None,
+) -> AutoEngineTickInput:
     return AutoEngineTickInput(
         engine_id=engine_id,
         venue="simulated",
@@ -33,6 +40,7 @@ def _tick(*, seq: int, proposals: int = 2, engine_id: str = "eng-a") -> AutoEngi
         vetoes=0,
         pending_plans=1,
         last_reason=("auto_simulated_only", "ok"),
+        activity=activity,
     )
 
 
@@ -103,3 +111,26 @@ def test_empty_snapshot_computes_first_seq() -> None:
         more_pending_plans=0,
     )
     assert nxt.seq == 1
+
+
+def test_activity_round_trips_and_defaults_to_none() -> None:
+    store = InMemoryAutoEngineStore()
+    _run(store.record_tick(_tick(seq=1, activity="ANALYZING")))
+    snap = _run(store.read("eng-a"))
+    assert snap is not None
+    assert snap.activity == "ANALYZING"
+    # Un tick sin actividad queda None (la UI lo declara «Sin dato todavía»).
+    _run(store.record_tick(_tick(seq=2, activity=None)))
+    snap2 = _run(store.read("eng-a"))
+    assert snap2 is not None
+    assert snap2.activity is None
+
+
+def test_activity_of_fails_closed_and_keeps_no_activity() -> None:
+    """La fase operacional solo admite el conjunto cerrado; lo demás es None."""
+    assert _activity_of("ANALYZING") == "ANALYZING"
+    assert _activity_of("no_activity") == "NO_ACTIVITY"  # normaliza a mayúsculas.
+    assert _activity_of("NO_ACTIVITY") == "NO_ACTIVITY"  # hecho válido, distinto de None.
+    assert _activity_of(None) is None
+    assert _activity_of("") is None
+    assert _activity_of("SLEEPING") is None  # token fuera del conjunto cerrado.

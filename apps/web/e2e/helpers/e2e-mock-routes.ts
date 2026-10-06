@@ -240,6 +240,8 @@ function autoOperationalMonitorMock() {
       lastDecisionAt: "2026-09-30T23:00:00Z",
       lastDecisionMeasurement: "COMPLETE",
       nextDecisionAt: "2026-10-01T00:01:00Z",
+      currentActivity: null,
+      currentActivityMeasurement: "UNKNOWN",
       realPriceEnabled: false,
       heartbeatsPersisted: 42,
       asOf: "2026-10-01T00:00:00Z",

@@ -932,6 +932,22 @@
             "title": "Asof",
             "type": "string"
           },
+          "currentActivity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentactivity"
+          },
+          "currentActivityMeasurement": {
+            "default": "UNKNOWN",
+            "title": "Currentactivitymeasurement",
+            "type": "string"
+          },
           "decisionClock": {
             "default": "CLOSED BAR",
             "title": "Decisionclock",

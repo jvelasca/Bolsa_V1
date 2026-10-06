@@ -162,7 +162,7 @@ describe("AutoHomePage", () => {
       "Ver actividad",
     );
     expect(screen.getByTestId("auto-home-doing").textContent).toBe(
-      "Funcionando",
+      "Sin dato todavía",
     );
     expect(screen.getByTestId("auto-home-last-activity").textContent).toBe(
       "Última decisión: 09:42 · Próxima decisión: 10:00",
@@ -173,6 +173,38 @@ describe("AutoHomePage", () => {
     expect(
       screen.getByTestId("auto-home-last-activity").textContent,
     ).not.toContain("análisis");
+  });
+
+  it("la fase operacional del tick se pinta sin inventar desde RUNNING", () => {
+    monitorState.header = {
+      ...monitorState.header,
+      currentActivity: "ANALYZING",
+    };
+    renderHome();
+    expect(screen.getByTestId("auto-home-q-doing").textContent).toContain(
+      "Analizando",
+    );
+    expect(screen.getByTestId("auto-home-doing").textContent).toBe(
+      "Analizando",
+    );
+
+    cleanup();
+    monitorState.header = {
+      state: "RUNNING",
+      lastDecisionAt: "2026-10-06T09:42:00Z",
+      nextDecisionAt: "2026-10-06T10:00:00Z",
+      currentActivity: "NO_ACTIVITY",
+    };
+    renderHome();
+    expect(screen.getByTestId("auto-home-q-doing").textContent).toContain(
+      "Sin actividad",
+    );
+    expect(screen.getByTestId("auto-home-doing").textContent).toBe(
+      "Sin actividad",
+    );
+    expect(screen.getByTestId("auto-home-doing").textContent).not.toContain(
+      "Analizando",
+    );
   });
 
   it("copia las cifras de cuenta y no marca la simulación con el fill", () => {

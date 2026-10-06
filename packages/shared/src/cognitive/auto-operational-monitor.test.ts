@@ -35,6 +35,8 @@ function minimalDto(): AutoOperationalMonitorV1 {
       lastHeartbeatAt: "2026-10-01T09:00:00Z",
       lastHeartbeatMeasurement: "COMPLETE",
       lastDecisionMeasurement: "UNKNOWN",
+      currentActivity: null,
+      currentActivityMeasurement: "UNKNOWN",
       realPriceEnabled: false,
       heartbeatsPersisted: 1,
       asOf: "2026-10-01T00:00:00Z",

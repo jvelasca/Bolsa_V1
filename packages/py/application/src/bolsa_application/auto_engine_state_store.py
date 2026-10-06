@@ -44,6 +44,19 @@ AutoEngineState = Literal[
     "REQUIRES_ATTENTION",
 ]
 
+#: v2.88.79 — fase operacional REAL del turno (telemetría, no inferencia de ``RUNNING``).
+#: Un latido no es una fase; ``NO_ACTIVITY`` es «vivo pero sin actividad concreta medida»,
+#: y su ausencia (``None``) es «sin dato todavía» — nunca una fase inventada.
+AutoActivity = Literal[
+    "ANALYZING",
+    "WAITING_SIGNAL",
+    "PREPARING_OPERATION",
+    "WAITING_EXECUTION",
+    "APPLYING_RESULT",
+    "NO_ACTIVITY",
+    "BLOCKED",
+]
+
 
 def _reason_text(reasons: tuple[str, ...] | list[str] | None) -> str:
     return ", ".join(reasons or ("idle",))
@@ -61,6 +74,26 @@ def _state_of(raw: str) -> AutoEngineState:
     return mapping.get(v, "REQUIRES_ATTENTION")
 
 
+def _activity_of(raw: str | None) -> AutoActivity | None:
+    """Traduce el token durable a la fase operacional, fail-closed.
+
+    Un token ausente o fuera del conjunto cerrado es ``None`` (la UI declara
+    «Sin dato todavía»), nunca una fase inventada. ``NO_ACTIVITY`` se conserva como
+    valor válido y distinto de ``None``.
+    """
+    v = str(raw or "").strip().upper()
+    mapping: dict[str, AutoActivity] = {
+        "ANALYZING": "ANALYZING",
+        "WAITING_SIGNAL": "WAITING_SIGNAL",
+        "PREPARING_OPERATION": "PREPARING_OPERATION",
+        "WAITING_EXECUTION": "WAITING_EXECUTION",
+        "APPLYING_RESULT": "APPLYING_RESULT",
+        "NO_ACTIVITY": "NO_ACTIVITY",
+        "BLOCKED": "BLOCKED",
+    }
+    return mapping.get(v)
+
+
 @dataclass(frozen=True, slots=True)
 class AutoEngineSnapshot:
     """Vista durable del estado AUTO que un proceso reiniciado readopta."""
@@ -74,6 +107,7 @@ class AutoEngineSnapshot:
     pending_plans: int = 0
     last_reason: tuple[str, ...] = ("idle",)
     last_tick_at: datetime | None = None
+    activity: AutoActivity | None = None
 
     @property
     def last_reason_text(self) -> str:
@@ -98,6 +132,7 @@ class AutoEngineTickInput:
     pending_plans: int
     last_reason: tuple[str, ...] = ("idle",)
     occurred_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    activity: AutoActivity | None = None
 
 
 @runtime_checkable
@@ -138,6 +173,7 @@ class InMemoryAutoEngineStore:
             pending_plans=tick.pending_plans,
             last_reason=tuple(tick.last_reason or ("idle",)),
             last_tick_at=tick.occurred_at,
+            activity=tick.activity,
         )
 
     def recorded_seq_max(self, engine_id: str) -> int:
@@ -189,6 +225,7 @@ class PostgresAutoEngineStore:
                 else ("idle",)
             ),
             last_tick_at=row.last_tick_at,
+            activity=_activity_of(row.activity),
         )
 
     async def _read_tick_count(self, engine_id: str) -> int:
@@ -245,6 +282,7 @@ class PostgresAutoEngineStore:
                     vetoes=int(tick.vetoes),
                     pending_plans=int(tick.pending_plans),
                     reason=_reason_text(tick.last_reason),
+                    activity=tick.activity,
                     tick_at=occurred,
                     created_at=now,
                 )
@@ -270,6 +308,7 @@ class PostgresAutoEngineStore:
                 vetoes=int(tick.vetoes),
                 pending_plans=int(tick.pending_plans),
                 last_reason=_reason_text(tick.last_reason),
+                activity=tick.activity,
                 created_at=now,
                 updated_at=now,
             )
@@ -283,6 +322,7 @@ class PostgresAutoEngineStore:
                     "vetoes": int(tick.vetoes),
                     "pending_plans": int(tick.pending_plans),
                     "last_reason": _reason_text(tick.last_reason),
+                    "activity": tick.activity,
                     "updated_at": now,
                 },
             )
@@ -305,6 +345,7 @@ def next_tick_input(
     more_pending_plans: int,
     reason: tuple[str, ...] = ("idle",),
     occurred_at: datetime | None = None,
+    activity: AutoActivity | None = None,
 ) -> AutoEngineTickInput:
     """Construye el ``AutoEngineTickInput`` del siguiente tick a partir del
     snapshot durable readoptado (acumulados monótonos) + el delta del dry_tick.
@@ -326,6 +367,7 @@ def next_tick_input(
         pending_plans=(prev.pending_plans if prev is not None else 0) + more_pending_plans,
         last_reason=reason if reason else ("idle",),
         occurred_at=occurred_at or datetime.now(UTC),
+        activity=activity,
     )
 
 

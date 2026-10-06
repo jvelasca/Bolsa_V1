@@ -154,6 +154,7 @@ from bolsa_application.auto_cycle_reconciliation import (
 from bolsa_application.auto_cycle_regime_reader import CycleRegimeReading, read_cycle_regimes
 from bolsa_application.auto_daily_journal import OperationMeasurement, OpportunityRow, SimJournalRow
 from bolsa_application.auto_engine_state_store import (
+    AutoActivity,
     AutoEngineSnapshot,
     AutoEngineStore,
     AutoEngineTickInput,
@@ -724,6 +725,40 @@ class TurnReport:
         self.closed += other.closed
         if other.venue:
             self.venue = other.venue
+
+
+def derive_activity(
+    *,
+    kill_active: bool,
+    decided: int,
+    proposals: int,
+    orders: int,
+    fills: int,
+) -> AutoActivity:
+    """Fase operacional del turno, derivada SOLO de hechos que el motor ya calculó.
+
+    Regla de honestidad de la UI: no se deriva de ``RUNNING`` (un motor vivo no
+    significa «analizando»). Cada fase responde a un hecho concreto del tick:
+    kill activo → ``BLOCKED``; fill/settlement → ``APPLYING_RESULT``; orden emitida
+    → ``WAITING_EXECUTION``; propuesta que pasó el gate → ``PREPARING_OPERATION``;
+    el bucle evaluó símbolos → ``ANALYZING``; y un tick vivo sin nada concreto
+    → ``NO_ACTIVITY`` («Sin actividad», distinto de la ausencia de dato).
+
+    ``WAITING_SIGNAL`` queda reservado para telemetría futura: el motor no puede
+    distinguirlo hoy de «analizó y no encontró señal», así que no se emite en vez
+    de inventar una espera que no demuestra.
+    """
+    if kill_active:
+        return "BLOCKED"
+    if fills > 0:
+        return "APPLYING_RESULT"
+    if orders > 0:
+        return "WAITING_EXECUTION"
+    if proposals > 0:
+        return "PREPARING_OPERATION"
+    if decided > 0:
+        return "ANALYZING"
+    return "NO_ACTIVITY"
 
 
 def turn_equity_from_book(
@@ -6238,6 +6273,13 @@ class AutoSimulationWorker:
                     pending_plans=len(self.open_symbols),
                     last_reason=("auto-sim-durable",),
                     occurred_at=self._time,
+                    activity=derive_activity(
+                        kill_active=self._kill_active(),
+                        decided=report.decided,
+                        proposals=report.proposals,
+                        orders=report.orders,
+                        fills=report.fills,
+                    ),
                 )
             )
         return report
@@ -6462,6 +6504,13 @@ class AutoSimulationWorker:
                         pending_plans=len(self.open_symbols),
                         last_reason=(self._last_gate_reason or ("idle",)),
                         occurred_at=self._time,
+                        activity=derive_activity(
+                            kill_active=self._kill_active(),
+                            decided=report.decided,
+                            proposals=report.proposals,
+                            orders=report.orders,
+                            fills=report.fills,
+                        ),
                     )
                 )
             return report
