@@ -112,12 +112,12 @@ E2E_RUN=1 pnpm --filter @bolsa/web e2e -- gp-e2e-v28856 gp-e2e-v28857
 | Rol | Commit | Árboles |
 | --- | --- | --- |
 | **Sello funcional** (`feat`) | `dd3af96d` | `apps` `6f24ce28…` / `packages` `95cb0d69…` |
-| Re-anclaje del freeze de la ventana (`chore`) | _(posterior)_ | pin `commit: dd3af96d` (no mueve árbol) |
-| **Commit del tag** (`docs(seal)`) | _(posterior)_ (tag anotado `v2.88.58-beta`) | (mismos árboles que el funcional) |
-| Cita **POST-TAG** (evidencia §7) | _(posterior)_ | — |
+| Re-anclaje del freeze de la ventana (`chore`) | `7fc486d1` | pin `commit: dd3af96d` (no mueve árbol) |
+| **Commit del tag** (`docs(seal)`) | `e99c99c5` (tag anotado `v2.88.58-beta`) | (mismos árboles que el funcional) |
+| Cita **POST-TAG** (evidencia §7) | _(este commit)_ | — |
 
 ---
 
 ## 7. Cita del CI (POST-TAG)
 
-> **`Release tag CI`** del tag `v2.88.58-beta`: **PENDIENTE**. El job sólo corre al empujar el tag; la cita se escribe en `main` (commit POST-TAG) una vez verde. Como en `v2.88.46`…`v2.88.57`, ningún tag contiene su propio resultado de CI — límite estructural declarado. Se espera `replay-repro` **`REPRODUCIDO`** `sha256 1E3ADAC2…` ⇒ **`Δ motor = 0` confirmado por CI**.
+> **`Release tag CI`** del tag `v2.88.58-beta`: run [`37367672717`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37367672717) **VERDE** (`attempt 2`, `20:06:28Z → 21:49:10Z`). El **`attempt 1`** cayó por **infraestructura de GitHub**, no por producto: `The job was not acquired by Runner of type hosted even after multiple attempts` (`lifecycle-pg`/`python`/`a7-gate`/`decision-spine`/`security`/`playwright`/`shared` no arrancaron; en ese mismo attempt sí pasaron `frontend`, `replay-repro` y `dr-verify`); el rerun `--failed` los ejecutó en verde. Jobs `success`: `security` (gitleaks), `python` (ruff/imports/mypy/pytest offline; **`4538 passed / 45 skipped`**), `a7-gate`, `decision-spine`, `shared`, `playwright (mock E2E)` (`7m9s`), `lifecycle-pg` (Alembic + auth + golden restart), `frontend` (typecheck/lint/test/build + `contract:check`; **`Test Files 249 passed (249)`**), `replay-repro` (`5m14s`), `dr-verify`, `certify`; `playwright (integrated E2E)` **`skipped`** (opt-in, por diseño). **`replay-repro` `VEREDICTO REPRODUCIDO`** (`mismo CONTENIDO; el sello está en CRLF y este fichero en LF`) — `bytes 3340728`, `sha256` LF **`1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`** = sello ⇒ **`Δ motor = 0` confirmado por CI**. **`GitHub Release` [`v2.88.58-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.58-beta) publicado** (pre-release). Ningún tag contiene su propio resultado de CI — límite estructural declarado, como en `v2.88.46`…`v2.88.57`.

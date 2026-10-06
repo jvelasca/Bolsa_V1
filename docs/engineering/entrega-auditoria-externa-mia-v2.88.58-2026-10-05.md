@@ -92,11 +92,11 @@ Sin cambio de motor **ni de muestra**, este sello no re-corre el pipeline. Se **
 | Rol | Commit | Árboles |
 | --- | --- | --- |
 | **Sello funcional** (`feat`) | `dd3af96d` | `apps` `6f24ce28…` / `packages` `95cb0d69…` |
-| Re-anclaje del freeze de la ventana (`chore`) | _(posterior)_ | pin `commit: dd3af96d` (no mueve árbol) |
-| **Commit del tag** (`docs(seal)`) | _(posterior)_ (tag anotado `v2.88.58-beta`) | (mismos árboles que el funcional) |
-| Cita **POST-TAG** (evidencia `§7`) | _(posterior)_ | — |
+| Re-anclaje del freeze de la ventana (`chore`) | `7fc486d1` | pin `commit: dd3af96d` (no mueve árbol) |
+| **Commit del tag** (`docs(seal)`) | `e99c99c5` (tag anotado `v2.88.58-beta`) | (mismos árboles que el funcional) |
+| Cita **POST-TAG** (evidencia `§7`) | _(este commit)_ | — |
 
-- **Tag:** `v2.88.58-beta` (anotado sobre el commit del sello; funcional `dd3af96d` + `chore(window)` + `docs(seal)`) — `Release tag CI` **PENDIENTE** (se espera `replay-repro` `REPRODUCIDO` `sha256 1E3ADAC2…` ⇒ `Δ motor = 0`); **`GitHub Release` `v2.88.58-beta`** (pre-release) a publicar al cerrar el sello. Dentro del tag, la evidencia lo declara como `POST-TAG`.
+- **Tag:** `v2.88.58-beta` (anotado sobre el commit del sello `e99c99c5`; funcional `dd3af96d` + `chore(window)` `7fc486d1` + `docs(seal)`) — `Release tag CI` [`37367672717`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37367672717) **VERDE** (`attempt 2`; `attempt 1` cayó por **infraestructura de GitHub** —`The job was not acquired by Runner of type hosted`— y el rerun `--failed` salió verde; jobs `success`: `security`/`python` (**`4538 passed / 45 skipped`**)/`a7-gate`/`decision-spine`/`shared`/`playwright (mock E2E)`/`lifecycle-pg`/`frontend` (**`Test Files 249 passed (249)`**)/`replay-repro`/`dr-verify`/`certify`; `playwright (integrated E2E)` `skipped` por diseño; **`replay-repro` `REPRODUCIDO`** `sha256 1E3ADAC2…` ⇒ **`Δ motor = 0` confirmado por CI**); **`GitHub Release` [`v2.88.58-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.58-beta) publicado** (pre-release). Dentro del tag, la evidencia lo declara como `POST-TAG`.
 
 ---
 

@@ -15,7 +15,7 @@ All notable releases of Bolsa V1.
 - **Deuda declarada (abierta).** `PortfolioDecision` durable (`UI52-02`); contrato de explicación DÍA-D `cycleId`-resolutivo (`F-S1`, fase backend F5); PIT histórico institucional y Execution Analysis (`23 orden_creada_sin_fill`); barrido `axe` en vivo de `/auto/*` (`F-A2`, no re-ejecutado); `F-S2`/`F-S3` (densidad `text-[11px]` e `h1` crudo de ausencia, P3).
 - **Gates:** bump guard **passed** (`2.11.58-beta`); `@bolsa/web` **1435 passed** (`249` ficheros) + `typecheck` limpio + `lint` **0 errores** (`23` warnings pre-existentes) + `contract:check` **OK**; E2E AUTO **6 passed** (`gp-e2e-v28856` + `gp-e2e-v28857`, mock, `workers=1` como CI); `window:test` **25/25**.
 - **Evidencia:** [`docs/engineering/evidence/v2.88.58/README.md`](docs/engineering/evidence/v2.88.58/README.md). **Entrega a auditoría externa (MIA):** [`docs/engineering/entrega-auditoria-externa-mia-v2.88.58-2026-10-05.md`](docs/engineering/entrega-auditoria-externa-mia-v2.88.58-2026-10-05.md).
-- **Sello:** funcional `dd3af96d`; tag anotado `v2.88.58-beta` y `Release tag CI`: **POST-TAG** (se citan en `main` al cerrar el sello).
+- **Sello:** funcional `dd3af96d` (`apps` `6f24ce28…` / `packages` `95cb0d69…`) + `chore(window)` `7fc486d1` + `docs(seal)` `e99c99c5`; tag anotado `v2.88.58-beta` y `Release tag CI` [`37367672717`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37367672717) **VERDE** (`attempt 2`; `attempt 1` cayó por infraestructura de GitHub —runner no adquirido—, ajena al producto; `replay-repro` **`REPRODUCIDO`** `sha256 1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI); **GitHub Release** publicado (pre-release).
 
 ## [2.11.57-beta] — `AUTO · UI`: **AUTO UI REFACTOR 2.1.1** (integridad del deep-link de operación)
 
