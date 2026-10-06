@@ -2,6 +2,15 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.78-beta] — `AUTO · UI`: **un reloj ausente no es una fase**
+
+**Bump** `2.11.77-beta` → `2.11.78-beta`. **SIN migración**. **`Δ motor = 0`**. Contrato HTTP sin cambio. Tag no creado. El tag `v2.88.76-beta` no se mueve. `v2.88.77-beta` sigue sin tag.
+
+- Sin `nextDecisionAt` la HOME y Sistema no dicen «Esperando nueva señal» ni «Próximo análisis». El hueco es «Sin dato todavía».
+- Con reloj, la frase copia la hora: «Última decisión» y «Próxima decisión». El latido no ocupa ese hueco.
+- «¿Qué está haciendo?» sigue «Sin dato todavía». No se inventan Analizando, Esperando ni Preparando.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.78/README.md`](docs/engineering/evidence/v2.88.78/README.md).
+
 ## [2.11.77-beta] — `AUTO · UI`: **en curso no es abierta**
 
 **Bump** `2.11.76-beta` → `2.11.77-beta`. **SIN migración**. **`Δ motor = 0`**. Contrato HTTP sin cambio. Tag no creado. El tag `v2.88.76-beta` no se mueve.

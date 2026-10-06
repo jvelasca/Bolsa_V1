@@ -15,6 +15,8 @@
  *   copia (`RUNNING`, `PAUSED`, `BLOCKED`, `DEGRADED`, `REQUIRES_ATTENTION`). Cualquier otro
  *   token es «Sin dato todavía». Conocer el estado no significa que funcione correctamente.
  *   El valor crudo queda para el detalle técnico.
+ * - Un reloj ausente no es una fase. Sin `lastDecisionAt` no hay «Última decisión» y el latido
+ *   no ocupa ese hueco. Sin `nextDecisionAt` no se dice «Esperando nueva señal» ni «análisis».
  *
  * @see docs/engineering/spec-auto-ui-refactor-3-0-2026-10-06.md §2
  */
@@ -36,6 +38,7 @@ export type AutoHomeCycleFacts = {
 export type AutoHomeHeaderFacts = {
   state?: string | null;
   lastDecisionAt?: string | null;
+  /** El resumen no lo copia: un latido no es una decisión. */
   lastHeartbeatAt?: string | null;
   nextDecisionAt?: string | null;
 };
@@ -66,9 +69,9 @@ export type AutoHomeSummaryV1 = {
    * Misma frase que `autoLabel`.
    */
   statusLabel: string;
-  /** Sello `HH:mm` de la última decisión/heartbeat, o `Sin dato todavía`. */
+  /** Sello `HH:mm` de `lastDecisionAt`, o `Sin dato todavía`. El latido no entra. */
   lastActivityLabel: string;
-  /** `Próximo análisis: HH:mm` | `Esperando nueva señal` | `Sin dato todavía`. */
+  /** `Próxima decisión: HH:mm` | `Sin dato todavía`. Un reloj ausente no es una fase. */
   nextStepLabel: string;
   inCourseOperationsCount: number;
   /** `3 en curso` | `1 en curso` | `Sin operaciones en curso`. */
@@ -153,6 +156,20 @@ function inCourseOperationsLabel(count: number): string {
   return count === 1 ? "1 en curso" : `${count} en curso`;
 }
 
+/**
+ * Frase del reloj de decisión. Sin sello, la frase entera es el hueco:
+ * no se nombra «Última decisión» ni se rellena con el latido.
+ */
+export function decisionClockCopy(
+  lastActivityLabel: string,
+  nextStepLabel: string,
+): string {
+  if (lastActivityLabel === AUTO_HOME_NO_DATA_LABEL) {
+    return AUTO_HOME_NO_DATA_LABEL;
+  }
+  return `Última decisión: ${lastActivityLabel} · ${nextStepLabel}`;
+}
+
 export function buildAutoHomeSummary(
   input: AutoHomeSummaryInput,
 ): AutoHomeSummaryV1 {
@@ -164,8 +181,8 @@ export function buildAutoHomeSummary(
   const engineLabel = loaded
     ? engineStateLabel(header?.state)
     : AUTO_HOME_NO_DATA_LABEL;
-  const lastActivityRaw =
-    header?.lastDecisionAt ?? header?.lastHeartbeatAt ?? null;
+  const lastDecisionAt = loaded ? header?.lastDecisionAt : null;
+  const nextDecisionAt = loaded ? header?.nextDecisionAt : null;
 
   const inCourseOperationsCount = (input.cycles ?? []).filter(
     isOperationInCourse,
@@ -179,15 +196,12 @@ export function buildAutoHomeSummary(
     isError,
     autoLabel: engineLabel,
     statusLabel: engineLabel,
-    lastActivityLabel: lastActivityRaw
-      ? formatActivityTime(lastActivityRaw)
+    lastActivityLabel: lastDecisionAt
+      ? formatActivityTime(lastDecisionAt)
       : AUTO_HOME_NO_DATA_LABEL,
-    nextStepLabel:
-      loaded && header?.nextDecisionAt
-        ? `Próximo análisis: ${formatActivityTime(header.nextDecisionAt)}`
-        : loaded
-          ? "Esperando nueva señal"
-          : AUTO_HOME_NO_DATA_LABEL,
+    nextStepLabel: nextDecisionAt
+      ? `Próxima decisión: ${formatActivityTime(nextDecisionAt)}`
+      : AUTO_HOME_NO_DATA_LABEL,
     inCourseOperationsCount,
     inCourseOperationsLabel: inCourseOperationsLabel(inCourseOperationsCount),
     hasOperationsInCourse: inCourseOperationsCount > 0,

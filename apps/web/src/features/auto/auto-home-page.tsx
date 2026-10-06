@@ -35,7 +35,10 @@ import {
 } from "@/features/auto/auto-nav";
 import { mesaOportunidadesHref } from "@/features/mesa/mesa-nav-links";
 import { buildAutoBasicHome } from "@/features/auto/auto-basic-home";
-import { buildAutoHomeSummary } from "@/features/auto/auto-home-summary";
+import {
+  buildAutoHomeSummary,
+  decisionClockCopy,
+} from "@/features/auto/auto-home-summary";
 import { AUTO_USER_TEXT } from "@/features/auto/auto-typography";
 import { AUTO_RISK_TONE_CLASS } from "@/features/auto/auto-risk-summary";
 import { api } from "@/lib/api";
@@ -235,15 +238,14 @@ export function AutoHomePage() {
             <p className="font-medium" data-testid="auto-home-doing">
               {summary.statusLabel}
             </p>
-            <p className="text-muted-foreground">
-              Última actividad:{" "}
-              <span
-                className="tabular-nums"
-                data-testid="auto-home-last-activity"
-              >
-                {summary.lastActivityLabel}
-              </span>{" "}
-              · {summary.nextStepLabel}
+            <p
+              className="text-muted-foreground"
+              data-testid="auto-home-last-activity"
+            >
+              {decisionClockCopy(
+                summary.lastActivityLabel,
+                summary.nextStepLabel,
+              )}
             </p>
           </div>
         ) : null}

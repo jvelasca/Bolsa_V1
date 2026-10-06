@@ -101,8 +101,14 @@ describe("AutoSistemaPage", () => {
       "Funcionando",
     );
     expect(screen.getByTestId("auto-sistema-last-activity").textContent).toBe(
-      "09:42",
+      "Última decisión: 09:42 · Próxima decisión: 10:00",
     );
+    expect(
+      screen.getByTestId("auto-sistema-last-activity").textContent,
+    ).not.toContain("Esperando nueva señal");
+    expect(
+      screen.getByTestId("auto-sistema-last-activity").textContent,
+    ).not.toContain("análisis");
   });
 
   it("el monitor crudo vive en un detalle técnico plegado", () => {

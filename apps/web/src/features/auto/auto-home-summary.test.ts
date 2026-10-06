@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   AUTO_HOME_NO_DATA_LABEL,
   buildAutoHomeSummary,
+  decisionClockCopy,
   engineStateLabel,
   formatActivityTime,
   isOperationInCourse,
@@ -130,6 +131,7 @@ describe("buildAutoHomeSummary", () => {
       header: {
         state: "RUNNING",
         lastDecisionAt: "2026-10-06T09:42:00Z",
+        lastHeartbeatAt: "2026-10-06T11:11:00Z",
         nextDecisionAt: "2026-10-06T10:00:00Z",
       },
       cycles: [
@@ -154,7 +156,12 @@ describe("buildAutoHomeSummary", () => {
     expect(summary.autoLabel).toBe("Funcionando");
     expect(summary.statusLabel).toBe("Funcionando");
     expect(summary.lastActivityLabel).toBe("09:42");
-    expect(summary.nextStepLabel).toBe("Próximo análisis: 10:00");
+    expect(summary.lastActivityLabel).not.toContain("11:11");
+    expect(summary.nextStepLabel).toBe("Próxima decisión: 10:00");
+    expect(summary.nextStepLabel).not.toContain("análisis");
+    expect(
+      decisionClockCopy(summary.lastActivityLabel, summary.nextStepLabel),
+    ).toBe("Última decisión: 09:42 · Próxima decisión: 10:00");
     expect(summary.inCourseOperationsCount).toBe(2);
     expect(summary.inCourseOperationsLabel).toBe("2 en curso");
     expect(summary.inCourseOperationsLabel).not.toContain("abierta");
@@ -177,6 +184,9 @@ describe("buildAutoHomeSummary", () => {
     });
     expect(summary.inCourseOperationsLabel).toBe("1 en curso");
     expect(summary.inCourseOperationsLabel).not.toContain("abierta");
+    expect(summary.nextStepLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(summary.nextStepLabel).not.toContain("Esperando nueva señal");
+    expect(summary.nextStepLabel).not.toContain("Próximo análisis");
   });
 
   it("un estado desconocido y un riesgo no medido se declaran, no se asumen", () => {
@@ -190,8 +200,31 @@ describe("buildAutoHomeSummary", () => {
     expect(summary.riskTone).toBe("unknown");
     expect(summary.riskLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
     expect(summary.inCourseOperationsLabel).toBe("Sin operaciones en curso");
-    // Cargado (el header existe) pero sin próxima decisión ⇒ esperando señal.
-    expect(summary.nextStepLabel).toBe("Esperando nueva señal");
+    expect(summary.nextStepLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(summary.nextStepLabel).not.toContain("Esperando nueva señal");
+    expect(summary.nextStepLabel).not.toContain("Próximo análisis");
+    expect(summary.lastActivityLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+  });
+
+  it("un latido no ocupa el hueco de la decisión", () => {
+    const summary = buildAutoHomeSummary({
+      header: {
+        state: "RUNNING",
+        lastHeartbeatAt: "2026-10-06T11:11:00Z",
+      },
+    });
+    expect(summary.lastActivityLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(summary.lastActivityLabel).not.toContain("11:11");
+    expect(summary.nextStepLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(summary.nextStepLabel).not.toContain("Esperando nueva señal");
+    expect(summary.nextStepLabel).not.toContain("análisis");
+    const phrase = decisionClockCopy(
+      summary.lastActivityLabel,
+      summary.nextStepLabel,
+    );
+    expect(phrase).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(phrase).not.toContain("11:11");
+    expect(phrase).not.toContain("Última actividad");
   });
 
   it("traduce solo el conjunto cerrado del motor", () => {

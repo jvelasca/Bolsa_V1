@@ -118,6 +118,8 @@ describe("buildAutoBasicHome", () => {
     });
     expect(home.workingLabel).toBe("Funcionando");
     expect(home.doingLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(home.doingLabel).not.toContain("Esperando");
+    expect(home.doingLabel).not.toContain("Analizando");
     expect(home.assetLabel).toBe("AAPL");
     expect(home.decisionLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
     expect(home.happenedLabel).toBe(AUTO_HEADER_PRICE_APPLIED);

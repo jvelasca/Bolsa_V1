@@ -1,8 +1,9 @@
 /**
  * AUTO · SISTEMA (ADR-044 + spec 3.0 §5) — primero «qué está haciendo AUTO», después el interior.
  *
- * Primer nivel (usuario): estado de AUTO en frases (está activo / última actividad / ahora / próximo
- * paso), reutilizando el helper de la HOME (`buildAutoHomeSummary`).
+ * Primer nivel (usuario): estado de AUTO en frases. El reloj copia la última decisión
+ * y, si existe, la próxima. Sin ese sello la frase es «Sin dato todavía». Reutiliza
+ * `buildAutoHomeSummary`.
  *
  * Detalle técnico (experto), plegado: la ventana cruda del monitor (header + timeline + reservas +
  * concurrencia), broker/ejecución y la reconciliación read-only de la Consola. La auditoría son
@@ -28,7 +29,10 @@ import { useLifecycleReconciliation } from "@/features/operational-console/use-l
 import { useOpsSelfEval } from "@/features/operational-console/use-ops-self-eval";
 import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
 import { AutoTechnicalDetail } from "@/features/auto/auto-technical-detail";
-import { buildAutoHomeSummary } from "@/features/auto/auto-home-summary";
+import {
+  buildAutoHomeSummary,
+  decisionClockCopy,
+} from "@/features/auto/auto-home-summary";
 
 export function AutoSistemaPage() {
   const { view, isLoading, isError } = useAutoOperationalMonitor();
@@ -81,15 +85,14 @@ export function AutoSistemaPage() {
             <p className="font-medium" data-testid="auto-sistema-doing">
               {status.statusLabel}
             </p>
-            <p className="text-muted-foreground">
-              Última actividad:{" "}
-              <span
-                className="tabular-nums"
-                data-testid="auto-sistema-last-activity"
-              >
-                {status.lastActivityLabel}
-              </span>{" "}
-              · {status.nextStepLabel}
+            <p
+              className="text-muted-foreground"
+              data-testid="auto-sistema-last-activity"
+            >
+              {decisionClockCopy(
+                status.lastActivityLabel,
+                status.nextStepLabel,
+              )}
             </p>
           </div>
         ) : null}
