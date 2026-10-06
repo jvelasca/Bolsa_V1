@@ -12,7 +12,7 @@ Este documento **congela el diseño del cockpit operativo de AUTO para un usuari
 ## 0. Propósito y alcance
 
 - **Congela:** el **modelo de realidad** (dinero virtual vs real) como principio visual de primer nivel; el mapa de las **5 preguntas del usuario básico** a las 5 secciones de AUTO; la **identidad de operación legible**; el **glosario** de traducción de jerga; y el **plan por fases** del cockpit.
-- **NO congela (fuera de este slice):** la implementación; el contrato HTTP `cycleId` de la explicación DÍA-D (§7, requiere backend); `PortfolioDecision` durable; PIT histórico institucional; Execution Analysis.
+- **NO congela (fuera de este slice):** la implementación; el contrato HTTP `cycleId` de la explicación DÍA-D (§7, requiere backend; **cerrado** por `v2.88.60`); `PortfolioDecision` durable; PIT histórico institucional; Execution Analysis.
 - **Regla de oro:** «resumen operativo arriba, causalidad técnica bajo demanda» — el usuario avanzado/auditor conserva acceso al detalle, pero **no** tiene que atravesarlo para operar.
 
 ---
@@ -187,6 +187,8 @@ La jerga **no se borra**: se **traduce en el primer nivel** y se conserva en el 
 
 ## 7. Contrato `cycleId` de la explicación DÍA-D (fase con backend)
 
+> **CERRADA en `v2.88.60-beta` (fase F5).** Implementada por el commit funcional `71ab00df`: el artefacto `dia-d-feedback-v2` expone el índice `cycles[]` (`cycleId` → identidad del ciclo) y la ruta `/auto/dia-d-feedback` lo proyecta (`DiaDFeedbackCycleDto`); el panel resuelve con `resolveExplanationForCycle(...)` por `cycleId` (si el ciclo figura en el índice) o por instrumento (fallback declarado **PARCIAL**). El veredicto OOS **sigue agregado por instrumento** (`n >= 5`). Ver [evidencia `v2.88.60`](./evidence/v2.88.60/README.md).
+
 **Problema (F-S1):** la explicación se resuelve por `symbol`; dos operaciones del mismo instrumento comparten explicación.
 
 **Objetivo:** resolver por identidad, con la clave primaria `cycleId` y ejes de desambiguación:
@@ -219,7 +221,7 @@ cycleId · instrument · strategy · strategyVersion · timeframe · entryDay ·
 | **F2** | **Identidad de operación legible** (§4) en OPERAR y selector de la historia. | UI-only | Cerrada por esta spec |
 | **F3** | **Cockpit OPERAR**: bloque Oportunidades + Operaciones + estados propios (cargando/error/vacío). | UI-only | Cerrada por esta spec |
 | **F4** | **Glosario de primer nivel** (§6) + de-duplicación de reconciliación (F-DUP1) + accesibilidad del tablist DÍA-D (F-A1). | UI-only | Cerrada por esta spec |
-| **F5** | **Contrato `cycleId`** de la explicación DÍA-D (§7). | Backend/contrato | Requiere spec propia (no UI-only) |
+| **F5** | **Contrato `cycleId`** de la explicación DÍA-D (§7). | Backend/contrato | **Cerrada** en `v2.88.60` (funcional `71ab00df`) |
 
 Cada fase es **aditiva**: no se borra ninguna pantalla antes de que su sustituto esté verde, y ninguna mueve el motor.
 
@@ -235,14 +237,14 @@ Cada fase es **aditiva**: no se borra ninguna pantalla antes de que su sustituto
 | 4 | El primer nivel no muestra jerga interna. | Que `cycleId`/`TOP-N`/`SETTLEMENT`/`venue`/`PAPER_D_EXECUTE` aparezcan sin traducir en primer nivel. |
 | 5 | El cockpit compone y no duplica superficies L1. | Que Oportunidades/Operaciones reimplemente Mesa/Mercado/Consola en vez de enlazar. |
 | 6 | `Δ motor = 0` en F1–F4. | Que el diff toque motor/umbrales, o que `contract:check` no coincida. |
-| 7 | La explicación no se afirma por `cycleId` mientras no exista la clave. | Que F5 se dé por hecho sin exponer la clave en el artefacto. |
+| 7 | La explicación declara resolución por `cycleId` **sólo si el artefacto trae la clave** (`cycles[]`); si no, declara **PARCIAL** por instrumento. | Que la UI afirme resolución por `cycleId` sin fila en el índice, o que se invente la clave en un ciclo sin `cycleId`. |
 
 ---
 
 ## 11. Límites declarados (NO resuelve esta spec)
 
 - **`PortfolioDecision` durable (`UI52-02`):** abierta (spine/backend). El cockpit puede **declararla** `NO MEDIDO`; no la inventa.
-- **Contrato `cycleId` DÍA-D:** abierto (§7, fase backend F5).
+- **Contrato `cycleId` DÍA-D:** **cerrado** en `v2.88.60` (§7, fase backend F5, funcional `71ab00df`).
 - **PIT histórico institucional** y **Execution Analysis** (`23 orden_creada_sin_fill`): abiertas (P3).
 - **`CONFIRMED` no se emite.**
 - **Barrido `axe` real de `/auto/*`:** no ejecutado en la auditoría (F-A2); F4 corrige el tablist DÍA-D, pero la verificación en vivo es de un sello de UI.
