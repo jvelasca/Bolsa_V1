@@ -726,6 +726,52 @@ class TurnReport:
             self.venue = other.venue
 
 
+def turn_equity_from_book(
+    book_equity: float | None,
+    *,
+    required: bool,
+    unreadable: bool,
+    env_raw: str,
+) -> tuple[float, bool]:
+    """Devuelve ``(equity, aperturas_vetadas)``.
+
+    Con el libro exigido, un valor ausente o no positivo veta las aperturas y
+    no cae al env ni a 100_000. Sin esa exigencia (tests herméticos) se conserva
+    ``AUTO_ENGINE_SIM_V2_EQUITY`` o 100_000.
+    """
+    if required:
+        if unreadable or book_equity is None or book_equity <= 0:
+            return 0.0, True
+        return float(book_equity), False
+    if env_raw:
+        try:
+            value = float(env_raw)
+        except ValueError:
+            value = 0.0
+        if value > 0:
+            return value, False
+    return 100_000.0, False
+
+
+async def read_account_book_equity(session: Any, account_id: str | None) -> float:
+    """Cash más valor de mercado (``GetPortfolioSummary.total_equity``)."""
+    if not (account_id or "").strip():
+        raise ValueError("book equity requires account_id")
+    from bolsa_application.accounts.portfolio import GetPortfolioSummary
+    from bolsa_infrastructure.database.repositories.account_repository import (
+        SqlAlchemyAccountRepository,
+    )
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (
+        SqlAlchemyPortfolioRepository,
+    )
+
+    summary = await GetPortfolioSummary(
+        SqlAlchemyAccountRepository(session),
+        SqlAlchemyPortfolioRepository(session),
+    ).execute(account_id=account_id)
+    return float(summary.total_equity)
+
+
 class AutoSimulationWorker:
     """Driver determinista del día autónomo (por tick; hard SIM-ONLY).
 
@@ -1057,6 +1103,12 @@ class AutoSimulationWorker:
         # governor ON, así que con el flag OFF no cambia ningún comportamiento.
         self._v2_equity_marks = equity_marks if equity_marks is not None else EquityMarkBook()
         self._sim_realized_pnl: Decimal = Decimal("0")
+        # v2.88.70: el turno real fija la equity del libro (cash + valor de mercado).
+        # Sin esa lectura las aperturas quedan vetadas. El fallback de env/100k solo
+        # vive en el camino hermético, que nunca llama a ``load_book_equity``.
+        self._book_equity: float | None = None
+        self._book_equity_required = False
+        self._book_equity_unreadable = False
         # AUTO 2.0 (V2): fuente del régimen operativo (inyectable). Sin fuente y sin
         # override de env, el régimen es UNKNOWN ⇒ exit-only (fail-closed: sin régimen
         # no se abren entradas nuevas).
@@ -1790,16 +1842,40 @@ class AutoSimulationWorker:
             return None
 
     def _v2_equity(self) -> float:
-        """Equity de referencia del tick (env ``AUTO_ENGINE_SIM_V2_EQUITY`` o 100k)."""
-        raw = (os.getenv("AUTO_ENGINE_SIM_V2_EQUITY") or "").strip()
-        if raw:
-            try:
-                value = float(raw)
-            except ValueError:
-                value = 0.0
-            if value > 0:
-                return value
-        return 100_000.0
+        """Equity del tick.
+
+        El turno real (``load_book_equity``) usa el cash y el valor de mercado del
+        libro. Si esa lectura falta o no es positiva, devuelve 0 y las aperturas
+        quedan vetadas: no hay caída a ``AUTO_ENGINE_SIM_V2_EQUITY`` ni a 100_000.
+        El camino hermético, que no carga el libro, conserva el env o 100_000.
+        """
+        equity, _unreadable = turn_equity_from_book(
+            self._book_equity,
+            required=self._book_equity_required,
+            unreadable=self._book_equity_unreadable,
+            env_raw=(os.getenv("AUTO_ENGINE_SIM_V2_EQUITY") or "").strip(),
+        )
+        return equity
+
+    async def load_book_equity(self, session: Any) -> None:
+        """Lee ``PortfolioSummary.total_equity`` y lo deja como autoridad del tick."""
+        self._book_equity_required = True
+        try:
+            equity = await read_account_book_equity(session, self._account_id)
+        except Exception:
+            logger.exception(
+                "auto_sim book equity unreadable account=%s",
+                self._account_id,
+            )
+            self._book_equity = None
+            self._book_equity_unreadable = True
+            return
+        if equity <= 0:
+            self._book_equity = None
+            self._book_equity_unreadable = True
+            return
+        self._book_equity = equity
+        self._book_equity_unreadable = False
 
     def _v2_governor_drawdown_pct(self) -> float | None:
         """Drawdown diario MEDIDO de la cuenta para el gobernador (V2.43/AUTO-3).
@@ -5898,6 +5974,9 @@ class AutoSimulationWorker:
             if action == "BUY" and self._openings_vetoed(symbol):
                 _veto("position_reconciliation_not_ok")
                 continue
+            if action == "BUY" and self._book_equity_unreadable:
+                _veto("book_equity_unreadable")
+                continue
             if action == "SELL" and held <= 0:
                 _veto("sell_without_position")
                 continue
@@ -7236,6 +7315,9 @@ class AutoSimRuntime:
             )
 
             adaptive_gate_store = PostgresAdaptiveGateStore(session)
+            # v2.88.70: la equity del turno es la del libro. Si falla, las aperturas
+            # quedan vetadas dentro de ``auto_turn``. No se sustituye por 100_000.
+            await self._worker.load_book_equity(session)
             # AUTO 2.0 · V2.40.1: fuentes de DATO reales del tick sobre la misma sesión.
             # Antes no se cableaba ninguna ⇒ régimen UNKNOWN (exit-only) y sector/edge
             # inexistentes; el AUTO "parecía prudente" estando a ciegas. Ahora el motor

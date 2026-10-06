@@ -2,7 +2,9 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf (V2.88.69) — en curso:** 2026-10-06 · sello **`v2.88.69-beta`** (**NÚCLEO: idempotency_key NOT NULL**) · package **`2.11.69-beta`** · Alembic **`050_transaction_idempotency_key_not_null`** · **`Δ motor = 0`** · si el conteo de nulos no es cero, la migración aborta y no rellena claves. No se contaron filas vivas aquí: PostgreSQL local no responde. Evidencia: [`docs/engineering/evidence/v2.88.69/README.md`](./engineering/evidence/v2.88.69/README.md).
+> **AsOf (V2.88.70) — en curso:** 2026-10-06 · sello **`v2.88.70-beta`** (**NÚCLEO: equity del libro**) · package **`2.11.70-beta`** · **`Δ motor ≠ 0`**. El turno real (`run_tick`) lee `GetPortfolioSummary.total_equity`. Si esa lectura falla, las compras quedan vetadas y no hay caída a 100_000 ni a `AUTO_ENGINE_SIM_V2_EQUITY`. El camino hermético, que no carga el libro, conserva esa base declarada. No se fuerza el hash de replay `1E3ADAC2`. Evidencia: [`docs/engineering/evidence/v2.88.70/README.md`](./engineering/evidence/v2.88.70/README.md).
+>
+> **AsOf (V2.88.69) — anterior:** 2026-10-06 · sello **`v2.88.69-beta`** (**NÚCLEO: idempotency_key NOT NULL**) · package **`2.11.69-beta`** · Alembic **`050_transaction_idempotency_key_not_null`** · **`Δ motor = 0`** · si el conteo de nulos no es cero, la migración aborta y no rellena claves. No se contaron filas vivas aquí: PostgreSQL local no responde. Evidencia: [`docs/engineering/evidence/v2.88.69/README.md`](./engineering/evidence/v2.88.69/README.md).
 >
 > **AsOf (V2.88.68) — anterior:** 2026-10-06 · sello **`v2.88.68-beta`** (**NÚCLEO: CHECK cash y cantidad**) · package **`2.11.68-beta`** · Alembic **`049_cash_quantity_nonneg_check`** · **`Δ motor = 0`** · si hay filas negativas la migración aborta y no borra. No se aplicó aquí: PostgreSQL local no responde. Evidencia: [`docs/engineering/evidence/v2.88.68/README.md`](./engineering/evidence/v2.88.68/README.md).
 >

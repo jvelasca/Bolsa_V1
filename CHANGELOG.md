@@ -2,6 +2,15 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.70-beta] — `NÚCLEO`: **el turno usa el equity del libro**
+
+**Bump** `2.11.69-beta` → `2.11.70-beta`. **SIN migración**. **`Δ motor ≠ 0`**.
+
+- `AutoSimRuntime.run_tick` llama a `load_book_equity` antes de decidir. La cifra es `total_equity` (cash + valor de mercado). Si la lectura falla o no es positiva, las compras se vetan con `book_equity_unreadable` y `_v2_equity` devuelve 0. No usa `AUTO_ENGINE_SIM_V2_EQUITY` ni 100_000 en ese camino.
+- Los tests herméticos que no cargan el libro siguen pudiendo fijar la base por env. Eso no es el turno real.
+- No se revalida ni se fuerza el hash de replay `1E3ADAC2`.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.70/README.md`](docs/engineering/evidence/v2.88.70/README.md).
+
 ## [2.11.69-beta] — `NÚCLEO`: **idempotency_key NOT NULL**
 
 **Bump** `2.11.68-beta` → `2.11.69-beta`. Migración **`050_transaction_idempotency_key_not_null`**. **`Δ motor = 0`**.
