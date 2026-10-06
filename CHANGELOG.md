@@ -2,6 +2,14 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.67-beta] — `NÚCLEO`: **add_cash y deduct_cash dejan de ser públicos**
+
+**Bump** `2.11.66-beta` → `2.11.67-beta`. **SIN migración**. **`Δ motor = 0`**.
+
+- El repositorio expone `_credit_cash_row` y `_debit_cash_row`. Depósito, retirada y custodia los llaman dentro del mismo savepoint que el asiento.
+- `test_b3_deuda_directa_rompe_invariant_documental` deja el `xfail` y comprueba que los nombres públicos no existen. **Passed** sin PostgreSQL.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.67/README.md`](docs/engineering/evidence/v2.88.67/README.md).
+
 ## [2.11.66-beta] — `NÚCLEO`: **IdempotencyKeyReused marca FAILED**
 
 **Bump** `2.11.65-beta` → `2.11.66-beta`. **SIN migración**. **`Δ motor = 0`**.

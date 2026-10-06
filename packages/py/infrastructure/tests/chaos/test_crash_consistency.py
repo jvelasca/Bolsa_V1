@@ -231,7 +231,7 @@ async def test_kill_after_cash_deduct_before_ledger_insert() -> None:
                 SqlAlchemyPortfolioRepository,
             )
 
-            await SqlAlchemyPortfolioRepository(killing).deduct_cash(legacy_pf_id, 1000.0)
+            await SqlAlchemyPortfolioRepository(killing)._debit_cash_row(legacy_pf_id, 1000.0)
             assert await _account_total_cash(killing, account_id) == Decimal("9000")
             # KILL: cerrar sin commit → ROLLBACK implícito/explicito de todo el work.
             await killing.rollback()
@@ -289,7 +289,7 @@ async def test_kill_after_ledger_insert_before_commit() -> None:
             )
 
             tx_id = f"k2-{uuid4().hex}"
-            await SqlAlchemyPortfolioRepository(killing).deduct_cash(legacy_pf_id, 1000.0)
+            await SqlAlchemyPortfolioRepository(killing)._debit_cash_row(legacy_pf_id, 1000.0)
             await SqlAlchemyLedgerRepository(killing).append_trade(
                 account_id=account_id,
                 portfolio_id=inv_pf_id,
@@ -354,7 +354,7 @@ async def test_control_commit_persists_deduct_and_ledger() -> None:
             )
 
             tx_id = f"c3-{uuid4().hex}"
-            await SqlAlchemyPortfolioRepository(tx).deduct_cash(legacy_pf_id, 1000.0)
+            await SqlAlchemyPortfolioRepository(tx)._debit_cash_row(legacy_pf_id, 1000.0)
             await SqlAlchemyLedgerRepository(tx).append_trade(
                 account_id=account_id,
                 portfolio_id=inv_pf_id,

@@ -267,7 +267,7 @@ async def test_recargo_forzado_no_deja_cash_descontado(db_session: AsyncSession)
     # descuenta cash ANTES de persistir, pero su append choca con el UNIQUE.
     legacy_id = scope.portfolio.legacy_portfolio_id
     assert legacy_id is not None  # la cartera de carga siempre tiene legacy id
-    await portfolio_repo.deduct_cash(
+    await portfolio_repo._debit_cash_row(
         legacy_id,
         5000.0,
         allow_partial=True,

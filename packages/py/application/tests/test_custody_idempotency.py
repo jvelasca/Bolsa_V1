@@ -100,7 +100,7 @@ class _FakePortfolioRepo:
         portfolio = type("P", (), {"cash": self._cash})
         return type("S", (), {"total_equity": self._equity, "portfolio": portfolio})
 
-    async def deduct_cash(self, portfolio_id, amount, *, allow_partial=False):  # noqa: ARG001
+    async def _debit_cash_row(self, portfolio_id, amount, *, allow_partial=False):  # noqa: ARG001
         applied = min(amount, self._cash)
         self._cash -= applied
         self.deducted = applied

@@ -69,11 +69,11 @@ class _FakePortfolioCashRepo:
     def __init__(self) -> None:
         self._cash = 0.0
 
-    async def add_cash(self, legacy_portfolio_id: str, amount: float) -> float:
+    async def _credit_cash_row(self, legacy_portfolio_id: str, amount: float) -> float:
         self._cash += amount
         return self._cash
 
-    async def deduct_cash(self, legacy_portfolio_id: str, amount: float) -> float:
+    async def _debit_cash_row(self, legacy_portfolio_id: str, amount: float) -> float:
         self._cash -= amount
         return self._cash
 

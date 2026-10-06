@@ -178,7 +178,7 @@ async def _portfolio_deposit_worker(
         ledger_repo = SqlAlchemyLedgerRepository(s)
         # P1/N1: mutex financiero por CUENTA antes del lock de cartera.
         await account_repo.lock_account(account_id)
-        balance_after = await portfolio_repo.add_cash(legacy_pf_id, amount)
+        balance_after = await portfolio_repo._credit_cash_row(legacy_pf_id, amount)
         await ledger_repo.append_cash_movement(
             account_id=account_id,
             portfolio_id=inv_pf_id,

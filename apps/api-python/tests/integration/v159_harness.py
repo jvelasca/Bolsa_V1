@@ -128,7 +128,7 @@ async def seed_portfolio_cash_drift(
     factory = app.state.session_factory
     async with factory() as session:
         scope = await SqlAlchemyAccountRepository(session).resolve_scope(account_id)
-        await SqlAlchemyPortfolioRepository(session).add_cash(
+        await SqlAlchemyPortfolioRepository(session)._credit_cash_row(
             scope.legacy_portfolio_id,
             drift_amount,
         )
@@ -151,7 +151,7 @@ async def heal_portfolio_cash_drift(
     factory = app.state.session_factory
     async with factory() as session:
         scope = await SqlAlchemyAccountRepository(session).resolve_scope(account_id)
-        await SqlAlchemyPortfolioRepository(session).deduct_cash(
+        await SqlAlchemyPortfolioRepository(session)._debit_cash_row(
             scope.legacy_portfolio_id,
             drift_amount,
         )

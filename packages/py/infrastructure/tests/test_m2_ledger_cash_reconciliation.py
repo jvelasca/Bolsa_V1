@@ -613,50 +613,17 @@ async def test_recomputed_es_coherente_a_nivel_account(db_session: AsyncSession)
     await _cleanup_account(db_session, account_b)
 
 
-@pytest.mark.asyncio
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "Escotilla B-3 (documentada): add_cash/deduct_cash mutan "
-        "PortfolioRow.cash SIN escribir ledger → ROMPEN el invariant M-2. Es cobertura "
-        "documental del agujero, NO un guard de runtime (fase B-3 lo decide). Este test "
-        "demuestra que sin ledger el Σ diverge (xfail esperado)."
-    ),
-)
-async def test_b3_deuda_directa_rompe_invariant_documental(
-    db_session: AsyncSession,
-) -> None:
-    """Documenta que los write-paths "sucios" (B-3) rompen la reconciliación.
+def test_b3_deuda_directa_rompe_invariant_documental() -> None:
+    """PG-01: la puerta pública ``add_cash`` / ``deduct_cash`` ya no existe.
 
-    ``add_cash`` mueve cash sin ledger: el Σ (via ``sum_cash_amounts``) NO refleja el
-    nuevo cash, así que el invariant diverge. Pensado como registro de la escotilla;
-    se marca xfail para que CI siga verde. No se invocan para "sanar" en esta fase.
-
-    Limpieza (R000): la cuenta simulada se cierra y borra físicamente SIEMPRE (``finally``),
-    incluso cuando el assert de reconciliación falla (que es precisamente lo que documenta el xfail).
+    El movimiento de cash vive en ``_credit_cash_row`` / ``_debit_cash_row``, y
+    depósito, retirada y custodia los llaman en el mismo savepoint que el ledger.
     """
-    from bolsa_infrastructure.database.repositories.account_repository import (
-        SqlAlchemyAccountRepository,
-    )
-    from bolsa_infrastructure.database.repositories.ledger_repository import (
-        SqlAlchemyLedgerRepository,
-    )
     from bolsa_infrastructure.database.repositories.portfolio_repository import (
         SqlAlchemyPortfolioRepository,
     )
 
-    account_repo = SqlAlchemyAccountRepository(db_session)
-    ledger_repo = SqlAlchemyLedgerRepository(db_session)
-    portfolio_repo = SqlAlchemyPortfolioRepository(db_session)
-
-    account_id = await _new_account(
-        db_session, name=f"m2-b3-{uuid4().hex[:8]}", initial_deposit=1000.0
-    )
-    scope = await account_repo.resolve_scope(account_id)
-    # add_cash muta cash SIN ledger → invariante ROMPIDO (esto es lo que documenta xfail).
-    await portfolio_repo.add_cash(scope.legacy_portfolio_id, 500.0)
-    try:
-        await _assert_reconciled(db_session, ledger_repo, account_id)
-    finally:
-        # Limpieza R000: garantizada aunque el assert (xfail) falle antes de llegar aquí.
-        await _cleanup_account(db_session, account_id)
+    assert not hasattr(SqlAlchemyPortfolioRepository, "add_cash")
+    assert not hasattr(SqlAlchemyPortfolioRepository, "deduct_cash")
+    assert hasattr(SqlAlchemyPortfolioRepository, "_credit_cash_row")
+    assert hasattr(SqlAlchemyPortfolioRepository, "_debit_cash_row")

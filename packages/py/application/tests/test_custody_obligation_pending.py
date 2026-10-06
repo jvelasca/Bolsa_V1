@@ -96,7 +96,7 @@ class _FakePortfolioRepo:
         portfolio = type("P", (), {"cash": self._cash})
         return type("S", (), {"total_equity": self._equity, "portfolio": portfolio})
 
-    async def deduct_cash(self, portfolio_id, amount, *, allow_partial=False):  # noqa: ARG001
+    async def _debit_cash_row(self, portfolio_id, amount, *, allow_partial=False):  # noqa: ARG001
         self.deduct_calls.append({"amount": amount, "allow_partial": allow_partial})
         if amount > self._cash and not allow_partial:
             raise ValueError("Efectivo insuficiente")

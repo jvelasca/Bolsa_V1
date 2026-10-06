@@ -132,7 +132,7 @@ class ApplyCustodyFees:
                         # sobre un estado que otro trade (concurrente, ya commiteado)
                         # había modificado, rompiendo la cadena
                         # ``balance_after[n] == balance_after[n-1] + amount[n]``.
-                        balance_after = await self._portfolio_repo.deduct_cash(
+                        balance_after = await self._portfolio_repo._debit_cash_row(
                             charge_legacy_id, to_charge, allow_partial=True
                         )
                         # El instante sale del secuenciador del ledger, invocado
@@ -170,7 +170,7 @@ class ApplyCustodyFees:
                 # cadena si otro trade commiteó entre la lectura y el lock.
                 # Invariante Σ ledger == cash se mantiene (no cargo parcial).
                 async with _idempotent_savepoint(session):
-                    balance_after = await self._portfolio_repo.deduct_cash(
+                    balance_after = await self._portfolio_repo._debit_cash_row(
                         charge_legacy_id,
                         fee_amount,
                         allow_partial=False,

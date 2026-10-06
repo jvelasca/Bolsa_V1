@@ -448,7 +448,7 @@ class SqlAlchemyPortfolioRepository:
             summary=summary,
         )
 
-    async def deduct_cash(
+    async def _debit_cash_row(
         self,
         legacy_portfolio_id: str,
         amount: float,
@@ -477,7 +477,7 @@ class SqlAlchemyPortfolioRepository:
         await self._session.flush()
         return float(row.cash)
 
-    async def add_cash(self, legacy_portfolio_id: str, amount: float) -> float:
+    async def _credit_cash_row(self, legacy_portfolio_id: str, amount: float) -> float:
         if amount <= 0:
             portfolio = await self.get_summary(legacy_portfolio_id)
             return portfolio.portfolio.cash

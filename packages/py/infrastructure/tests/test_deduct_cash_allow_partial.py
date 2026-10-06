@@ -89,7 +89,7 @@ async def test_deduct_cash_enough_is_normal(db_session) -> None:
 
     pid = await _new_portfolio(db_session, cash=1000.0)
     repo = SqlAlchemyPortfolioRepository(db_session)
-    balance = await repo.deduct_cash(pid, 300.0)
+    balance = await repo._debit_cash_row(pid, 300.0)
     assert balance == 700.0
 
 
@@ -102,7 +102,7 @@ async def test_deduct_cash_insufficient_without_partial_raises(db_session) -> No
     pid = await _new_portfolio(db_session, cash=100.0)
     repo = SqlAlchemyPortfolioRepository(db_session)
     with pytest.raises(ValueError, match="Efectivo insuficiente"):
-        await repo.deduct_cash(pid, 500.0)
+        await repo._debit_cash_row(pid, 500.0)
     # La transacción se revierte: no debe quedar un descuento silencioso.
 
 
@@ -114,5 +114,5 @@ async def test_deduct_cash_partial_exhausts_available(db_session) -> None:
 
     pid = await _new_portfolio(db_session, cash=100.0)
     repo = SqlAlchemyPortfolioRepository(db_session)
-    balance = await repo.deduct_cash(pid, 500.0, allow_partial=True)
+    balance = await repo._debit_cash_row(pid, 500.0, allow_partial=True)
     assert balance == 0.0

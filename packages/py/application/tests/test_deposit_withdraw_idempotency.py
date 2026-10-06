@@ -84,12 +84,12 @@ class _FakePortfolioRepo:
     def _key(self, legacy_portfolio_id: str) -> str:
         return legacy_portfolio_id or "legacy-1"
 
-    async def add_cash(self, legacy_portfolio_id: str, amount: float) -> float:
+    async def _credit_cash_row(self, legacy_portfolio_id: str, amount: float) -> float:
         key = self._key(legacy_portfolio_id)
         self._cash[key] = self._cash.get(key, 0.0) + amount
         return self._cash[key]
 
-    async def deduct_cash(self, legacy_portfolio_id: str, amount: float) -> float:
+    async def _debit_cash_row(self, legacy_portfolio_id: str, amount: float) -> float:
         key = self._key(legacy_portfolio_id)
         self._cash[key] = self._cash.get(key, 0.0) - amount
         return self._cash[key]
@@ -262,7 +262,7 @@ async def test_withdraw_replay_does_not_trigger_insufficient_funds() -> None:
     await withdraw.execute("acc-1", amount=100.0, idempotency_key="wd-1")
     # Retirada posterior del resto del saldo deja cash en 0; el replay de la
     # retirada previa NO debe rechazarse por efectivo insuficiente.
-    await portfolio.deduct_cash("legacy-1", portfolio.cash)
+    await portfolio._debit_cash_row("legacy-1", portfolio.cash)
     replay = await withdraw.execute("acc-1", amount=100.0, idempotency_key="wd-1")
     assert replay.kind == "external_withdrawal"
     assert portfolio.cash == 0.0

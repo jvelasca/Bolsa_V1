@@ -66,7 +66,7 @@ class DepositCashToAccount:
         session = getattr(self._ledger_repo, "session", None)
         try:
             async with _idempotent_savepoint(session):
-                balance_after = await self._portfolio_repo.add_cash(
+                balance_after = await self._portfolio_repo._credit_cash_row(
                     scope.legacy_portfolio_id, amount
                 )
                 description = note or "Depósito externo (simulado)"
@@ -173,7 +173,7 @@ class WithdrawCashFromAccount:
         session = getattr(self._ledger_repo, "session", None)
         try:
             async with _idempotent_savepoint(session):
-                balance_after = await self._portfolio_repo.deduct_cash(
+                balance_after = await self._portfolio_repo._debit_cash_row(
                     scope.legacy_portfolio_id, amount
                 )
                 description = note or "Retirada externa (simulada)"

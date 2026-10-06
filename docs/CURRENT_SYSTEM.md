@@ -2,7 +2,9 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf (V2.88.66) — en curso:** 2026-10-06 · sello **`v2.88.66-beta`** (**NÚCLEO: IdempotencyKeyReused marca FAILED**) · package **`2.11.66-beta`** · **`Δ motor = 0`** · el applier SIM relanza el conflicto de clave y `apply_execution_financial_once` lo deja en `FAILED`. Evidencia: [`docs/engineering/evidence/v2.88.66/README.md`](./engineering/evidence/v2.88.66/README.md).
+> **AsOf (V2.88.67) — en curso:** 2026-10-06 · sello **`v2.88.67-beta`** (**NÚCLEO: cash suelto deja de ser puerta pública**) · package **`2.11.67-beta`** · **`Δ motor = 0`** · `add_cash`/`deduct_cash` ya no existen en el repositorio. Evidencia: [`docs/engineering/evidence/v2.88.67/README.md`](./engineering/evidence/v2.88.67/README.md).
+>
+> **AsOf (V2.88.66) — anterior:** 2026-10-06 · sello **`v2.88.66-beta`** (**NÚCLEO: IdempotencyKeyReused marca FAILED**) · package **`2.11.66-beta`** · **`Δ motor = 0`** · el applier SIM relanza el conflicto de clave y `apply_execution_financial_once` lo deja en `FAILED`. Evidencia: [`docs/engineering/evidence/v2.88.66/README.md`](./engineering/evidence/v2.88.66/README.md).
 >
 > **AsOf (V2.88.65) — anterior:** 2026-10-06 · sello **`v2.88.65-beta`** (**NÚCLEO: la venta compara Decimal**) · package **`2.11.65-beta`** · Alembic head **`048`** · **`Δ motor = 0`** en cantidades de 6 decimales habituales. La admisión deja de usar `float(held) < quantity`. Evidencia: [`docs/engineering/evidence/v2.88.65/README.md`](./engineering/evidence/v2.88.65/README.md).
 >
