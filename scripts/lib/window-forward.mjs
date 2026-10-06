@@ -164,11 +164,23 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * `Delta motor = 0`: CERO ficheros de motor. El arbol pinneado es el del commit funcional
  * `c8c23cef`. Pin anterior (sello `v2.88.58-beta`, commit `dd3af96d`):
  * `apps` `6f24ce28…` / `packages` `95cb0d69…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.60-beta`): fase backend F5 — resolucion DIA-D por `cycleId`.
+ * El artefacto `dia-d-feedback-v2` expone un indice `cycles[]` (`cycleId` -> identidad del ciclo) y
+ * la ruta `/auto/dia-d-feedback` lo proyecta (`DiaDFeedbackCycleDto`); el panel `resolveExplanation`
+ * usa `cycleId` si esta en el indice y, si no, cae al instrumento declarando la resolucion PARCIAL.
+ * **A diferencia de `v2.88.59` (solo `apps`), este sello mueve `apps/` Y `packages/`** (application
+ * `dia_d_auto_feedback.py` + shared `auto-operation-story.ts`) y su contrato HTTP (openapi/schema.d.ts
+ * viven en `apps/`). `scripts/` no participa del pin.
+ * `Delta motor = 0`: CERO ficheros de motor; NO se toca `replay_oos.RoundTrip.to_dict` (la huella
+ * `sha256 1E3ADAC2…` del `replay-repro` no se mueve). El arbol pinneado es el del commit funcional
+ * `71ab00df`. Pin anterior (sello `v2.88.59-beta`, commit `c8c23cef`):
+ * `apps` `a909995b…` / `packages` `95cb0d69…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'c8c23cef',
-  appsHash: 'a909995ba8cb3310fb9c4c9550e16b1247ca0ef7',
-  packagesHash: '95cb0d698a708635e0594a5c85bacfb0a7538c20',
+  commit: '71ab00df',
+  appsHash: 'd7e6da64e5a19f605be5a08fca87b564114e412b',
+  packagesHash: 'b482a276fdf5ef0089dc1937c170e13bf01ffe07',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
