@@ -176,10 +176,19 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * `sha256 1E3ADAC2…` del `replay-repro` no se mueve). El arbol pinneado es el del commit funcional
  * `71ab00df`. Pin anterior (sello `v2.88.59-beta`, commit `c8c23cef`):
  * `apps` `a909995b…` / `packages` `95cb0d69…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.61-beta`): version bump a `2.11.61-beta` (package + `meta.bump`
+ * de los 9 CLI DIA-D) + fix de arranque de la venv bajo Windows Smart App Control
+ * (`scripts/lib/python.mjs`, `scripts/fix-venv-python.mjs`; **`scripts/` no participa del pin**).
+ * Cambia `apps/` SOLO por el `meta.bump` de `v2_89`..`v2_97`; `packages/` NO cambia (mismo arbol que
+ * `v2.88.60`). `Delta motor = 0`: CERO ficheros de motor; NO se toca `replay_oos.RoundTrip.to_dict`.
+ * Este sello **absorbe la F5 de `v2.88.60`** (su arbol de `apps`/`packages` viaja dentro, sin tag
+ * propio). El arbol pinneado es el del commit `52a697e1`. Pin anterior (sello `v2.88.60-beta`,
+ * commit `71ab00df`): `apps` `d7e6da64…` / `packages` `b482a276…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '71ab00df',
-  appsHash: 'd7e6da64e5a19f605be5a08fca87b564114e412b',
+  commit: '52a697e1',
+  appsHash: '286cf716032abdc675e641b0baaaee9ac5bac528',
   packagesHash: 'b482a276fdf5ef0089dc1937c170e13bf01ffe07',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
