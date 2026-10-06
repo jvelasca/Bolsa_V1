@@ -2,6 +2,14 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.69-beta] — `NÚCLEO`: **idempotency_key NOT NULL**
+
+**Bump** `2.11.68-beta` → `2.11.69-beta`. Migración **`050_transaction_idempotency_key_not_null`**. **`Δ motor = 0`**.
+
+- `upgrade` cuenta `transactions.idempotency_key IS NULL`. Si no es cero, aborta. No hay `UPDATE` de relleno. El unique existente se mantiene.
+- El test del aborto pasa sin base de datos. No hay conteo de filas vivas: PostgreSQL no responde en esta máquina.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.69/README.md`](docs/engineering/evidence/v2.88.69/README.md).
+
 ## [2.11.68-beta] — `NÚCLEO`: **CHECK de cash y cantidad**
 
 **Bump** `2.11.67-beta` → `2.11.68-beta`. Migración **`049_cash_quantity_nonneg_check`**. **`Δ motor = 0`**.

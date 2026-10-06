@@ -336,7 +336,7 @@ def main(argv: list[str] | None = None) -> int:
     artifact = build_thesis_exit_artifact(
         draw_ledgers=ledgers,
         meta={
-            "bump": "2.11.68-beta",
+            "bump": "2.11.69-beta",
             "phase": "V2.97 DIA-D AUTO THESIS EXIT",
             "nature": "INVESTIGACION",
             "drawsDir": str(out_dir),
