@@ -4,10 +4,11 @@
  * Uso: node scripts/dev-doctor.mjs [--fix-ports]
  */
 import { execSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { checkPort, findDockerExe, isDockerDaemonRunning } from './lib/docker.mjs';
 import { ensureLogDirs, logError, logInfo, logWarn, ROOT, writeAgentLog } from './lib/logger.mjs';
 import { freePort, getListenerPids } from './lib/ports.mjs';
-import { resolvePython } from './lib/python.mjs';
+import { probePython, projectVenvPython, resolvePython } from './lib/python.mjs';
 import { waitForApi } from './lib/wait-api.mjs';
 
 const fixPorts = process.argv.includes('--fix-ports');
@@ -81,6 +82,19 @@ async function main() {
     record('Python', true, `${python} (${pyVer})`, null);
   } catch {
     record('Python', false, 'no encontrado', 'Instala Python 3.11+');
+  }
+
+  // Smart App Control puede bloquear el trampolín de `uv` en `.venv` (spawn
+  // UNKNOWN). Se diagnóstica el intérprete de la venv tal cual, sin reparar.
+  const venvPython = projectVenvPython();
+  if (existsSync(venvPython)) {
+    const venvProbe = probePython(venvPython);
+    record(
+      'Python venv',
+      venvProbe.ok,
+      venvProbe.ok ? venvPython : `bloqueado (${venvProbe.code})`,
+      venvProbe.ok ? null : 'Ejecuta: node scripts/fix-venv-python.mjs',
+    );
   }
 
   // Docker / PostgreSQL

@@ -8,6 +8,8 @@
     "dev": "node scripts/run-dev.mjs",
     "doctor": "node scripts/dev-doctor.mjs",
     "doctor:fix": "node scripts/dev-doctor.mjs --fix-ports",
+    "fix:venv": "node scripts/fix-venv-python.mjs",
+    "venv:test": "node --test scripts/lib/python.test.mjs",
     "dev:verify": "node scripts/dev-verify.mjs",
     "startup:report": "node scripts/startup-report.mjs",
     "dev:web": "pnpm --filter @bolsa/web dev",

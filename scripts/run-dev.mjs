@@ -185,7 +185,7 @@ if (sharedPackageNeedsBuild()) {
 }
 
 const apiDir = join(ROOT, 'apps', 'api-python');
-const python = resolvePython();
+const python = resolvePython({ log: (msg) => logInfo('dev', msg) });
 logInfo('dev', `Python: ${python}`);
 
 const children = [];
