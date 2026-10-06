@@ -63,3 +63,16 @@ Confirm = firma · `PAPER_D_EXECUTE` off · AUTO off · Ranking ≠ BUY · `TOP_
 - Modificados: `admin-rail.tsx` (entrada `AUTO`), `command-registry.ts` (comandos de sección), `platform-shell.tsx`/`routes.ts` (tratamiento de `/auto` como workspace).
 - Deuda declarada que **no** cierra este ADR: `PortfolioDecision` durable (`UI52-02`), contrato de explicación por `cycleId`, PIT institucional, Execution Analysis.
 - Docs: este ADR + [spec AUTO UI REFACTOR 2.0](../engineering/spec-auto-ui-refactor-2-0-2026-10-05.md), `CURRENT_SYSTEM.md`, `CHANGELOG.md`.
+
+---
+
+## 7. Addendum `v2.88.62` — HOME como landing de `/auto`
+
+**Estado:** Accepted (`2026-10-06`). **Complementa (no reabre)** las cinco secciones de §1.
+
+- §4 decía «`/auto` redirige a `/auto/operar` (sección por defecto)». **Se sustituye** por: `/auto` monta una **HOME / cockpit** que responde en 5 s las cuatro preguntas del usuario básico (qué está haciendo AUTO · qué puede hacer · cuánto riesgo tiene · qué ha pasado) y **enlaza** a las cinco secciones.
+- **LA HOME es aditiva**: `/auto/operar`, `/auto/cartera`, `/auto/riesgo`, `/auto/analisis` y `/auto/sistema` se conservan sin cambios de rol; `operar` deja de ser la sección «por defecto» pero sigue siendo la superficie de oportunidades/operaciones.
+- La HOME **no** reimplementa ninguna superficie: compone por enlace (invariante de §2). El `<main>` sigue siendo único (lo aporta `PlatformShell`) y la HOME expone exactamente un `<h1>`.
+- **No** cambia ADR-040: AUTO sigue sin ser una sexta puerta L1.
+- **`Δ motor = 0`**, sin cambio de contrato HTTP, sin migración Alembic.
+- Congelado en [spec AUTO UI REFACTOR 3.0](../engineering/spec-auto-ui-refactor-3-0-2026-10-06.md).

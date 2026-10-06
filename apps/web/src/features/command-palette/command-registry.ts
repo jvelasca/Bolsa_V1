@@ -15,7 +15,12 @@ import {
   MESA_PATH,
 } from "@/features/confirm/daily-nav";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
-import { AUTO_LABEL, AUTO_NAV, AUTO_ROOT_PATH } from "@/features/auto/auto-nav";
+import {
+  AUTO_LABEL,
+  AUTO_NAV,
+  AUTO_ROOT_PATH,
+  AUTO_SECTION,
+} from "@/features/auto/auto-nav";
 import type { PlatformConfigTab } from "@/stores/ui-store";
 import {
   nextUiDensity,
@@ -55,13 +60,16 @@ const AUTO_COMMANDS: PlatformCommand[] = [
     group: "nav",
     run: (ctx) => ctx.navigate(AUTO_ROOT_PATH),
   },
-  ...AUTO_NAV.items.map((item) => ({
-    id: `nav-auto-${item.id}`,
-    label: `AUTO · ${item.label}`,
-    keywords: ["auto", item.id, item.label.toLowerCase()],
-    group: "nav" as const,
-    run: (ctx: CommandRunContext) => ctx.navigate(item.path),
-  })),
+  // La HOME vive en `AUTO_ROOT_PATH`: el comando raíz ya la cubre, así que no se duplica.
+  ...AUTO_NAV.items
+    .filter((item) => item.id !== AUTO_SECTION.home)
+    .map((item) => ({
+      id: `nav-auto-${item.id}`,
+      label: `AUTO · ${item.label}`,
+      keywords: ["auto", item.id, item.label.toLowerCase()],
+      group: "nav" as const,
+      run: (ctx: CommandRunContext) => ctx.navigate(item.path),
+    })),
 ];
 
 export const PLATFORM_COMMANDS: PlatformCommand[] = [

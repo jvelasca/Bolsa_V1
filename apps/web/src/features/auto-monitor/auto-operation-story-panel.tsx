@@ -1,15 +1,22 @@
 /**
- * AUTO UI REFACTOR 1.0 — PILOTO de la "operación única".
+ * AUTO UI REFACTOR 3.0 (S2) — la "operación única" en tres bloques.
  *
- * Pinta la historia ordenada de UN ciclo y reutiliza los paneles actuales como detalle experto.
- * Separa los HECHOS de la operación (`group: OPERATION`, 13 conceptos; 12 filas con `EXIT` plegado en `SETTLEMENT`) del CONTEXTO que la originó
- * (`OPPORTUNITY` + universo PIT/régimen/ranking declarados `NO MEDIDO`). Read-only: NO re-deriva
- * cifras ni completa pasos; un hueco se rotula `NO MEDIDO` (nunca `0`).
+ * Pinta la historia ordenada de UN ciclo y la separa en el modelo mental del usuario:
+ *
+ *   1. HISTORIA DE ESTA OPERACIÓN — los hechos del ciclo (grupo `OPERATION`; `EXIT` plegado en
+ *      `SETTLEMENT`): Señal → Selección → Decisión → Riesgo → Reserva → Orden → Ejecución →
+ *      Posición → Protección → Liquidación → Resultado.
+ *   2. CONTEXTO — lo que la originó (instrumento/estrategia/dirección + universo PIT/régimen/
+ *      ranking declarados `NO MEDIDO`).
+ *   3. ¿QUÉ APRENDEMOS? — la etapa `EXPLANATION` (DÍA-D/OOS), que es conocimiento **cross-ciclo**
+ *      y por eso NO vive dentro de los hechos de la operación (grupo propio `EXPLANATION`).
+ *
+ * Read-only y puro: NO re-deriva cifras ni completa pasos; un hueco se rotula «Sin dato todavía»
+ * en primer nivel (el rótulo técnico `NO MEDIDO` se conserva en `title`).
  *
  * La etapa `EXPLANATION` enlaza directo al heatmap DÍA-D del instrumento (un clic en vez de tres
  * saltos), preseleccionando símbolo y ventana en la URL. Los deep-links son **canónicos**
- * (`/auto/analisis?tab=dia-d...` y `/auto-monitor?mode=current&cycle=...`): no escriben parámetros
- * sobre la ruta actual (era inerte desde `/auto/operar/operacion/:cycleId`).
+ * (`/auto/analisis?tab=dia-d...` y `/auto-monitor?mode=current&cycle=...`).
  */
 
 import { useMemo } from "react";
@@ -27,11 +34,15 @@ import {
   type AutoOperationStoryExplanationIdentity,
   type AutoOperationStoryExplanationInput,
   type AutoOperationStoryExplanationResolution,
+  type AutoOperationStoryStage,
 } from "@bolsa/shared";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 import { useAutoDiaDFeedbackList } from "@/features/auto-monitor/use-auto-dia-d-feedback";
 import { buildOperationIdentity } from "@/features/auto/auto-operation-identity";
-import { plainStageLabel } from "@/features/auto/auto-story-plain-labels";
+import {
+  plainStageLabel,
+  plainStateLabel,
+} from "@/features/auto/auto-story-plain-labels";
 import {
   autoDiaDHref,
   autoTechnicalDetailHref,
@@ -134,6 +145,65 @@ export function resolveAutoOperationSelection<
   };
 }
 
+/**
+ * Fila de una etapa: lenguaje de usuario en primer nivel; el término técnico se conserva en el
+ * `title` (tooltip) para no perder vocabulario de auditoría (spec 3.0 §1.7/§4).
+ */
+function StoryStageRow({
+  stage,
+  testId = "auto-operation-story-stage",
+  children,
+}: {
+  stage: AutoOperationStoryStage;
+  testId?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <li
+      data-testid={testId}
+      data-stage={stage.id}
+      data-kind={stage.kind}
+      data-group={stage.group}
+      data-state={stage.state}
+      className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-t border-border/40 pt-1 text-sm first:border-t-0"
+    >
+      <span
+        className={cn(
+          "mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full",
+          stage.dotTone,
+        )}
+      />
+      <span className="w-40 shrink-0 font-medium">
+        {plainStageLabel(stage.id, stage.label)}
+      </span>
+      <span
+        className={cn("uppercase tracking-wide", stage.tone)}
+        title={stage.stateLabel}
+      >
+        {plainStateLabel(stage.state, stage.stateLabel)}
+      </span>
+      {stage.at ? (
+        <span className="tabular-nums text-muted-foreground">{stage.at}</span>
+      ) : null}
+      {stage.facts.map((fact) => (
+        <span
+          key={`${stage.id}-${fact.label}`}
+          className="text-muted-foreground"
+        >
+          {fact.label}:{" "}
+          <MeasurementValue value={fact.value} measurement={fact.measurement} />
+        </span>
+      ))}
+      {stage.note ? (
+        <span className="text-xs text-amber-600 dark:text-amber-400">
+          {stage.note}
+        </span>
+      ) : null}
+      {children}
+    </li>
+  );
+}
+
 export function AutoOperationStoryPanel({
   cycleIdOverride,
   onSelectCycle,
@@ -204,15 +274,22 @@ export function AutoOperationStoryPanel({
     [selected, explanation],
   );
 
-  // Los hechos de la operación (sin OPPORTUNITY) vs el contexto que la originó. Una etapa plegada
-  // (EXIT → SETTLEMENT) no se pinta como fila propia: una sola fila por hecho.
+  // Tres bloques: hechos de la operación (sin `EXPLANATION`, que es cross-ciclo), contexto que la
+  // originó y aprendizaje. Una etapa plegada (EXIT → SETTLEMENT) no se pinta como fila propia.
   const operationStages = story.stages.filter(
     (stage) => stage.group === "OPERATION" && stage.foldedInto === null,
   );
   const opportunity = story.stages.find((stage) => stage.id === "OPPORTUNITY");
+  const explanationStage = story.stages.find(
+    (stage) => stage.id === "EXPLANATION",
+  );
 
   const symbol = selected?.instrumentId ?? null;
   const latestWindow = feedbackList.data?.latest ?? null;
+  const identityLabel = selected
+    ? buildOperationIdentity(selected).label
+    : null;
+
   // Destino canónico: el DÍA-D vive en el workspace AUTO (`/auto/analisis?tab=dia-d`),
   // NO en la URL del monitor. Escribir `mode=dia-d` sobre la ruta actual era inerte.
   const openDiaDHeatmap = () => {
@@ -232,24 +309,24 @@ export function AutoOperationStoryPanel({
       <Card className="rounded-xl border border-border bg-card">
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <CardTitle className="text-sm">Operación única</CardTitle>
+            <CardTitle className="text-base">
+              {identityLabel ?? "Operación"}
+            </CardTitle>
             {selected ? (
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
                 data-testid="auto-operation-story-open-technical"
-                className="h-6 rounded px-2 text-[10px]"
+                className="h-7 rounded px-2 text-xs"
                 onClick={openTechnicalDetail}
               >
                 Detalle técnico (ventana actual)
               </Button>
             ) : null}
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Una historia: catorce conceptos del modelo. Los hechos de la
-            operación se copian de su traza durable o se declaran{" "}
-            <strong>NO MEDIDO</strong>; nunca se rellenan con 0.
+          <p className="text-sm text-muted-foreground">
+            ¿Por qué se abrió? → ¿Qué hizo AUTO? → ¿Cómo va? → ¿Qué aprendemos?
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -270,7 +347,7 @@ export function AutoOperationStoryPanel({
                     aria-pressed={selected?.cycleId === cycle.cycleId}
                     onClick={() => selectCycle(cycle.cycleId)}
                     className={cn(
-                      "h-6 rounded border px-2 text-[10px] tabular-nums",
+                      "h-7 rounded border px-2 text-xs tabular-nums",
                       selected?.cycleId === cycle.cycleId
                         ? "border-foreground/30 bg-background text-foreground shadow-sm"
                         : "border-border text-muted-foreground",
@@ -301,7 +378,7 @@ export function AutoOperationStoryPanel({
           ) : null}
           {!isLoading && !isError && cycles.length === 0 ? (
             <p
-              className="text-xs text-muted-foreground"
+              className="text-sm text-muted-foreground"
               data-testid="auto-operation-story-empty"
             >
               Sin ciclos en la ventana.
@@ -320,69 +397,18 @@ export function AutoOperationStoryPanel({
           ) : null}
 
           {selected ? (
-            <ol className="space-y-1" data-testid="auto-operation-story">
-              {operationStages.map((stage) => (
-                <li
-                  key={stage.id}
-                  data-testid="auto-operation-story-stage"
-                  data-stage={stage.id}
-                  data-kind={stage.kind}
-                  data-group={stage.group}
-                  data-state={stage.state}
-                  className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-t border-border/40 pt-1 text-[11px] first:border-t-0"
-                >
-                  <span
-                    className={cn(
-                      "mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full",
-                      stage.dotTone,
-                    )}
-                  />
-                  <span
-                    className="w-28 shrink-0 font-medium"
-                    title={stage.label}
-                  >
-                    {plainStageLabel(stage.id, stage.label)}
-                  </span>
-                  <span className={cn("uppercase tracking-wide", stage.tone)}>
-                    {stage.stateLabel}
-                  </span>
-                  {stage.at ? (
-                    <span className="tabular-nums text-muted-foreground">
-                      {stage.at}
-                    </span>
-                  ) : null}
-                  {stage.facts.map((fact) => (
-                    <span
-                      key={`${stage.id}-${fact.label}`}
-                      className="text-muted-foreground"
-                    >
-                      {fact.label}:{" "}
-                      <MeasurementValue
-                        value={fact.value}
-                        measurement={fact.measurement}
-                      />
-                    </span>
+            <>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Historia de esta operación
+                </p>
+                <ol className="space-y-1" data-testid="auto-operation-story">
+                  {operationStages.map((stage) => (
+                    <StoryStageRow key={stage.id} stage={stage} />
                   ))}
-                  {stage.note ? (
-                    <span className="text-[10px] text-amber-600 dark:text-amber-400">
-                      {stage.note}
-                    </span>
-                  ) : null}
-                  {stage.id === "EXPLANATION" && symbol && latestWindow ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      data-testid="auto-operation-story-open-heatmap"
-                      className="h-6 rounded px-2 text-[10px]"
-                      onClick={openDiaDHeatmap}
-                    >
-                      Ver heatmap de {symbol}
-                    </Button>
-                  ) : null}
-                </li>
-              ))}
-            </ol>
+                </ol>
+              </div>
+            </>
           ) : null}
         </CardContent>
       </Card>
@@ -393,15 +419,15 @@ export function AutoOperationStoryPanel({
           data-testid="auto-operation-story-context"
         >
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Contexto que la originó</CardTitle>
-            <p className="text-[10px] text-muted-foreground">
+            <CardTitle className="text-sm">Contexto</CardTitle>
+            <p className="text-xs text-muted-foreground">
               {opportunity?.note ??
                 "No es un hecho del ciclo: se declara lo que no se materializa."}
             </p>
           </CardHeader>
           <CardContent>
             <dl
-              className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:grid-cols-3"
+              className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3"
               data-testid="auto-operation-story-context-items"
             >
               {story.context.map((item) => (
@@ -424,6 +450,42 @@ export function AutoOperationStoryPanel({
                 </div>
               ))}
             </dl>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {selected && explanationStage ? (
+        <Card
+          className="rounded-xl border border-border bg-card"
+          data-testid="auto-operation-story-learning"
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">¿Qué aprendemos?</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              DÍA-D es conocimiento de todos los ciclos del instrumento: no es
+              un hecho de esta operación.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ol className="space-y-1">
+              <StoryStageRow
+                stage={explanationStage}
+                testId="auto-operation-story-explanation"
+              >
+                {symbol && latestWindow ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    data-testid="auto-operation-story-open-heatmap"
+                    className="h-7 rounded px-2 text-xs"
+                    onClick={openDiaDHeatmap}
+                  >
+                    Ver heatmap de {symbol}
+                  </Button>
+                ) : null}
+              </StoryStageRow>
+            </ol>
           </CardContent>
         </Card>
       ) : null}

@@ -1,9 +1,12 @@
 /**
- * AUTO · SISTEMA (ADR-044) — Salud AUTO · Broker/ejecución · Reconciliación · Auditoría.
+ * AUTO · SISTEMA (ADR-044 + spec 3.0 §5) — primero «qué está haciendo AUTO», después el interior.
  *
- * Compone la ventana cruda del monitor (header + timeline + reservas +
- * concurrencia), la reconciliación read-only de la Consola y enlaces a la
- * auditoría. Resumen operativo arriba; detalle experto enlazado.
+ * Primer nivel (usuario): estado de AUTO en frases (está activo / última actividad / ahora / próximo
+ * paso), reutilizando el helper de la HOME (`buildAutoHomeSummary`).
+ *
+ * Detalle técnico (experto), plegado: la ventana cruda del monitor (header + timeline + reservas +
+ * concurrencia), broker/ejecución y la reconciliación read-only de la Consola. La auditoría son
+ * enlaces y queda accesible en primer nivel.
  */
 
 import { Link } from "react-router-dom";
@@ -24,12 +27,21 @@ import {
 import { useLifecycleReconciliation } from "@/features/operational-console/use-lifecycle-reconciliation";
 import { useOpsSelfEval } from "@/features/operational-console/use-ops-self-eval";
 import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
+import { AutoTechnicalDetail } from "@/features/auto/auto-technical-detail";
+import { buildAutoHomeSummary } from "@/features/auto/auto-home-summary";
 
 export function AutoSistemaPage() {
   const { view, isLoading, isError } = useAutoOperationalMonitor();
   const { effectiveAccountId } = useActiveAccount();
   const selfEval = useOpsSelfEval(effectiveAccountId);
   const lifecycle = useLifecycleReconciliation(effectiveAccountId);
+
+  const status = buildAutoHomeSummary({
+    header: view?.header ?? null,
+    cycles: view?.cycles ?? [],
+    isLoading,
+    isError,
+  });
 
   return (
     <div className="space-y-6" data-testid="auto-sistema-page">
@@ -38,68 +50,107 @@ export function AutoSistemaPage() {
         description={AUTO_SECTION_COPY.sistema.description}
       />
 
-      <section className="space-y-3" aria-labelledby="auto-sistema-salud">
-        <AutoSectionBlockHeading id="auto-sistema-salud">
-          Salud AUTO
+      <section className="space-y-2" aria-labelledby="auto-sistema-estado">
+        <AutoSectionBlockHeading id="auto-sistema-estado">
+          Estado de AUTO
         </AutoSectionBlockHeading>
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Cargando monitor…</p>
+        {status.isLoading ? (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="auto-sistema-loading"
+          >
+            Cargando estado de AUTO…
+          </p>
         ) : null}
-        {isError ? (
-          <p className="text-sm text-destructive">
+        {status.isError ? (
+          <p
+            className="text-sm text-destructive"
+            data-testid="auto-sistema-error"
+          >
             No se pudo cargar el monitor operativo.
           </p>
         ) : null}
-        {view ? (
-          <>
-            <AutoMonitorHeader header={view.header} />
-            <AutoCycleTimeline cycles={view.cycles} />
-            <div className="grid gap-4 lg:grid-cols-2">
-              <AutoReservationPanel reservations={view.reservations} />
-              <AutoConcurrencyPanel concurrency={view.concurrency} />
-            </div>
-          </>
+        {status.loaded ? (
+          <div className="space-y-1 text-sm">
+            <p
+              className="text-base font-semibold"
+              data-testid="auto-sistema-auto"
+            >
+              AUTO: {status.autoLabel}
+            </p>
+            <p className="font-medium" data-testid="auto-sistema-doing">
+              {status.statusLabel}
+            </p>
+            <p className="text-muted-foreground">
+              Última actividad:{" "}
+              <span
+                className="tabular-nums"
+                data-testid="auto-sistema-last-activity"
+              >
+                {status.lastActivityLabel}
+              </span>{" "}
+              · {status.nextStepLabel}
+            </p>
+          </div>
         ) : null}
-        <p className="text-xs text-muted-foreground">
-          Vista experta (ventana actual con huecos declarados) en{" "}
-          <Link
-            to="/auto-monitor?mode=current"
-            className="underline hover:text-primary"
-          >
-            Monitor AUTO
-          </Link>
-          .
-        </p>
       </section>
 
-      <section className="space-y-2" aria-labelledby="auto-sistema-broker">
-        <AutoSectionBlockHeading id="auto-sistema-broker">
-          Broker / ejecución
-        </AutoSectionBlockHeading>
-        <p className="text-sm text-muted-foreground">
-          Ejecución declarada vs habilitada y modelo de protección en la salud
-          de arriba; estado de cuenta y P&amp;L en el{" "}
-          <Link to="/trading" className="underline hover:text-primary">
-            terminal de Mercado
-          </Link>
-          .
-        </p>
-      </section>
+      <AutoTechnicalDetail testId="auto-sistema-technical">
+        <section className="space-y-3" aria-labelledby="auto-sistema-salud">
+          <AutoSectionBlockHeading id="auto-sistema-salud">
+            Salud AUTO
+          </AutoSectionBlockHeading>
+          {view ? (
+            <>
+              <AutoMonitorHeader header={view.header} />
+              <AutoCycleTimeline cycles={view.cycles} />
+              <div className="grid gap-4 lg:grid-cols-2">
+                <AutoReservationPanel reservations={view.reservations} />
+                <AutoConcurrencyPanel concurrency={view.concurrency} />
+              </div>
+            </>
+          ) : null}
+          <p className="text-muted-foreground">
+            Vista experta (ventana actual con huecos declarados) en{" "}
+            <Link
+              to="/auto-monitor?mode=current"
+              className="underline hover:text-primary"
+            >
+              Monitor AUTO
+            </Link>
+            .
+          </p>
+        </section>
 
-      <section className="space-y-2" aria-labelledby="auto-sistema-recon">
-        <AutoSectionBlockHeading id="auto-sistema-recon">
-          Reconciliación
-        </AutoSectionBlockHeading>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <OpsReconSection report={selfEval.data} />
-          <OpsLifecycleReconSection
-            report={lifecycle.data}
-            isLoading={lifecycle.isLoading}
-            isError={lifecycle.isError}
-            error={lifecycle.error}
-          />
-        </div>
-      </section>
+        <section className="space-y-2" aria-labelledby="auto-sistema-broker">
+          <AutoSectionBlockHeading id="auto-sistema-broker">
+            Broker / ejecución
+          </AutoSectionBlockHeading>
+          <p className="text-muted-foreground">
+            Ejecución declarada vs habilitada y modelo de protección en la salud
+            de arriba; estado de cuenta y P&amp;L en el{" "}
+            <Link to="/trading" className="underline hover:text-primary">
+              terminal de Mercado
+            </Link>
+            .
+          </p>
+        </section>
+
+        <section className="space-y-2" aria-labelledby="auto-sistema-recon">
+          <AutoSectionBlockHeading id="auto-sistema-recon">
+            Reconciliación
+          </AutoSectionBlockHeading>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <OpsReconSection report={selfEval.data} />
+            <OpsLifecycleReconSection
+              report={lifecycle.data}
+              isLoading={lifecycle.isLoading}
+              isError={lifecycle.isError}
+              error={lifecycle.error}
+            />
+          </div>
+        </section>
+      </AutoTechnicalDetail>
 
       <section className="space-y-2" aria-labelledby="auto-sistema-auditoria">
         <AutoSectionBlockHeading id="auto-sistema-auditoria">

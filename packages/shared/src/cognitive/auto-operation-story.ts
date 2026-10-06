@@ -53,8 +53,12 @@ export type AutoOperationStoryKind =
   | "CONTEXT"
   | "EXPLANATION";
 
-/** Bloque al que pertenece: hechos de la operación vs contexto que la originó. */
-export type AutoOperationStoryGroup = "OPERATION" | "CONTEXT";
+/**
+ * Bloque al que pertenece. `OPERATION` = hechos de esta operación; `CONTEXT` = lo que la originó;
+ * `EXPLANATION` = conocimiento cross-ciclo (DÍA-D/OOS), que **no** es un hecho del ciclo y por eso
+ * no vive dentro de `OPERATION` (spec AUTO UI REFACTOR 3.0 §3.1).
+ */
+export type AutoOperationStoryGroup = "OPERATION" | "CONTEXT" | "EXPLANATION";
 
 const STORY_STATE_LABELS: Record<AutoOperationStoryState, string> = {
   REACHED: "alcanzado",
@@ -292,10 +296,12 @@ const STORY_STAGE_SPECS: readonly StageSpec[] = [
     sourceStepId: "CYCLE_CLOSED",
   },
   {
+    // `EXPLANATION` es conocimiento cross-ciclo (DÍA-D/OOS): NO es un hecho de este ciclo, así que
+    // tiene grupo propio y no se pinta dentro de la historia de la operación (spec 3.0 §3.1).
     id: "EXPLANATION",
     label: "Explicación",
     kind: "EXPLANATION",
-    group: "OPERATION",
+    group: "EXPLANATION",
     sourceStepId: null,
   },
 ];

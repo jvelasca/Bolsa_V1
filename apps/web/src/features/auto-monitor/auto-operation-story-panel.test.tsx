@@ -1,9 +1,10 @@
 /**
- * AUTO UI REFACTOR 1.0 — piloto de la "operación única".
+ * AUTO UI REFACTOR 3.0 — operación única en tres bloques.
  *
- * Monta el panel real con la API mockeada y comprueba que las 13 etapas de OPERACIÓN se pintan en
- * orden (sin OPPORTUNITY, que va al bloque `context`), que un paso sin traza se rotula NO MEDIDO y
- * que la etapa EXPLANATION enlaza al heatmap DÍA-D con símbolo/ventana preseleccionados.
+ * Monta el panel real con la API mockeada y comprueba que los hechos de OPERACIÓN se pintan en
+ * orden (sin OPPORTUNITY, que va al bloque `context`, y sin EXPLANATION, que va a «Qué
+ * aprendemos»), que un paso sin traza se rotula, y que la etapa EXPLANATION enlaza al heatmap
+ * DÍA-D con símbolo/ventana preseleccionados.
  */
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -194,7 +195,7 @@ afterEach(() => {
 });
 
 describe("AutoOperationStoryPanel", () => {
-  it("pinta las 12 filas de operación (OPPORTUNITY fuera, EXIT plegado)", async () => {
+  it("pinta las 11 filas de operación (OPPORTUNITY fuera, EXIT plegado, EXPLANATION aparte)", async () => {
     renderPanel();
 
     // El selector de ciclos sólo aparece con el monitor cargado: esperar a él evita asertar
@@ -216,9 +217,9 @@ describe("AutoOperationStoryPanel", () => {
       "PROTECTION",
       "SETTLEMENT",
       "RESULT",
-      "EXPLANATION",
     ]);
-    // Todas son hechos de la operación: OPPORTUNITY vive en el bloque `context`.
+    // Todas son hechos de la operación: OPPORTUNITY vive en el bloque `context` y EXPLANATION
+    // (cross-ciclo) vive en su propio bloque «¿Qué aprendemos?».
     expect(
       stages.every((stage) => stage.getAttribute("data-group") === "OPERATION"),
     ).toBe(true);
@@ -258,30 +259,32 @@ describe("AutoOperationStoryPanel", () => {
     expect(pit?.textContent).toContain("NO MEDIDO");
   });
 
-  it("resuelve la explicación por cycleId (índice `cycles[]`) y la pliega", async () => {
+  it("resuelve la explicación por cycleId (índice `cycles[]`) y la lleva a «Qué aprendemos»", async () => {
     renderPanel();
 
     await waitFor(() =>
       expect(
         screen
-          .getAllByTestId("auto-operation-story-stage")
-          .find((stage) => stage.getAttribute("data-stage") === "EXPLANATION")
-          ?.getAttribute("data-state"),
+          .getByTestId("auto-operation-story-explanation")
+          .getAttribute("data-state"),
       ).toBe("REACHED"),
     );
 
-    const explanation = screen
-      .getAllByTestId("auto-operation-story-stage")
-      .find((stage) => stage.getAttribute("data-stage") === "EXPLANATION");
-    expect(explanation?.textContent).toContain("OOS_SUPPORTED");
+    const explanation = screen.getByTestId("auto-operation-story-explanation");
+    // Vive en su propio bloque, no entre los hechos de la operación.
+    expect(explanation.getAttribute("data-group")).toBe("EXPLANATION");
+    expect(
+      screen.getByTestId("auto-operation-story-learning").textContent,
+    ).toContain("¿Qué aprendemos?");
+    expect(explanation.textContent).toContain("OOS_SUPPORTED");
     // Identidad de la operación: ejes copiados del ciclo + NO MEDIDO en lo no material.
-    expect(explanation?.textContent).toContain("cycleId");
-    expect(explanation?.textContent).toContain("cyc-1");
-    expect(explanation?.textContent).toContain("2026-09-29");
-    expect(explanation?.textContent).toContain("NO MEDIDO");
+    expect(explanation.textContent).toContain("cycleId");
+    expect(explanation.textContent).toContain("cyc-1");
+    expect(explanation.textContent).toContain("2026-09-29");
+    expect(explanation.textContent).toContain("NO MEDIDO");
     // El índice `cycles[]` ata el ciclo a su valor: resolución EXACTA por cycleId (no por símbolo).
-    expect(explanation?.textContent).toContain("resolución");
-    expect(explanation?.textContent).toContain("por ciclo (cycleId)");
+    expect(explanation.textContent).toContain("resolución");
+    expect(explanation.textContent).toContain("por ciclo (cycleId)");
   });
 
   it("enlaza la EXPLICACIÓN al heatmap DÍA-D canónico (workspace AUTO) con símbolo y ventana", async () => {

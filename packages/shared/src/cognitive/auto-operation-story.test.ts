@@ -87,6 +87,7 @@ describe("buildAutoOperationStory", () => {
     expect(byId.get("POSITION")?.kind).toBe("DERIVED");
     expect(byId.get("EXIT")?.kind).toBe("DERIVED");
     expect(byId.get("EXPLANATION")?.kind).toBe("EXPLANATION");
+    expect(byId.get("EXPLANATION")?.group).toBe("EXPLANATION");
     expect(byId.get("SIGNAL")?.kind).toBe("FACT");
     expect(byId.get("EXIT")?.group).toBe("OPERATION");
 
@@ -95,6 +96,12 @@ describe("buildAutoOperationStory", () => {
       (stage) => stage.group === "CONTEXT",
     );
     expect(contextStages.map((stage) => stage.id)).toEqual(["OPPORTUNITY"]);
+    // La explicación es conocimiento cross-ciclo: no se mezcla con los hechos.
+    expect(
+      story.stages
+        .filter((stage) => stage.group === "OPERATION")
+        .map((s) => s.id),
+    ).not.toContain("EXPLANATION");
   });
 
   it("copia los pasos durables con su estado y sus hechos", () => {

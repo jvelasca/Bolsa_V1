@@ -36,10 +36,10 @@ describe("AutoAnalisisPage — tabs ARIA", () => {
 
     const tabs = screen.getAllByRole("tab");
     expect(tabs.map((t) => t.textContent)).toEqual([
-      "DÍA-D",
-      "Evidencia",
-      "Estrategias",
-      "Investigación",
+      "¿Qué ha pasado?",
+      "¿Por qué?",
+      "¿Está funcionando?",
+      "¿Qué aprendemos?",
     ]);
 
     const active = screen.getByTestId("auto-analisis-tab-dia-d");

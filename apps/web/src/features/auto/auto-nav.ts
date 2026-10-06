@@ -13,10 +13,13 @@
 /** Nombre de producto del espacio. */
 export const AUTO_LABEL = "AUTO" as const;
 
-/** Raíz del espacio (redirige a la sección por defecto). */
+/** Raíz del espacio: HOME / cockpit (responde las 4 preguntas del usuario básico). */
 export const AUTO_ROOT_PATH = "/auto" as const;
 
-/** Sección por defecto (la historia de operación es la vista de trabajo). */
+/** HOME del cockpit (misma ruta que la raíz; alias legible en el código de producto). */
+export const AUTO_HOME_PATH = AUTO_ROOT_PATH;
+
+/** Sección por defecto: la historia de operación es la vista de trabajo. */
 export const AUTO_OPERAR_PATH = "/auto/operar" as const;
 export const AUTO_CARTERA_PATH = "/auto/cartera" as const;
 export const AUTO_RIESGO_PATH = "/auto/riesgo" as const;
@@ -34,6 +37,7 @@ export const AUTO_OPERACION_BASE_PATH = "/auto/operar/operacion" as const;
 export const AUTO_MONITOR_PATH = "/auto-monitor" as const;
 
 export const AUTO_SECTION = {
+  home: "home",
   operar: "operar",
   cartera: "cartera",
   riesgo: "riesgo",
@@ -50,10 +54,16 @@ export type AutoNavItem = {
   hint: string;
 };
 
-/** Sub-navegación del espacio AUTO (orden de producto). */
+/** Sub-navegación del espacio AUTO (orden de producto): HOME primero. */
 export const AUTO_NAV: { label: string; items: readonly AutoNavItem[] } = {
   label: AUTO_LABEL,
   items: [
+    {
+      id: AUTO_SECTION.home,
+      label: "Resumen",
+      path: AUTO_HOME_PATH,
+      hint: "Qué está haciendo AUTO, qué puedes hacer y qué ha pasado",
+    },
     {
       id: AUTO_SECTION.operar,
       label: "Operar",
@@ -129,19 +139,21 @@ export function autoDiaDHref(input?: {
  */
 export function autoSectionFromPathname(pathname: string): AutoNavItem | null {
   if (pathname === AUTO_ROOT_PATH) {
-    return (
-      AUTO_NAV.items.find((item) => item.id === AUTO_SECTION.operar) ?? null
-    );
+    return AUTO_NAV.items.find((item) => item.id === AUTO_SECTION.home) ?? null;
   }
   const target =
     pathname.startsWith(`${AUTO_OPERACION_BASE_PATH}/`) ||
     pathname === AUTO_OPERACION_BASE_PATH
       ? AUTO_OPERAR_PATH
       : pathname;
+  // La HOME vive en `/auto` (raíz): no participa en el `startsWith` por sección, o su path
+  // `/auto` absorbería cualquier `/auto/<sección>`.
   return (
-    AUTO_NAV.items.find(
-      (item) => target === item.path || target.startsWith(`${item.path}/`),
-    ) ?? null
+    AUTO_NAV.items
+      .filter((item) => item.id !== AUTO_SECTION.home)
+      .find(
+        (item) => target === item.path || target.startsWith(`${item.path}/`),
+      ) ?? null
   );
 }
 

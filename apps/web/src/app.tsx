@@ -33,7 +33,7 @@ import { TaxReportPage } from "@/features/fiscal/tax-report-page";
 import { OperationalConsolePage } from "@/features/operational-console/operational-console-page";
 import { AutoMonitorPage } from "@/features/auto-monitor/auto-monitor-page";
 import { AutoWorkspaceLayout } from "@/components/layout/auto-workspace-layout";
-import { AUTO_OPERAR_PATH } from "@/features/auto/auto-nav";
+import { AutoHomePage } from "@/features/auto/auto-home-page";
 import { AutoOperarPage } from "@/features/auto/auto-operar-page";
 import { AutoOperacionPage } from "@/features/auto/auto-operacion-page";
 import { AutoCarteraPage } from "@/features/auto/auto-cartera-page";
@@ -108,7 +108,7 @@ const router = createBrowserRouter([
         path: "auto",
         element: <AutoWorkspaceLayout />,
         children: [
-          { index: true, element: <Navigate to={AUTO_OPERAR_PATH} replace /> },
+          { index: true, element: <AutoHomePage /> },
           { path: "operar", element: <AutoOperarPage /> },
           {
             path: "operar/operacion/:cycleId",

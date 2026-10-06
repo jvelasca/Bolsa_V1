@@ -26,9 +26,10 @@ import {
 import { DAILY_NAV_ORDER, MESA_LABEL } from "@/features/confirm/daily-nav";
 
 describe("auto-nav — contrato de secciones", () => {
-  it("expone las cinco secciones en orden de producto", () => {
+  it("expone las seis secciones en orden de producto (HOME primero)", () => {
     expect(AUTO_NAV.label).toBe("AUTO");
     expect(AUTO_NAV.items.map((i) => i.id)).toEqual([
+      "home",
       "operar",
       "cartera",
       "riesgo",
@@ -36,6 +37,7 @@ describe("auto-nav — contrato de secciones", () => {
       "sistema",
     ]);
     expect(AUTO_NAV.items.map((i) => i.label)).toEqual([
+      "Resumen",
       "Operar",
       "Cartera",
       "Riesgo",
@@ -47,7 +49,9 @@ describe("auto-nav — contrato de secciones", () => {
   it("vive bajo /auto y no colisiona con las puertas L1 (ADR-040)", () => {
     expect(AUTO_ROOT_PATH).toBe("/auto");
     for (const item of AUTO_NAV.items) {
-      expect(item.path.startsWith("/auto/")).toBe(true);
+      expect(item.path === "/auto" || item.path.startsWith("/auto/")).toBe(
+        true,
+      );
     }
     expect(AUTO_OPERAR_PATH).toBe("/auto/operar");
     expect(AUTO_CARTERA_PATH).toBe("/auto/cartera");
@@ -101,7 +105,7 @@ describe("auto-nav — contrato de secciones", () => {
   });
 
   it("resuelve la sección activa desde el pathname", () => {
-    expect(autoSectionFromPathname("/auto")?.id).toBe("operar");
+    expect(autoSectionFromPathname("/auto")?.id).toBe("home");
     expect(autoSectionFromPathname("/auto/operar")?.id).toBe("operar");
     expect(autoSectionFromPathname("/auto/operar/operacion/cyc-1")?.id).toBe(
       "operar",
@@ -112,6 +116,7 @@ describe("auto-nav — contrato de secciones", () => {
   });
 
   it("etiqueta secciones por id", () => {
+    expect(autoSectionLabel("home")).toBe("Resumen");
     expect(autoSectionLabel("operar")).toBe("Operar");
     expect(autoSectionLabel("analisis")).toBe("Análisis");
   });

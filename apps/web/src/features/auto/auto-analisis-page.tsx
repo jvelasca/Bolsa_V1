@@ -16,11 +16,15 @@ import { OpsAutoEvidenceSection } from "@/features/operational-console/auto-evid
 import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
 import { cn } from "@/lib/utils";
 
+/**
+ * Pestañas como PREGUNTAS del usuario (spec 3.0 §5): mismas 4 vistas y misma URL (`?tab=`), sólo
+ * cambia la semántica visual. El `id` NO cambia (los deep-links `tab=dia-d` siguen siendo válidos).
+ */
 const ANALISIS_TABS = [
-  { id: "dia-d", label: "DÍA-D" },
-  { id: "evidencia", label: "Evidencia" },
-  { id: "estrategias", label: "Estrategias" },
-  { id: "investigacion", label: "Investigación" },
+  { id: "dia-d", label: "¿Qué ha pasado?" },
+  { id: "evidencia", label: "¿Por qué?" },
+  { id: "estrategias", label: "¿Está funcionando?" },
+  { id: "investigacion", label: "¿Qué aprendemos?" },
 ] as const;
 
 type AnalisisTabId = (typeof ANALISIS_TABS)[number]["id"];
@@ -82,7 +86,7 @@ export function AutoAnalisisPage() {
 
       <div
         role="tablist"
-        aria-label="Secciones de análisis"
+        aria-label="Preguntas de análisis"
         className="flex flex-wrap gap-1 border-b border-border pb-2"
       >
         {ANALISIS_TABS.map((item) => (

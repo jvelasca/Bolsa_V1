@@ -39,3 +39,18 @@ export function plainStageLabel(id: string, technicalLabel: string): string {
     AUTO_STORY_PLAIN_LABELS[id as AutoOperationStoryStageId] ?? technicalLabel
   );
 }
+
+/**
+ * Estado de una etapa en lenguaje de usuario (nivel 1). `NO MEDIDO` es el término correcto de
+ * auditoría, pero no de usuario: en primer nivel se declara «Sin dato todavía» (spec 3.0 §1.9).
+ */
+export const AUTO_STORY_PLAIN_STATE_LABELS: Record<string, string> = {
+  REACHED: "Hecho",
+  PENDING: "Pendiente",
+  ABSENT: "No ocurrió",
+  NOT_MEASURED: "Sin dato todavía",
+};
+
+export function plainStateLabel(state: string, technicalLabel: string): string {
+  return AUTO_STORY_PLAIN_STATE_LABELS[state] ?? technicalLabel;
+}

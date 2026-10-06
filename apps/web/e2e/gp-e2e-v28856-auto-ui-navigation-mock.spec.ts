@@ -2,7 +2,7 @@
  * V2.88.56 — AUTO UI REFACTOR 2.1: navegación canónica del espacio AUTO.
  *
  * Certifica de extremo a extremo el defecto P2 de la auditoría `v2.88.55`:
- *   - `/auto` → `/auto/operar` → `/auto/operar/operacion/:cycleId`
+ *   - `/auto` → HOME (cockpit) → `/auto/operar` → `/auto/operar/operacion/:cycleId`
  *   - "Detalle técnico" → `/auto-monitor?mode=current&cycle=...` (monitor experto)
  *   - "Ver heatmap" → `/auto/analisis?tab=dia-d&view=feedback&window=...&symbol=...`
  *   - invariantes ADR-044: un único `<main>` (sin el keep-alive de Backtests) y un `h1` por ruta.
@@ -43,7 +43,14 @@ test.describe("GP-E2E-V28856 — AUTO UI 2.1 navigation", () => {
   }) => {
     await page.goto("/auto");
 
-    // `/auto` redirige a la sección por defecto.
+    // `/auto` monta la HOME / cockpit (deja de redirigir a Operar).
+    await expect(page).toHaveURL(/\/auto$/);
+    await expect(page.getByTestId("auto-home-page")).toBeVisible();
+    await expectSingleMain(page);
+    await expectSingleH1(page);
+
+    // Desde la HOME se navega a las operaciones.
+    await page.getByTestId("auto-home-all-operations-link").click();
     await expect(page).toHaveURL(/\/auto\/operar$/);
     await expect(page.getByTestId("auto-operar-page")).toBeVisible();
     await expectSingleMain(page);
@@ -113,6 +120,7 @@ test.describe("GP-E2E-V28856 — AUTO UI 2.1 navigation", () => {
     page,
   }) => {
     const routes = [
+      "/auto",
       "/auto/operar",
       "/auto/cartera",
       "/auto/riesgo",

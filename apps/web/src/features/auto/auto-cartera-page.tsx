@@ -23,6 +23,18 @@ export function AutoCarteraPage() {
         description={AUTO_SECTION_COPY.cartera.description}
       />
 
+      <div
+        role="note"
+        data-testid="auto-cartera-demo-banner"
+        className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+      >
+        <p className="font-semibold">CARTERA DEMO — posiciones simuladas</p>
+        <p className="text-muted-foreground">
+          No se envían órdenes reales a XTB. Reducir o salir encola una
+          propuesta; Confirm es la única firma.
+        </p>
+      </div>
+
       <section className="space-y-2" aria-labelledby="auto-cartera-ops-heading">
         <AutoSectionBlockHeading id="auto-cartera-ops-heading">
           Posiciones y órdenes
