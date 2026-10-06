@@ -2,6 +2,14 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.63-beta] — `NÚCLEO`: **el test M0 vigila el worker AUTO**
+
+**Bump** `2.11.62-beta` → `2.11.63-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). **`Δ AUTO decision/execution motor = 0`**. **Contrato HTTP sin cambio.**
+
+- El test `test_a8_m0_auto_live_invariant` deja de mirar solo `bolsa_application`. También parsea `apps/api-python/src/bolsa_api/background/auto_simulation_worker.py` y falla si ese fichero importa o nombra `IBrokerAdapter`, `resolve_broker_adapter` o `XtbBrokerAdapter`.
+- **Tests.** `pytest packages/py/application/tests/test_a8_m0_auto_live_invariant.py` **12 passed**.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.63/README.md`](docs/engineering/evidence/v2.88.63/README.md).
+
 ## [2.11.62-beta] — `AUTO · UI`: **AUTO UI REFACTOR 3.0 — USER-FIRST COCKPIT** (HOME + Operación 3.0 + dos niveles + `axe`)
 
 **Bump** `2.11.61-beta` → `2.11.62-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello **de UI/read-model**: **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP sin cambio**. **NO** se re-mide `DÍA-D`: las cifras OOS se **heredan y citan**. Ejecuta el plan **AUTO UI REFACTOR 3.0 (S0–S4) como una ventana** y lo sella **una vez** (precedente del repo de absorber fases: `v2.88.61` absorbió la F5 de `v2.88.60`); los números `v2.88.63/64/65` del plan no se emiten.

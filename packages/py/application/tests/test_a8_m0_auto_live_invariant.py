@@ -19,6 +19,16 @@ from pathlib import Path
 import pytest
 
 _PKG = Path(__file__).resolve().parents[1] / "src" / "bolsa_application"
+_REPO = Path(__file__).resolve().parents[4]
+_WORKER = (
+    _REPO
+    / "apps"
+    / "api-python"
+    / "src"
+    / "bolsa_api"
+    / "background"
+    / "auto_simulation_worker.py"
+)
 _BROKER_MODULE = "bolsa_application.broker_adapter"
 # Símbolos de la vía real (money). Ningún módulo AUTO puede importarlos/referirlos.
 _MONEY_SYMBOLS = {"IBrokerAdapter", "resolve_broker_adapter", "XtbBrokerAdapter"}
@@ -36,6 +46,10 @@ _AUTO_MODULES = [
     "paper_daily_report.py",              # reporte diario PAPER (read-only)
     "evaluate_exit_plan.py",              # plan de salida
 ]
+
+# (ruta, nombre que sale en el fallo). El worker vive fuera de bolsa_application.
+_AUTO_PATHS: list[tuple[Path, str]] = [(_PKG / name, name) for name in _AUTO_MODULES]
+_AUTO_PATHS.append((_WORKER, "auto_simulation_worker.py"))
 
 
 def _imported_money_symbols(tree: ast.AST) -> set[str]:
@@ -59,9 +73,14 @@ def _imported_money_symbols(tree: ast.AST) -> set[str]:
     return found
 
 
-@pytest.mark.parametrize("module_name", _AUTO_MODULES)
-def test_auto_module_never_references_live_broker_money_path(module_name: str) -> None:
-    path = _PKG / module_name
+@pytest.mark.parametrize(
+    ("path", "module_name"),
+    _AUTO_PATHS,
+    ids=[name for _, name in _AUTO_PATHS],
+)
+def test_auto_module_never_references_live_broker_money_path(
+    path: Path, module_name: str
+) -> None:
     if not path.exists():
         pytest.skip(f"módulo {module_name} no presente")
     source = path.read_text(encoding="utf-8")
