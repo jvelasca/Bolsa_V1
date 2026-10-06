@@ -128,7 +128,13 @@ describe("buildAutoBasicHome", () => {
 
   it("la fase operacional del tick se traduce y no se inventa desde RUNNING", () => {
     const home = buildAutoBasicHome({
-      header: { state: "RUNNING", currentActivity: "ANALYZING" },
+      header: {
+        state: "RUNNING",
+        currentActivity: "ANALYZING",
+        currentActivityMeasurement: "COMPLETE",
+        currentActivityAt: "2026-10-06T09:42:00Z",
+        asOf: "2026-10-06T09:43:00Z",
+      },
       cycles: [],
     });
     expect(home.doingLabel).toBe("Analizando");
@@ -142,11 +148,43 @@ describe("buildAutoBasicHome", () => {
     expect(noActivity.doingLabel).not.toBe("Analizando");
 
     const idle = buildAutoBasicHome({
-      header: { state: "RUNNING", currentActivity: "NO_ACTIVITY" },
+      header: {
+        state: "RUNNING",
+        currentActivity: "NO_ACTIVITY",
+        currentActivityMeasurement: "COMPLETE",
+        currentActivityAt: "2026-10-06T09:42:00Z",
+        asOf: "2026-10-06T09:43:00Z",
+      },
       cycles: [],
     });
     expect(idle.doingLabel).toBe("Sin actividad");
     expect(idle.doingLabel).not.toBe(AUTO_HOME_NO_DATA_LABEL);
+  });
+
+  it("una fase con medición UNKNOWN o antigua no se afirma", () => {
+    const unknown = buildAutoBasicHome({
+      header: {
+        state: "RUNNING",
+        currentActivity: "ANALYZING",
+        currentActivityMeasurement: "UNKNOWN",
+        currentActivityAt: "2026-10-06T09:42:00Z",
+        asOf: "2026-10-06T09:43:00Z",
+      },
+      cycles: [],
+    });
+    expect(unknown.doingLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+
+    const stale = buildAutoBasicHome({
+      header: {
+        state: "RUNNING",
+        currentActivity: "ANALYZING",
+        currentActivityMeasurement: "COMPLETE",
+        currentActivityAt: "2026-10-06T09:00:00Z",
+        asOf: "2026-10-06T09:30:00Z",
+      },
+      cycles: [],
+    });
+    expect(stale.doingLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
   });
 
   it("una reserva o un cierre no medido no son una operación en curso", () => {

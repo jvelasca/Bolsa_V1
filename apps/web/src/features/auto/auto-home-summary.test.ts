@@ -13,6 +13,7 @@ import {
   decisionClockCopy,
   engineStateLabel,
   formatActivityTime,
+  isActivityStale,
   isOperationInCourse,
   isOperationOpen,
 } from "@/features/auto/auto-home-summary";
@@ -32,26 +33,61 @@ describe("formatActivityTime", () => {
 
 describe("activityLabel", () => {
   it("traduce solo el conjunto cerrado de fases operacionales", () => {
-    expect(activityLabel("ANALYZING")).toBe("Analizando");
-    expect(activityLabel("WAITING_SIGNAL")).toBe("Esperando señal");
-    expect(activityLabel("PREPARING_OPERATION")).toBe("Preparando operación");
-    expect(activityLabel("WAITING_EXECUTION")).toBe("Esperando ejecución");
-    expect(activityLabel("APPLYING_RESULT")).toBe("Aplicando resultado");
-    expect(activityLabel("NO_ACTIVITY")).toBe("Sin actividad");
-    expect(activityLabel("BLOCKED")).toBe("Bloqueado");
+    expect(activityLabel("ANALYZING", "COMPLETE")).toBe("Analizando");
+    expect(activityLabel("WAITING_SIGNAL", "COMPLETE")).toBe("Esperando señal");
+    expect(activityLabel("PREPARING_OPERATION", "COMPLETE")).toBe(
+      "Preparando operación",
+    );
+    expect(activityLabel("WAITING_EXECUTION", "COMPLETE")).toBe(
+      "Esperando ejecución",
+    );
+    expect(activityLabel("APPLYING_RESULT", "COMPLETE")).toBe(
+      "Aplicando resultado",
+    );
+    expect(activityLabel("NO_ACTIVITY", "COMPLETE")).toBe("Sin actividad");
+    expect(activityLabel("BLOCKED", "COMPLETE")).toBe("Bloqueado");
   });
 
   it("un token fuera del conjunto o ausente es Sin dato todavía", () => {
-    expect(activityLabel(null)).toBe(AUTO_HOME_NO_DATA_LABEL);
-    expect(activityLabel(undefined)).toBe(AUTO_HOME_NO_DATA_LABEL);
-    expect(activityLabel("")).toBe(AUTO_HOME_NO_DATA_LABEL);
-    expect(activityLabel("RUNNING")).toBe(AUTO_HOME_NO_DATA_LABEL);
-    expect(activityLabel("SLEEPING")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel(null, "COMPLETE")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel(undefined, "COMPLETE")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel("", "COMPLETE")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel("RUNNING", "COMPLETE")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel("SLEEPING", "COMPLETE")).toBe(AUTO_HOME_NO_DATA_LABEL);
+  });
+
+  it("un dato presente con medición no COMPLETE no se afirma", () => {
+    expect(activityLabel("ANALYZING", "UNKNOWN")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel("ANALYZING", "PARTIAL")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel("ANALYZING", null)).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel("ANALYZING", undefined)).toBe(AUTO_HOME_NO_DATA_LABEL);
   });
 
   it("Sin actividad es un hecho, no un hueco", () => {
-    expect(activityLabel("NO_ACTIVITY")).toBe("Sin actividad");
-    expect(activityLabel("NO_ACTIVITY")).not.toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(activityLabel("NO_ACTIVITY", "COMPLETE")).toBe("Sin actividad");
+    expect(activityLabel("NO_ACTIVITY", "COMPLETE")).not.toBe(
+      AUTO_HOME_NO_DATA_LABEL,
+    );
+  });
+});
+
+describe("isActivityStale", () => {
+  it("una actividad dentro de la ventana de frescura no es antigua", () => {
+    expect(
+      isActivityStale("2026-10-06T09:00:00Z", "2026-10-06T09:04:00Z"),
+    ).toBe(false);
+  });
+
+  it("una actividad más vieja que la ventana se considera antigua", () => {
+    expect(
+      isActivityStale("2026-10-06T09:00:00Z", "2026-10-06T09:06:00Z"),
+    ).toBe(true);
+  });
+
+  it("sin sello de actividad o sin asOf es antigua (fail-closed)", () => {
+    expect(isActivityStale(null, "2026-10-06T09:06:00Z")).toBe(true);
+    expect(isActivityStale("2026-10-06T09:00:00Z", null)).toBe(true);
+    expect(isActivityStale("ilegible", "2026-10-06T09:06:00Z")).toBe(true);
   });
 });
 
@@ -258,6 +294,9 @@ describe("buildAutoHomeSummary", () => {
       header: {
         state: "RUNNING",
         currentActivity: "ANALYZING",
+        currentActivityMeasurement: "COMPLETE",
+        currentActivityAt: "2026-10-06T09:42:00Z",
+        asOf: "2026-10-06T09:43:00Z",
         lastDecisionAt: "2026-10-06T09:42:00Z",
       },
       cycles: [],
@@ -273,6 +312,32 @@ describe("buildAutoHomeSummary", () => {
       cycles: [],
     });
     expect(withoutActivity.activityLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+  });
+
+  it("una actividad con medición UNKNOWN o antigua no se afirma", () => {
+    const unknown = buildAutoHomeSummary({
+      header: {
+        state: "RUNNING",
+        currentActivity: "ANALYZING",
+        currentActivityMeasurement: "UNKNOWN",
+        currentActivityAt: "2026-10-06T09:42:00Z",
+        asOf: "2026-10-06T09:43:00Z",
+      },
+      cycles: [],
+    });
+    expect(unknown.activityLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+
+    const stale = buildAutoHomeSummary({
+      header: {
+        state: "RUNNING",
+        currentActivity: "ANALYZING",
+        currentActivityMeasurement: "COMPLETE",
+        currentActivityAt: "2026-10-06T09:00:00Z",
+        asOf: "2026-10-06T09:30:00Z",
+      },
+      cycles: [],
+    });
+    expect(stale.activityLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
   });
 
   it("un RUNNING no se traduce a Analizando", () => {

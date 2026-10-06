@@ -4362,6 +4362,13 @@ export interface components {
             asOf: string;
             /** Currentactivity */
             currentActivity?: string | null;
+            /** Currentactivityat */
+            currentActivityAt?: string | null;
+            /**
+             * Currentactivityatmeasurement
+             * @default UNKNOWN
+             */
+            currentActivityAtMeasurement: string;
             /**
              * Currentactivitymeasurement
              * @default UNKNOWN

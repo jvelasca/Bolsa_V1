@@ -43,6 +43,13 @@ export type AutoHomeHeaderFacts = {
   nextDecisionAt?: string | null;
   /** Fase operacional real del último tick (telemetría); ausente = «Sin dato todavía». */
   currentActivity?: string | null;
+  /** Medición del `currentActivity`: un valor presente con `UNKNOWN` no se afirma. */
+  currentActivityMeasurement?: string | null;
+  /** Instante del `currentActivity` (telemetría); gobierna la frescura. */
+  currentActivityAt?: string | null;
+  currentActivityAtMeasurement?: string | null;
+  /** Sello del monitor, para la política de frescura de la actividad. */
+  asOf?: string | null;
 };
 
 export type AutoHomeSummaryInput = {
@@ -140,13 +147,45 @@ const ACTIVITY_LABELS: Readonly<Record<string, string>> = {
 };
 
 /**
- * Traduce `currentActivity` solo si el token está en el conjunto cerrado.
- * Un valor ausente o fuera de la tabla es «Sin dato todavía». NUNCA se deriva de
+ * Traduce `currentActivity` solo si el token está en el conjunto cerrado **y** la medición es
+ * `COMPLETE`. Un valor ausente, fuera de la tabla o con medición `UNKNOWN`/`PARTIAL` es
+ * «Sin dato todavía»: un dato presente NO equivale a un dato medido. NUNCA se deriva de
  * `RUNNING`: «Sin actividad» (``NO_ACTIVITY``) es un hecho, no un hueco.
  */
-export function activityLabel(value: string | null | undefined): string {
-  if (value == null) return AUTO_HOME_NO_DATA_LABEL;
+export function activityLabel(
+  value: string | null | undefined,
+  measurement: string | null | undefined,
+): string {
+  if (value == null || value === "") return AUTO_HOME_NO_DATA_LABEL;
+  if ((measurement ?? "UNKNOWN") !== "COMPLETE") return AUTO_HOME_NO_DATA_LABEL;
   return ACTIVITY_LABELS[value.trim().toUpperCase()] ?? AUTO_HOME_NO_DATA_LABEL;
+}
+
+/**
+ * Antigüedad máxima de `currentActivity` para considerarla actual (segundos).
+ * Política de frescura afinable: una actividad más vieja no se presenta como actual.
+ */
+export const AUTO_ACTIVITY_MAX_AGE_SECONDS = 300;
+
+/** Parsea un sello ISO UTC ``…Z`` a epoch-ms; ``null`` si ausente o ilegible. */
+function isoEpochMs(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
+ * ¿Está la actividad DEMASIADO vieja para presentarse como actual?
+ * Fail-closed: sin sello de actividad o sin `asOf` se considera antigua (no se afirma).
+ */
+export function isActivityStale(
+  activityAt: string | null | undefined,
+  asOf: string | null | undefined,
+): boolean {
+  const at = isoEpochMs(activityAt);
+  const as = isoEpochMs(asOf);
+  if (at === null || as === null) return true;
+  return (as - at) / 1000 > AUTO_ACTIVITY_MAX_AGE_SECONDS;
 }
 
 /**
@@ -209,6 +248,13 @@ export function buildAutoHomeSummary(
   const lastDecisionAt = loaded ? header?.lastDecisionAt : null;
   const nextDecisionAt = loaded ? header?.nextDecisionAt : null;
   const currentActivity = loaded ? header?.currentActivity : null;
+  const currentActivityMeasurement = loaded
+    ? header?.currentActivityMeasurement
+    : null;
+  const currentActivityAt = loaded ? header?.currentActivityAt : null;
+  const asOf = loaded ? header?.asOf : null;
+
+  const activityStale = isActivityStale(currentActivityAt, asOf);
 
   const inCourseOperationsCount = (input.cycles ?? []).filter(
     isOperationInCourse,
@@ -228,7 +274,9 @@ export function buildAutoHomeSummary(
     nextStepLabel: nextDecisionAt
       ? `Próxima decisión: ${formatActivityTime(nextDecisionAt)}`
       : AUTO_HOME_NO_DATA_LABEL,
-    activityLabel: activityLabel(currentActivity),
+    activityLabel: activityStale
+      ? AUTO_HOME_NO_DATA_LABEL
+      : activityLabel(currentActivity, currentActivityMeasurement),
     inCourseOperationsCount,
     inCourseOperationsLabel: inCourseOperationsLabel(inCourseOperationsCount),
     hasOperationsInCourse: inCourseOperationsCount > 0,

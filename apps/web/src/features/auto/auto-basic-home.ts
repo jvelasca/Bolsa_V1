@@ -11,6 +11,7 @@ import {
   AUTO_HOME_NO_DATA_LABEL,
   activityLabel,
   engineStateLabel,
+  isActivityStale,
   isOperationInCourse,
 } from "@/features/auto/auto-home-summary";
 
@@ -49,6 +50,11 @@ export type AutoBasicHomeInput = {
     state?: string | null;
     /** Fase operacional real del último tick (telemetría); ausente = «Sin dato todavía». */
     currentActivity?: string | null;
+    /** Medición del `currentActivity`: un valor presente con `UNKNOWN` no se afirma. */
+    currentActivityMeasurement?: string | null;
+    /** Instante del `currentActivity` (telemetría); gobierna la frescura. */
+    currentActivityAt?: string | null;
+    asOf?: string | null;
   } | null;
   cycles?: readonly AutoBasicCycle[] | null;
 };
@@ -181,7 +187,12 @@ export function buildAutoBasicHome(input: AutoBasicHomeInput): AutoBasicHomeV1 {
       ? engineStateLabel(input.header?.state)
       : AUTO_HOME_NO_DATA_LABEL,
     doingLabel: loaded
-      ? activityLabel(input.header?.currentActivity)
+      ? isActivityStale(input.header?.currentActivityAt, input.header?.asOf)
+        ? AUTO_HOME_NO_DATA_LABEL
+        : activityLabel(
+            input.header?.currentActivity,
+            input.header?.currentActivityMeasurement,
+          )
       : AUTO_HOME_NO_DATA_LABEL,
     assetLabel: loaded ? assetLabel : AUTO_HOME_NO_DATA_LABEL,
     decisionLabel: AUTO_HOME_NO_DATA_LABEL,

@@ -2,6 +2,16 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.80-beta] — `AUTO · UI`: **sello de la telemetría operacional (P1 + P2 + P3)**
+
+**Bump** `2.11.79-beta` → `2.11.80-beta`. **Sin migración nueva** (reutiliza `051_auto_engine_activity`). **Contrato HTTP con cambio aditivo** (`currentActivityAt` + `currentActivityAtMeasurement`). **Motor financiero sin cambio**. Tag no creado.
+
+- **P1** — `currentActivityMeasurement` gobierna la presentación: `activityLabel(value, measurement)` ya no traduce un dato presente con medición `UNKNOWN`/`PARTIAL`; se declara «Sin dato todavía».
+- **P2** — frescura: el contrato expone `currentActivityAt` (+ medición) y la UI aplica una política interna de frescura (`AUTO_ACTIVITY_MAX_AGE_SECONDS`, default 300 s). Una actividad antigua no se presenta como actual.
+- **P3** — fin de `RUNNING + BLOCKED`: `state` pasa a significar «¿operativa permitida?» y se deriva de la MISMA señal de bloqueo que `derive_activity` (`_kill_active() OR _v2_kill_switch_halted()`). Kill activo ⇒ `state="BLOCKED"` y `activity="BLOCKED"`.
+- Semántica oficial: `lastHeartbeatAt` = proceso vivo; `state` = operativa permitida; `currentActivity` = fase del último tick (con medición y sello).
+- **Evidencia:** [`docs/engineering/evidence/v2.88.80/README.md`](docs/engineering/evidence/v2.88.80/README.md).
+
 ## [2.11.79-beta] — `AUTO · UI`: **«¿Qué está haciendo?» con telemetría real**
 
 **Bump** `2.11.78-beta` → `2.11.79-beta`. **Con migración** `051_auto_engine_activity`. **Contrato HTTP con cambio** (`currentActivity` + `currentActivityMeasurement`). **Motor financiero sin cambio** (`ExecuteTrade`, ledger, posiciones, settlement intactos); el worker solo emite telemetría. Tag no creado.

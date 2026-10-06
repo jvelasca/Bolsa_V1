@@ -117,6 +117,9 @@ describe("AutoSistemaPage", () => {
       header: {
         state: "RUNNING",
         currentActivity: "ANALYZING",
+        currentActivityMeasurement: "COMPLETE",
+        currentActivityAt: "2026-10-06T09:42:00Z",
+        asOf: "2026-10-06T09:43:00Z",
       },
     };
     renderPage();

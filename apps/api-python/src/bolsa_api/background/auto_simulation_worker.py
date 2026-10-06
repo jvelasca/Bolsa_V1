@@ -6262,11 +6262,15 @@ class AutoSimulationWorker:
         if self._auto_store is not None:
             snap: AutoEngineSnapshot | None = await self._auto_store.read(self._engine_id)
             seq = (snap.ticks + 1) if snap is not None else 1
+            # P3 — el estado durable expresa «¿está permitida la operativa?», no «¿está
+            # vivo el proceso?» (eso es el latido). Kill activo (env o parada dura latcheada)
+            # ⇒ BLOCKED, en coherencia exacta con derive_activity: nunca RUNNING + BLOCKED.
+            blocked = self._kill_active() or self._v2_kill_switch_halted()
             await self._auto_store.record_tick(
                 AutoEngineTickInput(
                     engine_id=self._engine_id,
                     venue=report.venue,
-                    state="RUNNING",
+                    state="BLOCKED" if blocked else "RUNNING",
                     seq=seq,
                     proposals=report.proposals,
                     vetoes=report.vetoes,
@@ -6274,7 +6278,7 @@ class AutoSimulationWorker:
                     last_reason=("auto-sim-durable",),
                     occurred_at=self._time,
                     activity=derive_activity(
-                        kill_active=self._kill_active(),
+                        kill_active=blocked,
                         decided=report.decided,
                         proposals=report.proposals,
                         orders=report.orders,
@@ -6493,11 +6497,14 @@ class AutoSimulationWorker:
             if auto_store is not None:
                 snap: AutoEngineSnapshot | None = await auto_store.read(self._engine_id)
                 seq = (snap.ticks + 1) if snap is not None else 1
+                # P3 — estado durable = operativa permitida (no «proceso vivo»). Kill activo
+                # (env o parada dura latcheada) ⇒ BLOCKED, en coherencia con derive_activity.
+                blocked = self._kill_active() or self._v2_kill_switch_halted()
                 await auto_store.record_tick(
                     AutoEngineTickInput(
                         engine_id=self._engine_id,
                         venue=report.venue,
-                        state="RUNNING",
+                        state="BLOCKED" if blocked else "RUNNING",
                         seq=seq,
                         proposals=report.proposals,
                         vetoes=report.vetoes,
@@ -6505,7 +6512,7 @@ class AutoSimulationWorker:
                         last_reason=(self._last_gate_reason or ("idle",)),
                         occurred_at=self._time,
                         activity=derive_activity(
-                            kill_active=self._kill_active(),
+                            kill_active=blocked,
                             decided=report.decided,
                             proposals=report.proposals,
                             orders=report.orders,

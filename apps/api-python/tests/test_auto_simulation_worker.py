@@ -266,6 +266,41 @@ def test_derive_activity_never_infers_from_running() -> None:
     assert derive_activity(kill_active=False, decided=0, proposals=0, orders=0, fills=0) != "ANALYZING"
 
 
+@pytest.mark.asyncio
+async def test_persistent_turn_state_reflects_kill_switch(auto_env: None) -> None:
+    """P3 — el estado durable expresa «¿operativa permitida?»: kill activo ⇒ BLOCKED,
+    en coherencia exacta con ``derive_activity`` (nunca RUNNING + BLOCKED)."""
+    from bolsa_application.auto_engine_state_store import InMemoryAutoEngineStore
+
+    store = InMemoryExecutionEventStore()
+    _start, clock = step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))
+
+    blocked_engine = InMemoryAutoEngineStore()
+    blocked_worker = AutoSimulationWorker(
+        clock=clock,
+        exec_store=store,
+        auto_store=blocked_engine,
+        kill_switch_source=lambda: True,
+    )
+    await blocked_worker.persistent_turn()
+    blocked_snap = await blocked_engine.read("auto-sim")
+    assert blocked_snap is not None
+    assert blocked_snap.state == "BLOCKED"
+    assert blocked_snap.activity == "BLOCKED"
+
+    running_engine = InMemoryAutoEngineStore()
+    running_worker = AutoSimulationWorker(
+        clock=clock,
+        exec_store=store,
+        auto_store=running_engine,
+        kill_switch_source=lambda: False,
+    )
+    await running_worker.persistent_turn()
+    running_snap = await running_engine.read("auto-sim")
+    assert running_snap is not None
+    assert running_snap.state == "RUNNING"
+
+
 def test_strategy_version_from_source_extracts_active_version() -> None:
     from bolsa_api.background.auto_simulation_worker import _strategy_version_from_source
 

@@ -943,6 +943,22 @@
             ],
             "title": "Currentactivity"
           },
+          "currentActivityAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentactivityat"
+          },
+          "currentActivityAtMeasurement": {
+            "default": "UNKNOWN",
+            "title": "Currentactivityatmeasurement",
+            "type": "string"
+          },
           "currentActivityMeasurement": {
             "default": "UNKNOWN",
             "title": "Currentactivitymeasurement",

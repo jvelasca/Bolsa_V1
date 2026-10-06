@@ -164,6 +164,8 @@ class AutoMonitorHeaderDto(BaseModel):
     nextDecisionAt: str | None = None
     currentActivity: str | None = None
     currentActivityMeasurement: str = "UNKNOWN"
+    currentActivityAt: str | None = None
+    currentActivityAtMeasurement: str = "UNKNOWN"
     realPriceEnabled: bool = False
     heartbeatsPersisted: int = 0
     asOf: str

@@ -719,12 +719,16 @@ def test_header_activity_is_declared_and_never_inferred_from_running() -> None:
     dto = build_operational_monitor(account_id="acc-1", engine=_engine())
     assert dto["header"]["currentActivity"] is None
     assert dto["header"]["currentActivityMeasurement"] == "UNKNOWN"
+    assert dto["header"]["currentActivityAt"] is None
+    assert dto["header"]["currentActivityAtMeasurement"] == "UNKNOWN"
 
     dto2 = build_operational_monitor(
         account_id="acc-1", engine=_engine(activity="ANALYZING")
     )
     assert dto2["header"]["currentActivity"] == "ANALYZING"
     assert dto2["header"]["currentActivityMeasurement"] == "COMPLETE"
+    assert dto2["header"]["currentActivityAt"] == "2026-01-02T10:00:00Z"
+    assert dto2["header"]["currentActivityAtMeasurement"] == "COMPLETE"
 
 
 def test_facts_without_value_are_never_declared_measured() -> None:

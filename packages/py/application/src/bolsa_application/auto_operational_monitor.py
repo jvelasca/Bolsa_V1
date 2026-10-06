@@ -898,6 +898,12 @@ def _header(
         "currentActivityMeasurement": (
             MEASUREMENT_COMPLETE if activity is not None else MEASUREMENT_UNKNOWN
         ),
+        "currentActivityAt": _iso(last_tick) if activity is not None else None,
+        "currentActivityAtMeasurement": (
+            MEASUREMENT_COMPLETE
+            if (activity is not None and last_tick is not None)
+            else MEASUREMENT_UNKNOWN
+        ),
         "realPriceEnabled": real_price_enabled,
         "heartbeatsPersisted": engine_ticks,
         "asOf": as_of,

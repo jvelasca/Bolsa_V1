@@ -201,6 +201,8 @@ export type AutoMonitorHeaderV1 = {
   nextDecisionAt?: string | null;
   currentActivity?: string | null;
   currentActivityMeasurement: string;
+  currentActivityAt?: string | null;
+  currentActivityAtMeasurement: string;
   realPriceEnabled: boolean;
   heartbeatsPersisted: number;
   asOf: string;

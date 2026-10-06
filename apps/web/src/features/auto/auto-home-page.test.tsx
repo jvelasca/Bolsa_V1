@@ -179,6 +179,9 @@ describe("AutoHomePage", () => {
     monitorState.header = {
       ...monitorState.header,
       currentActivity: "ANALYZING",
+      currentActivityMeasurement: "COMPLETE",
+      currentActivityAt: "2026-10-06T09:42:00Z",
+      asOf: "2026-10-06T09:43:00Z",
     };
     renderHome();
     expect(screen.getByTestId("auto-home-q-doing").textContent).toContain(
@@ -194,6 +197,9 @@ describe("AutoHomePage", () => {
       lastDecisionAt: "2026-10-06T09:42:00Z",
       nextDecisionAt: "2026-10-06T10:00:00Z",
       currentActivity: "NO_ACTIVITY",
+      currentActivityMeasurement: "COMPLETE",
+      currentActivityAt: "2026-10-06T09:42:00Z",
+      asOf: "2026-10-06T09:43:00Z",
     };
     renderHome();
     expect(screen.getByTestId("auto-home-q-doing").textContent).toContain(
