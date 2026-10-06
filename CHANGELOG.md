@@ -8,6 +8,7 @@ All notable releases of Bolsa V1.
 
 - La revisión 050 pasa a `050_idem_key_not_null` (21 caracteres). El id de 40 caracteres no cabe en `alembic_version.version_num varchar(32)`, y el `Release tag CI` de `v2.88.72-beta` ([`37446072486`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37446072486)) murió en `upgrade head` antes de los tests del libro. El `ALTER NOT NULL` no cambia. No hay `051`.
 - Las guardas de head de `lifecycle-pg` dejan `048_journal_entry_dedupe_key` y apuntan a `050_idem_key_not_null`. El tag `v2.88.72-beta` no se mueve.
+- **Cita POST-TAG:** `Release tag CI` [`37448803302`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37448803302) **VERDE** (`certify` `success`; `replay-repro` `REPRODUCIDO` `1E3ADAC2…`).
 - **Evidencia:** [`docs/engineering/evidence/v2.88.73/README.md`](docs/engineering/evidence/v2.88.73/README.md).
 
 ## [2.11.72-beta] — `NÚCLEO`: **certificación del libro AUTO**

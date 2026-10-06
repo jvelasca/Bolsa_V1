@@ -18,4 +18,9 @@ El tag `v2.88.68-beta` ([`37441669343`](https://github.com/jvelasca/Bolsa_V1/act
 
 ## Cita POST-TAG
 
-Pendiente del `Release tag CI` de `v2.88.73-beta`. Esta sección se completa solo si `certify` queda verde.
+**Tag anotado `v2.88.73-beta`** → `a30dadff` (funcional `69966996`). **`Release tag CI` run [`37448803302`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37448803302) VERDE** (`2026-10-06T10:17:32Z` → `10:28:03Z`): `11` jobs `success` (`security`, `shared`, `spine`, `frontend`, `python`, `playwright-mock`, `lifecycle-pg`, `replay-repro`, `dr-verify`, `a7-gate` y `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño.
+
+- `python`: `4561 passed, 45 skipped` (`ruff` `All checks passed!`).
+- `frontend`: `255` ficheros / **`1475 passed`**; `contract:check` `passed=true · critical=0 · warn=0`.
+- `replay-repro`: **`VEREDICTO REPRODUCIDO`** — `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` ⇒ **`Δ motor = 0` confirmado por CI**.
+- `lifecycle-pg` pasó `upgrade head` con `050_idem_key_not_null` y ejecutó las baterías PostgreSQL.
