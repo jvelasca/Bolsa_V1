@@ -223,10 +223,14 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * RE-ANCLAJE 2026-10-06 (sello `v2.88.69-beta`): idempotency_key NOT NULL.
  * Árbol pinneado: `1cc6eff7`. Pin anterior (`c3ca7a93`): `apps` `5cbd5fc0…` /
  * `packages` `907726db…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.70-beta`): equity del libro en el turno.
+ * Δ motor ≠ 0. Árbol pinneado: `5e264556`. Pin anterior (`1cc6eff7`):
+ * `apps` `e92ff504…` / `packages` `737ba3bf…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '1cc6eff7',
-  appsHash: 'e92ff5048ae1b86633c1de9125fde3a61346f000',
+  commit: '5e264556',
+  appsHash: 'a84a14bd7fc172f8127f0da5e4530202cb01c899',
   packagesHash: '737ba3bf5dec524fdc334835ddd0716c04955db4',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
