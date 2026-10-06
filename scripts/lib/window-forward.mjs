@@ -185,11 +185,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * Este sello **absorbe la F5 de `v2.88.60`** (su arbol de `apps`/`packages` viaja dentro, sin tag
  * propio). El arbol pinneado es el del commit `52a697e1`. Pin anterior (sello `v2.88.60-beta`,
  * commit `71ab00df`): `apps` `d7e6da64…` / `packages` `b482a276…`.
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.62-beta`): **AUTO UI REFACTOR 3.0 (user-first cockpit)** en
+ * `apps/web/**` (HOME `/auto`, Operacion 3.0, dos niveles de densidad, spec `axe`) y
+ * `packages/shared/src/cognitive/auto-operation-story.ts` (grupo `EXPLANATION` propio) + bump a
+ * `2.11.62-beta` (package + `meta.bump` de los 9 CLI DIA-D; `scripts/` no participa del pin).
+ * `Delta motor = 0`: CERO ficheros de motor; NO se toca `replay_oos.RoundTrip.to_dict`. El arbol
+ * pinneado es el del commit `42085822`. Pin anterior (sello `v2.88.61-beta`, commit `52a697e1`):
+ * `apps` `286cf716…` / `packages` `b482a276…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '52a697e1',
-  appsHash: '286cf716032abdc675e641b0baaaee9ac5bac528',
-  packagesHash: 'b482a276fdf5ef0089dc1937c170e13bf01ffe07',
+  commit: '42085822',
+  appsHash: '8ad1efc21edd170c10b20ab45d194b360df68ddf',
+  packagesHash: 'bdcb1d349258f734b894d949a8bdbc9a859b84f1',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
