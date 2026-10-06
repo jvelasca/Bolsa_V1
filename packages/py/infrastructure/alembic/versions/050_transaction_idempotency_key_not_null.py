@@ -5,6 +5,10 @@ no es cero, aborta y no rellena claves. El unique
 ``transactions_portfolio_id_idempotency_key_key`` no se toca.
 
 ``down_revision = "049_cash_quantity_nonneg_check"``.
+
+El identificador es ``050_idem_key_not_null`` (21 caracteres). El id anterior
+``050_transaction_idempotency_key_not_null`` (40) no cabe en
+``alembic_version.version_num varchar(32)`` (convención 021). El SQL no cambia.
 """
 
 from __future__ import annotations
@@ -12,7 +16,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "050_transaction_idempotency_key_not_null"
+revision = "050_idem_key_not_null"
 down_revision = "049_cash_quantity_nonneg_check"
 branch_labels = None
 depends_on = None

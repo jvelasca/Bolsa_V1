@@ -30,6 +30,12 @@ def test_050_aborts_when_null_keys_exist() -> None:
     migration.assert_zero_null_idempotency_keys(0)
 
 
+def test_050_revision_fits_alembic_version_varchar32() -> None:
+    migration = _load()
+    assert migration.revision == "050_idem_key_not_null"
+    assert len(migration.revision) <= 32
+
+
 def test_050_source_does_not_backfill_or_drop_unique() -> None:
     source = _PATH.read_text(encoding="utf-8")
     upper = source.upper()
