@@ -2,7 +2,9 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf (V2.88.67) — en curso:** 2026-10-06 · sello **`v2.88.67-beta`** (**NÚCLEO: cash suelto deja de ser puerta pública**) · package **`2.11.67-beta`** · **`Δ motor = 0`** · `add_cash`/`deduct_cash` ya no existen en el repositorio. Evidencia: [`docs/engineering/evidence/v2.88.67/README.md`](./engineering/evidence/v2.88.67/README.md).
+> **AsOf (V2.88.68) — en curso:** 2026-10-06 · sello **`v2.88.68-beta`** (**NÚCLEO: CHECK cash y cantidad**) · package **`2.11.68-beta`** · Alembic **`049_cash_quantity_nonneg_check`** · **`Δ motor = 0`** · si hay filas negativas la migración aborta y no borra. No se aplicó aquí: PostgreSQL local no responde. Evidencia: [`docs/engineering/evidence/v2.88.68/README.md`](./engineering/evidence/v2.88.68/README.md).
+>
+> **AsOf (V2.88.67) — anterior:** 2026-10-06 · sello **`v2.88.67-beta`** (**NÚCLEO: cash suelto deja de ser puerta pública**) · package **`2.11.67-beta`** · **`Δ motor = 0`** · `add_cash`/`deduct_cash` ya no existen en el repositorio. Evidencia: [`docs/engineering/evidence/v2.88.67/README.md`](./engineering/evidence/v2.88.67/README.md).
 >
 > **AsOf (V2.88.66) — anterior:** 2026-10-06 · sello **`v2.88.66-beta`** (**NÚCLEO: IdempotencyKeyReused marca FAILED**) · package **`2.11.66-beta`** · **`Δ motor = 0`** · el applier SIM relanza el conflicto de clave y `apply_execution_financial_once` lo deja en `FAILED`. Evidencia: [`docs/engineering/evidence/v2.88.66/README.md`](./engineering/evidence/v2.88.66/README.md).
 >

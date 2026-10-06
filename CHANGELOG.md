@@ -2,6 +2,14 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.68-beta] — `NÚCLEO`: **CHECK de cash y cantidad**
+
+**Bump** `2.11.67-beta` → `2.11.68-beta`. Migración **`049_cash_quantity_nonneg_check`**. **`Δ motor = 0`**.
+
+- `portfolios.cash >= 0` y `positions.quantity >= 0`. Si el conteo de negativos no es cero, `upgrade` lanza y no ejecuta `DELETE`.
+- El test del aborto pasa sin base de datos. La migración no se aplicó en esta máquina: PostgreSQL no responde.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.68/README.md`](docs/engineering/evidence/v2.88.68/README.md).
+
 ## [2.11.67-beta] — `NÚCLEO`: **add_cash y deduct_cash dejan de ser públicos**
 
 **Bump** `2.11.66-beta` → `2.11.67-beta`. **SIN migración**. **`Δ motor = 0`**.

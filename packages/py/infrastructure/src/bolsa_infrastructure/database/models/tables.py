@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -174,6 +175,9 @@ class DataSyncLogRow(Base):
 
 class PortfolioRow(Base):
     __tablename__ = "portfolios"
+    __table_args__ = (
+        CheckConstraint("cash >= 0", name="ck_portfolios_cash_nonneg"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String, default="Cartera principal")
@@ -194,6 +198,7 @@ class PositionRow(Base):
         UniqueConstraint(
             "portfolio_id", "instrument_id", name="positions_portfolio_id_instrument_id_key"
         ),
+        CheckConstraint("quantity >= 0", name="ck_positions_quantity_nonneg"),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
