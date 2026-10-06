@@ -2,6 +2,14 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.71-beta] — `NÚCLEO`: **dividendo con retención**
+
+**Bump** `2.11.70-beta` → `2.11.71-beta`. **SIN migración**. **`Δ motor = 0`** (el turno AUTO no lo llama).
+
+- `CreditDividend` toma el porcentaje `dividend_withholding_pct` del perfil, acredita el bruto y escribe la fila de retención en el mismo savepoint, con `idempotency_key`.
+- Un reintento con la misma clave no vuelve a mover el cash. Una clave reutilizada con otro bruto lanza `IdempotencyKeyReused`.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.71/README.md`](docs/engineering/evidence/v2.88.71/README.md).
+
 ## [2.11.70-beta] — `NÚCLEO`: **el turno usa el equity del libro**
 
 **Bump** `2.11.69-beta` → `2.11.70-beta`. **SIN migración**. **`Δ motor ≠ 0`**.

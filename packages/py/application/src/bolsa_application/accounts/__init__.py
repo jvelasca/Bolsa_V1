@@ -12,6 +12,7 @@ from bolsa_application.accounts.crud import (
     UpdateAccountSettings,
 )
 from bolsa_application.accounts.custody import ApplyCustodyFees
+from bolsa_application.accounts.dividend import CreditDividend
 from bolsa_application.accounts.ledger import ListLedgerEntries
 from bolsa_application.accounts.portfolio import GetPortfolioSummary, ListTransactions
 from bolsa_application.accounts.summary import (
@@ -34,6 +35,7 @@ __all__ = [
     "CloseAccount",
     "DeleteAccount",
     "DepositCashToAccount",
+    "CreditDividend",
     "WithdrawCashFromAccount",
     "ApplyCustodyFees",
     "ListLedgerEntries",
