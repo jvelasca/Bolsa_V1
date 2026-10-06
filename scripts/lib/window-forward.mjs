@@ -207,11 +207,15 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * RE-ANCLAJE 2026-10-06 (sello `v2.88.65-beta`): admisión de venta en Decimal.
  * `Delta motor = 0` en el camino de 6 decimales. Árbol pinneado: `23abc3ee`.
  * Pin anterior (`v2.88.64-beta`, `5b0c1a54`): `apps` `54aefdee…` / `packages` `8d2fdf90…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.66-beta`): IdempotencyKeyReused → FAILED.
+ * Árbol pinneado: `c47f7882`. Pin anterior (`23abc3ee`): `apps` `f49b2222…` /
+ * `packages` `757c2883…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '23abc3ee',
-  appsHash: 'f49b2222321b034a07bcb85097a26fdf49c2e41f',
-  packagesHash: '757c2883ccf7603d280647596b7a8126f902190f',
+  commit: 'c47f7882',
+  appsHash: 'ca763e611fb8d855837bb2cd2e364f3cbbdef034',
+  packagesHash: '677b2e17f912b112a7bdba66746eb0a094fc6c7f',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
