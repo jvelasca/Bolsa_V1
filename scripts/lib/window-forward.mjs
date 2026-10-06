@@ -235,11 +235,15 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * RE-ANCLAJE 2026-10-06 (sello `v2.88.72-beta`): certificación del libro AUTO.
  * Δ motor = 0. Árbol pinneado: `969136d8`. Pin anterior (`332c9eea`):
  * `apps` `01d36cf8…` / `packages` `8b10b611…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.73-beta`): el id de Alembic 050 cabe
+ * en varchar(32). Δ motor = 0. Árbol pinneado: `69966996`. Pin anterior
+ * (`969136d8`): `apps` `56aca8b7…` / `packages` `bd993b5d…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '969136d8',
-  appsHash: '56aca8b76b8dc370ae9ce253b5e4e84f8aab8572',
-  packagesHash: 'bd993b5ddfc866f9dba137cc9a79f2ea0b9c1adc',
+  commit: '69966996',
+  appsHash: 'ff9a36239e8e359d7ce2b8429325e35b0c1f2732',
+  packagesHash: '30169088ff45bb4a60e398f5f14479334e9f515e',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
