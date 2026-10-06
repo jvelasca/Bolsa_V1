@@ -227,11 +227,15 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * RE-ANCLAJE 2026-10-06 (sello `v2.88.70-beta`): equity del libro en el turno.
  * Δ motor ≠ 0. Árbol pinneado: `5e264556`. Pin anterior (`1cc6eff7`):
  * `apps` `e92ff504…` / `packages` `737ba3bf…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.71-beta`): dividendo con retención.
+ * Δ motor = 0. Árbol pinneado: `332c9eea`. Pin anterior (`5e264556`):
+ * `apps` `a84a14bd…` / `packages` `737ba3bf…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '5e264556',
-  appsHash: 'a84a14bd7fc172f8127f0da5e4530202cb01c899',
-  packagesHash: '737ba3bf5dec524fdc334835ddd0716c04955db4',
+  commit: '332c9eea',
+  appsHash: '01d36cf85b7a9e45a01a2cc135904583e02e18c4',
+  packagesHash: '8b10b611529017f19a019f5e3d35f1cf34619eee',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
