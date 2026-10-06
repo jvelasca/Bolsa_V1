@@ -219,11 +219,15 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * RE-ANCLAJE 2026-10-06 (sello `v2.88.68-beta`): CHECK cash y cantidad.
  * Árbol pinneado: `c3ca7a93`. Pin anterior (`c6a4be15`): `apps` `8b35fa7a…` /
  * `packages` `5db6d7e0…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.69-beta`): idempotency_key NOT NULL.
+ * Árbol pinneado: `1cc6eff7`. Pin anterior (`c3ca7a93`): `apps` `5cbd5fc0…` /
+ * `packages` `907726db…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'c3ca7a93',
-  appsHash: '5cbd5fc065a87cde454a26316f601002e481e982',
-  packagesHash: '907726dbbbaf9dc12d951ed7a113679b9c1d21cf',
+  commit: '1cc6eff7',
+  appsHash: 'e92ff5048ae1b86633c1de9125fde3a61346f000',
+  packagesHash: '737ba3bf5dec524fdc334835ddd0716c04955db4',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
