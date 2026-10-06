@@ -71,12 +71,12 @@ Sin cambio de motor **ni de muestra**, este sello no re-corre el pipeline. Se **
 
 | Gate | Resultado |
 | --- | --- |
-| `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **passed** (`2.11.59-beta`, verificado por inspección local) |
+| `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **passed** (`2.11.59-beta`) — **CI `python` verde**; local por inspección |
 | `@bolsa/web` `vitest` | **1438 passed** (`249` ficheros; **+3** sobre `v2.88.58`) |
 | `@bolsa/web` `typecheck` / `lint` | limpio · **0 errores** (`23` warnings pre-existentes) |
 | `pnpm window:test` | **25/25** |
 | `E2E_RUN=1 pnpm --filter @bolsa/web e2e -- gp-e2e-v28856 gp-e2e-v28857` | **6 passed** (mock, sin API; `workers=1`) |
-| `contract:check` | no ejecutable en local (App Control); contrato **no tocado** — lo verifica CI |
+| `contract:check` | **OK en CI** (`frontend` verde); no ejecutable en local (App Control); contrato **no tocado** |
 
 ---
 
@@ -90,10 +90,10 @@ Sin cambio de motor **ni de muestra**, este sello no re-corre el pipeline. Se **
 | --- | --- | --- |
 | **Sello funcional** (`feat`) | `c8c23cef` | `apps` `a909995b…` / `packages` `95cb0d69…` |
 | Re-anclaje del freeze de la ventana (`chore`) | `982a50fd` | pin `commit: c8c23cef` (no mueve árbol) |
-| **Commit del tag** (`docs(seal)`) | _(este commit)_ · tag anotado `v2.88.59-beta` | (mismos árboles que el funcional) |
-| Cita **POST-TAG** | _(pendiente)_ | — |
+| **Commit del tag** (`docs(seal)`) | `a970b2e0` (tag anotado `v2.88.59-beta`) | (mismos árboles que el funcional) |
+| Cita **POST-TAG** | _(este commit)_ | — |
 
-- **Tag:** `v2.88.59-beta` — **PENDIENTE** de crear; `Release tag CI` **PENDIENTE**; `GitHub Release` **PENDIENTE**.
+- **Tag:** `v2.88.59-beta` (anotado sobre `a970b2e0`; funcional `c8c23cef` + `chore(window)` `982a50fd` + `docs(seal)` `a970b2e0`) — `Release tag CI` [`37423991541`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37423991541) **VERDE** (`replay-repro` `REPRODUCIDO` `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI); **`GitHub Release` [`v2.88.59-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.59-beta) publicado** (pre-release). Dentro del tag, la evidencia §7 lo declara **POST-TAG**.
 
 ---
 

@@ -40,15 +40,15 @@
 
 | Gate | Resultado |
 | --- | --- |
-| `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **passed** (`meta.bump` de `v2_89`…`v2_97` == `package.json` `2.11.59-beta`) — **verificado por inspección local** |
+| `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **passed** (`meta.bump` de `v2_89`…`v2_97` == `package.json` `2.11.59-beta`) — **CI `python` verde**; local verificado por inspección |
 | `@bolsa/web` `vitest` | **1438 passed** (`249` ficheros; **+3** sobre `v2.88.58`) |
 | `@bolsa/web` `typecheck` (`tsc -b --noEmit`) | limpio |
 | `@bolsa/web` `lint` | **0 errores** (`23` warnings pre-existentes) |
 | `pnpm window:test` | **25/25** |
 | E2E mock AUTO (`gp-e2e-v28856`/`gp-e2e-v28857`) | **6 passed** |
-| `contract:check` | **no ejecutable en local** (política *App Control* bloquea el spawn de `python`); contrato HTTP **no tocado**; lo verifica CI |
+| `contract:check` | **OK en CI** (`frontend` verde); **no ejecutable en local** (política *App Control* bloquea el spawn de `python`); contrato HTTP **no tocado** |
 
-> **Nota de método (declarada).** En esta máquina, la política *App Control* de Windows bloquea la ejecución de `python.exe` (`os error 4551`), por lo que el `bump guard` y `contract:check` **no** pudieron ejecutarse por CLI; el `bump guard` se verificó **por inspección** (los 9 `meta.bump` y `package.json` coinciden en `2.11.59-beta`, sin residuo `2.11.58-beta` en `apps/`) y el contrato se declara intacto. **Hueco declarado**, no silenciado; CI re-ejecuta ambos.
+> **Nota de método (declarada).** En esta máquina, la política *App Control* de Windows bloquea la ejecución de `python.exe` (`os error 4551`), por lo que el `bump guard` y `contract:check` **no** pudieron ejecutarse por CLI; el `bump guard` se verificó por inspección (los 9 `meta.bump` y `package.json` coinciden en `2.11.59-beta`, sin residuo `2.11.58-beta` en `apps/`). **El CI sí los ejecutó**: `python` (**`4538 passed / 45 skipped`**, con el bump guard) y `frontend` (**`contract:check` OK**), ambos en **verde** (§7).
 
 ---
 
@@ -104,11 +104,11 @@ E2E_RUN=1 pnpm --filter @bolsa/web e2e -- gp-e2e-v28856 gp-e2e-v28857
 | --- | --- | --- |
 | **Sello funcional** (`feat`) | `c8c23cef` | `apps` `a909995b…` / `packages` `95cb0d69…` |
 | Re-anclaje del freeze de la ventana (`chore`) | `982a50fd` | pin `commit: c8c23cef` (no mueve árbol) |
-| **Commit del tag** (`docs(seal)`) | _(este commit)_ · tag anotado `v2.88.59-beta` | (mismos árboles que el funcional) |
-| Cita **POST-TAG** (evidencia §7) | _(pendiente)_ | — |
+| **Commit del tag** (`docs(seal)`) | `a970b2e0` (tag anotado `v2.88.59-beta`) | (mismos árboles que el funcional) |
+| Cita **POST-TAG** (evidencia §7) | _(este commit)_ | — |
 
 ---
 
 ## 7. Cita del CI (POST-TAG)
 
-> **`Release tag CI`** del tag `v2.88.59-beta`: **PENDIENTE** de certificar. Se citará aquí (POST-TAG) con el run, el veredicto de `replay-repro` y la confirmación de `Δ motor = 0`. Ningún tag contiene su propio resultado de CI — límite estructural declarado, como en `v2.88.46`…`v2.88.58`.
+> **`Release tag CI`** del tag `v2.88.59-beta`: run [`37423991541`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37423991541) **VERDE** (`2026-10-06T06:29Z → 06:38Z`, ~9m). Jobs `success`: `security` (gitleaks), `python` (ruff/imports/mypy/pytest offline; **`4538 passed / 45 skipped`**, incluye el bump guard `2.11.59-beta`), `a7-gate`, `decision-spine`, `shared`, `playwright (mock E2E)`, `lifecycle-pg`, `frontend` (typecheck/lint/test/build + **`contract:check` OK**), `replay-repro`, `dr-verify`, `certify`; `playwright (integrated E2E)` **`skipped`** (opt-in, por diseño). **`replay-repro` `VEREDICTO REPRODUCIDO`** — `bytes 3340728`, `sha256` LF **`1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`** = sello ⇒ **`Δ motor = 0` confirmado por CI**. **`GitHub Release` [`v2.88.59-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.59-beta) publicado** (pre-release). Ningún tag contiene su propio resultado de CI — límite estructural declarado, como en `v2.88.46`…`v2.88.58`.
