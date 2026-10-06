@@ -2,6 +2,14 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.64-beta] — `NÚCLEO`: **positions.quantity contra el ledger**
+
+**Bump** `2.11.63-beta` → `2.11.64-beta`. **SIN migración**. **`Δ motor = 0`**.
+
+- Nuevo `test_position_quantity_matches_signed_ledger_qty`: compra 10, vende 4, y exige `positions.quantity == Σ` con signo de los asientos `buy`/`sell` (`Decimal("6")`). La comisión no entra en la suma.
+- En local el test hizo **skip**: PostgreSQL en `localhost:5432` agotó el tiempo de conexión. No hubo fallo de aserción y no se tocó el libro.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.64/README.md`](docs/engineering/evidence/v2.88.64/README.md).
+
 ## [2.11.63-beta] — `NÚCLEO`: **el test M0 vigila el worker AUTO**
 
 **Bump** `2.11.62-beta` → `2.11.63-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). **`Δ AUTO decision/execution motor = 0`**. **Contrato HTTP sin cambio.**

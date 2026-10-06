@@ -337,6 +337,76 @@ async def test_execute_trade_con_fees_reconcilia(db_session: AsyncSession) -> No
 
 
 @pytest.mark.asyncio
+async def test_position_quantity_matches_signed_ledger_qty(db_session: AsyncSession) -> None:
+    """TST-01: positions.quantity == compras − ventas del ledger para ese instrumento.
+
+    La comisión no lleva cantidad. Si el libro y los asientos divergen, el test
+    falla y no se reescribe la posición en este sello.
+    """
+    from bolsa_application.accounts import ExecuteTrade
+    from bolsa_infrastructure.database.models import LedgerEntryRow, PositionRow
+    from bolsa_infrastructure.database.repositories.account_repository import (
+        SqlAlchemyAccountRepository,
+    )
+    from bolsa_infrastructure.database.repositories.ledger_repository import (
+        SqlAlchemyLedgerRepository,
+    )
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (
+        SqlAlchemyPortfolioRepository,
+    )
+
+    account_repo = SqlAlchemyAccountRepository(db_session)
+    ledger_repo = SqlAlchemyLedgerRepository(db_session)
+    portfolio_repo = SqlAlchemyPortfolioRepository(db_session)
+    account_id = await _new_account(
+        db_session, name=f"m2-qty-{uuid4().hex[:8]}", initial_deposit=10_000.0
+    )
+    instrument = await _new_instrument(db_session, "qty")
+    trade = ExecuteTrade(account_repo, portfolio_repo, ledger_repo)
+    await trade.execute(
+        instrument_id=instrument.id,
+        trade_type="buy",
+        quantity=10,
+        price=100,
+        account_id=account_id,
+        idempotency_key=f"qty-buy-{uuid4().hex[:8]}",
+    )
+    await trade.execute(
+        instrument_id=instrument.id,
+        trade_type="sell",
+        quantity=4,
+        price=110,
+        account_id=account_id,
+        idempotency_key=f"qty-sell-{uuid4().hex[:8]}",
+    )
+    scope = await account_repo.resolve_scope(account_id)
+    position = (
+        await db_session.execute(
+            select(PositionRow.quantity).where(
+                PositionRow.portfolio_id == scope.legacy_portfolio_id,
+                PositionRow.instrument_id == instrument.id,
+            )
+        )
+    ).scalar_one()
+    rows = (
+        await db_session.execute(
+            select(LedgerEntryRow.type, LedgerEntryRow.quantity).where(
+                LedgerEntryRow.account_id == account_id,
+                LedgerEntryRow.instrument_id == instrument.id,
+                LedgerEntryRow.type.in_(("buy", "sell")),
+            )
+        )
+    ).all()
+    signed = Decimal("0")
+    for entry_type, qty in rows:
+        amount = qty or Decimal("0")
+        signed += amount if entry_type == "buy" else -amount
+    assert position == signed == Decimal("6")
+    await _cleanup_account(db_session, account_id)
+    await _cleanup_instrument(db_session, instrument)
+
+
+@pytest.mark.asyncio
 async def test_apply_custody_fees_reconcilia(db_session: AsyncSession) -> None:
     """ApplyCustodyFees: Σ ledger == Σ cash (cargo completo fee/custody con saldo).
 
