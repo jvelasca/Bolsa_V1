@@ -203,11 +203,15 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * contra el ledger. `Delta motor = 0`. El árbol pinneado es el del commit
  * `5b0c1a54`. Pin anterior (`v2.88.63-beta`, `427ee270`): `apps` `fd4ff254…` /
  * `packages` `19df876c…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.65-beta`): admisión de venta en Decimal.
+ * `Delta motor = 0` en el camino de 6 decimales. Árbol pinneado: `23abc3ee`.
+ * Pin anterior (`v2.88.64-beta`, `5b0c1a54`): `apps` `54aefdee…` / `packages` `8d2fdf90…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '5b0c1a54',
-  appsHash: '54aefdeec5947f9f64c26a8e27d0982381d5dcc9',
-  packagesHash: '8d2fdf9074921a9471e5ff332a3ee1b6af1b18b3',
+  commit: '23abc3ee',
+  appsHash: 'f49b2222321b034a07bcb85097a26fdf49c2e41f',
+  packagesHash: '757c2883ccf7603d280647596b7a8126f902190f',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
