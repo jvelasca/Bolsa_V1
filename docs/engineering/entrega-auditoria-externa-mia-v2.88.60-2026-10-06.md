@@ -97,7 +97,7 @@ Sin cambio de motor **ni de muestra**, este sello no re-corre el pipeline. Se **
 | --- | --- | --- |
 | **Sello funcional** (`feat`) | `71ab00df` | `apps` `d7e6da64…` / `packages` `b482a276…` |
 | Re-anclaje del freeze de la ventana (`chore`) | `a8f941e8` | pin `commit: 71ab00df` (no mueve árbol) |
-| **Commit del sello** (`docs(seal)`) | _(este commit)_ | (mismos árboles que el funcional) |
+| **Commit del sello** (`docs(seal)`) | `6e4db583` | (mismos árboles que el funcional) |
 
 - **Tag:** **pendiente** — `v2.88.60-beta` **no** se ha creado ni empujado (a petición: commits locales, sin push ni tag). Cuando se promocione, el `Release tag CI` validará `replay-repro` (⇒ `Δ motor = 0`) y los jobs `python`/`frontend`/`shared`/`decision-spine`/`lifecycle-pg`/`security`/`certify`.
 

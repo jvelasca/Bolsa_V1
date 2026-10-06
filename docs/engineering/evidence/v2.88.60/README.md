@@ -113,7 +113,7 @@ pnpm --filter @bolsa/web contract:check
 | --- | --- | --- |
 | **Sello funcional** (`feat`) | `71ab00df` | `apps` `d7e6da64…` / `packages` `b482a276…` |
 | Re-anclaje del freeze de la ventana (`chore`) | `a8f941e8` | pin `commit: 71ab00df` (no mueve árbol) |
-| **Commit del sello** (`docs(seal)`) | _(este commit)_ | (mismos árboles que el funcional) |
+| **Commit del sello** (`docs(seal)`) | `6e4db583` | (mismos árboles que el funcional) |
 | Tag anotado `v2.88.60-beta` | **pendiente** | (a petición: commits locales, **sin push ni tag**) |
 
 > **Diferencia con `v2.88.59`:** ese sello era UI-only y **solo** movía `apps`; este mueve **`apps` y `packages`** (por eso cambian **los dos** hashes del pin: `apps` `a909995b…` → `d7e6da64…`, `packages` `95cb0d69…` → `b482a276…`).

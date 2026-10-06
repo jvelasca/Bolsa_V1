@@ -15,7 +15,7 @@ All notable releases of Bolsa V1.
 - **Gates (locales).** `@bolsa/shared` build + **813 passed** (`97` ficheros); `@bolsa/web` `typecheck` limpio + **1442 passed** (`249` ficheros) + `lint` **0 errores** (`23` warnings pre-existentes); `ruff check` (config raíz) limpio. **No ejecutables en local** (*App Control* bloquea el spawn de `python.exe`, `os error 4551*): `pytest`/`mypy`/`import-linter`/`bump guard`/`contract:check`; el **CI sí los ejecuta**.
 - **Deuda declarada (abierta).** `PortfolioDecision` durable (`UI52-02`); barrido `axe` en vivo de `/auto/*` (`F-A2`, no re-ejecutado); `F-S2`/`F-S3` (P3); PIT histórico institucional y Execution Analysis.
 - **Evidencia:** [`docs/engineering/evidence/v2.88.60/README.md`](docs/engineering/evidence/v2.88.60/README.md). **Entrega a auditoría externa (MIA):** [`docs/engineering/entrega-auditoria-externa-mia-v2.88.60-2026-10-06.md`](docs/engineering/entrega-auditoria-externa-mia-v2.88.60-2026-10-06.md).
-- **Sello:** funcional `71ab00df` (`apps` `d7e6da64…` / `packages` `b482a276…`) + `chore(window)` `a8f941e8`; **tag anotado `v2.88.60-beta` pendiente** (a petición: commits locales, sin push ni tag).
+- **Sello:** funcional `71ab00df` (`apps` `d7e6da64…` / `packages` `b482a276…`) + `chore(window)` `a8f941e8` + `docs(seal)` `6e4db583`; **tag anotado `v2.88.60-beta` pendiente** (a petición: commits locales, sin push ni tag).
 
 ## [2.11.59-beta] — `AUTO · UI`: **AUTO COCKPIT 1.0.1** (telemetría honesta: semáforo `unknown` y `PAPER_D_EXECUTE` NO MEDIDO)
 
