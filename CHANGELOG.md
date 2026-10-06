@@ -2,6 +2,18 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.59-beta] — `AUTO · UI`: **AUTO COCKPIT 1.0.1** (telemetría honesta: semáforo `unknown` y `PAPER_D_EXECUTE` NO MEDIDO)
+
+**Bump** `2.11.58-beta` → `2.11.59-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello **de UI/read-model**: **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP sin cambio**. **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS de `v2.88.50`/`v2.88.51` se **heredan y citan**. Cierra las dos deudas **P2** de **honestidad de telemetría/UI** registradas por la auditoría externa de [`v2.88.58`](docs/engineering/entrega-auditoria-externa-mia-v2.88.58-2026-10-05.md).
+
+- **P2-a — El semáforo de realidad monetaria no declaraba el hueco.** `buildAutoReality` (`features/auto/auto-reality.ts`) colapsaba `accountType == null` a `tone = "virtual"` (verde), con la incertidumbre relegada a una nota de `11px`. Ahora un tipo de cuenta ausente toma un **tercer tono `"unknown"` (ámbar)**: `moneyLabel = "TIPO DE CUENTA NO CONFIRMADO"`, `brokerLabel = "Broker NO MEDIDO"` e `isVirtual = null` (tri-estado honesto, `UNKNOWN ≠ 0`). `auto-reality-strip.tsx` pinta contenedor y punto por `tone` (ámbar para `unknown`), no por un `isVirtual` forzado a `true`.
+- **P2-b — `PAPER_D_EXECUTE` no medido se colapsaba a `false`.** `auto-reality-strip.tsx` calculaba `killQuery.data?.paperDExecuteEnv === true`, convirtiendo `undefined` (query pendiente) en `false` antes de conocer el dato; el helper nunca recibía `null` y no emitía la nota. Ahora usa `?? null`, de modo que «no medido» se declara `NO MEDIDO` y no se afirma.
+- **Tests.** `auto-reality.test.ts` (tipo ausente → `unknown`/`isVirtual null`/etiquetas honestas; nota `Ejecución paper NO MEDIDA`); `auto-reality-strip.test.tsx` (cuenta aún cargando → `data-tone="unknown"`, nunca verde; kill switch pendiente → nota `NO MEDIDO`).
+- **Deuda corregida aquí, sin reescribir el sello anterior.** La afirmación falsable «una cuenta desconocida → `DINERO VIRTUAL`» de la evidencia de `v2.88.58` queda **corregida**; `v2.88.58-beta` **no** se retoca.
+- **Gates:** bump guard **passed** (`2.11.59-beta`); `@bolsa/web` **1438 passed** (`249` ficheros) + `typecheck` limpio + `lint` **0 errores** (`23` warnings pre-existentes); `window:test` **25/25**; E2E AUTO **6 passed** (`gp-e2e-v28856` + `gp-e2e-v28857`, mock, `workers=1`). `contract:check` **no ejecutable en local** (política *App Control* bloquea el spawn de `python`); contrato HTTP **no tocado** (lo verifica CI).
+- **Evidencia:** [`docs/engineering/evidence/v2.88.59/README.md`](docs/engineering/evidence/v2.88.59/README.md). **Entrega a auditoría externa (MIA):** [`docs/engineering/entrega-auditoria-externa-mia-v2.88.59-2026-10-06.md`](docs/engineering/entrega-auditoria-externa-mia-v2.88.59-2026-10-06.md).
+- **Sello:** _(pendiente de certificar)_ funcional + `chore(window)` + `docs(seal)`; tag anotado `v2.88.59-beta`; `Release tag CI` **PENDIENTE**.
+
 ## [2.11.58-beta] — `AUTO · UI`: **AUTO COCKPIT 1.0** (usuario básico: semáforo de realidad, identidad legible y cockpit OPERAR)
 
 **Bump** `2.11.57-beta` → `2.11.58-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello **de UI/read-model**: **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP sin cambio** (`contract:check` OK). **NO** se re-corre el pipeline `DÍA-D`: las cifras OOS de `v2.88.50`/`v2.88.51` se **heredan y citan**. Diseño congelado: [spec AUTO COCKPIT 1.0](docs/engineering/spec-auto-cockpit-usuario-basico-2026-10-05.md) (implementa F1–F4) sobre la [auditoría UI AUTO para usuario básico](docs/engineering/auditoria-ui-auto-cockpit-2026-10-05.md).
