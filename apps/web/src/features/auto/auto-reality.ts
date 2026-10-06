@@ -9,8 +9,9 @@
  * armado local) y le pasa el resultado.
  *
  * Invariantes:
- * - **No se asume**: un tipo de cuenta ausente se declara `NO MEDIDO`, no se pinta como real.
- * - **Fail-closed**: `live` es el único estado que reclama dinero real; todo lo demás es virtual.
+ * - **No se asume**: un tipo de cuenta ausente se declara `NO MEDIDO` y toma el tono neutro
+ *   `unknown` (ámbar), nunca el verde tranquilizador de `virtual`.
+ * - **Fail-closed**: `live` es el único estado que reclama dinero real.
  * - **No re-deriva** el modo de libro: delega en `buildPaperAutoPosture` (`@bolsa/shared`).
  *
  * @see docs/engineering/spec-auto-cockpit-usuario-basico-2026-10-05.md §F1
@@ -23,8 +24,11 @@ import {
   type InvestmentAccountType,
 } from "@bolsa/shared";
 
-/** Tono del semáforo: verde = virtual, rojo = dinero real (reservado, no alcanzable hoy). */
-export type AutoRealityTone = "virtual" | "real";
+/**
+ * Tono del semáforo: verde = virtual, rojo = dinero real (reservado, no alcanzable hoy),
+ * ámbar = tipo de cuenta no confirmado (el dato aún no llegó o el registro no lo trae).
+ */
+export type AutoRealityTone = "virtual" | "real" | "unknown";
 
 export type AutoRealityInputV1 = {
   /** Tipo de la cuenta activa. Ausente/`null` → se declara `NO MEDIDO`. */
@@ -39,8 +43,11 @@ export type AutoRealityInputV1 = {
 
 export type AutoRealityV1 = {
   tone: AutoRealityTone;
-  /** `true` = la operativa no usa dinero real. Hoy: siempre `true` salvo cuenta `live`. */
-  isVirtual: boolean;
+  /**
+   * `true` = la operativa no usa dinero real. `null` = no se sabe (tipo de cuenta no
+   * confirmado): un hueco no se rellena con `true` (principio `UNKNOWN ≠ 0`).
+   */
+  isVirtual: boolean | null;
   /** `DINERO VIRTUAL` / `DINERO REAL`. */
   moneyLabel: string;
   /** `AUTO DEMO`. */
@@ -59,9 +66,11 @@ export type AutoRealityV1 = {
 
 export const AUTO_REALITY_MONEY_VIRTUAL = "DINERO VIRTUAL";
 export const AUTO_REALITY_MONEY_REAL = "DINERO REAL";
+export const AUTO_REALITY_MONEY_UNKNOWN = "TIPO DE CUENTA NO CONFIRMADO";
 export const AUTO_REALITY_MODE_DEMO = "AUTO DEMO";
 export const AUTO_REALITY_BROKER_NO_ORDERS = "No envía órdenes a XTB";
 export const AUTO_REALITY_BROKER_LIVE = "Broker LIVE conectado";
+export const AUTO_REALITY_BROKER_UNKNOWN = "Broker NO MEDIDO";
 export const AUTO_REALITY_DISCLAIMER =
   "Operativa 100% simulada (paper): tus decisiones no mueven dinero real.";
 export const AUTO_REALITY_AUTO_ACTIVE = "Activo";
@@ -97,26 +106,39 @@ export function buildAutoReality(input: AutoRealityInputV1): AutoRealityV1 {
   });
 
   const notes: string[] = [];
-  // Sólo `live` reclama dinero real. `simulated`/`paper`/desconocido → virtual (fail-closed).
+  const accountKnown = input.accountType != null;
+  // Sólo `live` reclama dinero real. Un tipo ausente NO se finge `virtual`: se declara
+  // `unknown` (ámbar) para no pintar el verde tranquilizador sobre un hueco.
   const realMoney = input.accountType === "live";
-  if (input.accountType == null) {
+  if (!accountKnown) {
     notes.push("Tipo de cuenta NO MEDIDO");
   }
   if (input.paperDExecuteEnv == null) {
     notes.push("Ejecución paper NO MEDIDA");
   }
 
-  const tone: AutoRealityTone = realMoney ? "real" : "virtual";
+  const tone: AutoRealityTone = !accountKnown
+    ? "unknown"
+    : realMoney
+      ? "real"
+      : "virtual";
+  const moneyLabel = !accountKnown
+    ? AUTO_REALITY_MONEY_UNKNOWN
+    : realMoney
+      ? AUTO_REALITY_MONEY_REAL
+      : AUTO_REALITY_MONEY_VIRTUAL;
+  const brokerLabel = !accountKnown
+    ? AUTO_REALITY_BROKER_UNKNOWN
+    : realMoney
+      ? AUTO_REALITY_BROKER_LIVE
+      : AUTO_REALITY_BROKER_NO_ORDERS;
+
   return {
     tone,
-    isVirtual: !realMoney,
-    moneyLabel: realMoney
-      ? AUTO_REALITY_MONEY_REAL
-      : AUTO_REALITY_MONEY_VIRTUAL,
+    isVirtual: accountKnown ? !realMoney : null,
+    moneyLabel,
     modeLabel: AUTO_REALITY_MODE_DEMO,
-    brokerLabel: realMoney
-      ? AUTO_REALITY_BROKER_LIVE
-      : AUTO_REALITY_BROKER_NO_ORDERS,
+    brokerLabel,
     accountTypeLabel: accountTypeRealityLabel(input.accountType),
     notes,
     autoActive: posture.autoActive,

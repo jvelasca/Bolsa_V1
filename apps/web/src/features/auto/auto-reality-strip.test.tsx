@@ -4,34 +4,46 @@
  * Invariante: con una cuenta demo, la UI declara `DINERO VIRTUAL · AUTO DEMO` y no
  * reclama dinero real. El capital se rotula `NO MEDIDO` mientras no hay respuesta y se
  * presenta como medido cuando llega (nunca `0` por defecto).
+ *
+ * Honestidad de telemetría: un tipo de cuenta aún no cargado toma el tono neutro
+ * `unknown` (ámbar), y un `PAPER_D_EXECUTE` pendiente se declara `NO MEDIDO` en vez de
+ * colapsarse a `false`.
  */
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+type ActiveAccountState = {
+  account: { id: string; type: string } | null;
+  effectiveAccountId: string | null;
+  isLoading: boolean;
+  accounts: unknown[];
+};
+
+type KillSwitchData = {
+  effective: boolean;
+  env: boolean;
+  runtimeMemory: boolean;
+  redis: null;
+  paperDExecuteEnv: boolean;
+};
+
+const mocks = vi.hoisted(() => ({
+  getAccountSummary: vi.fn<() => Promise<{ data: { totalEquity: number } }>>(),
+  getRiskKillSwitch: vi.fn<() => Promise<KillSwitchData>>(),
+  useActiveAccount: vi.fn<() => ActiveAccountState>(),
+}));
 
 vi.mock("@/lib/api", () => ({
   api: {
-    getAccountSummary: vi.fn(async () => ({
-      data: { totalEquity: 12345.67 },
-    })),
-    getRiskKillSwitch: vi.fn(async () => ({
-      effective: false,
-      env: false,
-      runtimeMemory: false,
-      redis: null,
-      paperDExecuteEnv: false,
-    })),
+    getAccountSummary: mocks.getAccountSummary,
+    getRiskKillSwitch: mocks.getRiskKillSwitch,
   },
 }));
 
 vi.mock("@/features/accounts/use-active-account", () => ({
-  useActiveAccount: () => ({
-    account: { id: "acc-1", type: "simulated" },
-    effectiveAccountId: "acc-1",
-    isLoading: false,
-    accounts: [],
-  }),
+  useActiveAccount: mocks.useActiveAccount,
 }));
 
 vi.mock("@/features/trading/use-demo-book-prefs", () => ({
@@ -60,6 +72,25 @@ function renderStrip() {
   );
 }
 
+beforeEach(() => {
+  mocks.useActiveAccount.mockReturnValue({
+    account: { id: "acc-1", type: "simulated" },
+    effectiveAccountId: "acc-1",
+    isLoading: false,
+    accounts: [],
+  });
+  mocks.getAccountSummary.mockResolvedValue({
+    data: { totalEquity: 12345.67 },
+  });
+  mocks.getRiskKillSwitch.mockResolvedValue({
+    effective: false,
+    env: false,
+    runtimeMemory: false,
+    redis: null,
+    paperDExecuteEnv: false,
+  });
+});
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -82,6 +113,38 @@ describe("AutoRealityStrip", () => {
     );
     expect(screen.getByTestId("auto-reality-auto").textContent).toContain(
       "Inactivo",
+    );
+  });
+
+  it("con un tipo de cuenta aún no cargado declara el tono neutro unknown, nunca verde", () => {
+    mocks.useActiveAccount.mockReturnValue({
+      account: null,
+      effectiveAccountId: null,
+      isLoading: true,
+      accounts: [],
+    });
+    renderStrip();
+    expect(
+      screen.getByTestId("auto-reality-strip").getAttribute("data-tone"),
+    ).toBe("unknown");
+    expect(screen.getByTestId("auto-reality-money").textContent).toBe(
+      "TIPO DE CUENTA NO CONFIRMADO",
+    );
+    expect(screen.getByTestId("auto-reality-broker").textContent).toContain(
+      "NO MEDIDO",
+    );
+    expect(screen.getByTestId("auto-reality-notes").textContent).toContain(
+      "Tipo de cuenta NO MEDIDO",
+    );
+  });
+
+  it("conserva PAPER_D_EXECUTE como NO MEDIDO mientras la consulta no responde", () => {
+    mocks.getRiskKillSwitch.mockImplementation(
+      () => new Promise<never>(() => {}),
+    );
+    renderStrip();
+    expect(screen.getByTestId("auto-reality-notes").textContent).toContain(
+      "Ejecución paper NO MEDIDA",
     );
   });
 

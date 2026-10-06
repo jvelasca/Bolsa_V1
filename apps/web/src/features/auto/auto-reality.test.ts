@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { NO_MEASUREMENT_LABEL } from "@bolsa/shared";
 import {
   AUTO_REALITY_BROKER_NO_ORDERS,
+  AUTO_REALITY_BROKER_UNKNOWN,
+  AUTO_REALITY_MONEY_UNKNOWN,
   AUTO_REALITY_MONEY_VIRTUAL,
   AUTO_REALITY_MODE_DEMO,
   accountTypeRealityLabel,
@@ -45,16 +47,30 @@ describe("buildAutoReality", () => {
     expect(on.autoLabel).toBe("Activo");
   });
 
-  it("un tipo de cuenta ausente se declara NO MEDIDO, nunca Live", () => {
+  it("un tipo de cuenta ausente se declara NO MEDIDO con tono neutro (nunca virtual)", () => {
     const r = buildAutoReality({
       accountType: null,
       bookMode: "semi",
       autoArmed: null,
       paperDExecuteEnv: null,
     });
+    expect(r.tone).toBe("unknown");
+    expect(r.isVirtual).toBeNull();
+    expect(r.moneyLabel).toBe(AUTO_REALITY_MONEY_UNKNOWN);
+    expect(r.brokerLabel).toBe(AUTO_REALITY_BROKER_UNKNOWN);
     expect(r.accountTypeLabel).toBe(NO_MEASUREMENT_LABEL);
-    expect(r.isVirtual).toBe(true);
-    expect(r.notes.length).toBeGreaterThan(0);
+    expect(r.notes).toContain("Tipo de cuenta NO MEDIDO");
+  });
+
+  it("declara la ejecución paper NO MEDIDA mientras el eco no llega, sin colapsarla a false", () => {
+    const r = buildAutoReality({
+      accountType: "simulated",
+      bookMode: "auto",
+      autoArmed: true,
+      paperDExecuteEnv: null,
+    });
+    expect(r.tone).toBe("virtual");
+    expect(r.notes).toContain("Ejecución paper NO MEDIDA");
   });
 
   it("sólo `live` reclama dinero real (reservado)", () => {

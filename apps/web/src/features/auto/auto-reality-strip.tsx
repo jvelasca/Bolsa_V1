@@ -20,10 +20,27 @@ import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { AUTO_REALITY_DISCLAIMER, buildAutoReality } from "./auto-reality";
+import {
+  AUTO_REALITY_DISCLAIMER,
+  buildAutoReality,
+  type AutoRealityTone,
+} from "./auto-reality";
 
 /** Misma fuente/`staleTime` que `useMesaEntriesBlocked` (dedupe de React Query). */
 const KILL_SWITCH_STALE_MS = 15_000;
+
+/** Tono visual del semáforo: `unknown` (ámbar) nunca se funde con el verde de `virtual`. */
+const TONE_CONTAINER_CLASS: Record<AutoRealityTone, string> = {
+  virtual: "border-emerald-500/40 bg-emerald-500/10",
+  real: "border-red-500/50 bg-red-500/10",
+  unknown: "border-amber-500/50 bg-amber-500/10",
+};
+
+const TONE_DOT_CLASS: Record<AutoRealityTone, string> = {
+  virtual: "bg-emerald-500",
+  real: "bg-red-500",
+  unknown: "bg-amber-500",
+};
 
 export function AutoRealityStrip() {
   const { account, effectiveAccountId } = useActiveAccount();
@@ -39,7 +56,9 @@ export function AutoRealityStrip() {
     staleTime: KILL_SWITCH_STALE_MS,
   });
   const killOn = killQuery.data?.effective === true;
-  const paperDExecuteEnv = killQuery.data?.paperDExecuteEnv === true;
+  // Preserva la incertidumbre mientras la query no responde: `undefined` NO se colapsa a
+  // `false` (eso convertiría «no medido» en una afirmación). Se declara `null` → NO MEDIDO.
+  const paperDExecuteEnv = killQuery.data?.paperDExecuteEnv ?? null;
 
   const summaryQuery = useQuery({
     queryKey: ["account-summary", effectiveAccountId],
@@ -65,9 +84,7 @@ export function AutoRealityStrip() {
       data-tone={reality.tone}
       className={cn(
         "mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-3 py-2 text-xs",
-        reality.isVirtual
-          ? "border-emerald-500/40 bg-emerald-500/10"
-          : "border-red-500/50 bg-red-500/10",
+        TONE_CONTAINER_CLASS[reality.tone],
       )}
     >
       <span className="inline-flex items-center gap-1.5 font-semibold">
@@ -75,7 +92,7 @@ export function AutoRealityStrip() {
           aria-hidden="true"
           className={cn(
             "inline-block size-2 rounded-full",
-            reality.isVirtual ? "bg-emerald-500" : "bg-red-500",
+            TONE_DOT_CLASS[reality.tone],
           )}
         />
         <span data-testid="auto-reality-money">{reality.moneyLabel}</span>
