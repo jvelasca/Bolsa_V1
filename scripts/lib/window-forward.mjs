@@ -192,11 +192,17 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * `Delta motor = 0`: CERO ficheros de motor; NO se toca `replay_oos.RoundTrip.to_dict`. El arbol
  * pinneado es el del commit `42085822`. Pin anterior (sello `v2.88.61-beta`, commit `52a697e1`):
  * `apps` `286cf716…` / `packages` `b482a276…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.63-beta`): el test M0 pasa a vigilar
+ * `auto_simulation_worker.py`. Cambia `packages/` por el test y `apps/` por el
+ * `meta.bump` de los CLI DÍA-D. `Delta motor = 0`. El árbol pinneado es el del
+ * commit `427ee270`. Pin anterior (sello `v2.88.62-beta`, commit `42085822`):
+ * `apps` `8ad1efc2…` / `packages` `bdcb1d34…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '42085822',
-  appsHash: '8ad1efc21edd170c10b20ab45d194b360df68ddf',
-  packagesHash: 'bdcb1d349258f734b894d949a8bdbc9a859b84f1',
+  commit: '427ee270',
+  appsHash: 'fd4ff2542ac4d4bd88a9bdf45463a9d9c992039d',
+  packagesHash: '19df876c7866dc06c402627ade1f3b1c496db47d',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
