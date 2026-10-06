@@ -62,6 +62,45 @@ const DOT_TONES: Record<AutoMonitorStepState, string> = {
 
 export const NO_MEASUREMENT_LABEL = "NO MEDIDO";
 
+/** Estado visible de un ciclo. No afirma una etapa que los pasos no han alcanzado. */
+export const CYCLE_STATUS_UNMEASURED = "Sin dato todavía";
+export const CYCLE_STATUS_CLOSED = "Cerrada";
+export const CYCLE_STATUS_PRICE_APPLIED = "Precio aplicado";
+export const CYCLE_STATUS_ORDER_NOTED = "Orden anotada";
+export const CYCLE_STATUS_RESERVED = "Apartada";
+
+type CycleStatusInput = {
+  closed?: boolean | null;
+  closedMeasurement?: string | null;
+  steps?: readonly { id: string; state: string }[] | null;
+};
+
+function stepReached(
+  steps: readonly { id: string; state: string }[],
+  id: string,
+): boolean {
+  return steps.some((step) => step.id === id && step.state === "reached");
+}
+
+/**
+ * Etiqueta de primer nivel de un ciclo, copiada de `closed` y de los pasos ya presentes.
+ * No recalcula cantidades. Una medición incompleta no se llama abierta ni cerrada.
+ */
+export function cycleStatusLabel(cycle: CycleStatusInput): string {
+  if (
+    cycle.closed === null ||
+    cycle.closed === undefined ||
+    (cycle.closedMeasurement ?? "COMPLETE") !== "COMPLETE"
+  ) {
+    return CYCLE_STATUS_UNMEASURED;
+  }
+  if (cycle.closed) return CYCLE_STATUS_CLOSED;
+  const steps = cycle.steps ?? [];
+  if (stepReached(steps, "FILL")) return CYCLE_STATUS_PRICE_APPLIED;
+  if (stepReached(steps, "ORDER")) return CYCLE_STATUS_ORDER_NOTED;
+  return CYCLE_STATUS_RESERVED;
+}
+
 export type AutoMonitorFactV1 = {
   key: string;
   value: unknown;
@@ -311,17 +350,7 @@ export function buildAutoOperationalMonitorView(
         ...cycle,
         steps,
         directionLabel: cycle.direction === "short" ? "Corto" : "Largo",
-        // El cierre solo se afirma con la evidencia COMPLETA: `closed = null` o una medición
-        // distinta de `COMPLETE` (ventana de fills truncada) se rotula `NO MEDIDO`, jamás
-        // "Abierto" (que afirmaría lo contrario de lo que no se pudo medir).
-        statusLabel:
-          cycle.closed === null ||
-          cycle.closed === undefined ||
-          (cycle.closedMeasurement ?? "COMPLETE") !== "COMPLETE"
-            ? NO_MEASUREMENT_LABEL
-            : cycle.closed
-              ? "Cerrado"
-              : "Abierto",
+        statusLabel: cycleStatusLabel(cycle),
         unmeasuredStepIds: steps
           .filter((step) => step.measurement === "UNKNOWN")
           .map((step) => step.id),

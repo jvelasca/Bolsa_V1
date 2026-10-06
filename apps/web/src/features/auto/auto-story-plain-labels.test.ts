@@ -8,7 +8,9 @@ import {
 
 describe("plainStageLabel", () => {
   it("traduce las etapas clave a lenguaje de usuario", () => {
-    expect(plainStageLabel("FILL", "Fill")).toBe("Operación ejecutada");
+    expect(plainStageLabel("ORDER", "Orden")).toBe("Orden anotada");
+    expect(plainStageLabel("FILL", "Fill")).toBe("Precio aplicado");
+    expect(plainStageLabel("POSITION", "Posición")).toBe("Posición");
     expect(plainStageLabel("RESERVATION", "Reserva")).toBe("Capital apartado");
     expect(plainStageLabel("SETTLEMENT", "Liquidación")).toBe(
       "Resultado de la venta",

@@ -85,6 +85,7 @@ describe("buildAutoOperationStory", () => {
     expect(byId.get("OPPORTUNITY")?.kind).toBe("CONTEXT");
     expect(byId.get("OPPORTUNITY")?.group).toBe("CONTEXT");
     expect(byId.get("POSITION")?.kind).toBe("DERIVED");
+    expect(byId.get("POSITION")?.foldedInto).toBe("FILL");
     expect(byId.get("EXIT")?.kind).toBe("DERIVED");
     expect(byId.get("EXPLANATION")?.kind).toBe("EXPLANATION");
     expect(byId.get("EXPLANATION")?.group).toBe("EXPLANATION");
@@ -131,6 +132,48 @@ describe("buildAutoOperationStory", () => {
     expect(byId.get("DECISION")?.note).toContain(
       "no hay traza durable de decisión de cartera",
     );
+  });
+
+  it("pliega POSITION en FILL sin afirmar posición ni dinero", () => {
+    const story = buildAutoOperationStory({ cycle: cycle() });
+    const byId = new Map(story.stages.map((stage) => [stage.id, stage]));
+
+    expect(byId.get("FILL")?.kind).toBe("FACT");
+    expect(byId.get("FILL")?.state).toBe("REACHED");
+    expect(byId.get("FILL")?.facts).toEqual([
+      { label: "qty", value: 10, measurement: "COMPLETE" },
+      { label: "avgPrice", value: null, measurement: "UNKNOWN" },
+    ]);
+    expect(byId.get("FILL")?.note).toContain("no afirma la posición");
+
+    expect(byId.get("POSITION")?.kind).toBe("DERIVED");
+    expect(byId.get("POSITION")?.foldedInto).toBe("FILL");
+    expect(byId.get("POSITION")?.facts).toEqual([]);
+    expect(byId.get("POSITION")?.note).toContain("no afirma la posición");
+  });
+
+  it("despliega POSITION como fila propia si existe una traza durable", () => {
+    const withPosition = cycle();
+    withPosition.steps = [
+      ...withPosition.steps,
+      {
+        id: "POSITION",
+        state: "reached",
+        at: "2026-09-30T09:05:00Z",
+        measurement: "COMPLETE",
+        facts: [{ key: "quantity", value: 10, measurement: "COMPLETE" }],
+        note: null,
+      },
+    ];
+    const story = buildAutoOperationStory({ cycle: withPosition });
+    const byId = new Map(story.stages.map((stage) => [stage.id, stage]));
+    const position = byId.get("POSITION");
+
+    expect(position?.foldedInto).toBeNull();
+    expect(position?.facts).toEqual([
+      { label: "quantity", value: 10, measurement: "COMPLETE" },
+    ]);
+    expect(byId.get("FILL")?.note ?? "").not.toContain("no afirma la posición");
   });
 
   it("pliega EXIT en SETTLEMENT sin duplicar el hecho financiero", () => {

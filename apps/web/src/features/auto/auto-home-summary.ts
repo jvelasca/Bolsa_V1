@@ -8,13 +8,15 @@
  *
  * Invariantes:
  * - Un hueco (`null`/ausente/`UNKNOWN`) se declara «Sin dato todavía»; NUNCA se rellena con `0`.
- * - Una operación sólo cuenta como **abierta** con cierre afirmable (`closed === false` y medición
- *   `COMPLETE`); un cierre `null`/`PARTIAL` no se cuenta como abierta ni como cerrada.
+ * - El contador sólo incluye ciclos en «Precio aplicado» (`FILL` alcanzado y no cerrados, con
+ *   medición `COMPLETE`). Una reserva, una orden o un cierre no medido no cuentan.
  * - El estado del motor se traduce genéricamente («Funcionando correctamente»): no se afirma *qué*
  *   está analizando (el DTO no lo dice). El valor crudo queda para el detalle técnico.
  *
  * @see docs/engineering/spec-auto-ui-refactor-3-0-2026-10-06.md §2
  */
+
+import { CYCLE_STATUS_PRICE_APPLIED, cycleStatusLabel } from "@bolsa/shared";
 
 export const AUTO_HOME_NO_DATA_LABEL = "Sin dato todavía";
 
@@ -25,6 +27,7 @@ export type AutoHomeCycleFacts = {
   cycleId: string;
   closed?: boolean | null;
   closedMeasurement?: string | null;
+  steps?: readonly { id: string; state: string }[] | null;
 };
 
 export type AutoHomeHeaderFacts = {
@@ -67,12 +70,9 @@ export type AutoHomeSummaryV1 = {
   riskLabel: string;
 };
 
-/** `true` sólo con cierre afirmable (`closed === false` + medición `COMPLETE`). */
+/** `true` sólo si el ciclo está en «Precio aplicado» (fill alcanzado, no cerrado, medición completa). */
 export function isOperationOpen(cycle: AutoHomeCycleFacts): boolean {
-  return (
-    cycle.closed === false &&
-    (cycle.closedMeasurement ?? "COMPLETE") === "COMPLETE"
-  );
+  return cycleStatusLabel(cycle) === CYCLE_STATUS_PRICE_APPLIED;
 }
 
 const UNKNOWN_STATE_TOKENS = new Set([

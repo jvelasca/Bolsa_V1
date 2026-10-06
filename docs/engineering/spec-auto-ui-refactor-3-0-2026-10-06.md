@@ -217,3 +217,9 @@ El modelo semántico ya declara que **Explicación es conocimiento cross-ciclo**
 | **S4** | **Certificación**: barrido `axe` de `/auto/*` + teclado + responsive + estados (cierra `F-A2`). | UI/tests | `v2.88.65-beta` |
 
 Cada fase es **aditiva**: no se borra ninguna pantalla antes de que su sustituto esté verde, y ninguna mueve el motor.
+
+---
+
+## 10. Addendum 2026-10-06 — glosario de orden y fill
+
+Las filas `ORDER` («Orden enviada») y `FILL` («Operación ejecutada») de §4 quedan **superadas** por la [spec de operación para usuario básico](./spec-auto-operacion-usuario-basico-2026-10-06.md) §2. En primer nivel, la orden es «Orden anotada» y el fill es «Precio aplicado». El resto de esta spec 3.0 permanece.

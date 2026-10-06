@@ -18,7 +18,7 @@ function makeCycle(input: {
     cycleId: "cyc-1",
     instrumentId: input.instrumentId ?? null,
     directionLabel: input.directionLabel ?? "Largo",
-    statusLabel: input.statusLabel ?? "Abierto",
+    statusLabel: input.statusLabel ?? "Apartada",
     steps: [
       {
         id: "SIGNAL",
@@ -58,11 +58,11 @@ describe("buildOperationIdentity", () => {
         instrumentId: "AAPL",
         signalAt: "2026-10-03T09:31:00Z",
         directionLabel: "Largo",
-        statusLabel: "Abierto",
+        statusLabel: "Precio aplicado",
       }),
     );
     expect(identity.entryDay).toBe("03 oct");
-    expect(identity.label).toBe("AAPL · 03 oct · Largo · Abierto");
+    expect(identity.label).toBe("AAPL · 03 oct · Largo · Precio aplicado");
   });
 
   it("dos ciclos del mismo símbolo en días distintos son distinguibles", () => {
@@ -79,7 +79,7 @@ describe("buildOperationIdentity", () => {
     const identity = buildOperationIdentity(makeCycle({}));
     expect(identity.entryDay).toBe(NO_MEASUREMENT_LABEL);
     expect(identity.label).toBe(
-      `${NO_MEASUREMENT_LABEL} · ${NO_MEASUREMENT_LABEL} · Largo · Abierto`,
+      `${NO_MEASUREMENT_LABEL} · ${NO_MEASUREMENT_LABEL} · Largo · Apartada`,
     );
   });
 });

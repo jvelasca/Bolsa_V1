@@ -45,6 +45,6 @@ export const AUTO_SECTION_COPY: Record<AutoSectionId, AutoSectionCopy> = {
   sistema: {
     title: "Sistema",
     description:
-      "Cómo está funcionando AUTO por dentro: salud del motor, qué hizo el broker, cuadre de cuentas y auditoría. Es solo lectura.",
+      "Cómo está funcionando AUTO por dentro: salud del motor, qué registró la simulación, cuadre de cuentas y auditoría. Es solo lectura.",
   },
 };

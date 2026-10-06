@@ -57,10 +57,13 @@ const OPEN_CYCLE = {
   cycleId: "cyc-1",
   instrumentId: "AAPL",
   directionLabel: "Largo",
-  statusLabel: "Abierto",
+  statusLabel: "Precio aplicado",
   closed: false,
   closedMeasurement: "COMPLETE",
-  steps: [{ id: "SIGNAL", at: "2026-10-03T09:00:00Z" }],
+  steps: [
+    { id: "SIGNAL", state: "reached", at: "2026-10-03T09:00:00Z" },
+    { id: "FILL", state: "reached", at: "2026-10-03T09:05:00Z" },
+  ],
 };
 
 beforeEach(() => {

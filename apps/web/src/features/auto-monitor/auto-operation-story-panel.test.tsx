@@ -195,7 +195,7 @@ afterEach(() => {
 });
 
 describe("AutoOperationStoryPanel", () => {
-  it("pinta las 11 filas de operación (OPPORTUNITY fuera, EXIT plegado, EXPLANATION aparte)", async () => {
+  it("pinta las 10 filas de operación (OPPORTUNITY fuera, POSITION y EXIT plegados, EXPLANATION aparte)", async () => {
     renderPanel();
 
     // El selector de ciclos sólo aparece con el monitor cargado: esperar a él evita asertar
@@ -213,7 +213,6 @@ describe("AutoOperationStoryPanel", () => {
       "RESERVATION",
       "ORDER",
       "FILL",
-      "POSITION",
       "PROTECTION",
       "SETTLEMENT",
       "RESULT",
@@ -227,6 +226,10 @@ describe("AutoOperationStoryPanel", () => {
     const byStage = new Map(
       stages.map((stage) => [stage.getAttribute("data-stage"), stage]),
     );
+    // POSITION se pliega en FILL: el precio no se pinta como posición hecha.
+    expect(byStage.has("POSITION")).toBe(false);
+    expect(byStage.get("FILL")?.textContent).toContain("no afirma la posición");
+    expect(byStage.get("FILL")?.textContent).toContain("Precio aplicado");
     // EXIT se pliega en SETTLEMENT: no es una fila independiente…
     expect(byStage.has("EXIT")).toBe(false);
     // …y deja su intención como NOTA de la liquidación (una sola fila por hecho).

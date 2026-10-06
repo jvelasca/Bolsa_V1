@@ -1,8 +1,8 @@
 /**
  * AUTO UI REFACTOR 3.0 (S1) — resumen de la HOME: casos duros.
  *
- * Fija que un hueco nunca se convierte en un dato, que una operación sólo cuenta como abierta con
- * cierre afirmable, y que la traducción de estado/riesgo es honesta.
+ * Fija que un hueco nunca se convierte en un dato, que el contador sólo incluye ciclos con
+ * precio aplicado, y que la traducción de estado/riesgo es honesta.
  */
 
 import { describe, expect, it } from "vitest";
@@ -26,28 +26,47 @@ describe("formatActivityTime", () => {
   });
 });
 
+const PRICE_STEP = { id: "FILL", state: "reached" } as const;
+const ORDER_STEP = { id: "ORDER", state: "reached" } as const;
+
 describe("isOperationOpen", () => {
-  it("sólo es abierta con cierre afirmable (false + medición COMPLETE)", () => {
-    expect(isOperationOpen({ cycleId: "c", closed: false })).toBe(true);
+  it("sólo cuenta un fill alcanzado que no está cerrado", () => {
     expect(
       isOperationOpen({
         cycleId: "c",
         closed: false,
         closedMeasurement: "COMPLETE",
+        steps: [PRICE_STEP],
       }),
     ).toBe(true);
   });
 
-  it("un cierre no medido (null / PARTIAL) no cuenta como abierta", () => {
+  it("una reserva, una orden o un cierre no medido no cuentan", () => {
+    expect(isOperationOpen({ cycleId: "c", closed: false })).toBe(false);
+    expect(
+      isOperationOpen({
+        cycleId: "c",
+        closed: false,
+        closedMeasurement: "COMPLETE",
+        steps: [ORDER_STEP],
+      }),
+    ).toBe(false);
     expect(isOperationOpen({ cycleId: "c", closed: null })).toBe(false);
     expect(
       isOperationOpen({
         cycleId: "c",
         closed: false,
         closedMeasurement: "PARTIAL",
+        steps: [PRICE_STEP],
       }),
     ).toBe(false);
-    expect(isOperationOpen({ cycleId: "c", closed: true })).toBe(false);
+    expect(
+      isOperationOpen({
+        cycleId: "c",
+        closed: true,
+        steps: [PRICE_STEP],
+      }),
+    ).toBe(false);
   });
 });
 
@@ -60,9 +79,20 @@ describe("buildAutoHomeSummary", () => {
         nextDecisionAt: "2026-10-06T10:00:00Z",
       },
       cycles: [
-        { cycleId: "a", closed: false },
-        { cycleId: "b", closed: true },
+        {
+          cycleId: "a",
+          closed: false,
+          closedMeasurement: "COMPLETE",
+          steps: [PRICE_STEP],
+        },
+        { cycleId: "b", closed: true, steps: [PRICE_STEP] },
         { cycleId: "c", closed: null },
+        {
+          cycleId: "d",
+          closed: false,
+          closedMeasurement: "COMPLETE",
+          steps: [ORDER_STEP],
+        },
       ],
       riskOperationalState: "OK",
     });

@@ -2,7 +2,7 @@
  * AUTO UI REFACTOR (F2) — identidad legible de una operación (helper puro).
  *
  * Convierte un ciclo del monitor en una etiqueta humana y estable, sin re-derivar nada:
- * `AAPL · 03 Oct · Largo · Abierto`. Resuelve el problema de que dos ciclos del mismo símbolo
+ * `AAPL · 03 Oct · Largo · Precio aplicado`. Resuelve el problema de que dos ciclos del mismo símbolo
  * (p. ej. dos operaciones de AAPL en días distintos) eran indistinguibles por `instrumentId`.
  *
  * Invariantes:

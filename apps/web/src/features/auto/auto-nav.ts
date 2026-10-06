@@ -92,7 +92,7 @@ export const AUTO_NAV: { label: string; items: readonly AutoNavItem[] } = {
       id: AUTO_SECTION.sistema,
       label: "Sistema",
       path: AUTO_SISTEMA_PATH,
-      hint: "Salud AUTO, broker, reconciliación y auditoría",
+      hint: "Salud AUTO, simulación, reconciliación y auditoría",
     },
   ],
 } as const;

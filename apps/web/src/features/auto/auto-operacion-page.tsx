@@ -2,7 +2,7 @@
  * AUTO · OPERACIÓN canónica `/auto/operar/operacion/:cycleId` (ADR-044).
  *
  * Lectura causal de UNA operación: qué pasó → por qué → qué riesgo tenía → qué
- * hizo el broker → qué resultado → qué enseña DÍA-D. La selección viaja en la
+ * qué precio se aplicó → qué resultado → qué enseña DÍA-D. La selección viaja en la
  * URL (ruta); cambiar de ciclo navega a la operación correspondiente.
  */
 
@@ -33,7 +33,7 @@ export function AutoOperacionPage() {
         </Link>
         <AutoSectionHeading
           title={`Operación · ${title}`}
-          description="Qué pasó → por qué → qué riesgo tenía → qué hizo el broker → qué resultado → qué enseña DÍA-D."
+          description="Qué pasó → por qué → qué riesgo tenía → qué precio se aplicó → qué resultado → qué enseña DÍA-D."
         />
       </div>
 

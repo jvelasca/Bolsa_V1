@@ -5,11 +5,16 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAutoOperationalMonitorView,
+  CYCLE_STATUS_CLOSED,
+  CYCLE_STATUS_ORDER_NOTED,
+  CYCLE_STATUS_PRICE_APPLIED,
+  CYCLE_STATUS_RESERVED,
+  CYCLE_STATUS_UNMEASURED,
+  cycleStatusLabel,
   executionModeLabel,
   formatLastConflict,
   formatMonitorFactValue,
   formatMonitorInstant,
-  NO_MEASUREMENT_LABEL,
   realPriceEnabledLabel,
   stepStateLabel,
   type AutoOperationalMonitorV1,
@@ -94,7 +99,7 @@ describe("buildAutoOperationalMonitorView", () => {
     const view = buildAutoOperationalMonitorView(minimalDto());
     const cycle = view.cycles[0]!;
     expect(cycle.directionLabel).toBe("Corto");
-    expect(cycle.statusLabel).toBe("Cerrado");
+    expect(cycle.statusLabel).toBe(CYCLE_STATUS_CLOSED);
     expect(cycle.steps[0]!.label).toBe("Riesgo");
     expect(cycle.steps[0]!.stateLabel).toBe(stepStateLabel("unknown"));
     expect(cycle.unmeasuredStepIds).toEqual(["RISK"]);
@@ -105,7 +110,57 @@ describe("buildAutoOperationalMonitorView", () => {
     dto.cycles[0]!.closed = null;
     dto.cycles[0]!.closedMeasurement = "PARTIAL";
     const cycle = buildAutoOperationalMonitorView(dto).cycles[0]!;
-    expect(cycle.statusLabel).toBe(NO_MEASUREMENT_LABEL);
+    expect(cycle.statusLabel).toBe(CYCLE_STATUS_UNMEASURED);
+  });
+
+  it("no llama abierta a una reserva ni a una orden sin precio", () => {
+    const reserved = minimalDto();
+    reserved.cycles[0]!.closed = false;
+    reserved.cycles[0]!.closedMeasurement = "COMPLETE";
+    reserved.cycles[0]!.steps = [
+      {
+        id: "RESERVATION",
+        state: "reached",
+        measurement: "COMPLETE",
+        facts: [],
+      },
+    ];
+    expect(
+      buildAutoOperationalMonitorView(reserved).cycles[0]!.statusLabel,
+    ).toBe(CYCLE_STATUS_RESERVED);
+
+    const ordered = minimalDto();
+    ordered.cycles[0]!.closed = false;
+    ordered.cycles[0]!.closedMeasurement = "COMPLETE";
+    ordered.cycles[0]!.steps = [
+      {
+        id: "ORDER",
+        state: "reached",
+        measurement: "COMPLETE",
+        facts: [],
+      },
+    ];
+    expect(
+      buildAutoOperationalMonitorView(ordered).cycles[0]!.statusLabel,
+    ).toBe(CYCLE_STATUS_ORDER_NOTED);
+  });
+
+  it("con fill alcanzado y sin cierre dice Precio aplicado", () => {
+    const dto = minimalDto();
+    dto.cycles[0]!.closed = false;
+    dto.cycles[0]!.closedMeasurement = "COMPLETE";
+    dto.cycles[0]!.steps = [
+      {
+        id: "FILL",
+        state: "reached",
+        measurement: "COMPLETE",
+        facts: [],
+      },
+    ];
+    expect(cycleStatusLabel(dto.cycles[0]!)).toBe(CYCLE_STATUS_PRICE_APPLIED);
+    expect(buildAutoOperationalMonitorView(dto).cycles[0]!.statusLabel).toBe(
+      CYCLE_STATUS_PRICE_APPLIED,
+    );
   });
 });
 

@@ -101,8 +101,8 @@ export type AutoOperationStoryStage = {
   sourceStepId: string | null;
   /**
    * Etapa en la que esta se PLIEGA visualmente (``null`` = fila propia). `EXIT` se pliega en
-   * `SETTLEMENT` mientras no exista una traza durable propia de intención de salida: la UI no
-   * pinta dos filas `REACHED` a partir del MISMO hecho financiero (spec §4.2).
+   * `SETTLEMENT` y `POSITION` en `FILL` mientras no exista una traza durable propia: la UI no
+   * pinta dos filas `REACHED` a partir del MISMO hecho (spec §4.2).
    */
   foldedInto: AutoOperationStoryStageId | null;
   state: AutoOperationStoryState;
@@ -255,12 +255,15 @@ const STORY_STAGE_SPECS: readonly StageSpec[] = [
     sourceStepId: "FILL",
   },
   {
+    // POSICIÓN no es el fill. Mientras no haya paso durable propio, se PLIEGA en `FILL`:
+    // el precio no se pinta otra vez como «posición hecha» ni como dinero de la cuenta.
     id: "POSITION",
     label: "Posición",
     kind: "DERIVED",
     group: "OPERATION",
     sourceStepId: "FILL",
-    derivedNote: "posición derivada de los fills (no hay paso durable propio)",
+    foldedInto: "FILL",
+    derivedNote: "el precio no afirma la posición ni el dinero de la cuenta",
   },
   {
     id: "PROTECTION",
@@ -518,6 +521,32 @@ export function buildAutoOperationStory(input: {
     }
     if (spec.id === "EXPLANATION") {
       return buildExplanationStage(spec, index, input.explanation ?? null);
+    }
+    if (spec.id === "POSITION") {
+      // Sin paso durable de posición no se fabrica un hecho a partir del fill. Con traza
+      // propia (`steps[].id === "POSITION"`) vuelve a ser fila independiente.
+      const ownPosition = stepsById.get("POSITION");
+      const fill = stepsById.get("FILL");
+      const evidence = ownPosition ?? fill;
+      const foldedInto: AutoOperationStoryStageId | null = ownPosition
+        ? null
+        : "FILL";
+      return {
+        ...baseStage(spec, index, mapStepState(evidence)),
+        at: evidence?.at ?? null,
+        measurement: evidence?.measurement ?? "UNKNOWN",
+        facts: ownPosition
+          ? ownPosition.facts.map((fact) => ({
+              label: fact.key,
+              value: fact.value,
+              measurement: fact.measurement,
+            }))
+          : [],
+        foldedInto,
+        note: ownPosition
+          ? joinNote(undefined, ownPosition)
+          : joinNote(spec.derivedNote, undefined),
+      };
     }
     if (spec.id === "EXIT") {
       // Intención/motivo de salida: NO fabrica un hecho financiero propio. Sin traza durable de

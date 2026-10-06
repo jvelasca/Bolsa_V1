@@ -5,7 +5,7 @@
  * 1. **Oportunidades** — *lanzadera honesta* a la Mesa. El ranking vive en Mesa
  *    (`mesaOportunidadesHref()`); aquí NO se recalcula para no fabricar una segunda cifra.
  * 2. **Operaciones** — la operación única es el objeto canónico. Cada fila se identifica en
- *    lenguaje humano (`AAPL · 03 oct · Largo · Abierto`) y enlaza a su historia canónica.
+ *    lenguaje humano (`AAPL · 03 oct · Largo · Precio aplicado`) y enlaza a su historia canónica.
  *
  * Read-only: un hueco se declara NO MEDIDO, nunca 0. Estados propios (carga/error/vacío) en vez
  * de presentar la ausencia de datos como lista vacía.
