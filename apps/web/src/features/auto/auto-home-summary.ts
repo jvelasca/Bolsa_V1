@@ -175,16 +175,22 @@ function isoEpochMs(value: string | null | undefined): number | null {
 }
 
 /**
- * ¿Está la actividad DEMASIADO vieja para presentarse como actual?
- * Fail-closed: sin sello de actividad o sin `asOf` se considera antigua (no se afirma).
+ * ¿Es la actividad NO utilizable como actual?
+ * Fail-closed:
+ * - la medición del instante (`activityAtMeasurement`) debe ser `COMPLETE` para usar el sello;
+ * - sin sello de actividad o sin `asOf` se considera antigua (no se afirma);
+ * - un sello futuro (`activityAt > asOf`, reloj desincronizado o dato corrupto) no se afirma.
  */
 export function isActivityStale(
   activityAt: string | null | undefined,
   asOf: string | null | undefined,
+  activityAtMeasurement: string | null | undefined,
 ): boolean {
+  if ((activityAtMeasurement ?? "UNKNOWN") !== "COMPLETE") return true;
   const at = isoEpochMs(activityAt);
   const as = isoEpochMs(asOf);
   if (at === null || as === null) return true;
+  if (at > as) return true;
   return (as - at) / 1000 > AUTO_ACTIVITY_MAX_AGE_SECONDS;
 }
 
@@ -252,9 +258,16 @@ export function buildAutoHomeSummary(
     ? header?.currentActivityMeasurement
     : null;
   const currentActivityAt = loaded ? header?.currentActivityAt : null;
+  const currentActivityAtMeasurement = loaded
+    ? header?.currentActivityAtMeasurement
+    : null;
   const asOf = loaded ? header?.asOf : null;
 
-  const activityStale = isActivityStale(currentActivityAt, asOf);
+  const activityStale = isActivityStale(
+    currentActivityAt,
+    asOf,
+    currentActivityAtMeasurement,
+  );
 
   const inCourseOperationsCount = (input.cycles ?? []).filter(
     isOperationInCourse,

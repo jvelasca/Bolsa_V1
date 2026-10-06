@@ -133,6 +133,7 @@ describe("buildAutoBasicHome", () => {
         currentActivity: "ANALYZING",
         currentActivityMeasurement: "COMPLETE",
         currentActivityAt: "2026-10-06T09:42:00Z",
+        currentActivityAtMeasurement: "COMPLETE",
         asOf: "2026-10-06T09:43:00Z",
       },
       cycles: [],
@@ -153,6 +154,7 @@ describe("buildAutoBasicHome", () => {
         currentActivity: "NO_ACTIVITY",
         currentActivityMeasurement: "COMPLETE",
         currentActivityAt: "2026-10-06T09:42:00Z",
+        currentActivityAtMeasurement: "COMPLETE",
         asOf: "2026-10-06T09:43:00Z",
       },
       cycles: [],
@@ -185,6 +187,32 @@ describe("buildAutoBasicHome", () => {
       cycles: [],
     });
     expect(stale.doingLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+
+    const staleMeasurement = buildAutoBasicHome({
+      header: {
+        state: "RUNNING",
+        currentActivity: "ANALYZING",
+        currentActivityMeasurement: "COMPLETE",
+        currentActivityAt: "2026-10-06T09:42:00Z",
+        currentActivityAtMeasurement: "UNKNOWN",
+        asOf: "2026-10-06T09:43:00Z",
+      },
+      cycles: [],
+    });
+    expect(staleMeasurement.doingLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+
+    const futureTimestamp = buildAutoBasicHome({
+      header: {
+        state: "RUNNING",
+        currentActivity: "ANALYZING",
+        currentActivityMeasurement: "COMPLETE",
+        currentActivityAt: "2026-10-06T09:44:00Z",
+        currentActivityAtMeasurement: "COMPLETE",
+        asOf: "2026-10-06T09:43:00Z",
+      },
+      cycles: [],
+    });
+    expect(futureTimestamp.doingLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
   });
 
   it("una reserva o un cierre no medido no son una operación en curso", () => {
@@ -227,9 +255,26 @@ describe("buildAutoBasicHome", () => {
       cycles: [],
     });
     expect(home.workingLabel).toBe("Detenido");
-    expect(home.assetLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(home.assetLabel).toBe(AUTO_NO_CURRENT_OPERATION);
     expect(home.happenedLabel).toBe(AUTO_NO_CURRENT_OPERATION);
     expect(home.moneyLabel).toBe(AUTO_SIMULATION_BANNER);
+  });
+
+  it("una operación en curso sin símbolo es hueco, no vacío", () => {
+    const home = buildAutoBasicHome({
+      header: { state: "RUNNING" },
+      cycles: [
+        {
+          cycleId: "nosym",
+          closed: false,
+          closedMeasurement: "COMPLETE",
+          steps: [ORDER_PENDING, FILL_PENDING],
+        },
+      ],
+    });
+    expect(home.currentOperations).toHaveLength(1);
+    expect(home.assetLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(home.happenedLabel).toBe(AUTO_HEADER_ORDER_PENDING);
   });
 
   it("durante la carga no finge el estado y el banner de dinero sigue", () => {

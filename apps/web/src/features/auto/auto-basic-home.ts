@@ -54,6 +54,8 @@ export type AutoBasicHomeInput = {
     currentActivityMeasurement?: string | null;
     /** Instante del `currentActivity` (telemetría); gobierna la frescura. */
     currentActivityAt?: string | null;
+    /** Medición del `currentActivityAt`: un sello presente con `UNKNOWN` no se usa. */
+    currentActivityAtMeasurement?: string | null;
     asOf?: string | null;
   } | null;
   cycles?: readonly AutoBasicCycle[] | null;
@@ -166,7 +168,7 @@ export function buildAutoBasicHome(input: AutoBasicHomeInput): AutoBasicHomeV1 {
   const symbols = currentOperations.map((operation) => operation.symbol);
   const assetLabel =
     currentOperations.length === 0
-      ? AUTO_HOME_NO_DATA_LABEL
+      ? AUTO_NO_CURRENT_OPERATION
       : symbols.every((symbol) => symbol !== AUTO_HOME_NO_DATA_LABEL)
         ? [...new Set(symbols)].join(", ")
         : AUTO_HOME_NO_DATA_LABEL;
@@ -187,7 +189,11 @@ export function buildAutoBasicHome(input: AutoBasicHomeInput): AutoBasicHomeV1 {
       ? engineStateLabel(input.header?.state)
       : AUTO_HOME_NO_DATA_LABEL,
     doingLabel: loaded
-      ? isActivityStale(input.header?.currentActivityAt, input.header?.asOf)
+      ? isActivityStale(
+          input.header?.currentActivityAt,
+          input.header?.asOf,
+          input.header?.currentActivityAtMeasurement,
+        )
         ? AUTO_HOME_NO_DATA_LABEL
         : activityLabel(
             input.header?.currentActivity,

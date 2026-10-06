@@ -74,20 +74,71 @@ describe("activityLabel", () => {
 describe("isActivityStale", () => {
   it("una actividad dentro de la ventana de frescura no es antigua", () => {
     expect(
-      isActivityStale("2026-10-06T09:00:00Z", "2026-10-06T09:04:00Z"),
+      isActivityStale(
+        "2026-10-06T09:00:00Z",
+        "2026-10-06T09:04:00Z",
+        "COMPLETE",
+      ),
     ).toBe(false);
   });
 
   it("una actividad más vieja que la ventana se considera antigua", () => {
     expect(
-      isActivityStale("2026-10-06T09:00:00Z", "2026-10-06T09:06:00Z"),
+      isActivityStale(
+        "2026-10-06T09:00:00Z",
+        "2026-10-06T09:06:00Z",
+        "COMPLETE",
+      ),
     ).toBe(true);
   });
 
   it("sin sello de actividad o sin asOf es antigua (fail-closed)", () => {
-    expect(isActivityStale(null, "2026-10-06T09:06:00Z")).toBe(true);
-    expect(isActivityStale("2026-10-06T09:00:00Z", null)).toBe(true);
-    expect(isActivityStale("ilegible", "2026-10-06T09:06:00Z")).toBe(true);
+    expect(isActivityStale(null, "2026-10-06T09:06:00Z", "COMPLETE")).toBe(
+      true,
+    );
+    expect(isActivityStale("2026-10-06T09:00:00Z", null, "COMPLETE")).toBe(
+      true,
+    );
+    expect(
+      isActivityStale("ilegible", "2026-10-06T09:06:00Z", "COMPLETE"),
+    ).toBe(true);
+  });
+
+  it("una medición del instante no COMPLETE no se usa (fail-closed)", () => {
+    expect(
+      isActivityStale(
+        "2026-10-06T09:00:00Z",
+        "2026-10-06T09:04:00Z",
+        "UNKNOWN",
+      ),
+    ).toBe(true);
+    expect(
+      isActivityStale(
+        "2026-10-06T09:00:00Z",
+        "2026-10-06T09:04:00Z",
+        "PARTIAL",
+      ),
+    ).toBe(true);
+    expect(
+      isActivityStale("2026-10-06T09:00:00Z", "2026-10-06T09:04:00Z", null),
+    ).toBe(true);
+    expect(
+      isActivityStale(
+        "2026-10-06T09:00:00Z",
+        "2026-10-06T09:04:00Z",
+        undefined,
+      ),
+    ).toBe(true);
+  });
+
+  it("un sello futuro (reloj desincronizado) no se afirma", () => {
+    expect(
+      isActivityStale(
+        "2026-10-06T09:06:00Z",
+        "2026-10-06T09:04:00Z",
+        "COMPLETE",
+      ),
+    ).toBe(true);
   });
 });
 
@@ -296,6 +347,7 @@ describe("buildAutoHomeSummary", () => {
         currentActivity: "ANALYZING",
         currentActivityMeasurement: "COMPLETE",
         currentActivityAt: "2026-10-06T09:42:00Z",
+        currentActivityAtMeasurement: "COMPLETE",
         asOf: "2026-10-06T09:43:00Z",
         lastDecisionAt: "2026-10-06T09:42:00Z",
       },
@@ -338,6 +390,32 @@ describe("buildAutoHomeSummary", () => {
       cycles: [],
     });
     expect(stale.activityLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+
+    const staleMeasurement = buildAutoHomeSummary({
+      header: {
+        state: "RUNNING",
+        currentActivity: "ANALYZING",
+        currentActivityMeasurement: "COMPLETE",
+        currentActivityAt: "2026-10-06T09:42:00Z",
+        currentActivityAtMeasurement: "UNKNOWN",
+        asOf: "2026-10-06T09:43:00Z",
+      },
+      cycles: [],
+    });
+    expect(staleMeasurement.activityLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
+
+    const futureTimestamp = buildAutoHomeSummary({
+      header: {
+        state: "RUNNING",
+        currentActivity: "ANALYZING",
+        currentActivityMeasurement: "COMPLETE",
+        currentActivityAt: "2026-10-06T09:44:00Z",
+        currentActivityAtMeasurement: "COMPLETE",
+        asOf: "2026-10-06T09:43:00Z",
+      },
+      cycles: [],
+    });
+    expect(futureTimestamp.activityLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
   });
 
   it("un RUNNING no se traduce a Analizando", () => {

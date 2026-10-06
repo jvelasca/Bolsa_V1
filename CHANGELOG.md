@@ -2,6 +2,15 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.81-beta] — `AUTO · UI`: **telemetría robusta (P2) y «vacío ≠ hueco» en activo**
+
+**Bump** `2.11.80-beta` → `2.11.81-beta`. **Sin migración nueva** (reutiliza `051_auto_engine_activity`). **Contrato HTTP sin cambio** (se consume un campo ya existente). **Motor financiero sin cambio**. Tag no creado.
+
+- **P2 (medición del instante):** `isActivityStale` ahora exige `currentActivityAtMeasurement === "COMPLETE"` antes de usar `currentActivityAt`. Un sello presente con medición `UNKNOWN`/`PARTIAL`/ausente no se usa (fail-closed).
+    10|- **P2 (timestamp futuro):** un `currentActivityAt` posterior a `asOf` (reloj desincronizado o dato corrupto) no se afirma; se declara «Sin dato todavía».
+- **«Vacío ≠ hueco» en P3:** «¿Qué activo?» sin operación en curso ahora dice «Sin operación en curso» (vacío), no «Sin dato todavía» (hueco). Una operación en curso sin símbolo sigue siendo «Sin dato todavía».
+- **Evidencia:** [`docs/engineering/auditoria-ui-auto-home-seis-preguntas-v2.88.80-2026-10-06.md`](docs/engineering/auditoria-ui-auto-home-seis-preguntas-v2.88.80-2026-10-06.md) · [`docs/engineering/spec-auto-home-vacio-hueco-2026-10-06.md`](docs/engineering/spec-auto-home-vacio-hueco-2026-10-06.md).
+
 ## [2.11.80-beta] — `AUTO · UI`: **sello de la telemetría operacional (P1 + P2 + P3)**
 
 **Bump** `2.11.79-beta` → `2.11.80-beta`. **Sin migración nueva** (reutiliza `051_auto_engine_activity`). **Contrato HTTP con cambio aditivo** (`currentActivityAt` + `currentActivityAtMeasurement`). **Motor financiero sin cambio**. Tag no creado.
