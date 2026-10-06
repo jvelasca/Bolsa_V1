@@ -131,7 +131,7 @@ test.describe("GP-E2E-V28865 — AUTO 3.0 accesibilidad (axe)", () => {
     });
     await page.goto("/auto");
     await expect(page.getByTestId("auto-home-loading")).toBeVisible();
-    await expect(page.getByTestId("auto-home-open-empty")).toHaveCount(0);
+    await expect(page.getByTestId("auto-home-in-course-empty")).toHaveCount(0);
     await expectNoCriticalSerious(page, "/auto (carga)");
   });
 
@@ -147,7 +147,7 @@ test.describe("GP-E2E-V28865 — AUTO 3.0 accesibilidad (axe)", () => {
     );
     await page.goto("/auto");
     await expect(page.getByTestId("auto-home-error")).toBeVisible();
-    await expect(page.getByTestId("auto-home-open-empty")).toHaveCount(0);
+    await expect(page.getByTestId("auto-home-in-course-empty")).toHaveCount(0);
     await expectNoCriticalSerious(page, "/auto (error)");
   });
 
@@ -177,7 +177,7 @@ test.describe("GP-E2E-V28865 — AUTO 3.0 accesibilidad (axe)", () => {
       }),
     );
     await page.goto("/auto");
-    await expect(page.getByTestId("auto-home-open-empty")).toBeVisible();
+    await expect(page.getByTestId("auto-home-in-course-empty")).toBeVisible();
     await expect(page.getByTestId("auto-home-tile-auto")).toContainText(
       "Sin dato todavía",
     );

@@ -35,10 +35,7 @@ import {
 } from "@/features/auto/auto-nav";
 import { mesaOportunidadesHref } from "@/features/mesa/mesa-nav-links";
 import { buildAutoBasicHome } from "@/features/auto/auto-basic-home";
-import {
-  buildAutoHomeSummary,
-  isOperationOpen,
-} from "@/features/auto/auto-home-summary";
+import { buildAutoHomeSummary } from "@/features/auto/auto-home-summary";
 import { AUTO_USER_TEXT } from "@/features/auto/auto-typography";
 import { AUTO_RISK_TONE_CLASS } from "@/features/auto/auto-risk-summary";
 import { api } from "@/lib/api";
@@ -115,10 +112,17 @@ export function AutoHomePage() {
     return cycle ? [buildAutoOperationCard(cycle, accountForCard)] : [];
   });
 
-  const openOperations = cycles.filter(isOperationOpen).map((cycle) => ({
-    cycleId: cycle.cycleId,
-    identity: buildOperationIdentity(cycle),
-  }));
+  const inCourseOperations = basic.currentOperations.flatMap((operation) => {
+    const cycle = cycles.find((item) => item.cycleId === operation.cycleId);
+    return cycle
+      ? [
+          {
+            cycleId: operation.cycleId,
+            identity: buildOperationIdentity(cycle),
+          },
+        ]
+      : [];
+  });
 
   return (
     <div className="space-y-6" data-testid="auto-home-page">
@@ -198,7 +202,7 @@ export function AutoHomePage() {
         />
         <SummaryTile
           label="Operaciones"
-          value={summary.openOperationsLabel}
+          value={summary.inCourseOperationsLabel}
           testId="auto-home-tile-operations"
         />
         <SummaryTile
@@ -251,9 +255,12 @@ export function AutoHomePage() {
         </AutoSectionBlockHeading>
 
         {!summary.isLoading && !summary.isError ? (
-          summary.hasOpenOperations ? (
-            <ul className="space-y-1.5" data-testid="auto-home-open-operations">
-              {openOperations.map((operation) => (
+          inCourseOperations.length > 0 ? (
+            <ul
+              className="space-y-1.5"
+              data-testid="auto-home-in-course-operations"
+            >
+              {inCourseOperations.map((operation) => (
                 <li key={operation.cycleId}>
                   <Link
                     to={autoOperacionHref(operation.cycleId)}
@@ -274,9 +281,9 @@ export function AutoHomePage() {
           ) : (
             <p
               className="text-sm text-muted-foreground"
-              data-testid="auto-home-open-empty"
+              data-testid="auto-home-in-course-empty"
             >
-              Sin operaciones abiertas.
+              Sin operaciones en curso.
             </p>
           )
         ) : null}

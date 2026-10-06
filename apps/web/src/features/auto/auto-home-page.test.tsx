@@ -2,7 +2,7 @@
  * AUTO · RESUMEN (HOME) — estructura y estados.
  *
  * Comprueba que la HOME expone un `<h1>` y responde las preguntas del usuario básico, que el
- * error se declara distinto del vacío y que las operaciones abiertas enlazan a su ruta canónica.
+ * error se declara distinto del vacío y que las operaciones en curso enlazan a su ruta canónica.
  * Los hooks de red se mockean; el helper de resumen es real.
  */
 
@@ -116,7 +116,10 @@ describe("AutoHomePage", () => {
     );
     expect(
       screen.getByTestId("auto-home-tile-operations").textContent,
-    ).toContain("1 abierta");
+    ).toContain("1 en curso");
+    expect(
+      screen.getByTestId("auto-home-tile-operations").textContent,
+    ).not.toContain("abierta");
     expect(screen.getByTestId("auto-home-tile-risk").textContent).toContain(
       "Normal",
     );
@@ -211,9 +214,79 @@ describe("AutoHomePage", () => {
     expect(
       screen.getByTestId("auto-card-slot-money").textContent,
     ).not.toContain("DINERO REAL");
+    expect(screen.getByTestId("auto-operation-card").textContent).toContain(
+      "Precio aplicado",
+    );
+    const pageText = document.body.textContent ?? "";
+    expect(pageText).not.toContain("Posición abierta");
+    expect(pageText).not.toContain("Materializada");
+    expect(pageText).not.toContain("Completada");
+    expect(
+      screen.getByTestId("auto-home-tile-operations").textContent,
+    ).toContain("1 en curso");
   });
 
-  it("enlaza las operaciones abiertas a su ruta canónica", () => {
+  it("una orden sin fill es en curso y no se llama abierta", () => {
+    monitorState.cycles = [
+      {
+        cycleId: "cyc-ord",
+        instrumentId: "AAPL",
+        directionLabel: "Largo",
+        closed: false,
+        closedMeasurement: "COMPLETE",
+        steps: [
+          { id: "ORDER", state: "reached", measurement: "COMPLETE" },
+          { id: "FILL", state: "pending" },
+        ],
+      },
+    ];
+    renderHome();
+    const tile =
+      screen.getByTestId("auto-home-tile-operations").textContent ?? "";
+    expect(tile).toContain("1 en curso");
+    expect(tile).not.toContain("abierta");
+    expect(screen.getByTestId("auto-operation-card").textContent).toContain(
+      "Orden pendiente",
+    );
+    expect(screen.getByTestId("auto-home-operation-link")).toBeTruthy();
+    expect(screen.queryByTestId("auto-home-in-course-empty")).toBeNull();
+    expect(document.body.textContent).not.toContain("Sin operaciones abiertas");
+  });
+
+  it("una reserva, un cierre no medido o un ciclo cerrado no entran en el contador", () => {
+    monitorState.cycles = [
+      {
+        cycleId: "cyc-res",
+        instrumentId: "AAPL",
+        closed: false,
+        closedMeasurement: "COMPLETE",
+        steps: [{ id: "RESERVATION", state: "reached" }],
+      },
+    ];
+    renderHome();
+    expect(
+      screen.getByTestId("auto-home-tile-operations").textContent,
+    ).toContain("Sin operaciones en curso");
+    expect(screen.queryByTestId("auto-operation-card")).toBeNull();
+    expect(screen.getByTestId("auto-home-in-course-empty")).toBeTruthy();
+
+    cleanup();
+    monitorState.cycles = [
+      {
+        ...OPEN_CYCLE,
+        cycleId: "cyc-gap",
+        closed: null,
+        closedMeasurement: "UNKNOWN",
+      },
+    ];
+    renderHome();
+    expect(screen.queryByTestId("auto-operation-card")).toBeNull();
+    expect(
+      screen.getByTestId("auto-home-tile-operations").textContent,
+    ).toContain("Sin operaciones en curso");
+  });
+
+  it("enlaza las operaciones en curso a su ruta canónica", () => {
     renderHome();
     const links = screen.getAllByTestId("auto-home-operation-link");
     expect(links).toHaveLength(1);
@@ -227,11 +300,15 @@ describe("AutoHomePage", () => {
     ).toContain("tab=dia-d");
   });
 
-  it("un ciclo cerrado no aparece como operación abierta", () => {
+  it("un ciclo cerrado no aparece como operación en curso", () => {
     monitorState.cycles = [{ ...OPEN_CYCLE, cycleId: "cyc-9", closed: true }];
     renderHome();
     expect(screen.queryByTestId("auto-home-operation-link")).toBeNull();
-    expect(screen.getByTestId("auto-home-open-empty")).toBeTruthy();
+    expect(screen.queryByTestId("auto-operation-card")).toBeNull();
+    expect(screen.getByTestId("auto-home-in-course-empty")).toBeTruthy();
+    expect(
+      screen.getByTestId("auto-home-tile-operations").textContent,
+    ).toContain("Sin operaciones en curso");
   });
 
   it("el error se declara distinto del vacío", () => {
@@ -240,7 +317,7 @@ describe("AutoHomePage", () => {
     monitorState.cycles = [];
     renderHome();
     expect(screen.getByTestId("auto-home-error")).toBeTruthy();
-    expect(screen.queryByTestId("auto-home-open-empty")).toBeNull();
+    expect(screen.queryByTestId("auto-home-in-course-empty")).toBeNull();
   });
 
   it("la carga no se presenta como vacío", () => {
@@ -249,6 +326,6 @@ describe("AutoHomePage", () => {
     monitorState.cycles = [];
     renderHome();
     expect(screen.getByTestId("auto-home-loading")).toBeTruthy();
-    expect(screen.queryByTestId("auto-home-open-empty")).toBeNull();
+    expect(screen.queryByTestId("auto-home-in-course-empty")).toBeNull();
   });
 });

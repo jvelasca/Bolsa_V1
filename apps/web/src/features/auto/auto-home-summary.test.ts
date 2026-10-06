@@ -1,8 +1,8 @@
 /**
  * AUTO UI REFACTOR 3.0 (S1) — resumen de la HOME: casos duros.
  *
- * Fija que un hueco nunca se convierte en un dato, que el contador sólo incluye ciclos con
- * precio aplicado, y que la traducción de estado/riesgo es honesta.
+ * Fija que un hueco nunca se convierte en un dato, que el contador cuenta ciclos en curso
+ * y no los llama abiertos, y que la traducción de estado/riesgo es honesta.
  */
 
 import { describe, expect, it } from "vitest";
@@ -11,6 +11,7 @@ import {
   buildAutoHomeSummary,
   engineStateLabel,
   formatActivityTime,
+  isOperationInCourse,
   isOperationOpen,
 } from "@/features/auto/auto-home-summary";
 
@@ -29,6 +30,58 @@ describe("formatActivityTime", () => {
 
 const PRICE_STEP = { id: "FILL", state: "reached" } as const;
 const ORDER_STEP = { id: "ORDER", state: "reached" } as const;
+const FILL_PENDING = { id: "FILL", state: "pending" } as const;
+const RESERVATION_STEP = { id: "RESERVATION", state: "reached" } as const;
+
+describe("isOperationInCourse", () => {
+  it("cuenta una orden sin fill y un precio aplicado", () => {
+    expect(
+      isOperationInCourse({
+        cycleId: "order",
+        closed: false,
+        closedMeasurement: "COMPLETE",
+        steps: [ORDER_STEP, FILL_PENDING],
+      }),
+    ).toBe(true);
+    expect(
+      isOperationInCourse({
+        cycleId: "fill",
+        closed: false,
+        closedMeasurement: "COMPLETE",
+        steps: [ORDER_STEP, PRICE_STEP],
+      }),
+    ).toBe(true);
+  });
+
+  it("una reserva, un cierre no medido o un ciclo cerrado no cuentan", () => {
+    expect(
+      isOperationInCourse({
+        cycleId: "reserve",
+        closed: false,
+        closedMeasurement: "COMPLETE",
+        steps: [RESERVATION_STEP],
+      }),
+    ).toBe(false);
+    expect(isOperationInCourse({ cycleId: "bare", closed: false })).toBe(false);
+    expect(isOperationInCourse({ cycleId: "c", closed: null })).toBe(false);
+    expect(
+      isOperationInCourse({
+        cycleId: "partial-close",
+        closed: false,
+        closedMeasurement: "PARTIAL",
+        steps: [PRICE_STEP],
+      }),
+    ).toBe(false);
+    expect(
+      isOperationInCourse({
+        cycleId: "closed",
+        closed: true,
+        closedMeasurement: "COMPLETE",
+        steps: [PRICE_STEP],
+      }),
+    ).toBe(false);
+  });
+});
 
 describe("isOperationOpen", () => {
   it("sólo cuenta un fill alcanzado que no está cerrado", () => {
@@ -72,7 +125,7 @@ describe("isOperationOpen", () => {
 });
 
 describe("buildAutoHomeSummary", () => {
-  it("traduce el estado del motor y cuenta las operaciones abiertas", () => {
+  it("traduce el estado del motor y cuenta las operaciones en curso", () => {
     const summary = buildAutoHomeSummary({
       header: {
         state: "RUNNING",
@@ -102,11 +155,28 @@ describe("buildAutoHomeSummary", () => {
     expect(summary.statusLabel).toBe("Funcionando");
     expect(summary.lastActivityLabel).toBe("09:42");
     expect(summary.nextStepLabel).toBe("Próximo análisis: 10:00");
-    expect(summary.openOperationsCount).toBe(1);
-    expect(summary.openOperationsLabel).toBe("1 abierta");
-    expect(summary.hasOpenOperations).toBe(true);
+    expect(summary.inCourseOperationsCount).toBe(2);
+    expect(summary.inCourseOperationsLabel).toBe("2 en curso");
+    expect(summary.inCourseOperationsLabel).not.toContain("abierta");
+    expect(summary.hasOperationsInCourse).toBe(true);
     expect(summary.riskTone).toBe("ok");
     expect(summary.riskLabel).toBe("Normal");
+  });
+
+  it("una orden sin fill cuenta como en curso y no se llama abierta", () => {
+    const orderOnly = {
+      cycleId: "order",
+      closed: false,
+      closedMeasurement: "COMPLETE",
+      steps: [ORDER_STEP, FILL_PENDING],
+    };
+    expect(isOperationOpen(orderOnly)).toBe(false);
+    const summary = buildAutoHomeSummary({
+      header: { state: "RUNNING" },
+      cycles: [orderOnly],
+    });
+    expect(summary.inCourseOperationsLabel).toBe("1 en curso");
+    expect(summary.inCourseOperationsLabel).not.toContain("abierta");
   });
 
   it("un estado desconocido y un riesgo no medido se declaran, no se asumen", () => {
@@ -119,7 +189,7 @@ describe("buildAutoHomeSummary", () => {
     expect(summary.statusLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
     expect(summary.riskTone).toBe("unknown");
     expect(summary.riskLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
-    expect(summary.openOperationsLabel).toBe("Sin operaciones abiertas");
+    expect(summary.inCourseOperationsLabel).toBe("Sin operaciones en curso");
     // Cargado (el header existe) pero sin próxima decisión ⇒ esperando señal.
     expect(summary.nextStepLabel).toBe("Esperando nueva señal");
   });

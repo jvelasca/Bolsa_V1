@@ -8,8 +8,9 @@
  *
  * Invariantes:
  * - Un hueco (`null`/ausente/`UNKNOWN`) se declara «Sin dato todavía»; NUNCA se rellena con `0`.
- * - El contador sólo incluye ciclos en «Precio aplicado» (`FILL` alcanzado y no cerrados, con
- *   medición `COMPLETE`). Una reserva, una orden o un cierre no medido no cuentan.
+ * - El contador de la HOME cuenta ciclos en curso: orden o fill alcanzados, cierre medido como
+ *   no cerrado. Una reserva no entra. Esos ciclos no se llaman «abiertos».
+ * - `isOperationOpen` es el hecho «Precio aplicado». La HOME no lo traduce a «abierta».
  * - El estado del motor se traduce solo si el token pertenece al conjunto cerrado que el monitor
  *   copia (`RUNNING`, `PAUSED`, `BLOCKED`, `DEGRADED`, `REQUIRES_ATTENTION`). Cualquier otro
  *   token es «Sin dato todavía». Conocer el estado no significa que funcione correctamente.
@@ -69,10 +70,10 @@ export type AutoHomeSummaryV1 = {
   lastActivityLabel: string;
   /** `Próximo análisis: HH:mm` | `Esperando nueva señal` | `Sin dato todavía`. */
   nextStepLabel: string;
-  openOperationsCount: number;
-  /** `3 abiertas` | `1 abierta` | `Sin operaciones abiertas`. */
-  openOperationsLabel: string;
-  hasOpenOperations: boolean;
+  inCourseOperationsCount: number;
+  /** `3 en curso` | `1 en curso` | `Sin operaciones en curso`. */
+  inCourseOperationsLabel: string;
+  hasOperationsInCourse: boolean;
   riskTone: AutoHomeRiskTone;
   /** `Normal` | `Atención` | `Bloqueado` | `Sin dato todavía`. */
   riskLabel: string;
@@ -81,6 +82,23 @@ export type AutoHomeSummaryV1 = {
 /** `true` sólo si el ciclo está en «Precio aplicado» (fill alcanzado, no cerrado, medición completa). */
 export function isOperationOpen(cycle: AutoHomeCycleFacts): boolean {
   return cycleStatusLabel(cycle) === CYCLE_STATUS_PRICE_APPLIED;
+}
+
+function stepState(cycle: AutoHomeCycleFacts, id: string): string | undefined {
+  return cycle.steps?.find((step) => step.id === id)?.state;
+}
+
+/**
+ * Orden o fill ya alcanzados, con el cierre medido como no cerrado.
+ * Una reserva no entra. No significa posición abierta.
+ */
+export function isOperationInCourse(cycle: AutoHomeCycleFacts): boolean {
+  if (cycle.closed !== false) return false;
+  if ((cycle.closedMeasurement ?? "COMPLETE") !== "COMPLETE") return false;
+  return (
+    stepState(cycle, "ORDER") === "reached" ||
+    stepState(cycle, "FILL") === "reached"
+  );
 }
 
 /**
@@ -130,9 +148,9 @@ function riskFromOperationalState(state: string | null | undefined): {
   }
 }
 
-function openOperationsLabel(count: number): string {
-  if (count === 0) return "Sin operaciones abiertas";
-  return count === 1 ? "1 abierta" : `${count} abiertas`;
+function inCourseOperationsLabel(count: number): string {
+  if (count === 0) return "Sin operaciones en curso";
+  return count === 1 ? "1 en curso" : `${count} en curso`;
 }
 
 export function buildAutoHomeSummary(
@@ -149,8 +167,8 @@ export function buildAutoHomeSummary(
   const lastActivityRaw =
     header?.lastDecisionAt ?? header?.lastHeartbeatAt ?? null;
 
-  const openOperationsCount = (input.cycles ?? []).filter(
-    isOperationOpen,
+  const inCourseOperationsCount = (input.cycles ?? []).filter(
+    isOperationInCourse,
   ).length;
 
   const risk = riskFromOperationalState(input.riskOperationalState);
@@ -170,9 +188,9 @@ export function buildAutoHomeSummary(
         : loaded
           ? "Esperando nueva señal"
           : AUTO_HOME_NO_DATA_LABEL,
-    openOperationsCount,
-    openOperationsLabel: openOperationsLabel(openOperationsCount),
-    hasOpenOperations: openOperationsCount > 0,
+    inCourseOperationsCount,
+    inCourseOperationsLabel: inCourseOperationsLabel(inCourseOperationsCount),
+    hasOperationsInCourse: inCourseOperationsCount > 0,
     riskTone: risk.tone,
     riskLabel: risk.label,
   };

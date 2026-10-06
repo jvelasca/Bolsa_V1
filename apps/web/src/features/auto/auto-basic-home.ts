@@ -10,6 +10,7 @@
 import {
   AUTO_HOME_NO_DATA_LABEL,
   engineStateLabel,
+  isOperationInCourse,
 } from "@/features/auto/auto-home-summary";
 
 export const AUTO_SIMULATION_BANNER = "SIMULACIÓN — DINERO VIRTUAL";
@@ -78,13 +79,6 @@ function stepOf(cycle: AutoBasicCycle, id: string): AutoBasicStep | undefined {
 
 function reached(step: AutoBasicStep | undefined): boolean {
   return step?.state === "reached";
-}
-
-/** Orden o fill ya alcanzados, cierre medido como no cerrado. Una reserva no entra. */
-export function isOperationInCourse(cycle: AutoBasicCycle): boolean {
-  if (cycle.closed !== false) return false;
-  if ((cycle.closedMeasurement ?? "COMPLETE") !== "COMPLETE") return false;
-  return reached(stepOf(cycle, "ORDER")) || reached(stepOf(cycle, "FILL"));
 }
 
 export function readEntryQuantities(cycle: AutoBasicCycle): {

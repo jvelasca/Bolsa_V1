@@ -2,6 +2,15 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.77-beta] — `AUTO · UI`: **en curso no es abierta**
+
+**Bump** `2.11.76-beta` → `2.11.77-beta`. **SIN migración**. **`Δ motor = 0`**. Contrato HTTP sin cambio. Tag no creado. El tag `v2.88.76-beta` no se mueve.
+
+- El azulejo, la lista y la tarjeta de `/auto` cuentan el mismo ciclo en curso: orden o fill alcanzados, cierre medido como no cerrado. Una reserva no entra.
+- Una orden sin fill ya no convive con «Sin operaciones abiertas». El texto es «en curso». «Precio aplicado» no se llama posición abierta.
+- Decisión, Simulación y «¿Qué está haciendo?» siguen «Sin dato todavía». La posición de cuenta se copia del resumen.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.77/README.md`](docs/engineering/evidence/v2.88.77/README.md).
+
 ## [2.11.76-beta] — `AUTO · UI`: **la tarjeta muestra las seis ranuras**
 
 **Bump** `2.11.75-beta` → `2.11.76-beta`. **SIN migración**. **`Δ motor = 0`**. Contrato HTTP sin cambio. Tag no creado.

@@ -95,6 +95,7 @@ describe("operationHappenedLabel", () => {
     });
     expect(label).not.toBe("Materializada");
     expect(label).not.toBe("Completada");
+    expect(label).not.toBe("Posición abierta");
   });
 });
 
@@ -121,6 +122,40 @@ describe("buildAutoBasicHome", () => {
     expect(home.decisionLabel).toBe(AUTO_HOME_NO_DATA_LABEL);
     expect(home.happenedLabel).toBe(AUTO_HEADER_PRICE_APPLIED);
     expect(home.moneyLabel).toBe(AUTO_SIMULATION_BANNER);
+  });
+
+  it("una reserva o un cierre no medido no son una operación en curso", () => {
+    const home = buildAutoBasicHome({
+      header: { state: "RUNNING" },
+      cycles: [
+        {
+          cycleId: "reserve",
+          instrumentId: "AAPL",
+          closed: false,
+          closedMeasurement: "COMPLETE",
+          steps: [{ id: "RESERVATION", state: "reached" }],
+        },
+        {
+          cycleId: "gap",
+          instrumentId: "MSFT",
+          closed: null,
+          closedMeasurement: "UNKNOWN",
+          steps: [ORDER_PENDING, FILL_PENDING],
+        },
+        {
+          cycleId: "done",
+          instrumentId: "IBM",
+          closed: true,
+          closedMeasurement: "COMPLETE",
+          steps: [
+            { ...ORDER_PENDING, facts: [entryOrder(10, 10)] },
+            FILL_REACHED,
+          ],
+        },
+      ],
+    });
+    expect(home.currentOperations).toHaveLength(0);
+    expect(home.happenedLabel).toBe(AUTO_NO_CURRENT_OPERATION);
   });
 
   it("sin ciclo en curso distingue el vacío del hueco", () => {
