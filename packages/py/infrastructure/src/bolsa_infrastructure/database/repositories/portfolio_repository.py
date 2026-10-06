@@ -27,6 +27,17 @@ from bolsa_infrastructure.database.models import (
 from bolsa_infrastructure.ids import new_id
 
 
+def sell_quantity_exceeds_held(held: Decimal, quantity: float) -> bool:
+    """True si la venta pide más de lo que hay, comparando en Decimal.
+
+    ``float(held) < quantity`` admite un ``Decimal(str(quantity))`` mayor que
+    ``held`` cuando el float redondea (p. ej. ``999999999999.000062``).
+    """
+    if quantity <= 0:
+        return True
+    return held < Decimal(str(quantity))
+
+
 class SqlAlchemyPortfolioRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -378,9 +389,11 @@ class SqlAlchemyPortfolioRepository:
         existing_position = position_result.scalar_one_or_none()
 
         if trade_type == "sell":
-            held = float(existing_position.quantity) if existing_position else 0.0
-            if held < quantity:
-                raise PermanentRejectionError(f"No tienes suficientes acciones. En cartera: {held}")
+            held = existing_position.quantity if existing_position is not None else Decimal("0")
+            if sell_quantity_exceeds_held(held, quantity):
+                raise PermanentRejectionError(
+                    f"No tienes suficientes acciones. En cartera: {held}"
+                )
 
         now = datetime.now(UTC)
         transaction = TransactionRow(

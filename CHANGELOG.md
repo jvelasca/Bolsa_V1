@@ -2,6 +2,14 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.65-beta] — `NÚCLEO`: **la venta compara Decimal**
+
+**Bump** `2.11.64-beta` → `2.11.65-beta`. **SIN migración**. **`Δ motor = 0`** para cantidades que el float representa igual que el `Decimal`.
+
+- `sell_quantity_exceeds_held` compara `held < Decimal(str(quantity))`. El caso `999999999999.000062` pasaba el `float` y pedía `999999999999.0001` al restar.
+- **Tests.** `test_sell_admission_decimal.py` **2 passed**.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.65/README.md`](docs/engineering/evidence/v2.88.65/README.md).
+
 ## [2.11.64-beta] — `NÚCLEO`: **positions.quantity contra el ledger**
 
 **Bump** `2.11.63-beta` → `2.11.64-beta`. **SIN migración**. **`Δ motor = 0`**.
