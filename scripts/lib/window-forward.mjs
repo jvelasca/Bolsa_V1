@@ -247,10 +247,14 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * RE-ANCLAJE 2026-10-06 (sello `v2.88.76-beta`): la tarjeta muestra las seis
  * ranuras. Incluye el corte local v2.88.75. Δ motor = 0. Árbol pinneado:
  * `13d5bff6`. Pin anterior (`68335c5c`): `apps` `34172e7f…` / `packages` `f80b2285…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.77-beta`): en curso no es abierta.
+ * Δ motor = 0. Árbol pinneado: `9b8e4904`. Pin anterior (`13d5bff6`):
+ * `apps` `5b0d50e7…` / `packages` `f80b2285…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '13d5bff6',
-  appsHash: '5b0d50e76c6f080e02c2952c22a6b2461e272b6a',
+  commit: '9b8e4904',
+  appsHash: '79fb268580fb46e4b2766c961b2b87f2d7c13b38',
   packagesHash: 'f80b2285da4624474a56e8df71c6e56b532120f0',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
