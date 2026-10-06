@@ -2,6 +2,19 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.62-beta] — `AUTO · UI`: **AUTO UI REFACTOR 3.0 — USER-FIRST COCKPIT** (HOME + Operación 3.0 + dos niveles + `axe`)
+
+**Bump** `2.11.61-beta` → `2.11.62-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello **de UI/read-model**: **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP sin cambio**. **NO** se re-mide `DÍA-D`: las cifras OOS se **heredan y citan**. Ejecuta el plan **AUTO UI REFACTOR 3.0 (S0–S4) como una ventana** y lo sella **una vez** (precedente del repo de absorber fases: `v2.88.61` absorbió la F5 de `v2.88.60`); los números `v2.88.63/64/65` del plan no se emiten.
+
+- **S0 — Spec congelada.** Nuevo `docs/engineering/spec-auto-ui-refactor-3-0-2026-10-06.md` (tres niveles de lenguaje, dos niveles de densidad, wireframe de HOME, reagrupación de la historia, falsabilidad) + **addendum ADR-044 §7**: **HOME pasa a ser la landing de `/auto`**.
+- **S1 — HOME / cockpit.** `/auto` deja de redirigir a `/auto/operar`: monta `AutoHomePage` + helper puro `auto-home-summary.ts` (estado del motor, sello `HH:mm`, operaciones abiertas con cierre **afirmable**, integridad operativa). `auto-nav.ts` gana la entrada **HOME** (`Resumen`, primera) y `autoSectionFromPathname("/auto") → home`. Estados carga/error/vacío/no-medido **distinguibles**.
+- **S2 — Operación única 3.0.** `EXPLANATION` deja de pertenecer a `group: "OPERATION"`: nuevo grupo `EXPLANATION` en `auto-operation-story.ts` (read-model puro) y el panel se reorganiza en **HISTORIA / CONTEXTO / ¿QUÉ APRENDEMOS?**. Lenguaje humano en primer nivel (`NO MEDIDO` → «Sin dato todavía», término técnico en `title`).
+- **S3 — Dos niveles de densidad/lenguaje.** `auto-typography.ts` (≥14 px usuario · 10–12 px técnico) + `AutoTechnicalDetail` (bloque plegable, cerrado por defecto). **SISTEMA** invierte la jerarquía (estado en frases arriba; monitor/recon/auditoría bajo el detalle). **RIESGO** gana cabecera plana honesta (`auto-risk-summary.ts`; lo no materializado se declara «Sin dato todavía», nunca `0`). **CARTERA** declara «CARTERA DEMO — posiciones simuladas» antes de `OperationsPanel`. **ANÁLISIS** reetiqueta sus 4 pestañas como preguntas (misma URL `?tab=`).
+- **S4 — Certificación `axe`.** Nueva devDependency `@axe-core/playwright` (`^4.13.0`) y spec `gp-e2e-v28865-auto-axe-mock.spec.ts`: **0 violaciones `critical`/`serious`** en las 8 rutas de `/auto/*` + `/auto-monitor`, teclado de las pestañas, responsive (`390×844`) y estados (carga/error/vacío/no-medido). **Cierra `F-A2`.**
+- **Tests.** `@bolsa/shared` **813 passed** (`97` ficheros); `@bolsa/web` **1475 passed** (`255` ficheros; **+19**) + `typecheck` limpio + `lint` 0 errores de los ficheros tocados; `contract:check` **OK**; `window:test` **25/25**; bump guard **1 passed**; E2E `axe` **13/13** y navegación **3/3**.
+- **Deuda declarada (abierta).** `PortfolioDecision` durable (`UI52-02`); PIT histórico institucional y Execution Analysis; re-anclaje del freeze de la ventana + tag/Release (pendientes del commit de sello).
+- **Evidencia:** [`docs/engineering/evidence/v2.88.62/README.md`](docs/engineering/evidence/v2.88.62/README.md).
+
 ## [2.11.61-beta] — `DEV/INFRA`: **fix de arranque de la venv bajo Windows Smart App Control** (+ bump `2.11.61-beta`; absorbe la F5 de `v2.88.60`)
 
 **Bump** `2.11.60-beta` → `2.11.61-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). **`Δ AUTO decision/execution motor = 0`** y **contrato HTTP SIN cambio**. Este sello resuelve el bloqueo de arranque reportado («no arranca la APP») y, de paso, **absorbe la F5 de `v2.88.60`** (resolución DÍA-D por `cycleId`), que viajaba en **commits locales sin tag**: al no existir tag propio de `v2.88.60`, su árbol de `apps`/`packages` viaja dentro de este sello y el freeze se re-ancla al commit del bump.
