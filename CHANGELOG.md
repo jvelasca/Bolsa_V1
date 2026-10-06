@@ -2,6 +2,15 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.72-beta] — `NÚCLEO`: **certificación del libro AUTO**
+
+**Bump** `2.11.71-beta` → `2.11.72-beta`. **SIN migración**. **`Δ motor = 0`**.
+
+- `TransactionRow.idempotency_key` y el campo Prisma pasan a `NOT NULL`. La migración 050 no se reescribe.
+- El día SIM sobre PostgreSQL comprueba compra, venta a plano, P&L, equity y Σ ledger = cash. Reaplicar un fill no mueve el libro.
+- Dos `ExecuteTrade` simultáneos con la misma clave devuelven la misma transacción y un solo efecto.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.72/README.md`](docs/engineering/evidence/v2.88.72/README.md).
+
 ## [2.11.71-beta] — `NÚCLEO`: **dividendo con retención**
 
 **Bump** `2.11.70-beta` → `2.11.71-beta`. **SIN migración**. **`Δ motor = 0`** (el turno AUTO no lo llama).

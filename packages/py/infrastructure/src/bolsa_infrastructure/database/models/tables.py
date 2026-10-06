@@ -232,7 +232,7 @@ class TransactionRow(Base):
     price: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     total: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     executed_at: Mapped[datetime] = mapped_column("executed_at", DateTime(timezone=True))
-    idempotency_key: Mapped[str | None] = mapped_column("idempotency_key", String, nullable=True)
+    idempotency_key: Mapped[str] = mapped_column("idempotency_key", String, nullable=False)
 
     portfolio: Mapped[PortfolioRow] = relationship(back_populates="transactions")
     instrument: Mapped[InstrumentRow] = relationship()

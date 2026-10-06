@@ -181,6 +181,7 @@ async def _drive_buy_sell(
     instrument_id: str,
     seed: int,
     quantities: dict[str, Decimal],
+    sides: tuple[str, ...] = ("buy", "sell"),
 ) -> list[str]:
     """Recorre BUY→SELL materializando ExecuteTrade real por fill SIM.
 
@@ -203,7 +204,7 @@ async def _drive_buy_sell(
     fills: list[str] = []
     async with session_factory() as session:
         exec_store = PostgresExecutionEventStore(session)
-        for side in ("buy", "sell"):
+        for side in sides:
             # V2.24/A9.1 (P1-03): identidad namespaceada única por intención. El
             # applier y el settlement DEBEN compartir el mismo venue_order_id para
             # que el resolver del schedule case por execution_id.
@@ -299,8 +300,13 @@ def _roundtrip_plan(instrument_id: str) -> tuple[int, Decimal, Decimal]:
         sell = _fill_chunks(instrument_id, "sell", seed=seed, quantity=realized)
         if not sell:
             continue
-        # Invariante del FIXTURE: la venta no puede exceder lo que dejó la compra.
-        assert sum(sell, Decimal("0")) <= realized
+        # Net-zero de libro: la venta llena exactamente lo comprado, también después
+        # del borde float→Decimal que ExecuteTrade persiste. Si no, la posición no
+        # queda plana y el aserto de cierre no certificaría el camino.
+        if sum(sell, Decimal("0")) != realized:
+            continue
+        if _booked_qty_sum(buy) != _booked_qty_sum(sell):
+            continue
         return seed, total, realized
     raise AssertionError(f"no seed con ida-y-vuelta viable para {instrument_id!r}")
 
@@ -323,20 +329,192 @@ def _sell_seed_with_fill(instrument_id: str, *, quantity: Decimal) -> int:
     raise AssertionError(f"no seed con fill para la pata sell de {instrument_id!r}")
 
 
+_INITIAL_CASH = Decimal("100000")
+_MONEY = Decimal("0.000001")
+
+
+def _booked_qty(delta: Decimal) -> Decimal:
+    """Cantidad que persiste ExecuteTrade: ``Decimal(str(float(delta)))``."""
+    return Decimal(str(float(abs(delta))))
+
+
+def _booked_qty_sum(chunks: tuple[Decimal, ...]) -> Decimal:
+    return sum((_booked_qty(chunk) for chunk in chunks), Decimal("0"))
+
+
+def _booked_notional(qty: Decimal, price: Decimal) -> Decimal:
+    """Notional del borde real: no multiplica float por float."""
+    return Decimal(str(float(qty))) * Decimal(str(float(price)))
+
+
+def _booked_fee(notional: Decimal, side: str) -> Decimal:
+    from bolsa_domain.account_settings import calculate_trade_fees, default_account_settings
+
+    breakdown = calculate_trade_fees(
+        float(notional),
+        side,  # type: ignore[arg-type]
+        default_account_settings(),
+        currency="EUR",
+    )
+    return Decimal(str(breakdown.total))
+
+
+def _cash_effect(fills: tuple, side: str) -> tuple[Decimal, Decimal, Decimal]:
+    """(efecto en cash, notional firmado a favor del P&L, comisiones)."""
+    cash = Decimal("0")
+    notional = Decimal("0")
+    fees = Decimal("0")
+    for fill in fills:
+        leg = _booked_notional(fill.qty_delta, fill.price)
+        fee = _booked_fee(leg, side)
+        notional += leg
+        fees += fee
+        if side == "buy":
+            cash -= leg + fee
+        else:
+            cash += leg - fee
+    return cash, notional, fees
+
+
+def _priced_fills(
+    instrument_id: str, side: str, *, seed: int, quantity: Decimal
+) -> tuple:
+    from bolsa_application.simulated_broker import simulated_fill_schedule
+
+    result = simulated_fill_schedule(
+        instrument_id=instrument_id,
+        side=side,
+        quantity=quantity,
+        venue_order_id=f"sim-{side}-{instrument_id}-{seed}",
+        seed=seed,
+        fill_chunks=3,
+        base_mid=100.0,
+    )
+    return tuple(fill for fill in result.fills if abs(fill.qty_delta) > 0)
+
+
+async def _legacy_portfolio_id(session: AsyncSession, account_id: str) -> str:
+    from sqlalchemy import select
+
+    from bolsa_infrastructure.database.models.tables import InvestmentPortfolioRow
+
+    portfolio_id = (
+        await session.execute(
+            select(InvestmentPortfolioRow.legacy_portfolio_id).where(
+                InvestmentPortfolioRow.account_id == account_id
+            )
+        )
+    ).scalar_one()
+    assert portfolio_id is not None
+    return str(portfolio_id)
+
+
+async def _account_cash(session: AsyncSession, account_id: str) -> Decimal:
+    from sqlalchemy import select
+
+    from bolsa_infrastructure.database.models.tables import InvestmentPortfolioRow, PortfolioRow
+
+    values = (
+        await session.execute(
+            select(PortfolioRow.cash)
+            .join(
+                InvestmentPortfolioRow,
+                InvestmentPortfolioRow.legacy_portfolio_id == PortfolioRow.id,
+            )
+            .where(InvestmentPortfolioRow.account_id == account_id)
+        )
+    ).scalars().all()
+    return sum((value for value in values), Decimal("0"))
+
+
+async def _position_qty(
+    session: AsyncSession, portfolio_id: str, instrument_id: str
+) -> Decimal | None:
+    from sqlalchemy import select
+
+    from bolsa_infrastructure.database.models.tables import PositionRow
+
+    return (
+        await session.execute(
+            select(PositionRow.quantity).where(
+                PositionRow.portfolio_id == portfolio_id,
+                PositionRow.instrument_id == instrument_id,
+            )
+        )
+    ).scalar_one_or_none()
+
+
+async def _ledger_sum_and_count(session: AsyncSession, account_id: str) -> tuple[Decimal, int]:
+    from sqlalchemy import func, select
+
+    from bolsa_infrastructure.database.models.tables import LedgerEntryRow
+
+    total, count = (
+        await session.execute(
+            select(
+                func.coalesce(func.sum(LedgerEntryRow.amount), 0),
+                func.count(),
+            ).where(LedgerEntryRow.account_id == account_id)
+        )
+    ).one()
+    return Decimal(total), int(count)
+
+
+async def _assert_fill_truths(
+    session: AsyncSession,
+    *,
+    portfolio_id: str,
+    execution_ids: list[str],
+    schedule: tuple,
+    side: str,
+) -> Decimal:
+    """Cada fill APPLIED tiene su transacción, con la clave y la cantidad del schedule."""
+    from sqlalchemy import select
+
+    from bolsa_application.execution_event import PostgresExecutionEventStore
+    from bolsa_application.simulated_settlement import simulated_idempotency_key
+    from bolsa_infrastructure.database.models.tables import TransactionRow
+
+    assert len(execution_ids) == len(schedule)
+    store = PostgresExecutionEventStore(session)
+    booked = Decimal("0")
+    for execution_id, fill in zip(execution_ids, schedule, strict=True):
+        assert execution_id.rsplit("#", 1)[-1] == str(fill.fill_seq)
+        event = await store.get(execution_id)
+        assert event is not None and event.status == "APPLIED", event.status if event else None
+        key = simulated_idempotency_key(execution_id)
+        row = (
+            await session.execute(
+                select(TransactionRow).where(
+                    TransactionRow.portfolio_id == portfolio_id,
+                    TransactionRow.idempotency_key == key,
+                )
+            )
+        ).scalar_one()
+        qty = _booked_qty(fill.qty_delta)
+        assert row.type == side
+        assert row.quantity == qty
+        assert row.price == Decimal(str(float(fill.price))).quantize(_MONEY)
+        assert row.total == _booked_notional(fill.qty_delta, fill.price).quantize(_MONEY)
+        booked += qty
+    return booked
+
+
 @pytest.mark.asyncio
 async def test_finance_auto_day_materializes_executetrade_exactly_once(
     fin_pg_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """Día AUTO SIM-ONLY con finanzas REALES mueve el libro PG exactamente una vez.
+    """Día AUTO SIM-ONLY: BUY, SELL a plano, y las cinco verdades del libro.
 
-    Ejecuta un BUY y un SELL (net-zero) por el settlement AUTO con finanzas reales y
-    comprueba sobre PG que cada fill quedó ``APPLIED`` y que re-aplicar el MISMO fill
-    (crash/relaunch) devuelve ``already_applied`` sin volver a tocar dinero (invariante
-    C3/P2-01 idempotente por ``simulated_idempotency_key``).
+    Settlement → ExecuteTrade → APPLIED, y sobre PostgreSQL:
 
-    La venta se dimensiona a lo que la compra LIQUIDA de verdad (``_roundtrip_plan``):
-    los parciales no son simétricos entre patas y pedir la cantidad nominal en las dos
-    sobrevendía la cartera en ~6,7 % de los ``instrument_id`` (FLAKE-1, 2026-09-30).
+    * cada fill tiene su ``transactions`` con ``simulated_idempotency_key``;
+    * la posición tras el BUY es la cantidad liquidada, y tras el SELL desaparece;
+    * Σ ledger == cash, y el cash es el depósito más el P&L menos las comisiones;
+    * re-aplicar el fill devuelve ``already_applied`` sin mover cash, posición ni asientos.
+
+    La venta se dimensiona a lo que la compra liquida (``_roundtrip_plan``), también
+    en la cantidad que ExecuteTrade persiste, para que el cierre quede en cero.
     """
     instrument_id = f"inst-fin-{uuid.uuid4().hex[:10]}"
     # V2.23/A9 + FLAKE-1 (2026-09-30): seed determinista con ida-y-vuelta VIABLE.
@@ -347,15 +525,81 @@ async def test_finance_auto_day_materializes_executetrade_exactly_once(
             account_id = await _seed_account_tag(session)
             await _seed_instrument(session, instrument_id)
 
-        fills = await _drive_buy_sell(
+        buy_schedule = _priced_fills(instrument_id, "buy", seed=seed, quantity=buy_qty)
+        sell_schedule = _priced_fills(instrument_id, "sell", seed=seed, quantity=sell_qty)
+        buy_cash, buy_notional, buy_fees = _cash_effect(buy_schedule, "buy")
+        sell_cash, sell_notional, sell_fees = _cash_effect(sell_schedule, "sell")
+        buy_fills = await _drive_buy_sell(
             fin_pg_factory,
             account_id=account_id,
             instrument_id=instrument_id,
             seed=seed,
             quantities={"buy": buy_qty, "sell": sell_qty},
+            sides=("buy",),
         )
-        assert fills, "la corrida finance debió confirmar fills reales"
+        assert buy_fills, "la compra debió confirmar fills reales"
+        assert len(buy_fills) == len(set(buy_fills))
+
+        async with fin_pg_factory() as session:
+            portfolio_id = await _legacy_portfolio_id(session, account_id)
+            bought = await _assert_fill_truths(
+                session,
+                portfolio_id=portfolio_id,
+                execution_ids=buy_fills,
+                schedule=buy_schedule,
+                side="buy",
+            )
+            position = await _position_qty(session, portfolio_id, instrument_id)
+            cash = await _account_cash(session, account_id)
+            ledger_sum, ledger_count = await _ledger_sum_and_count(session, account_id)
+            assert position == bought
+            assert cash == _INITIAL_CASH + buy_cash
+            assert ledger_sum == cash
+            from bolsa_infrastructure.database.repositories.portfolio_repository import (  # noqa: PLC0415
+                SqlAlchemyPortfolioRepository,
+            )
+
+            summary = await SqlAlchemyPortfolioRepository(session).get_summary(portfolio_id)
+            assert len(summary.positions) == 1
+            marked = summary.positions[0]
+            assert marked.last_price is not None
+            assert marked.market_value == pytest.approx(marked.quantity * marked.last_price)
+            assert summary.total_equity == pytest.approx(
+                summary.portfolio.cash + summary.total_market_value
+            )
+            assert summary.total_equity == pytest.approx(
+                float(cash) + float(position) * marked.last_price
+            )
+
+        sell_fills = await _drive_buy_sell(
+            fin_pg_factory,
+            account_id=account_id,
+            instrument_id=instrument_id,
+            seed=seed,
+            quantities={"buy": buy_qty, "sell": sell_qty},
+            sides=("sell",),
+        )
+        assert sell_fills, "la venta debió confirmar fills reales"
+        fills = buy_fills + sell_fills
         assert len(fills) == len(set(fills)), "cada execution_id es único (no-doble)"
+
+        async with fin_pg_factory() as session:
+            portfolio_id = await _legacy_portfolio_id(session, account_id)
+            await _assert_fill_truths(
+                session,
+                portfolio_id=portfolio_id,
+                execution_ids=sell_fills,
+                schedule=sell_schedule,
+                side="sell",
+            )
+            assert await _position_qty(session, portfolio_id, instrument_id) is None
+            cash = await _account_cash(session, account_id)
+            ledger_sum, ledger_count_after_sell = await _ledger_sum_and_count(session, account_id)
+            realized_pnl = sell_notional - buy_notional
+            assert cash == _INITIAL_CASH + realized_pnl - (buy_fees + sell_fees)
+            assert cash == _INITIAL_CASH + buy_cash + sell_cash
+            assert ledger_sum == cash
+            assert ledger_count_after_sell > ledger_count
 
         from bolsa_application.accounts.trade import ExecuteTrade  # noqa: PLC0415
         from bolsa_application.execution_event import (  # noqa: PLC0415
@@ -376,6 +620,10 @@ async def test_finance_auto_day_materializes_executetrade_exactly_once(
         )
 
         async with fin_pg_factory() as session:
+            portfolio_id = await _legacy_portfolio_id(session, account_id)
+            cash_before = await _account_cash(session, account_id)
+            position_before = await _position_qty(session, portfolio_id, instrument_id)
+            ledger_before, count_before = await _ledger_sum_and_count(session, account_id)
             store = PostgresExecutionEventStore(session)
             trade = ExecuteTrade(
                 SqlAlchemyAccountRepository(session),
@@ -394,6 +642,11 @@ async def test_finance_auto_day_materializes_executetrade_exactly_once(
                     owner="fin-pg-gate-replay",
                 )
                 assert second == "already_applied", second
+            assert await _account_cash(session, account_id) == cash_before
+            assert await _position_qty(session, portfolio_id, instrument_id) == position_before
+            ledger_after, count_after = await _ledger_sum_and_count(session, account_id)
+            assert ledger_after == ledger_before == cash_before
+            assert count_after == count_before
     finally:
         if account_id:
             from sqlalchemy import delete  # noqa: PLC0415

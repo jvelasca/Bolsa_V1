@@ -310,6 +310,174 @@ async def test_concurrent_buys_no_double_spend() -> None:
 
 
 @pytest.mark.asyncio
+async def test_concurrent_same_key_buy_returns_original_once() -> None:
+    """Dos ExecuteTrade simultáneos con la misma clave dejan un solo efecto en el libro.
+
+    El mutex de cuenta serializa a los dos: el segundo reencuentra la transacción
+    original (pre-check) o, si la unicidad gana la carrera, ``IdempotencyKeyExists``
+    se traduce al mismo original. En ambos caminos hay una fila, una posición y
+    Σ ledger == cash.
+    """
+    from decimal import Decimal
+
+    from sqlalchemy import func
+
+    from bolsa_application.accounts.trade import ExecuteTrade
+    from bolsa_infrastructure.database.migrations import ensure_migrated
+    from bolsa_infrastructure.database.models import (
+        InvestmentPortfolioRow,
+        LedgerEntryRow,
+        PortfolioRow,
+        PositionRow,
+        TransactionRow,
+    )
+    from bolsa_infrastructure.database.repositories.account_repository import (
+        SqlAlchemyAccountRepository,
+    )
+    from bolsa_infrastructure.database.repositories.ledger_repository import (
+        SqlAlchemyLedgerRepository,
+    )
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (
+        SqlAlchemyPortfolioRepository,
+    )
+
+    _load_env()
+    from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.session import create_engine, create_session_factory
+
+    get_settings.cache_clear()
+    settings = get_settings()
+    try:
+        await asyncio.to_thread(ensure_migrated)
+    except Exception as exc:  # noqa: BLE001
+        pytest.skip(f"PostgreSQL/Alembic no disponible: {exc}")
+    engine = create_engine(settings)
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(select(1))
+    except Exception as exc:  # noqa: BLE001
+        await engine.dispose()
+        pytest.skip(f"PostgreSQL no disponible: {exc}")
+    factory = create_session_factory(engine)
+
+    account_id: str | None = None
+    instrument_id: str | None = None
+    key = f"race-same-key-{uuid4().hex}"
+    quantity = 10
+    price = 50.0
+    try:
+        async with factory() as setup:
+            scope = await SqlAlchemyAccountRepository(setup).create_simulated_account(
+                name=f"race-{uuid4().hex[:8]}",
+                initial_deposit=100_000.0,
+            )
+            account_id = scope.account.id
+            now = datetime.now(UTC)
+            instrument_id = f"inst_race_{uuid4().hex[:12]}"
+            setup.add(
+                InstrumentRow(
+                    id=instrument_id,
+                    symbol=f"RC{uuid4().hex[:6].upper()}",
+                    yahoo_symbol=f"RC{uuid4().hex[:8]}",
+                    isin=None,
+                    name="Race same key",
+                    exchange="BMAD",
+                    country="ES",
+                    currency="EUR",
+                    type="stock",
+                    is_active=True,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            await setup.commit()
+
+        async def _buy() -> str:
+            async with factory() as session:
+                trade = ExecuteTrade(
+                    SqlAlchemyAccountRepository(session),
+                    SqlAlchemyPortfolioRepository(session),
+                    SqlAlchemyLedgerRepository(session),
+                )
+                result = await trade.execute(
+                    instrument_id=instrument_id,
+                    trade_type="buy",
+                    quantity=quantity,
+                    price=price,
+                    account_id=account_id,
+                    idempotency_key=key,
+                )
+                await session.commit()
+                return result.transaction.id
+
+        first_id, second_id = await asyncio.gather(_buy(), _buy())
+        assert first_id == second_id
+
+        async with factory() as check:
+            legacy_id = (
+                await check.execute(
+                    select(InvestmentPortfolioRow.legacy_portfolio_id).where(
+                        InvestmentPortfolioRow.account_id == account_id
+                    )
+                )
+            ).scalar_one()
+            tx_count = (
+                await check.execute(
+                    select(func.count())
+                    .select_from(TransactionRow)
+                    .where(
+                        TransactionRow.portfolio_id == legacy_id,
+                        TransactionRow.idempotency_key == key,
+                    )
+                )
+            ).scalar_one()
+            assert int(tx_count) == 1
+            position = (
+                await check.execute(
+                    select(PositionRow.quantity).where(
+                        PositionRow.portfolio_id == legacy_id,
+                        PositionRow.instrument_id == instrument_id,
+                    )
+                )
+            ).scalar_one()
+            assert position == Decimal(str(quantity))
+            cash = (
+                await check.execute(
+                    select(PortfolioRow.cash)
+                    .join(
+                        InvestmentPortfolioRow,
+                        InvestmentPortfolioRow.legacy_portfolio_id == PortfolioRow.id,
+                    )
+                    .where(InvestmentPortfolioRow.account_id == account_id)
+                )
+            ).scalar_one()
+            ledger = (
+                await check.execute(
+                    select(func.coalesce(func.sum(LedgerEntryRow.amount), 0)).where(
+                        LedgerEntryRow.account_id == account_id
+                    )
+                )
+            ).scalar_one()
+            assert Decimal(ledger) == cash
+            assert cash < Decimal("100000")
+    finally:
+        if account_id is not None:
+            async with factory() as cleanup:
+                if instrument_id is not None:
+                    from sqlalchemy import delete
+
+                    await cleanup.execute(
+                        delete(InstrumentRow).where(InstrumentRow.id == instrument_id)
+                    )
+                try:
+                    await SqlAlchemyAccountRepository(cleanup).close_account(account_id)
+                except Exception:  # noqa: BLE001 — la limpieza no tapa el fallo del aserto
+                    pass
+                await cleanup.commit()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_fin1_no_global_default_portfolio_by_name(db_session) -> None:
     """F-FIN-1: fail-closed — sin scope de cartera NO se resuelve ningún default global.
 

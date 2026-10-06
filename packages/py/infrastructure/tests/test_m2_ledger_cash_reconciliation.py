@@ -514,7 +514,7 @@ async def test_custody_cash_insuficiente_no_escribe_ledger(db_session: AsyncSess
         price=Decimal("150"),
         total=Decimal("150000"),
         executed_at=_now(),
-        idempotency_key=None,
+        idempotency_key=f"m2-insf-{uuid4().hex[:12]}",
     )
     db_session.add(tx)
     # Cash bajo (se reduce DIRECTAMENTE en la fila, B-3: muta cash SIN ledger; es la

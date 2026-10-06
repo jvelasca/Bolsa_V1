@@ -170,6 +170,7 @@ async def test_caso1_close_d1_valored_por_close_no_fallback(db_session: AsyncSes
             price=Decimal("9"),
             total=Decimal("45"),
             executed_at=_now(),
+            idempotency_key=f"sum-close-{uuid4().hex[:12]}",
         )
     )
     await db_session.flush()
@@ -223,6 +224,7 @@ async def test_caso2_sin_close_pero_con_transaccion_mark_to_cost(db_session: Asy
             price=Decimal("7"),
             total=Decimal("35"),
             executed_at=t_now - timedelta(days=2),
+            idempotency_key=f"sum-old-{uuid4().hex[:12]}",
         )
     )
     db_session.add(
@@ -235,6 +237,7 @@ async def test_caso2_sin_close_pero_con_transaccion_mark_to_cost(db_session: Asy
             price=Decimal("10"),
             total=Decimal("50"),
             executed_at=t_now,
+            idempotency_key=f"sum-new-{uuid4().hex[:12]}",
         )
     )
     await db_session.flush()

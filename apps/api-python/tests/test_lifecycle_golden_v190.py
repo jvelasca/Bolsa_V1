@@ -229,7 +229,7 @@ async def _seed_open_ledger_fks(
                     price=p,
                     total=q * p,
                     executed_at=now,
-                    idempotency_key=None,
+                    idempotency_key=f"golden-v190-{tx_id}",
                 )
             )
         await session.commit()
