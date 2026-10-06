@@ -155,10 +155,19 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * `Delta motor = 0`: CERO ficheros de motor. El arbol pinneado es el del commit funcional
  * `dd3af96d`. Pin anterior (sello `v2.88.57-beta`, commit `287a15b5`):
  * `apps` `0556be2f…` / `packages` `95cb0d69…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.59-beta`): AUTO COCKPIT 1.0.1 — telemetria honesta del semaforo
+ * de realidad monetaria: tercer tono `unknown` (ambar) cuando el tipo de cuenta no se conoce
+ * (`auto-reality.ts`), `isVirtual` tri-estado, y `PAPER_D_EXECUTE` no medido declarado `NO MEDIDO`
+ * (`auto-reality-strip.tsx`, `?? null`). UI/read-model puro: toca `apps/` (web); `packages/` NO
+ * cambia (mismo arbol que `v2.88.58`); `scripts/` no participa del pin.
+ * `Delta motor = 0`: CERO ficheros de motor. El arbol pinneado es el del commit funcional
+ * `c8c23cef`. Pin anterior (sello `v2.88.58-beta`, commit `dd3af96d`):
+ * `apps` `6f24ce28…` / `packages` `95cb0d69…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'dd3af96d',
-  appsHash: '6f24ce2858413c47273fcaef49b998a49f38460b',
+  commit: 'c8c23cef',
+  appsHash: 'a909995ba8cb3310fb9c4c9550e16b1247ca0ef7',
   packagesHash: '95cb0d698a708635e0594a5c85bacfb0a7538c20',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
