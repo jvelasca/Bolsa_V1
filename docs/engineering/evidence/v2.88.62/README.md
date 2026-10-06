@@ -81,7 +81,7 @@
 - **Contrato de explicación por `cycleId`**: heredado de `v2.88.60`.
 - **PIT histórico institucional** y **Execution Analysis** (`23 orden_creada_sin_fill`): P3 abiertas.
 - **`CONFIRMED` NO se emite.**
-- **Re-anclaje del freeze de la ventana** (`scripts/lib/window-forward.mjs`) y **tag/Relesase**: pendientes del commit de sello (no ejecutables desde un árbol sin commit).
+- **Re-anclaje del freeze de la ventana** (`scripts/lib/window-forward.mjs`) y **tag/Release**: **cerrados** en este sello (ver §6 y §7).
 - **NO** se re-mide `DÍA-D`: las cifras OOS se **heredan y citan**.
 
 ---
@@ -117,12 +117,19 @@ E2E_RUN=1 pnpm --filter @bolsa/web exec playwright test gp-e2e-v28865 gp-e2e-v28
 
 | Rol | Commit | Árboles |
 | --- | --- | --- |
-| **Sello funcional** (`feat`) | _pendiente_ | — |
-| Re-anclaje del freeze de la ventana (`chore`) | _pendiente_ | — |
-| **Commit del tag** (`docs(seal)`) | _pendiente_ | — |
+| **Sello funcional** (`feat`) | `9690971d` | `apps` `8ad1efc2…` / `packages` `bdcb1d34…` |
+| Bump de versión (`chore(release)`) | `42085822` | `2.11.62-beta` (package + `meta.bump` `v2_89`…`v2_97`) |
+| Re-anclaje del freeze de la ventana (`chore(window)`) | `3245a529` | pin → `42085822` |
+| **Commit del tag** (`docs(seal)`) | `7b9cdc14` | — |
 
 ---
 
 ## 7. Cita del CI (POST-TAG)
 
-> **Pendiente.** Se completa cuando exista el tag `v2.88.62-beta` y su `Release tag CI` (límite estructural declarado, como en sellos previos).
+**Tag anotado `v2.88.62-beta`** (objeto `96bb7476…`) → tip `docs(seal)` `7b9cdc14`. **`Release tag CI` run [`37433048176`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37433048176) VERDE** (`attempt 2`): `11` jobs `success` (`security`, `shared`, `spine`, `frontend`, `python`, `playwright-mock`, `lifecycle-pg`, `replay-repro`, `dr-verify`, `a7-gate`, y `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño.
+
+- `python`: `4544 passed / 45 skipped` (`ruff` `All checks passed!`).
+- `frontend`: `255` ficheros / **`1475 passed`**; `contract:check` `passed=true · critical=0 · warn=0`.
+- `replay-repro`: **`VEREDICTO REPRODUCIDO`** — `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` ⇒ **`Δ motor = 0` confirmado por CI** (mismo digest en las dos corridas; sellado en CRLF, fichero en LF).
+- `dr-verify`: la **batería DR** (`db:dr:test · TCP`) pasa; el `attempt 1` cayó por un **fallo de infraestructura del action** en el *post-run* de `actions/setup-node@v5` (`Path Validation Error … caching`, cache miss por el `pnpm-lock.yaml` nuevo — no ejecutable producto), **ajeno al sello**; el re-run (`attempt 2`) fue **VERDE**.
+- **`GitHub Release` `v2.88.62-beta` publicado** (pre-release): <https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.62-beta>.
