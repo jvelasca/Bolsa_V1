@@ -6,7 +6,7 @@
 > **Regla del hueco:** una regla que no se puede afirmar se declara **abierta** con su remediación, **nunca** se silencia.
 > **`Δ AUTO decision/execution motor = 0`.** Ningún fichero de motor tocado; **no** se toca `replay_oos.RoundTrip.to_dict`. **El contrato HTTP NO cambia** en este sello (se hereda el de `v2.88.60`).
 > **Evidencia cruda:** [`docs/engineering/evidence/v2.88.61/README.md`](./evidence/v2.88.61/README.md) (`§0`–`§7`).
-> **Nota de auditabilidad.** A diferencia de `v2.88.60` (commits locales, sin push ni tag), este sello **se publica**: `main` empujado y **tag anotado `v2.88.61-beta`** creado, de modo que el `Release tag CI` certifica el árbol en GitHub. La **cita del CI** viaja en el `Release` y en la evidencia §7 (POST-TAG).
+> **Nota de auditabilidad.** A diferencia de `v2.88.60` (commits locales, sin push ni tag), este sello **se publica**: `main` empujado y **tag anotado `v2.88.61-beta`** creado, de modo que el `Release tag CI` certifica el árbol en GitHub. **Cita POST-TAG:** `Release tag CI` [`37429328159`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37429328159) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `python` `4544 passed / 45 skipped`; `frontend` `1442 passed`; `replay-repro` `REPRODUCIDO` `1E3ADAC2…` ⇒ **`Δ motor = 0` confirmado por CI**); **GitHub Release** `v2.88.61-beta` publicado (pre-release). Detalle en la evidencia §8.
 
 **Sello dirigido (declarado).** Mandato: **la APP debe arrancar**. La decisión de diseño es **no depender de la configuración de Windows** (SAC no admite exclusiones) y **eliminar la causa**: la venv usa un binario firmado y **se auto-repara** si `uv` reintroduce el trampolín bloqueado. Se **absorbe** la F5 de `v2.88.60` para no correr dos pipelines (criterio `v2.88.49`→`v2.88.50`).
 
@@ -87,7 +87,7 @@
 | Bump de versión (`chore(release)`) | `52a697e1` | `apps` `286cf716…` / `packages` `b482a276…` |
 | Re-anclaje del freeze (`chore(window)`) | `dfc2966a` | pin `commit: 52a697e1` (no mueve árbol) |
 | **Commit del sello** (`docs(seal)`) | (tip) | (mismos árboles que el bump) |
-| Tag anotado `v2.88.61-beta` | **creado y empujado** | `Release tag CI` pendiente de cita POST-TAG |
+| Tag anotado `v2.88.61-beta` | **`df74739d`** (creado y empujado) | `Release tag CI` [`37429328159`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37429328159) **VERDE** (`replay-repro` `REPRODUCIDO` ⇒ `Δ motor = 0`) |
 
 - **Absorción:** este sello **incluye** la F5 de `v2.88.60` (sin tag propio); el `Release tag CI` de `v2.88.61-beta` certificará conjuntamente ambos cambios.
 

@@ -115,8 +115,8 @@ pytest apps/api-python/tests/test_dia_d_bump_guard.py -q
 | --- | --- | --- |
 | Bump de versión (`chore(release)`) | `52a697e1` | `apps` `286cf716…` / `packages` `b482a276…` |
 | Re-anclaje del freeze (`chore(window)`) | `dfc2966a` | pin `commit: 52a697e1` (no mueve árbol) |
-| **Commit del sello** (`docs(seal)`) | (este commit) | (mismos árboles que el bump) |
-| Tag anotado `v2.88.61-beta` | **creado y empujado** | `Release tag CI` pendiente de cita POST-TAG |
+| **Commit del sello** (`docs(seal)`) | `e9755a5f` | (mismos árboles que el bump) |
+| Tag anotado `v2.88.61-beta` | **`df74739d`** | `Release tag CI` [`37429328159`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37429328159) **VERDE** (§8) |
 
 > **Diferencia con `v2.88.60`:** ese sello movía `apps` **y** `packages` y cambiaba el contrato HTTP; este **solo** mueve `apps` (por `meta.bump`) y **no** toca contrato. `packages` conserva `b482a276…`.
 
@@ -126,3 +126,25 @@ pytest apps/api-python/tests/test_dia_d_bump_guard.py -q
 
 - `openapi.json` / `schema.d.ts` **no** se tocan en este sello (contrato sin cambio); el `contract:check` del CI sigue validando el contrato heredado de `v2.88.60`.
 - El pin del freeze (`WINDOW_CONFIG`) se **re-ancla** al commit `52a697e1` porque el `meta.bump` de los 9 CLI DÍA-D vive en `apps/`; `packages/` no cambia. `freezeCheck` compara `git rev-parse HEAD:apps HEAD:packages` contra el pin, y en `HEAD` coinciden (`286cf716…` / `b482a276…`).
+
+---
+
+## 8. Cita POST-TAG (certificación del CI)
+
+**`Release tag CI`** run [`37429328159`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37429328159) — **VERDE** (tag `v2.88.61-beta` → commit `e9755a5f`; `11` jobs `success` + `playwright` integrado `skipped` por diseño; `certify` `success`).
+
+| Job | Resultado |
+| --- | --- |
+| `security` (gitleaks) | `success` |
+| `shared` (build/typecheck/test + `window:test`) | `success` |
+| `spine` (decision-spine) | `success` |
+| `frontend` (typecheck/lint/test/build + `contract:check`) | `success` — `249` ficheros / **`1442 passed`**; `contract:check` OK (`Δ contrato` de este sello = 0) |
+| `python` (ruff/imports/mypy/pytest offline) | `success` — **`4544 passed / 45 skipped`**; `ruff` limpio; imports **`4 kept, 0 broken`**; `mypy` **`531`** ficheros |
+| `playwright-mock` (E2E mock) | `success` |
+| `lifecycle-pg` (Alembic + auth + golden restart) | `success` |
+| `replay-repro` | `success` — **`VEREDICTO REPRODUCIDO`** (`sha256 1E3ADAC2…`; `3340728 B` LF; sello `3 445 622 B` CRLF) ⇒ **`Δ motor = 0` confirmado por CI** |
+| `dr-verify` (DB_DR / TCP) | `success` |
+| `a7-gate` (A7 C3 chaos live_a7) | `success` |
+| `certify` (aggregate + artifact) | `success` |
+
+> **Conclusión.** El tag `v2.88.61-beta` queda **certificado por CI**: reproducible (`replay-repro` `REPRODUCIDO`) y con `Δ motor = 0`. La única observación del run son **warnings** de `react-hooks/exhaustive-deps` pre-existentes y avisos de deprecación de acciones (`Node.js 20`), **ajenos** a este sello. **GitHub Release** `v2.88.61-beta` **publicado** (pre-release).
