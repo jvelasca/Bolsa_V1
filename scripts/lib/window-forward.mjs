@@ -215,11 +215,15 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * RE-ANCLAJE 2026-10-06 (sello `v2.88.67-beta`): cash suelto deja de ser puerta pública.
  * Árbol pinneado: `c6a4be15`. Pin anterior (`c47f7882`): `apps` `ca763e61…` /
  * `packages` `677b2e17…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.68-beta`): CHECK cash y cantidad.
+ * Árbol pinneado: `c3ca7a93`. Pin anterior (`c6a4be15`): `apps` `8b35fa7a…` /
+ * `packages` `5db6d7e0…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'c6a4be15',
-  appsHash: '8b35fa7ab2c1d9aee75b74abb1c23711563a2cc4',
-  packagesHash: '5db6d7e035b0611097dfe16ad15b6ff1f4f0a3fe',
+  commit: 'c3ca7a93',
+  appsHash: '5cbd5fc065a87cde454a26316f601002e481e982',
+  packagesHash: '907726dbbbaf9dc12d951ed7a113679b9c1d21cf',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
