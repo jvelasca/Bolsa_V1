@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { NO_MEASUREMENT_LABEL } from "@bolsa/shared";
 import {
+  AUTO_REALITY_ACCOUNT_LIVE,
   AUTO_REALITY_BROKER_NO_ORDERS,
-  AUTO_REALITY_BROKER_UNKNOWN,
-  AUTO_REALITY_MONEY_UNKNOWN,
   AUTO_REALITY_MONEY_VIRTUAL,
   AUTO_REALITY_MODE_DEMO,
   accountTypeRealityLabel,
@@ -47,19 +46,21 @@ describe("buildAutoReality", () => {
     expect(on.autoLabel).toBe("Activo");
   });
 
-  it("un tipo de cuenta ausente se declara NO MEDIDO con tono neutro (nunca virtual)", () => {
+  it("un tipo de cuenta ausente no apaga el banner virtual y declara la cuenta NO MEDIDO", () => {
     const r = buildAutoReality({
       accountType: null,
       bookMode: "semi",
       autoArmed: null,
       paperDExecuteEnv: null,
     });
-    expect(r.tone).toBe("unknown");
-    expect(r.isVirtual).toBeNull();
-    expect(r.moneyLabel).toBe(AUTO_REALITY_MONEY_UNKNOWN);
-    expect(r.brokerLabel).toBe(AUTO_REALITY_BROKER_UNKNOWN);
+    expect(r.tone).toBe("virtual");
+    expect(r.isVirtual).toBe(true);
+    expect(r.moneyLabel).toBe(AUTO_REALITY_MONEY_VIRTUAL);
+    expect(r.modeLabel).toBe(AUTO_REALITY_MODE_DEMO);
+    expect(r.brokerLabel).toBe(AUTO_REALITY_BROKER_NO_ORDERS);
     expect(r.accountTypeLabel).toBe(NO_MEASUREMENT_LABEL);
     expect(r.notes).toContain("Tipo de cuenta NO MEDIDO");
+    expect(r.moneyLabel).not.toBe("DINERO REAL");
   });
 
   it("declara la ejecución paper NO MEDIDA mientras el eco no llega, sin colapsarla a false", () => {
@@ -73,11 +74,17 @@ describe("buildAutoReality", () => {
     expect(r.notes).toContain("Ejecución paper NO MEDIDA");
   });
 
-  it("sólo `live` reclama dinero real (reservado)", () => {
+  it("una cuenta live no convierte el modo AUTO en dinero real", () => {
     const r = buildAutoReality({ accountType: "live" });
-    expect(r.tone).toBe("real");
-    expect(r.isVirtual).toBe(false);
-    expect(r.moneyLabel).toBe("DINERO REAL");
+    expect(r.tone).toBe("virtual");
+    expect(r.isVirtual).toBe(true);
+    expect(r.moneyLabel).toBe(AUTO_REALITY_MONEY_VIRTUAL);
+    expect(r.modeLabel).toBe(AUTO_REALITY_MODE_DEMO);
+    expect(r.brokerLabel).toBe(AUTO_REALITY_BROKER_NO_ORDERS);
+    expect(r.accountTypeLabel).toBe(AUTO_REALITY_ACCOUNT_LIVE);
+    expect(r.moneyLabel).not.toBe("DINERO REAL");
+    expect(r.brokerLabel).not.toContain("Broker LIVE");
+    expect(r.tone).not.toBe("real");
   });
 });
 
@@ -85,7 +92,7 @@ describe("accountTypeRealityLabel", () => {
   it("traduce cada tipo y degrada el ausente a NO MEDIDO", () => {
     expect(accountTypeRealityLabel("simulated")).toBe("Cuenta demo");
     expect(accountTypeRealityLabel("paper")).toBe("Paper (broker futuro)");
-    expect(accountTypeRealityLabel("live")).toBe("Cuenta real");
+    expect(accountTypeRealityLabel("live")).toBe(AUTO_REALITY_ACCOUNT_LIVE);
     expect(accountTypeRealityLabel(null)).toBe(NO_MEASUREMENT_LABEL);
     expect(accountTypeRealityLabel(undefined)).toBe(NO_MEASUREMENT_LABEL);
   });

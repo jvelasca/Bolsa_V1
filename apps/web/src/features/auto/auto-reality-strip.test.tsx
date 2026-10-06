@@ -5,9 +5,9 @@
  * reclama dinero real. El capital se rotula `NO MEDIDO` mientras no hay respuesta y se
  * presenta como medido cuando llega (nunca `0` por defecto).
  *
- * Honestidad de telemetría: un tipo de cuenta aún no cargado toma el tono neutro
- * `unknown` (ámbar), y un `PAPER_D_EXECUTE` pendiente se declara `NO MEDIDO` en vez de
- * colapsarse a `false`.
+ * Honestidad de telemetría: el banner de AUTO sigue en dinero virtual aunque la cuenta
+ * sea `live` o aún no haya llegado. La cuenta ausente se declara `NO MEDIDO` en su línea.
+ * Un `PAPER_D_EXECUTE` pendiente se declara `NO MEDIDO` en vez de colapsarse a `false`.
  */
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -102,6 +102,9 @@ describe("AutoRealityStrip", () => {
     expect(
       screen.getByTestId("auto-reality-strip").getAttribute("data-tone"),
     ).toBe("virtual");
+    expect(screen.getByTestId("auto-reality-banner").textContent).toBe(
+      "SIMULACIÓN — DINERO VIRTUAL",
+    );
     expect(screen.getByTestId("auto-reality-money").textContent).toBe(
       "DINERO VIRTUAL",
     );
@@ -116,7 +119,7 @@ describe("AutoRealityStrip", () => {
     );
   });
 
-  it("con un tipo de cuenta aún no cargado declara el tono neutro unknown, nunca verde", () => {
+  it("con un tipo de cuenta aún no cargado mantiene el banner virtual y declara la cuenta", () => {
     mocks.useActiveAccount.mockReturnValue({
       account: null,
       effectiveAccountId: null,
@@ -126,16 +129,51 @@ describe("AutoRealityStrip", () => {
     renderStrip();
     expect(
       screen.getByTestId("auto-reality-strip").getAttribute("data-tone"),
-    ).toBe("unknown");
+    ).toBe("virtual");
     expect(screen.getByTestId("auto-reality-money").textContent).toBe(
-      "TIPO DE CUENTA NO CONFIRMADO",
+      "DINERO VIRTUAL",
+    );
+    expect(screen.getByTestId("auto-reality-mode").textContent).toBe(
+      "AUTO DEMO",
     );
     expect(screen.getByTestId("auto-reality-broker").textContent).toContain(
+      "No envía órdenes a XTB",
+    );
+    expect(screen.getByTestId("auto-reality-account").textContent).toBe(
       "NO MEDIDO",
     );
     expect(screen.getByTestId("auto-reality-notes").textContent).toContain(
       "Tipo de cuenta NO MEDIDO",
     );
+  });
+
+  it("una cuenta live no pinta DINERO REAL ni Broker LIVE dentro de AUTO", () => {
+    mocks.useActiveAccount.mockReturnValue({
+      account: { id: "acc-live", type: "live" },
+      effectiveAccountId: "acc-live",
+      isLoading: false,
+      accounts: [],
+    });
+    renderStrip();
+    const strip = screen.getByTestId("auto-reality-strip");
+    expect(strip.getAttribute("data-tone")).toBe("virtual");
+    expect(screen.getByTestId("auto-reality-banner").textContent).toBe(
+      "SIMULACIÓN — DINERO VIRTUAL",
+    );
+    expect(screen.getByTestId("auto-reality-money").textContent).toBe(
+      "DINERO VIRTUAL",
+    );
+    expect(screen.getByTestId("auto-reality-mode").textContent).toBe(
+      "AUTO DEMO",
+    );
+    expect(screen.getByTestId("auto-reality-broker").textContent).toContain(
+      "No envía órdenes a XTB",
+    );
+    expect(screen.getByTestId("auto-reality-account").textContent).toBe(
+      "Cuenta conectada: XTB LIVE",
+    );
+    expect(strip.textContent).not.toContain("DINERO REAL");
+    expect(strip.textContent).not.toContain("Broker LIVE");
   });
 
   it("conserva PAPER_D_EXECUTE como NO MEDIDO mientras la consulta no responde", () => {

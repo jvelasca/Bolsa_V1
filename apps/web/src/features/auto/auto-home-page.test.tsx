@@ -42,6 +42,18 @@ const financialState = vi.hoisted(() => ({
   operationalState: "OK" as string | null,
 }));
 
+const accountSummary = vi.hoisted(() => ({
+  data: null as {
+    positionsCount: number;
+    cash: number;
+    totalUnrealizedPnl: number;
+  } | null,
+}));
+
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: () => ({ data: accountSummary.data }),
+}));
+
 vi.mock("@/features/operational-console/use-financial-integrity", () => ({
   useFinancialIntegrity: () => ({
     data: { operationalState: financialState.operationalState },
@@ -76,6 +88,7 @@ beforeEach(() => {
   monitorState.isLoading = false;
   monitorState.isError = false;
   financialState.operationalState = "OK";
+  accountSummary.data = null;
 });
 
 afterEach(cleanup);
@@ -99,7 +112,7 @@ describe("AutoHomePage", () => {
   it("responde las preguntas clave con datos legibles", () => {
     renderHome();
     expect(screen.getByTestId("auto-home-tile-auto").textContent).toContain(
-      "Activo",
+      "Funcionando",
     );
     expect(
       screen.getByTestId("auto-home-tile-operations").textContent,
@@ -107,12 +120,97 @@ describe("AutoHomePage", () => {
     expect(screen.getByTestId("auto-home-tile-risk").textContent).toContain(
       "Normal",
     );
+    expect(screen.getByTestId("auto-home-q-working").textContent).toContain(
+      "Funcionando",
+    );
+    expect(screen.getByTestId("auto-home-q-doing").textContent).toContain(
+      "Sin dato todavía",
+    );
+    expect(screen.getByTestId("auto-home-q-asset").textContent).toContain(
+      "AAPL",
+    );
+    expect(screen.getByTestId("auto-home-q-decision").textContent).toContain(
+      "Sin dato todavía",
+    );
+    expect(screen.getByTestId("auto-home-q-happened").textContent).toContain(
+      "Sin dato todavía",
+    );
+    expect(screen.getByTestId("auto-home-q-money").textContent).toContain(
+      "SIMULACIÓN — DINERO VIRTUAL",
+    );
+    expect(
+      screen.getByTestId("auto-home-figure-position").textContent,
+    ).toContain("Sin dato todavía");
+    expect(screen.getByTestId("auto-home-figure-risk").textContent).toContain(
+      "Normal",
+    );
+    const card = screen.getByTestId("auto-operation-card");
+    expect(card.getAttribute("data-cycle-id")).toBe("cyc-1");
+    expect(screen.getByTestId("auto-card-slot-decision").textContent).toContain(
+      "Sin dato todavía",
+    );
+    expect(
+      screen.getByTestId("auto-card-slot-simulation").textContent,
+    ).toContain("Sin dato todavía");
+    expect(
+      screen.getByTestId("auto-operation-card-details").getAttribute("href"),
+    ).toBe("/auto-monitor?mode=current&cycle=cyc-1");
+    expect(screen.getByTestId("auto-home-activity").textContent).toContain(
+      "Ver actividad",
+    );
     expect(screen.getByTestId("auto-home-doing").textContent).toBe(
-      "Funcionando correctamente",
+      "Funcionando",
     );
     expect(screen.getByTestId("auto-home-last-activity").textContent).toBe(
       "09:42",
     );
+  });
+
+  it("copia las cifras de cuenta y no marca la simulación con el fill", () => {
+    accountSummary.data = {
+      positionsCount: 2,
+      cash: 10000,
+      totalUnrealizedPnl: 12.5,
+    };
+    monitorState.cycles = [
+      {
+        ...OPEN_CYCLE,
+        steps: [
+          {
+            id: "ORDER",
+            state: "reached",
+            measurement: "COMPLETE",
+            facts: [
+              {
+                key: "entryOrder",
+                measurement: "COMPLETE",
+                value: { requestedQty: 10, appliedQty: 10 },
+              },
+            ],
+          },
+          { id: "FILL", state: "reached", measurement: "COMPLETE" },
+        ],
+      },
+    ];
+    renderHome();
+    expect(
+      screen.getByTestId("auto-home-figure-position").textContent,
+    ).toContain("2 posiciones en la cuenta simulada");
+    expect(screen.getByTestId("auto-home-figure-cash").textContent).toContain(
+      "10000.00 €",
+    );
+    expect(
+      screen.getByTestId("auto-card-slot-execution").textContent,
+    ).toContain("10/10");
+    expect(
+      screen.getByTestId("auto-card-slot-simulation").textContent,
+    ).toContain("Sin dato todavía");
+    expect(screen.getByTestId("auto-card-slot-money").textContent).toContain(
+      "en la cuenta simulada",
+    );
+    expect(
+      screen.getByTestId("auto-card-slot-money").textContent,
+    ).not.toContain("DINERO REAL");
   });
 
   it("enlaza las operaciones abiertas a su ruta canónica", () => {

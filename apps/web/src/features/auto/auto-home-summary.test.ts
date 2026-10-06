@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   AUTO_HOME_NO_DATA_LABEL,
   buildAutoHomeSummary,
+  engineStateLabel,
   formatActivityTime,
   isOperationOpen,
 } from "@/features/auto/auto-home-summary";
@@ -97,8 +98,8 @@ describe("buildAutoHomeSummary", () => {
       riskOperationalState: "OK",
     });
     expect(summary.loaded).toBe(true);
-    expect(summary.autoLabel).toBe("Activo");
-    expect(summary.statusLabel).toBe("Funcionando correctamente");
+    expect(summary.autoLabel).toBe("Funcionando");
+    expect(summary.statusLabel).toBe("Funcionando");
     expect(summary.lastActivityLabel).toBe("09:42");
     expect(summary.nextStepLabel).toBe("Próximo análisis: 10:00");
     expect(summary.openOperationsCount).toBe(1);
@@ -121,6 +122,31 @@ describe("buildAutoHomeSummary", () => {
     expect(summary.openOperationsLabel).toBe("Sin operaciones abiertas");
     // Cargado (el header existe) pero sin próxima decisión ⇒ esperando señal.
     expect(summary.nextStepLabel).toBe("Esperando nueva señal");
+  });
+
+  it("traduce solo el conjunto cerrado del motor", () => {
+    expect(engineStateLabel("RUNNING")).toBe("Funcionando");
+    expect(engineStateLabel("PAUSED")).toBe("Detenido");
+    expect(engineStateLabel("DEGRADED")).toBe("Funcionamiento limitado");
+    expect(engineStateLabel("BLOCKED")).toBe("Bloqueado");
+    expect(engineStateLabel("REQUIRES_ATTENTION")).toBe("Atención requerida");
+    expect(engineStateLabel("WAITING")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(engineStateLabel("STOPPED")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(engineStateLabel("UNKNOWN")).toBe(AUTO_HOME_NO_DATA_LABEL);
+    expect(engineStateLabel(null)).toBe(AUTO_HOME_NO_DATA_LABEL);
+
+    for (const state of [
+      "PAUSED",
+      "DEGRADED",
+      "BLOCKED",
+      "REQUIRES_ATTENTION",
+      "WAITING",
+    ]) {
+      const summary = buildAutoHomeSummary({ header: { state } });
+      expect(summary.autoLabel).toBe(engineStateLabel(state));
+      expect(summary.statusLabel).toBe(summary.autoLabel);
+      expect(summary.statusLabel).not.toBe("Funcionando correctamente");
+    }
   });
 
   it("mapea los estados de integridad operativa", () => {

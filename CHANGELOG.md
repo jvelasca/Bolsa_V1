@@ -2,6 +2,24 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.76-beta] — `AUTO · UI`: **la tarjeta muestra las seis ranuras**
+
+**Bump** `2.11.75-beta` → `2.11.76-beta`. **SIN migración**. **`Δ motor = 0`**. Contrato HTTP sin cambio. Tag no creado.
+
+- Cada operación en curso tiene una tarjeta con Decisión, Orden, Ejecución, Simulación, Posición y Dinero. Decisión y Simulación quedan «Sin dato todavía». Un fill no marca la simulación ni dice que la operación abrió la posición.
+- La HOME copia posición, resultado, efectivo simulado y riesgo del resumen de cuenta. Si el resumen no llega, esas cifras son «Sin dato todavía».
+- Oportunidades, DÍA-D, evidencia e investigación quedan detrás de «Ver actividad». «Ver detalles» abre el monitor técnico del ciclo.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.76/README.md`](docs/engineering/evidence/v2.88.76/README.md).
+
+## [2.11.75-beta] — `AUTO · UI`: **el dinero de AUTO es simulado y la HOME responde seis preguntas**
+
+**Bump** `2.11.74-beta` → `2.11.75-beta`. **SIN migración**. **`Δ motor = 0`**. Contrato HTTP sin cambio. Tag no creado.
+
+- La tira de AUTO ya no pinta `DINERO REAL` ni `Broker LIVE conectado` cuando la cuenta activa es `live`. El banner es `SIMULACIÓN — DINERO VIRTUAL`. La cuenta LIVE se lee aparte: `Cuenta conectada: XTB LIVE`.
+- El estado del motor solo se traduce si el token está en el conjunto cerrado (`RUNNING`, `PAUSED`, `BLOCKED`, `DEGRADED`, `REQUIRES_ATTENTION`). Un token desconocido es «Sin dato todavía».
+- La HOME de `/auto` muestra las seis preguntas. Acción y decisión quedan «Sin dato todavía». Un fill sin cantidades pedida y aplicada medidas no se llama «Precio aplicado». La tarjeta de operación no está.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.75/README.md`](docs/engineering/evidence/v2.88.75/README.md).
+
 ## [2.11.74-beta] — `AUTO · UI`: **el primer nivel no afirma posición ni dinero**
 
 **Bump** `2.11.73-beta` → `2.11.74-beta`. **SIN migración**. **`Δ motor = 0`**. Contrato HTTP sin cambio.

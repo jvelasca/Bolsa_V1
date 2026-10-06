@@ -95,10 +95,10 @@ describe("AutoSistemaPage", () => {
     renderPage();
     expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByTestId("auto-sistema-auto").textContent).toContain(
-      "Activo",
+      "Funcionando",
     );
     expect(screen.getByTestId("auto-sistema-doing").textContent).toBe(
-      "Funcionando correctamente",
+      "Funcionando",
     );
     expect(screen.getByTestId("auto-sistema-last-activity").textContent).toBe(
       "09:42",

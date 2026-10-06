@@ -20,6 +20,7 @@ import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { AUTO_SIMULATION_BANNER } from "./auto-basic-home";
 import {
   AUTO_REALITY_DISCLAIMER,
   buildAutoReality,
@@ -87,6 +88,13 @@ export function AutoRealityStrip() {
         TONE_CONTAINER_CLASS[reality.tone],
       )}
     >
+      <span
+        className="basis-full text-sm font-semibold"
+        data-testid="auto-reality-banner"
+      >
+        {AUTO_SIMULATION_BANNER}
+      </span>
+
       <span className="inline-flex items-center gap-1.5 font-semibold">
         <span
           aria-hidden="true"

@@ -10,8 +10,10 @@
  * - Un hueco (`null`/ausente/`UNKNOWN`) se declara «Sin dato todavía»; NUNCA se rellena con `0`.
  * - El contador sólo incluye ciclos en «Precio aplicado» (`FILL` alcanzado y no cerrados, con
  *   medición `COMPLETE`). Una reserva, una orden o un cierre no medido no cuentan.
- * - El estado del motor se traduce genéricamente («Funcionando correctamente»): no se afirma *qué*
- *   está analizando (el DTO no lo dice). El valor crudo queda para el detalle técnico.
+ * - El estado del motor se traduce solo si el token pertenece al conjunto cerrado que el monitor
+ *   copia (`RUNNING`, `PAUSED`, `BLOCKED`, `DEGRADED`, `REQUIRES_ATTENTION`). Cualquier otro
+ *   token es «Sin dato todavía». Conocer el estado no significa que funcione correctamente.
+ *   El valor crudo queda para el detalle técnico.
  *
  * @see docs/engineering/spec-auto-ui-refactor-3-0-2026-10-06.md §2
  */
@@ -53,9 +55,15 @@ export type AutoHomeSummaryV1 = {
   /** Estado de sustitución a pintar cuando la query no está disponible aún. */
   isLoading: boolean;
   isError: boolean;
-  /** `Activo` | `Sin dato todavía` (estado del motor, traducido). */
+  /**
+   * Traducción del estado del motor, o `Sin dato todavía`.
+   * Misma frase que `statusLabel`.
+   */
   autoLabel: string;
-  /** `Funcionando correctamente` | `Sin dato todavía`. */
+  /**
+   * Traducción del estado del motor, o `Sin dato todavía`.
+   * Misma frase que `autoLabel`.
+   */
   statusLabel: string;
   /** Sello `HH:mm` de la última decisión/heartbeat, o `Sin dato todavía`. */
   lastActivityLabel: string;
@@ -75,17 +83,24 @@ export function isOperationOpen(cycle: AutoHomeCycleFacts): boolean {
   return cycleStatusLabel(cycle) === CYCLE_STATUS_PRICE_APPLIED;
 }
 
-const UNKNOWN_STATE_TOKENS = new Set([
-  "",
-  "UNKNOWN",
-  "NO MEDIDO",
-  "N/A",
-  "NONE",
-]);
+/**
+ * Conjunto cerrado que el monitor copia de `AutoEngineState`.
+ * Un token fuera de esta tabla no se presenta como funcionamiento correcto.
+ */
+const ENGINE_STATE_LABELS: Readonly<Record<string, string>> = {
+  RUNNING: "Funcionando",
+  PAUSED: "Detenido",
+  DEGRADED: "Funcionamiento limitado",
+  BLOCKED: "Bloqueado",
+  REQUIRES_ATTENTION: "Atención requerida",
+};
 
-function hasKnownState(state: string | null | undefined): boolean {
-  if (state === null || state === undefined) return false;
-  return !UNKNOWN_STATE_TOKENS.has(state.trim().toUpperCase());
+/** Traduce `header.state` solo si el token está en el conjunto cerrado del motor. */
+export function engineStateLabel(state: string | null | undefined): string {
+  if (state == null) return AUTO_HOME_NO_DATA_LABEL;
+  return (
+    ENGINE_STATE_LABELS[state.trim().toUpperCase()] ?? AUTO_HOME_NO_DATA_LABEL
+  );
 }
 
 /**
@@ -128,7 +143,9 @@ export function buildAutoHomeSummary(
   const isError = input.isError === true;
   const loaded = !isLoading && !isError && header !== null;
 
-  const stateKnown = loaded && hasKnownState(header?.state);
+  const engineLabel = loaded
+    ? engineStateLabel(header?.state)
+    : AUTO_HOME_NO_DATA_LABEL;
   const lastActivityRaw =
     header?.lastDecisionAt ?? header?.lastHeartbeatAt ?? null;
 
@@ -142,10 +159,8 @@ export function buildAutoHomeSummary(
     loaded,
     isLoading,
     isError,
-    autoLabel: stateKnown ? "Activo" : AUTO_HOME_NO_DATA_LABEL,
-    statusLabel: stateKnown
-      ? "Funcionando correctamente"
-      : AUTO_HOME_NO_DATA_LABEL,
+    autoLabel: engineLabel,
+    statusLabel: engineLabel,
     lastActivityLabel: lastActivityRaw
       ? formatActivityTime(lastActivityRaw)
       : AUTO_HOME_NO_DATA_LABEL,
