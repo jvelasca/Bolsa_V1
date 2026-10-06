@@ -239,11 +239,15 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * RE-ANCLAJE 2026-10-06 (sello `v2.88.73-beta`): el id de Alembic 050 cabe
  * en varchar(32). Δ motor = 0. Árbol pinneado: `69966996`. Pin anterior
  * (`969136d8`): `apps` `56aca8b7…` / `packages` `bd993b5d…`.
+ *
+ * RE-ANCLAJE 2026-10-06 (sello `v2.88.74-beta`): el primer nivel no afirma
+ * posición ni dinero. Δ motor = 0. Árbol pinneado: `68335c5c`. Pin anterior
+ * (`69966996`): `apps` `ff9a3623…` / `packages` `30169088…`.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '69966996',
-  appsHash: 'ff9a36239e8e359d7ce2b8429325e35b0c1f2732',
-  packagesHash: '30169088ff45bb4a60e398f5f14479334e9f515e',
+  commit: '68335c5c',
+  appsHash: '34172e7f412d61ad7ac1a7d2da71f6476ccc4886',
+  packagesHash: 'f80b2285da4624474a56e8df71c6e56b532120f0',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
