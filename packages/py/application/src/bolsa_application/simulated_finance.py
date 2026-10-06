@@ -54,7 +54,7 @@ from bolsa_application.simulated_settlement import (
     AUTO_SETTLE_VENUES,
     simulated_idempotency_key,
 )
-from bolsa_domain.errors import PermanentRejectionError
+from bolsa_domain.errors import IdempotencyKeyReused, PermanentRejectionError
 
 logger = logging.getLogger(__name__)
 
@@ -269,7 +269,7 @@ def build_simulated_execute_trade_applier(
                 strategy_version_id=finance.strategy_version_id,
             )
             return True
-        except PermanentRejectionError:
+        except (PermanentRejectionError, IdempotencyKeyReused):
             # OBS-21: rechazo DETERMINISTA del dominio (p.ej. «No tienes suficientes
             # acciones»): reintentar el mismo fill lo vuelve a encontrar idéntico. NO
             # se traga aquí; se RE-LANZA para que el store lo clasifique como terminal

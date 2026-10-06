@@ -33,7 +33,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal, Protocol, runtime_checkable
 
-from bolsa_domain.errors import PermanentRejectionError
+from bolsa_domain.errors import IdempotencyKeyReused, PermanentRejectionError
 
 _INSERTED = "inserted"
 _DUPLICATE = "duplicate"
@@ -1133,15 +1133,18 @@ async def apply_execution_financial_once(
     fence = owned.lease_generation
     try:
         effective = await apply_finance(execution)
-    except PermanentRejectionError:
-        # OBS-21: rechazo DETERMINISTA del dominio (p.ej. «No tienes suficientes
-        # acciones»). Reintentar el mismo fill lo vuelve a encontrar idéntico, así que
-        # su terminal correcto es NO reintentable (FAILED), no un RETRY indefinido que
-        # el reaper/recovery volvería a barrer pagando cómputo por un hecho inmutable.
-        # Fail-closed intacto: jamás se marca APPLIED.
+    except (PermanentRejectionError, IdempotencyKeyReused) as exc:
+        # OBS-21 / TST-03: rechazo DETERMINISTA (sin acciones, o la misma
+        # idempotency_key con otro payload). Reintentar no cambia el hecho.
+        # Fail-closed: jamás se marca APPLIED.
+        error = (
+            "apply_idempotency_reused"
+            if isinstance(exc, IdempotencyKeyReused)
+            else "apply_permanent_rejection"
+        )
         marked = await store.mark_failed(
             execution.execution_id,
-            error="apply_permanent_rejection",
+            error=error,
             lease_owner=owner,
             lease_generation=fence,
         )
@@ -1270,13 +1273,17 @@ async def reap_stale_applying(
                     continue
                 try:
                     effective = await apply_finance(candidate)
-                except PermanentRejectionError:
-                    # OBS-21: rechazo determinista del dominio al reaplicar un APPLYING
-                    # stale → FAILED (no reintentable). No se devuelve a RETRY: el reaper
-                    # no debe reencolar un hecho que no cambia.
+                except (PermanentRejectionError, IdempotencyKeyReused) as exc:
+                    # OBS-21 / TST-03: rechazo determinista al reaplicar un APPLYING
+                    # stale → FAILED (no reintentable).
+                    error = (
+                        "reap_apply_idempotency_reused"
+                        if isinstance(exc, IdempotencyKeyReused)
+                        else "reap_apply_permanent_rejection"
+                    )
                     marked = await store.mark_failed(
                         execution_id,
-                        error="reap_apply_permanent_rejection",
+                        error=error,
                         lease_owner=owner,
                         lease_generation=fence,
                     )

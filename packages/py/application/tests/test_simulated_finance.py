@@ -43,7 +43,7 @@ from bolsa_application.simulated_finance import (
     sim_roundtrip_accounting,
 )
 from bolsa_application.simulated_settlement import simulated_execution_candidates
-from bolsa_domain.errors import PermanentRejectionError
+from bolsa_domain.errors import IdempotencyKeyReused, PermanentRejectionError
 from bolsa_domain.lifecycle import LIFECYCLE_CASH, LifecycleAccounting, assert_equity_invariant
 
 _Q = Decimal("100.000000")
@@ -274,6 +274,26 @@ def test_applier_propagates_permanent_rejection_instead_of_swallowing() -> None:
     )
 
     with pytest.raises(PermanentRejectionError):
+        asyncio.run(applier(event))
+
+
+class _ReusedKeyExecuteTrade:
+    async def execute(self, **kwargs: object) -> object:
+        raise IdempotencyKeyReused("sim-fin-same-key")
+
+
+def test_applier_propagates_idempotency_key_reused() -> None:
+    """TST-03: un conflicto de clave no vuelve como False (eso era un RETRY)."""
+    result = _schedule("buy")
+    applier = _applier_for(result, fake=_ReusedKeyExecuteTrade())
+    fill = result.fills[0]
+    event = ExecutionEvent(
+        execution_id=fill.execution_id,
+        order_id="o",
+        venue="SIMULATED",
+        qty=abs(fill.qty_delta),
+    )
+    with pytest.raises(IdempotencyKeyReused):
         asyncio.run(applier(event))
 
 

@@ -2,6 +2,15 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.66-beta] — `NÚCLEO`: **IdempotencyKeyReused marca FAILED**
+
+**Bump** `2.11.65-beta` → `2.11.66-beta`. **SIN migración**. **`Δ motor = 0`**.
+
+- El applier SIM deja de tragar `IdempotencyKeyReused` en el `except Exception` que devolvía `False` (reintento). Lo relanza, igual que `PermanentRejectionError`.
+- `apply_execution_financial_once` y el reaper marcan `FAILED` con `apply_idempotency_reused`.
+- **Tests.** `test_applier_propagates_idempotency_key_reused` y `test_durable_apply_idempotency_reused_marks_failed` **passed**.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.66/README.md`](docs/engineering/evidence/v2.88.66/README.md).
+
 ## [2.11.65-beta] — `NÚCLEO`: **la venta compara Decimal**
 
 **Bump** `2.11.64-beta` → `2.11.65-beta`. **SIN migración**. **`Δ motor = 0`** para cantidades que el float representa igual que el `Decimal`.

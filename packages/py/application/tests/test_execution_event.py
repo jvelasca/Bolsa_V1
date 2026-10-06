@@ -22,7 +22,7 @@ from bolsa_application.execution_event import (
     apply_pending_execution,
     reap_stale_applying,
 )
-from bolsa_domain.errors import PermanentRejectionError
+from bolsa_domain.errors import IdempotencyKeyReused, PermanentRejectionError
 
 
 def _exec(event_id: str = "ev-1", *, qty: str = "40") -> ExecutionEvent:
@@ -336,6 +336,23 @@ async def test_durable_apply_permanent_rejection_marks_failed() -> None:
     assert row is not None
     assert row.status == "FAILED"
     assert row.last_error == "apply_permanent_rejection"
+
+
+@pytest.mark.asyncio
+async def test_durable_apply_idempotency_reused_marks_failed() -> None:
+    """TST-03: la misma clave con otro payload termina en FAILED, no en RETRY."""
+    store = InMemoryExecutionEventStore()
+
+    async def applier(execution: ExecutionEvent) -> bool:  # noqa: ARG001
+        raise IdempotencyKeyReused("sim-fin-conflict")
+
+    ev = _exec("ev-durable-reused")
+    outcome = await apply_execution_financial_once(store, execution=ev, apply_finance=applier)
+    assert outcome == "failed"
+    row = await store.get(ev.execution_id)
+    assert row is not None
+    assert row.status == "FAILED"
+    assert row.last_error == "apply_idempotency_reused"
 
 
 @pytest.mark.asyncio
