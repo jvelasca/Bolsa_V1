@@ -270,6 +270,87 @@ describe("buildAutoOperationStory", () => {
     expect(explanation?.note).toContain("instrumento");
   });
 
+  it("declara la resolución por cycleId cuando el artefacto la aporta", () => {
+    const story = buildAutoOperationStory({
+      cycle: cycle(),
+      explanation: {
+        verdict: "OOS_SUPPORTED",
+        evidenceQuality: "PRELIMINARY",
+        resolution: "cycleId",
+        identity: {
+          cycleId: "cyc-1",
+          instrument: "AAA",
+          strategyVersion: "strat-3",
+          direction: "long",
+          entryDay: "2026-09-29",
+          timeframe: null,
+          regime: null,
+        },
+      },
+    });
+    const explanation = story.stages.find(
+      (stage) => stage.id === "EXPLANATION",
+    );
+    const byLabel = new Map(
+      (explanation?.facts ?? []).map((fact) => [fact.label, fact]),
+    );
+    expect(byLabel.get("resolución")).toEqual({
+      label: "resolución",
+      value: "por ciclo (cycleId)",
+      measurement: "COMPLETE",
+    });
+    expect(explanation?.note).toContain("resuelta por cycleId");
+  });
+
+  it("declara la resolución por instrumento como PARCIAL (fallback honesto)", () => {
+    const story = buildAutoOperationStory({
+      cycle: cycle(),
+      explanation: {
+        verdict: "OOS_SUPPORTED",
+        evidenceQuality: "PRELIMINARY",
+        resolution: "instrument",
+        identity: {
+          cycleId: "cyc-1",
+          instrument: "AAA",
+          strategyVersion: "strat-3",
+          direction: "long",
+          entryDay: "2026-09-29",
+          timeframe: null,
+          regime: null,
+        },
+      },
+    });
+    const explanation = story.stages.find(
+      (stage) => stage.id === "EXPLANATION",
+    );
+    expect(explanation?.note).toContain("PARCIAL");
+    const resolution = (explanation?.facts ?? []).find(
+      (fact) => fact.label === "resolución",
+    );
+    expect(resolution?.value).toBe("por instrumento (parcial)");
+  });
+
+  it("sin resolución declarada, se declara NO MEDIDA", () => {
+    const story = buildAutoOperationStory({
+      cycle: cycle(),
+      explanation: {
+        verdict: "OOS_SUPPORTED",
+        evidenceQuality: "PRELIMINARY",
+      },
+    });
+    const explanation = story.stages.find(
+      (stage) => stage.id === "EXPLANATION",
+    );
+    const resolution = (explanation?.facts ?? []).find(
+      (fact) => fact.label === "resolución",
+    );
+    expect(resolution).toEqual({
+      label: "resolución",
+      value: null,
+      measurement: "UNKNOWN",
+    });
+  });
+
   it("un ciclo ausente deja todas las trazas en NOT_MEASURED", () => {
     const story = buildAutoOperationStory({ cycle: null });
     expect(story.cycleId).toBeNull();

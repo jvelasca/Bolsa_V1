@@ -57,6 +57,16 @@ def _artifact(window: str, account: str = "acc") -> dict:
                 "limits": {"minCycles": 5, "minHitRate": 0.5},
             }
         ],
+        "cycles": [
+            {
+                "cycleId": "cyc-1",
+                "symbol": "AAA",
+                "entryDay": day_from,
+                "exitDay": day_to,
+                "strategyVersion": "sv-1",
+                "realizedR": 0.5,
+            }
+        ],
         "matrix": [
             {
                 "symbol": "AAA",
@@ -150,9 +160,33 @@ async def test_get_returns_the_artifact_projection(app, tmp_path, monkeypatch) -
     assert body["values"][0]["symbol"] == "AAA"
     assert body["values"][0]["evidenceQuality"] == "PRELIMINARY"
     assert body["values"][0]["expectancyR"] == 0.5
+    assert body["cycles"][0]["cycleId"] == "cyc-1"
+    assert body["cycles"][0]["symbol"] == "AAA"
+    assert body["cycles"][0]["realizedR"] == 0.5
     assert body["matrix"][0]["cells"][1]["outcome"] == "NOT_MEASURED"
     assert body["errors"][0]["kind"] == "SOFTWARE"
     assert body["notes"] == []
+
+
+@pytest.mark.asyncio
+async def test_cycles_absent_in_v1_artifact_projects_as_empty_list(
+    app, tmp_path, monkeypatch
+) -> None:
+    # Compatibilidad: un artefacto v1 (sin índice `cycles`) NO rompe la proyección; se declara [].
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    artifact = _artifact("2026-09-25_2026-09-30")
+    artifact.pop("cycles")
+    (tmp_path / "feedback-2026-09-25_2026-09-30.json").write_text(
+        json.dumps(artifact), encoding="utf-8"
+    )
+
+    async def _scope(_request, _account_id):
+        return "acc"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
+    body = (await _get(app, "/api/auto/dia-d-feedback/2026-09-25_2026-09-30")).json()
+    assert body["available"] is True
+    assert body["cycles"] == []
 
 
 @pytest.mark.asyncio

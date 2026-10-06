@@ -26,6 +26,7 @@ import {
   buildAutoOperationStory,
   type AutoOperationStoryExplanationIdentity,
   type AutoOperationStoryExplanationInput,
+  type AutoOperationStoryExplanationResolution,
 } from "@bolsa/shared";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 import { useAutoDiaDFeedbackList } from "@/features/auto-monitor/use-auto-dia-d-feedback";
@@ -37,12 +38,49 @@ import {
 } from "@/features/auto/auto-nav";
 
 type DiaDFeedbackValueDto = components["schemas"]["DiaDFeedbackValueDto"];
+type DiaDFeedbackCycleDto = components["schemas"]["DiaDFeedbackCycleDto"];
 
-function toExplanation(
-  value: DiaDFeedbackValueDto | undefined,
-  identity: AutoOperationStoryExplanationIdentity,
-): AutoOperationStoryExplanationInput | null {
+/**
+ * Resuelve la explicación DÍA-D de UN ciclo (pura). Precedencia DECLARADA:
+ *
+ *   1. por `cycleId` (exacta): el ciclo figura en el índice `cycles[]` del artefacto; se usa el
+ *      valor de su instrumento y los ejes del índice (`entryDay`/estrategia).
+ *   2. por instrumento (fallback PARCIAL): sin fila de ciclo; se resuelve por símbolo y se declara.
+ *
+ * Devuelve `null` si no hay valor para el instrumento (⇒ `NO MEDIDO`, como antes). NO re-deriva
+ * cifras: copia el valor AGREGADO por instrumento y declara cómo lo ató al ciclo.
+ */
+export function resolveExplanationForCycle(input: {
+  cycle: {
+    cycleId: string;
+    instrumentId: string | null;
+    strategyVersion?: string | null;
+    direction?: string | null;
+    entryDay: string | null;
+  } | null;
+  values: readonly DiaDFeedbackValueDto[];
+  cycles: readonly DiaDFeedbackCycleDto[];
+}): AutoOperationStoryExplanationInput | null {
+  const { cycle, values, cycles } = input;
+  if (!cycle) return null;
+  const cycleRef =
+    cycles.find((item) => item.cycleId === cycle.cycleId) ?? null;
+  const symbol = cycleRef?.symbol ?? cycle.instrumentId ?? null;
+  if (!symbol) return null;
+  const value = values.find((item) => item.symbol === symbol);
   if (!value) return null;
+  const resolution: AutoOperationStoryExplanationResolution = cycleRef
+    ? "cycleId"
+    : "instrument";
+  const identity: AutoOperationStoryExplanationIdentity = {
+    cycleId: cycle.cycleId,
+    instrument: symbol,
+    strategyVersion: cycleRef?.strategyVersion ?? cycle.strategyVersion ?? null,
+    direction: cycle.direction ?? null,
+    entryDay: cycleRef?.entryDay ?? cycle.entryDay ?? null,
+    timeframe: null,
+    regime: null,
+  };
   return {
     verdict: value.verdict,
     verdictReason: value.verdictReason ?? null,
@@ -52,6 +90,7 @@ function toExplanation(
     measuredCycles: value.measuredCycles ?? null,
     errorTotal: value.errorTotal ?? null,
     identity,
+    resolution,
   };
 }
 
@@ -140,25 +179,24 @@ export function AutoOperationStoryPanel({
 
   const explanation = useMemo(() => {
     const artifact = feedbackList.data?.artifact;
-    const symbol = selected?.instrumentId ?? null;
-    if (!artifact?.available || !symbol || !selected) return null;
+    if (!artifact?.available || !selected) return null;
     // Identidad explícita: a QUÉ operación responde la explicación. `entryDay` se copia del sello
     // temporal de la SEÑAL (no se re-deriva); timeframe/régimen no los materializa el artefacto.
+    // La resolución la decide `resolveExplanationForCycle`: por `cycleId` (índice `cycles[]`) o,
+    // si el artefacto no trae la clave, por instrumento (fallback declarado como PARCIAL).
     const signalAt =
       selected.steps.find((step) => step.id === "SIGNAL")?.at ?? null;
-    const identity: AutoOperationStoryExplanationIdentity = {
-      cycleId: selected.cycleId ?? null,
-      instrument: symbol,
-      strategyVersion: selected.strategyVersion ?? null,
-      direction: selected.direction ?? null,
-      entryDay: signalAt ? signalAt.slice(0, 10) : null,
-      timeframe: null,
-      regime: null,
-    };
-    return toExplanation(
-      (artifact.values ?? []).find((item) => item.symbol === symbol),
-      identity,
-    );
+    return resolveExplanationForCycle({
+      cycle: {
+        cycleId: selected.cycleId,
+        instrumentId: selected.instrumentId ?? null,
+        strategyVersion: selected.strategyVersion ?? null,
+        direction: selected.direction ?? null,
+        entryDay: signalAt ? signalAt.slice(0, 10) : null,
+      },
+      values: artifact.values ?? [],
+      cycles: artifact.cycles ?? [],
+    });
   }, [feedbackList.data, selected]);
 
   const story = useMemo(

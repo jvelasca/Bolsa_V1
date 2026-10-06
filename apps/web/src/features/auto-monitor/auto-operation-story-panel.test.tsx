@@ -126,6 +126,16 @@ vi.mock("@/lib/api", () => ({
             errorTotal: 0,
           },
         ],
+        cycles: [
+          {
+            cycleId: "cyc-1",
+            symbol: "AAA",
+            entryDay: "2026-09-29",
+            exitDay: "2026-09-30",
+            strategyVersion: "sv-1",
+            realizedR: 0.5,
+          },
+        ],
       },
       notes: [],
     })),
@@ -144,6 +154,7 @@ vi.mock("@/features/accounts/use-active-account", () => ({
 import {
   AutoOperationStoryPanel,
   resolveAutoOperationSelection,
+  resolveExplanationForCycle,
 } from "@/features/auto-monitor/auto-operation-story-panel";
 
 function LocationProbe() {
@@ -247,7 +258,7 @@ describe("AutoOperationStoryPanel", () => {
     expect(pit?.textContent).toContain("NO MEDIDO");
   });
 
-  it("pliega la explicación OOS del instrumento", async () => {
+  it("resuelve la explicación por cycleId (índice `cycles[]`) y la pliega", async () => {
     renderPanel();
 
     await waitFor(() =>
@@ -268,6 +279,9 @@ describe("AutoOperationStoryPanel", () => {
     expect(explanation?.textContent).toContain("cyc-1");
     expect(explanation?.textContent).toContain("2026-09-29");
     expect(explanation?.textContent).toContain("NO MEDIDO");
+    // El índice `cycles[]` ata el ciclo a su valor: resolución EXACTA por cycleId (no por símbolo).
+    expect(explanation?.textContent).toContain("resolución");
+    expect(explanation?.textContent).toContain("por ciclo (cycleId)");
   });
 
   it("enlaza la EXPLICACIÓN al heatmap DÍA-D canónico (workspace AUTO) con símbolo y ventana", async () => {
@@ -426,5 +440,73 @@ describe("resolveAutoOperationSelection", () => {
       hasLoaded: true,
     });
     expect(result.selectedCycle?.cycleId).toBe("cyc-1");
+  });
+});
+
+describe("resolveExplanationForCycle", () => {
+  const value = (symbol: string) => ({
+    symbol,
+    verdict: "OOS_SUPPORTED",
+    evidenceQuality: "PRELIMINARY",
+    expectancyR: 0.5,
+    hitRate: 0.67,
+    measuredCycles: 6,
+    daysCovered: 1,
+    windowDays: 2,
+    errorTotal: 0,
+  });
+  const cycle = {
+    cycleId: "cyc-1",
+    instrumentId: "AAA",
+    strategyVersion: "strat-x",
+    direction: "long",
+    entryDay: "2026-09-29",
+  };
+
+  it("resuelve por cycleId cuando el índice lo contiene y usa sus ejes", () => {
+    const explanation = resolveExplanationForCycle({
+      cycle,
+      values: [value("AAA")],
+      cycles: [
+        {
+          cycleId: "cyc-1",
+          symbol: "AAA",
+          entryDay: "2026-09-28",
+          strategyVersion: "sv-9",
+        },
+      ],
+    });
+    expect(explanation?.resolution).toBe("cycleId");
+    // Los ejes del ÍNDICE (identidad del ciclo) mandan sobre los copiados del monitor.
+    expect(explanation?.identity?.entryDay).toBe("2026-09-28");
+    expect(explanation?.identity?.strategyVersion).toBe("sv-9");
+    expect(explanation?.identity?.instrument).toBe("AAA");
+  });
+
+  it("si el ciclo no está en el índice, cae al instrumento (parcial) y lo declara", () => {
+    const explanation = resolveExplanationForCycle({
+      cycle,
+      values: [value("AAA")],
+      cycles: [{ cycleId: "otro", symbol: "AAA" }],
+    });
+    expect(explanation?.resolution).toBe("instrument");
+    expect(explanation?.identity?.entryDay).toBe("2026-09-29");
+    expect(explanation?.identity?.strategyVersion).toBe("strat-x");
+    expect(explanation?.identity?.instrument).toBe("AAA");
+  });
+
+  it("declara NO MEDIDO (null) si no hay valor para el instrumento", () => {
+    const explanation = resolveExplanationForCycle({
+      cycle,
+      values: [value("BBB")],
+      cycles: [],
+    });
+    expect(explanation).toBeNull();
+  });
+
+  it("sin ciclo no hay explicación", () => {
+    expect(
+      resolveExplanationForCycle({ cycle: null, values: [], cycles: [] }),
+    ).toBeNull();
   });
 });

@@ -6169,12 +6169,32 @@ export interface components {
             realizedR?: number | null;
         };
         /**
+         * DiaDFeedbackCycleDto
+         * @description Identidad de UN ciclo (``cycleId`` -> valor del instrumento); sin veredicto por ciclo.
+         */
+        DiaDFeedbackCycleDto: {
+            /** Cycleid */
+            cycleId: string;
+            /** Entryday */
+            entryDay?: string | null;
+            /** Exitday */
+            exitDay?: string | null;
+            /** Realizedr */
+            realizedR?: number | null;
+            /** Strategyversion */
+            strategyVersion?: string | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /**
          * DiaDFeedbackDto
          * @description Artefacto de una ventana. ``available = false`` cuando no existe (fail-closed).
          */
         DiaDFeedbackDto: {
             /** Available */
             available: boolean;
+            /** Cycles */
+            cycles?: components["schemas"]["DiaDFeedbackCycleDto"][];
             /** Errors */
             errors?: components["schemas"]["DiaDFeedbackErrorDto"][];
             /** Gate */

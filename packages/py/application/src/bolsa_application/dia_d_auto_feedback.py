@@ -57,7 +57,9 @@ from bolsa_application.market_operability import (
 )
 
 #: Versión del esquema del artefacto de feedback. Un cambio de forma la sube.
-SCHEMA_VERSION = "dia-d-feedback-v1"
+#: ``v2`` añade el índice ``cycles[]`` (``cycleId`` → identidad del ciclo) manteniendo el
+#: veredicto AGREGADO por instrumento: sólo desambigua a qué valor pertenece cada ciclo.
+SCHEMA_VERSION = "dia-d-feedback-v2"
 
 #: Veredicto POR VALOR sobre evidencia de REPLAY/OOS: soporta / mezcla / refuta / no medido.
 #: ``OOS_SUPPORTED`` NO significa "valor confirmado operativamente": afirma que el
@@ -157,6 +159,9 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "historicos (ver meta.survivorBiasRisk). El contrato Universe(D) ya modela intervalo de "
     "fin/delistado y elegibilidad DEMOSTRABLE, pero la fuente real sigue pendiente: el watch "
     "no se construye con el.",
+    "El veredicto OOS es AGREGADO por instrumento (suelo de muestra n>=5): un veredicto por "
+    "ciclo seria n=1 y no mediria nada. El indice cycles[] solo desambigua a que valor "
+    "pertenece cada ciclo; NO emite veredicto por ciclo.",
 )
 
 
@@ -515,6 +520,59 @@ def normalize_error(
     return row
 
 
+# ── Índice de ciclos (desambiguación por ``cycleId``) ────────────────────────────
+
+
+def _normalize_cycle_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Fila del índice de ciclos con la forma EXACTA del contrato; un campo ausente es hueco.
+
+    No re-deriva: copia lo que el replay ya midió (``cycleId``/``symbol``/``entryDay``/
+    ``exitDay``/``strategyVersion``/``realizedR``) y declara ``None`` cuando falta. Un
+    ``realizedR`` ilegible es un hueco (no un ``0``).
+    """
+    cycle_id = str(row.get("cycleId") or "").strip()
+    version = row.get("strategyVersion")
+    return {
+        "cycleId": cycle_id,
+        "symbol": str(row.get("symbol") or "").strip(),
+        "entryDay": normalize_day(row.get("entryDay")) or None,
+        "exitDay": normalize_day(row.get("exitDay")) or None,
+        "strategyVersion": str(version) if version is not None else None,
+        "realizedR": finite_number(row.get("realizedR")),
+    }
+
+
+def build_cycle_index(
+    round_trips: Sequence[Mapping[str, Any]] = (),
+    *,
+    days: Sequence[Any] = (),
+) -> list[dict[str, Any]]:
+    """Índice de CICLOS de la ventana: ``cycleId`` → identidad del ciclo (PURA y determinista).
+
+    El veredicto OOS es AGREGADO por instrumento (suelo de muestra ``n >= 5``); un veredicto
+    por ciclo sería ``n = 1`` y no mediría nada. Este índice sólo DESAMBIGUA a qué valor
+    pertenece cada ciclo, para que el consumidor resuelva la explicación por ``cycleId`` en vez
+    de por ``symbol`` (dos ciclos del mismo instrumento dejan de compartir explicación en
+    silencio).
+
+    Un ciclo SIN ``cycleId`` legible se OMITE (se declara el hueco; nunca se inventa una clave
+    para forzar una resolución). ``entryDay`` acota a la ventana (un ciclo sin día legible no se
+    descarta por eso: se conserva como hueco declarado). ``exitDay`` es atributo del ciclo, no
+    filtro de ventana. Salida ordenada por ``cycleId`` (mismo estado ⇒ mismo payload).
+    """
+    window_days = {day for day in (normalize_day(item) for item in days) if day}
+    by_cycle: dict[str, dict[str, Any]] = {}
+    for trip in round_trips or ():
+        cycle_id = str(trip.get("cycleId") or "").strip()
+        if not cycle_id:
+            continue
+        row = _normalize_cycle_row(trip)
+        if window_days and row["entryDay"] and row["entryDay"] not in window_days:
+            continue
+        by_cycle[cycle_id] = row
+    return [by_cycle[key] for key in sorted(by_cycle)]
+
+
 # ── Artefacto canónico ───────────────────────────────────────────────────────────
 
 
@@ -524,6 +582,7 @@ def build_dia_d_feedback_artifact(
     window_to: Any,
     days: Sequence[Any],
     values: Sequence[Mapping[str, Any]],
+    cycles: Sequence[Mapping[str, Any]] = (),
     errors: Sequence[Mapping[str, Any]] = (),
     gate: Mapping[str, Any] | None = None,
     meta: Mapping[str, Any] | None = None,
@@ -532,9 +591,10 @@ def build_dia_d_feedback_artifact(
     """Construye el payload canónico del feedback (puro y determinista).
 
     ``values`` son fichas ya construidas con ``build_value_scorecard`` (se ordenan por
-    símbolo); ``errors`` el catálogo normalizado; ``gate`` la declaración de ``window_gate``.
-    Los símbolos se deduplican y ordenan para que el mismo estado produzca el mismo payload
-    byte a byte (sin reloj ni identificadores aleatorios).
+    símbolo); ``cycles`` el índice de ciclos (``build_cycle_index``, deduplicado y ordenado por
+    ``cycleId``); ``errors`` el catálogo normalizado; ``gate`` la declaración de ``window_gate``.
+    Los símbolos y los ciclos se deduplican y ordenan para que el mismo estado produzca el mismo
+    payload byte a byte (sin reloj ni identificadores aleatorios).
     """
     window_days = [normalize_day(day) for day in days if normalize_day(day)]
     unique_days = sorted(set(window_days))
@@ -557,6 +617,15 @@ def build_dia_d_feedback_artifact(
         key=lambda row: (str(row.get("day")), str(row.get("symbol")), str(row.get("kind")), str(row.get("code")))
     )
     matrix = build_day_matrix(ordered_values, days=unique_days)
+    ordered_cycles: list[dict[str, Any]] = []
+    seen_cycles: set[str] = set()
+    for cycle in cycles or ():
+        row = _normalize_cycle_row(cycle)
+        if not row["cycleId"] or row["cycleId"] in seen_cycles:
+            continue
+        seen_cycles.add(row["cycleId"])
+        ordered_cycles.append(row)
+    ordered_cycles.sort(key=lambda item: item["cycleId"])
     return {
         "schemaVersion": SCHEMA_VERSION,
         "kind": "DIA_D_AUTO_FEEDBACK",
@@ -569,6 +638,7 @@ def build_dia_d_feedback_artifact(
         },
         "summary": summarize_feedback(ordered_values, normalized_errors),
         "values": [dict(value) for value in ordered_values],
+        "cycles": ordered_cycles,
         "matrix": matrix,
         "errors": normalized_errors,
         "gate": dict(gate or {}),
@@ -602,6 +672,7 @@ __all__ = [
     "VALUE_OOS_SUPPORTED",
     "VALUE_REFUTED",
     "VALUE_VERDICTS",
+    "build_cycle_index",
     "build_day_matrix",
     "build_dia_d_feedback_artifact",
     "build_value_scorecard",

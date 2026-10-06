@@ -26,7 +26,7 @@ vi.mock("lightweight-charts", () => ({
 const FEEDBACK = {
   available: true,
   readOnly: true,
-  schemaVersion: "dia-d-feedback-v1",
+  schemaVersion: "dia-d-feedback-v2",
   kind: "DIA_D_AUTO_FEEDBACK",
   window: {
     from: "2026-09-29",

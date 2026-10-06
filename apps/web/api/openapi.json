@@ -6203,12 +6203,82 @@
         "title": "DiaDFeedbackCellDto",
         "type": "object"
       },
+      "DiaDFeedbackCycleDto": {
+        "description": "Identidad de UN ciclo (``cycleId`` -> valor del instrumento); sin veredicto por ciclo.",
+        "properties": {
+          "cycleId": {
+            "title": "Cycleid",
+            "type": "string"
+          },
+          "entryDay": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entryday"
+          },
+          "exitDay": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exitday"
+          },
+          "realizedR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realizedr"
+          },
+          "strategyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategyversion"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cycleId",
+          "symbol"
+        ],
+        "title": "DiaDFeedbackCycleDto",
+        "type": "object"
+      },
       "DiaDFeedbackDto": {
         "description": "Artefacto de una ventana. ``available = false`` cuando no existe (fail-closed).",
         "properties": {
           "available": {
             "title": "Available",
             "type": "boolean"
+          },
+          "cycles": {
+            "items": {
+              "$ref": "#/components/schemas/DiaDFeedbackCycleDto"
+            },
+            "title": "Cycles",
+            "type": "array"
           },
           "errors": {
             "items": {

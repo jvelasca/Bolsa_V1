@@ -127,6 +127,13 @@ export type AutoOperationStoryExplanationIdentity = {
   regime: string | null;
 };
 
+/**
+ * Cómo se resolvió la explicación de ESTA operación: por su clave de ciclo (exacta) o por
+ * instrumento (fallback parcial). El veredicto OOS es AGREGADO por instrumento; `resolution`
+ * declara si el artefacto pudo atar la explicación al `cycleId` o sólo al símbolo.
+ */
+export type AutoOperationStoryExplanationResolution = "cycleId" | "instrument";
+
 /** Explicación OOS/DÍA-D del instrumento (se copia tal cual: NO se re-deriva). */
 export type AutoOperationStoryExplanationInput = {
   verdict: string;
@@ -138,6 +145,8 @@ export type AutoOperationStoryExplanationInput = {
   errorTotal?: number | null;
   /** Ejes que desambiguan a qué operación responde la explicación. */
   identity?: AutoOperationStoryExplanationIdentity | null;
+  /** Si el artefacto ató la explicación al `cycleId` o sólo al instrumento (fallback). */
+  resolution?: AutoOperationStoryExplanationResolution | null;
 };
 
 /** Contexto que ORIGINÓ la operación (no es un hecho del ciclo). */
@@ -369,6 +378,34 @@ function buildExplanationIdentityFacts(
   ];
 }
 
+/** Etiqueta legible de la resolución; `null` si el artefacto no la declara (⇒ NO MEDIDO). */
+function explanationResolutionLabel(
+  resolution: AutoOperationStoryExplanationResolution | null | undefined,
+): string | null {
+  if (resolution === "cycleId") return "por ciclo (cycleId)";
+  if (resolution === "instrument") return "por instrumento (parcial)";
+  return null;
+}
+
+/**
+ * Nota de honestidad: SÓLO se afirma resolución por `cycleId` si el artefacto la declara. El
+ * fallback por instrumento se declara explícitamente PARCIAL (nunca se presenta como de *esa*
+ * operación). Sin declaración de resolución se conserva la nota histórica.
+ */
+function explanationResolutionNote(
+  explanation: AutoOperationStoryExplanationInput,
+): string | null {
+  if (explanation.resolution === "cycleId") {
+    return "resuelta por cycleId (DÍA-D); el veredicto OOS es del instrumento en la ventana";
+  }
+  if (explanation.resolution === "instrument") {
+    return "resuelta por instrumento (DÍA-D) — sin clave de ciclo en el artefacto; resolución PARCIAL";
+  }
+  return explanation.identity
+    ? "resuelta por instrumento (DÍA-D); ejes no materiales por ciclo = NO MEDIDO"
+    : null;
+}
+
 function buildExplanationStage(
   spec: StageSpec,
   index: number,
@@ -397,12 +434,15 @@ function buildExplanationStage(
       measuredFact("hit", explanation.hitRate ?? null),
       measuredFact("n", explanation.measuredCycles ?? null),
       measuredFact("errores", explanation.errorTotal ?? null),
+      // Cómo se resolvió (por ciclo o por instrumento): un hueco se declara NO MEDIDO.
+      measuredFact(
+        "resolución",
+        explanationResolutionLabel(explanation.resolution),
+      ),
       // A QUÉ operación responde: `cycleId` + ejes; los no materiales se declaran NO MEDIDO.
       ...buildExplanationIdentityFacts(explanation.identity),
     ],
-    note: explanation.identity
-      ? "resuelta por instrumento (DÍA-D); ejes no materiales por ciclo = NO MEDIDO"
-      : null,
+    note: explanationResolutionNote(explanation),
   };
 }
 

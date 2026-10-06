@@ -37,6 +37,7 @@ from bolsa_application.dia_d_auto_feedback import (
     VALUE_OOS_SUPPORTED,
     VALUE_REFUTED,
     VALUE_VERDICTS,
+    build_cycle_index,
     build_day_matrix,
     build_dia_d_feedback_artifact,
     build_value_scorecard,
@@ -358,5 +359,79 @@ def test_artifact_dedupes_and_sorts_days_and_values() -> None:
     )
     assert artifact["window"]["days"] == ["2026-10-01"]
     assert [value["symbol"] for value in artifact["values"]] == ["AAA", "BBB"]
-    assert set(artifact) >= {"summary", "matrix", "errors", "gate", "meta", "limits"}
+    assert set(artifact) >= {
+        "summary",
+        "values",
+        "cycles",
+        "matrix",
+        "errors",
+        "gate",
+        "meta",
+        "limits",
+    }
     assert ERROR_KINDS == (SOFTWARE, OPERATIONAL, DATA)
+
+
+# ── Índice de ciclos (resolución por `cycleId`) ──────────────────────────────────
+
+
+def test_cycle_index_is_sorted_deduped_and_keeps_only_rows_with_cycle_id() -> None:
+    index = build_cycle_index(
+        [
+            {"cycleId": "cyc-b", "symbol": "AAA", "entryDay": "2026-09-30", "realizedR": 1.0},
+            {"cycleId": "cyc-a", "symbol": "AAA", "entryDay": "2026-09-30", "realizedR": -0.5},
+            {"symbol": "BBB", "entryDay": "2026-09-30", "realizedR": 2.0},  # sin cycleId: hueco
+            {"cycleId": "cyc-a", "symbol": "AAA", "entryDay": "2026-09-30", "realizedR": -0.5},
+        ],
+        days=["2026-09-30"],
+    )
+    assert [row["cycleId"] for row in index] == ["cyc-a", "cyc-b"]
+    assert index[0]["symbol"] == "AAA"
+    assert index[0]["realizedR"] == -0.5
+
+
+def test_cycle_index_drops_cycles_outside_the_window() -> None:
+    index = build_cycle_index(
+        [
+            {"cycleId": "cyc-in", "symbol": "AAA", "entryDay": "2026-09-30"},
+            {"cycleId": "cyc-out", "symbol": "AAA", "entryDay": "2026-09-20"},
+        ],
+        days=["2026-09-30"],
+    )
+    assert [row["cycleId"] for row in index] == ["cyc-in"]
+
+
+def test_cycle_index_declares_missing_fields_as_gaps_never_zero() -> None:
+    index = build_cycle_index([{"cycleId": "cyc-a", "symbol": "AAA"}])
+    row = index[0]
+    assert row["entryDay"] is None
+    assert row["exitDay"] is None
+    assert row["strategyVersion"] is None
+    assert row["realizedR"] is None
+    assert "Infinity" not in json.dumps(index)
+
+
+def test_cycle_index_treats_unreadable_realized_r_as_a_gap() -> None:
+    index = build_cycle_index(
+        [{"cycleId": "cyc-a", "symbol": "AAA", "realizedR": float("inf")}]
+    )
+    assert index[0]["realizedR"] is None
+
+
+def test_artifact_includes_a_deduped_sorted_cycle_index() -> None:
+    artifact = build_dia_d_feedback_artifact(
+        window_from="2026-09-30",
+        window_to="2026-09-30",
+        days=["2026-09-30"],
+        values=[],
+        cycles=[
+            {"cycleId": "cyc-b", "symbol": "AAA", "entryDay": "2026-09-30"},
+            {"cycleId": "cyc-a", "symbol": "BBB", "entryDay": "2026-09-30"},
+            {"cycleId": "cyc-a", "symbol": "BBB", "entryDay": "2026-09-30"},
+            {"cycleId": "", "symbol": "CCC", "entryDay": "2026-09-30"},
+        ],
+    )
+    assert [row["cycleId"] for row in artifact["cycles"]] == ["cyc-a", "cyc-b"]
+    assert artifact["cycles"][0]["symbol"] == "BBB"
+    # El veredicto OOS sigue siendo agregado por instrumento: `cycles` NO emite veredicto.
+    assert SCHEMA_VERSION == "dia-d-feedback-v2"

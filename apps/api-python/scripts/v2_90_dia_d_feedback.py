@@ -242,6 +242,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     from bolsa_application.dia_d_auto import compare_declared_vs_executed, normalize_day
     from bolsa_application.dia_d_auto_feedback import (
         SOFTWARE,
+        build_cycle_index,
         build_dia_d_feedback_artifact,
         build_value_scorecard,
         normalize_error,
@@ -395,6 +396,10 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             for row in score.get("roundTrips", [])
             if str(row.get("entryDay") or "") in set(window_days)
         ]
+        # Índice de ciclos: desambigua a qué valor pertenece cada ``cycleId`` (la estadística
+        # sigue siendo AGREGADA por instrumento). Solo copia campos ya serializados por el
+        # replay: NO se toca ``RoundTrip.to_dict`` (la referencia congelada no se mueve).
+        cycles = build_cycle_index(round_trips, days=window_days)
         by_symbol: dict[str, list[dict[str, Any]]] = {}
         for trip in round_trips:
             by_symbol.setdefault(str(trip.get("symbol") or ""), []).append(trip)
@@ -420,10 +425,11 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             window_to=window_days[-1],
             days=window_days,
             values=values,
+            cycles=cycles,
             errors=errors,
             gate=gate,
             meta={
-                "bump": "2.11.59-beta",
+                "bump": "2.11.60-beta",
                 "phase": "V2.90 DIA-D AUTO FEEDBACK",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),

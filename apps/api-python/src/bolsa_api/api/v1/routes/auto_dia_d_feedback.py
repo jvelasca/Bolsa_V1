@@ -165,6 +165,19 @@ class DiaDFeedbackErrorDto(BaseModel):
     detail: str | None = None
 
 
+class DiaDFeedbackCycleDto(BaseModel):
+    """Identidad de UN ciclo (``cycleId`` -> valor del instrumento); sin veredicto por ciclo."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    cycleId: str
+    symbol: str
+    entryDay: str | None = None
+    exitDay: str | None = None
+    strategyVersion: str | None = None
+    realizedR: float | None = None
+
+
 class DiaDFeedbackDto(BaseModel):
     """Artefacto de una ventana. ``available = false`` cuando no existe (fail-closed)."""
 
@@ -178,6 +191,7 @@ class DiaDFeedbackDto(BaseModel):
     window: DiaDFeedbackWindowDto = Field(default_factory=DiaDFeedbackWindowDto)
     summary: DiaDFeedbackSummaryDto | None = None
     values: list[DiaDFeedbackValueDto] = Field(default_factory=list)
+    cycles: list[DiaDFeedbackCycleDto] = Field(default_factory=list)
     matrix: list[DiaDFeedbackMatrixRowDto] = Field(default_factory=list)
     errors: list[DiaDFeedbackErrorDto] = Field(default_factory=list)
     gate: dict[str, Any] = Field(default_factory=dict)
@@ -222,6 +236,7 @@ def _project(artifact: dict[str, Any]) -> DiaDFeedbackDto:
             DiaDFeedbackSummaryDto(**artifact["summary"]) if artifact.get("summary") else None
         ),
         values=[DiaDFeedbackValueDto(**row) for row in artifact.get("values", [])],
+        cycles=[DiaDFeedbackCycleDto(**row) for row in artifact.get("cycles", [])],
         matrix=[DiaDFeedbackMatrixRowDto(**row) for row in artifact.get("matrix", [])],
         errors=[DiaDFeedbackErrorDto(**row) for row in artifact.get("errors", [])],
         gate=dict(artifact.get("gate") or {}),
