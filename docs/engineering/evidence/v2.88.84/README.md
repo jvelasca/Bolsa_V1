@@ -1,6 +1,6 @@
 # Evidencia `v2.88.84-beta` — `AUTO · TOP3`: **productor durable del TOP3 cross-asset + degradación explícita**
 
-**Producto:** `V2.88.84-beta` · **Package:** `2.11.84-beta` · **AsOf:** 2026-10-07. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** (el TOP3 persistido es observabilidad: no vuelve a la decisión, y el scoring del plan recibe el MISMO `evidence` leído una sola vez). **Contrato HTTP sin cambio**. **Tag anotado** por crear.
+**Producto:** `V2.88.84-beta` · **Package:** `2.11.84-beta` · **AsOf:** 2026-10-07. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** (el TOP3 persistido es observabilidad: no vuelve a la decisión, y el scoring del plan recibe el MISMO `evidence` leído una sola vez). **Contrato HTTP sin cambio**. **Tag anotado `v2.88.84-beta`** (objeto `e7289149` → commit `5d20e26f`).
 
 **Padre de producto:** [`v2.88.83`](../v2.88.83/README.md). Auditoría que motivó el sello:
 [`auditoria-composition-root-evidence-top3-v2.88.83-2026-10-07.md`](../../auditoria-composition-root-evidence-top3-v2.88.83-2026-10-07.md).
@@ -54,9 +54,21 @@ Cierra los DOS huecos no bloqueantes que dejó abiertos la auditoría de `v2.88.
 
 Núcleo financiero (`ExecuteTrade`, ledger, posiciones, settlement), el scoring del plan
 (`plan_v2_tick` recibe el MISMO `evidence`) y el contrato HTTP. El tag `v2.88.76-beta`
-permanece; el tag anotado de este sello se crea en el paso POST-TAG.
+permanece; el tag anotado de este sello (`v2.88.84-beta`) ya está en `origin` con su
+`Release tag CI` **VERDE** (ver «Cita POST-TAG»).
 
 ## Cita POST-TAG
 
-Pendiente: tag anotado `v2.88.84-beta` + `Release tag CI` VERDE + `replay-repro` reproducido
-(⇒ `Δ motor` confirmado por CI).
+**Tag anotado `v2.88.84-beta`** (objeto `e7289149` → commit `5d20e26f`, el tip del sello).
+`Release tag CI` [`37629056130`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37629056130)
+**VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`):
+
+- `python` (ruff/imports/mypy/pytest offline): `4592 passed, 45 skipped`.
+- `frontend` (typecheck/lint/test/build + `contract:check`): `1519 passed` (`258` ficheros).
+- `lifecycle-pg` (Alembic + auth + golden restart): `success`.
+- `replay-repro`: **`REPRODUCIDO`** `1E3ADAC2…` (`sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`,
+  `bytes 3340728`; `Determinismo del runner` ⇒ 2ª corrida IDÉNTICA) ⇒ **`Δ motor = 0` confirmado por CI**.
+- `decision-spine`, `dr-verify`, `shared`, `security` (gitleaks) y `a7-gate`: `success`.
+
+El run apunta exactamente al árbol del sello (`head 5d20e26f`), así que la certificación de CI
+cubre lo que el auditor descarga del tag.
