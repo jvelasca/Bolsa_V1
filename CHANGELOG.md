@@ -2,6 +2,16 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.82-beta] — `ESTRATEGIA`: **oleada anti-overfit (campeón OOS-aware + TOP3 cross-asset + gate DSR)**
+
+**Bump** `2.11.80-beta` → `2.11.82-beta` (el `2.11.81-beta` quedó reclamado por «telemetría robusta» en el CHANGELOG pero sin bump de `package.json`; este sello avanza al siguiente). **Con migración** `052_top3_opportunities`. **`Δ motor ≠ 0`** (el scoring del simulador consume evidencia LAB por instrumento). Tag no creado.
+
+- **Campeón OOS-aware:** `champion_trial()` unifica qué trial manda (OOS preferido cuando todos lo miden, fallback IS declarado); ACTIVE promueve el MISMO trial cuya evidencia se validó fuera de muestra.
+- **TOP3 cross-asset (P3):** tablero de oportunidades con 7 componentes de evidencia (edge, liquidez, robust_score OOS-aware, drawdown, CPCV, régimen, DSR); ruta `/top3-opportunities`; migración `052_top3_opportunities`.
+- **Gate DSR exigible:** el DSR pasa a ser el 7º gate del Promotion Gate (`LabThresholds.min_dsr` 0.0 → 0.7, override por env `AUTO_ORCHESTRATOR_LAB_MIN_DSR`); fail-closed: DSR ausente o < 0.7 veta la promoción (anti-overfit → más aciertos).
+- **Fixes:** sello DÍA-D → `2.11.82-beta`; head de migraciones de los roundtrips PG → `052_top3_opportunities`; purga de residuos antes y después de la sesión (fin del rojo intermitente de `workspaces`/chaos).
+- **Evidencia:** [`docs/engineering/evidence/v2.88.82/README.md`](docs/engineering/evidence/v2.88.82/README.md).
+
 ## [2.11.81-beta] — `AUTO · UI`: **telemetría robusta (P2) y «vacío ≠ hueco» en activo**
 
 **Bump** `2.11.80-beta` → `2.11.81-beta`. **Sin migración nueva** (reutiliza `051_auto_engine_activity`). **Contrato HTTP sin cambio** (se consume un campo ya existente). **Motor financiero sin cambio**. Tag no creado.

@@ -17,9 +17,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from bolsa_analytics.cognitive.opportunity_ranker import OpportunityScore, rank_opportunities
-from bolsa_domain.entities.strategy_lifecycle import StrategyEvaluation, StrategyHealth
-
 from bolsa_application.opportunity_evidence_adapter import score_instrument_opportunity
+from bolsa_domain.entities.strategy_lifecycle import StrategyEvaluation, StrategyHealth
 
 __all__ = [
     "AssetEvidence",

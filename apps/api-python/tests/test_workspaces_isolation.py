@@ -194,6 +194,12 @@ async def test_get_default_workspace_is_per_user(
             id_b = default_b.json()["data"]["id"]
             assert id_a != id_b
 
+            # Higiene: no dejar defaults residuales (nacen ``is_default=True``, que el
+            # purgado de sesión NO borra). Acumulan filas ``user-a``/``user-b`` en cada
+            # pasada; sin esto la tabla `workspaces` crece sin techo.
+            for wid in (id_a, id_b):
+                await _delete_raw_workspace(app.state.session_factory, wid)
+
 
 @pytest.mark.asyncio
 async def test_bootstrap_principal_constant_matches_default() -> None:

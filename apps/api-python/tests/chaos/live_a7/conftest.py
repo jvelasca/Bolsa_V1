@@ -51,10 +51,11 @@ async def _purge_unknown_rows_now() -> None:
     _load_root_env()
     engine = None
     try:
+        from sqlalchemy import delete
+
         from bolsa_infrastructure.config import get_settings
         from bolsa_infrastructure.database.models.tables import LiveOrderRow
         from bolsa_infrastructure.database.session import create_engine, create_session_factory
-        from sqlalchemy import delete
 
         get_settings.cache_clear()
         engine = create_engine(get_settings())

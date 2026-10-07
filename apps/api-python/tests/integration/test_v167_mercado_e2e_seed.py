@@ -97,4 +97,22 @@ async def test_gp_v167_07_mercado_seed_fixture() -> None:
             },
         )
         assert workspace.status_code == 201, workspace.text
-        assert workspace.json()["data"]["id"]
+        workspace_id = workspace.json()["data"]["id"]
+        assert workspace_id
+
+        # Higiene: este workspace no debe sobrevivir al test. Si se queda, en la
+        # batería completa deja el conteo de workspaces del principal ``app`` > 1 y
+        # rompe la guarda de ``DeleteWorkspace`` (conteo <= 1 ⇒ 400) que verifica
+        # ``test_workspaces_crud``. Peor aún: en una BD limpia este workspace nace
+        # ``is_default=True`` (conteo 0) y el purgado de sesión solo borra
+        # ``is_default=false``, así que queda como «default envenenado» permanente.
+        # Se borra por DB (sin pasar por la guarda de conteo) para ser determinista.
+        from sqlalchemy import delete as sa_delete
+
+        from bolsa_infrastructure.database.models import WorkspaceRow
+
+        async with app.state.session_factory() as session:
+            await session.execute(
+                sa_delete(WorkspaceRow).where(WorkspaceRow.id == workspace_id)
+            )
+            await session.commit()

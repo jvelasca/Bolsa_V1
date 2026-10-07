@@ -20,7 +20,6 @@ from bolsa_analytics.cognitive.opportunity_ranker import (
     OpportunityScore,
     select_top_opportunities,
 )
-
 from bolsa_application.opportunity_board import AssetExclusion
 
 __all__ = [

@@ -10,16 +10,16 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from bolsa_infrastructure.database.repositories.top3_opportunity_repository import (
-    SqlAlchemyTop3OpportunityRepository,
-    Top3OpportunityRowRecord,
-)
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import get_db_session
 from bolsa_api.schemas.mappers import to_iso
+from bolsa_infrastructure.database.repositories.top3_opportunity_repository import (
+    SqlAlchemyTop3OpportunityRepository,
+    Top3OpportunityRowRecord,
+)
 
 router = APIRouter()
 

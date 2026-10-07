@@ -674,11 +674,12 @@ def champion_trial(trials: list[Any]) -> Any | None:
     """
     if not trials:
         return None
-    if all(
-        isinstance(getattr(t, "oos_metrics", None), dict)
-        and getattr(t, "oos_metrics", None).get("score") is not None
-        for t in trials
-    ):
+
+    def _has_oos_score(trial: Any) -> bool:
+        metrics = getattr(trial, "oos_metrics", None)
+        return isinstance(metrics, dict) and metrics.get("score") is not None
+
+    if all(_has_oos_score(t) for t in trials):
         return max(trials, key=_oos_rank_key)
     return max(trials, key=lambda t: float(getattr(t, "score", 0.0) or 0.0))
 

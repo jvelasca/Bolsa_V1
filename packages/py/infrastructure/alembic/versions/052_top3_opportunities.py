@@ -16,7 +16,6 @@ Cadena lineal: ``down_revision = "051_auto_engine_activity"``.
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "052_top3_opportunities"

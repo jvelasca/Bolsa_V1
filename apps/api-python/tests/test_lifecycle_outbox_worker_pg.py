@@ -268,9 +268,7 @@ async def test_worker_fail_backoff_retry(
     session_factory: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from bolsa_api.background.lifecycle_outbox_worker import (
-        start_lifecycle_outbox_worker,
-    )
+    from bolsa_api.background.lifecycle_outbox_worker import _drain_once
     from bolsa_application.lifecycle_event_store import AppendLifecycleEvent
 
     calls = {"n": 0}
@@ -312,15 +310,20 @@ async def test_worker_fail_backoff_retry(
             at="2026-09-03T10:00:00.000Z",
         ),
     )
-    task = start_lifecycle_outbox_worker(session_factory, tick_seconds=0.05)
-    assert task is not None
-    try:
-        await _wait_status(session_factory, oid, "applied", timeout=8.0)
-        assert calls["n"] >= 2
-    finally:
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
-        await _cleanup(session_factory, position_id=pos)
+    # Drenado DETERMINISTA (`_drain_once` directo, no el loop async). El 1er drain
+    # falla (mark_attempt → pending con backoff 0) y el 2º aplica (retry). El loop
+    # async corría contra un drenador concurrente (scheduler_worker vivo) que
+    # aplicaba la fila entre el fallo y el retry, dejando `calls["n"]==1` (flaky).
+    d1 = await _drain_once(session_factory)
+    assert d1["applied"] == 0 and d1["errors"] == 1
+    assert calls["n"] == 1
+    assert await _status(session_factory, oid) == "pending"
+
+    d2 = await _drain_once(session_factory)
+    assert d2["applied"] == 1 and d2["errors"] == 0
+    assert calls["n"] == 2
+    await _wait_status(session_factory, oid, "applied", timeout=8.0)
+    await _cleanup(session_factory, position_id=pos)
 
 
 @pytest.mark.asyncio
@@ -451,9 +454,7 @@ async def test_crash_after_claim_then_stale_reclaim(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """V1.93 — TX1 commits processing; crash before apply; stale reclaim → applied."""
-    from bolsa_api.background.lifecycle_outbox_worker import (
-        start_lifecycle_outbox_worker,
-    )
+    from bolsa_api.background.lifecycle_outbox_worker import _drain_once
     from bolsa_application.lifecycle_event_store import (
         GetLifecycleSnapshot,
         PostgresLifecycleEventStore,
@@ -487,29 +488,34 @@ async def test_crash_after_claim_then_stale_reclaim(
         if boom["n"] == 1:
             raise RuntimeError("injected crash after claim")
 
-    task = start_lifecycle_outbox_worker(
-        session_factory,
-        tick_seconds=0.05,
-        on_after_claim=_after_claim,
-    )
-    assert task is not None
-    try:
-        await _wait_status(session_factory, oid, "processing", timeout=5.0)
-        async with session_factory() as session:
-            row = await session.get(LifecycleOutboxRow, oid)
-            assert row is not None
-            row.claimed_at = datetime.now(UTC) - timedelta(
-                seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
-            )
-            await session.commit()
-        await _wait_status(session_factory, oid, "applied", timeout=8.0)
-        async with session_factory() as session:
-            snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
-        assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
-    finally:
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
-        await _cleanup(session_factory, position_id=pos)
+    # Drenado DETERMINISTA (`_drain_once` directo, no el loop async). El loop real
+    # solo envuelve `_drain_once` en try/except + sleep (su resiliencia la cubre
+    # `test_worker_fail_backoff_retry`). Llamarlo directo elimina la carrera contra
+    # un drenador concurrente (p. ej. un `scheduler_worker` vivo) que aplicaba la
+    # fila antes de que el worker del test la reclamara: firma del flaky
+    # `applied` observado al esperar `processing`.
+    with pytest.raises(RuntimeError):
+        await _drain_once(session_factory, on_after_claim=_after_claim)
+
+    assert boom["n"] == 1
+    assert await _status(session_factory, oid) == "processing"
+
+    async with session_factory() as session:
+        row = await session.get(LifecycleOutboxRow, oid)
+        assert row is not None
+        row.claimed_at = datetime.now(UTC) - timedelta(
+            seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
+        )
+        await session.commit()
+
+    # Reclamo stale y aplico (idempotente por event_id). Si un drenador concurrente
+    # ya lo aplicó, `_wait_status` lo observa igualmente.
+    await _drain_once(session_factory)
+    await _wait_status(session_factory, oid, "applied", timeout=8.0)
+    async with session_factory() as session:
+        snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
+    assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
+    await _cleanup(session_factory, position_id=pos)
 
 
 @pytest.mark.asyncio
@@ -517,9 +523,7 @@ async def test_crash_mid_apply_before_commit_then_reclaim(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """V1.93 — append in session then raise before TX2 commit → reclaim → 1 event."""
-    from bolsa_api.background.lifecycle_outbox_worker import (
-        start_lifecycle_outbox_worker,
-    )
+    from bolsa_api.background.lifecycle_outbox_worker import _drain_once
     from bolsa_application.lifecycle_event_store import (
         GetLifecycleSnapshot,
         PostgresLifecycleEventStore,
@@ -553,29 +557,29 @@ async def test_crash_mid_apply_before_commit_then_reclaim(
         if boom["n"] == 1:
             raise RuntimeError("injected crash before apply commit")
 
-    task = start_lifecycle_outbox_worker(
-        session_factory,
-        tick_seconds=0.05,
-        on_before_apply_commit=_before_commit,
-    )
-    assert task is not None
-    try:
-        await _wait_status(session_factory, oid, "processing", timeout=5.0)
-        async with session_factory() as session:
-            row = await session.get(LifecycleOutboxRow, oid)
-            assert row is not None
-            row.claimed_at = datetime.now(UTC) - timedelta(
-                seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
-            )
-            await session.commit()
-        await _wait_status(session_factory, oid, "applied", timeout=8.0)
-        async with session_factory() as session:
-            snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
-        assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
-    finally:
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
-        await _cleanup(session_factory, position_id=pos)
+    # Drenado directo: la caída en `on_before_apply_commit` ocurre dentro del
+    # try/except del bucle de apply, así que `_drain_once` NO propaga; devuelve
+    # errors=1/applied=0 y deja la fila `processing` (TX2 sin commit). Determinista
+    # frente a drenadores concurrentes (ver `test_crash_after_claim_then_stale_reclaim`).
+    drain = await _drain_once(session_factory, on_before_apply_commit=_before_commit)
+    assert drain["applied"] == 0 and drain["errors"] == 1
+    assert boom["n"] == 1
+    assert await _status(session_factory, oid) == "processing"
+
+    async with session_factory() as session:
+        row = await session.get(LifecycleOutboxRow, oid)
+        assert row is not None
+        row.claimed_at = datetime.now(UTC) - timedelta(
+            seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
+        )
+        await session.commit()
+
+    await _drain_once(session_factory)
+    await _wait_status(session_factory, oid, "applied", timeout=8.0)
+    async with session_factory() as session:
+        snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
+    assert [e["kind"] for e in snap["events"]] == ["POSITION_OPENED"]
+    await _cleanup(session_factory, position_id=pos)
 
 
 @pytest.mark.asyncio
@@ -852,9 +856,7 @@ async def test_t2_crash_mid_pair_then_reclaim_exactly_one_each(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """V1.97 — crash after T2_TRIGGERED inside append_many → reclaim → 1+1 events."""
-    from bolsa_api.background.lifecycle_outbox_worker import (
-        start_lifecycle_outbox_worker,
-    )
+    from bolsa_api.background.lifecycle_outbox_worker import _drain_once
     from bolsa_application.lifecycle_event_store import (
         AppendLifecycleEvent,
         GetLifecycleSnapshot,
@@ -931,43 +933,46 @@ async def test_t2_crash_mid_pair_then_reclaim_exactly_one_each(
             if boom["n"] == 1:
                 raise RuntimeError("injected crash after T2_TRIGGERED")
 
-    task = start_lifecycle_outbox_worker(
+    # Drenado directo: la caída en `on_after_append_index` ocurre dentro del
+    # try/except del bucle de apply → `_drain_once` devuelve errors=1/applied=0 y
+    # deja la fila `processing` sin commit del par T2 (huérfano no materializado).
+    # Determinista frente a drenadores concurrentes (ver
+    # `test_crash_after_claim_then_stale_reclaim`).
+    drain = await _drain_once(
         session_factory,
-        tick_seconds=0.05,
         on_after_append_index=_crash_after_trigger,
     )
-    assert task is not None
-    try:
-        await _wait_status(session_factory, oid, "processing", timeout=5.0)
-        # Confirm orphan trigger was NOT committed.
-        async with session_factory() as session:
-            snap_mid = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
-        kinds_mid = [e["kind"] for e in snap_mid["events"]]
-        assert "T2_TRIGGERED" not in kinds_mid
-        assert "T2_EXECUTED" not in kinds_mid
+    assert drain["applied"] == 0 and drain["errors"] == 1
+    assert boom["n"] == 1
+    assert await _status(session_factory, oid) == "processing"
 
-        inject_armed["on"] = False
-        async with session_factory() as session:
-            row = await session.get(LifecycleOutboxRow, oid)
-            assert row is not None
-            row.claimed_at = datetime.now(UTC) - timedelta(
-                seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
-            )
-            await session.commit()
+    # Confirm orphan trigger was NOT committed.
+    async with session_factory() as session:
+        snap_mid = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
+    kinds_mid = [e["kind"] for e in snap_mid["events"]]
+    assert "T2_TRIGGERED" not in kinds_mid
+    assert "T2_EXECUTED" not in kinds_mid
 
-        await _wait_status(session_factory, oid, "applied", timeout=8.0)
-        async with session_factory() as session:
-            snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
-        kinds = [e["kind"] for e in snap["events"]]
-        assert kinds.count("T2_TRIGGERED") == 1
-        assert kinds.count("T2_EXECUTED") == 1
-        assert kinds == [
-            "POSITION_OPENED",
-            "T1_EXECUTED",
-            "T2_TRIGGERED",
-            "T2_EXECUTED",
-        ]
-    finally:
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
-        await _cleanup(session_factory, position_id=pos)
+    inject_armed["on"] = False
+    async with session_factory() as session:
+        row = await session.get(LifecycleOutboxRow, oid)
+        assert row is not None
+        row.claimed_at = datetime.now(UTC) - timedelta(
+            seconds=OUTBOX_STALE_PROCESSING_SECONDS + 5
+        )
+        await session.commit()
+
+    await _drain_once(session_factory)
+    await _wait_status(session_factory, oid, "applied", timeout=8.0)
+    async with session_factory() as session:
+        snap = await GetLifecycleSnapshot(PostgresLifecycleEventStore(session)).execute(pos)
+    kinds = [e["kind"] for e in snap["events"]]
+    assert kinds.count("T2_TRIGGERED") == 1
+    assert kinds.count("T2_EXECUTED") == 1
+    assert kinds == [
+        "POSITION_OPENED",
+        "T1_EXECUTED",
+        "T2_TRIGGERED",
+        "T2_EXECUTED",
+    ]
+    await _cleanup(session_factory, position_id=pos)

@@ -10,12 +10,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from bolsa_application.top3_opportunities import Top3OpportunityRecord
 from bolsa_infrastructure.database.repositories.top3_opportunity_repository import (
     SqlAlchemyTop3OpportunityRepository,
     Top3OpportunityInput,
 )
-
-from bolsa_application.top3_opportunities import Top3OpportunityRecord
 
 __all__ = ["PostgresTop3OpportunitySink"]
 
