@@ -162,6 +162,46 @@ def test_optimize_result_to_dict() -> None:
     assert payload["isBarCount"] == 80
 
 
+def test_optimize_result_to_dict_persists_anti_overfit_evidence() -> None:
+    """V2.88.83 (anti-overfit II): cpcv/walk_forward/pbo viajan en el result JSON."""
+    from dataclasses import replace
+
+    result = replace(
+        _sample_result(),
+        cpcv={"nGroups": 4, "walkForwardEfficiency": 0.6, "pbo": {"pbo": 0.2}},
+        walk_forward={"nFolds": 3, "walkForwardEfficiency": 0.5},
+        pbo={"pbo": 0.2},
+    )
+    payload = optimize_result_to_dict(result)
+    assert payload["cpcv"]["walkForwardEfficiency"] == 0.6
+    assert payload["walkForward"]["walkForwardEfficiency"] == 0.5
+    assert payload["pbo"]["pbo"] == 0.2
+
+
+@pytest.mark.asyncio
+async def test_persist_trials_includes_cpcv_walk_forward_pbo_blocks() -> None:
+    """V2.88.83 (anti-overfit II): los trials persisten blocks cpcv/walkForward/pbo."""
+    from dataclasses import replace
+
+    from bolsa_application.optimization_runs import _persist_optimize_research_trials
+
+    result = replace(
+        _sample_result(),
+        cpcv={"nGroups": 4, "walkForwardEfficiency": 0.6},
+        walk_forward={"nFolds": 3, "walkForwardEfficiency": 0.5},
+        pbo={"pbo": 0.2},
+    )
+    trials = MagicMock()
+    trials.insert_trial = AsyncMock()
+    await _persist_optimize_research_trials(
+        trials, result=result, optimization_run_id="run-1", proposed_by="grid"
+    )
+    blocks = trials.insert_trial.await_args.kwargs["blocks"]
+    assert blocks["cpcv"]["walkForwardEfficiency"] == 0.6
+    assert blocks["walkForward"]["walkForwardEfficiency"] == 0.5
+    assert blocks["pbo"]["pbo"] == 0.2
+
+
 # ── V2.39 (incremento 4) — régimen por trial en el write-path ───────────────────
 
 

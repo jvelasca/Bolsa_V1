@@ -115,19 +115,21 @@ def select_top3(
     max_candidates: int = 3,
     timeframe: str = "1d",
     expected_regime: str | None = None,
-    min_gates: tuple[str, ...] = ("backtest",),
+    min_gates: tuple[str, ...] = ("backtest", "oos", "walk_forward", "robustness"),
 ) -> Top3Selection:
     """Fase TOP 3: ranking por evidencia robusta con ``runId`` por slot.
 
-    Descarta candidatas sin los gates mínimos en PASS (por defecto ``backtest``) o por
+    Descarta candidatas sin los gates mínimos en PASS (por defecto los 4 gates
+    ``lab_validated``: ``backtest`` + ``oos`` + ``walk_forward`` + ``robustness``) o por
     debajo de ``min_score`` (fail-closed: sin evidencia no entran en el TOP). El ranking
     ya **no** se ordena por el IS puro: prefiere la evidencia fuera de muestra
     (``oos_score`` → ``wfe`` → ``dsr`` → ``1 - pbo`` → ``regime_match``) y degrada las
     hipótesis ``in_sample_only`` frente a las ``lab_validated``.
 
-    ``min_gates`` eleva la barrera de evidencia cuando se exige (p. ej.
-    ``("backtest", "oos", "walk_forward", "robustness")``); por defecto se mantiene el
-    mínimo histórico para no romper el flujo ``semifinal``/in_sample_only. Los slots
+    ``min_gates`` permite **relajar** la barrera cuando se exige (p. ej. ``("backtest",)``
+    para el flujo ``semifinal``/in_sample_only). V2.88.83 (anti-overfit II): el default
+    sube a ``lab_validated`` — con CPCV/WF ya cableado al LAB real, el ciclo real mide
+    OOS/WF/CPCV y el TOP3 deja de admitir hipótesis ``in_sample_only``. Los slots
     resultantes cumplen el requisito de ``runId`` para poder publicarse como
     ``lab_validated``.
     """

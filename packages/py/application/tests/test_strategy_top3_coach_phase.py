@@ -25,7 +25,7 @@ def _evaluation(
     candidate_id: str,
     *,
     score: float,
-    gates: tuple[str, ...] = ("backtest", "oos"),
+    gates: tuple[str, ...] = ("backtest", "oos", "walk_forward", "robustness"),
     pbo: float | None = None,
 ) -> StrategyEvaluation:
     metrics = {"instrument_id": "AAA"}
@@ -92,6 +92,32 @@ def test_top3_evidence_level_reflects_gates() -> None:
         ],
     )
     assert selection.slots[0]["evidenceLevel"] == "lab_validated"
+
+
+def test_top3_default_requires_lab_validated_gates() -> None:
+    """V2.88.83 (anti-overfit II): el default exige los 4 gates lab_validated.
+
+    Una hipótesis ``in_sample_only`` (solo ``backtest`` PASS) queda fuera por defecto;
+    el override explícito ``min_gates=("backtest",)`` sigue habilitando el flujo
+    ``semifinal``/in_sample_only.
+    """
+    in_sample = _evaluation("c-is", score=2.0, gates=("backtest",))
+    full = _evaluation("c-full", score=1.0)  # default: 4 gates PASS
+    selection = select_top3(
+        instrument_id="AAA",
+        run_id="run-1",
+        evaluations=[in_sample, full],
+    )
+    assert selection.top.candidate_ids == ("c-full",)
+    assert set(selection.rejected) == {"c-is"}
+
+    relaxed = select_top3(
+        instrument_id="AAA",
+        run_id="run-1",
+        evaluations=[in_sample, full],
+        min_gates=("backtest",),
+    )
+    assert relaxed.top.candidate_ids == ("c-is", "c-full")
 
 
 # ── COACH ───────────────────────────────────────────────────────────────────────

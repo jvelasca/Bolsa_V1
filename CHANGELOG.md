@@ -2,6 +2,15 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.83-beta] — `ESTRATEGIA`: **anti-overfit II (CPCV/walk-forward al LAB real + TOP3 `lab_validated`)**
+
+**Bump** `2.11.82-beta` → `2.11.83-beta`. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor ≠ 0`** (el LAB real cablea CPCV/WF a las familias H0 y el TOP3 eleva su barrera de evidencia). Tag por crear.
+
+- **CPCV/walk-forward al LAB real (H0):** `_STRUCTURAL_LAB_DEFAULTS` pasa a incluir `cpcv_groups=4` y `walk_forward_folds=3` para TODAS las familias (H0 `SMA`/`RSI`/`MACD` y declarativas). El ciclo real deja de correr la «rejilla IS plana» y mide evidencia OOS/WF/CPCV: los gates `oos`/`robustness`/`walk_forward` dejan de quedar `NOT_EVALUATED`.
+- **TOP3 por defecto `lab_validated`:** `select_top3` sube su `min_gates` por defecto de `("backtest",)` a `("backtest", "oos", "walk_forward", "robustness")`; el TOP3 excluye hipótesis `in_sample_only` salvo override explícito (`min_gates=("backtest",)` para el flujo `semifinal`).
+- **Persistencia de la evidencia anti-overfit:** certificado que `cpcv`/`walkForward`/`pbo` viajan en el result JSON (`optimize_result_to_dict`) y en los `blocks` de los research trials.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.83/README.md`](docs/engineering/evidence/v2.88.83/README.md).
+
 ## [2.11.82-beta] — `ESTRATEGIA`: **oleada anti-overfit (campeón OOS-aware + TOP3 cross-asset + gate DSR)**
 
 **Bump** `2.11.80-beta` → `2.11.82-beta` (el `2.11.81-beta` quedó reclamado por «telemetría robusta» en el CHANGELOG pero sin bump de `package.json`; este sello avanza al siguiente). **Con migración** `052_top3_opportunities`. **`Δ motor ≠ 0`** (el scoring del simulador consume evidencia LAB por instrumento). **Tag anotado `v2.88.82-beta`** (→ commit `0b907398`) con `Release tag CI` [`37599997743`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37599997743) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `python` `4587 passed / 45 skipped`; `frontend` `1519 passed`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).

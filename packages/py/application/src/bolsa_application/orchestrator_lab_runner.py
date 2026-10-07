@@ -93,21 +93,17 @@ _LAB_RUN_KEYS = frozenset(
     }
 )
 
-# V2.32.1 (auditoría P1-02): defaults estructurales de ventana aplicables a TODAS las
-# familias. ``cpcv_groups``/``walk_forward_folds`` NO se incluyen aquí; desde V2.34/A14
-# las familias declarativas los reciben vía ``_DECLARATIVE_LAB_DEFAULTS`` porque el
-# motor ya soporta CPCV/WF sobre definiciones declarativas.
+# V2.32.1 (auditoría P1-02) + V2.88.83 (anti-overfit II): defaults estructurales
+# aplicables a TODAS las familias (H0 y declarativas). ``cpcv_groups`` y
+# ``walk_forward_folds`` se habilitan por defecto para ambas vías: el motor
+# ``RunSmaGridOptimize._run_cpcv/_run_walk_forward`` ya soporta H0 (vía
+# ``_run_h0_partial_on_bars``) y declarativas (vía ``_run_declarative_partial_on_bars``),
+# de modo que los gates ``robustness``/``walk_forward``/``oos`` dejan de quedar
+# NOT_EVALUATED en el ciclo real. Valores conservadores: ``cpcv_groups=4``
+# (> CPCV_GROUPS_MIN) y 3 folds WF. El candidato puede sobreescribirlos (viajan en
+# ``_LAB_RUN_KEYS``).
 _STRUCTURAL_LAB_DEFAULTS: dict[str, Any] = {
     "bar_limit": 400,
-}
-
-# V2.34/A14: defaults estructurales para familias DECLARATIVAS (catálogo de Discovery o
-# gramática). A diferencia de las H0, estas familias sí soportan CPCV/WF desde A14
-# (``RunSmaGridOptimize._run_cpcv/_run_walk_forward`` con ``definition`` declaran una
-# rama declarativa), así que se les habilita el CPCV/WF por defecto para que los gates
-# ``robustness``/``walk_forward`` dejen de quedar NOT_EVALUATED. Valores conservadores:
-# ``cpcv_groups=4`` (> CPCV_MIN_GROUPS) y 3 folds WF. El candidato puede sobreescribirlos.
-_DECLARATIVE_LAB_DEFAULTS: dict[str, Any] = {
     "cpcv_groups": 4,
     "walk_forward_folds": 3,
 }
@@ -255,12 +251,10 @@ class LabOptimizeRunner:
             STRATEGY_FAMILY_SMA,
         )
 
-        # V2.32.1 (P1-02): el default estructural de ventana (``bar_limit``) se aplica a
-        # TODAS las familias, incluidas las declarativas del Discovery, para que el corte
-        # LAB/hold-out sea coherente. ``cpcv_groups``/``walk_forward_folds`` NO se fuerzan
-        # aquí: solo las familias H0 los soportan (las declarativas los reciben del
-        # catálogo o del candidato, y con ellos los gates robustness/walk_forward/oos
-        # dejan de quedar NOT_EVALUATED).
+        # V2.32.1 (P1-02) + V2.88.83: los defaults estructurales (``bar_limit`` +
+        # ``cpcv_groups``/``walk_forward_folds``) se aplican a TODAS las familias para que
+        # el corte LAB/hold-out sea coherente y los gates robustness/walk_forward/oos
+        # dejen de quedar NOT_EVALUATED. El candidato puede sobreescribirlos.
         merged: dict[str, Any] = dict(_STRUCTURAL_LAB_DEFAULTS)
         merged.update(self._grid_defaults.get(family, {}))
         for key, value in dict(candidate_params or {}).items():
@@ -281,15 +275,9 @@ class LabOptimizeRunner:
         merged["emit_regime"] = self._emit_regime
         if family in {STRATEGY_FAMILY_SMA, STRATEGY_FAMILY_RSI, STRATEGY_FAMILY_MACD}:
             return _prune_grid_to_window(family, merged)
-        # V2.34/A14: familia declarativa (catálogo de Discovery o gramática). El motor
-        # YA soporta CPCV/WF sobre definiciones declarativas
-        # (``_run_declarative_partial_on_bars``), así que se aplican los defaults
-        # estructurales para que ``robustness``/``walk_forward`` se midan de verdad.
-        # El candidato puede sobreescribirlos (vienen de ``candidate_params``).
-        for key, value in _DECLARATIVE_LAB_DEFAULTS.items():
-            merged.setdefault(key, value)
-        # El grid lo aporta el catálogo/gramática dentro del LAB; no se recorta por
-        # warm-up de familia H0.
+        # V2.34/A14 + V2.88.83: familia declarativa (catálogo de Discovery o gramática).
+        # CPCV/WF ya vienen en ``_STRUCTURAL_LAB_DEFAULTS`` (compartidos con H0); el grid
+        # lo aporta el catálogo/gramática dentro del LAB, no se recorta por warm-up H0.
         return merged
 
 

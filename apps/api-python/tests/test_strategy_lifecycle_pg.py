@@ -413,9 +413,12 @@ async def test_default_orchestrator_real_wiring_end_to_end_pg(
     ``run_optimize`` y el candidato), este test usa ``_default_orchestrator`` tal cual
     lo usa el scheduler: el universo ESTUDIO y el LAB real (``RunSmaGridOptimizeAndSave``)
     se cablean solos. Se siembra instrumento + pertenencia a la lista ``estudio`` +
-    barras OHLCV, y se certifica que el ciclo deja ``sin_evidencia_top3`` y produce
-    evidencia real (evaluación persistida con ``optimization_run_id``).
+    barras OHLCV, y se certifica que el ciclo NO cae en ``sin_evidencia_top3`` y produce
+    evidencia real (evaluación persistida con ``optimization_run_id``). V2.88.83
+    (anti-overfit II): el LAB real cablea CPCV/WF a las familias H0, el campeón pasa los
+    4 gates ``lab_validated`` y el TOP3 (default ``lab_validated``) queda válido.
     """
+    import math
     from datetime import UTC, datetime, timedelta
     from decimal import Decimal
 
@@ -487,13 +490,16 @@ async def test_default_orchestrator_real_wiring_end_to_end_pg(
                     updated_at=now,
                 )
             )
-            # Serie oscilante con tendencia alcista: SMA cross genera operaciones y un
-            # campeón con score > 0 (el gate `backtest` exige score positivo; una serie
-            # monótona produce 0 operaciones y no es evidencia válida del LAB).
+            # Serie con tendencia alcista + oscilación suave: SMA cross genera operaciones
+            # y un campeón con score > 0 (el gate `backtest` exige score positivo; una
+            # serie monótona produce 0 operaciones). V2.88.83 (anti-overfit II): con el LAB
+            # real cableado a CPCV/WF y el TOP3 por defecto ``lab_validated``, la serie debe
+            # hacer que el campeón OOS-aware conserve IS > 0 Y OOS > 0 Y WFE > 0 en las
+            # ventanas reducidas de CPCV: drift dominante sobre la sinusoide (0.08/día).
             base = Decimal("10.00")
             for day in range(420):
-                wave = Decimal(str(1.5 * (1 if day % 40 < 20 else -1)))
-                drift = Decimal(day) * Decimal("0.03")
+                wave = Decimal(str(round(2.0 * math.sin(2 * math.pi * day / 60.0), 4)))
+                drift = Decimal(day) * Decimal("0.08")
                 price = base + drift + wave
                 session.add(
                     OhlcvBarRow(
@@ -551,7 +557,17 @@ async def test_default_orchestrator_real_wiring_end_to_end_pg(
             # Diagnóstico de gates (el LAB real no promete PASS con cualquier serie).
             gates = {g.gate: g.status.value for g in evaluations[0].gates}
             assert "backtest" in gates
-            assert result.status != "sin_evidencia_top3", (result, gates, evaluations[0].metrics)
+            # V2.88.83 (anti-overfit II): con CPCV/WF ya cableado al LAB real H0, el
+            # campeón pasa los 4 gates ``lab_validated`` (backtest+oos+walk_forward+
+            # robustness) y el TOP3 (default ``lab_validated``) queda válido — el ciclo
+            # NO cae en ``sin_evidencia_top3``.
+            metrics = evaluations[0].metrics
+            assert metrics.get("cpcv") is True, (result, gates, metrics)
+            assert gates.get("backtest") == "pass", (result, gates, metrics)
+            assert gates.get("oos") == "pass", (result, gates, metrics)
+            assert gates.get("robustness") == "pass", (result, gates, metrics)
+            assert gates.get("walk_forward") == "pass", (result, gates, metrics)
+            assert result.status != "sin_evidencia_top3", (result, gates, metrics)
     finally:
         await _cleanup()
 
