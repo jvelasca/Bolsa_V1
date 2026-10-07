@@ -2,6 +2,17 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.85-beta] — `MANUAL · H1` + `AUTO · TOP3 (T1)`: **cierre manual por HTTP + contrato web del TOP3**
+
+**Bump** `2.11.84-beta` → `2.11.85-beta`. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** (el fence relajado vive en el canal HTTP paper `execute_gated_portfolio_trade.py`, **no** en el motor AUTO de decisión/ejecución). **Contrato HTTP**: se regenera `openapi.json` + `schema.d.ts` (los endpoints `/top3-opportunities` ya existían en FastAPI pero no figuraban en el contrato web; `contract:check` verde). **Tag anotado `v2.88.85-beta`**.
+
+- **H1 (P1) — cierre de posición abierta en MANUAL.** El fence de venta HTTP solo bloquea posiciones **no** manuales: `row_is_human_manual` autoriza la salida directa cuando la fila declara origen manual (`birth_override_reason="human_manual"` / `trade_plan_snapshot.origin="HUMAN_MANUAL"` / `trade_plan_id` con prefijo `manual-`). Quien abrió en MANUAL ya puede cerrar; **SEMI/AUTO siguen exigiendo Confirm** (ExitPermission), sin bypass.
+- **Copy de recuperación (H3).** En MANUAL el desriesgo dirige a **Vender** (venta directa sobre el libro DEMO), no a encolar Confirm; el bloqueo deja de presentarse como error genérico.
+- **T1 — contrato web del TOP3.** `getLatestTop3Opportunities()` y `getTop3OpportunitiesForRun(runId)` en `apps/web/src/lib/api.ts` (patrón `call<T>()`), tipados por `Top3OpportunitiesResponseDto`. Sin hook ni panel (eso es T2/T3).
+- **Limpieza semántica (P2).** El TOP3 describe **oportunidades rankeadas**, nunca una decisión de cartera: endpoint, worker, repositorio y la spec dejan de decir «activos decididos» (regla dura añadida a la spec).
+- **Tests.** Backend: el fence sigue vivo para posiciones no manuales + cierre de una posición `HUMAN_MANUAL`; FE: mensaje de recuperación en MANUAL y no-encolado de Confirm.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.85/README.md`](docs/engineering/evidence/v2.88.85/README.md).
+
 ## [2.11.84-beta] — `AUTO · TOP3`: **productor durable del TOP3 cross-asset + degradación explícita**
 
 **Bump** `2.11.83-beta` → `2.11.84-beta`. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** (el TOP3 persistido es observabilidad: no vuelve a la decisión, y el scoring del plan recibe el MISMO `evidence` leído una sola vez). **Contrato HTTP sin cambio** (el endpoint `/top3-opportunities` ya existía). **Tag anotado `v2.88.84-beta`** (→ commit `5d20e26f`) con `Release tag CI` [`37629056130`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37629056130) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `python` `4592 passed / 45 skipped`; `frontend` `1519 passed`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
