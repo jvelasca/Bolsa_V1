@@ -1,6 +1,6 @@
 # Evidencia `v2.88.82-beta` — `ESTRATEGIA`: **oleada anti-overfit (campeón OOS-aware + TOP3 cross-asset + gate DSR)**
 
-**Producto:** `V2.88.82-beta` · **Package:** `2.11.82-beta` · **AsOf:** 2026-10-07. **Con migración** `052_top3_opportunities`. **`Δ motor ≠ 0`** (el scoring del simulador consume evidencia LAB por instrumento). **Tag no creado.**
+**Producto:** `V2.88.82-beta` · **Package:** `2.11.82-beta` · **AsOf:** 2026-10-07. **Con migración** `052_top3_opportunities`. **`Δ motor ≠ 0`** (el scoring del simulador consume evidencia LAB por instrumento). **Tag anotado `v2.88.82-beta`** (→ commit `0b907398`).
 
 **Padre de producto:** [`v2.88.80`](../v2.88.80/README.md) (el `v2.88.81-beta` — «telemetría robusta» — quedó con entrada de CHANGELOG pero **sin** bump de `package.json`; este sello avanza de `2.11.80-beta` a `2.11.82-beta`).
 
@@ -54,4 +54,4 @@ El tag `v2.88.76-beta` permanece.
 
 ## Cita POST-TAG
 
-No hay tag de `v2.88.82-beta`. No se inventa un veredicto de `Release tag CI`.
+**Tag anotado `v2.88.82-beta`** (→ commit `0b907398`). `Release tag CI` [`37599997743`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37599997743) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `python` `4587 passed / 45 skipped`; `frontend` `1519 passed`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).

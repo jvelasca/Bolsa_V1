@@ -4,7 +4,7 @@ All notable releases of Bolsa V1.
 
 ## [2.11.82-beta] — `ESTRATEGIA`: **oleada anti-overfit (campeón OOS-aware + TOP3 cross-asset + gate DSR)**
 
-**Bump** `2.11.80-beta` → `2.11.82-beta` (el `2.11.81-beta` quedó reclamado por «telemetría robusta» en el CHANGELOG pero sin bump de `package.json`; este sello avanza al siguiente). **Con migración** `052_top3_opportunities`. **`Δ motor ≠ 0`** (el scoring del simulador consume evidencia LAB por instrumento). Tag no creado.
+**Bump** `2.11.80-beta` → `2.11.82-beta` (el `2.11.81-beta` quedó reclamado por «telemetría robusta» en el CHANGELOG pero sin bump de `package.json`; este sello avanza al siguiente). **Con migración** `052_top3_opportunities`. **`Δ motor ≠ 0`** (el scoring del simulador consume evidencia LAB por instrumento). **Tag anotado `v2.88.82-beta`** (→ commit `0b907398`) con `Release tag CI` [`37599997743`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37599997743) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `python` `4587 passed / 45 skipped`; `frontend` `1519 passed`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 - **Campeón OOS-aware:** `champion_trial()` unifica qué trial manda (OOS preferido cuando todos lo miden, fallback IS declarado); ACTIVE promueve el MISMO trial cuya evidencia se validó fuera de muestra.
 - **TOP3 cross-asset (P3):** tablero de oportunidades con 7 componentes de evidencia (edge, liquidez, robust_score OOS-aware, drawdown, CPCV, régimen, DSR); ruta `/top3-opportunities`; migración `052_top3_opportunities`.
