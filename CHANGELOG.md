@@ -2,6 +2,17 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.86-beta] — `MANUAL · H1 UX`: **la CTA de salida conduce de verdad a Vender directo**
+
+**Bump** `2.11.85-beta` → `2.11.86-beta`. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** y **contrato HTTP sin cambio**: la venta de una posición `HUMAN_MANUAL` ya estaba autorizada en `v2.88.85-beta` (`row_is_human_manual`); este sello solo cierra la **UX** que aún no la ofrecía. **Tag anotado `v2.88.86-beta`**.
+
+- **H1 UX (P1) — cierre desde la superficie de posición.** En [`position-exit-drawer-actions.tsx`](apps/web/src/features/trading/position-exit-drawer-actions.tsx), con el libro en **MANUAL** y una posición nacida por el canal manual (`tradePlanId` con prefijo `manual-`), las CTAs **Reducir**/**Salir** abren el flujo **Vender** canónico (`OrderDialog`) con la cantidad de desriesgo precargada ([`open-sell-position-order.ts`](apps/web/src/features/trading/open-sell-position-order.ts)) en vez de limitarse a mostrar el copy «usa Vender». La firma humana sigue en el diálogo (no ejecuta sola).
+- **Detección de origen manual** en cliente: `positionIsHumanManual` / `HUMAN_MANUAL_TRADE_PLAN_PREFIX` en [`propose-position-exit.ts`](apps/web/src/features/operations/propose-position-exit.ts), espejo de la tercera evidencia de `row_is_human_manual` (el `PositionDto` solo expone el prefijo `manual-{tx}`).
+- **SEMI/AUTO y posiciones no manuales intactas:** en MANUAL una posición **no** `HUMAN_MANUAL` conserva el bloqueo actual (el fence backend sigue vetando su venta HTTP); SEMI sigue encolando Confirm.
+- **Preset del diálogo:** [`trading-ui-store.ts`](apps/web/src/stores/trading-ui-store.ts) gana `orderPreset` (lado + cantidad); `OrderDialog` lo aplica al abrir.
+- **Tests:** `position-exit-drawer-actions.test.tsx` (MANUAL + `HUMAN_MANUAL` abre Vender y **no** encola; MANUAL + no manual mantiene el bloqueo; SEMI encola) y `propose-position-exit.test.ts` (`positionIsHumanManual`).
+- **Evidencia:** [`docs/engineering/evidence/v2.88.86/README.md`](docs/engineering/evidence/v2.88.86/README.md).
+
 ## [2.11.85-beta] — `MANUAL · H1` + `AUTO · TOP3 (T1)`: **cierre manual por HTTP + contrato web del TOP3**
 
 **Bump** `2.11.84-beta` → `2.11.85-beta`. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** (el fence relajado vive en el canal HTTP paper `execute_gated_portfolio_trade.py`, **no** en el motor AUTO de decisión/ejecución). **Contrato HTTP**: se regenera `openapi.json` + `schema.d.ts` (los endpoints `/top3-opportunities` ya existían en FastAPI pero no figuraban en el contrato web; `contract:check` verde). **Tag anotado `v2.88.85-beta`** (objeto `23076a9f` → commit `f626bfaa`) con `Release tag CI` [`37653650379`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37653650379) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `python` `4594 passed / 45 skipped`; `frontend` `1523 passed` (`258` ficheros); `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
