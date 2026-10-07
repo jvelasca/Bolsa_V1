@@ -9,7 +9,7 @@ Glue puro/orquestable que reutiliza la infraestructura ya existente:
   no se inventan candidatas). No ejecuta nada: decide qué investigar.
 * **LABORATORIO** (``evaluate_optimize_result``): traduce el resultado REAL de
   ``RunSmaGridOptimize`` (champion IS/OOS + walk-forward + CPCV + PBO + edge report)
-  a los seis gates del Promotion Gate y a una ``StrategyEvaluation`` con score.
+  a los siete gates del Promotion Gate y a una ``StrategyEvaluation`` con score.
 
 Sin IA, sin red y sin DB en estas funciones: son transformaciones deterministas que
 la orquestación (V2.26) encadena. Fail-closed: si falta evidencia de un gate, ese
@@ -177,7 +177,7 @@ class LabThresholds:
     min_oos_score: float = 0.0
     min_wfe: float = 0.0
     max_pbo: float = 1.0
-    min_dsr: float = 0.0
+    min_dsr: float = 0.7
     zero_tolerance: float = 1e-9
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -186,7 +186,10 @@ def _best_trial(result: Any) -> Any | None:
     trials = list(getattr(result, "trials", None) or [])
     if not trials:
         return None
-    return max(trials, key=lambda t: float(getattr(t, "score", 0.0) or 0.0))
+    # V2.88 — campeón OOS-aware (misma fuente que ``champion_params_from_result``).
+    from bolsa_application.optimize import champion_trial
+
+    return champion_trial(trials)
 
 
 def evaluate_optimize_result(
@@ -327,6 +330,22 @@ def evaluate_optimize_result(
         metrics["pbo"] = float(pbo_value)
     if dsr is not None:
         metrics["dsr"] = float(dsr)
+    # V2.88 (TOP3 oportunidades) — plumb de evidencia que antes solo vivía en el
+    # detalle de gates: drawdown, CPCV y régimen (para que el ranking cross-asset
+    # y el adapter de evidencia los vean sin re-derivarlos).
+    if dd is not None:
+        metrics["max_drawdown_pct"] = float(dd)
+    metrics["cpcv"] = bool(has_cpcv)
+    regime = getattr(result, "regime", None)
+    if isinstance(regime, str) and regime.strip():
+        metrics["regime"] = regime.strip()
+
+    # El score de borde usado para RANKEAR prefiere la evidencia fuera de muestra:
+    # OOS si está medido; si no, IS (fallback in_sample_only). El campo ``score``
+    # del contrato se mantiene como IS por compatibilidad (lo consumen el COACH y
+    # la persistencia), pero el ranking de TOP3 usa ``robust_score``.
+    edge = oos_score if oos_score is not None else is_score
+    metrics["robust_score"] = float(edge) if edge is not None else 0.0
 
     score = is_score if is_score is not None else 0.0
     return StrategyEvaluation(

@@ -127,6 +127,8 @@ AUTO_ORCHESTRATOR_HEALTH_MIN_EDGE = "AUTO_ORCHESTRATOR_HEALTH_MIN_EDGE"
 AUTO_ORCHESTRATOR_HEALTH_MIN_WFE = "AUTO_ORCHESTRATOR_HEALTH_MIN_WFE"
 AUTO_ORCHESTRATOR_HEALTH_MIN_DSR = "AUTO_ORCHESTRATOR_HEALTH_MIN_DSR"
 AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY = "AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY"
+# V2.88 (DSR gate exigible): umbral de promoción DSR del LAB (anti-overfit).
+AUTO_ORCHESTRATOR_LAB_MIN_DSR = "AUTO_ORCHESTRATOR_LAB_MIN_DSR"
 
 
 def _truthy(raw: str | None) -> bool:
@@ -499,6 +501,18 @@ def _health_thresholds() -> Any:
         min_dsr=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_DSR, 0.0),
         min_credibility=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY, 0.1),
     )
+
+
+def _lab_thresholds() -> Any:
+    """Umbrales del LAB para el gate DSR exigible (V2.88, anti-overfit).
+
+    ``min_dsr`` manda sobre el gate ``dsr`` del Promotion Gate: con el default 0.7,
+    una estrategia con DSR inferior queda fuera de la promoción (fail-closed). Ajustable
+    por env ``AUTO_ORCHESTRATOR_LAB_MIN_DSR``; si no se fija, conserva el default.
+    """
+    from bolsa_application.strategy_lab_phase import LabThresholds
+
+    return LabThresholds(min_dsr=_float_env(AUTO_ORCHESTRATOR_LAB_MIN_DSR, 0.7))
 
 
 def _float_env(name: str, default: float) -> float:
@@ -1183,6 +1197,8 @@ def _default_orchestrator(session_factory: Any) -> Any:
             params=_default_grid_params(),
             max_candidates=_max_candidates(),
             candidate_id_factory=_candidate_id_factory,
+            # V2.88 (DSR gate exigible): umbral de promoción DSR del LAB (anti-overfit).
+            lab_thresholds=_lab_thresholds(),
             # V2.28 / A10 (P1-02 real): vigilancia con métricas OBSERVADAS de la ejecución
             # SIM atribuida a la versión activa (fills con strategy_version_id).
             observed_metrics=make_observed_metrics_provider(session_factory),

@@ -170,6 +170,42 @@ def test_validation_missing_gates_are_reported() -> None:
     assert set(validation.missing_gates) == set(PROMOTION_GATES) - {"backtest", "risk"}
 
 
+# ── V2.88 / DSR gate exigible ────────────────────────────────────────────────────
+
+
+def _gates_except(gate: str) -> tuple[GateResult, ...]:
+    return tuple(g for g in _all_gates_pass() if g.gate != gate)
+
+
+def test_promotion_blocked_by_dsr_fail() -> None:
+    """Un gate ``dsr`` FAIL veta la promoción aunque el resto de gates pasen."""
+    gates = tuple(
+        GateResult.failed("dsr") if g.gate == "dsr" else g for g in _all_gates_pass()
+    )
+    validation = StrategyValidation(finalist_id="ver-1", gates=gates)
+    promo = evaluate_admin_promotion(
+        finalist=_finalist(),
+        validation=validation,
+        coach=_coach_approves(),
+        shadow_validated=True,
+    )
+    assert not promo.promoted
+    assert any("gates_no_superados" in r and "dsr" in r for r in promo.reasons)
+
+
+def test_promotion_blocked_by_missing_dsr() -> None:
+    """Un gate ``dsr`` ausente (NOT_EVALUATED) bloquea la promoción (fail-closed)."""
+    validation = StrategyValidation(finalist_id="ver-1", gates=_gates_except("dsr"))
+    promo = evaluate_admin_promotion(
+        finalist=_finalist(),
+        validation=validation,
+        coach=_coach_approves(),
+        shadow_validated=True,
+    )
+    assert not promo.promoted
+    assert any("gates_no_superados" in r and "dsr" in r for r in promo.reasons)
+
+
 # ── V2.35.1 / P2-01: separación compuerta AUTOMÁTICA vs ADMIN ────────────────────
 
 

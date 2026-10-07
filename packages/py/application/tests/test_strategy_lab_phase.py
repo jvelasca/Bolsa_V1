@@ -133,6 +133,30 @@ def test_lab_full_evidence_passes_quantitative_gates() -> None:
     assert evaluation.metrics["oos_score"] == 0.9
 
 
+def test_lab_champion_is_oos_aware() -> None:
+    """V2.88 — el campeón es el de mayor OOS (no IS): score/oos_score anclados al mismo trial."""
+    result = _Result(
+        trials=[
+            _Trial(score=9.0, oos_metrics={"score": -1.0, "tradeCount": 5}, max_drawdown_pct=4.0),
+            _Trial(score=1.0, oos_metrics={"score": 2.0, "tradeCount": 5}, max_drawdown_pct=3.0),
+        ],
+        cpcv={"pbo": 0.1},
+        pbo={"pbo": 0.1},
+        walk_forward={"walkForwardEfficiency": 0.7},
+        edge_report={"dsr": 0.5},
+    )
+    evaluation = evaluate_optimize_result(
+        candidate=_candidate(),
+        result=result,
+        thresholds=LabThresholds(min_oos_score=0.0, min_wfe=0.0, max_pbo=0.3, min_dsr=0.0),
+    )
+    # El campeón es el de mayor OOS (2.0), no el de mayor IS (9.0).
+    assert evaluation.score == 1.0
+    assert evaluation.metrics["is_score"] == 1.0
+    assert evaluation.metrics["oos_score"] == 2.0
+    assert evaluation.metrics["robust_score"] == 2.0
+
+
 def test_lab_high_pbo_fails_robustness() -> None:
     result = _Result(
         trials=[_Trial(score=1.0, oos_metrics={"score": 0.8})],
@@ -147,6 +171,38 @@ def test_lab_high_pbo_fails_robustness() -> None:
     )
     by_gate = {g.gate: g for g in evaluation.gates}
     assert by_gate["robustness"].status == GateStatus.FAIL
+
+
+def test_lab_dsr_threshold_vetoes_overfit() -> None:
+    """V2.88 — con ``min_dsr=0.7``, un DSR bajo veta el gate ``dsr`` (anti-overfit)."""
+    result = _Result(
+        trials=[_Trial(score=1.0, oos_metrics={"score": 0.8})],
+        cpcv={"pbo": 0.1},
+        pbo={"pbo": 0.1},
+        walk_forward={"walkForwardEfficiency": 0.7},
+        edge_report={"dsr": 0.5},
+    )
+    evaluation = evaluate_optimize_result(
+        candidate=_candidate(),
+        result=result,
+        thresholds=LabThresholds(min_dsr=0.7),
+    )
+    by_gate = {g.gate: g for g in evaluation.gates}
+    assert by_gate["dsr"].status == GateStatus.FAIL
+
+    ok_result = _Result(
+        trials=[_Trial(score=1.0, oos_metrics={"score": 0.8})],
+        cpcv={"pbo": 0.1},
+        pbo={"pbo": 0.1},
+        walk_forward={"walkForwardEfficiency": 0.7},
+        edge_report={"dsr": 0.8},
+    )
+    ok_eval = evaluate_optimize_result(
+        candidate=_candidate(),
+        result=ok_result,
+        thresholds=LabThresholds(min_dsr=0.7),
+    )
+    assert {g.gate: g for g in ok_eval.gates}["dsr"].passed
 
 
 def test_gate_from_metrics_fail_closed() -> None:

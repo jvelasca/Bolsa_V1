@@ -703,7 +703,7 @@ def _candidate_provenance(
 
 
 def _promotion_gates(evaluation: StrategyEvaluation, coach: Any) -> tuple[GateResult, ...]:
-    """Compone los seis gates del Promotion Gate desde la evaluación + coach.
+    """Compone los siete gates del Promotion Gate desde la evaluación + coach.
 
     Toma los gates cuantitativos de la evaluación y añade el gate ``coach`` a partir
     del ``CoachAssessment`` (PASS si no veta). Un gate ausente en la evaluación queda

@@ -1,7 +1,7 @@
 """V2.25 / A10 — fase FINALISTA + Promotion Gate (anti strategy-chasing).
 
 Convierte una candidata aprobada en una ``StrategyVersion`` **inmutable** (hash estable
-de su definición) y aplica el Promotion Gate completo (seis gates cuantitativos +
+de su definición) y aplica el Promotion Gate completo (siete gates cuantitativos +
 COACH + shadow/paper) antes de permitir que sea ACTIVE.
 
 Regla anti strategy-chasing (auditoría V2.24 §20): una candidata del LAB **nunca**
@@ -109,7 +109,7 @@ def decide_promotion(
     active: ActiveStrategyRef | None = None,
     require_gate_for_active: bool = True,
 ) -> PromotionDecision:
-    """Promotion Gate AUTOMÁTICO: seis gates + COACH + evidencia shadow.
+    """Promotion Gate AUTOMÁTICO: siete gates + COACH + evidencia shadow.
 
     V2.32 / A12: la autoridad shadow es la **evidencia ejecutada** (``shadow``). Esta
     es la compuerta de la ruta autónoma y NO acepta override humano (V2.35.1, auditoría

@@ -58,7 +58,7 @@ def _good_result() -> _OptimizeResult:
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7, "wfe": 0.7},
-        edge_report={"dsr": 0.5},
+        edge_report={"dsr": 0.7},
     )
 
 
@@ -259,13 +259,14 @@ def test_active_strategy_decider_holds_outside_watch() -> None:
     assert decider("BBB").action == "HOLD"
 
 
-def test_promotion_gate_names_are_the_six() -> None:
+def test_promotion_gate_names_are_the_seven() -> None:
     assert set(PROMOTION_GATES) == {
         "backtest",
         "robustness",
         "walk_forward",
         "oos",
         "risk",
+        "dsr",
         "coach",
     }
 
@@ -306,7 +307,7 @@ async def test_version_without_champion_keeps_plain_definition() -> None:
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7, "wfe": 0.7},
-        edge_report={"dsr": 0.5},
+        edge_report={"dsr": 0.7},
     )
     deps, store = _deps(runner=lambda c: no_params, resolution=_Resolution())
     _with_shadow_evidence(deps)

@@ -36,6 +36,7 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         w.AUTO_ORCHESTRATOR_ALLOCATOR_CATALOG_WEIGHT,
         w.AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_SIMPLE_WEIGHT,
         w.AUTO_ORCHESTRATOR_ALLOCATOR_GRAMMAR_COMPOSITE_WEIGHT,
+        w.AUTO_ORCHESTRATOR_LAB_MIN_DSR,
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -345,6 +346,15 @@ def test_health_thresholds_are_calibrated() -> None:
     th = w._health_thresholds()
     assert th.min_credibility is not None
     assert th.min_edge is not None
+
+
+def test_lab_thresholds_dsr_calibrated(monkeypatch: pytest.MonkeyPatch) -> None:
+    """V2.88 (DSR gate exigible): el LAB fija ``min_dsr`` real (anti-overfit), por env."""
+    assert w._lab_thresholds().min_dsr == 0.7
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_LAB_MIN_DSR, "0.55")
+    assert w._lab_thresholds().min_dsr == 0.55
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_LAB_MIN_DSR, "basura")
+    assert w._lab_thresholds().min_dsr == 0.7
 
 
 # ── V2.33/A13: forward paper (default OFF, reversible) ───────────────────────────

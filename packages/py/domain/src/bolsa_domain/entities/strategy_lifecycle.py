@@ -96,13 +96,14 @@ class GateResult:
         return cls(gate=gate, status=GateStatus.FAIL, detail=detail)
 
 
-# Los seis gates del Promotion Gate (V2.25 · Fase 7). Todos deben ser PASS.
+# Los siete gates del Promotion Gate (V2.25 · Fase 7). Todos deben ser PASS.
 PROMOTION_GATES: tuple[str, ...] = (
     "backtest",
     "robustness",
     "walk_forward",
     "oos",
     "risk",
+    "dsr",
     "coach",
 )
 
@@ -191,7 +192,7 @@ class StrategyFinalist:
 
 @dataclass(frozen=True, slots=True)
 class StrategyValidation:
-    """Validación formal del finalista (mismos seis gates, evidencia enlazada)."""
+    """Validación formal del finalista (mismos siete gates, evidencia enlazada)."""
 
     finalist_id: str
     gates: tuple[GateResult, ...]
@@ -597,7 +598,7 @@ def evaluate_promotion(
     Es la compuerta de la ruta autónoma (AUTO/worker): NO acepta override humano.
     Decide estrictamente sobre evidencia ejecutada, en este orden:
 
-    1. Los SEIS gates cuantitativos en PASS (``validation.passed``).
+    1. Los SIETE gates cuantitativos en PASS (``validation.passed``).
     2. El COACH sin veto (un veto del COACH bloquea aunque los gates pasen).
     3. Evidencia shadow/paper *ejecutada* (anti strategy-chasing): V2.32 / A12.
        Sin ``shadow`` que pase ⇒ ``shadow_validation_requerida`` (fail-closed).
