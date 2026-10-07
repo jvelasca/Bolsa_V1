@@ -236,6 +236,40 @@ def test_plan_v2_tick_excluded_keeps_real_score_and_rank() -> None:
     assert excluded["BBB"]["rank"] == 2
 
 
+def test_plan_v2_tick_evidence_components_reorder_ranking() -> None:
+    """V2.88 — la evidencia LAB (robustness/regime_fit) reordena el ranking del TOP.
+
+    Mismo edge/liquidez, pero ``BBB`` aporta robustez y encaje de régimen: debe quedar
+    primera pese a no tener ventaja en el borde directo.
+    """
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[
+            _signal("AAA", edge=0.9),
+            _signal("BBB", edge=0.9),
+        ],
+        regime="BULL_TREND",
+        evidence={
+            "AAA": {"robustness": 0.0, "regime_fit": 0.0},
+            "BBB": {"robustness": 0.9, "regime_fit": 1.0},
+        },
+    )
+    assert plan.ranked[0].instrument_id == "BBB"
+    assert plan.ranked[1].instrument_id == "AAA"
+
+
+def test_plan_v2_tick_evidence_none_is_historical() -> None:
+    """V2.88 — sin ``evidence`` el scoring es byte-idéntico al histórico (solo edge+liquidity)."""
+    base = plan_v2_tick(snapshot=_snapshot(), signals=[_signal("AAA", edge=0.9)], regime="BULL_TREND")
+    explicit = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=0.9)],
+        regime="BULL_TREND",
+        evidence=None,
+    )
+    assert base.ranked[0].combined == explicit.ranked[0].combined
+
+
 def test_plan_v2_tick_regime_unknown_blocks_all() -> None:
     plan = plan_v2_tick(
         snapshot=_snapshot(),

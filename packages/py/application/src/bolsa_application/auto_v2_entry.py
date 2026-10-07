@@ -838,7 +838,12 @@ def signal_identity_for_bar(
     )
 
 
-def _score_from_signal(signal: V2Signal, *, key: str | None = None) -> OpportunityScore:
+def _score_from_signal(
+    signal: V2Signal,
+    *,
+    key: str | None = None,
+    components: dict[str, float] | None = None,
+) -> OpportunityScore:
     """Score de oportunidad de una señal (componentes derivados de la señal).
 
     ``key`` (V2.47) es la clave de candidata que el pipeline usa para identificar la
@@ -850,6 +855,12 @@ def _score_from_signal(signal: V2Signal, *, key: str | None = None) -> Opportuni
     resto queda a 0 (fail-closed: no se inventa evidencia que la señal no aporta).
     ``regime_fit`` lo aporta el llamante vía el gate de régimen (no aquí).
 
+    V2.88 — ``components`` (opcional) enriquece la señal con la evidencia de estrategia
+    del LAB (``robustness``/``regime_fit``/``momentum``/``risk_reward``/
+    ``execution_quality``) calculada por ``opportunity_evidence_adapter``. Nunca pisa el
+    ``edge``/``liquidity`` de la propia señal (son su fuente directa). Con ``None`` el
+    output es byte-idéntico al histórico (dedupe de candidata inalterado).
+
     V2.40.1: ni el edge ni la liquidez tienen valor de reserva. Un ``edge`` ausente vale
     0 (el ranker no redistribuye pesos) y una liquidez desconocida también vale 0, en vez
     del antiguo ``1.0`` que convertía "no sé" en "liquidez perfecta". El motor, además,
@@ -860,10 +871,21 @@ def _score_from_signal(signal: V2Signal, *, key: str | None = None) -> Opportuni
         if signal.liquidity_notional is None
         else min(1.0, max(0.0, signal.liquidity_notional / 1_000_000.0))
     )
+    if components is None:
+        return score_opportunity(
+            key if key is not None else signal.instrument_id,
+            edge=signal.edge,
+            liquidity=liquidity,
+        )
     return score_opportunity(
         key if key is not None else signal.instrument_id,
         edge=signal.edge,
         liquidity=liquidity,
+        robustness=components.get("robustness", 0.0),
+        regime_fit=components.get("regime_fit", 0.0),
+        momentum=components.get("momentum", 0.0),
+        risk_reward=components.get("risk_reward", 0.0),
+        execution_quality=components.get("execution_quality", 0.0),
     )
 
 
@@ -1034,6 +1056,7 @@ def plan_v2_tick(
     consumed_signal_ids: Iterable[str] = (),
     halted: bool = False,
     adaptive: AdaptivePlan | None = None,
+    evidence: Mapping[str, dict[str, float]] | None = None,
 ) -> V2TickPlan:
     """Planifica las entradas del tick: rankeo → decisión → TradePlan → propuesta.
 
@@ -1062,6 +1085,15 @@ def plan_v2_tick(
     motivo ``adaptive_strategy_paused``) y la ASIGNACIÓN estrecha el techo de riesgo por
     estrategia (``min(escalado_del_gobernador, multiplicador_adaptativo)``). Adaptive
     recomienda; el motor determinista (gates, gobernador, sizing) sigue decidiendo.
+
+    ``evidence`` (V2.88 · TOP3 cross-asset) es el lookup de componentes de evidencia del
+    LAB por ``instrument_id`` (``opportunity_evidence_adapter.evidence_components``): un
+    ``dict[str, dict[str, float]]`` con ``robustness``/``regime_fit``/``momentum``/
+    ``risk_reward``/``execution_quality``. Con ``None`` (o sin entrada para un
+    instrumento) el scoring es byte-idéntico al histórico: solo ``edge``/``liquidity``
+    aportan, el resto vale 0 (fail-closed, no se inventa evidencia). El lookup se indexa
+    por instrumento (no por clave de candidata) porque la evidencia del campeón es una
+    propiedad del ACTIVO, no de la versión concreta que dedupe la cartera.
     """
     cfg = tunables if tunables is not None else V2Tunables()
     resolved_regime = _coerce_operational_regime(
@@ -1170,8 +1202,15 @@ def plan_v2_tick(
             return cached
         return candidate_key(signal, allow_distinct_strategies=cfg.allow_distinct_strategies)
 
+    def _components_of(signal: V2Signal) -> dict[str, float] | None:
+        """Evidencia LAB del campeón para este instrumento (``None`` si no se aporta)."""
+        if evidence is None:
+            return None
+        return evidence.get(signal.instrument_id)
+
     scored: list[OpportunityScore] = [
-        _score_from_signal(s, key=_key_of(s)) for s in entry_signals
+        _score_from_signal(s, key=_key_of(s), components=_components_of(s))
+        for s in entry_signals
     ]
     ranked = rank_opportunities(scored)
     top = select_top_opportunities(ranked, top_n=cfg.top_n)

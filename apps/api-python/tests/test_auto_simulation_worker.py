@@ -435,3 +435,45 @@ async def test_deterministic_spine_fills_have_no_attribution(auto_env: None) -> 
     assert ctx_store.size() > 0, "debe haber fills"
     # Ninguno atribuido a una versión: el origen es el spine determinista.
     assert await ctx_store.list_for_strategy_version("ver-abc") == []
+
+
+@pytest.mark.asyncio
+async def test_evidence_source_plumbs_into_tick(auto_env: None) -> None:
+    """V2.88 — la evidencia LAB del campeón se refresca y se lee síncrona en el hot path."""
+    from bolsa_application.opportunity_evidence_adapter import (
+        StrategyEvidenceBundle,
+        StrategyEvidenceSource,
+    )
+    from bolsa_domain.entities.strategy_lifecycle import GateResult, StrategyEvaluation
+
+    evaluation = StrategyEvaluation(
+        candidate_id="c1",
+        score=2.0,
+        gates=tuple(
+            GateResult.passed_gate(g) for g in ("backtest", "oos", "walk_forward", "robustness")
+        ),
+        metrics={"instrument_id": "AAA", "oos_score": 1.0, "regime": "trend_up"},
+    )
+
+    async def reader(symbols, _regime):  # noqa: ANN001, ARG001
+        return {"AAA": StrategyEvidenceBundle(evaluation=evaluation)}
+
+    source = StrategyEvidenceSource(reader=reader)
+    worker = AutoSimulationWorker(
+        exec_store=InMemoryExecutionEventStore(),
+        evidence_source=source,
+    )
+    await worker._v2_refresh_evidence({"AAA": object()}, regime="trend_up")
+    lookup = worker._v2_evidence_lookup({"AAA": object()})
+    assert lookup is not None
+    assert lookup["AAA"]["regime_fit"] == 1.0
+    # Instrumento sin evidencia ⇒ ausente del lookup (scoring histórico, Δ = 0).
+    assert "ZZZ" not in lookup
+
+
+@pytest.mark.asyncio
+async def test_evidence_source_absent_returns_none(auto_env: None) -> None:
+    """Sin fuente inyectada el lookup es ``None`` (byte-idéntico al histórico)."""
+    worker = AutoSimulationWorker(exec_store=InMemoryExecutionEventStore())
+    assert worker._v2_evidence_lookup({"AAA": object()}) is None
+    await worker._v2_refresh_evidence({"AAA": object()}, regime="trend_up")  # no-op sin fuente

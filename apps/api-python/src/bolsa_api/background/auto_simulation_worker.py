@@ -862,6 +862,10 @@ class AutoSimulationWorker:
         # tests) y se estrechan en el ``__init__`` a la interfaz que consume el hot path.
         edge_source: Any = None,
         trade_context_source: Any = None,
+        # V2.88 / TOP3 cross-asset: evidencia LAB del campeón ACTIVE por instrumento
+        # (``StrategyEvidenceSource``). Con ``None`` el scoring es byte-idéntico al
+        # histórico (solo edge+liquidity). Se refresca por tick como el resto de fuentes.
+        evidence_source: Any = None,
         consumed_signal_store: Any = None,
         # AUTO-1b: espejo durable de las RESERVAS de cartera (``portfolio_reservations``).
         # Con él, las reservas vivas son la autoridad de ``reserved_cash``/``pending_risk``
@@ -1189,6 +1193,7 @@ class AutoSimulationWorker:
         # tick) y lectura SÍNCRONA en el hot path, igual que el régimen.
         self._v2_trade_context_source: CatalogTradeContextSource | None = trade_context_source
         self._v2_edge_source: EdgeReportSource | None = edge_source
+        self._v2_evidence_source: Any = evidence_source
         # AUTO 2.0 · P4: espejo durable de las señales consumidas (inyectable). Con él,
         # un reinicio NO autoriza a re-emitir la misma señal sobre la misma barra; sin
         # él (hermético) el dedupe vive solo en RAM, como hasta ahora.
@@ -2551,6 +2556,44 @@ class AutoSimulationWorker:
                 await edge_refresh(versions, account_id=self._account_id)
             except Exception:  # noqa: BLE001 — sin edge, el motor veta.
                 logger.exception("auto_sim v2 edge refresh failed")
+
+    async def _v2_refresh_evidence(self, packages: Mapping[str, Any], regime: str | None) -> None:
+        """Precarga (async) la evidencia LAB del campeón ACTIVE por instrumento.
+
+        V2.88 / TOP3 cross-asset: mismo patrón que contexto/edge — I/O una vez por tick,
+        lectura SÍNCRONA en el hot path. Sin fuente inyectada es un no-op (Δ = 0). Un
+        fallo deja el mapa vacío ⇒ ``_v2_evidence_lookup`` devuelve ``None`` ⇒ scoring
+        byte-idéntico al histórico (fail-closed: no se inventa evidencia).
+        """
+        source = self._v2_evidence_source
+        if source is None:
+            return
+        refresh = getattr(source, "refresh", None)
+        if not callable(refresh):
+            return
+        try:
+            await refresh(tuple(packages), regime=regime)
+        except Exception:  # noqa: BLE001 — sin evidencia, scoring histórico.
+            logger.exception("auto_sim v2 strategy evidence refresh failed")
+
+    def _v2_evidence_lookup(self, packages: Mapping[str, Any]) -> dict[str, dict[str, float]] | None:
+        """Lookup síncrono ``instrument_id → components`` para ``plan_v2_tick``.
+
+        ``None`` cuando no hay fuente o ningún instrumento tiene evidencia: el motor
+        conserva el scoring histórico (solo edge+liquidity).
+        """
+        source = self._v2_evidence_source
+        if source is None:
+            return None
+        components_for = getattr(source, "components_for", None)
+        if not callable(components_for):
+            return None
+        lookup: dict[str, dict[str, float]] = {}
+        for symbol in packages:
+            comps = components_for(str(symbol))
+            if isinstance(comps, dict):
+                lookup[str(symbol)] = comps
+        return lookup or None
 
     async def _v2_refresh_open_orders(self) -> None:
         """Precarga (async) las órdenes AUTO NO materializadas (V2.40.4 · P1).
@@ -4153,6 +4196,10 @@ class AutoSimulationWorker:
         versions.update(self._position_version.values())
         if not reuse_bar_datum:
             await self._v2_refresh_trade_context(tuple(packages), tuple(sorted(versions)))
+            # V2.88 / TOP3 cross-asset: evidencia LAB del campeón ACTIVE por instrumento.
+            # Precarga UNA vez por tick (misma política que contexto/edge); el hot path lee
+            # síncrono. Sin fuente inyectada es un no-op (Δ = 0, scoring histórico).
+            await self._v2_refresh_evidence(packages, regime)
             # Órdenes pendientes (capital ya comprometido): se leen ANTES de construir la
             # foto para que la decisión del tick no pueda gastar dos veces el mismo cash.
             # AUTO-1b: con libro durable de reservas, la autoridad del compromiso son las
@@ -4182,6 +4229,7 @@ class AutoSimulationWorker:
             consumed_signal_ids=self._v2_consumed_signals,
             halted=self._v2_kill_switch_halted(),
             adaptive=adaptive,
+            evidence=self._v2_evidence_lookup(packages),
         )
         # AUTO-1b: el compromiso se hace DURABLE antes de emitir la orden. Sin persistir
         # no hay aprobación que emitir (fail-closed, ver ``_v2_persist_tick_reservations``).
@@ -6304,6 +6352,9 @@ class AutoSimulationWorker:
         trade_context_source: Any = None,
         edge_source: Any = None,
         atr_source: Any = None,
+        # V2.88 / TOP3 cross-asset: evidencia LAB del campeón ACTIVE por instrumento
+        # (misma sesión del tick). Sin ella se conserva la del constructor ⇒ Δ = 0.
+        evidence_source: Any = None,
         # W4 (v2.88.17): fuente de precio REAL del tick (misma sesión que régimen y ATR).
         # Con ``None`` se conserva la del constructor (``price_script`` hermético) ⇒ Δ = 0.
         price_source: PriceSource | None = None,
@@ -6356,6 +6407,7 @@ class AutoSimulationWorker:
             self._v2_edge_source,
             self._reservation_store,
         )
+        prev_evidence = self._v2_evidence_source
         prev_atr = self._v2_atr_source
         prev_price = self._price_source
         prev_kill_store = self._kill_switch_store
@@ -6393,6 +6445,10 @@ class AutoSimulationWorker:
                 trade_context_source if trade_context_source is not None else prev_context
             )
             self._v2_edge_source = edge_source if edge_source is not None else prev_edge
+            # V2.88 / TOP3 cross-asset: la evidencia se enlaza igual que el edge (misma sesión).
+            self._v2_evidence_source = (
+                evidence_source if evidence_source is not None else prev_evidence
+            )
             # E2: la fuente de ATR del tick se enlaza igual que el régimen (misma sesión).
             self._v2_atr_source = atr_source if atr_source is not None else prev_atr
             # W4: la fuente de precio REAL del tick se enlaza igual (misma sesión). Sin
@@ -6533,6 +6589,7 @@ class AutoSimulationWorker:
             self._v2_regime_source = prev_regime
             self._v2_trade_context_source = prev_context
             self._v2_edge_source = prev_edge
+            self._v2_evidence_source = prev_evidence
             self._v2_atr_source = prev_atr
             self._price_source = prev_price
             self._reservation_store = prev_reservations
@@ -7029,6 +7086,44 @@ def _compose_edge_source(session: Any) -> Any:
     return EdgeReportSource(reader=_read)
 
 
+def _compose_evidence_source(session: Any) -> Any:
+    """V2.88 / TOP3 cross-asset: evidencia LAB del campeón ACTIVE por instrumento.
+
+    Carga, para cada instrumento del tick, la estrategia ACTIVE y su último
+    ``StrategyEvaluation`` + ``StrategyHealth``; el adapter los convierte en componentes
+    de oportunidad (robustness/regime_fit/…). Sin estrategia activa para un instrumento
+    no se devuelve entrada ⇒ su scoring queda histórico (solo edge+liquidity). Un fallo
+    deja el mapa vacío (fail-closed: nunca se inventa evidencia).
+    """
+    from bolsa_application.opportunity_evidence_adapter import (  # noqa: PLC0415
+        StrategyEvidenceBundle,
+        StrategyEvidenceSource,
+    )
+    from bolsa_application.strategy_lifecycle_store import (  # noqa: PLC0415
+        PostgresStrategyLifecycleStore,
+    )
+
+    store = PostgresStrategyLifecycleStore(session)
+
+    async def _read(
+        symbols: Sequence[str], _regime: str | None
+    ) -> Mapping[str, StrategyEvidenceBundle]:
+        bundles: dict[str, StrategyEvidenceBundle] = {}
+        for symbol in symbols:
+            record = await store.get_active(instrument_id=str(symbol))
+            if record is None:
+                continue
+            evaluations = await store.list_evaluations(record.active.candidate_id)
+            healths = await store.list_health(record.active.version_id)
+            bundles[str(symbol)] = StrategyEvidenceBundle(
+                evaluation=evaluations[-1] if evaluations else None,
+                health=healths[-1] if healths else None,
+            )
+        return bundles
+
+    return StrategyEvidenceSource(reader=_read)
+
+
 def active_strategy_enabled() -> bool:
     """V2.26/A10: ¿el AUTO debe seguir la estrategia ACTIVE? (env, default OFF)."""
     return (os.getenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY") or "").strip().lower() in {
@@ -7245,6 +7340,9 @@ class AutoSimRuntime:
         edge_source: Any = None,
         atr_source: Any = None,
         liquidity_source: Callable[[str], float | None] | None = None,
+        # V2.88 / TOP3 cross-asset: evidencia LAB del campeón ACTIVE (inyectable en tests).
+        # Con ``None`` (producción) se compone la fuente real por sesión/tick.
+        evidence_source: Any = None,
         # W4: fuente de precio inyectable (tests). Con ``None`` (producción) se compone el
         # ``OhlcvPriceSource`` real por sesión/tick, que es lo que mata el ``100.0``.
         price_source: Any = None,
@@ -7261,6 +7359,7 @@ class AutoSimRuntime:
         self._edge_source = edge_source
         self._atr_source = atr_source
         self._liquidity_source = liquidity_source
+        self._evidence_source = evidence_source
         self._price_source = price_source
         # V2.24/A9.1 (P1-01): lector canónico inyectable (por defecto se compone por
         # sesión desde ``position_state``). Sin él, la reconciliación es UNKNOWN.
@@ -7275,6 +7374,7 @@ class AutoSimRuntime:
                 liquidity_source=liquidity_source,
                 trade_context_source=trade_context_source,
                 edge_source=edge_source,
+                evidence_source=evidence_source,
                 atr_source=atr_source,
                 price_source=price_source,
             )
@@ -7411,6 +7511,10 @@ class AutoSimRuntime:
                 trade_context_source=self._trade_context_source
                 or _compose_trade_context_source(session),
                 edge_source=self._edge_source or _compose_edge_source(session),
+                # V2.88 / TOP3 cross-asset: evidencia del campeón ACTIVE por instrumento.
+                # Sin fuente inyectada se compone la real por sesión (fail-closed: un
+                # fallo de lectura deja el scoring histórico, no una evidencia inventada).
+                evidence_source=self._evidence_source or _compose_evidence_source(session),
                 atr_source=self._atr_source
                 or _compose_atr_source(
                     session,
@@ -7503,6 +7607,7 @@ def start_auto_sim_worker(
     trade_context_source: Any = None,
     edge_source: Any = None,
     liquidity_source: Callable[[str], float | None] | None = None,
+    evidence_source: Any = None,
 ) -> asyncio.Task[None] | None:
     """start hook para ``_event_loop_starters()`` (env-gated; default OFF, SIM).
 
@@ -7555,6 +7660,7 @@ def start_auto_sim_worker(
             trade_context_source=trade_context_source,
             edge_source=edge_source,
             liquidity_source=liquidity_source,
+            evidence_source=evidence_source,
         )
         # V2.26/A10: solo con runtime PG real y sin decider inyectado; el seam es el
         # ``DecisionProvider`` (no se toca RiskGate/SimulationGate ni se abre LIVE).

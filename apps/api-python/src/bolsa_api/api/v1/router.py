@@ -44,6 +44,7 @@ from bolsa_api.api.v1.routes import (
     strategies,
     supervised_f3,
     sync,
+    top3_opportunities,
     trackers,
     workspaces,
 )
@@ -75,6 +76,7 @@ api_v1_router.include_router(auto_self_evaluation.router, tags=["auto"])
 api_v1_router.include_router(auto_operational_monitor.router, tags=["auto"])
 api_v1_router.include_router(auto_dia_d.router, tags=["auto"])
 api_v1_router.include_router(auto_dia_d_feedback.router, tags=["auto"])
+api_v1_router.include_router(top3_opportunities.router, tags=["auto"])
 api_v1_router.include_router(mandates.router, tags=["mandates"])
 api_v1_router.include_router(core_r.router, tags=["core-r"])
 api_v1_router.include_router(supervised_f3.router, tags=["supervised-f3"])

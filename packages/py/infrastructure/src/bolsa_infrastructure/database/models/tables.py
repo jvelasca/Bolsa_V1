@@ -2849,3 +2849,31 @@ class AutoExitOrderRow(Base):
     # V2.47 — ciclo financiero del intent (migración 044). Nullable: filas previas a 2.47
     # no tienen ciclo conocido (``NULL`` ≠ fabricado).
     cycle_id: Mapped[str | None] = mapped_column("cycle_id", String, nullable=True)
+
+
+# ── V2.88 / TOP3 cross-asset — oportunidades (activos) decididas por AUTO ──
+# Migración 052_top3_opportunities. A DIFERENCIA de ``instrument_strategy_tops``
+# (per-instrumento, FK instruments.id, clave natural (instrument_id, timeframe)), ésta
+# es UNA instantánea cross-asset por ``run_id``: "qué 3 activos decidió AUTO y por qué".
+# ``asset_id`` NO es FK a instruments: el TOP3 cruza activos y no está subordinado a un
+# instrumento (la migración 041 mantuvo la clave natural de instrument_strategy_tops).
+
+
+class Top3OpportunityRow(Base):
+    """Un slot del TOP3 cross-asset (activo) con sus componentes explicables."""
+
+    __tablename__ = "top3_opportunities"
+    __table_args__ = (
+        Index("top3_opportunities_run_id_idx", "run_id"),
+        Index("top3_opportunities_run_rank_idx", "run_id", "rank"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    run_id: Mapped[str] = mapped_column("run_id", String, nullable=False)
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    asset_id: Mapped[str] = mapped_column("asset_id", String, nullable=False)
+    combined: Mapped[float] = mapped_column(Float, nullable=False)
+    components: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    regime: Mapped[str | None] = mapped_column("regime", String, nullable=True)
+    reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))

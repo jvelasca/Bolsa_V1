@@ -25,7 +25,7 @@ Este módulo es determinista y sin I/O: produce un ``AutoRunReport``. El llamant
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -290,6 +290,40 @@ def _entry(
         instrument_id=instrument_id,
         payload=payload,
     )
+
+
+def build_opportunity_scores(
+    evidence: Sequence[Any],
+    *,
+    expected_regime: str | None = None,
+    direction: str = "long",
+    veto: Callable[[Any], str | None] | None = None,
+) -> list[OpportunityScore]:
+    """Construye los ``OpportunityScore`` cross-asset a partir de la evidencia por activo.
+
+    V2.88 — une la evidencia de estrategia del LAB (adapter), el encaje de régimen y el
+    veto operativo, y devuelve las oportunidades que consume ``run_auto_cycle``. Sustituye
+    la alimentación histórica ``edge`` + ``liquidity`` solos por un score con los 7
+    componentes. Sin DB: el llamante resuelve universo → campeón por activo
+    (``AssetEvidence``) y aporta el veto; este módulo sigue determinista y sin I/O.
+    """
+    from bolsa_application.opportunity_board import AssetEvidence, OpportunityBoard
+
+    assets: list[AssetEvidence] = []
+    for item in evidence:
+        if isinstance(item, AssetEvidence):
+            assets.append(item)
+        elif isinstance(item, Mapping):
+            assets.append(AssetEvidence(**dict(item)))
+        else:
+            raise TypeError(f"evidence inválida: {type(item)!r}")
+
+    result = OpportunityBoard(
+        expected_regime=expected_regime,
+        direction=direction,
+        veto=veto,
+    ).score(assets)
+    return list(result.scores)
 
 
 def run_auto_cycle(
