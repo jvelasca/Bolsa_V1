@@ -269,6 +269,10 @@ from bolsa_application.simulated_settlement import (
     normalized_auto_venue,
     submit_simulated_order,
 )
+from bolsa_application.top3_opportunities import (
+    HISTORICAL_SCORING_NO_CHAMPION,
+    select_top3_records,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -866,6 +870,11 @@ class AutoSimulationWorker:
         # (``StrategyEvidenceSource``). Con ``None`` el scoring es byte-idéntico al
         # histórico (solo edge+liquidity). Se refresca por tick como el resto de fuentes.
         evidence_source: Any = None,
+        # V2.88.84 — sink DURABLE del TOP3 cross-asset (``top3_opportunities``, migración 052):
+        # el productor que faltaba. Recibe ``(records, regime)`` y persiste la foto de la barra
+        # (una por barra, con la procedencia del score declarada por slot). Sin él (hermético o
+        # test) no se escribe nada ⇒ Δ = 0 y el hueco sigue declarado, nunca inventado.
+        top3_opportunity_sink: Callable[[list[Any], str | None], Awaitable[None]] | None = None,
         consumed_signal_store: Any = None,
         # AUTO-1b: espejo durable de las RESERVAS de cartera (``portfolio_reservations``).
         # Con él, las reservas vivas son la autoridad de ``reserved_cash``/``pending_risk``
@@ -1194,6 +1203,13 @@ class AutoSimulationWorker:
         self._v2_trade_context_source: CatalogTradeContextSource | None = trade_context_source
         self._v2_edge_source: EdgeReportSource | None = edge_source
         self._v2_evidence_source: Any = evidence_source
+        # V2.88.84 — espejo durable del TOP3 cross-asset (``top3_opportunities``, migración 052).
+        # Inyectable por sesión/tick como los demás; sin él no se escribe (Δ = 0).
+        self._top3_opportunity_sink: Callable[[list[Any], str | None], Awaitable[None]] | None = (
+            top3_opportunity_sink
+        )
+        # Barra (inicio ISO) de la última foto del TOP3: acota la escritura a UNA por barra.
+        self._v2_top3_bar: str = ""
         # AUTO 2.0 · P4: espejo durable de las señales consumidas (inyectable). Con él,
         # un reinicio NO autoriza a re-emitir la misma señal sobre la misma barra; sin
         # él (hermético) el dedupe vive solo en RAM, como hasta ahora.
@@ -4220,6 +4236,9 @@ class AutoSimulationWorker:
             )
             self._v2_bar_adaptive = adaptive
         snapshot = self._v2_snapshot(regime)
+        # V2.88.84 — la evidencia se lee UNA vez y se reusa para el plan y para la foto del
+        # TOP3, de modo que la procedencia declarada por slot es la MISMA que la del scoring.
+        evidence_lookup = self._v2_evidence_lookup(packages)
         plan = plan_v2_tick(
             snapshot=snapshot,
             signals=self._v2_signals(packages),
@@ -4229,7 +4248,7 @@ class AutoSimulationWorker:
             consumed_signal_ids=self._v2_consumed_signals,
             halted=self._v2_kill_switch_halted(),
             adaptive=adaptive,
-            evidence=self._v2_evidence_lookup(packages),
+            evidence=evidence_lookup,
         )
         # AUTO-1b: el compromiso se hace DURABLE antes de emitir la orden. Sin persistir
         # no hay aprobación que emitir (fail-closed, ver ``_v2_persist_tick_reservations``).
@@ -4258,7 +4277,67 @@ class AutoSimulationWorker:
             # ya está podada cuando el dato de barra se cargó: dentro de la misma barra no
             # hay nada nuevo que podar.
             await self._v2_prune_consumed_signals()
+        # V2.88.84 — TOP3 cross-asset: la foto durable de «qué activos considera AUTO y por
+        # qué». Una por barra; declara por slot si el score usó evidencia LAB o histórico.
+        await self._v2_persist_top3(
+            plan, regime=regime, evidenced_symbols=frozenset(evidence_lookup or {})
+        )
         return plan
+
+    async def _v2_persist_top3(
+        self,
+        plan: Any,
+        *,
+        regime: str | None,
+        evidenced_symbols: frozenset[str],
+    ) -> None:
+        """V2.88.84 — escribe la foto durable del TOP3 cross-asset (``top3_opportunities``).
+
+        Da el llamante PRODUCTIVO que faltaba a ``select_top3_records`` + el sink de la
+        migración 052: sin esto, la tabla y ``GET /top3-opportunities/latest`` no tenían quién
+        las escribiera (el hueco que dejó ``v2.88.82``: la cadena se probaba, pero no se cableaba).
+
+        * **Una foto por barra**: el ``run_id`` se ancla a la barra de decisión y solo se
+          reescribe cuando la barra cambia (idempotente dentro de la barra).
+        * **Degradación DECLARADA**: un activo puntuado sin campeón ACTIVE (scoring histórico
+          ``edge``+``liquidity``) lleva el motivo ``scoring_historico_sin_campeon``; la ausencia
+          de evidencia deja de ser silenciosa.
+        * Sin sink inyectado es un no-op (Δ = 0). Un fallo del sink se declara y NO tumba el
+          turno: es observabilidad, no decisión.
+        """
+        sink = self._top3_opportunity_sink
+        if sink is None:
+            return
+        ranked = tuple(getattr(plan, "ranked", ()) or ())
+        if not ranked:
+            return
+        bar = self._v2_current_bar_start()
+        if not bar or bar == self._v2_top3_bar:
+            return
+        run_id = f"top3-{self._account_id or 'sim'}-{bar}"
+        records = select_top3_records(
+            list(ranked), top_n=3, run_id=run_id, evidenced_symbols=evidenced_symbols
+        )
+        if not records:
+            return
+        degraded = [
+            record.instrument_id
+            for record in records
+            if record.reason == HISTORICAL_SCORING_NO_CHAMPION
+        ]
+        try:
+            await sink(records, regime)
+        except Exception:  # noqa: BLE001 — la traza del TOP3 no puede tumbar el turno.
+            logger.exception("auto_sim v2 TOP3 cross-asset sink failed")
+            return
+        self._v2_top3_bar = bar
+        if degraded:
+            logger.warning(
+                "auto_sim v2 TOP3 cross-asset: %s sin campeón ACTIVE — scoring histórico "
+                "declarado (run=%s)",
+                ",".join(degraded),
+                run_id,
+            )
 
     async def _v2_cycle_risk(self, fills: Sequence[Any]) -> dict[str, CycleRisk] | None:
         """AUTO-9/AUTO-10 — denominador de R, coste y RÉGIMEN por CICLO.
@@ -6355,6 +6434,9 @@ class AutoSimulationWorker:
         # V2.88 / TOP3 cross-asset: evidencia LAB del campeón ACTIVE por instrumento
         # (misma sesión del tick). Sin ella se conserva la del constructor ⇒ Δ = 0.
         evidence_source: Any = None,
+        # V2.88.84 — sink durable del TOP3 cross-asset, atado a la MISMA sesión del tick.
+        # Sin él se conserva el del constructor (hermético/tests) ⇒ Δ = 0.
+        top3_opportunity_sink: Callable[[list[Any], str | None], Awaitable[None]] | None = None,
         # W4 (v2.88.17): fuente de precio REAL del tick (misma sesión que régimen y ATR).
         # Con ``None`` se conserva la del constructor (``price_script`` hermético) ⇒ Δ = 0.
         price_source: PriceSource | None = None,
@@ -6408,6 +6490,7 @@ class AutoSimulationWorker:
             self._reservation_store,
         )
         prev_evidence = self._v2_evidence_source
+        prev_top3_sink = self._top3_opportunity_sink
         prev_atr = self._v2_atr_source
         prev_price = self._price_source
         prev_kill_store = self._kill_switch_store
@@ -6448,6 +6531,11 @@ class AutoSimulationWorker:
             # V2.88 / TOP3 cross-asset: la evidencia se enlaza igual que el edge (misma sesión).
             self._v2_evidence_source = (
                 evidence_source if evidence_source is not None else prev_evidence
+            )
+            # V2.88.84 — el sink del TOP3 cross-asset viaja con la sesión del tick (como los
+            # demás espejos). Sin él se conserva el del constructor (hermético/tests).
+            self._top3_opportunity_sink = (
+                top3_opportunity_sink if top3_opportunity_sink is not None else prev_top3_sink
             )
             # E2: la fuente de ATR del tick se enlaza igual que el régimen (misma sesión).
             self._v2_atr_source = atr_source if atr_source is not None else prev_atr
@@ -6590,6 +6678,7 @@ class AutoSimulationWorker:
             self._v2_trade_context_source = prev_context
             self._v2_edge_source = prev_edge
             self._v2_evidence_source = prev_evidence
+            self._top3_opportunity_sink = prev_top3_sink
             self._v2_atr_source = prev_atr
             self._price_source = prev_price
             self._reservation_store = prev_reservations
@@ -6759,6 +6848,32 @@ def build_adaptive_recommendation_sink(session: Any) -> Callable[[Any], Awaitabl
         try:
             await repository.append(entry)
             await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+    return sink
+
+
+def build_top3_opportunity_sink(
+    session: Any,
+) -> Callable[[list[Any], str | None], Awaitable[None]]:
+    """V2.88.84 — sink durable del TOP3 cross-asset, atado a la sesión del tick.
+
+    Materializa la tabla ``top3_opportunities`` (migración 052): el productor que faltaba en
+    la composición real. Mismo patrón que los demás espejos del turno (una sesión por tick,
+    commit propio y ``rollback`` en el fallo para no envenenar la sesión). El ``regime`` del
+    run llega en la LLAMADA —es propiedad del cómputo, no del slot— y se persiste tal cual
+    (``None`` incluido), sin inventar uno. Una lista vacía es un no-op (no se escribe un run
+    sin TOP3).
+    """
+    from bolsa_application.top3_opportunity_store import (  # noqa: PLC0415
+        PostgresTop3OpportunitySink,
+    )
+
+    async def sink(records: list[Any], regime: str | None) -> None:
+        try:
+            await PostgresTop3OpportunitySink(session, regime=regime).save(records)
         except Exception:
             await session.rollback()
             raise
@@ -7471,6 +7586,10 @@ class AutoSimRuntime:
             )
 
             adaptive_gate_store = PostgresAdaptiveGateStore(session)
+            # V2.88.84 — el TOP3 cross-asset (``top3_opportunities``, migración 052): la foto
+            # durable de «qué activos considera AUTO y por qué», sobre la MISMA sesión del tick.
+            # Cierra el hueco de ``v2.88.82`` (cadena probada pero sin productor cableado).
+            top3_opportunity_sink = build_top3_opportunity_sink(session)
             # v2.88.70: la equity del turno es la del libro. Si falla, las aperturas
             # quedan vetadas dentro de ``auto_turn``. No se sustituye por 100_000.
             await self._worker.load_book_equity(session)
@@ -7515,6 +7634,8 @@ class AutoSimRuntime:
                 # Sin fuente inyectada se compone la real por sesión (fail-closed: un
                 # fallo de lectura deja el scoring histórico, no una evidencia inventada).
                 evidence_source=self._evidence_source or _compose_evidence_source(session),
+                # V2.88.84 — productor durable del TOP3 cross-asset (tabla 052), misma sesión.
+                top3_opportunity_sink=top3_opportunity_sink,
                 atr_source=self._atr_source
                 or _compose_atr_source(
                     session,

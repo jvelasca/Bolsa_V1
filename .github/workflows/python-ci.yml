@@ -417,6 +417,8 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v2_real_price_production_pg.py
           --ignore=apps/api-python/tests/test_auto_operational_monitor_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
+          --ignore=apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
+          --ignore=apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
@@ -805,6 +807,8 @@ jobs:
             apps/api-python/tests/test_auto_v2_real_price_production_pg.py \
             apps/api-python/tests/test_auto_operational_monitor_pg.py \
             apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py \
+            apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py \
+            apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 
       - name: Fail on skipped AUTO 2.0 durable PG (no skip silencioso)

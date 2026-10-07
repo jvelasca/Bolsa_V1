@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from bolsa_analytics.cognitive.opportunity_ranker import OpportunityScore
 from bolsa_application.opportunity_board import AssetEvidence, OpportunityBoard
 from bolsa_application.opportunity_evidence_adapter import (
     StrategyEvidenceBundle,
@@ -18,7 +19,11 @@ from bolsa_application.opportunity_evidence_adapter import (
     robustness_component,
 )
 from bolsa_application.strategy_top3_coach_phase import select_top3
-from bolsa_application.top3_opportunities import select_top3_assets
+from bolsa_application.top3_opportunities import (
+    HISTORICAL_SCORING_NO_CHAMPION,
+    select_top3_assets,
+    select_top3_records,
+)
 from bolsa_domain.entities.strategy_lifecycle import (
     GateResult,
     StrategyEvaluation,
@@ -259,3 +264,39 @@ def test_postgres_sink_empty_records_is_noop() -> None:
 
     asyncio.run(_run())
     assert session.added == []
+
+
+# ── select_top3_records: procedencia DECLARADA por slot (V2.88.84) ──────────────
+
+
+def test_select_top3_records_declares_historical_scoring() -> None:
+    """Un activo sin evidencia LAB lleva el motivo explícito; uno con evidencia, ``None``.
+
+    Cierra la degradación silenciosa: el scoring histórico (sin campeón ACTIVE) deja de
+    confundirse con un score con evidencia en la foto durable del TOP3.
+    """
+    scores = [
+        OpportunityScore(instrument_id="AAA", components={"edge": 0.9}, combined=0.9, rank=1),
+        OpportunityScore(instrument_id="BBB", components={"edge": 0.6}, combined=0.6, rank=2),
+        OpportunityScore(instrument_id="CCC", components={"edge": 0.5}, combined=0.5, rank=3),
+        OpportunityScore(instrument_id="DDD", components={"edge": 0.1}, combined=0.1, rank=4),
+    ]
+    records = select_top3_records(
+        scores, top_n=3, run_id="run-9", evidenced_symbols=frozenset({"AAA", "BBB"})
+    )
+    assert [r.instrument_id for r in records] == ["AAA", "BBB", "CCC"]
+    assert [r.rank for r in records] == [1, 2, 3]
+    assert records[0].reason is None  # AAA sí tiene campeón ACTIVE
+    assert records[1].reason is None  # BBB sí tiene campeón ACTIVE
+    assert records[2].reason == HISTORICAL_SCORING_NO_CHAMPION  # CCC cayó a scoring histórico
+    assert all(r.run_id == "run-9" for r in records)
+
+
+def test_select_top3_records_collapses_candidate_key_to_asset() -> None:
+    """Una clave ``SÍMBOLO#versión`` (allow_distinct_strategies) se colapsa al activo."""
+    scores = [
+        OpportunityScore(instrument_id="AAA#v2", components={"edge": 0.9}, combined=0.9, rank=1),
+    ]
+    records = select_top3_records(scores, top_n=3, run_id="r", evidenced_symbols=frozenset({"AAA"}))
+    assert records[0].instrument_id == "AAA"
+    assert records[0].reason is None

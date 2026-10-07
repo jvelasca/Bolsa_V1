@@ -12,6 +12,7 @@ La persistencia se expone como ``Top3OpportunityRecord`` serializable y un ``Pro
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -23,12 +24,20 @@ from bolsa_analytics.cognitive.opportunity_ranker import (
 from bolsa_application.opportunity_board import AssetExclusion
 
 __all__ = [
+    "HISTORICAL_SCORING_NO_CHAMPION",
     "Top3Opportunity",
     "Top3OpportunityRecord",
     "Top3OpportunitySink",
     "Top3OpportunitySelection",
     "select_top3_assets",
+    "select_top3_records",
 ]
+
+#: V2.88.84 — motivo DECLARADO de un slot del TOP3 cuyo score se calculó SIN evidencia LAB
+#: del campeón ACTIVE: el motor cayó al scoring histórico (solo ``edge``+``liquidity``). El
+#: activo sigue siendo operable, pero la degradación deja de ser silenciosa: la foto durable
+#: lo dice. Sin esta marca, un slot puntuado a ciegas se leería igual que uno con evidencia.
+HISTORICAL_SCORING_NO_CHAMPION = "scoring_historico_sin_campeon"
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,3 +148,46 @@ def select_top3_assets(
         top_n_excluded=top_n_excluded,
         excluded=excluded,
     )
+
+
+def _base_symbol(instrument_id: str) -> str:
+    """Activo base de una clave de candidata (``SÍMBOLO#versión`` ⇒ ``SÍMBOLO``).
+
+    ``plan_v2_tick`` puede rankear por ``candidate_key`` (con ``allow_distinct_strategies``);
+    el TOP3 es de ACTIVOS, así que colapsa a la parte del símbolo.
+    """
+    return str(instrument_id).split("#", 1)[0]
+
+
+def select_top3_records(
+    scores: Sequence[OpportunityScore],
+    *,
+    top_n: int = 3,
+    run_id: str = "",
+    evidenced_symbols: frozenset[str] = frozenset(),
+) -> list[Top3OpportunityRecord]:
+    """TOP3 serializable que DECLARA, por slot, si el score usó evidencia LAB o histórico.
+
+    Reutiliza :func:`select_top3_assets` (mismo top N, misma semántica de ``TOP_N_EXCLUDED``)
+    y añade la procedencia del score: un activo cuyo símbolo base NO figura en
+    ``evidenced_symbols`` se puntuó con scoring histórico (no había campeón ACTIVE) y su slot
+    lo declara con :data:`HISTORICAL_SCORING_NO_CHAMPION`. Un activo con evidencia lleva
+    ``reason=None`` (no se inventa un motivo para lo que sí se midió). La ausencia de
+    evidencia, aquí, es un HECHO declarado, no un silencio.
+    """
+    selection = select_top3_assets(list(scores), top_n=top_n, run_id=run_id)
+    records: list[Top3OpportunityRecord] = []
+    for opportunity in selection.selected:
+        symbol = _base_symbol(opportunity.instrument_id)
+        evidenced = symbol in evidenced_symbols
+        records.append(
+            Top3OpportunityRecord(
+                run_id=run_id,
+                rank=opportunity.rank,
+                instrument_id=symbol,
+                combined=opportunity.combined,
+                components=dict(opportunity.components),
+                reason=None if evidenced else HISTORICAL_SCORING_NO_CHAMPION,
+            )
+        )
+    return records
