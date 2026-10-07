@@ -212,3 +212,16 @@ Opciones de diseño a decidir por producto (esta auditoría **no** las implement
 Cualquiera de las tres exige su propio slice (con tests de UI/backend y, si toca el fence, revisión de `Δ motor`) y **no** se cierra en esta auditoría.
 
 Complementos de menor severidad: copy de recuperación para H3 y cobertura de tests del diálogo de orden manual.
+
+---
+
+## 11. Addendum post-auditoría (slices posteriores)
+
+> Este apartado se añade **después** de la auditoría; no reescribe el cuerpo original. Registra el estado de cierre de H1/H3 tras los slices que la siguieron.
+
+- **`v2.88.85-beta` — H1 backend + H3 (copy).** Se implementó la opción 1 para el **backend**: `row_is_human_manual` autoriza la venta HTTP de una posición nacida por el canal manual (`origin = HUMAN_MANUAL`, snapshot `manual-{tx}`), manteniendo el fence para SEMI/AUTO. En cliente se mejoró el copy de recuperación (H3) para dirigir a **Vender**. Evidencia: [`evidence/v2.88.85`](./evidence/v2.88.85/README.md).
+- **Cierre H1 UX (posterior a `v2.88.85-beta`).** La superficie de posición ([`position-exit-drawer-actions.tsx`](../../apps/web/src/features/trading/position-exit-drawer-actions.tsx)) ya no se limita a decir «usa Vender»: con el libro en MANUAL y una posición `HUMAN_MANUAL`, **Reducir/Salir abren el flujo Vender canónico** (`OrderDialog`, [`open-sell-position-order.ts`](../../apps/web/src/features/trading/open-sell-position-order.ts)) con la cantidad de desriesgo. No mueve el motor ni el contrato HTTP (`Δ motor = 0`).
+
+Con esto, **H1 queda cerrado en backend y en la UX de la superficie de posición** (el resto de superficies de salida, p. ej. `MesaPositionNextActionButton`, se tratan aparte). MANUAL sigue siendo un interruptor de producto y nunca alcanza broker real (§7).
+
+Esto **no** sella una nueva versión por sí solo: el bump/tag/CI de este slice de UX es un paso de release aparte. La auditoría del motor AUTO/SEMI permanece como estaba.
