@@ -1,9 +1,9 @@
-"""Repository: top3_opportunities (TOP3 cross-asset de activos decididos por AUTO).
+"""Repository: top3_opportunities (TOP3 cross-asset de oportunidades rankeadas por AUTO).
 
 Read + write del espejo durable del TOP3 (migración 052). No reutiliza
 ``instrument_strategy_tops`` (per-instrumento): aquí cada ``run_id`` es una foto del
-universo decidido (cross-asset) y ``asset_id`` es un identificador de activo, no una FK
-a ``instruments``.
+universo rankeado (cross-asset) y ``asset_id`` es un identificador de activo, no una FK
+a ``instruments``. El TOP3 describe oportunidades rankeadas, nunca una decisión de cartera.
 """
 
 from __future__ import annotations

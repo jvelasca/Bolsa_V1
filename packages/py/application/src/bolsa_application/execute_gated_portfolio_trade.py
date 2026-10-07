@@ -2,7 +2,8 @@
 
 ``buy`` re-ejecuta ``allow_opening_fill`` (mismo SoT que Confirm/Fill).
 ``sell`` no abre cesta; V1.32 — si hay PositionState abierta, exige Confirm
-(ExitPermission) y no deja bypass HTTP.
+(ExitPermission) y no deja bypass HTTP. V2.88.85 (H1): excepción para posiciones
+nacidas por el canal manual (``HUMAN_MANUAL``), que sí cierran por HTTP.
 Tras fill: ``post_fill_position_sync`` alinea ledger y Position persistida.
 """
 
@@ -25,12 +26,54 @@ from bolsa_application.persist_position_from_fill import (
     PersistPositionFromFill,
     open_transaction_id_from_trade,
 )
-from bolsa_application.post_fill_position_sync import sync_position_after_ledger_fill
+from bolsa_application.post_fill_position_sync import (
+    HUMAN_MANUAL_OVERRIDE,
+    sync_position_after_ledger_fill,
+)
 from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
     PortfolioReconLookup,
 )
 from bolsa_domain.errors import IdempotencyKeyReused
+
+#: V2.88.85 (H1) — origen del snapshot de una posición nacida por el canal HTTP manual.
+HUMAN_MANUAL_ORIGIN = "HUMAN_MANUAL"
+
+#: V2.88.85 (H1) — prefijo del ``trade_plan_id`` sintetizado para esas posiciones.
+HUMAN_MANUAL_TRADE_PLAN_PREFIX = "manual-"
+
+
+def _row_field(row: Any, name: str) -> Any:
+    """Lee un campo de una fila de posición (``dict`` o ``PositionStateRecord``)."""
+    if isinstance(row, dict):
+        return row.get(name)
+    return getattr(row, name, None)
+
+
+def row_is_human_manual(row: Any) -> bool:
+    """V2.88.85 (H1) — ¿la posición nació por el canal HTTP manual (``HUMAN_MANUAL``)?
+
+    Una posición que el propio usuario abrió en modo MANUAL debe poder cerrarse por HTTP
+    con la misma identidad. El fence de venta sigue intacto para posiciones SEMI/AUTO:
+    aquí solo se autoriza la salida directa cuando la fila declara origen manual
+    (``birth_override_reason``/``trade_plan_snapshot.origin``/``trade_plan_id`` ``manual-``).
+    """
+    if row is None:
+        return False
+    override = _row_field(row, "birth_override_reason")
+    if isinstance(override, str) and override.strip() == HUMAN_MANUAL_OVERRIDE:
+        return True
+    snapshot = _row_field(row, "trade_plan_snapshot")
+    if isinstance(snapshot, dict):
+        origin = snapshot.get("origin")
+        if isinstance(origin, str) and origin.strip() == HUMAN_MANUAL_ORIGIN:
+            return True
+    trade_plan_id = _row_field(row, "trade_plan_id")
+    if isinstance(trade_plan_id, str) and trade_plan_id.strip().startswith(
+        HUMAN_MANUAL_TRADE_PLAN_PREFIX
+    ):
+        return True
+    return False
 
 
 class OpeningVetoedError(Exception):
@@ -38,7 +81,10 @@ class OpeningVetoedError(Exception):
 
 
 class ExitVetoedError(Exception):
-    """V1.32 — venta HTTP bloqueada si hay PositionState (usar Confirm SEMI)."""
+    """V1.32 — venta HTTP bloqueada si hay PositionState (usar Confirm SEMI).
+
+    V2.88.85 (H1): no se lanza para posiciones ``HUMAN_MANUAL`` (ver :func:`row_is_human_manual`).
+    """
 
 
 class ExecuteGatedPortfolioTrade:
@@ -143,11 +189,17 @@ class ExecuteGatedPortfolioTrade:
                 raise OpeningVetoedError("risk_veto")
         elif side == "sell" and self._position_from_exit is not None:
             # V1.32 — Position abierta ⇒ Confirm SEMI (ExitPermission), no HTTP.
+            # V2.88.85 (H1) — salvo una posición nacida por el canal manual
+            # (``HUMAN_MANUAL``): quien abrió en MANUAL debe poder cerrar por HTTP. El
+            # fence sigue intacto para posiciones SEMI/AUTO (origen != manual).
             row = await self._position_from_exit.get_open(
                 account_id or "", instrument_id
             )
-            if row is not None:
-                raise ExitVetoedError("position_exit_requires_confirm")
+            if row is not None and not row_is_human_manual(row):
+                raise ExitVetoedError(
+                    "position_exit_requires_confirm: esta posición no es manual; "
+                    "usa Confirm (SEMI) para cerrarla o reducirla."
+                )
         trade = await self._execute_trade.execute(
             instrument_id=instrument_id,
             trade_type=side,

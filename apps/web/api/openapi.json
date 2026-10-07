@@ -20102,6 +20102,82 @@
         "title": "TaxReportSummaryDto",
         "type": "object"
       },
+      "Top3OpportunitiesResponseDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Top3OpportunityDto"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "runId": {
+            "title": "Runid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "runId"
+        ],
+        "title": "Top3OpportunitiesResponseDto",
+        "type": "object"
+      },
+      "Top3OpportunityDto": {
+        "properties": {
+          "assetId": {
+            "title": "Assetid",
+            "type": "string"
+          },
+          "components": {
+            "additionalProperties": true,
+            "title": "Components",
+            "type": "object"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "regime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regime"
+          },
+          "runId": {
+            "title": "Runid",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "runId",
+          "rank",
+          "assetId",
+          "score",
+          "createdAt"
+        ],
+        "title": "Top3OpportunityDto",
+        "type": "object"
+      },
       "TrackerDefinitionDetailDto": {
         "properties": {
           "createdAt": {
@@ -33860,6 +33936,71 @@
         "summary": "Update Sync Settings",
         "tags": [
           "sync"
+        ]
+      }
+    },
+    "/api/top3-opportunities/latest": {
+      "get": {
+        "description": "Run más reciente del TOP3 (por ``created_at``) y sus slots ordenados por rank.\n\nSin TOP3 persistido devuelve ``runId=\"\"`` e ``items=[]`` (fail-closed: la UI declara\n«sin TOP3 todavía», nunca una foto inventada).",
+        "operationId": "get_latest_top3_opportunities_api_top3_opportunities_latest_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Top3OpportunitiesResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Latest Top3 Opportunities",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/top3-opportunities/{run_id}": {
+      "get": {
+        "description": "Slots del TOP3 de un ``run_id`` concreto, ordenados por rank.",
+        "operationId": "get_top3_opportunities_for_run_api_top3_opportunities__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Top3OpportunitiesResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Top3 Opportunities For Run",
+        "tags": [
+          "auto"
         ]
       }
     },

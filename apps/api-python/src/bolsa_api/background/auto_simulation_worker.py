@@ -4277,8 +4277,8 @@ class AutoSimulationWorker:
             # ya está podada cuando el dato de barra se cargó: dentro de la misma barra no
             # hay nada nuevo que podar.
             await self._v2_prune_consumed_signals()
-        # V2.88.84 — TOP3 cross-asset: la foto durable de «qué activos considera AUTO y por
-        # qué». Una por barra; declara por slot si el score usó evidencia LAB o histórico.
+        # V2.88.84 — TOP3 cross-asset: la foto durable de «qué 3 oportunidades ha rankeado
+        # AUTO y por qué». Una por barra; declara por slot si el score usó evidencia LAB o histórico.
         await self._v2_persist_top3(
             plan, regime=regime, evidenced_symbols=frozenset(evidence_lookup or {})
         )
@@ -7587,7 +7587,7 @@ class AutoSimRuntime:
 
             adaptive_gate_store = PostgresAdaptiveGateStore(session)
             # V2.88.84 — el TOP3 cross-asset (``top3_opportunities``, migración 052): la foto
-            # durable de «qué activos considera AUTO y por qué», sobre la MISMA sesión del tick.
+            # durable de «qué 3 oportunidades ha rankeado AUTO y por qué», sobre la MISMA sesión del tick.
             # Cierra el hueco de ``v2.88.82`` (cadena probada pero sin productor cableado).
             top3_opportunity_sink = build_top3_opportunity_sink(session)
             # v2.88.70: la equity del turno es la del libro. Si falla, las aperturas

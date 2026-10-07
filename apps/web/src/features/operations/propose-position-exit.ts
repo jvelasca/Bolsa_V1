@@ -357,8 +357,12 @@ export function buildPositionExitPayload(opts: {
   }
   const book = loadDemoBookPrefs();
   if (!demoBookAllowsEnqueueConfirm(book.mode)) {
+    // V2.88.85 (H1) — en MANUAL el cierre/reducción se hace con Vender (venta directa
+    // sobre el libro DEMO); el resto de tickets siguen exigiendo SEMI.
     throw new Error(
-      "Libro en MANUAL: cambia a SEMI en Operativa → Configuración para encolar Confirm.",
+      intent === "reduce" || intent === "exit_hint"
+        ? "Libro en MANUAL: para desriesgo usa Vender (venta directa sobre el libro DEMO). Cambia a SEMI si quieres encolar un ticket de Confirm."
+        : "Libro en MANUAL: cambia a SEMI en Operativa → Configuración para encolar Confirm.",
     );
   }
 

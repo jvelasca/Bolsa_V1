@@ -1,9 +1,10 @@
 """API: TOP3 de oportunidades (activos) cross-asset — read-only.
 
-Expone ``GET /api/v1/top3-opportunities/latest`` y ``GET /api/v1/top3-opportunities/{run_id}``:
-la foto durable de «qué 3 activos decidió AUTO y por qué» (migración 052). Read-only: no
-escribe ni deriva; la UI pinta el DTO tal cual (``assetId``, ``score``, ``components``,
-``regime`` y ``reasons``).
+Expone ``GET /api/top3-opportunities/latest`` y ``GET /api/top3-opportunities/{run_id}``:
+la foto durable de «qué 3 oportunidades ha rankeado AUTO y por qué» (migración 052). Read-only:
+no escribe ni deriva; la UI pinta el DTO tal cual (``assetId``, ``score``, ``components``,
+``regime`` y ``reasons``). El TOP3 describe oportunidades rankeadas del tick, nunca una decisión
+de cartera (esa es otro peldaño: ``PortfolioDecision``).
 """
 
 from __future__ import annotations

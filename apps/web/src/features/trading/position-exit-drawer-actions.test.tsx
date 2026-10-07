@@ -2,7 +2,7 @@
  * V1.36 — CTAs alineados con PositionDecision.action.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PositionDto } from "@bolsa/shared";
 import { PositionExitDrawerActions } from "@/features/trading/position-exit-drawer-actions";
@@ -25,12 +25,19 @@ vi.mock("@/features/confirm/confirm-drawer", () => ({
   openConfirmDrawer: vi.fn(),
 }));
 
-vi.mock("@/features/trading/demo-book-prefs", () => ({
-  loadDemoBookPrefs: () => ({ mode: "semi" }),
-  demoBookAllowsEnqueueConfirm: () => true,
+const demoBookState = vi.hoisted(() => ({
+  mode: "semi" as "manual" | "semi" | "auto",
 }));
 
-afterEach(() => cleanup());
+vi.mock("@/features/trading/demo-book-prefs", () => ({
+  loadDemoBookPrefs: () => ({ mode: demoBookState.mode }),
+  demoBookAllowsEnqueueConfirm: (mode: string) => mode === "semi",
+}));
+
+afterEach(() => {
+  cleanup();
+  demoBookState.mode = "semi";
+});
 
 function position(
   partial: Partial<PositionDto> = {},
@@ -214,5 +221,24 @@ describe("PositionExitDrawerActions V1.36 / F7", () => {
     );
     expect(screen.getByText("Mantener")).toBeTruthy();
     expect(screen.getByTestId("position-exit-protect-TEST")).toBeTruthy();
+  });
+
+  it("V2.88.85 (H1) — MANUAL no encola Confirm y muestra copy de recuperación", () => {
+    demoBookState.mode = "manual";
+    render(
+      <PositionExitDrawerActions
+        position={position(undefined, {
+          status: "TRIGGERED",
+          suggestedAction: "reduce",
+          suggestedQty: 5,
+          primaryReason: "TARGET_1",
+          policyTemplateId: "moderate",
+        })}
+        primaryCtaKind="reduce"
+        portfolioReconStatus="ok"
+      />,
+    );
+    fireEvent.click(screen.getByTestId("position-exit-reduce-TEST"));
+    expect(screen.getByText(/Vender/i)).toBeTruthy();
   });
 });

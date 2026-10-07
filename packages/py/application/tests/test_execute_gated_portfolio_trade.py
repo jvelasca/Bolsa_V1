@@ -213,7 +213,16 @@ async def test_gated_http_sell_fenced_when_position_open() -> None:
     from bolsa_application.execute_gated_portfolio_trade import ExitVetoedError
 
     trade = _FakeExecuteTrade()
-    exit_store = _ExitStore(row={"id": "pos-1", "status": "OPEN"})
+    # Fila NO manual (SEMI/AUTO): el fence se mantiene.
+    exit_store = _ExitStore(
+        row={
+            "id": "pos-1",
+            "status": "OPEN",
+            "birth_override_reason": None,
+            "trade_plan_id": "tp-1",
+            "trade_plan_snapshot": {},
+        }
+    )
 
     class _ExitUc:
         def __init__(self):
@@ -237,6 +246,87 @@ async def test_gated_http_sell_fenced_when_position_open() -> None:
             idempotency_key="k" * 16,
         )
     assert trade.calls == []
+    assert exit_store.updates == []
+
+
+def _human_manual_open_row() -> dict[str, Any]:
+    """Fila abierta nacida por el canal HTTP manual (H1)."""
+    from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
+
+    plan: dict[str, Any] = {
+        "decisionId": "manual-tx-open",
+        "instrumentId": "inst-1",
+        "direction": "long",
+        "status": "HUMAN_MANUAL",
+        "origin": "HUMAN_MANUAL",
+        "entry": 10.0,
+    }
+    pos = build_position_state_from_fill(
+        plan,
+        fill_price=10.0,
+        fill_quantity=2.0,
+        filled_at="2026-10-07T15:00:00Z",
+        position_id="pos-manual-1",
+        override={"reason": "human_manual"},
+    )
+    assert pos is not None
+    return {
+        "id": "pos-manual-1",
+        "account_id": "acc-1",
+        "instrument_id": "inst-1",
+        "status": "OPEN",
+        "trade_plan_id": "manual-tx-open",
+        "trade_plan_snapshot": plan,
+        "birth_override_reason": "human_manual",
+        "position_state": pos.to_dict(),
+    }
+
+
+@pytest.mark.asyncio
+async def test_gated_http_sell_allows_when_position_origin_human_manual() -> None:
+    """H1 (V2.88.85) — una posición HUMAN_MANUAL sí cierra por HTTP."""
+    trade = _FakeExecuteTrade()
+    exit_store = _ExitStore(row=_human_manual_open_row())
+    uc = ExecuteGatedPortfolioTrade(
+        trade,  # type: ignore[arg-type]
+        portfolio_summary=_VetoSummary(),
+        position_from_exit=PersistPositionFromExit(exit_store),
+    )
+    result = await uc.execute(
+        instrument_id="inst-1",
+        trade_type="sell",
+        quantity=1.0,
+        price=11.0,
+        account_id="acc-1",
+        idempotency_key="k" * 16,
+    )
+    assert result.transaction.id == "tx-http"
+    assert len(trade.calls) == 1
+    assert trade.calls[0]["trade_type"] == "sell"
+    # El sync cierra/reduce la PositionState (no se queda abierta sin salida).
+    assert len(exit_store.updates) == 1
+    assert exit_store.updates[0]["status"] == "PARTIAL"
+
+
+def test_row_is_human_manual_signals() -> None:
+    """H1 (V2.88.85) — las tres señales de origen manual (y el rechazo del resto)."""
+    from bolsa_application.execute_gated_portfolio_trade import row_is_human_manual
+
+    assert row_is_human_manual(None) is False
+    assert row_is_human_manual({"birth_override_reason": "human_manual"}) is True
+    assert row_is_human_manual({"trade_plan_id": "manual-tx-9"}) is True
+    assert row_is_human_manual({"trade_plan_snapshot": {"origin": "HUMAN_MANUAL"}}) is True
+    # Una posición SEMI/AUTO no se autoriza por accidente.
+    assert (
+        row_is_human_manual(
+            {
+                "birth_override_reason": None,
+                "trade_plan_id": "tp-1",
+                "trade_plan_snapshot": {"origin": "HUMAN_CONFIRM"},
+            }
+        )
+        is False
+    )
 
 
 class _FillStore:

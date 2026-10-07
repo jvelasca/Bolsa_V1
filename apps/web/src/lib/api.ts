@@ -964,6 +964,24 @@ export const api = {
       }),
     ),
 
+  /**
+   * T1 — TOP3 de oportunidades (cross-asset) del tick más reciente. Read-only: la UI
+   * copia el DTO tal cual (no re-deriva el score). El TOP3 describe oportunidades
+   * rankeadas, nunca una decisión de cartera.
+   */
+  getLatestTop3Opportunities: () =>
+    call<components["schemas"]["Top3OpportunitiesResponseDto"]>(() =>
+      client.GET("/api/top3-opportunities/latest", {}),
+    ),
+
+  /** T1 — slots del TOP3 de un ``run_id`` concreto (foto histórica, read-only). */
+  getTop3OpportunitiesForRun: (runId: string) =>
+    call<components["schemas"]["Top3OpportunitiesResponseDto"]>(() =>
+      client.GET("/api/top3-opportunities/{run_id}", {
+        params: { path: { run_id: runId } },
+      }),
+    ),
+
   /** V1.92/V1.93 — outbox queue depth + SLA for Consola Operativa. */
   getLifecycleOutboxStats: (accountId: string) =>
     call<{

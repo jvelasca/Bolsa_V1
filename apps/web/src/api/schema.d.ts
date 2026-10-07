@@ -3904,6 +3904,49 @@ export interface paths {
         patch: operations["update_sync_settings_api_sync_settings_patch"];
         trace?: never;
     };
+    "/api/top3-opportunities/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Latest Top3 Opportunities
+         * @description Run más reciente del TOP3 (por ``created_at``) y sus slots ordenados por rank.
+         *
+         *     Sin TOP3 persistido devuelve ``runId=""`` e ``items=[]`` (fail-closed: la UI declara
+         *     «sin TOP3 todavía», nunca una foto inventada).
+         */
+        get: operations["get_latest_top3_opportunities_api_top3_opportunities_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/top3-opportunities/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Top3 Opportunities For Run
+         * @description Slots del TOP3 de un ``run_id`` concreto, ordenados por rank.
+         */
+        get: operations["get_top3_opportunities_for_run_api_top3_opportunities__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/trackers": {
         parameters: {
             query?: never;
@@ -10846,6 +10889,34 @@ export interface components {
             unrealizedLines: components["schemas"]["UnrealizedGainLineDto"][];
             /** Year */
             year: number;
+        };
+        /** Top3OpportunitiesResponseDto */
+        Top3OpportunitiesResponseDto: {
+            /** Items */
+            items?: components["schemas"]["Top3OpportunityDto"][];
+            /** Runid */
+            runId: string;
+        };
+        /** Top3OpportunityDto */
+        Top3OpportunityDto: {
+            /** Assetid */
+            assetId: string;
+            /** Components */
+            components?: {
+                [key: string]: unknown;
+            };
+            /** Createdat */
+            createdAt: string;
+            /** Rank */
+            rank: number;
+            /** Reasons */
+            reasons?: string[];
+            /** Regime */
+            regime?: string | null;
+            /** Runid */
+            runId: string;
+            /** Score */
+            score: number;
         };
         /** TrackerDefinitionDetailDto */
         TrackerDefinitionDetailDto: {
@@ -19212,6 +19283,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SyncSettingsResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_latest_top3_opportunities_api_top3_opportunities_latest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Top3OpportunitiesResponseDto"];
+                };
+            };
+        };
+    };
+    get_top3_opportunities_for_run_api_top3_opportunities__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Top3OpportunitiesResponseDto"];
                 };
             };
             /** @description Validation Error */

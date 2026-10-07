@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   buildPositionExitPayload,
   evaluateProtectStopOverride,
@@ -8,9 +8,13 @@ import {
 } from "@/features/operations/propose-position-exit";
 import type { PositionDto, ProtectPlanV1 } from "@bolsa/shared";
 
+const demoBookState = vi.hoisted(() => ({
+  mode: "semi" as "manual" | "semi" | "auto",
+}));
+
 vi.mock("@/features/trading/demo-book-prefs", () => ({
-  loadDemoBookPrefs: () => ({ mode: "semi" }),
-  demoBookAllowsEnqueueConfirm: () => true,
+  loadDemoBookPrefs: () => ({ mode: demoBookState.mode }),
+  demoBookAllowsEnqueueConfirm: (mode: string) => mode === "semi",
 }));
 
 function position(partial: Partial<PositionDto> = {}): PositionDto {
@@ -468,5 +472,49 @@ describe("V2.08 OPEN_UNPROTECTED bootstrap protect", () => {
     });
     expect(positionShowsProtectHint(unprotected)).toBe(false);
     expect(positionShowsProtectCta(unprotected)).toBe(true);
+  });
+});
+
+describe("V2.88.85 (H1) — copy de recuperación en MANUAL", () => {
+  beforeEach(() => {
+    demoBookState.mode = "manual";
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {},
+    });
+  });
+
+  afterEach(() => {
+    demoBookState.mode = "semi";
+  });
+
+  it("exit_hint dirige a Vender en lugar de Confirm", () => {
+    expect(() =>
+      buildPositionExitPayload({
+        position: position(),
+        accountId: "acc-1",
+        intent: "exit_hint",
+      }),
+    ).toThrow(/Vender/i);
+  });
+
+  it("reduce dirige a Vender en lugar de Confirm", () => {
+    expect(() =>
+      buildPositionExitPayload({
+        position: position({ quantity: 7 }),
+        accountId: "acc-1",
+        intent: "reduce",
+      }),
+    ).toThrow(/Vender/i);
+  });
+
+  it("protect mantiene la guía de cambiar a SEMI (no es una venta)", () => {
+    expect(() =>
+      buildPositionExitPayload({
+        position: position(),
+        accountId: "acc-1",
+        intent: "protect",
+      }),
+    ).toThrow(/cambia a SEMI/i);
   });
 });

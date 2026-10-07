@@ -49,6 +49,8 @@ flowchart TD
     Endpoint --> Surface["Superficie TOP 3 OPORTUNIDADES"]
 ```
 
+> **Regla dura (semántica).** El TOP3 describe **oportunidades rankeadas**; **nunca** una decisión de cartera. Cualquier texto de producto, docstring o comentario que afirme «AUTO decidió/compró estos activos» es incorrecto: debe decir «AUTO rankeó estas oportunidades». La decisión de cartera es otro peldaño (`PortfolioDecision`, §2).
+
 ---
 
 ## 2. TOP3 ≠ operación (escalera no negociable)
