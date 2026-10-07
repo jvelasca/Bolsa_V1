@@ -18,13 +18,19 @@ import {
 } from "@/components/layout/auto-workspace-layout";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 import { buildOperationIdentity } from "@/features/auto/auto-operation-identity";
-import { autoOperacionHref } from "@/features/auto/auto-nav";
+import {
+  autoOperacionHref,
+  AUTO_ACTIVIDAD_PATH,
+} from "@/features/auto/auto-nav";
 import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
+import { AutoTop3Panel } from "@/features/auto/auto-top3-panel";
+import { useAutoTop3Opportunities } from "@/features/auto/use-auto-top3-opportunities";
 import { mesaOportunidadesHref } from "@/features/mesa/mesa-nav-links";
 import { OPERATIONAL_CONSOLE_PATH } from "@/features/confirm/daily-nav";
 
 export function AutoOperarPage() {
   const { view, isLoading, isError } = useAutoOperationalMonitor();
+  const top3 = useAutoTop3Opportunities();
   const cycles = view?.cycles ?? [];
   const hasOperations = cycles.length > 0;
 
@@ -43,9 +49,16 @@ export function AutoOperarPage() {
         <AutoSectionBlockHeading id="auto-operar-opportunities-heading">
           Oportunidades
         </AutoSectionBlockHeading>
+        <AutoTop3Panel
+          view={top3.view}
+          isLoading={top3.isLoading}
+          isError={top3.isError}
+          testId="auto-operar-top3"
+        />
         <p className="text-sm text-muted-foreground">
-          Las oportunidades viven en la Mesa: allí se rankean y se decide. Esta
-          sección no repite el cálculo para que no existan dos cifras distintas.
+          El ranking completo y su explicación viven en la Mesa: allí se rankean
+          y se decide. Aquí se copia el TOP3 ya producido por AUTO, sin repetir
+          el cálculo para que no existan dos cifras distintas.
         </p>
         <p className="text-xs text-amber-600 dark:text-amber-400">
           Ranking ≠ orden: estar arriba en la lista no equivale a comprar ya.
@@ -57,6 +70,15 @@ export function AutoOperarPage() {
         >
           Ver oportunidades en la Mesa
         </Link>
+        <p className="text-sm text-muted-foreground">
+          <Link
+            to={AUTO_ACTIVIDAD_PATH}
+            className="underline hover:text-primary"
+            data-testid="auto-operar-activity-link"
+          >
+            Ver toda la actividad de AUTO
+          </Link>
+        </p>
       </section>
 
       <section className="space-y-2" aria-labelledby="auto-operar-list-heading">

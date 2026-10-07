@@ -14,6 +14,8 @@ import {
 import { AutoOperationStoryPanel } from "@/features/auto-monitor/auto-operation-story-panel";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 import { AUTO_OPERAR_PATH, autoOperacionHref } from "@/features/auto/auto-nav";
+import { buildAutoOperationSheet } from "@/features/auto/auto-operation-sheet";
+import { AutoOperationSheetView } from "@/features/auto/auto-operation-sheet-view";
 
 export function AutoOperacionPage() {
   const { cycleId } = useParams<{ cycleId: string }>();
@@ -36,6 +38,25 @@ export function AutoOperacionPage() {
           description="Qué pasó → por qué → qué riesgo tenía → qué precio se aplicó → qué resultado → qué enseña DÍA-D."
         />
       </div>
+
+      <section
+        className="space-y-2"
+        aria-labelledby="auto-operacion-sheet-heading"
+      >
+        <AutoSectionBlockHeading id="auto-operacion-sheet-heading">
+          Ficha de la operación
+        </AutoSectionBlockHeading>
+        {cycle ? (
+          <AutoOperationSheetView sheet={buildAutoOperationSheet(cycle)} />
+        ) : (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="auto-operacion-sheet-hole"
+          >
+            Sin dato todavía: no hay una operación con ese identificador.
+          </p>
+        )}
+      </section>
 
       <section
         className="space-y-2"

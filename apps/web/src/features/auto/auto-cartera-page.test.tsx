@@ -7,7 +7,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 
 vi.mock("@/features/trading/operations-panel", () => ({
-  OperationsPanel: () => <div data-testid="operations-panel-stub" />,
+  OperationsPanel: ({ surface = "market" }: { surface?: string }) => (
+    <div data-testid="operations-panel-stub" data-surface={surface} />
+  ),
 }));
 
 import { AutoCarteraPage } from "@/features/auto/auto-cartera-page";
@@ -34,6 +36,7 @@ describe("AutoCarteraPage", () => {
 
     // El aviso precede a las acciones (posiciones y órdenes).
     const panel = screen.getByTestId("operations-panel-stub");
+    expect(panel.getAttribute("data-surface")).toBe("auto");
     expect(
       banner.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();

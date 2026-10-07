@@ -30,6 +30,7 @@ import { buildAutoOperationCard } from "@/features/auto/auto-operation-card";
 import { AutoOperationCardView } from "@/features/auto/auto-operation-card-view";
 import {
   autoOperacionHref,
+  AUTO_ACTIVIDAD_PATH,
   AUTO_ANALISIS_PATH,
   AUTO_OPERAR_PATH,
 } from "@/features/auto/auto-nav";
@@ -39,6 +40,12 @@ import {
   buildAutoHomeSummary,
   decisionClockCopy,
 } from "@/features/auto/auto-home-summary";
+import { buildAutoHumanState } from "@/features/auto/auto-human-state";
+import { AutoHumanStateBadge } from "@/features/auto/auto-human-state-badge";
+import { buildAutoStateWhy } from "@/features/auto/auto-why";
+import { AutoWhyButton } from "@/features/auto/auto-why-button";
+import { AutoTop3Panel } from "@/features/auto/auto-top3-panel";
+import { useAutoTop3Opportunities } from "@/features/auto/use-auto-top3-opportunities";
 import { AUTO_USER_TEXT } from "@/features/auto/auto-typography";
 import { AUTO_RISK_TONE_CLASS } from "@/features/auto/auto-risk-summary";
 import { api } from "@/lib/api";
@@ -127,12 +134,29 @@ export function AutoHomePage() {
       : [];
   });
 
+  const humanState = buildAutoHumanState({
+    header: view?.header ?? null,
+    riskOperationalState: financial.data?.operationalState ?? null,
+    isLoading,
+    isError,
+  });
+  const why = buildAutoStateWhy({
+    state: humanState,
+    header: view?.header ?? null,
+    riskOperationalState: financial.data?.operationalState ?? null,
+    hasOperationsInCourse: inCourseOperations.length > 0,
+  });
+  const top3 = useAutoTop3Opportunities();
+
   return (
     <div className="space-y-6" data-testid="auto-home-page">
       <AutoSectionHeading
         title="Resumen"
         description="Qué está haciendo AUTO, qué puedes hacer y qué ha pasado. Todo es dinero virtual (DEMO)."
       />
+
+      <AutoHumanStateBadge state={humanState} testId="auto-home-human-state" />
+      <AutoWhyButton why={why} testId="auto-home-why" />
 
       <section
         className="space-y-3"
@@ -256,6 +280,13 @@ export function AutoHomePage() {
           ¿Qué puedo hacer?
         </AutoSectionBlockHeading>
 
+        <AutoTop3Panel
+          view={top3.view}
+          isLoading={top3.isLoading}
+          isError={top3.isError}
+          testId="auto-home-top3"
+        />
+
         {!summary.isLoading && !summary.isError ? (
           inCourseOperations.length > 0 ? (
             <ul
@@ -313,6 +344,15 @@ export function AutoHomePage() {
             ¿Qué ha pasado?
           </AutoSectionBlockHeading>
           <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <li>
+              <Link
+                to={AUTO_ACTIVIDAD_PATH}
+                className="underline hover:text-primary"
+                data-testid="auto-home-activity-link"
+              >
+                Toda la actividad
+              </Link>
+            </li>
             <li>
               <Link
                 to={mesaOportunidadesHref()}

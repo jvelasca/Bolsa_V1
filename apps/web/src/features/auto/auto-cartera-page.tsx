@@ -39,7 +39,7 @@ export function AutoCarteraPage() {
         <AutoSectionBlockHeading id="auto-cartera-ops-heading">
           Posiciones y órdenes
         </AutoSectionBlockHeading>
-        <OperationsPanel />
+        <OperationsPanel surface="auto" />
       </section>
 
       <section

@@ -33,12 +33,19 @@ function renderAt(entry: string) {
 afterEach(cleanup);
 
 describe("AutoWorkspaceLayout", () => {
-  it("monta la sub-navegación con las cinco secciones", () => {
+  it("monta la sub-navegación con las secciones de AUTO", () => {
     renderAt("/auto/operar");
     expect(
       screen.getByRole("navigation", { name: "Secciones AUTO" }),
     ).toBeTruthy();
-    for (const id of ["operar", "cartera", "riesgo", "analisis", "sistema"]) {
+    for (const id of [
+      "operar",
+      "actividad",
+      "cartera",
+      "riesgo",
+      "analisis",
+      "sistema",
+    ]) {
       expect(screen.getByTestId(`auto-nav-${id}`)).toBeTruthy();
     }
   });

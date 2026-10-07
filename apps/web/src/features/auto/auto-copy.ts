@@ -11,6 +11,7 @@
 
 export type AutoSectionId =
   | "operar"
+  | "actividad"
   | "cartera"
   | "riesgo"
   | "analisis"
@@ -27,10 +28,15 @@ export const AUTO_SECTION_COPY: Record<AutoSectionId, AutoSectionCopy> = {
     description:
       "Elige una oportunidad y revisa tus operaciones. Todo es dinero virtual (DEMO): abrir una operación no mueve dinero real.",
   },
+  actividad: {
+    title: "Actividad",
+    description:
+      "Qué ha hecho AUTO, en orden: cada análisis, cada operación y cada paso, en una sola línea temporal. Todo es dinero virtual (DEMO).",
+  },
   cartera: {
     title: "Cartera",
     description:
-      "Qué tienes ahora: posiciones abiertas, órdenes en curso y el historial de lo que ya pasó. Antes de reducir o cerrar, la app te pide que confirmes.",
+      "Qué tienes ahora: posiciones de la cuenta simulada, órdenes en curso y el historial de lo que ya pasó. Antes de reducir o cerrar, la app te pide que confirmes.",
   },
   riesgo: {
     title: "Riesgo",

@@ -21,6 +21,7 @@ export const AUTO_HOME_PATH = AUTO_ROOT_PATH;
 
 /** Sección por defecto: la historia de operación es la vista de trabajo. */
 export const AUTO_OPERAR_PATH = "/auto/operar" as const;
+export const AUTO_ACTIVIDAD_PATH = "/auto/actividad" as const;
 export const AUTO_CARTERA_PATH = "/auto/cartera" as const;
 export const AUTO_RIESGO_PATH = "/auto/riesgo" as const;
 export const AUTO_ANALISIS_PATH = "/auto/analisis" as const;
@@ -39,6 +40,7 @@ export const AUTO_MONITOR_PATH = "/auto-monitor" as const;
 export const AUTO_SECTION = {
   home: "home",
   operar: "operar",
+  actividad: "actividad",
   cartera: "cartera",
   riesgo: "riesgo",
   analisis: "analisis",
@@ -69,6 +71,12 @@ export const AUTO_NAV: { label: string; items: readonly AutoNavItem[] } = {
       label: "Operar",
       path: AUTO_OPERAR_PATH,
       hint: "Oportunidades, operaciones y la operación seleccionada",
+    },
+    {
+      id: AUTO_SECTION.actividad,
+      label: "Actividad",
+      path: AUTO_ACTIVIDAD_PATH,
+      hint: "Qué ha hecho AUTO, en orden, en una sola línea temporal",
     },
     {
       id: AUTO_SECTION.cartera,

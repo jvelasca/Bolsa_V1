@@ -33,6 +33,8 @@ import {
   buildAutoHomeSummary,
   decisionClockCopy,
 } from "@/features/auto/auto-home-summary";
+import { buildAutoHumanState } from "@/features/auto/auto-human-state";
+import { AutoHumanStateBadge } from "@/features/auto/auto-human-state-badge";
 
 export function AutoSistemaPage() {
   const { view, isLoading, isError } = useAutoOperationalMonitor();
@@ -43,6 +45,12 @@ export function AutoSistemaPage() {
   const status = buildAutoHomeSummary({
     header: view?.header ?? null,
     cycles: view?.cycles ?? [],
+    isLoading,
+    isError,
+  });
+
+  const humanState = buildAutoHumanState({
+    header: view?.header ?? null,
     isLoading,
     isError,
   });
@@ -58,6 +66,10 @@ export function AutoSistemaPage() {
         <AutoSectionBlockHeading id="auto-sistema-estado">
           Estado de AUTO
         </AutoSectionBlockHeading>
+        <AutoHumanStateBadge
+          state={humanState}
+          testId="auto-sistema-human-state"
+        />
         {status.isLoading ? (
           <p
             className="text-sm text-muted-foreground"

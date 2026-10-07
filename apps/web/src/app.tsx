@@ -35,6 +35,7 @@ import { AutoMonitorPage } from "@/features/auto-monitor/auto-monitor-page";
 import { AutoWorkspaceLayout } from "@/components/layout/auto-workspace-layout";
 import { AutoHomePage } from "@/features/auto/auto-home-page";
 import { AutoOperarPage } from "@/features/auto/auto-operar-page";
+import { AutoActividadPage } from "@/features/auto/auto-actividad-page";
 import { AutoOperacionPage } from "@/features/auto/auto-operacion-page";
 import { AutoCarteraPage } from "@/features/auto/auto-cartera-page";
 import { AutoRiesgoPage } from "@/features/auto/auto-riesgo-page";
@@ -110,6 +111,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <AutoHomePage /> },
           { path: "operar", element: <AutoOperarPage /> },
+          { path: "actividad", element: <AutoActividadPage /> },
           {
             path: "operar/operacion/:cycleId",
             element: <AutoOperacionPage />,

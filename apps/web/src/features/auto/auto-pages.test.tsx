@@ -31,6 +31,14 @@ vi.mock("@/features/auto-monitor/use-auto-operational-monitor", () => ({
   }),
 }));
 
+vi.mock("@/features/auto/use-auto-top3-opportunities", () => ({
+  useAutoTop3Opportunities: () => ({
+    view: null,
+    isLoading: false,
+    isError: false,
+  }),
+}));
+
 import { AutoOperarPage } from "@/features/auto/auto-operar-page";
 import { AutoOperacionPage } from "@/features/auto/auto-operacion-page";
 

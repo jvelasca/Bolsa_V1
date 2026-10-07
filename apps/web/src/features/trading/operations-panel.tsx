@@ -33,6 +33,29 @@ import {
 
 type OperationsTab = "open" | "pending";
 
+/**
+ * Superficie que hospeda el panel. En AUTO (`/auto/cartera`) los rótulos son de cartera
+ * («Posiciones»), no de operación: un ciclo puede tener reserva/orden/fill y ninguno es una
+ * posición. En el resto de la app se conserva el vocabulario de mercado.
+ */
+export type OperationsPanelSurface = "market" | "auto";
+
+const OPEN_TAB_LABEL: Record<OperationsPanelSurface, string> = {
+  market: "Operaciones abiertas",
+  auto: "Posiciones",
+};
+
+const EMPTY_OPEN_LABEL: Record<OperationsPanelSurface, string> = {
+  market: "Sin posiciones abiertas",
+  auto: "Sin posiciones en la cuenta simulada",
+};
+
+/** Exportado para falsabilidad: el primer nivel de AUTO nunca rotula «… abiertas». */
+export const OPERATIONS_PANEL_SURFACE_LABELS = {
+  openTab: OPEN_TAB_LABEL,
+  emptyOpen: EMPTY_OPEN_LABEL,
+} as const;
+
 function formatR(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
   const sign = value >= 0 ? "+" : "";
@@ -48,8 +71,10 @@ function formatR(value: number | null | undefined): string {
  */
 export function OperationsPanel({
   scopeToActiveChart = false,
+  surface = "market",
 }: {
   scopeToActiveChart?: boolean;
+  surface?: OperationsPanelSurface;
 } = {}) {
   const [tab, setTab] = useState<OperationsTab>("open");
   const [accountWide, setAccountWide] = useState(false);
@@ -142,7 +167,7 @@ export function OperationsPanel({
       <div className="scroll-area flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border px-1">
         {(
           [
-            ["open", "Operaciones abiertas"],
+            ["open", OPEN_TAB_LABEL[surface]],
 
             ["pending", "Operaciones pendientes"],
           ] as const
@@ -204,7 +229,7 @@ export function OperationsPanel({
             <p className="p-4 text-center text-xs text-muted-foreground">
               {scopeInstrumentId
                 ? `Sin posición abierta en ${activeSymbol ?? "este valor"}`
-                : "Sin posiciones abiertas"}
+                : EMPTY_OPEN_LABEL[surface]}
             </p>
           )}
 
