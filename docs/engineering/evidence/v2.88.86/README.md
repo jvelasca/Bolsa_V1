@@ -55,4 +55,4 @@ HTTP y el contrato HTTP. El TOP3 y su contrato web (T1) quedan como en `v2.88.85
 
 ## Cita POST-TAG
 
-**Tag anotado `v2.88.86-beta`.** `Release tag CI` **pendiente de medición** tras el push del tag.
+**Tag anotado `v2.88.86-beta`** (objeto `bb6438e3` → commit `067cbaad`). `Release tag CI` [`37666847381`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37666847381) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `python` `4594 passed / 45 skipped`; `frontend` `1528 passed` (`258` ficheros); `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
