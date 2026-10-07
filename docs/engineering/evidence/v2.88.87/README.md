@@ -69,4 +69,4 @@ esquema (head `052_top3_opportunities`).
 
 ## Cita POST-TAG
 
-**Tag anotado `v2.88.87-beta`.** `Release tag CI` **pendiente de medición** tras el push del tag.
+**Tag anotado `v2.88.87-beta`** (objeto `be7af907` → commit `6b70da1f`). `Release tag CI` [`37685922011`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37685922011) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `python` `4594 passed / 45 skipped`; `frontend` `1564 passed` (`265` ficheros); `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
