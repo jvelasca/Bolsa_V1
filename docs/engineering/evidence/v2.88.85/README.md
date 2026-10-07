@@ -1,6 +1,6 @@
 # Evidencia `v2.88.85-beta` — `MANUAL · H1` + `AUTO · TOP3 (T1)`: **cierre manual por HTTP + contrato web del TOP3**
 
-**Producto:** `V2.88.85-beta` · **Package:** `2.11.85-beta` · **AsOf:** 2026-10-07. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** (el fence relajado vive en el canal HTTP paper, no en el motor AUTO de decisión/ejecución). **Contrato HTTP regenerado** (los endpoints `/top3-opportunities` ya existían en FastAPI; `contract:check` verde). **Tag anotado `v2.88.85-beta`** (por crear → ver «Cita POST-TAG»).
+**Producto:** `V2.88.85-beta` · **Package:** `2.11.85-beta` · **AsOf:** 2026-10-07. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** (el fence relajado vive en el canal HTTP paper, no en el motor AUTO de decisión/ejecución). **Contrato HTTP regenerado** (los endpoints `/top3-opportunities` ya existían en FastAPI; `contract:check` verde). **Tag anotado `v2.88.85-beta`** (objeto `23076a9f` → commit `f626bfaa`).
 
 **Padre de producto:** [`v2.88.84`](../v2.88.84/README.md). Auditoría que motivó el slice:
 [`auditoria-manual-modo-demo-2026-10-07.md`](../../auditoria-manual-modo-demo-2026-10-07.md) (§H1) y
@@ -61,6 +61,17 @@ plan. El TOP3 persistido sigue siendo observabilidad. El tag `v2.88.84-beta` per
 
 ## Cita POST-TAG
 
-**Tag anotado `v2.88.85-beta`** — pendiente de crear y de correr el `Release tag CI`.
-Se completará en el commit `docs(seal)` POST-TAG con el objeto/commit del tag y el veredicto de CI
-(`replay-repro` ⇒ `Δ motor = 0`).
+**Tag anotado `v2.88.85-beta`** (objeto `23076a9f` → commit `f626bfaa`, el tip del sello).
+`Release tag CI` [`37653650379`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37653650379)
+**VERDE** (`12` jobs = `11` `success` + `playwright` integrado `skipped`; `certify` `success`):
+
+- `python` (ruff/imports/mypy/pytest offline): `4594 passed, 45 skipped`.
+- `frontend` (typecheck/lint/test/build + `contract:check`): `1523 passed` (`258` ficheros).
+- `lifecycle-pg` (Alembic + auth + golden restart): `success`.
+- `playwright (mock E2E)`: `success`.
+- `replay-repro`: **`REPRODUCIDO`** `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`
+  (`bytes 3340728`; `Determinismo del runner` ⇒ 2ª corrida IDÉNTICA) ⇒ **`Δ motor = 0` confirmado por CI**.
+- `decision-spine`, `dr-verify`, `shared`, `security` (gitleaks) y `a7-gate`: `success`.
+
+El run apunta exactamente al árbol del sello (`head f626bfaa`), así que la certificación de CI
+cubre lo que el auditor descarga del tag.
