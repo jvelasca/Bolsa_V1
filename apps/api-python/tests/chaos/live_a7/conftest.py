@@ -41,34 +41,30 @@ def _load_root_env() -> None:
         return
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def _purge_unknown_rows_after_test() -> AsyncIterator[None]:
-    """Borra las UNKNOWN de prueba al terminar el test, pase o falle.
+async def _purge_unknown_rows_now() -> None:
+    """Borra las UNKNOWN de prueba (``acc-c3-test``) del paquete live_a7.
 
-    Best-effort deliberado: una purga que falla no debe convertir un test ya juzgado en
-    error. Si la BD no está disponible el test correspondiente ya habrá skipeado.
+    Best-effort deliberado: una purga que falla no debe convertir un test en error.
+    Solo toca el espacio de pruebas de live_a7; el resto de la tabla es de producción
+    local y no se toca (no es un TRUNCATE).
     """
-    yield
     _load_root_env()
     engine = None
     try:
-        from sqlalchemy import delete
-
         from bolsa_infrastructure.config import get_settings
         from bolsa_infrastructure.database.models.tables import LiveOrderRow
         from bolsa_infrastructure.database.session import create_engine, create_session_factory
+        from sqlalchemy import delete
 
         get_settings.cache_clear()
         engine = create_engine(get_settings())
         factory = create_session_factory(engine)
         async with factory() as session:
-            # Solo el espacio de pruebas de live_a7: el resto de la tabla es de
-            # producción local y no se toca (no es un TRUNCATE).
             await session.execute(
                 delete(LiveOrderRow).where(LiveOrderRow.account_id == _TEST_ACCOUNT_ID)
             )
             await session.commit()
-    except Exception:  # noqa: BLE001 — la purga nunca debe tumbar un test ya juzgado
+    except Exception:  # noqa: BLE001 — la purga nunca debe tumbar un test
         pass
     finally:
         if engine is not None:
@@ -76,3 +72,17 @@ async def _purge_unknown_rows_after_test() -> AsyncIterator[None]:
                 await engine.dispose()
             except Exception:  # noqa: BLE001
                 pass
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _purge_unknown_rows_around_test() -> AsyncIterator[None]:
+    """Borra las UNKNOWN de prueba ANTES y DESPUÉS de cada test del paquete.
+
+    ANTES: una pasada anterior interrumpida (crash real de un subproceso, kill del runner)
+    puede dejar filas ``acc-c3-test`` vivas; sin esta purga previa, ``test_c3a`` arranca
+    con ``count_unknown() > 0`` y su invariante final falla. DESPUÉS: ninguna pasada
+    —verde o roja— deja munición para la siguiente (self-poisoning entre suites).
+    """
+    await _purge_unknown_rows_now()
+    yield
+    await _purge_unknown_rows_now()

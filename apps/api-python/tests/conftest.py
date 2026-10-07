@@ -243,36 +243,46 @@ async def purge_all_residuals() -> None:
         await engine.dispose()
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _cleanup_residuals_after_session() -> Iterator[None]:
-    """Red de seguridad global: limpia los residuos de TODA la sesión de tests.
+def _purge_residuals_once() -> None:
+    """Ejecuta una pasada de ``purge_all_residuals`` sin tumbar la sesión.
 
-    Varias suites crean cuentas/instrumentos reales y no los borran (se llegaron a medir 89
-    cuentas y 127 instrumentos sintéticos acumulados). En vez de confiar en que cada suite
-    recuerde limpiar, al terminar la sesión se purga todo lo que no sea la semilla.
-
-    Se ejecuta también si algún test falla, que es justo cuando más residuo se deja.
-
-    El aviso es un ``warnings.warn`` y no un ``print`` a propósito: pytest captura la
-    salida, así que un ``print`` en el teardown es INVISIBLE. Con ``print``, esta limpieza
-    podía llevar meses sin ejecutarse (BD inalcanzable por una `DATABASE_URL` heredada)
-    sin que nadie lo notara, que es exactamente el residuo que la red de seguridad existe
-    para evitar.
+    Fail-soft deliberado: una purga que falla solo avisa (``warnings.warn``), nunca
+    convierte una sesión de tests en error. Sin BD ⇒ ``ResidualsUnavailable`` ⇒ aviso.
     """
-    yield
     try:
         asyncio.run(purge_all_residuals())
     except ResidualsUnavailable as exc:
         # Estado legítimo (jobs offline sin PostgreSQL): se avisa, no se falla.
         warnings.warn(
-            f"[conftest] limpieza final de residuos omitida: la BD no responde ({exc}). "
+            f"[conftest] limpieza de residuos omitida: la BD no responde ({exc}). "
             "Si esperabas PostgreSQL, revisa DATABASE_URL (una variable heredada puede "
             "tener prioridad sobre el .env de la raíz).",
             stacklevel=2,
         )
-    except Exception as exc:  # nunca debe tumbar la sesión de tests por el teardown
+    except Exception as exc:  # nunca debe tumbar la sesión de tests por la purga
         warnings.warn(
-            f"[conftest] limpieza final de residuos FALLÓ: {type(exc).__name__}: {exc}. "
+            f"[conftest] limpieza de residuos FALLÓ: {type(exc).__name__}: {exc}. "
             "Quedarán cuentas/instrumentos de test en la BD.",
             stacklevel=2,
         )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _cleanup_residuals_around_session() -> Iterator[None]:
+    """Red de seguridad global: limpia residuos ANTES y DESPUÉS de la sesión.
+
+    Varias suites crean cuentas/instrumentos reales y no los borran (se llegaron a medir 89
+    cuentas y 127 instrumentos sintéticos acumulados). En vez de confiar en que cada suite
+    recuerde limpiar, se purga todo lo que no sea la semilla.
+
+    Purga ANTES de arrancar (residuo de una pasada anterior interrumpida que dejó la purga
+    final sin ejecutar — la causa del rojo intermitente de ``test_workspaces_crud``: un
+    workspace residual hacía que el conteo > 1 y el veto del default dejara de ser 400) y
+    DESPUÉS (residuo de esta pasada, también si algún test falla).
+
+    El aviso es un ``warnings.warn`` y no un ``print`` a propósito: pytest captura la
+    salida, así que un ``print`` en el teardown es INVISIBLE.
+    """
+    _purge_residuals_once()
+    yield
+    _purge_residuals_once()
