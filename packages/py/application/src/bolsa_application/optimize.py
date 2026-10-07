@@ -658,6 +658,31 @@ def rank_trials_for_result(trials: list[OptimizeGridTrial]) -> list[OptimizeGrid
     return sorted(trials, key=lambda trial: trial.score, reverse=True)
 
 
+def champion_trial(trials: list[Any]) -> Any | None:
+    """Campeón OOS-aware: el primer trial de ``rank_trials_for_result``.
+
+    V2.88 — fuente única de "qué trial manda" para que la evidencia (WFE/DSR/PBO) y los
+    parámetros promovidos a ACTIVE describan el MISMO campeón. Prefiere el OOS cuando
+    TODOS los trials lo miden (con penalización de OOS disperso, misma regla que la UI);
+    si no, el mayor score IS. Fail-closed: sin trials ⇒ ``None``.
+
+    A diferencia de ``rank_trials_for_result`` (que asume ``OptimizeGridTrial`` con
+    ``oos_metrics`` siempre presente), aquí se usa ``getattr`` para tolerar objetos
+    genéricos (p. ej. los ``_Trial`` de los tests de ``champion_params_from_result`` sin
+    ``oos_metrics``), de modo que un trial sin OOS degrada al fallback IS en vez de
+    lanzar ``AttributeError``.
+    """
+    if not trials:
+        return None
+    if all(
+        isinstance(getattr(t, "oos_metrics", None), dict)
+        and getattr(t, "oos_metrics", None).get("score") is not None
+        for t in trials
+    ):
+        return max(trials, key=_oos_rank_key)
+    return max(trials, key=lambda t: float(getattr(t, "score", 0.0) or 0.0))
+
+
 async def _run_in_thread_with_live_progress[T](
     fn: Callable[..., T],
     /,

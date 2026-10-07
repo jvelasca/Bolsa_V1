@@ -20,6 +20,7 @@ from bolsa_application.strategy_executable_definition import (
 class _Trial:
     score: float
     params: dict[str, Any] = field(default_factory=dict)
+    oos_metrics: dict[str, Any] | None = None
 
 
 @dataclass
@@ -44,6 +45,44 @@ def test_champion_params_picks_highest_score() -> None:
 def test_champion_params_none_without_trials_or_params() -> None:
     assert champion_params_from_result(_Result(trials=[])) is None
     assert champion_params_from_result(_Result(trials=[_Trial(score=1.0)])) is None
+
+
+def test_champion_params_picks_oos_when_present() -> None:
+    """V2.88 — el campeón se elige por OOS (no por IS) cuando todos los trials lo miden."""
+    result = _Result(
+        trials=[
+            _Trial(
+                score=9.0,
+                params={"fastPeriod": 5, "slowPeriod": 20},
+                oos_metrics={"score": -1.0, "tradeCount": 5},
+            ),
+            _Trial(
+                score=1.0,
+                params={"fastPeriod": 10, "slowPeriod": 30},
+                oos_metrics={"score": 2.0, "tradeCount": 5},
+            ),
+        ]
+    )
+    assert champion_params_from_result(result) == {"fastPeriod": 10, "slowPeriod": 30}
+
+
+def test_champion_params_penalizes_sparse_oos() -> None:
+    """V2.88 — un OOS con menos de 2 trades no desplaza al OOS denso (misma regla que UI)."""
+    result = _Result(
+        trials=[
+            _Trial(
+                score=50.0,
+                params={"fastPeriod": 5, "slowPeriod": 20},
+                oos_metrics={"score": 20.0, "tradeCount": 1},
+            ),
+            _Trial(
+                score=40.0,
+                params={"fastPeriod": 10, "slowPeriod": 30},
+                oos_metrics={"score": 8.0, "tradeCount": 5},
+            ),
+        ]
+    )
+    assert champion_params_from_result(result) == {"fastPeriod": 10, "slowPeriod": 30}
 
 
 # ── build_executable_definition ─────────────────────────────────────────────────

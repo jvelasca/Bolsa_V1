@@ -37,13 +37,60 @@ __all__ = [
 ]
 
 
-def _rank_key(evaluation: StrategyEvaluation) -> tuple[float, float, float]:
-    """Orden por evidencia: score, luego nº de gates PASS, luego robustez (PBO)."""
-    passed = sum(1 for g in evaluation.gates if g.passed)
-    pbo = evaluation.metrics.get("pbo")
-    # Menos PBO es mejor ⇒ se ordena por -pbo; ausente ⇒ 1.0 (peor caso).
-    pbo_rank = -(float(pbo) if isinstance(pbo, (int, float)) else 1.0)
-    return (float(evaluation.score), float(passed), pbo_rank)
+def _finite(value: Any) -> float | None:
+    """Devuelve ``value`` como float finito, o ``None`` (fail-closed: ausente/no finito)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+        if number != number or number in (float("inf"), float("-inf")):
+            return None
+        return number
+    return None
+
+
+def _evidence_precedence(evaluation: StrategyEvaluation) -> int:
+    """Nivel de evidencia como orden: lab_validated > oos_validated > in_sample_only."""
+    return {
+        "lab_validated": 2,
+        "oos_validated": 1,
+        "in_sample_only": 0,
+    }.get(_evidence_level(evaluation), 0)
+
+
+def _rank_key(
+    evaluation: StrategyEvaluation,
+    *,
+    expected_regime: str | None = None,
+) -> tuple[float, int, float, float, float, float]:
+    """Clave de ranking por evidencia robusta fuera de muestra (no IS puro).
+
+    Orden lexicográfico descendente:
+
+    1. ``edge``     — OOS score si está medido; si no, IS (fallback in_sample_only).
+    2. ``evidence`` — lab_validated > oos_validated > in_sample_only.
+    3. ``wfe``      — walk-forward efficiency (ausente ⇒ -inf).
+    4. ``dsr``      — deflated Sharpe ratio (ausente ⇒ -inf).
+    5. ``-pbo``     — menos overfit (ausente ⇒ -1.0, peor caso).
+    6. ``regime_match`` — 1.0 si el régimen coincide con el esperado, else 0.0.
+    """
+    metrics = evaluation.metrics
+    oos = _finite(metrics.get("oos_score"))
+    edge = oos if oos is not None else float(evaluation.score)
+    wfe = _finite(metrics.get("wfe"))
+    dsr = _finite(metrics.get("dsr"))
+    pbo = _finite(metrics.get("pbo"))
+    wfe_rank = wfe if wfe is not None else float("-inf")
+    dsr_rank = dsr if dsr is not None else float("-inf")
+    pbo_rank = -(pbo if pbo is not None else 1.0)
+    regime_match = 0.0
+    if expected_regime:
+        candidate_regime = metrics.get("regime")
+        if isinstance(candidate_regime, str) and candidate_regime.strip():
+            regime_match = (
+                1.0 if candidate_regime.strip() == str(expected_regime).strip() else 0.0
+            )
+    return (edge, _evidence_precedence(evaluation), wfe_rank, dsr_rank, pbo_rank, regime_match)
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,23 +114,34 @@ def select_top3(
     min_score: float = 0.0,
     max_candidates: int = 3,
     timeframe: str = "1d",
+    expected_regime: str | None = None,
+    min_gates: tuple[str, ...] = ("backtest",),
 ) -> Top3Selection:
-    """Fase TOP 3: ranking por evidencia con ``runId`` por slot.
+    """Fase TOP 3: ranking por evidencia robusta con ``runId`` por slot.
 
-    Descarta candidatas sin gate ``backtest`` PASS o por debajo de ``min_score``
-    (fail-closed: sin evidencia no entran en el TOP). Los slots resultantes cumplen
-    el requisito de ``runId`` para poder publicarse como ``lab_validated``.
+    Descarta candidatas sin los gates mínimos en PASS (por defecto ``backtest``) o por
+    debajo de ``min_score`` (fail-closed: sin evidencia no entran en el TOP). El ranking
+    ya **no** se ordena por el IS puro: prefiere la evidencia fuera de muestra
+    (``oos_score`` → ``wfe`` → ``dsr`` → ``1 - pbo`` → ``regime_match``) y degrada las
+    hipótesis ``in_sample_only`` frente a las ``lab_validated``.
+
+    ``min_gates`` eleva la barrera de evidencia cuando se exige (p. ej.
+    ``("backtest", "oos", "walk_forward", "robustness")``); por defecto se mantiene el
+    mínimo histórico para no romper el flujo ``semifinal``/in_sample_only. Los slots
+    resultantes cumplen el requisito de ``runId`` para poder publicarse como
+    ``lab_validated``.
     """
     eligible: list[StrategyEvaluation] = []
     rejected: list[str] = []
     for evaluation in evaluations:
-        backtest_ok = any(g.gate == "backtest" and g.passed for g in evaluation.gates)
-        if not backtest_ok or float(evaluation.score) < min_score:
+        passed_gates = {g.gate for g in evaluation.gates if g.passed}
+        gates_ok = all(gate in passed_gates for gate in min_gates)
+        if not gates_ok or float(evaluation.score) < min_score:
             rejected.append(evaluation.candidate_id)
             continue
         eligible.append(evaluation)
 
-    eligible.sort(key=_rank_key, reverse=True)
+    eligible.sort(key=lambda e: _rank_key(e, expected_regime=expected_regime), reverse=True)
     selected = eligible[: max(1, min(max_candidates, 3))]
     candidate_ids = tuple(e.candidate_id for e in selected)
     scores = tuple(float(e.score) for e in selected)

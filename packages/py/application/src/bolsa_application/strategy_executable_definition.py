@@ -27,6 +27,7 @@ from bolsa_application.optimize import (
     STRATEGY_FAMILY_MACD,
     STRATEGY_FAMILY_RSI,
     STRATEGY_FAMILY_SMA,
+    champion_trial,
     normalize_strategy_family,
 )
 
@@ -37,15 +38,21 @@ __all__ = [
 
 
 def champion_params_from_result(result: Any) -> dict[str, Any] | None:
-    """Parámetros del trial campeón (mayor ``score``) del resultado de optimización.
+    """Parámetros del trial campeón (OOS-aware) del resultado de optimización.
+
+    V2.88 — el campeón se elige con ``champion_trial`` (OOS preferido, fallback IS), la
+    misma fuente que ``evaluate_optimize_result``, de modo que los parámetros promovidos
+    a ACTIVE describan el MISMO trial cuya evidencia (WFE/DSR/PBO) se validó. Sin esta
+    unificación, ACTIVE podía operar con parámetros overfit del IS mientras la evidencia
+    describía otro trial.
 
     Devuelve ``None`` cuando no hay trials o el campeón no trae ``params`` (no se
     inventan parámetros).
     """
     trials = list(getattr(result, "trials", None) or [])
-    if not trials:
+    champion = champion_trial(trials)
+    if champion is None:
         return None
-    champion = max(trials, key=lambda t: float(getattr(t, "score", 0.0) or 0.0))
     params = getattr(champion, "params", None)
     if not isinstance(params, dict) or not params:
         return None
