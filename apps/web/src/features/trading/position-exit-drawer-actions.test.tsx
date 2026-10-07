@@ -2,7 +2,13 @@
  * V1.36 — CTAs alineados con PositionDecision.action.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PositionDto } from "@bolsa/shared";
 import { PositionExitDrawerActions } from "@/features/trading/position-exit-drawer-actions";
@@ -15,10 +21,12 @@ vi.mock("@/features/accounts/use-active-account", () => ({
   }),
 }));
 
+const enqueueMock = vi.hoisted(() => vi.fn(() => "q1"));
+const setActiveMock = vi.hoisted(() => vi.fn());
 vi.mock("@/stores/supervised-f3-queue-store", () => ({
   useSupervisedF3QueueStore: (
     sel: (s: { enqueue: () => string; setActive: () => void }) => unknown,
-  ) => sel({ enqueue: vi.fn(() => "q1"), setActive: vi.fn() }),
+  ) => sel({ enqueue: enqueueMock, setActive: setActiveMock }),
 }));
 
 vi.mock("@/features/confirm/confirm-drawer", () => ({
@@ -34,9 +42,21 @@ vi.mock("@/features/trading/demo-book-prefs", () => ({
   demoBookAllowsEnqueueConfirm: (mode: string) => mode === "semi",
 }));
 
+vi.mock("@/features/trading/use-demo-book-prefs", () => ({
+  useDemoBookPrefs: () => ({ mode: demoBookState.mode }),
+}));
+
+const openSellMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+vi.mock("@/features/trading/open-sell-position-order", () => ({
+  openSellOrderForPosition: openSellMock,
+}));
+
 afterEach(() => {
   cleanup();
   demoBookState.mode = "semi";
+  enqueueMock.mockClear();
+  setActiveMock.mockClear();
+  openSellMock.mockClear();
 });
 
 function position(
@@ -223,7 +243,43 @@ describe("PositionExitDrawerActions V1.36 / F7", () => {
     expect(screen.getByTestId("position-exit-protect-TEST")).toBeTruthy();
   });
 
-  it("V2.88.85 (H1) — MANUAL no encola Confirm y muestra copy de recuperación", () => {
+  it("V2.88.85+ (H1 UX) — MANUAL + HUMAN_MANUAL abre Vender directo (no encola)", async () => {
+    demoBookState.mode = "manual";
+    render(
+      <PositionExitDrawerActions
+        position={position({
+          operational: {
+            status: "OPEN",
+            direction: "long",
+            tradePlanId: "manual-1",
+            plannedEntry: 100,
+            actualEntry: 100,
+            initialStop: null,
+            currentStop: null,
+            target1: null,
+            target2: null,
+            exitPlan: {
+              status: "TRIGGERED",
+              suggestedAction: "reduce",
+              suggestedQty: 5,
+              primaryReason: "TARGET_1",
+              policyTemplateId: "moderate",
+            },
+          },
+        })}
+        primaryCtaKind="reduce"
+        portfolioReconStatus="ok"
+      />,
+    );
+    fireEvent.click(screen.getByTestId("position-exit-reduce-TEST"));
+    await waitFor(() => expect(openSellMock).toHaveBeenCalledTimes(1));
+    expect(openSellMock).toHaveBeenCalledWith(
+      expect.objectContaining({ instrumentId: "inst-1", quantity: 5 }),
+    );
+    expect(enqueueMock).not.toHaveBeenCalled();
+  });
+
+  it("V2.88.85+ (H1 UX) — MANUAL + posición no manual conserva el bloqueo", () => {
     demoBookState.mode = "manual";
     render(
       <PositionExitDrawerActions
@@ -239,6 +295,27 @@ describe("PositionExitDrawerActions V1.36 / F7", () => {
       />,
     );
     fireEvent.click(screen.getByTestId("position-exit-reduce-TEST"));
+    expect(openSellMock).not.toHaveBeenCalled();
+    expect(enqueueMock).not.toHaveBeenCalled();
     expect(screen.getByText(/Vender/i)).toBeTruthy();
+  });
+
+  it("SEMI sigue encolando Confirm en Reducir (Δ sin regresión)", () => {
+    render(
+      <PositionExitDrawerActions
+        position={position(undefined, {
+          status: "TRIGGERED",
+          suggestedAction: "reduce",
+          suggestedQty: 5,
+          primaryReason: "TARGET_1",
+          policyTemplateId: "moderate",
+        })}
+        primaryCtaKind="reduce"
+        portfolioReconStatus="ok"
+      />,
+    );
+    fireEvent.click(screen.getByTestId("position-exit-reduce-TEST"));
+    expect(enqueueMock).toHaveBeenCalledTimes(1);
+    expect(openSellMock).not.toHaveBeenCalled();
   });
 });

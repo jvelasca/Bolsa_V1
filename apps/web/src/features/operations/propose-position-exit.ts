@@ -27,6 +27,29 @@ import {
 
 export type PositionExitIntent = "review" | "reduce" | "exit_hint" | "protect";
 
+/**
+ * V2.88.85+ (H1 UX) — prefijo del ``tradePlanId`` sintetizado para una posición
+ * nacida por el canal HTTP manual (``HUMAN_MANUAL``) en ``post_fill_position_sync``
+ * (``manual-{tx}``). Espeja el prefijo de ``row_is_human_manual`` en backend.
+ */
+export const HUMAN_MANUAL_TRADE_PLAN_PREFIX = "manual-";
+
+/**
+ * V2.88.85+ (H1 UX) — ¿la posición nació por el canal HTTP manual (``HUMAN_MANUAL``)?
+ *
+ * Es la única evidencia que el ``PositionDto`` expone hoy: el wire no trae
+ * ``birth_override_reason`` ni ``trade_plan_snapshot.origin`` (evidencias 1 y 2 del
+ * backend), pero sí el ``tradePlanId`` ``manual-{tx}`` (evidencia 3). Se usa para
+ * enrutar la salida MANUAL al flujo Vender directo (el backend ya autoriza esa venta).
+ */
+export function positionIsHumanManual(position: PositionDto): boolean {
+  const tradePlanId = position.operational?.tradePlanId;
+  return (
+    typeof tradePlanId === "string" &&
+    tradePlanId.trim().startsWith(HUMAN_MANUAL_TRADE_PLAN_PREFIX)
+  );
+}
+
 export type OperativaProtectMetaV1 = {
   operativaIntent: "protect";
   suggestedStop: number;

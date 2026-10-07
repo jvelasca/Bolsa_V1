@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createIdempotencyKey } from "@bolsa/shared";
 import {
@@ -27,6 +27,7 @@ import { api } from "@/lib/api";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { useTradePreferencesStore } from "@/stores/trade-preferences-store";
 import { useTradingUiStore } from "@/stores/trading-ui-store";
+import type { OrderDialogPreset } from "@/stores/trading-ui-store";
 import {
   ENTRIES_BLOCKED_CTA_LABEL,
   ENTRIES_BLOCKED_PROPOSE_MSG,
@@ -40,6 +41,7 @@ type PendingConfirm =
 
 export function OrderDialog() {
   const instrument = useTradingUiStore((s) => s.orderInstrument);
+  const orderPreset = useTradingUiStore((s) => s.orderPreset);
   const close = useTradingUiStore((s) => s.closeOrderDialog);
   const addPendingOrder = usePendingOrders().addPendingOrder;
   const queryClient = useQueryClient();
@@ -66,6 +68,23 @@ export function OrderDialog() {
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(
     null,
   );
+
+  // V2.88.85+ (H1 UX) — preset al abrir desde la CTA de salida MANUAL:
+  // precarga volumen + lado y pre-arma la firma humana (no ejecuta sola).
+  const appliedPresetRef = useRef<OrderDialogPreset | null>(null);
+  useEffect(() => {
+    if (!orderPreset) {
+      appliedPresetRef.current = null;
+      return;
+    }
+    if (appliedPresetRef.current === orderPreset) return;
+    appliedPresetRef.current = orderPreset;
+    setMode("market");
+    setSizeMode("volume");
+    setVolume(String(orderPreset.quantity));
+    setError(null);
+    setPendingConfirm({ kind: "market", side: orderPreset.side });
+  }, [orderPreset]);
 
   const lastPrice = instrument?.meta.lastClose ?? 0;
   const instrumentCurrency = instrument?.currency ?? accountCurrency;

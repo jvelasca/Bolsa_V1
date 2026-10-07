@@ -24,8 +24,10 @@ import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 import {
   buildPositionExitPayload,
+  positionIsHumanManual,
   positionShowsProtectCta,
   positionShowsProtectHint,
+  resolveExitQuantity,
   type PositionExitIntent,
 } from "@/features/operations/propose-position-exit";
 import {
@@ -33,6 +35,8 @@ import {
   CABIN_TYPE,
 } from "@/features/trading/cabin-visual";
 import { CABIN_FOCUS_RING } from "@/features/trading/operator-cabin-ui";
+import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
+import { openSellOrderForPosition } from "@/features/trading/open-sell-position-order";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 
 export function PositionExitDrawerActions({
@@ -61,6 +65,12 @@ export function PositionExitDrawerActions({
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const setActive = useSupervisedF3QueueStore((s) => s.setActive);
   const [error, setError] = useState<string | null>(null);
+  const bookPrefs = useDemoBookPrefs();
+  // V2.88.85+ (H1 UX) — en MANUAL, una posición nacida por el canal manual
+  // (HUMAN_MANUAL) se cierra con Vender directo (el backend ya lo autoriza); el
+  // resto de posiciones siguen exigiendo SEMI/Confirm.
+  const manualDirectSell =
+    bookPrefs.mode === "manual" && positionIsHumanManual(position);
 
   const decision = buildPositionDecisionFromDto(position, {
     portfolioReconStatus,
@@ -90,6 +100,22 @@ export function PositionExitDrawerActions({
       openConfirmDrawer();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo encolar");
+    }
+  }
+
+  // V2.88.85+ (H1 UX) — ruta de cierre MANUAL: abre el flujo Vender canónico con la
+  // cantidad de desriesgo. No ejecuta; el usuario firma en el diálogo (vía HTTP manual).
+  async function manualSell(intent: PositionExitIntent) {
+    setError(null);
+    try {
+      const quantity = resolveExitQuantity(position, intent);
+      await openSellOrderForPosition({
+        instrumentId: position.instrumentId,
+        quantity,
+        lastPrice: position.lastPrice,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo abrir la venta");
     }
   }
 
@@ -214,9 +240,19 @@ export function PositionExitDrawerActions({
               <button
                 type="button"
                 className={cn(ctaClass("reduce"), "border-amber-500/40")}
-                onClick={() => enqueueExit("reduce")}
+                onClick={() => {
+                  if (manualDirectSell) {
+                    void manualSell("reduce");
+                    return;
+                  }
+                  enqueueExit("reduce");
+                }}
                 data-testid={`position-exit-reduce-${position.symbol}`}
-                title="Reducir → cola Confirm (firma SEMI)"
+                title={
+                  manualDirectSell
+                    ? "Reducir → Vender directo sobre el libro DEMO (MANUAL)"
+                    : "Reducir → cola Confirm (firma SEMI)"
+                }
               >
                 Reducir
               </button>
@@ -225,9 +261,19 @@ export function PositionExitDrawerActions({
               <button
                 type="button"
                 className={cn(ctaClass("exit"), "border-rose-500/40")}
-                onClick={() => enqueueExit("exit_hint")}
+                onClick={() => {
+                  if (manualDirectSell) {
+                    void manualSell("exit_hint");
+                    return;
+                  }
+                  enqueueExit("exit_hint");
+                }}
                 data-testid={`position-exit-full-${position.symbol}`}
-                title="Salir → cola Confirm (firma SEMI)"
+                title={
+                  manualDirectSell
+                    ? "Salir → Vender directo sobre el libro DEMO (MANUAL)"
+                    : "Salir → cola Confirm (firma SEMI)"
+                }
               >
                 Salir
               </button>

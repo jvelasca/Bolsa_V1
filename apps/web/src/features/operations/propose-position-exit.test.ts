@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   buildPositionExitPayload,
   evaluateProtectStopOverride,
+  positionIsHumanManual,
   positionShowsProtectCta,
   positionShowsProtectHint,
   resolveProtectSuggestedStop,
@@ -516,5 +517,32 @@ describe("V2.88.85 (H1) — copy de recuperación en MANUAL", () => {
         intent: "protect",
       }),
     ).toThrow(/cambia a SEMI/i);
+  });
+});
+
+describe("positionIsHumanManual (V2.88.85+ H1 UX)", () => {
+  it("true when tradePlanId carries the manual- prefix", () => {
+    expect(
+      positionIsHumanManual(
+        position({
+          operational: {
+            status: "OPEN",
+            direction: "long",
+            currentStop: null,
+            target1: null,
+            target2: null,
+            tradePlanId: "manual-tx-123",
+          },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("false for a normal tradePlanId", () => {
+    expect(positionIsHumanManual(position())).toBe(false);
+  });
+
+  it("false when there is no operational plan", () => {
+    expect(positionIsHumanManual(position({ operational: null }))).toBe(false);
   });
 });
