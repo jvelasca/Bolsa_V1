@@ -145,7 +145,9 @@ def _filling_instrument_id() -> str:
     )
 
 
-async def _seed_instrument_with_bars(session: AsyncSession, instrument_id: str) -> None:
+async def _seed_instrument_with_bars(
+    session: AsyncSession, instrument_id: str, *, tail_entry_signal: bool = True
+) -> None:
     """Instrumento con 700 barras: tendencia alcista sostenida y baja en ruido.
 
     V2.32.1 (auditoría P1-02): se siembran más barras que la ventana del LAB para que
@@ -153,6 +155,15 @@ async def _seed_instrument_with_bars(session: AsyncSession, instrument_id: str) 
     familia del catálogo (``supertrend_follow``) pase los gates del LAB y que su señal
     en la última barra sea ``entry_long``. Así el E2E certifica de verdad el camino
     DISCOVERY → SHADOW → SIM y nunca puede terminar en SKIPPED.
+
+    V2.88.84: ``tail_entry_signal=False`` siembra la MISMA serie sin el declive final ni
+    el salto vertical de la última barra. El certifier positivo los necesita para forzar
+    ``entry_long`` de la ACTIVE en el SIM; el caso negativo (sin provider de barras
+    shadow) **no** tiene frontera de hold-out —``_lab_end_timestamp`` solo existe si hay
+    provider— así que su LAB ve la serie COMPLETA y ese salto artificial (``+120``)
+    caería dentro de la ventana del LAB, tumbando el ``walk_forward`` y dejando el ciclo
+    en ``sin_evidencia_top3`` (nunca llegaría a la compuerta shadow que es lo que el caso
+    negativo certifica). Sin él, la ventana del LAB es la oscilación limpia + deriva.
     """
     from bolsa_infrastructure.database.models.tables import InstrumentRow, OhlcvBarRow
     from bolsa_infrastructure.ids import new_id
@@ -189,9 +200,9 @@ async def _seed_instrument_with_bars(session: AsyncSession, instrument_id: str) 
         # slow``) para CUALQUIER par (rápida, lenta) del campeón ⇒ ``entry_long`` de la
         # ACTIVE (SIM BUY determinista, sin SKIPPED).
         dip_start = total - 25
-        if dip_start <= day <= total - 2:
+        if tail_entry_signal and dip_start <= day <= total - 2:
             price -= Decimal("0.5") * Decimal(day - dip_start + 1)
-        if day >= total - 1:
+        if tail_entry_signal and day >= total - 1:
             price += Decimal("120.0")
         value = price.quantize(Decimal("0.0001"))
         session.add(
@@ -584,7 +595,9 @@ async def test_a11_promotion_requires_shadow_evidence_pg(
     instrument_id = f"inst-a11n-{uuid.uuid4().hex[:10]}"
     try:
         async with a11_factory() as session:
-            await _seed_instrument_with_bars(session, instrument_id)
+            # V2.88.84: sin provider shadow no hay frontera de hold-out ⇒ el LAB ve la
+            # serie completa; se siembra sin el salto artificial de la última barra.
+            await _seed_instrument_with_bars(session, instrument_id, tail_entry_signal=False)
 
         orchestrator = AutoOrchestrator(
             OrchestratorDeps(

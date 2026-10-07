@@ -2,6 +2,17 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.84-beta] — `AUTO · TOP3`: **productor durable del TOP3 cross-asset + degradación explícita**
+
+**Bump** `2.11.83-beta` → `2.11.84-beta`. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** (el TOP3 persistido es observabilidad: no vuelve a la decisión, y el scoring del plan recibe el MISMO `evidence` leído una sola vez). **Contrato HTTP sin cambio** (el endpoint `/top3-opportunities` ya existía). Tag por crear.
+
+- **Productor que faltaba:** `_v2_persist_top3` (`auto_simulation_worker.py`) da el llamante PRODUCTIVO a `select_top3_records` + `PostgresTop3OpportunitySink` (tabla `top3_opportunities`, migración 052). `AutoSimRuntime.run_tick` compone el sink por sesión/tick (`build_top3_opportunity_sink`); el TOP3 deja de estar «probado pero sin cablear» (el hueco que dejó `v2.88.82`). Una foto por barra, idempotente dentro de la barra.
+- **Degradación explícita (no silenciosa):** un activo puntuado sin campeón ACTIVE (scoring histórico `edge`+`liquidity`) lleva el motivo `scoring_historico_sin_campeon` en su slot y se declara en el log; la ausencia de evidencia deja de confundirse con un score con evidencia.
+- **Fail-open declarado:** un fallo del sink se registra y NO tumba el turno (es observabilidad, no decisión).
+- **Sello DÍA-D:** los CLI `v2_89`…`v2_97` (`meta.bump`) y su guardián (`test_dia_d_bump_guard`) pasan a sellar `2.11.84-beta`: sin esto, el bump dejaba el guardián rojo.
+- **Cierre de auditoría:** entra al repo `test_auto_v88_83_evidence_composition_pg.py` (existía sin commitear desde `v2.88.83`) y la auditoría [`auditoria-composition-root-evidence-top3-v2.88.83-2026-10-07.md`](docs/engineering/auditoria-composition-root-evidence-top3-v2.88.83-2026-10-07.md) con su sección de cierre.
+- **Evidencia:** [`docs/engineering/evidence/v2.88.84/README.md`](docs/engineering/evidence/v2.88.84/README.md).
+
 ## [2.11.83-beta] — `ESTRATEGIA`: **anti-overfit II (CPCV/walk-forward al LAB real + TOP3 `lab_validated`)**
 
 **Bump** `2.11.82-beta` → `2.11.83-beta`. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor ≠ 0`** (el LAB real cablea CPCV/WF a las familias H0 y el TOP3 eleva su barrera de evidencia). Tag por crear.
