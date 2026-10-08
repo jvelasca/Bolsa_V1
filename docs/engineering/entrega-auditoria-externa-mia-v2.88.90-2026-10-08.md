@@ -6,7 +6,7 @@
 > **Regla del hueco:** una regla que no se puede afirmar se declara **abierta** con su remediación, **nunca** se silencia. Un dato ausente o `UNKNOWN` se rotula «Sin dato todavía»; **jamás** se rellena con `0` ni con verde.
 > **`Δ AUTO decision/execution motor = 0`.** Todo el sello es UI/read-model y tests en `apps/web/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin tocar `packages/py/**`**. **El contrato HTTP NO cambia.**
 > **Evidencia cruda:** [`docs/engineering/evidence/v2.88.90/README.md`](./evidence/v2.88.90/README.md).
-> **Cita POST-TAG:** **pendiente** — se anexa el `Release tag CI` tras `git push origin v2.88.90-beta`.
+> **Cita POST-TAG:** `Release tag CI` [`37774540104`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37774540104) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0` confirmado por CI**). Tag anotado `v2.88.90-beta` (objeto `c220df76` → commit `c15873fd`).
 
 **Sello dirigido (declarado).** Mandato: **una sola aplicación, un único lenguaje operativo en el primer nivel**. No se añaden funciones ni se toca el motor: se re-corta la superficie ya existente (fuera jerga, fuera duplicidades, una cosa por término, ningún peldaño sin evidencia) y se hace **falsable** cada afirmación con un test. El barrido `axe` de rutas no-AUTO queda **con mocks** (el `playwright` integrado sigue `opt-in`).
 
@@ -84,7 +84,7 @@
 | `E2E_RUN=1 … playwright test e2e/gp-e2e-v28865-auto-axe-mock.spec.ts` | **14/14** (0 `critical`/`serious`) |
 | `E2E_RUN=1 … playwright test e2e/gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts` | **9/9** (desktop + 390×844) |
 | `E2E_RUN=1 … playwright test e2e/gp-e2e-live-virtual-confirm-mock.spec.ts` | **2/2** |
-| `replay-repro` — CI (cita POST-TAG) | **pendiente** ⇒ debe ser `REPRODUCIDO` ⇒ **`Δ motor = 0`** |
+| `replay-repro` — CI | **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0`** |
 
 ---
 
@@ -93,7 +93,7 @@
 - **Producto:** `V2.88.90-beta`. **Package:** `2.11.90-beta`. **Sin migración** (Alembic head `052_top3_opportunities`). **Contrato HTTP sin cambio.** `packages/py/**` **sin mover**.
 - **Añadidos:** `apps/web/e2e/gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts`, `apps/web/src/features/trading/trading-status-bar.test.tsx`, `apps/web/src/features/command-palette/command-palette.test.tsx`, `docs/engineering/evidence/v2.88.90/README.md`, este documento.
 - **Modificados:** `apps/web/src/**` (AUTO + trading + mesa + charts + confirm + command-palette), `package.json`, `apps/api-python/scripts/v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`, `docs/engineering/spec-ui-contract-5-0-2026-10-08.md`, `docs/adr/045-ui-contract-5-0.md`.
-- **Tag anotado `v2.88.90-beta`** — mensaje `UI 5.0 backlog closure · Δ motor = 0`. **Cita POST-TAG:** pendiente del `Release tag CI` (URL + estado + `certify` + `replay-repro`).
+- **Tag anotado `v2.88.90-beta`** (objeto `c220df76` → commit `c15873fd`) — mensaje `UI 5.0 backlog closure · Δ motor = 0`. **`Release tag CI` [`37774540104`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37774540104) VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0` confirmado por CI**).
 
 ---
 
