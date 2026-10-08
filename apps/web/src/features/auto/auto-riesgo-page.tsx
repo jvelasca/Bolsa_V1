@@ -100,7 +100,7 @@ export function AutoRiesgoPage() {
 
         <section className="space-y-3" aria-labelledby="auto-riesgo-now">
           <AutoSectionBlockHeading id="auto-riesgo-now">
-            Riesgo actual
+            Riesgo ahora mismo
           </AutoSectionBlockHeading>
 
           {risk.isLoading ? (

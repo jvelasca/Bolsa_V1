@@ -161,6 +161,8 @@ Vocabulario **único** de presentación en toda la app. Una palabra → un signi
 | **Sin dato todavía**             | Estado oficial del dato ausente: hay superficie, falta el hecho       | `0` · `—` · `N/A` · `UNKNOWN` · un fallo                |
 | **CONFIRMADO / PARCIAL-PENDIENTE / SIN DATO TODAVÍA / BLOQUEADO** | Los cuatro tonos oficiales de estado (bloqueo solo con evidencia) | Cuatro colores decorativos                              |
 | **Modo de operación** (`AUTO` / `SEMI` / `MANUAL`) | Insignia obligatoria por operación, con canal (`SIMULADO`/`LIVE`) | Un atributo deducible o por ticker                      |
+| **Modo operativo persistente** (`Operativa · AUTO/SEMI/MANUAL`) | Chip-enlace del chrome que informa del modo vigente y abre AUTO (`UI5-21`) | Una acción que cambia el modo; una sexta puerta L1      |
+| **Dinero virtual**               | Término **único** de primer nivel para el canal simulado de AUTO       | Alternar DEMO/PAPER/SIMULADO en primer nivel            |
 | **Oportunidad**                  | Slot rankeado del análisis (propuesta), `N/100`                        | Una compra; «las mejores acciones»                      |
 | **Ranking ≠ decisión**           | Estar arriba en el ranking no es una decisión de cartera              | Una orden                                             |
 | **Orden preparada / enviada**    | Registro de pedido; «enviada» no implica salida al broker             | Una ejecución                                           |

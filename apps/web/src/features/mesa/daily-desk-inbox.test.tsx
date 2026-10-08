@@ -121,6 +121,25 @@ describe("DailyDeskInbox V1.42 F6/F7", () => {
     ).toBe("0");
   });
 
+  it("ordena el primer nivel: atención → oportunidades → posiciones (UI5-01)", () => {
+    render(
+      <MemoryRouter>
+        <DailyDeskInbox inbox={inbox()} />
+      </MemoryRouter>,
+    );
+    const ids = Array.from(
+      screen
+        .getByTestId("daily-desk-buckets")
+        .querySelectorAll("[data-testid^='daily-desk-bucket-']"),
+    ).map((el) => el.getAttribute("data-testid"));
+    expect(ids.indexOf("daily-desk-bucket-requiere_accion")).toBeLessThan(
+      ids.indexOf("daily-desk-bucket-oportunidades"),
+    );
+    expect(ids.indexOf("daily-desk-bucket-oportunidades")).toBeLessThan(
+      ids.indexOf("daily-desk-bucket-posiciones"),
+    );
+  });
+
   it("places items into the matching cube with phrase + CTA", () => {
     const items = [
       {

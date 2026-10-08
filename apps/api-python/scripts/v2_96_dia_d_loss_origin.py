@@ -165,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
     artifact = build_loss_origin_artifact(
         draw_ledgers=ledgers,
         meta={
-            "bump": "2.11.93-beta",
+            "bump": "2.11.94-beta",
             "phase": "V2.96 DIA-D AUTO LOSS ORIGIN",
             "nature": "INVESTIGACION",
             "drawsDir": str(out_dir),

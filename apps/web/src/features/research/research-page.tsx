@@ -260,6 +260,45 @@ export function ResearchPage() {
 
       {tab === "dashboard" && (
         <div className="space-y-4">
+          {/* Primer nivel (`UI5-01`/`R-G2`): el Asesor explica «¿Por qué?», no experimenta.
+              Las métricas de experimentación bajan a «Detalle técnico» (`RT-01`). */}
+          <Card data-testid="asesor-why-first-level">
+            <CardHeader className="pb-2">
+              <SectionTitle>
+                ¿Por qué esta tesis, este riesgo, esta acción?
+              </SectionTitle>
+              <CardDescription>
+                El Asesor explica; las pruebas viven en el Laboratorio.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <Link
+                to="?tab=opiniones"
+                className="text-primary underline hover:underline"
+              >
+                Análisis
+              </Link>
+              <Link
+                to="?tab=journal"
+                className="text-primary underline hover:underline"
+              >
+                Journal
+              </Link>
+              <Link
+                to="?tab=diario"
+                className="text-primary underline hover:underline"
+              >
+                Diario
+              </Link>
+              <Link
+                to="/backtests"
+                className="text-primary underline hover:underline"
+              >
+                Laboratorio (pruebas)
+              </Link>
+            </CardContent>
+          </Card>
+
           {summaryQuery.isLoading && (
             <p className="text-sm text-muted-foreground">
               Cargando resumen del laboratorio…
@@ -290,7 +329,10 @@ export function ResearchPage() {
             </Card>
           )}
           {summary && (
-            <>
+            <TechnicalDetail
+              testId="asesor-lab-metrics-technical"
+              className="space-y-4"
+            >
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Stat
                   label="Experimentos"
@@ -324,10 +366,7 @@ export function ResearchPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
-                    <TechnicalDetail
-                      className="space-y-3"
-                      testId="research-lab-health-technical"
-                    >
+                    <div className="space-y-3">
                       <div className="grid gap-2 sm:grid-cols-3">
                         <Stat
                           label="Sharpe presente"
@@ -368,7 +407,7 @@ export function ResearchPage() {
                       <p className="text-xs text-muted-foreground">
                         {labHealth.caveat}
                       </p>
-                    </TechnicalDetail>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -429,7 +468,7 @@ export function ResearchPage() {
                         {absentDataLabel()}
                       </p>
                     ) : (
-                      <TechnicalDetail testId="research-origin-technical">
+                      <div>
                         <ul className="space-y-2 text-sm">
                           {summary.byOrigin.map((row) => (
                             <li
@@ -445,7 +484,7 @@ export function ResearchPage() {
                             </li>
                           ))}
                         </ul>
-                      </TechnicalDetail>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -461,7 +500,7 @@ export function ResearchPage() {
                       {absentDataLabel()}
                     </p>
                   ) : (
-                    <TechnicalDetail testId="research-preset-technical">
+                    <div>
                       <div className="flex flex-wrap gap-2">
                         {summary.byPreset.map((row) => (
                           <button
@@ -481,7 +520,7 @@ export function ResearchPage() {
                           </button>
                         ))}
                       </div>
-                    </TechnicalDetail>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -495,7 +534,7 @@ export function ResearchPage() {
                     ` · caída máxima media ${formatPct(summary.avgMaxDD)}`}
                 </p>
               )}
-            </>
+            </TechnicalDetail>
           )}
         </div>
       )}

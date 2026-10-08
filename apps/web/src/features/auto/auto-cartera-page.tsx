@@ -36,8 +36,10 @@ export function AutoCarteraPage() {
         </p>
         <p className="text-muted-foreground">
           No es una segunda cartera: son las posiciones de la cuenta simulada
-          que ves también en Cartera. No se envían órdenes reales a XTB. Reducir
-          o salir encola una propuesta; Confirm es la única firma.
+          que ves también en Cartera. No se envían órdenes reales a XTB. AUTO
+          puede continuar su operativa simulada sin tu firma; si reduces o sales
+          tú de una posición, se encola una propuesta y Confirmar es la única
+          firma.
         </p>
       </div>
 

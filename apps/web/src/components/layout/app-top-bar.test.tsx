@@ -92,6 +92,15 @@ vi.mock("@/features/accounts/account-scope-selector", () => ({
   AccountScopeSelector: () => <span data-testid="account-scope-stub" />,
 }));
 
+vi.mock("@/features/trading/use-demo-book-prefs", () => ({
+  useDemoBookPrefs: () => ({
+    mode: "auto",
+    maxOpenPositions: 10,
+    defaultSizePctOfCash: 10,
+    countryPrefer: "home_first",
+  }),
+}));
+
 import { AppTopBar } from "@/components/layout/app-top-bar";
 
 afterEach(cleanup);
@@ -178,5 +187,22 @@ describe("AppTopBar — lenguaje de primer nivel (`R-G1`/`R-G2`/`RT-01`)", () =>
     expect(screen.getByText("Operaciones")).toBeTruthy();
     expect(screen.getByText("Completa")).toBeTruthy();
     expect(screen.getByText("Abrir en otra pestaña")).toBeTruthy();
+  });
+});
+
+describe("AppTopBar — modo operativo persistente (`UI5-21`)", () => {
+  it("muestra el modo vigente y enlaza a /auto", () => {
+    renderTopBar("/mesa");
+    const chip = screen.getByTestId("operative-mode-chip");
+    expect(chip.getAttribute("href")).toBe("/auto");
+    expect(chip.textContent).toContain("AUTO");
+    expect(chip.getAttribute("data-mode")).toBe("AUTO");
+  });
+
+  it("NO es una sexta puerta L1: vive fuera de la nav Principal", () => {
+    renderTopBar("/mesa");
+    const chip = screen.getByTestId("operative-mode-chip");
+    const nav = screen.getByRole("navigation", { name: "Principal" });
+    expect(nav.contains(chip)).toBe(false);
   });
 });

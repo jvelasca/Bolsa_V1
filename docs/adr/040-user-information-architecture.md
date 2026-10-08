@@ -165,3 +165,13 @@ Contexto: el [Mapa de problemas UI 5.0](../engineering/auditoria-ui-5-0-mapa-pro
 - **`AdminRail`** queda **administrativa/técnica**: no duplica las cinco puertas L1 (que viven en la barra superior). `Producto` = accesos rápidos disponibles (`Overview`).
 
 Se aceptan, además, las reglas de densidad y explicación `RT-01`…`RT-04` de [ADR-045](./045-ui-contract-5-0.md) §1.4. Las cinco puertas L1, `/mesa` como aterrizaje y AUTO como espacio no-L1 permanecen intactos.
+
+## 13. Enmienda UI 7.0 — Modo operativo persistente (`UI5-21`)
+
+**Fecha:** 2026-10-08
+
+Contexto: la auditoría de [UI 6.x](../engineering/auditoria-ui-6-x-global-2026-10-08.md) confirma que AUTO sigue localizable solo desde la `AdminRail`, donde aparece bajo **Administración**, lo que sugiere erróneamente que AUTO es una herramienta administrativa y no una **forma de operar** (MANUAL · SEMI · AUTO).
+
+- Se añade el **chip-enlace de modo operativo** al chrome (barra superior): informa del modo vigente (`AUTO`/`SEMI`/`MANUAL`) y enlaza al espacio `/auto`.
+- Es **Información + Navegación**, nunca acción: no cambia el modo (eso sigue en el libro operativo) y **no** es una sexta puerta L1.
+- **No** se reabre ADR-040: las cinco puertas L1 y `/mesa` como aterrizaje permanecen intactos; AUTO sigue siendo un espacio no-L1. La affordance vive **fuera** de `nav[aria-label="Principal"]`.

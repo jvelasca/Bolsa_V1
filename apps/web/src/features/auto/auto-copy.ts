@@ -22,26 +22,35 @@ export type AutoSectionCopy = {
   description: string;
 };
 
+/**
+ * Frase oficial de dinero virtual (`UI5-20`, enmienda UI 7.0).
+ *
+ * Lenguaje único para explicar que AUTO no usa dinero real. Sustituye a la alternancia
+ * DEMO/PAPER/SIMULADO/DINERO VIRTUAL en el primer nivel: un solo término = un solo significado.
+ */
+export const AUTO_VIRTUAL_MONEY_PHRASE =
+  "AUTO trabaja con dinero virtual: no utiliza dinero real ni envía órdenes reales.";
+
 export const AUTO_SECTION_COPY: Record<AutoSectionId, AutoSectionCopy> = {
   operar: {
     title: "Operar",
     description:
-      "Qué ha elegido AUTO y qué operaciones hay en curso. Todo es dinero virtual (DEMO); no necesitas intervenir.",
+      "Qué oportunidades ha encontrado AUTO y qué operaciones están en curso. Es dinero virtual; no necesitas intervenir.",
   },
   actividad: {
     title: "Actividad",
     description:
-      "Qué ha hecho AUTO, en orden: cada análisis, cada operación y cada paso, en una sola línea temporal. Todo es dinero virtual (DEMO).",
+      "Qué ha hecho AUTO, en orden: cada análisis, cada operación y cada paso, en una sola línea temporal. Es dinero virtual.",
   },
   cartera: {
     title: "Cartera",
     description:
-      "Vista de la misma cuenta que Cartera, en dinero virtual (DEMO): posiciones simuladas, órdenes en curso e historial. Antes de reducir o cerrar, la app te pide que confirmes.",
+      "Vista de la misma cuenta que Cartera, en dinero virtual: posiciones simuladas, órdenes en curso e historial. AUTO puede continuar su operativa simulada sin tu firma; las acciones que tú hagas sobre una posición sí requieren tu confirmación.",
   },
   riesgo: {
     title: "Riesgo",
     description:
-      "Cuánto puedes perder y qué límites te protegen. Es solo lectura: lo que falta se marca «Sin dato todavía», nunca se rellena con ceros.",
+      "¿Hay algún problema de riesgo ahora mismo? Es solo lectura: lo que falta se marca «Sin dato todavía», nunca se rellena con ceros.",
   },
   analisis: {
     title: "Análisis",

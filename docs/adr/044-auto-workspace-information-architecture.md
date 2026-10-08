@@ -32,7 +32,7 @@ El principio rector es **resumen operativo arriba, causalidad técnica bajo dema
 ## 2. Relación con ADR-040 (invariante)
 
 - La arquitectura de usuario **global** de ADR-040 **no cambia**: `Hoy · Mercado · Cartera · Asesor · Laboratorio` siguen siendo las cinco puertas L1.
-- AUTO **no** es una sexta puerta L1 y **no** aparece como L1 en la barra superior. Es un **espacio con alcance propio**, accesible desde la `AdminRail` (barra admin, no nav diaria) y desde la command palette.
+- AUTO **no** es una sexta puerta L1 y **no** aparece como L1 en la barra superior. Es un **espacio con alcance propio**, accesible desde la `AdminRail` (barra admin, no nav diaria), desde la command palette y desde el **chip-enlace de modo operativo** del chrome (`UI5-21`, ADR-040 §13), que lo presenta como una **forma de operar** (`AUTO`/`SEMI`/`MANUAL`) sin promocionarlo a puerta L1.
 - El espacio AUTO **compone** superficies ya existentes (Mesa, Mercado, Consola operativa, Laboratorio, Asesor) mediante deep-links; **no** las sustituye ni las duplica. Es una capa de lectura/agrupación de producto, no un motor nuevo.
 - Cuando AUTO necesite una superficie que hoy vive en una puerta L1, la **enlaza** (`/mesa?view=…`, `/backtests?tab=…`, `/research`, `/history`), no la reimplementa.
 

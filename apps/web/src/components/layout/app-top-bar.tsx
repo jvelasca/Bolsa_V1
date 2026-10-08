@@ -43,6 +43,7 @@ import {
 } from "@/features/command-palette/named-layout";
 import { UniverseChip } from "@/features/platform/universe-chip";
 import { AccountScopeSelector } from "@/features/accounts/account-scope-selector";
+import { OperativeModeChip } from "@/components/layout/operative-mode-chip";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -577,6 +578,7 @@ export function AppTopBar() {
           <Bell className="h-4 w-4" />
         </NavLink>
         <UniverseChip density="icon" />
+        <OperativeModeChip />
         <AccountScopeSelector compact hideLabel className="hidden sm:flex" />
         <button
           type="button"

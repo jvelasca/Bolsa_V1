@@ -658,8 +658,9 @@ export function MesaHoyPage() {
                   Estado: {operationalHeader.operationalStatusLabel}
                 </p>
                 <p className="text-muted-foreground">
-                  Todo lo que requiere tu atención está aquí arriba.
-                  Oportunidades y posiciones siguen en «Avanzado».
+                  Primero lo que requiere tu atención; después, oportunidades y
+                  posiciones. El detalle completo de cada bloque vive en
+                  «Avanzado».
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">

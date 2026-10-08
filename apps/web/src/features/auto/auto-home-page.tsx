@@ -230,14 +230,17 @@ export function AutoHomePage() {
         </p>
       </section>
 
-      {/* 3 · DECISIÓN — hueco declarado: no se deduce del ranking (`UI5-12`). */}
+      {/* 3 · DECISIÓN — hueco declarado: no se deduce del ranking (`UI5-12`).
+          La cadena completa es oportunidad → ranking → (decisión de cartera) → orden; AUTO todavía
+          no registra una decisión de cartera duradera, así que el eslabón se declara «Sin dato
+          todavía» en vez de inferirlo del TOP3. */}
       <section
         className="space-y-1"
         aria-labelledby="auto-home-decision-heading"
         data-testid="auto-home-decision"
       >
         <AutoSectionBlockHeading id="auto-home-decision-heading">
-          Decisión
+          Decisión de cartera
         </AutoSectionBlockHeading>
         <p
           className={cn("font-semibold", AUTO_USER_TEXT)}
@@ -246,8 +249,9 @@ export function AutoHomePage() {
           {basic.decisionLabel}
         </p>
         <p className="text-sm text-muted-foreground">
-          Todavía no hay una decisión de cartera registrada. El ranking de
-          oportunidades no es una decisión de compra.
+          El ranking no es una decisión de compra. AUTO todavía no registra una
+          decisión de cartera (qué activo y cuánto entrar); hasta que exista,
+          este dato se declara «Sin dato todavía» y no se deduce del TOP3.
         </p>
       </section>
 

@@ -17,6 +17,7 @@ La aplicación debe leerse como **una sola aplicación**, con un **único lengua
    - Cinco puertas L1 **intactas** (Hoy · Mercado · Cartera · Asesor · Laboratorio); AUTO **no** es L1 (ADR-040).
    - **Nav visible de AUTO = `Resumen · Operar · Cartera · Actividad`**; `Riesgo · Análisis · Sistema` pasan bajo **«Más información»**. Las rutas `/auto/riesgo`, `/auto/analisis`, `/auto/sistema` **no cambian** (siguen siendo compartibles); sólo cambia la jerarquía visual, no la topología.
    - **HOME de AUTO = cockpit**: cada hecho se pinta una sola vez; «¿Qué puedo hacer?» se reserva a acciones del usuario.
+   - **Modo operativo persistente (`UI5-21`, enmienda UI 7.0):** el chrome expone el modo vigente (`AUTO`/`SEMI`/`MANUAL`) como un **chip-enlace a `/auto`** (Información + Navegación). No es una sexta puerta L1 (`UI5-02`) ni cambia el modo por sí solo; el cambio sigue en el libro operativo (`demo-book-mode-panel`). Resuelve que AUTO deje de parecer una herramienta administrativa sin romper la jerarquía L1.
    - `AdminRail` se agrupa en **Producto / Administración / Diagnóstico**; «Consola avanzada» se conserva bajo diagnóstico/avanzado. `Producto` contiene los **accesos rápidos de producto disponibles** (`Overview`); las cinco puertas L1 siguen en la barra superior y no se duplican en el rail.
 2. **Gramática de la operación**
    - **Escalera universal**: `Orden preparada → Orden enviada → Esperando ejecución → Ejecución parcial/completada → Posición creada → Posición cerrada`. Nunca se salta de orden a posición.
