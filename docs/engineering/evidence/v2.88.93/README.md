@@ -6,7 +6,7 @@
 > **Cierre de huecos del barrido de `v2.88.92`.** La [evidencia `v2.88.92`](../v2.88.92/README.md) §4 dejó abierto que el censo del gate era **acotado**; la revisión posterior a `v2.88.92-beta` detectó hallazgos **fuera de ese censo**: `Gate` crudo en el drawer de Oportunidades y «Gate preset» en Estrategias guardadas, la jerga de `Paper D` y el comodín `—` en superficies hermanas. Aquí se cierran **todos** y se añaden al gate falsable.
 
 **Base:** [`evidence/v2.88.92/README.md`](../v2.88.92/README.md). Contrato: [`spec-ui-contract-5-0-2026-10-08.md`](../../spec-ui-contract-5-0-2026-10-08.md). Auditoría de origen: [`auditoria-ui-6-x-global-2026-10-08.md`](../../auditoria-ui-6-x-global-2026-10-08.md).
-**Cita POST-TAG:** pendiente (tag anotado `v2.88.93-beta` y `Release tag CI` se citan en el commit post-tag).
+**Cita POST-TAG:** tag anotado `v2.88.93-beta` (objeto `544158c8` → commit `68e78ead`); `Release tag CI` [`37815922396`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37815922396) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 ## 1. Huecos cerrados (fuera del censo de `v2.88.92`)
 

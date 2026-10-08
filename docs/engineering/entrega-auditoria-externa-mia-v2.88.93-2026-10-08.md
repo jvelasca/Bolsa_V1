@@ -6,7 +6,7 @@
 > **Regla del hueco:** una regla que no se puede afirmar se declara **abierta** con su remediación, **nunca** se silencia. Un dato ausente o `UNKNOWN` se rotula «Sin dato todavía»; **jamás** se rellena con `0` ni con verde. Los tres rótulos de ausencia (`Sin dato todavía` / `No aplica` / `No disponible`) **no son intercambiables**; el guion `—` queda **prohibido** en el primer nivel de las superficies **cubiertas por el gate**.
 > **`Δ AUTO decision/execution motor = 0`.** Todo el sello es UI/copy y tests en `apps/web/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin tocar `packages/py/**`**. **El contrato HTTP NO cambia.**
 > **Evidencia cruda:** [`docs/engineering/evidence/v2.88.93/README.md`](./evidence/v2.88.93/README.md).
-> **Cita POST-TAG:** pendiente (tag anotado `v2.88.93-beta` y `Release tag CI` se citan en el commit post-tag).
+> **Cita POST-TAG:** tag anotado `v2.88.93-beta` (objeto `544158c8` → commit `68e78ead`); `Release tag CI` [`37815922396`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37815922396) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 **Sello dirigido (declarado).** Mandato: **una sola aplicación, un único lenguaje operativo en el primer nivel, sin residuos**. No se añaden funciones ni se toca el motor: se cierra el censo del gate y se hace **falsable** cada afirmación con el gate (`first-level-gate.ts`, ahora con `findFirstLevelGateLiterals`) que falla si la jerga o el comodín reaparecen fuera del nivel 3.
 
@@ -72,7 +72,7 @@
 | `pnpm --filter @bolsa/web exec eslint src` | **0 errores** (23 avisos preexistentes) |
 | `pnpm --filter @bolsa/web exec vitest run` | **277 ficheros / 1727 passed** |
 | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **1 passed** (`2.11.93-beta`) |
-| `replay-repro` — CI | pendiente (**esperado `REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0`**) |
+| `replay-repro` — CI | **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0`** (`Release tag CI` [`37815922396`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37815922396) **VERDE**) |
 
 ---
 
@@ -81,7 +81,7 @@
 - **Producto:** `V2.88.93-beta`. **Package:** `2.11.93-beta`. **Sin migración** (Alembic head `052_top3_opportunities`). **Contrato HTTP sin cambio.** `packages/py/**` **sin mover**.
 - **Añadidos:** `docs/engineering/evidence/v2.88.93/README.md`, este documento.
 - **Modificados:** `apps/web/src/**` (components, mesa, operations, screeners, trading), `package.json`, `apps/api-python/scripts/v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`, `docs/engineering/evidence/v2.88.92/README.md` y `docs/engineering/entrega-auditoria-externa-mia-v2.88.92-2026-10-08.md` (acotado de la afirmación de alcance).
-- **Tag anotado `v2.88.93-beta`** — mensaje `UI 6.x close of global sweep gaps (Gate literal, paper-d jerga, dash wildcard) - Delta motor = 0`. **`Release tag CI` pendiente** de cita.
+- **Tag anotado `v2.88.93-beta`** — objeto `544158c8` → commit `68e78ead`; mensaje `UI 6.x close of global sweep gaps (Gate literal, paper-d jerga, dash wildcard) - Delta motor = 0`. **`Release tag CI`** [`37815922396`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37815922396) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 ---
 
