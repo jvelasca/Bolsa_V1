@@ -122,6 +122,23 @@ test.describe("GP-E2E-V28865 — AUTO 3.0 accesibilidad (axe)", () => {
     ).toBeFocused();
   });
 
+  test("teclado/ratón: la AdminRail expandida certifica sus rótulos de grupo", async ({
+    page,
+  }) => {
+    // El state expandido es el que pinta los rótulos de grupo (`UI5-08`); sin
+    // forzarlo, el barrido depende del hover del puntero y los deja sin
+    // certificar. Aquí se ancla explícitamente.
+    await page.goto("/auto");
+    await expectWorkspaceReady(page);
+    const rail = page.getByTestId("admin-rail");
+    await rail.hover();
+    await expect(rail).toHaveAttribute("data-collapsed", "0");
+    await expect(page.getByTestId("admin-rail-group-admin")).toContainText(
+      "AUTO",
+    );
+    await expectNoCriticalSerious(page, "/auto (AdminRail expandida)");
+  });
+
   test("carga: el estado de carga es accesible y distinto del vacío", async ({
     page,
   }) => {

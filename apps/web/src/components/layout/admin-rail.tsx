@@ -346,7 +346,7 @@ export function AdminRail() {
             data-testid={`admin-rail-group-${group.id}`}
           >
             {expanded ? (
-              <p className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+              <p className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {group.label}
               </p>
             ) : (
