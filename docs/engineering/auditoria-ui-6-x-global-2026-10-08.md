@@ -200,10 +200,10 @@ Pregunta principal acordada: **«¿Qué requiere mi atención?»**. La pantalla 
 
 ---
 
-## 9. Barrido global — cierre de residuos declarados (rama, sin tag)
+## 9. Barrido global — cierre de residuos declarados (sellado en `v2.88.92-beta`)
 
-> **AsOf:** 2026-10-08 · **Estado:** ejecución en rama `ui6x-barrido-global-residuos`, **sin sello ni tag**.
-> **Naturaleza:** UI/semántica y tests en `apps/web/**`. **`Δ motor = 0`** (el diff no toca `packages/py/**`, worker, umbrales, Alembic, `contract:gen` ni `package.json`/`meta.bump`).
+> **AsOf:** 2026-10-08 · **Estado:** **sellado en `v2.88.92-beta`** (package `2.11.92-beta`; tag anotado, cita de `Release tag CI` post-tag).
+> **Naturaleza:** UI/semántica y tests en `apps/web/**`. **`Δ motor = 0`** (el diff no toca `packages/py/**`, worker, umbrales, Alembic ni `contract:gen`; el bump solo toca `package.json`/`meta.bump`).
 > **Precedente:** correcciones que `v2.88.91-beta` dejó **abiertas** en su [entrega §4](./entrega-auditoria-externa-mia-v2.88.91-2026-10-08.md).
 
 | # | Residuo declarado en §4 de la entrega | Cierre en este barrido |
@@ -216,4 +216,4 @@ Pregunta principal acordada: **«¿Qué requiere mi atención?»**. La pantalla 
 
 **Verificación (local):** `typecheck` OK · `lint` **0 errores** (23 avisos `react-hooks/exhaustive-deps` preexistentes) · **277 ficheros / 1687 passed** (+1 fichero / +25 tests sobre `v2.88.91`) · `git diff --name-only -- packages/py` **vacío** ⇒ **`Δ motor = 0`**.
 
-**Límites de este documento (§8 sigue vigente):** este §9 **sí** implementa y añade tests (a diferencia del cuerpo de solo lectura); **no** crea tag, **no** re-certifica `axe` en vivo ni activa el `playwright` integrado (`opt-in`), y **no** reabre AUTO.
+**Límites de este documento (§8 sigue vigente):** este §9 **sí** implementa y añade tests (a diferencia del cuerpo de solo lectura); **no** re-certifica `axe` en vivo ni activa el `playwright` integrado (`opt-in`), y **no** reabre AUTO. El tag y el bump los ejecuta el **sello `v2.88.92-beta`** ([entrega](./entrega-auditoria-externa-mia-v2.88.92-2026-10-08.md)).
