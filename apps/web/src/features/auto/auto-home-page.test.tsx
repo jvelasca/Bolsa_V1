@@ -1,9 +1,9 @@
 /**
- * AUTO · RESUMEN (HOME) — estructura y estados.
+ * AUTO · RESUMEN (HOME) — estructura, densidad y estados (UI REFACTOR 5.1).
  *
- * Comprueba que la HOME expone un `<h1>` y responde las preguntas del usuario básico, que el
- * error se declara distinto del vacío y que las operaciones en curso enlazan a su ruta canónica.
- * Los hooks de red se mockean; el helper de resumen es real.
+ * Comprueba que la HOME expone un `<h1>`, que es un cockpit sin las seis preguntas (cada hecho
+ * se pinta una sola vez, `UI5-04`), que la decisión es un hueco declarado (`ranking ≠ decisión`)
+ * y que el error se declara distinto del vacío. Los hooks de red se mockean; los helpers reales.
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -113,19 +113,40 @@ describe("AutoHomePage", () => {
     expect(h1[0]?.textContent).toBe("Resumen");
   });
 
-  it("pinta cada hecho una sola vez (UI5-04): sin tiles ni bloque duplicados", () => {
+  it("es un cockpit sin las seis preguntas y cada hecho aparece una sola vez (UI5-04)", () => {
     renderHome();
-    // Se retiraron la fila de tiles y el bloque «¿Qué está haciendo AUTO?».
+    // Se retiraron la fila de tiles, el bloque «¿Qué está haciendo AUTO?» y la batería de
+    // seis preguntas que duplicaban estado/operación/dinero.
     expect(screen.queryByTestId("auto-home-tile-auto")).toBeNull();
     expect(screen.queryByTestId("auto-home-tile-risk")).toBeNull();
-    // El estado del motor se afirma una sola vez en el primer nivel (la insignia usa otra caja).
+    for (const question of [
+      "¿AUTO está funcionando?",
+      "¿Qué está haciendo?",
+      "¿Qué activo?",
+      "¿Qué ha decidido?",
+      "¿Qué ha ocurrido realmente?",
+      "¿Qué dinero utiliza?",
+    ]) {
+      expect(document.body.textContent).not.toContain(question);
+    }
     const text = document.body.textContent ?? "";
-    expect(countOccurrences(text, "Funcionando")).toBe(1);
+    // El estado del motor se afirma una sola vez (la insignia usa mayúsculas).
+    expect(countOccurrences(text, "FUNCIONANDO")).toBe(1);
     // Las operaciones en curso se cuentan en un único lugar.
     expect(countOccurrences(text, "1 en curso")).toBe(1);
   });
 
-  it("responde las preguntas clave con datos legibles", () => {
+  it("no repite el hueco: si la insignia ya declara «Sin dato todavía», la línea de actividad se omite", () => {
+    monitorState.header = { state: "UNKNOWN" };
+    monitorState.cycles = [];
+    renderHome();
+    expect(screen.getByTestId("auto-home-human-state-label").textContent).toBe(
+      "Sin dato todavía",
+    );
+    expect(screen.queryByTestId("auto-home-activity-line")).toBeNull();
+  });
+
+  it("responde los hechos clave con datos legibles", () => {
     renderHome();
     expect(
       screen.getByTestId("auto-home-tile-operations").textContent,
@@ -133,24 +154,19 @@ describe("AutoHomePage", () => {
     expect(
       screen.getByTestId("auto-home-tile-operations").textContent,
     ).not.toContain("abierta");
-    expect(screen.getByTestId("auto-home-q-working").textContent).toContain(
-      "Funcionando",
+    expect(screen.getByTestId("auto-home-human-state-label").textContent).toBe(
+      "FUNCIONANDO",
     );
-    expect(screen.getByTestId("auto-home-q-doing").textContent).toContain(
+    expect(screen.getByTestId("auto-home-activity-line").textContent).toContain(
+      "Última decisión: 09:42",
+    );
+    // La decisión de cartera es un hueco declarado: no se deduce del ranking.
+    expect(screen.getByTestId("auto-home-decision-label").textContent).toBe(
       "Sin dato todavía",
     );
-    expect(screen.getByTestId("auto-home-q-asset").textContent).toContain(
-      "AAPL",
-    );
-    expect(screen.getByTestId("auto-home-q-decision").textContent).toContain(
-      "Sin dato todavía",
-    );
-    expect(screen.getByTestId("auto-home-q-happened").textContent).toContain(
-      "Sin dato todavía",
-    );
-    expect(screen.getByTestId("auto-home-q-money").textContent).toContain(
-      "SIMULACIÓN — DINERO VIRTUAL",
-    );
+    expect(
+      screen.getByTestId("auto-home-money-simulation").textContent,
+    ).toContain("SIMULACIÓN — DINERO VIRTUAL");
     expect(
       screen.getByTestId("auto-home-figure-position").textContent,
     ).toContain("Sin dato todavía");
@@ -171,18 +187,13 @@ describe("AutoHomePage", () => {
     expect(screen.getByTestId("auto-home-activity").textContent).toContain(
       "Ver actividad",
     );
-    expect(screen.getByTestId("auto-home-doing").textContent).toBe(
-      "Sin dato todavía",
-    );
-    expect(screen.getByTestId("auto-home-last-activity").textContent).toBe(
-      "Última decisión: 09:42 · Próxima decisión: 10:00",
-    );
+    // El activo de la operación en curso se muestra en su enlace canónico.
     expect(
-      screen.getByTestId("auto-home-last-activity").textContent,
-    ).not.toContain("Esperando nueva señal");
-    expect(
-      screen.getByTestId("auto-home-last-activity").textContent,
-    ).not.toContain("análisis");
+      screen.getByTestId("auto-home-operation-link").textContent,
+    ).toContain("AAPL");
+    const activityLine = screen.getByTestId("auto-home-activity-line");
+    expect(activityLine.textContent).not.toContain("Esperando nueva señal");
+    expect(activityLine.textContent).not.toContain("análisis");
   });
 
   it("la fase operacional del tick se pinta sin inventar desde RUNNING", () => {
@@ -195,10 +206,7 @@ describe("AutoHomePage", () => {
       asOf: "2026-10-06T09:43:00Z",
     };
     renderHome();
-    expect(screen.getByTestId("auto-home-q-doing").textContent).toContain(
-      "Analizando",
-    );
-    expect(screen.getByTestId("auto-home-doing").textContent).toBe(
+    expect(screen.getByTestId("auto-home-activity-line").textContent).toContain(
       "Analizando",
     );
 
@@ -214,15 +222,10 @@ describe("AutoHomePage", () => {
       asOf: "2026-10-06T09:43:00Z",
     };
     renderHome();
-    expect(screen.getByTestId("auto-home-q-doing").textContent).toContain(
-      "Sin actividad",
-    );
-    expect(screen.getByTestId("auto-home-doing").textContent).toBe(
-      "Sin actividad",
-    );
-    expect(screen.getByTestId("auto-home-doing").textContent).not.toContain(
-      "Analizando",
-    );
+    const line =
+      screen.getByTestId("auto-home-activity-line").textContent ?? "";
+    expect(line).toContain("Sin actividad");
+    expect(line).not.toContain("Analizando");
   });
 
   it("copia las cifras de cuenta y no marca la simulación con el fill", () => {

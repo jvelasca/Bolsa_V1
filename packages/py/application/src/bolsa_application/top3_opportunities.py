@@ -117,10 +117,17 @@ def select_top3_assets(
     ``top_n <= 0`` ⇒ vacío (fail-closed, idéntico al contrato del ranker). Los activos
     fuera del TOP se anotan con ``TOP_N_EXCLUDED`` (motivo honesto); los veteados por el
     board (sin evidencia o veto operativo) llegan en ``excluded``.
+
+    El top N se corta sobre **activos base**: con ``allow_distinct_strategies`` los scores
+    pueden venir rankeados por ``candidate_key`` (``SÍMBOLO#versión``), así que se colapsan
+    a un único score por símbolo ANTES del corte (``_collapse_to_base_assets``). Colapsar
+    después permitía que dos variantes del mismo activo ocuparan dos slots del TOP3 y
+    desplazaran a un tercer activo real.
     """
     if top_n <= 0:
         return Top3OpportunitySelection(run_id=run_id, excluded=excluded)
-    top = select_top_opportunities(scores, top_n=top_n)
+    collapsed = _collapse_to_base_assets(scores)
+    top = select_top_opportunities(collapsed, top_n=top_n)
     selected = tuple(
         Top3Opportunity(
             rank=opportunity.rank or (index + 1),
@@ -139,7 +146,7 @@ def select_top3_assets(
             components=dict(opportunity.components),
             reason=TOP_N_EXCLUDED,
         )
-        for opportunity in scores
+        for opportunity in collapsed
         if opportunity.instrument_id not in selected_ids
     )
     return Top3OpportunitySelection(
@@ -148,6 +155,34 @@ def select_top3_assets(
         top_n_excluded=top_n_excluded,
         excluded=excluded,
     )
+
+
+def _collapse_to_base_assets(
+    scores: Sequence[OpportunityScore],
+) -> list[OpportunityScore]:
+    """Un único ``OpportunityScore`` por activo base (``SÍMBOLO``), el de mayor ``combined``.
+
+    Con ``allow_distinct_strategies`` el ``plan_v2_tick`` rankea por ``candidate_key``
+    (``SÍMBOLO#versión``): dos variantes de estrategia del MISMO activo pueden rankear en
+    los dos primeros puestos. El TOP3 es de ACTIVOS, así que se agrupa por símbolo base y
+    se conserva la mejor variante antes del corte a top-N (desempate determinista por
+    ``instrument_id`` ascendente, igual que ``rank_opportunities``). Se preserva el objeto
+    original (con su ``instrument_id`` con clave) para no perder la procedencia del score.
+    """
+    best: dict[str, OpportunityScore] = {}
+    for score in scores:
+        symbol = _base_symbol(score.instrument_id)
+        current = best.get(symbol)
+        if (
+            current is None
+            or score.combined > current.combined
+            or (
+                score.combined == current.combined
+                and str(score.instrument_id) < str(current.instrument_id)
+            )
+        ):
+            best[symbol] = score
+    return list(best.values())
 
 
 def _base_symbol(instrument_id: str) -> str:

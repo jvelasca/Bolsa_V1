@@ -17,7 +17,7 @@ La aplicación debe leerse como **una sola aplicación**, con un **único lengua
    - Cinco puertas L1 **intactas** (Hoy · Mercado · Cartera · Asesor · Laboratorio); AUTO **no** es L1 (ADR-040).
    - **Nav visible de AUTO = `Resumen · Operar · Cartera · Actividad`**; `Riesgo · Análisis · Sistema` pasan bajo **«Más información»**. Las rutas `/auto/riesgo`, `/auto/analisis`, `/auto/sistema` **no cambian** (siguen siendo compartibles); sólo cambia la jerarquía visual, no la topología.
    - **HOME de AUTO = cockpit**: cada hecho se pinta una sola vez; «¿Qué puedo hacer?» se reserva a acciones del usuario.
-   - `AdminRail` se agrupa en **Producto / Administración / Diagnóstico**; «Consola avanzada» se conserva bajo diagnóstico/avanzado.
+   - `AdminRail` se agrupa en **Producto / Administración / Diagnóstico**; «Consola avanzada» se conserva bajo diagnóstico/avanzado. `Producto` contiene los **accesos rápidos de producto disponibles** (`Overview`); las cinco puertas L1 siguen en la barra superior y no se duplican en el rail.
 2. **Gramática de la operación**
    - **Escalera universal**: `Orden preparada → Orden enviada → Esperando ejecución → Ejecución parcial/completada → Posición creada → Posición cerrada`. Nunca se salta de orden a posición.
    - **Insignia de modo obligatoria** por operación: `AUTO` / `SEMI` / `MANUAL` (+ `LIVE` cuando exista), con el canal `SIMULADO`/`LIVE`; nunca se deduce.

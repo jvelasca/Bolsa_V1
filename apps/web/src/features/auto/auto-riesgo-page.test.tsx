@@ -89,16 +89,16 @@ describe("AutoRiesgoPage", () => {
     );
   });
 
-  it("declara «Sin dato todavía» lo que AUTO no materializa (nunca 0)", () => {
+  it("declara una sola vez lo que AUTO no materializa (nunca 0, ni repite el hueco)", () => {
     renderPage();
-    for (const testId of [
-      "auto-riesgo-open-risk",
-      "auto-riesgo-max-loss",
-      "auto-riesgo-position-risk",
-      "auto-riesgo-daily-limit",
-    ]) {
-      expect(screen.getByTestId(testId).textContent).toBe("Sin dato todavía");
-    }
+    const limits = screen.getByTestId("auto-riesgo-limits").textContent ?? "";
+    expect(limits).toContain("todavía no están disponibles");
+    expect(limits).not.toContain("0");
+    // Las cuatro filas con el mismo hueco se han retirado del primer nivel.
+    expect(screen.queryByTestId("auto-riesgo-open-risk")).toBeNull();
+    expect(screen.queryByTestId("auto-riesgo-max-loss")).toBeNull();
+    expect(screen.queryByTestId("auto-riesgo-position-risk")).toBeNull();
+    expect(screen.queryByTestId("auto-riesgo-daily-limit")).toBeNull();
   });
 
   it("sin datos medidos, todo se declara en vez de asumirse", () => {

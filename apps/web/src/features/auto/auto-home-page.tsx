@@ -1,19 +1,23 @@
 /**
- * AUTO · RESUMEN (HOME del cockpit) — `/auto` (ADR-044 + UI Contract 5.0 §UI5-04).
+ * AUTO · RESUMEN (HOME del cockpit) — `/auto` (ADR-044 + UI Contract 5.0 §UI5-04, UI REFACTOR 5.1).
  *
  * Landing del espacio AUTO: responde en 5 s las preguntas del usuario básico sin obligarle a
  * entrar en Sistema ni a conocer la arquitectura interna.
  *
- *   Estado → oportunidades → decisión → operación → dinero → enlaces.
+ *   Estado → oportunidades → decisión → operación → dinero → detalles (plegados).
  *
- * Cada hecho se pinta **una sola vez** en primer nivel (`UI5-04`): el estado del motor vive en el
- * badge humano y en su pregunta; las operaciones en curso, en un único bloque (contador + tarjetas
- * + enlaces). Se han retirado la fila de tiles y el bloque «¿Qué está haciendo AUTO?», que
- * repetían el estado y las operaciones (auditoría `G-01`).
+ * Cada hecho se pinta **una sola vez** en primer nivel (`UI5-04`). El estado del motor vive en
+ * la insignia humana; la actividad del último tick, en una única línea bajo ella; las
+ * operaciones en curso, en un único bloque; el dinero, en un bloque con su chip `SIMULADO`.
+ * Se han retirado la batería de seis preguntas («¿AUTO está funcionando?» … «¿Qué dinero
+ * utiliza?»), la fila de tiles y el bloque «¿Qué está haciendo AUTO?», que repetían estado,
+ * operación y dinero (auditorías `G-01` y HOME user-first 5.1).
  *
  * Read-only y honesto: compone por enlace (no reimplementa Mesa/Análisis) y todo dato no medido
- * se declara «Sin dato todavía» (`buildAutoHomeSummary`). El semáforo de realidad monetaria ya se
- * monta sobre el `Outlet` del layout, así que esta sección lo hereda en primer nivel.
+ * se declara «Sin dato todavía» (`buildAutoHomeSummary`). `ranking ≠ decisión` (`UI5-12`): la
+ * decisión de cartera es un hueco declarado hasta que exista traza durable, nunca se deduce del
+ * TOP3. El semáforo de realidad monetaria ya se monta sobre el `Outlet` del layout, así que esta
+ * sección lo hereda en primer nivel.
  *
  * @see docs/engineering/spec-ui-contract-5-0-2026-10-08.md §UI5-04 §UI5-05
  * @see docs/engineering/spec-auto-ui-refactor-3-0-2026-10-06.md §2
@@ -34,13 +38,18 @@ import { buildAutoOperationCard } from "@/features/auto/auto-operation-card";
 import { AutoOperationCardView } from "@/features/auto/auto-operation-card-view";
 import {
   autoOperacionHref,
+  autoTechnicalDetailHref,
   AUTO_ACTIVIDAD_PATH,
   AUTO_ANALISIS_PATH,
   AUTO_OPERAR_PATH,
 } from "@/features/auto/auto-nav";
 import { mesaOportunidadesHref } from "@/features/mesa/mesa-nav-links";
-import { buildAutoBasicHome } from "@/features/auto/auto-basic-home";
 import {
+  AUTO_SIMULATION_BANNER,
+  buildAutoBasicHome,
+} from "@/features/auto/auto-basic-home";
+import {
+  AUTO_HOME_NO_DATA_LABEL,
   buildAutoHomeSummary,
   decisionClockCopy,
 } from "@/features/auto/auto-home-summary";
@@ -127,6 +136,26 @@ export function AutoHomePage() {
   });
   const top3 = useAutoTop3Opportunities();
 
+  // Única línea de actividad de primer nivel (absorbe «¿Qué está haciendo?» sin repetirlo).
+  const clockCopy = decisionClockCopy(
+    summary.lastActivityLabel,
+    summary.nextStepLabel,
+  );
+  const activityParts = [
+    basic.doingLabel,
+    clockCopy === AUTO_HOME_NO_DATA_LABEL ? null : clockCopy,
+  ].filter((part): part is string => Boolean(part));
+  const activityText = activityParts.join(" · ");
+  // No se repite el hueco: si la insignia ya declara «Sin dato todavía» y la actividad no
+  // aporta nada más, la línea se omite (evita declarar el mismo hecho dos veces, UI5-04).
+  const showActivityLine =
+    summary.loaded &&
+    activityText.length > 0 &&
+    !(
+      activityText === AUTO_HOME_NO_DATA_LABEL &&
+      humanState.label === AUTO_HOME_NO_DATA_LABEL
+    );
+
   return (
     <div className="space-y-6" data-testid="auto-home-page">
       <AutoSectionHeading
@@ -135,8 +164,24 @@ export function AutoHomePage() {
       />
 
       {/* 1 · ESTADO — único lugar donde se afirma el estado del motor (UI5-04). */}
-      <AutoHumanStateBadge state={humanState} testId="auto-home-human-state" />
-      <AutoWhyButton why={why} testId="auto-home-why" />
+      <section
+        className="space-y-2"
+        aria-labelledby="auto-home-state-heading"
+        data-testid="auto-home-state"
+      >
+        <AutoHumanStateBadge
+          state={humanState}
+          testId="auto-home-human-state"
+        />
+        {showActivityLine ? (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="auto-home-activity-line"
+          >
+            {activityText}
+          </p>
+        ) : null}
+      </section>
 
       {summary.isLoading ? (
         <p
@@ -151,57 +196,6 @@ export function AutoHomePage() {
           No se pudo cargar el estado de AUTO.
         </p>
       ) : null}
-
-      <section
-        className="space-y-3"
-        aria-label="Seis preguntas de AUTO"
-        data-testid="auto-home-questions"
-      >
-        {(
-          [
-            [
-              "¿AUTO está funcionando?",
-              basic.workingLabel,
-              "auto-home-q-working",
-            ],
-            ["¿Qué está haciendo?", basic.doingLabel, "auto-home-q-doing"],
-            ["¿Qué activo?", basic.assetLabel, "auto-home-q-asset"],
-            ["¿Qué ha decidido?", basic.decisionLabel, "auto-home-q-decision"],
-            [
-              "¿Qué ha ocurrido realmente?",
-              basic.happenedLabel,
-              "auto-home-q-happened",
-            ],
-            ["¿Qué dinero utiliza?", basic.moneyLabel, "auto-home-q-money"],
-          ] as const
-        ).map(([question, answer, testId]) => {
-          const isDoing = testId === "auto-home-q-doing";
-          return (
-            <div key={testId} data-testid={testId}>
-              <p className={cn(AUTO_USER_TEXT, "text-muted-foreground")}>
-                {question}
-              </p>
-              <p
-                className={cn("mt-0.5 font-semibold", AUTO_USER_TEXT)}
-                {...(isDoing ? { "data-testid": "auto-home-doing" } : {})}
-              >
-                {answer}
-              </p>
-              {isDoing && summary.loaded ? (
-                <p
-                  className="mt-0.5 text-xs text-muted-foreground"
-                  data-testid="auto-home-last-activity"
-                >
-                  {decisionClockCopy(
-                    summary.lastActivityLabel,
-                    summary.nextStepLabel,
-                  )}
-                </p>
-              ) : null}
-            </div>
-          );
-        })}
-      </section>
 
       {/* 2 · OPORTUNIDADES — TOP3 resumido; el ranking completo vive en Operar (UI5-05/06). */}
       <section
@@ -241,7 +235,28 @@ export function AutoHomePage() {
         </p>
       </section>
 
-      {/* 3 · OPERACIÓN EN CURSO — un único bloque: contador + tarjetas + enlaces (UI5-04). */}
+      {/* 3 · DECISIÓN — hueco declarado: no se deduce del ranking (`UI5-12`). */}
+      <section
+        className="space-y-1"
+        aria-labelledby="auto-home-decision-heading"
+        data-testid="auto-home-decision"
+      >
+        <AutoSectionBlockHeading id="auto-home-decision-heading">
+          Decisión
+        </AutoSectionBlockHeading>
+        <p
+          className={cn("font-semibold", AUTO_USER_TEXT)}
+          data-testid="auto-home-decision-label"
+        >
+          {basic.decisionLabel}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Todavía no hay una decisión de cartera registrada. El ranking de
+          oportunidades no es una decisión de compra.
+        </p>
+      </section>
+
+      {/* 4 · OPERACIÓN EN CURSO — un único bloque: contador + tarjetas + enlaces (UI5-04). */}
       {!summary.isLoading && !summary.isError ? (
         <section
           className="space-y-2"
@@ -250,7 +265,7 @@ export function AutoHomePage() {
         >
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <AutoSectionBlockHeading id="auto-home-operations-heading">
-              Operaciones en curso
+              Operación
             </AutoSectionBlockHeading>
             <span
               className="text-xs text-muted-foreground"
@@ -306,7 +321,7 @@ export function AutoHomePage() {
         </section>
       ) : null}
 
-      {/* 4 · DINERO — cifras ya medidas de la cuenta simulada. */}
+      {/* 5 · DINERO — cifras ya medidas de la cuenta simulada + chip `SIMULADO`. */}
       <section
         className="space-y-2"
         aria-labelledby="auto-home-money-heading"
@@ -315,6 +330,15 @@ export function AutoHomePage() {
         <AutoSectionBlockHeading id="auto-home-money-heading">
           Dinero
         </AutoSectionBlockHeading>
+        <p
+          className={cn(
+            "inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 font-medium text-muted-foreground",
+            AUTO_USER_TEXT,
+          )}
+          data-testid="auto-home-money-simulation"
+        >
+          {AUTO_SIMULATION_BANNER}
+        </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {figures.map((figure) => (
             <div key={figure.id} data-testid={`auto-home-figure-${figure.id}`}>
@@ -329,7 +353,7 @@ export function AutoHomePage() {
         </div>
       </section>
 
-      {/* 5 · ENLACES — el resto de superficies, bajo demanda. */}
+      {/* 6 · DETALLE — todo lo demás, bajo demanda (no compite en el primer nivel). */}
       <details className="space-y-2" data-testid="auto-home-activity">
         <summary className={cn("cursor-pointer font-medium", AUTO_USER_TEXT)}>
           Ver actividad
@@ -385,7 +409,17 @@ export function AutoHomePage() {
                 Investigación
               </Link>
             </li>
+            <li>
+              <Link
+                to={autoTechnicalDetailHref()}
+                className="underline hover:text-primary"
+                data-testid="auto-home-technical-detail-link"
+              >
+                Ver detalles técnicos
+              </Link>
+            </li>
           </ul>
+          <AutoWhyButton why={why} testId="auto-home-why" />
         </section>
       </details>
     </div>

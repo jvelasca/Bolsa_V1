@@ -300,3 +300,46 @@ def test_select_top3_records_collapses_candidate_key_to_asset() -> None:
     records = select_top3_records(scores, top_n=3, run_id="r", evidenced_symbols=frozenset({"AAA"}))
     assert records[0].instrument_id == "AAA"
     assert records[0].reason is None
+
+
+def test_select_top3_records_collapses_before_top_n() -> None:
+    """Dos variantes del MISMO activo no ocupan dos slots del TOP3 (colapso antes del corte).
+
+    Con ``allow_distinct_strategies`` el plan rankea por ``candidate_key``. Aquí ``AAPL#v1`` y
+    ``AAPL#v2`` rankean 1º y 2º: sin colapsar antes del corte, el TOP3 persistido tendría AAPL
+    dos veces y ``GOOG`` (con score real por encima de la segunda variante de AAPL) nunca
+    aparecería. El TOP3 es de ACTIVOS: 3 activos distintos, con la mejor variante de AAPL.
+    """
+    scores = [
+        OpportunityScore(instrument_id="AAPL#v1", components={"edge": 0.9}, combined=0.91, rank=1),
+        OpportunityScore(instrument_id="AAPL#v2", components={"edge": 0.87}, combined=0.88, rank=2),
+        OpportunityScore(instrument_id="MSFT#v1", components={"edge": 0.8}, combined=0.80, rank=3),
+        OpportunityScore(instrument_id="GOOG#v1", components={"edge": 0.75}, combined=0.75, rank=4),
+    ]
+    records = select_top3_records(
+        scores,
+        top_n=3,
+        run_id="r",
+        evidenced_symbols=frozenset({"AAPL", "MSFT", "GOOG"}),
+    )
+    symbols = [r.instrument_id for r in records]
+    assert symbols == ["AAPL", "MSFT", "GOOG"]
+    assert len(set(symbols)) == 3  # ningún activo duplicado
+    assert [r.rank for r in records] == [1, 2, 3]
+    assert all(r.reason is None for r in records)
+
+
+def test_select_top3_assets_collapses_candidate_key_before_cut() -> None:
+    """``select_top3_assets`` colapsa por activo base y no cuenta dos veces el excluido."""
+    scores = [
+        OpportunityScore(instrument_id="AAPL#v1", components={"edge": 0.9}, combined=0.91, rank=1),
+        OpportunityScore(instrument_id="AAPL#v2", components={"edge": 0.87}, combined=0.88, rank=2),
+        OpportunityScore(instrument_id="MSFT#v1", components={"edge": 0.8}, combined=0.80, rank=3),
+        OpportunityScore(instrument_id="GOOG#v1", components={"edge": 0.75}, combined=0.75, rank=4),
+    ]
+    selection = select_top3_assets(scores, top_n=2, run_id="r")
+    # Se conserva la mejor variante de AAPL y el corte top-N es sobre activos base.
+    assert [o.instrument_id for o in selection.selected] == ["AAPL#v1", "MSFT#v1"]
+    # ``GOOG`` es el único excluido por corte; AAPL no aparece por partida doble.
+    assert [o.instrument_id for o in selection.top_n_excluded] == ["GOOG#v1"]
+    assert all(o.reason == "top_n_excluded" for o in selection.top_n_excluded)

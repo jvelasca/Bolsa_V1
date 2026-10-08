@@ -1,6 +1,6 @@
 # Spec — UI Contract 5.0: **Global User-First** (contrato de UI/UX)
 
-> **AsOf:** 2026-10-08 · **Estado:** **DISEÑO CONGELADO** (no es código).
+> **AsOf:** 2026-10-08 · **Estado:** **DISEÑO CONGELADO** + **estado de implementación** (sello 5.0 en `v2.88.88-beta` · sello `UI REFACTOR 5.1` posterior). El estado regla a regla vive en §5 (`DONE`/`PENDING`).
 > **Base:** tag `v2.88.87-beta` → commit `6b70da1f`, `Δ motor = 0`.
 > **Padres:** [auditoría UI global v2.88.87](./auditoria-ui-global-v2.88.87-2026-10-08.md) · [spec AUTO UI definitiva](./spec-auto-ui-definitiva-2026-10-07.md) · [spec AUTO UI 3.0](./spec-auto-ui-refactor-3-0-2026-10-06.md) · [modelo semántico 1.0](./spec-auto-ui-semantic-model-1-2026-10-05.md) · [ADR-040](../adr/040-user-information-architecture.md) · [ADR-044](../adr/044-auto-workspace-information-architecture.md) · [ADR-019](../adr/019-dual-universes-lab-vs-trading.md) · [domain-language](../domain-language.md).
 > **Naturaleza:** UI / producto / semántica. **`Δ motor = 0`**. Sin contrato HTTP nuevo. Sin Alembic. Sin código en este slice.
@@ -63,12 +63,14 @@ flowchart TD
     Rail["AdminRail"] --> Prod["PRODUCTO"]
     Rail --> Admin["ADMINISTRACIÓN"]
     Rail --> Diag["DIAGNÓSTICO"]
-    Prod --> P1["Hoy · Mercado · Cartera · Asesor · Laboratorio (atajos)"]
+    Prod --> P1["Overview (acceso a la raíz de producto)"]
     Admin --> A1["Cuentas · Perfiles · Fiscal · AUTO"]
     Diag --> D1["Consola avanzada (avanzado)"]
 ```
 
 `Riesgo`, `Análisis` y `Sistema` no aparecen aquí: son segundo nivel **dentro** de AUTO. No se cambian rutas; es jerarquía visual.
+
+**Corrección §1.3 (UI REFACTOR 5.1, opción B).** El bloque `Producto` del rail **no** duplica las cinco puertas L1: contiene los **accesos rápidos de producto disponibles** (`Overview`). Las cinco puertas (`Hoy · Mercado · Cartera · Asesor · Laboratorio`) siguen en la **barra de navegación superior (L1)** de ADR-040 y **no** se replican dentro del rail.
 
 ---
 
@@ -87,7 +89,7 @@ Cada regla es **falsable**. El identificador `UI5-xx` es estable y citable.
 | `UI5-05` | **«¿Qué puedo hacer?» se reserva a acciones del usuario** (o a «no necesitas hacer nada»). Las oportunidades van bajo **«Oportunidades»**, no bajo «¿Qué puedo hacer?». | Que el TOP3 cuelgue del bloque «¿Qué puedo hacer?». |
 | `UI5-06` | **TOP3 en tres niveles:** resumen en HOME, completo en OPERAR, profundidad en Análisis. Sin duplicar el peso entre HOME y OPERAR. | Que HOME y OPERAR monten el mismo panel con la misma densidad. |
 | `UI5-07` | **Oportunidades: `Hoy` = universo completo; `AUTO` = subconjunto que AUTO usa.** La UI lo dice explícitamente y ofrece enlace cruzado. | Que ambas listas se muestren sin copy que explique su relación. |
-| `UI5-08` | **`AdminRail` en tres grupos** (`Producto` / `Administración` / `Diagnóstico`); «Consola avanzada» se conserva y queda bajo diagnóstico/avanzado. No se cambian rutas. | Que la rail siga siendo una lista plana sin grupos. |
+| `UI5-08` | **`AdminRail` en tres grupos** (`Producto` / `Administración` / `Diagnóstico`); «Consola avanzada» se conserva y queda bajo diagnóstico/avanzado. `Producto` contiene los **accesos rápidos de producto disponibles** (`Overview`), sin duplicar las cinco puertas L1 (que viven en la barra superior). No se cambian rutas. | Que la rail siga siendo una lista plana sin grupos. |
 
 ### Bloque B — Gramática de la operación
 
@@ -147,23 +149,23 @@ Se conserva el modelo de tres niveles ya vigente en AUTO ([`auto-typography.ts`]
 
 ## 5. Deuda de implementación (P0/P1/P2 → regla)
 
-Esta spec **no implementa** nada; mapea el trabajo a las reglas. La implementación es la fase **UI REFACTOR 5.0**.
+Esta spec **congela**; el estado de implementación se anota aquí regla a regla. El **sello 5.0** (`v2.88.88-beta`) implementó la estructura; el **sello `UI REFACTOR 5.1`** remata la densidad de la HOME y de Riesgo y cierra la decisión de `AdminRail`. `DONE` = regla implementada y falsable por test; `PENDING` = trabajo vivo.
 
 | Prioridad | Mejora | Regla | Estado |
 | --- | --- | --- | --- |
-| P0 | Eliminar duplicidades de la HOME de AUTO | `UI5-04` | Pendiente |
-| P0 | Gramática universal de operación | `UI5-09`, `UI5-20` | Pendiente |
-| P0 | Diferenciar definitivamente AUTO/SEMI/MANUAL | `UI5-10` | Pendiente |
-| P1 | Simplificar navegación interna de AUTO | `UI5-03` | Pendiente |
-| P1 | Unificar oportunidades Hoy vs AUTO | `UI5-07` | Pendiente |
-| P1 | Simplificar Cartera (vista única, rotulada) | `UI5-13` | Pendiente |
-| P1 | Primer nivel de Riesgo humano | `UI5-18` | Pendiente |
-| P1 | Separar navegación de acciones | `UI5-17` | Pendiente |
-| P2 | Refinar `AdminRail` | `UI5-08` | Pendiente |
-| P2 | Compactar Análisis/Sistema | `UI5-19`, `UI5-03` | Pendiente |
-| P2 | Revisión visual global responsive | `UI5-01`, `UI5-04` | Pendiente |
+| P0 | Eliminar duplicidades de la HOME de AUTO | `UI5-04` | **DONE** (5.0 retiró tiles/bloque; 5.1 retiró las seis preguntas → cockpit de 5 bloques) |
+| P0 | Gramática universal de operación | `UI5-09`, `UI5-20` | **DONE** |
+| P0 | Diferenciar definitivamente AUTO/SEMI/MANUAL | `UI5-10` | **DONE** |
+| P1 | Simplificar navegación interna de AUTO | `UI5-03` | **DONE** |
+| P1 | Unificar oportunidades Hoy vs AUTO | `UI5-07` | **DONE** |
+| P1 | Simplificar Cartera (vista única, rotulada) | `UI5-13` | **DONE** |
+| P1 | Primer nivel de Riesgo humano | `UI5-18` | **DONE** (5.1 colapsa los cuatro huecos repetidos en una declaración única) |
+| P1 | Separar navegación de acciones | `UI5-17` | **DONE** |
+| P2 | Refinar `AdminRail` | `UI5-08` | **DONE** (5.1 resuelve la ambigüedad §1.3 por la opción B: `Producto` = accesos rápidos disponibles) |
+| P2 | Compactar Análisis/Sistema | `UI5-19` | **PENDING** |
+| P2 | Revisión visual global responsive | `UI5-01` | **PENDING** |
 
-**Copy P2 a corregir en implementación** ([`auto-top3-panel.tsx`](../../apps/web/src/features/auto/auto-top3-panel.tsx) L46-48): sustituir «Las tres mejores oportunidades operables que AUTO ha detectado en el último análisis.» por «Las 3 oportunidades que AUTO ha situado en los primeros puestos de su último análisis.» (regla `UI5-06`/`UI5-07`; `ranking ≠ decisión`).
+**Copy P2 (DONE).** [`auto-top3-panel.tsx`](../../apps/web/src/features/auto/auto-top3-panel.tsx): «Las 3 oportunidades que AUTO ha situado en los primeros puestos de su último análisis.» (regla `UI5-06`/`UI5-07`; `ranking ≠ decisión`).
 
 ---
 

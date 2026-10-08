@@ -133,41 +133,52 @@ export function AutoRiesgoPage() {
           />
         </dl>
 
-        <dl className="grid gap-2 sm:grid-cols-2">
-          <div className="flex justify-between gap-4 text-sm">
-            <dt className="text-muted-foreground">Riesgo abierto</dt>
-            <dd data-testid="auto-riesgo-open-risk">
-              {risk.positionRiskLabel}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4 text-sm">
-            <dt className="text-muted-foreground">Máxima pérdida</dt>
-            <dd data-testid="auto-riesgo-max-loss">{risk.positionRiskLabel}</dd>
-          </div>
-          <div className="flex justify-between gap-4 text-sm">
-            <dt className="text-muted-foreground">Posiciones con riesgo</dt>
-            <dd data-testid="auto-riesgo-position-risk">
-              {risk.positionRiskLabel}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4 text-sm">
-            <dt className="text-muted-foreground">Límite diario</dt>
-            <dd data-testid="auto-riesgo-daily-limit">
-              {risk.positionRiskLabel}
-            </dd>
-          </div>
-        </dl>
-
-        <p className="text-sm text-muted-foreground">
-          El riesgo por posición y los límites se calculan en{" "}
-          <Link
-            to={CARTERA_RIESGO_PATH}
-            className="underline hover:text-primary"
+        {risk.positionRiskAvailable ? (
+          <dl className="grid gap-2 sm:grid-cols-2">
+            <div className="flex justify-between gap-4 text-sm">
+              <dt className="text-muted-foreground">Riesgo abierto</dt>
+              <dd data-testid="auto-riesgo-open-risk">
+                {risk.positionRiskLabel}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4 text-sm">
+              <dt className="text-muted-foreground">Máxima pérdida</dt>
+              <dd data-testid="auto-riesgo-max-loss">
+                {risk.positionRiskLabel}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4 text-sm">
+              <dt className="text-muted-foreground">Posiciones con riesgo</dt>
+              <dd data-testid="auto-riesgo-position-risk">
+                {risk.positionRiskLabel}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4 text-sm">
+              <dt className="text-muted-foreground">Límite diario</dt>
+              <dd data-testid="auto-riesgo-daily-limit">
+                {risk.positionRiskLabel}
+              </dd>
+            </div>
+          </dl>
+        ) : (
+          // Los límites detallados NO están materializados en el read-model de AUTO: en vez de
+          // repetir «Sin dato todavía» cuatro veces, se declara una sola vez y se enlaza a su
+          // superficie canónica. Nunca se rellena con `0`.
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="auto-riesgo-limits"
           >
-            Cartera → Riesgo
-          </Link>
-          ; hasta entonces se declaran «Sin dato todavía», nunca `0`.
-        </p>
+            Los límites detallados todavía no están disponibles. El riesgo por
+            posición y los límites se calculan en{" "}
+            <Link
+              to={CARTERA_RIESGO_PATH}
+              className="underline hover:text-primary"
+            >
+              Cartera → Riesgo
+            </Link>
+            .
+          </p>
+        )}
       </section>
 
       <AutoTechnicalDetail testId="auto-riesgo-technical">

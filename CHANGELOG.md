@@ -2,6 +2,31 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.89-beta] — `UI` + `AUTO · TOP3`: **UI REFACTOR 5.1 — HOME user-first + fix del TOP3 cross-asset**
+
+**Bump** `2.11.88-beta` → `2.11.89-beta`. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** y **contrato HTTP sin cambio**: el slice es UI/read-model en `apps/web/**` **más un fix de selección puro** en `packages/py/application/**` (no toca motor de decisión/ejecución, ledger, settlement, umbrales ni Alembic). Los 9 CLIs DÍA-D `v2_89`…`v2_97` sellan `2.11.89-beta` junto al `package.json` (guardián `test_dia_d_bump_guard` verde). **Tag anotado `v2.88.89-beta` pendiente de crear** (CI del tag se cita al sellarlo).
+
+**UI REFACTOR 5.1 — HOME user-first (`UI5-04`/`UI5-12`/`UI5-18`/`UI5-08`):**
+
+- **HOME de AUTO = cockpit de 5 bloques.** [`auto-home-page.tsx`](apps/web/src/features/auto/auto-home-page.tsx) elimina definitivamente la batería de **seis preguntas** («¿AUTO está funcionando?» … «¿Qué dinero utiliza?»), que duplicaba estado/operación/dinero. Primer nivel: **Estado** (insignia humana + una única línea de actividad) · **Oportunidades** (TOP3 `compact`) · **Decisión** · **Operación** (contador + tarjetas) · **Dinero** (chip `SIMULACIÓN — DINERO VIRTUAL` + cifras). Todo lo demás (actividad, DÍA-D, Evidencia, Sistema, «Ver detalles técnicos», «¿Por qué?») queda **plegado** bajo `Ver actividad`.
+- **Decisión = hueco declarado.** El bloque **Decisión** muestra «Sin dato todavía» + copy que recuerda que el ranking **no** es una compra: no se deduce «Esperar» del TOP3 (`ranking ≠ decisión`, `UI5-12`; `PortfolioDecision` durable sigue abierto).
+- **Riesgo sin repetición (`UI5-18`).** [`auto-riesgo-page.tsx`](apps/web/src/features/auto/auto-riesgo-page.tsx) colapsa las cuatro filas que repetían «Sin dato todavía» (riesgo abierto, máxima pérdida, posiciones con riesgo, límite diario) en **una sola** declaración enlazada a `Cartera → Riesgo`; las métricas reales se renderizan solo cuando `positionRiskAvailable` sea verdadero. El veredicto human-first se mantiene como primer bloque.
+- **`AdminRail` ↔ contrato (`UI5-08`, opción B).** Sin cambio de código: se corrige la spec `§1.3`/`UI5-08` para declarar que `Producto` = **accesos rápidos de producto disponibles** (`Overview`); las cinco puertas L1 siguen en la barra superior y **no** se duplican en el rail. Se cierra el hallazgo `UI5-08b` del expediente `v2.88.88`.
+- **Spec con estado real.** [`spec-ui-contract-5-0-2026-10-08.md`](docs/engineering/spec-ui-contract-5-0-2026-10-08.md) pasa a `DISEÑO CONGELADO + estado de implementación` (`DONE`/`PENDING` por regla en §5); [`045-ui-contract-5-0.md`](docs/adr/045-ui-contract-5-0.md) alinea el texto.
+
+**Fix backend — TOP3 cross-asset no puede duplicar un activo:**
+
+- **Causa.** [`top3_opportunities.py`](packages/py/application/src/bolsa_application/top3_opportunities.py): `select_top3_assets` cortaba el top-N sobre `instrument_id` crudos y solo `select_top3_records` colapsaba a activo base **después**. Con `allow_distinct_strategies=True`, dos variantes de estrategia del MISMO activo (`AAPL#v1`, `AAPL#v2`) podían ocupar dos de los tres slots y desplazar a un tercer activo real (la tabla `top3_opportunities` no tiene constraint de unicidad por `(run_id, asset_id)`). El único log de la función solo cubría la degradación de evidencia LAB, no este caso.
+- **Fix.** Nuevo helper `_collapse_to_base_assets`: agrupa por símbolo base conservando la variante de mayor `combined` (desempate determinista por `instrument_id`, igual que `rank_opportunities`) y se aplica **antes** de `select_top_opportunities(top_n)`. `top_n_excluded` se calcula sobre la lista colapsada, de modo que un activo excluido no se cuenta dos veces. `select_top3_records` no cambia de firma (el colapso pasa a ser idempotente).
+- **Tests.** Nuevos `test_select_top3_records_collapses_before_top_n` y `test_select_top3_assets_collapses_candidate_key_before_cut`; `test_top3_opportunities.py` **15 passed**. Productor durable `test_auto_v88_84_top3_producer_pg.py` **2 passed**.
+
+**Tests y gates (local).** `pnpm --filter @bolsa/web typecheck` **OK** · `lint` **0 errores** (23 avisos `react-hooks/exhaustive-deps` preexistentes) · `pnpm --filter @bolsa/web test` **268 ficheros / 1594 passed** · `pytest apps/api-python/tests/test_dia_d_bump_guard.py` **1 passed** (`2.11.89-beta`). E2E `gp-e2e-v28865` actualizado (`auto-home-q-working` → `auto-home-human-state-label`) para la HOME nueva.
+
+**Verificación en navegador (`debug`, local).** Recorrido en vivo sobre API `:8000` + Web `:5173`: HOME con 5 bloques y cero preguntas; `AdminRail` (`PRODUCTO: Overview` · `ADMINISTRACIÓN: … AUTO` · `DIAGNÓSTICO: Consola avanzada`); Riesgo con una única línea de límites; `Más información` auto-abierto en rutas secundarias. Se detectó y corrigió _en vivo_ una repetición de «Sin dato todavía» (insignia + línea de actividad): la línea se omite cuando no aporta nada más que la insignia. Único error de consola: `401` preexistente de `GET /api/lifecycle/integrity` (exige JWT). Se confirmó que `GET /api/top3-opportunities/latest` (montado bajo `/api`) responde `200` fail-closed, por lo que la observación de auditoría sobre una «URL stale» en el docstring **no aplica**.
+
+- **Evidencia:** [`docs/engineering/evidence/v2.88.89/README.md`](docs/engineering/evidence/v2.88.89/README.md).
+- **Hallazgo de auditoría (MIA) cerrado:** el TOP3 cross-asset ya no puede persistir el mismo activo dos veces; el endpoint `GET /top3-opportunities/latest` y la tabla `052` dejan de violar en silencio el contrato «TOP3 de activos distintos».
+
 ## [2.11.88-beta] — `DOCS` + `UI`: **UI REFACTOR 5.0 — Global User-First (contrato congelado + implementación)**
 
 **Bump** `2.11.87-beta` → `2.11.88-beta`. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** y **contrato HTTP sin cambio**: primero un slice **doc-only** que **congela** la jerarquía y el lenguaje operativo de toda la aplicación, y a continuación su **implementación** UI/read-model en `apps/web/**` (sin tocar motor, worker, umbrales, Alembic ni `contract:gen`). Los 9 CLIs DÍA-D `v2_89`…`v2_97` sellan `2.11.88-beta` junto al `package.json` (guardián `test_dia_d_bump_guard` verde). **Tag anotado `v2.88.88-beta`** (objeto `b47ecb2f` → commit `021afbb4`; **re-anclado** desde `a2da85a7` tras corregir el `color-contrast` AA de la `AdminRail`) con `Release tag CI` [`37748285829`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37748285829) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `python` `4594 passed / 45 skipped`; `frontend` `268 ficheros / 1593 passed`; `playwright (mock E2E)` `96 passed / 21 skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
@@ -12,7 +37,7 @@ All notable releases of Bolsa V1.
 - **Vocabulario.** [`docs/domain-language.md`](docs/domain-language.md) §4.2 añade el lenguaje operativo único (modo, estados, escalera, «Sin dato todavía»).
 - **Registro.** [`docs/CURRENT_SYSTEM.md`](docs/CURRENT_SYSTEM.md) y [`docs/engineering/versioning.md`](docs/engineering/versioning.md) reflejan el contrato implementado y el bump `2.11.88-beta`.
 
-**Implementación `UI5-01`…`UI5-20` (P0+P1+P2) — UI/read-model en `apps/web/**`:**
+**Implementación `UI5-01`…`UI5-20` (P0+P1+P2) — UI/read-model en `apps/web/**`:\*\*
 
 - **UI5-04 HOME cockpit (`G-01`).** [`auto-home-page.tsx`](apps/web/src/features/auto/auto-home-page.tsx) elimina la fila de tiles y el bloque «¿Qué está haciendo AUTO?» (repetían estado y operaciones), fusiona el reloj de decisión en la pregunta «¿Qué está haciendo?» y mueve «N en curso» junto a las operaciones. Orden: estado → oportunidades → operación → dinero → enlaces. Cada hecho se pinta una vez.
 - **UI5-05/06 Oportunidades y TOP3.** El TOP3 deja de colgar de «¿Qué puedo hacer?» y pasa a **Oportunidades**; [`auto-top3-panel.tsx`](apps/web/src/features/auto/auto-top3-panel.tsx) gana `compact` (resumen en HOME, completo en Operar) y el copy `UI5-16` («Las 3 oportunidades que AUTO ha situado en los primeros puestos de su último análisis.»).
@@ -34,7 +59,7 @@ All notable releases of Bolsa V1.
 
 - **Estado humano unificado (P1).** [`auto-human-state.ts`](apps/web/src/features/auto/auto-human-state.ts) colapsa el estado interno del motor y la telemetría a **cinco** estados (`FUNCIONANDO`/`ANALIZANDO`/`ESPERANDO`/`ATENCIÓN`/`DETENIDO`) con una frase-resumen en lenguaje de usuario; [`auto-human-state-badge.tsx`](apps/web/src/features/auto/auto-human-state-badge.tsx) lo pinta en `/auto` (HOME) y `/auto/sistema`. **Fail-closed**: sin cabecera, con medición `UNKNOWN`/`PARTIAL` o con un token fuera del conjunto cerrado el estado es «Sin dato todavía», nunca un verde inventado (no re-deriva: agrupa los hechos ya producidos por `auto-home-summary`).
 - **Centro de actividad (P1).** [`auto-activity-feed.ts`](apps/web/src/features/auto/auto-activity-feed.ts) fusiona los pasos de ciclo alcanzados (`steps[].at`) y el reloj de decisión de la telemetría de mercado en una **única** timeline cronológica inversa; [`auto-actividad-page.tsx`](apps/web/src/features/auto/auto-actividad-page.tsx) la sirve en `/auto/actividad`, con cada hecho enlazado a su operación canónica (`/auto/operar/operacion/:cycleId`) y entrada propia en la sub-navegación (`Actividad`).
-- **«¿Por qué?» transversal (P1).** [`auto-why.ts`](apps/web/src/features/auto/auto-why.ts) clasifica cada condición en **tres** estados (`ok`/`no`/`unknown`, donde `unknown` dice «Sin dato todavía» y no finge un fallo); [`auto-why-button.tsx`](apps/web/src/features/auto/auto-why-button.tsx) es un *disclosure* accesible (`aria-expanded`/`aria-controls`) reutilizable, montado en la HOME.
+- **«¿Por qué?» transversal (P1).** [`auto-why.ts`](apps/web/src/features/auto/auto-why.ts) clasifica cada condición en **tres** estados (`ok`/`no`/`unknown`, donde `unknown` dice «Sin dato todavía» y no finge un fallo); [`auto-why-button.tsx`](apps/web/src/features/auto/auto-why-button.tsx) es un _disclosure_ accesible (`aria-expanded`/`aria-controls`) reutilizable, montado en la HOME.
 - **Ficha universal de operación (P2).** [`auto-operation-sheet.ts`](apps/web/src/features/auto/auto-operation-sheet.ts) compone seis bloques canónicos (`decidió`/`hizo`/`cambió`/`precio`/`dinero`/`estado`) **sin saltarse peldaños** ni re-derivar cifras; [`auto-operation-sheet-view.tsx`](apps/web/src/features/auto/auto-operation-sheet-view.tsx) la pinta en `/auto/operar/operacion/:cycleId`.
 - **TOP 3 OPORTUNIDADES (P3).** [`auto-top3-opportunities.ts`](apps/web/src/features/auto/auto-top3-opportunities.ts) + [`use-auto-top3-opportunities.ts`](apps/web/src/features/auto/use-auto-top3-opportunities.ts) + [`auto-top3-panel.tsx`](apps/web/src/features/auto/auto-top3-panel.tsx) copian el ranking del motor (`GET /api/top3-opportunities/latest`) **sin recalcular** el score; cada slot declara `Estado: propuesta` y, si viene degradado, «Puntuado sin evidencia completa» (**ranking ≠ decisión**). Montado en HOME y Operar.
 - **Barrido semántico P0.** [`operations-panel.tsx`](apps/web/src/features/trading/operations-panel.tsx) gana `surface="auto"`: en `/auto/cartera` el vocabulario pasa a «Posiciones» / «Sin posiciones en la cuenta simulada», y «… abiertas» queda solo para Mercado/Hoy.
@@ -99,7 +124,7 @@ All notable releases of Bolsa V1.
 **Bump** `2.11.80-beta` → `2.11.81-beta`. **Sin migración nueva** (reutiliza `051_auto_engine_activity`). **Contrato HTTP sin cambio** (se consume un campo ya existente). **Motor financiero sin cambio**. Tag no creado.
 
 - **P2 (medición del instante):** `isActivityStale` ahora exige `currentActivityAtMeasurement === "COMPLETE"` antes de usar `currentActivityAt`. Un sello presente con medición `UNKNOWN`/`PARTIAL`/ausente no se usa (fail-closed).
-    10|- **P2 (timestamp futuro):** un `currentActivityAt` posterior a `asOf` (reloj desincronizado o dato corrupto) no se afirma; se declara «Sin dato todavía».
+  10|- **P2 (timestamp futuro):** un `currentActivityAt` posterior a `asOf` (reloj desincronizado o dato corrupto) no se afirma; se declara «Sin dato todavía».
 - **«Vacío ≠ hueco» en P3:** «¿Qué activo?» sin operación en curso ahora dice «Sin operación en curso» (vacío), no «Sin dato todavía» (hueco). Una operación en curso sin símbolo sigue siendo «Sin dato todavía».
 - **Evidencia:** [`docs/engineering/auditoria-ui-auto-home-seis-preguntas-v2.88.80-2026-10-06.md`](docs/engineering/auditoria-ui-auto-home-seis-preguntas-v2.88.80-2026-10-06.md) · [`docs/engineering/spec-auto-home-vacio-hueco-2026-10-06.md`](docs/engineering/spec-auto-home-vacio-hueco-2026-10-06.md).
 
@@ -118,7 +143,7 @@ All notable releases of Bolsa V1.
 **Bump** `2.11.78-beta` → `2.11.79-beta`. **Con migración** `051_auto_engine_activity`. **Contrato HTTP con cambio** (`currentActivity` + `currentActivityMeasurement`). **Motor financiero sin cambio** (`ExecuteTrade`, ledger, posiciones, settlement intactos); el worker solo emite telemetría. Tag no creado.
 
 - Nuevo hecho durable `currentActivity`: el worker emite en cada tick la fase operacional REAL derivada de sus propios contadores (`derive_activity`), persistida en `auto_engine_runs.activity` y su traza en `auto_engine_ticks`.
-    10|- Vocabulario cerrado de fases: `ANALYZING`, `WAITING_SIGNAL`, `PREPARING_OPERATION`, `WAITING_EXECUTION`, `APPLYING_RESULT`, `NO_ACTIVITY`, `BLOCKED`. Un token fuera del conjunto o ausente es «Sin dato todavía»; `NO_ACTIVITY` es «Sin actividad», distinto del hueco.
+  10|- Vocabulario cerrado de fases: `ANALYZING`, `WAITING_SIGNAL`, `PREPARING_OPERATION`, `WAITING_EXECUTION`, `APPLYING_RESULT`, `NO_ACTIVITY`, `BLOCKED`. Un token fuera del conjunto o ausente es «Sin dato todavía»; `NO_ACTIVITY` es «Sin actividad», distinto del hueco.
 - «¿Qué está haciendo?» en HOME y Sistema ya no se inventa ni queda «Sin dato todavía»: copia `currentActivity`. NUNCA se deriva de `RUNNING` (un motor vivo no es «analizando»).
 - El heartbeat y la decisión siguen separados: `currentActivity` no contamina `lastActivityLabel`/`nextStepLabel`.
 - **Evidencia:** [`docs/engineering/evidence/v2.88.79/README.md`](docs/engineering/evidence/v2.88.79/README.md).
@@ -272,7 +297,7 @@ All notable releases of Bolsa V1.
 - **S4 — Certificación `axe`.** Nueva devDependency `@axe-core/playwright` (`^4.13.0`) y spec `gp-e2e-v28865-auto-axe-mock.spec.ts`: **0 violaciones `critical`/`serious`** en las 8 rutas de `/auto/*` + `/auto-monitor`, teclado de las pestañas, responsive (`390×844`) y estados (carga/error/vacío/no-medido). **Cierra `F-A2`.**
 - **Tests.** `@bolsa/shared` **813 passed** (`97` ficheros); `@bolsa/web` **1475 passed** (`255` ficheros; **+19**) + `typecheck` limpio + `lint` 0 errores de los ficheros tocados; `contract:check` **OK**; `window:test` **25/25**; bump guard **1 passed**; E2E `axe` **13/13** y navegación **3/3**.
 - **Deuda declarada (abierta).** `PortfolioDecision` durable (`UI52-02`); PIT histórico institucional y Execution Analysis.
-- **Sello y CI.** Funcional `9690971d` (`apps` `8ad1efc2…` / `packages` `bdcb1d34…`) + `chore(release)` `42085822` (bump `2.11.62-beta`) + `chore(window)` `3245a529` (pin → `42085822`) + `docs(seal)` `7b9cdc14`; tag anotado **`v2.88.62-beta`** (objeto `96bb7476…`) con `Release tag CI` [`37433048176`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37433048176) **VERDE** (`attempt 2`; `attempt 1` cayó por un fallo de infraestructura del action en el *post-run* de `actions/setup-node@v5` —cache miss del `pnpm-lock.yaml` nuevo—, ajeno al producto y a la batería DR, que pasó) — `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0` confirmado por CI** (`python` `4544 passed / 45 skipped`; `frontend` `1475 passed`) y **GitHub Release publicado** (pre-release).
+- **Sello y CI.** Funcional `9690971d` (`apps` `8ad1efc2…` / `packages` `bdcb1d34…`) + `chore(release)` `42085822` (bump `2.11.62-beta`) + `chore(window)` `3245a529` (pin → `42085822`) + `docs(seal)` `7b9cdc14`; tag anotado **`v2.88.62-beta`** (objeto `96bb7476…`) con `Release tag CI` [`37433048176`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37433048176) **VERDE** (`attempt 2`; `attempt 1` cayó por un fallo de infraestructura del action en el _post-run_ de `actions/setup-node@v5` —cache miss del `pnpm-lock.yaml` nuevo—, ajeno al producto y a la batería DR, que pasó) — `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0` confirmado por CI** (`python` `4544 passed / 45 skipped`; `frontend` `1475 passed`) y **GitHub Release publicado** (pre-release).
 - **Evidencia:** [`docs/engineering/evidence/v2.88.62/README.md`](docs/engineering/evidence/v2.88.62/README.md).
 
 ## [2.11.61-beta] — `DEV/INFRA`: **fix de arranque de la venv bajo Windows Smart App Control** (+ bump `2.11.61-beta`; absorbe la F5 de `v2.88.60`)
@@ -282,9 +307,9 @@ All notable releases of Bolsa V1.
 - **Causa (medida, no inferida).** `Windows Smart App Control` bloqueaba **el intérprete de la venv** (`.venv/Scripts/python.exe`): el registro `Microsoft-Windows-CodeIntegrity/Operational` lo registra con eventos **`3077`**/`3118` (`node.exe attempted to load …\.venv\Scripts\python.exe that did not meet the Enterprise signing level requirements…`, `Policy ID:{0283ac0f-…}`). Ese fichero es el **trampolín de `uv`** (45 568 B, `sha256 61b54f85…`), distinto del binario base firmado (`sha256 d8e3f0ad…`). Como `scripts/run-dev.mjs:253` hacía `spawn(python, [run_dev.py], { shell:false })` y `resolvePython()` devolvía `"python"` (la venv activada), el `spawn` moría con `Error: spawn UNKNOWN` (`errno: -4094`) **antes** de arrancar la API. Una venv nueva de `uv` reproduce el **mismo** trampolín bloqueado ⇒ **recrear con `uv` no arreglaba nada**.
 - **Fix (causa, no parche).** `scripts/lib/python.mjs` gana `probePython` (detecta `error.code === 'UNKNOWN'`), `projectVenvPython`, `readPyvenvHome`, `ensureVenvPython` y **`repairVenvPython`** (sustituye el trampolín por una **copia real** del intérprete base vía `python -m venv --copies`, conservando `pyvenv.cfg` y `site-packages`; backup del original en `python.exe.sacbak`). `resolvePython({ log })` ahora **prioriza la venv del proyecto y la auto-repara** si está bloqueada, y cae a `PATH` si no hay venv. `run-dev.mjs` pasa el logger para que la reparación sea visible en el arranque.
 - **Operación.** Nuevo `scripts/fix-venv-python.mjs` (`node scripts/fix-venv-python.mjs [--check]`), chequeo `Python venv` en `dev-doctor` con pista de arreglo, y scripts npm **`fix:venv`** / **`venv:test`**. Tests unitarios `scripts/lib/python.test.mjs` (**4 passed**), incluida la simulación del bloqueo.
-- **Bonus de auditabilidad (declarado).** Con la venv reparada, los gates **Python** vuelven a ejecutarse **en local** (en `v2.88.60` figuraban como «no ejecutables por *App Control*»): `pytest apps/api-python/tests/test_dia_d_bump_guard.py` **1 passed**.
+- **Bonus de auditabilidad (declarado).** Con la venv reparada, los gates **Python** vuelven a ejecutarse **en local** (en `v2.88.60` figuraban como «no ejecutables por _App Control_»): `pytest apps/api-python/tests/test_dia_d_bump_guard.py` **1 passed**.
 - **Verificado end-to-end.** `node scripts/run-dev.mjs` arranca con `[dev] Python: …\.venv\Scripts\python.exe` → `[dev] API lista` → `VITE ready` → `[dev] Web lista -> http://localhost:5173`. Se probó también la **auto-reparación real**: simulando que `uv` reintroduce el trampolín, el arranque lo detecta (`UNKNOWN`) y lo repara solo.
-- **Sobre SAC (declarado).** *Smart App Control* **no admite exclusiones** (por carpeta o fichero): solo *Activado*/*Desactivado*, y desactivarlo no es reversible sin reinstalar Windows. Por eso la solución no es excluir, sino **eliminar la causa** (venv con binario firmado + auto-reparación).
+- **Sobre SAC (declarado).** _Smart App Control_ **no admite exclusiones** (por carpeta o fichero): solo _Activado_/_Desactivado_, y desactivarlo no es reversible sin reinstalar Windows. Por eso la solución no es excluir, sino **eliminar la causa** (venv con binario firmado + auto-reparación).
 - **Alcance.** Toca `scripts/` (no participa del pin) y `apps/` **solo** por `meta.bump` de los 9 CLI DÍA-D (`v2_89`…`v2_97`), obligado por `test_dia_d_bump_guard.py`; `packages/` intacto respecto a `v2.88.60`. **No** toca motor (`replay_oos.RoundTrip.to_dict` intacto).
 - **Evidencia:** [`docs/engineering/evidence/v2.88.61/README.md`](docs/engineering/evidence/v2.88.61/README.md). **Entrega a auditoría externa (MIA):** [`docs/engineering/entrega-auditoria-externa-mia-v2.88.61-2026-10-06.md`](docs/engineering/entrega-auditoria-externa-mia-v2.88.61-2026-10-06.md).
 - **Sello:** `chore(release)` `52a697e1` (bump `2.11.61-beta` + `meta.bump`) + `chore(window)` `dfc2966a` (re-ancla el freeze; `apps` `286cf716…` / `packages` `b482a276…`) + `docs(seal)` `e9755a5f`; **tag anotado `v2.88.61-beta`** (`df74739d`) y `Release tag CI` [`37429328159`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37429328159) **VERDE** (`replay-repro` `REPRODUCIDO` `1E3ADAC2…` ⇒ `Δ motor = 0`; `python` `4544 passed / 45 skipped`; `frontend` `1442 passed`); **GitHub Release** publicado (pre-release).
@@ -299,7 +324,7 @@ All notable releases of Bolsa V1.
 - **Modelo compartido + panel.** `auto-operation-story.ts` añade `AutoOperationStoryExplanationResolution = "cycleId" | "instrument"` y una `note` honesta (`resolución PARCIAL` si es por instrumento). `auto-operation-story-panel.tsx` resuelve con el helper puro **`resolveExplanationForCycle(...)`**: por `cycleId` (si está en el índice `cycles[]`) o por instrumento (fallback **declarado**).
 - **El veredicto OOS NO se re-granula:** sigue siendo **agregado por instrumento** (suelo `n >= 5`); `cycles[]` sólo **desambigua a qué valor pertenece cada ciclo**, no emite veredicto por ciclo.
 - **Tests.** `test_dia_d_auto_feedback.py` (índice ordenado/dedup, omite sin `cycleId`, huecos `None`, determinismo), `test_auto_dia_d_feedback_route.py` (proyección + compat `v1` ⇒ `[]`), `auto-operation-story.test.ts` (nota según resolución), `auto-operation-story-panel.test.tsx` (resolución por `cycleId` y fallback) y fixture `dia-d-auto-feedback-panel.test.tsx` a `v2`.
-- **Gates (locales).** `@bolsa/shared` build + **813 passed** (`97` ficheros); `@bolsa/web` `typecheck` limpio + **1442 passed** (`249` ficheros) + `lint` **0 errores** (`23` warnings pre-existentes); `ruff check` (config raíz) limpio. **No ejecutables en local** (*App Control* bloquea el spawn de `python.exe`, `os error 4551*): `pytest`/`mypy`/`import-linter`/`bump guard`/`contract:check`; el **CI sí los ejecuta**.
+- **Gates (locales).** `@bolsa/shared` build + **813 passed** (`97` ficheros); `@bolsa/web` `typecheck` limpio + **1442 passed** (`249` ficheros) + `lint` **0 errores** (`23` warnings pre-existentes); `ruff check` (config raíz) limpio. **No ejecutables en local** (_App Control_ bloquea el spawn de `python.exe`, `os error 4551*): `pytest`/`mypy`/`import-linter`/`bump guard`/`contract:check`; el **CI sí los ejecuta**.
 - **Deuda declarada (abierta).** `PortfolioDecision` durable (`UI52-02`); barrido `axe` en vivo de `/auto/*` (`F-A2`, no re-ejecutado); `F-S2`/`F-S3` (P3); PIT histórico institucional y Execution Analysis.
 - **Evidencia:** [`docs/engineering/evidence/v2.88.60/README.md`](docs/engineering/evidence/v2.88.60/README.md). **Entrega a auditoría externa (MIA):** [`docs/engineering/entrega-auditoria-externa-mia-v2.88.60-2026-10-06.md`](docs/engineering/entrega-auditoria-externa-mia-v2.88.60-2026-10-06.md).
 - **Sello:** funcional `71ab00df` (`apps` `d7e6da64…` / `packages` `b482a276…`) + `chore(window)` `a8f941e8` + `docs(seal)` `6e4db583`; **tag anotado `v2.88.60-beta` pendiente** (a petición: commits locales, sin push ni tag).
@@ -312,7 +337,7 @@ All notable releases of Bolsa V1.
 - **P2-b — `PAPER_D_EXECUTE` no medido se colapsaba a `false`.** `auto-reality-strip.tsx` calculaba `killQuery.data?.paperDExecuteEnv === true`, convirtiendo `undefined` (query pendiente) en `false` antes de conocer el dato; el helper nunca recibía `null` y no emitía la nota. Ahora usa `?? null`, de modo que «no medido» se declara `NO MEDIDO` y no se afirma.
 - **Tests.** `auto-reality.test.ts` (tipo ausente → `unknown`/`isVirtual null`/etiquetas honestas; nota `Ejecución paper NO MEDIDA`); `auto-reality-strip.test.tsx` (cuenta aún cargando → `data-tone="unknown"`, nunca verde; kill switch pendiente → nota `NO MEDIDO`).
 - **Deuda corregida aquí, sin reescribir el sello anterior.** La afirmación falsable «una cuenta desconocida → `DINERO VIRTUAL`» de la evidencia de `v2.88.58` queda **corregida**; `v2.88.58-beta` **no** se retoca.
-- **Gates:** bump guard **passed** (`2.11.59-beta`; CI `python` verde); `@bolsa/web` **1438 passed** (`249` ficheros) + `typecheck` limpio + `lint` **0 errores** (`23` warnings pre-existentes); `window:test` **25/25**; E2E AUTO **6 passed** (`gp-e2e-v28856` + `gp-e2e-v28857`, mock, `workers=1`). `contract:check` **OK en CI** (`frontend` verde); no ejecutable en local (*App Control*).
+- **Gates:** bump guard **passed** (`2.11.59-beta`; CI `python` verde); `@bolsa/web` **1438 passed** (`249` ficheros) + `typecheck` limpio + `lint` **0 errores** (`23` warnings pre-existentes); `window:test` **25/25**; E2E AUTO **6 passed** (`gp-e2e-v28856` + `gp-e2e-v28857`, mock, `workers=1`). `contract:check` **OK en CI** (`frontend` verde); no ejecutable en local (_App Control_).
 - **Evidencia:** [`docs/engineering/evidence/v2.88.59/README.md`](docs/engineering/evidence/v2.88.59/README.md). **Entrega a auditoría externa (MIA):** [`docs/engineering/entrega-auditoria-externa-mia-v2.88.59-2026-10-06.md`](docs/engineering/entrega-auditoria-externa-mia-v2.88.59-2026-10-06.md).
 - **Sello:** funcional `c8c23cef` (`apps` `a909995b…` / `packages` `95cb0d69…`) + `chore(window)` `982a50fd` + `docs(seal)` `a970b2e0`; tag anotado `v2.88.59-beta` y `Release tag CI` [`37423991541`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37423991541) **VERDE** (`replay-repro` **`REPRODUCIDO`** `sha256 1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI); **GitHub Release** publicado (pre-release).
 
@@ -378,13 +403,13 @@ Auditoría con **navegador real** (`vite dev` + API) y **`axe-core 4.10.2`** iny
 
 ### Parte A — Críticos a 0
 
-- **`button-name` (`critical`, 2 nodos, `/screeners`)**: dos botones *icon-only* del panel de rastreadores (`trackers-panel.tsx`) sin nombre accesible → `title` + `aria-label` («Ejecutar rastreador ahora», «Eliminar rastreador»).
+- **`button-name` (`critical`, 2 nodos, `/screeners`)**: dos botones _icon-only_ del panel de rastreadores (`trackers-panel.tsx`) sin nombre accesible → `title` + `aria-label` («Ejecutar rastreador ahora», «Eliminar rastreador»).
 - **`select-name` (`critical`, 1 nodo en `/screeners` y `/alerts`)**: los `<select>` de preset/estrategia guardada colgaban de un `<fieldset><legend>Estrategia</legend>` que **no** etiqueta al control → `aria-label="Estrategia preset"` / `"Estrategia guardada"` en `scan-runner-form.tsx` y `signal-alerts-section.tsx`.
 
-### Parte B — Interactividad anidada y *landmarks*
+### Parte B — Interactividad anidada y _landmarks_
 
 - **`nested-interactive` (`serious`, 506 nodos) a 0**: (a) las filas del hub de `/instruments` eran `div[role="button"][tabindex=0]` **con botones dentro** (`303` nodos) → se elimina el rol/tabIndex redundante y se conserva la vía de teclado por el `<button>` interno; (b) la pestaña de gráfico (`charts-zone.tsx`) era `div[role="button"]` con el botón de cerrar dentro (`203` nodos) → pasa a contenedor no interactivo con **dos botones hermanos**.
-- **`landmark-one-main` + `region` (`200` nodos) a 0 en `/trading`**: en `platform-shell.tsx` la rama de Trading montaba un `<div>` (la única `main` del DOM era el *keepalive* de Backtests, `aria-hidden` + `inert`) → ahora `<main>`, con `<h1 class="sr-only">Trading</h1>`. Verificado: `main = 1` en las 15 rutas. El efecto colateral (`landmark-complementary-is-top-level` por el `<aside>` del rail de dibujo) se cierra aquí: `chart-drawing-sidebar.tsx` pasa a `<div>` ⇒ **`/trading` 0 violaciones**.
+- **`landmark-one-main` + `region` (`200` nodos) a 0 en `/trading`**: en `platform-shell.tsx` la rama de Trading montaba un `<div>` (la única `main` del DOM era el _keepalive_ de Backtests, `aria-hidden` + `inert`) → ahora `<main>`, con `<h1 class="sr-only">Trading</h1>`. Verificado: `main = 1` en las 15 rutas. El efecto colateral (`landmark-complementary-is-top-level` por el `<aside>` del rail de dibujo) se cierra aquí: `chart-drawing-sidebar.tsx` pasa a `<div>` ⇒ **`/trading` 0 violaciones**.
 - **`page-has-heading-one` (`moderate`, 10 rutas) a 0**: el título de página pasa a `<h1>` en las 9 vistas que lo marcaban como `<h2>` (`dashboard-page`, `backtests-page`, `instruments-page`, `accounts-page`, `screeners-page`, `alerts-page`, `tax-report-page`, `confirm-content`, `history-page`).
 
 ### Parte C — Contraste y enlaces de prosa
@@ -469,15 +494,18 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 **Bump** `2.11.50-beta` → `2.11.51-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Sello dirigido, sin tocar el motor: **Δ AUTO decision/execution motor = 0**. **NO** re-mide `DÍA-D` ni reabre la investigación `THESIS_EXIT` (A/C cerrada en `v2.88.50`; las cifras se **heredan y citan**, no se reutilizan como nuevas).
 
 ### Fase 1 — Fix del PnL que se publicaba `COMPLETE` con cierre `PARTIAL`
+
 - **Backend** `packages/py/application/src/bolsa_application/auto_operational_monitor.py` (`_build_cycle`): el bloque `result` sólo miraba `closed is None or window_truncated`, así que un cierre degradado a `None`/`PARTIAL` por un `side` no clasificable (`unclassified_fills > 0`) **seguía publicando una cifra de PnL**. Ahora se rige por la **misma** medición ya calculada (`closed_measurement != MEASUREMENT_COMPLETE`) ⇒ sin cierre afirmable **no** se publica cifra de dinero.
 - **Frontend** `apps/web/src/features/auto-monitor/auto-cycle-timeline.tsx`: la cifra de PnL usa `cycle.closedMeasurement` (en vez de `"COMPLETE"` a fuego) y, cuando la medición no es `COMPLETE`, **rotula la medición** (`PARCIAL`/`NO MEDIDO`) en vez de presentar el número sin ambigüedad. Test de UI: un ciclo `PARTIAL` no muestra la cifra como medida.
 - **Tests de regresión (fallan sin el fix):** `test_auto_operational_monitor.py::test_cycle_result_not_published_when_close_is_partial_by_unclassified_side` (el caso `buy`+`sell`+`side` ilegible publicaba `pnl` con el cierre no afirmable) y `auto-monitor.test.tsx` (ciclo `PARTIAL` exige `PARCIAL`, nunca el número).
 
 ### Fase 2 — `AUTO UI SEMANTIC MODEL 1.0` (diseño congelado, sin tocar pantallas)
+
 - Nuevo `docs/engineering/spec-auto-ui-semantic-model-1-2026-10-05.md`: congela qué es cada una de las **14 etapas** (`OPORTUNIDAD → … → EXPLICACIÓN`), su clase (hecho / derivado / contexto / explicación), los **dos ejes** (estado de etapa vs medición del hecho), las definiciones duras y la navegación objetivo (`OPERAR · CARTERA · RIESGO · ANÁLISIS · SISTEMA`), resolviendo los tres problemas conceptuales del piloto: **`TOP_N ≠ DECISIÓN`**, **`SALIDA ≠ LIQUIDACIÓN`** y **`OPORTUNIDAD` como contexto** (no un `NO MEDIDO` suelto). Incluye el plan de migración post-1.0 y sus límites declarados.
 - **No** sustituye pantallas, **no** re-deriva cifras y **no** toca el view-model `buildAutoOperationStory` (la migración del piloto al modelo es trabajo posterior, declarado).
 
 ### Fase 3 — Sello
+
 - **Versión:** `package.json` → `2.11.51-beta`; `meta.bump` alineado en `v2_89`…`v2_97` (guard `test_dia_d_bump_guard.py`).
 - **Evidencia:** `docs/engineering/evidence/v2.88.51/README.md`. **NO** se corre el pipeline `DÍA-D`: la evidencia **cita** lo medido en `v2.88.50` (`route A=0/C=23`, `42/42`, `n=42`, `expectancy -0.7150`).
 - **Gates:** ver evidencia (§2).
@@ -487,27 +515,32 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 **Bump** `2.11.49-beta` → `2.11.50-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Se **absorbe** el sello `v2.88.49-beta` (separación A/C `DÍA-D-3h`), que estaba **commiteado** (`e70b23fa`) pero **sin tag ni medición** (su evidencia declaraba la medición PENDIENTE), y se corrige el **sesgo de universo punto-en-el-tiempo (PIT)** que contaminaba la muestra de los re-pipelines multianuales. **`Δ decisión motor = 0`** (ninguna línea de motor/gobernador/umbrales/costuras de decisión; sólo lectura, agregación pura y UI). La absorción se registra en `docs/engineering/versioning.md`.
 
 ### Fase 1 — Fix PIT per-day (raíz del sesgo de muestra)
+
 - **Helpers puros** en `packages/py/application/src/bolsa_application/universe_point_in_time.py`: `candidate_ids(members, window_start, window_end)` (ids cuya **ventana de elegibilidad** `[max(active_from, availability_from), min(active_until, availability_until)]` **intersecta** el rango) y `eligible_days_by_symbol(universe, days)` (días de la ventana en que un miembro es elegible), más `ids_by_day`. Fail-closed y deterministas. `CatalogPointInTimeUniverse` expone `all_members`.
 - **Refactor PIT per-day** en `v2_93_dia_d_multi.py` (`_year_watch` deja de anclar el watch al **último día del año**, `YYYY-12-31`, y pasa a resolver candidatos de `YYYY-01-01`…`YYYY-12-31`), replicado en `v2_91_dia_d_longitudinal.py` y `v2_92_dia_d_attribution.py`. El `watch` del motor pasa a ser la **unión** de candidatos y `bars_by_symbol` se **poda** a los días elegibles por símbolo (`_prune_bars_to_eligibility`), cinturón y tirantes: garantiza que ningún símbolo opere fuera de su ventana. Se declara `watchSource`/cobertura y el texto de `limits` pasa de "anonymous POR AÑO" a per-day.
 - **Efecto:** deja de excluirse del watch a los instrumentos **deslistados a mitad de año** (antes sólo sobrevivían al cierre los vigentes a `31-dic`). Para el provider actual `active_until` = última barra, así que la poda suele ser **no-op**; el arreglo real es la **inclusión** de los no-supervivientes.
 - **Tests:** `test_universe_point_in_time.py` (unitarios de `candidate_ids`/`ids_by_day`/`eligible_days_by_symbol`) + `apps/api-python/tests/test_v2_93_pit_watch.py` (instrumento deslistado a mitad de año elegible ene–may y sólo opera ese tramo).
 
 ### Fase 2 — Proyección de las 5 banderas de medición en reservas
+
 - `packages/py/application/src/bolsa_application/auto_operational_monitor.py` (`_reservation_view`) copia por evento `reasonMeasurement`, `callerMeasurement`, `agedMeasurement`, `graceWindowMeasurement`, `reconciliationMeasurement` (producidos por `build_reservation_reconciliation_entry` en `auto_operational_audit.py`).
 - DTO de ruta `AutoMonitorReconciliationDto` (`apps/api-python/src/bolsa_api/api/v1/routes/auto_operational_monitor.py`) y tipo compartido `packages/shared/src/cognitive/auto-operational-monitor.ts` (`reconciliations[]`) ganan los `5` campos (`str`, default `"UNKNOWN"`).
 - UI `apps/web/src/features/auto-monitor/auto-reservation-panel.tsx`: `reason`/`caller`/`aged`/`graceWindow` se rotulan con `formatMeasurementLabel`/`formatMonitorFactValue`. Un `UNKNOWN` **deja de ser indistinguible de `"?"`** — se pinta `NO MEDIDO` (nunca un `0` fingido).
 
 ### Fase 3 — Fixes de UI y del rojo de `main`
+
 - `apps/web/src/features/auto-monitor/auto-monitor-page.tsx`: `useAutoOperationalMonitor({ enabled: mode === "current" })` ⇒ la pestaña **DÍA-D deja de sondear** `GET /auto/operational-monitor` cada `20 s`.
 - `apps/web/src/features/auto-monitor/dia-d-auto-feedback-heatmap.tsx`: helper `formatCellTooltip`; una celda `NOT_MEASURED` pinta **`sin dato`** y no `0 ciclo(s) · 0 error(es)`.
 - **Rojo de `main`:** `dia-d-auto-feedback-panel.test.tsx` asertaba la query de detalle (`getAutoDiaDFeedback`) antes de que el efecto la disparara; se arregla la **causa** (aserción con `waitFor`), no se relaja el test.
 
 ### Fase 4 — AUTO UI REFACTOR 1.0 (piloto, sin borrar pantallas)
+
 - **View-model puro** en `packages/shared/src/cognitive/auto-operation-story.ts`: `buildAutoOperationStory` pliega los DTO existentes (monitor operativo + DÍA-D feedback/replay) en **una operación** ordenada de `13` etapas — `OPPORTUNITY → SIGNAL → DECISION → RISK → RESERVATION → ORDER → FILL → POSITION → PROTECTION → EXIT → SETTLEMENT → RESULT → EXPLANATION` — preservando la regla "NO MEDIDO nunca es `0`" y **sin re-derivar cifras** (sólo proyecta lo medido; `null`/`UNKNOWN` se mantienen como hueco).
 - **Página piloto** `apps/web/src/features/auto-monitor/auto-operation-story-panel.tsx`, accesible como pestaña **«Operación»** (`dia-d-auto-toolbar.tsx`); **no se elimina ninguna pantalla existente** (los paneles actuales siguen como detalle experto).
 - **Tests:** unitarios del view-model puro (`auto-operation-story.test.ts`, `6`) + componente del piloto (`auto-operation-story-panel.test.tsx`, `2`).
 
 ### Fase 5 — Re-pipeline único, evidencia y sello
+
 - **Versión:** `package.json` → `2.11.50-beta`; `meta.bump` alineado en `v2_89`…`v2_97` (guard `test_dia_d_bump_guard.py`).
 - **Un solo re-pipeline** con el universo PIT corregido (`v2_94 --reuse --cycles --cycle-detail --from-year 2021 --to-year 2026` → `v2_97 --sequences`), **dos corridas** y comparación de `sha256` (determinismo); se mide A/C de `v2.88.49` y el **delta PIT** frente al anclaje a `31-dic`.
 - **`replay-repro` local** (fixture `v2.88.7`, BD efímera) para certificar `Δ motor = 0`.
@@ -516,7 +549,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 - **Medición real (re-pipeline PIT corregido, PostgreSQL, `K=12` sorteos, años `2021-2026`):** **delta PIT** — el ancla al `31-dic` dejaba `2026` `NOT_MEASURED 12/12` (`sin_universo_pit`); con PIT por día `2026` pasa a **medido `12/12`** (`exp +0.1819`, `22.25` ciclos/sorteo, no citable), mientras `2022`–`2025` **no cambian** (`2022 -0.4363` citable / `2023 +0.3658` / `2024 +1.2856` citable / `2025 +0.2477`) y `2021` sigue vacío. Global: ciclos/sorteo `89.5 → 111.75` (**+22.25** = `2026`), `expectancyR` `-0.0283 → +0.0111`, `se` `2.501 → 3.228`, banda de R `[-17.290, +19.328]` ⇒ **`pointCitable = false`** (sigue cruzando cero). **A/C (`v2.88.49` absorbido) sobre el universo corregido:** `42` observaciones `THESIS_EXIT` (antes `38`), `route = {materializado: 19, orden_creada_sin_fill: 23}` ⇒ **caso A (`stop_evaluado_sin_orden`) = `0`, caso C = `23`** (el spine **siempre** creó el INTENT de salida; lo que falló fue el fill aguas abajo); `stopEvaluatedOnTouch 42/42` y `deciderRanOnTouch 42/42`; `candidate 42/42`; `stopFiredNotFilled 26/42` (`0.619`); expectancy bruta `-0.7150`. Determinismo: los `12` ledgers de ciclos **byte a byte idénticos** entre las dos corridas de `v2_94`; `sha256 thesis-exit-v5 = F865106D…` (`184 445 B`) y `sequences = 2268FA79…` (`291 275 B`). **Se publica únicamente lo medido; un hueco es `None`/`NOT_MEASURED`, nunca `0`.**
 - **`Δ motor = 0` DEMOSTRADO LOCALMENTE:** fixture congelado (`v2.88.7`, `20` instrumentos / `25 700` barras) re-sembrado en una **BD efímera** (`bolsa_v1_repro`, `DROP/CREATE` antes de cada corrida); `assert-artifact` ⇒ `REPRODUCIDO` `24066225…` (`3 445 622 B` CRLF / `1E3ADAC2…` LF) = **idéntico al sello** en **dos** corridas byte a byte. (**Nota de método:** el primer intento dio un falso negativo porque la corrida `run2` de `v2_94` estaba **en vuelo** e inyectaba temporalmente el seed desplazado en `auto_simulation_worker.py`, que restaura byte a byte al terminar cada sorteo; una vez terminó, el replay reprodujo el sello.)
 - **Incidencia de sello (declarada; cierre de un flake PRE-EXISTENTE del arnés).** El primer `Release tag CI` del tag `v2.88.50-beta` (run [`37277722008`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37277722008), attempt 1) dio **rojo** en `lifecycle-pg` por `test_a9_scheduler_process_pg_zero_human.py::test_a9_scheduler_process_full_day_pg_zero_human` (`lados=['buy']`, `117` ticks, `0` ventas) con **todos** los demás jobs en verde, incluido `replay-repro`. **La causa es del arnés de certificación, no del sello:** el venue SIM sortea su ruido **por `(barra, instrumento, lado)`** (`draw_queue_noise(seed, side, instrument_id)`) y la barrida determinista `_filling_instrument_id` sólo exigía que llenara la **entrada**. Medido el **`2026-10-05 UTC`**: el primer candidato que llenaba el BUY (`inst-a9proc-0000000000`) tenía el schedule de **SELL vacío** en la barra `20731` y llenaba en `20730`/`20732` ⇒ el día **no podía** cerrar y el gate «ciclo BUY→SELL» era una **moneda al aire por día** (el mismo árbol dio verde el `2026-10-04`). **Fix de la causa, no de la aserción:** `_filling_instrument_id(..., round_trip=True)` exige que **ambos lados** llenen en las barras probadas en el día completo (el restart NO lo pide: retiene con `AUTO_ENGINE_SIM_EXIT_AFTER_TICKS=1000`); **ninguna** aserción se relaja — el día sigue teniendo que cerrar. El tag `v2.88.50-beta` se **re-ancló** una vez (`d0acc7ab` → commit de este fix, declarado en `docs/engineering/evidence/v2.88.50/README.md` §7, con los SHAs exactos en el commit POST-TAG); ningún `Release` se había publicado.
-- **Segunda incidencia de sello (declarada; fix de PRODUCTO, no de aserción — §8 de la evidencia).** El **segundo** `Release tag CI` del tag (run [`37282852860`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37282852860), `935c76a0`) volvió a dar **rojo** en `lifecycle-pg` —con `replay-repro` **verde**—, esta vez en el paso **Golden Day 2.0** y en el test **con precio real** (`test_golden_day_v2_real_price_process_opens_and_closes_the_book_pg`): `PermanentRejectionError: No tienes suficientes acciones. En cartera: 4e-06`, con el día **sin cerrar**. Reproducido en local el mismo día sobre el mismo árbol (**no** es del runner). **Causa raíz medida:** en modo precio real el tamaño es **fraccionario** y el venue llena en **tranchas**; las cantidades viven como `Numeric(18, 6)` (quantum del **dinero**) pero el ledger de posición las cuantizaba a **4 decimales** (quantum de la **casa**) ⇒ la cartera tenía `490.000024` y el libro canónico publicaba `490.0001`; al reiniciar, el worker re-anclaba el plan durable a esa cantidad y la salida pedía más de lo que había, con el último chunk permanentemente rechazado. **Fix de la causa:** `position_ledger.round6` para **cantidades** (`coerce_applied_fill_fact` + fold: `quantity`/`realized_qty`/`sold_qty`/`unmatched_exit_qty`/`remaining_qty`); el **precio** y el `realized_pnl` siguen en `round4` (magnitudes monetarias). Y `apps/api-python/tests/applied_fill_equity.py` mide el notional de cada fill al **quantum del dinero** (`ROUND_HALF_UP` a `0.000001`, como `ledger_entries.amount`/`transactions.total` `NUMERIC(18, 6)`), porque sumar los productos de 12 decimales dejaba un residuo de `≈2e-6` que el invariante de equity (tol `1e-6`) leía como descuadre. **Ablación declarada:** la variante que tocaba `position_state.py` (`_round6` en `quantity`/`remaining_quantity`) también arreglaba el día pero **rompía `Δ motor = 0`** (replay `1FC2CAF2…`, `3 755 749 B`, `book.cancelReleaseDays 57→109`) ⇒ **descartada**; el ledger, en cambio, es un **read-model** y el replay sigue **`REPRODUCIDO`** `24066225…` byte a byte. Ninguna aserción se relaja (día plano, `pending = 0`, invariante de equity intacto).     El tag se **re-ancló una segunda vez** (§8.6).
+- **Segunda incidencia de sello (declarada; fix de PRODUCTO, no de aserción — §8 de la evidencia).** El **segundo** `Release tag CI` del tag (run [`37282852860`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37282852860), `935c76a0`) volvió a dar **rojo** en `lifecycle-pg` —con `replay-repro` **verde**—, esta vez en el paso **Golden Day 2.0** y en el test **con precio real** (`test_golden_day_v2_real_price_process_opens_and_closes_the_book_pg`): `PermanentRejectionError: No tienes suficientes acciones. En cartera: 4e-06`, con el día **sin cerrar**. Reproducido en local el mismo día sobre el mismo árbol (**no** es del runner). **Causa raíz medida:** en modo precio real el tamaño es **fraccionario** y el venue llena en **tranchas**; las cantidades viven como `Numeric(18, 6)` (quantum del **dinero**) pero el ledger de posición las cuantizaba a **4 decimales** (quantum de la **casa**) ⇒ la cartera tenía `490.000024` y el libro canónico publicaba `490.0001`; al reiniciar, el worker re-anclaba el plan durable a esa cantidad y la salida pedía más de lo que había, con el último chunk permanentemente rechazado. **Fix de la causa:** `position_ledger.round6` para **cantidades** (`coerce_applied_fill_fact` + fold: `quantity`/`realized_qty`/`sold_qty`/`unmatched_exit_qty`/`remaining_qty`); el **precio** y el `realized_pnl` siguen en `round4` (magnitudes monetarias). Y `apps/api-python/tests/applied_fill_equity.py` mide el notional de cada fill al **quantum del dinero** (`ROUND_HALF_UP` a `0.000001`, como `ledger_entries.amount`/`transactions.total` `NUMERIC(18, 6)`), porque sumar los productos de 12 decimales dejaba un residuo de `≈2e-6` que el invariante de equity (tol `1e-6`) leía como descuadre. **Ablación declarada:** la variante que tocaba `position_state.py` (`_round6` en `quantity`/`remaining_quantity`) también arreglaba el día pero **rompía `Δ motor = 0`** (replay `1FC2CAF2…`, `3 755 749 B`, `book.cancelReleaseDays 57→109`) ⇒ **descartada**; el ledger, en cambio, es un **read-model** y el replay sigue **`REPRODUCIDO`** `24066225…` byte a byte. Ninguna aserción se relaja (día plano, `pending = 0`, invariante de equity intacto). El tag se **re-ancló una segunda vez** (§8.6).
 - **CITA REAL DEL CI (POST-TAG, 2026-10-05):** `Release tag CI` run [`37297920781`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37297920781) (`ref=refs/tags/v2.88.50-beta`, tag → commit `f48975bb`, `attempt 1`, `10:39:02Z → 10:47:25Z`) → **`SUCCESS`**: **`11 jobs success`** (`security`, `shared`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño; `certify` `success`. Job `python`: **`4537 passed, 45 skipped`** (`132.43 s`) con `ruff` `All checks passed!`, `imports` `4 kept, 0 broken`, `mypy` limpio. Job `lifecycle-pg`: **Golden Day 2.0 `2 passed in 16.71 s`** (incluye el test **con precio real** que cayó en el `attempt 2`) · lote `190 passed` (arnés A9 ya corregido, §7) · `200 passed, 1 xfailed` (34 ficheros PG) · `account-isolation 45 passed`. Job `replay-repro`: **`VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`** `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (`3 340 728 B` LF = sello `3 445 622 B` CRLF) ⇒ **`Δ motor = 0` confirmado por CI**. **Re-anclajes del tag (auditables):** `d0acc7ab` → `935c76a0` (`§7`, fix de arnés `356aaf2a`) → `f48975bb` (`§8`, fix de producto `40876dac` + freeze de la ventana `f05459e3`, que pinnea `40876dac`); **ningún `Release` de GitHub se había publicado** en ninguno de los dos. **GitHub Release** `v2.88.50-beta` **publicado** (pre-release).
 - **Límites declarados:** `Δ motor = 0`; sin migración; la corrección PIT **cambia la muestra** ⇒ las cifras citadas en `v2.88.41`…`v2.88.49` (38/38, 19/19, expectancy) **se re-miden**, no se reutilizan; **REPLAY/OOS** no sustituye la ventana PAPER real (`P3-2`/`P3-3` **ABIERTAS**); `CONFIRMED` **NO** se emite; el piloto UI **no** toca motor ni borra pantallas.
 
@@ -536,7 +569,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 
 ## [2.11.48-beta] — `AUTO · DÍA-D-3g`: **correlación DECISIÓN↔CICLO** (`THESIS_EXIT` vs `STOP`) — la huella de decisión intra-tick por `cycle_id`, sin tocar motor
 
-**Bump** `2.11.47-beta` → `2.11.48-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra la pregunta que `v2.88.47` dejó abierta: se midió que el stop vigente **fue tocado** en los `38/38` `THESIS_EXIT` (`structuralStopCandidate 38/38`), pero la secuencia `D1` se captura **antes** de `auto_turn()` y **no registra qué hizo el decider ese tick** ⇒ no podía separar *"stop evaluado no ejecutado"* de *"stop no evaluado"*. Esta fase añade la **huella de decisión intra-tick por `cycle_id`** leyendo el estado ya producido por el worker, y clasifica cada toque. **`Δ decisión motor = 0`** (la costura sigue inerte por defecto; sólo se añade lectura) y **`Δ motor = 0` DEMOSTRADO LOCALMENTE** (§verificación: `replay-repro` reproducido byte a byte contra el fixture congelado).
+**Bump** `2.11.47-beta` → `2.11.48-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra la pregunta que `v2.88.47` dejó abierta: se midió que el stop vigente **fue tocado** en los `38/38` `THESIS_EXIT` (`structuralStopCandidate 38/38`), pero la secuencia `D1` se captura **antes** de `auto_turn()` y **no registra qué hizo el decider ese tick** ⇒ no podía separar _"stop evaluado no ejecutado"_ de _"stop no evaluado"_. Esta fase añade la **huella de decisión intra-tick por `cycle_id`** leyendo el estado ya producido por el worker, y clasifica cada toque. **`Δ decisión motor = 0`** (la costura sigue inerte por defecto; sólo se añade lectura) y **`Δ motor = 0` DEMOSTRADO LOCALMENTE** (§verificación: `replay-repro` reproducido byte a byte contra el fixture congelado).
 
 - **(costura inerte, sólo lectura)** `v2_87` escribe, con `capture_cycle_detail=True`, en el **mismo fotograma del día** (no un segundo fotograma) `decisionReasons`/`decisionLabel`/`survived`/`filledQty` (`STRUCTURAL_STOP`, `THESIS_INVALIDATION`, …) leídos de `_v2_last_exit_reasons`/`_v2_last_exit_label` tras `auto_turn()`, más `dayOrders`/`dayFills` (delta de `report.orders`/`report.fills`, señal de **DÍA**, declarada NO por-ciclo); y anota cada fila `managementRows` con el `cycleId` del ciclo abierto de su instrumento (`(instrument_id, day)`). Con la costura apagada el replay es **idéntico** (un `if`).
 - **(ledger v6, aditivo)** `dia-d-multi-cycle-ledger-v6` añade por ciclo la **huella de decisión** (`decisionReasons`/`decisionLabel`/`filledQty`/`survived`/`dayOrders`/`dayFills` en la secuencia compacta) y la clasificación `_decision_correlation_fields`: `stopTouchDays`, `stopEvaluatedOnTouch`, `deciderRanOnTouch`, `stopFiredNotFilled`, `decisionRoute` ∈ {`materializado`, `stop_evaluado_sin_materializar`, `stop_no_evaluado`, `sin_toque`, `sin_traza`} (tupla **cerrada**) y `timelineStartsAt = "first_full_tick_after_entry"` (**D47-01 declarado**). El token `STRUCTURAL_STOP` se compara **case-insensitive** contra los motivos del worker (`structural_stop`). Un hueco es `None`, **nunca** `0`. `v2_95`/`v2_96` siguen leyendo `-v1`…`-v5`; `v2_94._DETAIL_LEDGER_SCHEMA` exige v6 ⇒ un ledger antiguo se re-corre.
@@ -551,7 +584,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 
 ## [2.11.47-beta] — `AUTO · DÍA-D-3f`: **desambiguación `THESIS_EXIT` vs `STOP`** — por qué ruta se invalidó la tesis (reconstruida), sin tocar motor
 
-**Bump** `2.11.46.1-beta` → `2.11.47-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra la deuda declarada en `v2.88.46`: se midió que el **nivel congelado ES el stop inicial** (`levelEqualsInitialStop 38/38`), pero *por qué el MISMO nivel* produce `THESIS_EXIT` en unos ciclos y `STOP_EJECUTADO` en otros seguía sin reconstruirse. Esta fase reconstruye la **secuencia temporal real** de los ciclos `THESIS_EXIT` y clasifica la **RUTA** de la invalidación —sin inventarla— desde la costura inerte ya sellada. **`Δ decisión motor = 0`** (la costura sigue inerte por defecto; sólo se añade lectura).
+**Bump** `2.11.46.1-beta` → `2.11.47-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra la deuda declarada en `v2.88.46`: se midió que el **nivel congelado ES el stop inicial** (`levelEqualsInitialStop 38/38`), pero _por qué el MISMO nivel_ produce `THESIS_EXIT` en unos ciclos y `STOP_EJECUTADO` en otros seguía sin reconstruirse. Esta fase reconstruye la **secuencia temporal real** de los ciclos `THESIS_EXIT` y clasifica la **RUTA** de la invalidación —sin inventarla— desde la costura inerte ya sellada. **`Δ decisión motor = 0`** (la costura sigue inerte por defecto; sólo se añade lectura).
 
 - **(costura inerte, sólo lectura)** `v2_87` publica, con `capture_cycle_detail=True`, `cycleDetail.cycleTimeline` (la SECUENCIA día a día por `cycle_id`: `day`, `mark`, `currentStop`, `invalidationPrice`, `initialStop`, `actualEntry`, `initialRisk`, `maeR`, `mfeR`, `remainingQty`) y `cycleDetail.managementRows` (proyección read-only de los eventos ricos `auto_position_management`: `primaryReason`/`exitReasons`/`thesisInvalid`). Con la costura apagada el replay es **idéntico** (un `if`).
 - **(ledger v5, aditivo)** `dia-d-multi-cycle-ledger-v5` añade por ciclo la **desambiguación**: `thesisExitRoute` ∈ {`ruta_mark`, `ruta_mae`, `ruta_ambas`, `sin_geometria`}, `markAtExitR`/`minMarkR`/`persistedMaeR`/`persistedMaeAtExitR`/`levelR`, `firstTouchDay`/`markFirstTouchDay`/`daysToFirstTouch`/`touchBeforeExit`, `stopChanged`/`breakevenReached`/`stopAboveLevel`, `structuralStopCandidate` y la secuencia compacta `sequence`. Un hueco es `None`, **nunca** `0`. `v2_95`/`v2_96` siguen leyendo `-v1`…`-v4`; `v2_94._DETAIL_LEDGER_SCHEMA` exige v5 ⇒ un ledger antiguo se re-corre.
@@ -577,7 +610,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 
 ## [2.11.46-beta] — `AUTO · DÍA-D-3e`: **condición de la invalidación del `THESIS_EXIT`** — el nivel congelado ES el stop inicial (medido), sin tocar motor
 
-**Bump** `2.11.45-beta` → `2.11.46-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra la deuda declarada en `v2.88.45`: el journal sólo publica el token **COLAPSADO** `thesis_exit`, de modo que *qué condición* invalidó la tesis no llegaba al artefacto. Esta fase la **mide** —sin inventarla— desde el estado de la posición que la **costura inerte** `capture_cycle_detail` ya capturaba, la persiste en un **ledger aditivo v4** y la pliega en un nuevo bloque `invalidation` del quirófano. **`Δ decisión motor = 0`** (la costura sigue inerte por defecto; sólo se añade lectura).
+**Bump** `2.11.45-beta` → `2.11.46-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Cierra la deuda declarada en `v2.88.45`: el journal sólo publica el token **COLAPSADO** `thesis_exit`, de modo que _qué condición_ invalidó la tesis no llegaba al artefacto. Esta fase la **mide** —sin inventarla— desde el estado de la posición que la **costura inerte** `capture_cycle_detail` ya capturaba, la persiste en un **ledger aditivo v4** y la pliega en un nuevo bloque `invalidation` del quirófano. **`Δ decisión motor = 0`** (la costura sigue inerte por defecto; sólo se añade lectura).
 
 - **(ledger v4, aditivo)** `dia-d-multi-cycle-ledger-v4` añade por ciclo la **geometría de la invalidación**: `invalidationPrice` (nivel congelado al nacer), `initialStop` (el de la POSICIÓN), `currentStopAtExit` (stop vigente al cierre), `invalidationLevelR`/`currentStopAtExitR`/`stopAboveLevelR`/`stopBasisMismatchR`/`maeVsLevelR`, los booleanos `levelEqualsInitialStop`/`maeReachedLevel` y el token `thesisExitCondition` ∈ {`sin_geometria`, `nivel_igual_stop`, `nivel_distinto_stop`}. El R se normaliza con los **anclajes propios de la posición** (`actualEntry`/`initialRisk`), no con la base del round trip; cuando ambas difieren se declara en `stopBasisMismatchR` (**medida, NO reconciliada**). `v2_95` sigue leyendo `-v1`/`-v2`/`-v3`. `v2_94._DETAIL_LEDGER_SCHEMA` exige v4 ⇒ un ledger antiguo se re-corre (no se mezclan esquemas).
 - **(costura inerte, sólo lectura)** `v2_87` publica `cycleDetail.invalidationByCycle` (estado congelado por `cycle_id`: `invalidationPrice`, `actualEntry`, `initialStop`, `initialRisk`, `currentStop`, `direction`) sólo con `capture_cycle_detail=True`; `v2_93` lo acumula y se lo pasa a `build_cycle_ledger`. Con la costura apagada el replay es **idéntico** (un `if`).
@@ -666,7 +699,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 
 ## [2.11.39-beta] — `AUTO · DÍA-D-3a`: **atribución del OOS 2022** (por régimen / estrategia / sector / activo + MAE/MFE y concentración), sin tocar motor
 
-**Bump** `2.11.38-beta` → `2.11.39-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Convierte el `REFUTED` de `v2.88.38` en un **diagnóstico falsable**: sobre la MISMA muestra OOS de 2022 (universo `PIT` histórico), **descompone** la expectativa `-0.5011 R/ciclo` para responder *dónde* y *cómo* se pierde el R, sin ejecutar ventanas nuevas. **`Δ decisión motor = 0`:** ningún fichero de motor (`auto_simulation_worker.py`, `auto_v2_entry.py`, `sim_durable_store.py`, `market_operability.py`, `replay_oos.py`, `v2_87_replay_oos_durable_cycle.py`) se toca, y **el artefacto congelado de `replay-repro` no se mueve**. Evidencia: [`docs/engineering/evidence/v2.88.39/README.md`](./docs/engineering/evidence/v2.88.39/README.md).
+**Bump** `2.11.38-beta` → `2.11.39-beta`. **SIN migración** (Alembic head sigue `048_journal_entry_dedupe_key`). Convierte el `REFUTED` de `v2.88.38` en un **diagnóstico falsable**: sobre la MISMA muestra OOS de 2022 (universo `PIT` histórico), **descompone** la expectativa `-0.5011 R/ciclo` para responder _dónde_ y _cómo_ se pierde el R, sin ejecutar ventanas nuevas. **`Δ decisión motor = 0`:** ningún fichero de motor (`auto_simulation_worker.py`, `auto_v2_entry.py`, `sim_durable_store.py`, `market_operability.py`, `replay_oos.py`, `v2_87_replay_oos_durable_cycle.py`) se toca, y **el artefacto congelado de `replay-repro` no se mueve**. Evidencia: [`docs/engineering/evidence/v2.88.39/README.md`](./docs/engineering/evidence/v2.88.39/README.md).
 
 - **(nuevo) Módulo puro `dia_d_attribution.py`** (`packages/py/application/src/bolsa_application/`): `payoff_decomposition(...)` (identidad `expectancyR = winRate·avgWinR + (1 − winRate)·avgLossR` con residuo `identityGap` auditable), `attribute_by(...)` + lectores de dimensión (`regime_key_reader`/`strategy_key_reader`/`sector_key_reader`/`symbol_key_reader`, con cubos declarados `sin_regimen`/`sin_sector`/`sin_version`/`sin_simbolo`), `capture_study(...)` (captura de MFE y premio dejado en la mesa, `reversedCount`), `mae_severity(...)` (perdedores peores que `-1R`/`-1.25R`/`-1.5R`), `concentration(...)` (peso de los `k` mejores/peores y `classification` `broad`/`concentrated`) y `build_dia_d_attribution_artifact(...)` (payload determinista que **reutiliza** `build_value_scorecard` y `excursions`, sin duplicar umbrales).
 - **(nuevo) CLI `v2_92_dia_d_attribution.py`**: reutiliza el harness de `v2_91` (`_resolve_window`/`_run_pass`), carga el universo `PIT` (histórico), corre **una** pasada del replay durable y agrega la atribución. Sonda `probe` con `truncationReason`/`windowFallback` (sin plan B silencioso). Flag `--check-against <longitudinal.json>` cruza el resumen con el artefacto sellado de `v2_88.38` y declara `crossCheck.evidenceDrift` si la BD local deriva.
@@ -780,7 +813,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 - **Regresiones que muerden.** `scripts/lib/window-forward.test.mjs` (19 tests `node:test`, sin dependencias nuevas) cubre config, lock, provenance y la no regresión de veto/`exit 2`; nuevo `pnpm window:test`, añadido al job `shared` del `Release tag CI`.
 - **`Δ decisión motor = 0`.** Sólo cambia el orquestador Node y su módulo puro: no se toca motor, gobernador, `TOP_N`, umbrales, allocation, pesos A/B, UI ni migraciones. **Sin cambios de producto Python** y sin cambios de contrato.
 - **Límite declarado:** este sello cierra la deuda del **runner**, **no** la ventana PAPER (`≥4 días`/`≥2 episodios`/`≥32 ciclos` sigue **abierta**, ledger vacío). Se declara igualmente que la cuenta fija sigue supeditada a la BD alcanzable y que no se re-mide `Δ motor = 0` con PG real (no hay cambio de motor que re-medir).
-- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`37049811028`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37049811028) (`ref=refs/tags/v2.88.31-beta`, HEAD `1f870100`, `2026-10-02T18:47:24Z → 18:55:33Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `shared`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. El job `shared` estrena **Window runner guards** (`pnpm window:test`): `# tests 19 · # pass 19 · # fail 0`. Job `python`: `All checks passed!` · `Contracts: 4 kept, 0 broken.` · `mypy no issues found in 517 source files` · **`4324 passed, 45 skipped`** (**idéntico a `v2.88.30`** ⇒ sin cambios de producto Python, como se declara). Job `frontend`: **`Test Files 235 passed (235)`** / **`Tests 1355 passed (1355)`** · `passed=true · critical=0 · warn=0`. `lifecycle-pg` **VERDE** con gates *fail-if-skipped*: **Golden Day 2.0 `2 passed`** · **Crash/Recovery Day `2 passed`** · **Concurrent AUTO `3 passed`** · crash injection matrix `2 passed` · multiprocess AUTO `1 passed`. `replay-repro` → `VEREDICTO REPRODUCIDO` con `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (**idéntico a `v2.88.25`–`v2.88.30`**), **2ª corrida IDÉNTICA** ⇒ el árbol no mueve el artefacto OOS.
+- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`37049811028`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37049811028) (`ref=refs/tags/v2.88.31-beta`, HEAD `1f870100`, `2026-10-02T18:47:24Z → 18:55:33Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `shared`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. El job `shared` estrena **Window runner guards** (`pnpm window:test`): `# tests 19 · # pass 19 · # fail 0`. Job `python`: `All checks passed!` · `Contracts: 4 kept, 0 broken.` · `mypy no issues found in 517 source files` · **`4324 passed, 45 skipped`** (**idéntico a `v2.88.30`** ⇒ sin cambios de producto Python, como se declara). Job `frontend`: **`Test Files 235 passed (235)`** / **`Tests 1355 passed (1355)`** · `passed=true · critical=0 · warn=0`. `lifecycle-pg` **VERDE** con gates _fail-if-skipped_: **Golden Day 2.0 `2 passed`** · **Crash/Recovery Day `2 passed`** · **Concurrent AUTO `3 passed`** · crash injection matrix `2 passed` · multiprocess AUTO `1 passed`. `replay-repro` → `VEREDICTO REPRODUCIDO` con `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (**idéntico a `v2.88.25`–`v2.88.30`**), **2ª corrida IDÉNTICA** ⇒ el árbol no mueve el artefacto OOS.
 
 ## [2.11.30-beta] — `OPS`/`AUTO`: LA VENTANA PAPER ≥4 DÍAS GANA RUNNER AUTOMÁTICO Y EL MONITOR AUTO VUELVE A PINTARSE (freeze del árbol `TREE_MOVED` fail-closed, y el DTO directo vs `query.data.data`)
 
@@ -794,7 +827,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 - **`Δ decisión motor = 0`.** Ninguno de los dos cambios toca motor, umbrales, `TOP_N`, allocation ni la lógica de entrada/salida: (a) es orquestación externa (sólo-lanzador); (b) corrige qué campo lee la UI, no la cadena que decide.
 - **Contrato sin drift:** `openapi.json`/`schema.d.ts`/shared **sin cambios**; **sin migración** (head `048`); **sin cambios de producto Python**.
 - **Verificación (este sello):** `vitest run` (web) **235 ficheros / 1355 tests `passed`** · `tsc -b --noEmit` **limpio** · el test de regresión **muerde** (rojo con el bug, verde con el fix) · app en vivo (`/auto-monitor` monta header/notas/timeline/concurrencia; **0** errores de consola) y terminal dev **~7 min sin un solo `500`** · `window:*` `status`/`--dry-run` OK y `freeze OK` (`apps 2237f069…` · `packages ce0a38b7…`).
-- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`37042907416`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37042907416) (`ref=refs/tags/v2.88.30-beta`, HEAD `52a07e19`, `2026-10-02T17:45:44Z → 17:53:19Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `shared`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!` · `Contracts: 4 kept, 0 broken.` · `mypy no issues found in 517 source files` · **`4324 passed, 45 skipped`** (**idéntico a `v2.88.29`** ⇒ sin cambios de producto Python, como se declara). Job `frontend`: **`Test Files 235 passed (235)`** / **`Tests 1355 passed (1355)`** · `passed=true · critical=0 · warn=0`. `lifecycle-pg` **VERDE** con gates *fail-if-skipped*: **Golden Day 2.0 `2 passed`** · **Crash/Recovery Day `2 passed`** · **Concurrent AUTO `3 passed`** · crash injection matrix `2 passed` · multiprocess AUTO `1 passed`. `replay-repro` → `VEREDICTO REPRODUCIDO` con `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (**idéntico a `v2.88.25`–`v2.88.29`**), **2ª corrida IDÉNTICA** ⇒ el árbol no mueve el artefacto OOS.
+- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`37042907416`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37042907416) (`ref=refs/tags/v2.88.30-beta`, HEAD `52a07e19`, `2026-10-02T17:45:44Z → 17:53:19Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `shared`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!` · `Contracts: 4 kept, 0 broken.` · `mypy no issues found in 517 source files` · **`4324 passed, 45 skipped`** (**idéntico a `v2.88.29`** ⇒ sin cambios de producto Python, como se declara). Job `frontend`: **`Test Files 235 passed (235)`** / **`Tests 1355 passed (1355)`** · `passed=true · critical=0 · warn=0`. `lifecycle-pg` **VERDE** con gates _fail-if-skipped_: **Golden Day 2.0 `2 passed`** · **Crash/Recovery Day `2 passed`** · **Concurrent AUTO `3 passed`** · crash injection matrix `2 passed` · multiprocess AUTO `1 passed`. `replay-repro` → `VEREDICTO REPRODUCIDO` con `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (**idéntico a `v2.88.25`–`v2.88.29`**), **2ª corrida IDÉNTICA** ⇒ el árbol no mueve el artefacto OOS.
 
 ## [2.11.29-beta] — `AUTO`: EL DÍA COMPLETO DEJA DE AFIRMARSE SIN MEDIRSE — GOLDEN DAY 2.0 SOBRE PG REAL CON HECHOS DURABLES Y PRECIO REAL (`ENTRY_ORDER`/`SETTLEMENT`/`PROTECTION`, `MARKET_CLOSE`, `exactly-once`, `Δ decisión motor = 0`)
 
@@ -802,17 +835,17 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 
 - **(H1 · 🔴) Golden Day 2.0 con hechos durables.** `AUTO_OPERATIONAL_AUDIT=1` en el día completo: cada orden BUY sella `auto_entry_order`, cada ciclo cerrado `auto_cycle_settlement` y cada nacimiento de posición `auto_protection_event`, **todos con `dedupe_key` no nulo** (ningún hecho sin identidad ⇒ nada vuelve a ser duplicable). `read_operational_monitor` reconstruye la cadena **desde lo durable** y ya no declara `protection_not_durable`/`settlement_not_durable`; la cadena llega a `CYCLE_CLOSED` sin huecos.
 - **(H2 · 🔴) Golden Day 2.0 con PRECIO REAL.** `AUTO_ENGINE_SIM_REAL_PRICE=1` + barras D1 sembradas (`close(B-1)`/`open(B)`, más `B+1`): el día abre y cierra plano (`time_exit`) pero **cada fill** declara `sim_fill_finance_context.price_source == 'MARKET_CLOSE'`, **ningún** precio es el `100.0` del `flat_price_script` y el `reference_mid` está medido (un `NULL` delataría un fallback silencioso).
-- **(H3 · 🔴 · producto) El precio real se refresca en CADA turno, no sólo al rodar la barra.** Nuevo `_v2_refresh_price()` extraído de `_v2_refresh_regime()`: el runtime recompone la fuente de precio por sesión/tick, así que el *short-circuit* por barra (`reuse_bar_datum`) dejaba la fuente **vacía** dentro de la misma barra ⇒ el turno se quedaba sin `execution` y **no podía marcar ni cerrar** (*fail-closed* silencioso en el camino de precio real). Sin fuente real es un **no-op** ⇒ `Δ = 0` para el `price_script` hermético.
+- **(H3 · 🔴 · producto) El precio real se refresca en CADA turno, no sólo al rodar la barra.** Nuevo `_v2_refresh_price()` extraído de `_v2_refresh_regime()`: el runtime recompone la fuente de precio por sesión/tick, así que el _short-circuit_ por barra (`reuse_bar_datum`) dejaba la fuente **vacía** dentro de la misma barra ⇒ el turno se quedaba sin `execution` y **no podía marcar ni cerrar** (_fail-closed_ silencioso en el camino de precio real). Sin fuente real es un **no-op** ⇒ `Δ = 0` para el `price_script` hermético.
 - **(H4 · 🔴 · producto) La clave de deduplicación no puede desbordar la columna.** Un `order_id` de venue largo rebasaba `decision_journal_entries.dedupe_key VARCHAR(160)` (migración `048`) y el alta reventaba con `StringDataRightTruncation`. Nuevo `_bounded_dedupe_key()`: los literales históricos (≤160) se devuelven **byte-idénticos** (`Δ = 0`); sólo al desbordar se acota a `prefijo + ':' + sha256[:16]` del literal completo, **sin perder determinismo ni identidad** (el `ON CONFLICT` sigue colapsando el reintento; dos órdenes distintas no colisionan).
 - **(H5 · 🟠) Crash/restart medido sobre los hechos durables.** El crash day corre con `AUDIT=1` y toma una foto de salud **antes** de la muerte sucia y **después** del reinicio convergente: 0 claves `NULL`, 0 duplicados, la orden de entrada **no se re-emite** (1 antes ⇒ 1 después) y el ciclo readoptado sella su liquidación. Además se declara la **matriz §14.B** de puntos de inyección (`AFTER_ENTRY`/`AFTER_RESERVATION`/`AFTER_ORDER`/`AFTER_FILL`/`AFTER_PROTECTION` inyectables y cubiertos; `BEFORE_ORDER`/`BEFORE_FILL`/`BEFORE_PROTECTION`/`BEFORE_SETTLEMENT` declarados **no inyectables mid-tick** por construcción del broker SIM) — un test muerde si la tabla se edita a la ligera o cita un test inexistente.
 - **(H6 · 🟠) Concurrencia con `exactly-once`.** El PG concurrente corre con `AUDIT=1` y exige que N sesiones contendientes sobre la MISMA señal produzcan **exactamente 1** `auto_entry_order`, sin claves `NULL` ni duplicadas. La divergencia **OBS-18** entre el gemelo hermético (`auto_turn` suelto ⇒ cola viva) y el PG (`released == pedido`, `remaining == 0`, `tail_dead`) se reconcilia en un **oráculo único** `apps/api-python/tests/obs18_contract.py`, compartido por ambos; el hermético ahora conduce `real_turn` (el mismo cierre que el proceso real) para medir el estado **terminal**.
 - **(H7 · 🟠) Guarda hermética `Δ motor = 0`.** Nuevo test que conduce el MISMO día dos veces —flags OFF (sin sumidero) y ON (sumidero inyectado)— y exige que el informe agregado del motor sea **idéntico** y que el camino ON **sólo añada** hechos durables al spine. Encender la auditoría **no mueve** el artefacto que decide.
 - **(H8 · 🟡) Mutaciones que muerden, declaradas.** `M294` quita la `revision_id` del hecho de PROTECCIÓN (⇒ `dedupe_key = None` ⇒ duplicable) y `M295` sustituye `deterministic_revision_id` por `uuid4` (⇒ dos ticks idénticos dejan de colapsar). Ambas se verifican **rojas** y restauradas byte a byte.
-- **`Δ decisión motor = 0`.** Con los flags por defecto **OFF** no se construye sumidero, los productores son no-op y `_bounded_dedupe_key` devuelve el literal de siempre; el overlay M2 sólo **añade** hechos, no altera signal/ranking/risk sizing/allocation/execution. El **único** cambio que toca el *fill* es `AUTO_ENGINE_SIM_REAL_PRICE=1` (deja de fabricar `100.0`), que es exactamente lo que se **re-mide**. No se toca ningún umbral ni la lógica de entrada/salida.
+- **`Δ decisión motor = 0`.** Con los flags por defecto **OFF** no se construye sumidero, los productores son no-op y `_bounded_dedupe_key` devuelve el literal de siempre; el overlay M2 sólo **añade** hechos, no altera signal/ranking/risk sizing/allocation/execution. El **único** cambio que toca el _fill_ es `AUTO_ENGINE_SIM_REAL_PRICE=1` (deja de fabricar `100.0`), que es exactamente lo que se **re-mide**. No se toca ningún umbral ni la lógica de entrada/salida.
 - **Contrato sin drift:** `openapi.json`/`schema.d.ts`/shared **sin cambios**; **sin migración** (reutiliza la columna y el índice de la `048`).
-- **Límites declarados:** la **deuda P3 del hash** (`sha256[:16]`) no se toca; el **recovery de AUSENCIA** de `PROTECTION` y de `ENTRY_ORDER` sigue fuera (sólo exactly-once); el crash *mid-tick* del broker SIM no es inyectable por construcción (se declara); la **ventana PAPER ≥4 días** es el salto operativo siguiente sobre este árbol ya congelado.
-- **Verificación (este sello):** `ruff` `All checks passed!` · `mypy` `no issues found in 517 source files` · `lint-imports` `Contracts: 4 kept, 0 broken.` · `packages/py/application/tests/test_auto_operational_audit.py` **25 passed** (+2: clave acotada) · `packages/py/analytics/tests/test_position_revision.py` **19 passed** · `test_auto_v46_concurrent.py` + `test_auto_v88_28_protection_exactly_once.py` + `test_auto_v2_worker_integration.py` **75 passed** · seam + bar short-circuit **46 passed** (incluye el nuevo `Δ motor = 0`) · **`AUTO_GOLDEN_DAY_V2_PG_REQUIRED=1 AUTO_CRASH_RECOVERY_PG_REQUIRED=1 AUTO_CONCURRENT_PG_REQUIRED=1` → `test_golden_day_v2_process_pg.py` + `test_crash_recovery_day_process_pg.py` + `test_concurrent_auto_pg.py` **7 passed** (PG real, fallo duro si skip) · mutaciones `M294`/`M295` **muerden** (rojo en `test_protection_is_persisted_with_account_and_engine` / `test_seal_protection_transition_without_change_shares_content_id`, restaurado byte a byte) · `alembic heads` → `048_journal_entry_dedupe_key (head)`.
-- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`37034237594`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37034237594) (`ref=refs/tags/v2.88.29-beta`, HEAD `2b67a2fa`, `2026-10-02T16:29:04Z → 16:37:58Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken.`, `mypy no issues found in 517 source files`, **`4324 passed, 45 skipped, 7 warnings in 132.65s`** (`v2.88.28` = `4321 passed, 45 skipped` ⇒ **+3 passed** = la clave acotada +2 y el `Δ motor = 0` hermético +1; **mismos `45` skips**). `lifecycle-pg` **VERDE** con gates *fail-if-skipped*: **Golden Day 2.0 `2 passed`**, **Crash/Recovery Day `2 passed`**, **Concurrent AUTO `3 passed`**. `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` / `3340728 B` (**idéntico a `v2.88.25`–`v2.88.28`**), **2ª corrida IDÉNTICA** ⇒ **`Δ motor = 0` confirmado en el runner.**
+- **Límites declarados:** la **deuda P3 del hash** (`sha256[:16]`) no se toca; el **recovery de AUSENCIA** de `PROTECTION` y de `ENTRY_ORDER` sigue fuera (sólo exactly-once); el crash _mid-tick_ del broker SIM no es inyectable por construcción (se declara); la **ventana PAPER ≥4 días** es el salto operativo siguiente sobre este árbol ya congelado.
+- **Verificación (este sello):** `ruff` `All checks passed!` · `mypy` `no issues found in 517 source files` · `lint-imports` `Contracts: 4 kept, 0 broken.` · `packages/py/application/tests/test_auto_operational_audit.py` **25 passed** (+2: clave acotada) · `packages/py/analytics/tests/test_position_revision.py` **19 passed** · `test_auto_v46_concurrent.py` + `test_auto_v88_28_protection_exactly_once.py` + `test_auto_v2_worker_integration.py` **75 passed** · seam + bar short-circuit **46 passed** (incluye el nuevo `Δ motor = 0`) · **`AUTO_GOLDEN_DAY_V2_PG_REQUIRED=1 AUTO_CRASH_RECOVERY_PG_REQUIRED=1 AUTO_CONCURRENT_PG_REQUIRED=1` → `test_golden_day_v2_process_pg.py` + `test_crash_recovery_day_process_pg.py` + `test_concurrent_auto_pg.py` **7 passed** (PG real, fallo duro si skip) · mutaciones `M294`/`M295` **muerden\*\* (rojo en `test_protection_is_persisted_with_account_and_engine` / `test_seal_protection_transition_without_change_shares_content_id`, restaurado byte a byte) · `alembic heads` → `048_journal_entry_dedupe_key (head)`.
+- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`37034237594`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37034237594) (`ref=refs/tags/v2.88.29-beta`, HEAD `2b67a2fa`, `2026-10-02T16:29:04Z → 16:37:58Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken.`, `mypy no issues found in 517 source files`, **`4324 passed, 45 skipped, 7 warnings in 132.65s`** (`v2.88.28` = `4321 passed, 45 skipped` ⇒ **+3 passed** = la clave acotada +2 y el `Δ motor = 0` hermético +1; **mismos `45` skips**). `lifecycle-pg` **VERDE** con gates _fail-if-skipped_: **Golden Day 2.0 `2 passed`**, **Crash/Recovery Day `2 passed`**, **Concurrent AUTO `3 passed`**. `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` / `3340728 B` (**idéntico a `v2.88.25`–`v2.88.28`**), **2ª corrida IDÉNTICA** ⇒ **`Δ motor = 0` confirmado en el runner.**
 
 ## [2.11.28-beta] — `AUTO`: LA PROTECCIÓN DEJA DE PODER DUPLICARSE — TODA TRANSICIÓN LLEVA SU REVISIÓN DURABLE DETERMINISTA (`PROTECTION`, `revision_id`, `exactly-once`, `Δ decisión motor = 0`)
 
@@ -825,7 +858,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 - **Límites declarados:** **sin migración** (reutiliza la columna e índice de la `048`); **`PROTECTION` sigue sin recuperación de AUSENCIA** de transiciones (sólo exactly-once: no hay histórico que re-derivar); sin backfill (los hechos previos quedan con `dedupe_key = NULL`); Golden Day 2.0, crash/recovery longitudinal y PAPER ≥4 días siguen fuera de alcance.
 - **Verificación (este sello):** `ruff` `All checks passed!` · `mypy` `no issues found in 517 source files` · `packages/py/analytics/tests` **1277 passed** · `test_position_revision.py` **19 passed** (+6) · `packages/py/application/tests` **2299 passed** · `test_auto_v2_worker_integration.py` **39 passed** (+1) · `test_auto_v88_28_protection_exactly_once.py` **12 passed** (nuevo, hermético) · `test_auto_v88_28_protection_exactly_once_pg.py` **3 passed** (PG real: cada `kind` idempotente · dos sesiones ⇒ 1 fila · sin revisión ⇒ 2 filas) · durable facts **18 passed** · import-linter `Contracts: 4 kept, 0 broken.` · `alembic heads` → `048_journal_entry_dedupe_key (head)` · **`replay-repro` local:** el artefacto OOS regenerado es **byte-idéntico** al del árbol PRE-cambio (`Δ motor = 0`; el sello byte a byte lo certifica el runner Linux del tag).
 - **Nota de honestidad:** la corrida local completa de `apps/api-python/tests` (contra PG real) reportó fallos de **caos/concurrencia** que desaparecen al re-ejecutarlos en aislamiento, más `test_tax_report.py::test_tax_report_after_round_trip_trade` (`403`), **preexistente** ya documentado en la evidencia de `v2.88.27` (falla idénticamente en el árbol pre-cambio). El job `python`/`lifecycle-pg` del CI es quien certifica.
-- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`37023279460`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37023279460) (`ref=refs/tags/v2.88.28-beta`, HEAD `7c585273`, `2026-10-02T14:55:22Z → 15:04:10Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken.`, `mypy no issues found in 517 source files`, **`4321 passed, 45 skipped, 7 warnings in 92.94s`** (`v2.88.27` = `4302 passed, 42 skipped` ⇒ **+19 passed** = `test_position_revision.py` +6, hermético nuevo +12, `test_auto_v2_worker_integration.py` +1; **+3 skipped** = los 3 PG nuevos, que corren en `lifecycle-pg`). `lifecycle-pg` **VERDE** (gates *fail-if-skipped* cumplidos). `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` / `3340728 B` (**idéntico a `v2.88.25`/`26`/`27`**), **2ª corrida IDÉNTICA** ⇒ **`Δ motor = 0` confirmado en el runner.**
+- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`37023279460`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37023279460) (`ref=refs/tags/v2.88.28-beta`, HEAD `7c585273`, `2026-10-02T14:55:22Z → 15:04:10Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken.`, `mypy no issues found in 517 source files`, **`4321 passed, 45 skipped, 7 warnings in 92.94s`** (`v2.88.27` = `4302 passed, 42 skipped` ⇒ **+19 passed** = `test_position_revision.py` +6, hermético nuevo +12, `test_auto_v2_worker_integration.py` +1; **+3 skipped** = los 3 PG nuevos, que corren en `lifecycle-pg`). `lifecycle-pg` **VERDE** (gates _fail-if-skipped_ cumplidos). `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` / `3340728 B` (**idéntico a `v2.88.25`/`26`/`27`**), **2ª corrida IDÉNTICA** ⇒ **`Δ motor = 0` confirmado en el runner.**
 
 ## [2.11.27-beta] — `AUTO`: LOS HECHOS DURABLES M2 DEJAN DE PODER DUPLICARSE Y EL `SETTLEMENT` QUE UN CRASH DEJÓ SIN PUBLICAR SE RECUPERA (`dedupe_key`, `exactly-once`, `recuperación de arranque`, `Δ decisión motor = 0`)
 
@@ -840,11 +873,11 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 - **Contrato sin drift:** `openapi.json`/`schema.d.ts`/shared **sin cambios** (`contract:check OK`).
 - **Límites declarados:** **sin backfill** (los hechos previos quedan con `dedupe_key = NULL` y no se reescriben); **`ENTRY_ORDER` sin recuperación de AUSENCIA** (sí exactly-once: el intent de orden no es durable, pero los fills y la posición sí; cerrar la ausencia exige persistir el intent en un sello posterior); **`PROTECTION` sin recuperación de transiciones** (sólo exactly-once: no hay histórico de transiciones que re-derivar); la ventana de recuperación acota el trabajo de arranque (el ciclo fuera de ventana se sella al reabrirse o en el siguiente arranque, y el monitor lo declara mientras tanto).
 - **Verificación (este sello):** `ruff` `All checks passed!` · `mypy` `no issues found in 517 source files` · `packages/py/application/tests` **2299 passed** (+6 sobre `2.11.26-beta`) · `test_auto_operational_audit.py` **23 passed** (+4) · `test_price_source_kind.py` **15 passed** (+2) · `test_auto_v88_durable_facts.py` **4 passed** (con dedupe) · `test_auto_v88_27_durable_facts_recovery.py` **8 passed** (nuevo, hermético) · monitor PG **13 passed** (PG real, gate `fail-if-skipped`) · `test_auto_v88_27_durable_facts_idempotent_pg.py` **3 passed** (PG real: append repetido ⇒ 1 fila; sin clave ⇒ 2 filas; roundtrip `047→048→head`) · seam **21 passed** · v2 worker integration **38 passed** · `contract:check OK` · `alembic heads` → `048_journal_entry_dedupe_key (head)`.
-- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`37006426124`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37006426124) (`ref=refs/tags/v2.88.27-beta`, HEAD `5b650676`, `2026-10-02T12:23:50Z → 12:31:15Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken.`, `mypy no issues found in 517 source files`, **`4302 passed, 42 skipped, 7 warnings in 136.40s`** (`v2.88.26` = `4288 passed, 42 skipped` ⇒ **+14** = los tests de este sello, con los **mismos `42` skips**). `lifecycle-pg` **VERDE** (gates *fail-if-skipped* cumplidos, incluido el nuevo PG de idempotencia); `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` / `3340728 B` (**idéntico a `v2.88.25`/`v2.88.26`**), **2ª corrida IDÉNTICA** ⇒ **el artefacto OOS no se mueve: `Δ motor = 0` confirmado en el runner**.
+- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`37006426124`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37006426124) (`ref=refs/tags/v2.88.27-beta`, HEAD `5b650676`, `2026-10-02T12:23:50Z → 12:31:15Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken.`, `mypy no issues found in 517 source files`, **`4302 passed, 42 skipped, 7 warnings in 136.40s`** (`v2.88.26` = `4288 passed, 42 skipped` ⇒ **+14** = los tests de este sello, con los **mismos `42` skips**). `lifecycle-pg` **VERDE** (gates _fail-if-skipped_ cumplidos, incluido el nuevo PG de idempotencia); `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` / `3340728 B` (**idéntico a `v2.88.25`/`v2.88.26`**), **2ª corrida IDÉNTICA** ⇒ **el artefacto OOS no se mueve: `Δ motor = 0` confirmado en el runner**.
 
 ## [2.11.26-beta] — `AUTO`: LA PROTECCIÓN DEJA DE SER SÓLO ESTADO PROYECTADO — LAS TRANSICIONES DE PROTECCIÓN PASAN A SER HECHOS DURABLES APPEND-ONLY (`PROTECTION`, `auto_protection_event`, `Δ decisión motor = 0`)
 
-**Bump** `2.11.25-beta` → `2.11.26-beta`. **SIN migración** (Alembic head sigue `047_fill_price_source`). Cierra el **último hueco de la cadena operativa**: hasta ahora la protección vivía **sólo** en el `position_state` proyectado y el paso `PROTECTION` se encendía con esa proyección, sin traza append-only de *cuándo* y *por qué* cambió el stop, se alcanzó T1/T2, se armó el trailing o se pidió la salida. **Ninguna decisión de inversión cambia**: el evento va tras el sumidero M2 (`AUTO_OPERATIONAL_AUDIT`, default OFF ⇒ no-op) y el paso se vuelve **durable-only** (simétrico a `SETTLEMENT`). Evidencia: [`docs/engineering/evidence/v2.88.26/README.md`](./docs/engineering/evidence/v2.88.26/README.md).
+**Bump** `2.11.25-beta` → `2.11.26-beta`. **SIN migración** (Alembic head sigue `047_fill_price_source`). Cierra el **último hueco de la cadena operativa**: hasta ahora la protección vivía **sólo** en el `position_state` proyectado y el paso `PROTECTION` se encendía con esa proyección, sin traza append-only de _cuándo_ y _por qué_ cambió el stop, se alcanzó T1/T2, se armó el trailing o se pidió la salida. **Ninguna decisión de inversión cambia**: el evento va tras el sumidero M2 (`AUTO_OPERATIONAL_AUDIT`, default OFF ⇒ no-op) y el paso se vuelve **durable-only** (simétrico a `SETTLEMENT`). Evidencia: [`docs/engineering/evidence/v2.88.26/README.md`](./docs/engineering/evidence/v2.88.26/README.md).
 
 - **(H1 · 🔴) `PROTECTION` deja de afirmarse sobre una proyección.** Nuevo `AUTO_PROTECTION_EVENT = "auto_protection_event"` y builder puro `build_protection_entry(...)` en `auto_operational_audit.py`, sellado por `cycle_id` (el `decision_id` derivado entra en `list_by_decision_ids` **sin consulta nueva**). El worker emite la traza de la transición que **ya produjo** `PositionState` (la autoridad) — nunca la re-deriva — en el nacimiento (`PROTECT_APPLIED`, `source=plan`), el ratchet/trail (`STOP_RATCHET_APPLIED`/`PROTECT_APPLIED`/`TRAIL_ADVANCED`), el objetivo y armado (`T1_HIT`/`T2_HIT`/`TRAIL_ARMED`) y la salida pedida (`TIME_EXIT`/`THESIS_EXIT`/`EXIT_REQUESTED`); la intención sin efecto emite `PROTECT_REQUESTED`.
 - **(H2 · 🔴) El paso `PROTECTION` pasa a durable-only.** Sin hecho durable se declara `unknown` con `protection_not_durable` y sus facts proyectados viajan `UNKNOWN` (**jamás** `reached` desde la proyección); con el hecho se enciende `reached` y expone la última transición del ciclo (`kind`, `stopBefore`→`stopAfter`, `target`, `lifecycleFrom`→`lifecycleTo`, `revisionId`, `source`) junto con la proyección viva. Un último `kind` de salida pedida declara `protection_exit_requested_without_materialization`. El read model agrupa varias transiciones por ciclo y expone la **más reciente por instante**, no por orden accidental de la lista.
@@ -853,7 +886,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 - **Contrato sin drift:** los facts del monitor son genéricos `{key,value,measurement}`; `openapi.json`/`schema.d.ts`/shared **sin cambios** (`contract:check OK`).
 - **Límites declarados:** **sin backfill** (posiciones previas ⇒ `protection_not_durable` hasta la próxima transición); la **adopción** tras reinicio **no** fabrica una transición (el hecho durable previo es la evidencia); `PROTECTION_EXIT` en XTB/live fuera de alcance; `P3-2`/`P3-3` y `G1`–`G7` siguen abiertas; el crash/restart de la cadena completa es `P4`, no este sello.
 - **Verificación (este sello):** `ruff` `All checks passed!` · `mypy` `no issues found in 517 source files` (+1 = `protection_event_kind.py`) · `packages/py/application/tests` **2293 passed** (+28 sobre `2.11.25-beta`) · monitor PG **13 passed** (PG real, gate `fail-if-skipped`) · seam **21 passed** (+4) · v2 worker integration **38 passed** (+3) · durable facts **4 passed** · `test_protection_event_kind.py` **20 passed** · `test_auto_operational_audit.py` **19 passed** · `test_auto_operational_monitor.py` **49 passed** · `contract:check OK` · `alembic heads` → `047_fill_price_source (head)`.
-- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`36998362582`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36998362582) (`ref=refs/tags/v2.88.26-beta`, HEAD `13e37412`, `2026-10-02T10:57:42Z → 11:05:56Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken.`, `mypy no issues found in 517 source files`, **`4288 passed, 42 skipped, 7 warnings in 128.18s`** (`v2.88.25` = `4254 passed, 42 skipped` ⇒ **+34** = los tests de este sello, con los **mismos `42` skips**). `lifecycle-pg` **VERDE** (gates *fail-if-skipped* cumplidos); `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (**idéntico a `v2.88.25`**), **2ª corrida IDÉNTICA** ⇒ **el artefacto OOS no se mueve: `Δ motor = 0` confirmado en el runner**.
+- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`36998362582`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36998362582) (`ref=refs/tags/v2.88.26-beta`, HEAD `13e37412`, `2026-10-02T10:57:42Z → 11:05:56Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken.`, `mypy no issues found in 517 source files`, **`4288 passed, 42 skipped, 7 warnings in 128.18s`** (`v2.88.25` = `4254 passed, 42 skipped` ⇒ **+34** = los tests de este sello, con los **mismos `42` skips**). `lifecycle-pg` **VERDE** (gates _fail-if-skipped_ cumplidos); `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (**idéntico a `v2.88.25`**), **2ª corrida IDÉNTICA** ⇒ **el artefacto OOS no se mueve: `Δ motor = 0` confirmado en el runner**.
 
 ## [2.11.25-beta] — `AUTO`: LOS TRES HECHOS QUE FALTABAN DEJAN DE SER HUECOS — LA ORDEN DE ENTRADA, LA LIQUIDACIÓN DEL CICLO Y LA FUENTE DE PRECIO POR FILL PASAN A SER DURABLES (`ENTRY_ORDER`/`SETTLEMENT`/`price_source`, `Δ decisión motor = 0`)
 
@@ -866,7 +899,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 - **`Δ decisión motor = 0`.** Sin `AUTO_OPERATIONAL_AUDIT` los productores son no-op y el motor produce exactamente lo mismo; el `price_source` es una columna aditiva (no cambia el reparto de fills). No se toca ningún umbral.
 - **Límites declarados:** **sin backfill** (los fills previos llevan `price_source = NULL`; no hay eventos retrospectivos); `PROTECTION` sigue como estado (no evento); `activeSessions` sigue un suelo; `ENTRY_ORDER`/`SETTLEMENT`/`price_source` en XTB/live fuera de alcance; `P3-2`/`P3-3` y `G1`–`G7` abiertas.
 - **Verificación (este sello):** `ruff` `All checks passed!` · `mypy` `no issues found in 516 source files` (+1 = `price_source_kind.py`) · `packages/py/application/tests` **2265 passed** (+28 sobre `2.11.24-beta`) · monitor PG **11 passed** (PG real) · seam **17 passed** · durable facts **4 passed** · `test_price_source_kind.py` **13 passed** · `test_sim_durable_v2_state.py` **7 passed** · shared **12 passed** · web `auto-monitor` **9 passed** · `contract:check OK` · `alembic heads` → `047_fill_price_source (head)`.
-- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`36991159733`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36991159733) (`ref=refs/tags/v2.88.25-beta`, HEAD `9c475221`, `2026-10-02T09:40:43Z → 09:50:03Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken.`, `mypy no issues found in 516 source files`, **`4254 passed, 42 skipped, 7 warnings in 129.02s`** (`v2.88.24` tenía **`4217 passed, 42 skipped`** ⇒ **+37** = los tests de este sello, con los **mismos `42` skips**). `lifecycle-pg` **VERDE** (gates *fail-if-skipped* cumplidos); `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`, **2ª corrida IDÉNTICA** ⇒ **el artefacto OOS no se mueve: `Δ motor = 0` confirmado en el runner**.
+- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`36991159733`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36991159733) (`ref=refs/tags/v2.88.25-beta`, HEAD `9c475221`, `2026-10-02T09:40:43Z → 09:50:03Z`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken.`, `mypy no issues found in 516 source files`, **`4254 passed, 42 skipped, 7 warnings in 129.02s`** (`v2.88.24` tenía **`4217 passed, 42 skipped`** ⇒ **+37** = los tests de este sello, con los **mismos `42` skips**). `lifecycle-pg` **VERDE** (gates _fail-if-skipped_ cumplidos); `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`, **2ª corrida IDÉNTICA** ⇒ **el artefacto OOS no se mueve: `Δ motor = 0` confirmado en el runner**.
 
 ## [2.11.24-beta] — `AUTO-MONITOR`: EL CIERRE DE CICLO Y EL `PnL` DEJAN DE AFIRMARSE SOBRE UNA VENTANA DE FILLS TRUNCADA (`CYCLE_CLOSED`/`PnL` POR CICLO), EL AGREGADO CON `COUNT=0` PASA A `COMPLETE`, `lastDecisionAt` GANA DESEMPATE DETERMINISTA Y SE ACOTA POR `engine_id` (`Δ decisión motor = 0`)
 
@@ -879,7 +912,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 - **Contrato y UI:** `closed` pasa a **nullable** (+ `closedMeasurement`) en el DTO/OpenAPI/`schema.d.ts` y en `@bolsa/shared`; la timeline rotula `NO MEDIDO` (ámer) cuando el cierre no se puede afirmar. `contract:gen` regenerado y `contract:check OK`.
 - **Límites declarados:** las decisiones trazadas antes de este sello no llevan `engineId` y no entran en la lectura scoped (mismo límite que el backfill de `account_id` de `v2.88.23`); se puebla a partir de la próxima decisión. `SETTLEMENT`/`ENTRY_ORDER` y el resto de productores durables siguen **NO MEDIDO** (deuda ya declarada, no se cierra aquí).
 - **Verificación (este sello):** `ruff` `All checks passed!` · `mypy` `no issues found in 515 source files` · `packages/py/application/tests` **2237 passed** (+4 sobre `2.11.23-beta`) · monitor PG + seam **20 passed** (PG real) · shared **12 passed** · web `auto-monitor` **9 passed** · `contract:check OK`.
-- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`36985958957`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36985958957) (`ref=refs/tags/v2.88.24-beta`, HEAD `695c9800`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken`, `mypy no issues found in 515 source files`, **`4217 passed, 42 skipped, 7 warnings in 91.03s`** (`v2.88.23` tenía **`4211 passed, 42 skipped`** ⇒ **+6** = los tests de este sello, con los **mismos `42` skips**). `lifecycle-pg` **VERDE** (gates *fail-if-skipped* cumplidos); `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` / **3340728 B** (LF; sello `3445622 B`), **2ª corrida IDÉNTICA** ⇒ **el artefacto OOS no se mueve: `Δ motor = 0` confirmado en el runner**.
+- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`36985958957`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36985958957) (`ref=refs/tags/v2.88.24-beta`, HEAD `695c9800`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken`, `mypy no issues found in 515 source files`, **`4217 passed, 42 skipped, 7 warnings in 91.03s`** (`v2.88.23` tenía **`4211 passed, 42 skipped`** ⇒ **+6** = los tests de este sello, con los **mismos `42` skips**). `lifecycle-pg` **VERDE** (gates _fail-if-skipped_ cumplidos); `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` / **3340728 B** (LF; sello `3445622 B`), **2ª corrida IDÉNTICA** ⇒ **el artefacto OOS no se mueve: `Δ motor = 0` confirmado en el runner**.
 
 ## [2.11.23-beta] — `AUTO-MONITOR`: CIERRE DE NUEVE GRIETAS DEL CONTRATO `M2` — EL CLAIM PERDIDO DEJA DE FABRICAR CARRERA, LOS CONTADORES PASAN A AGREGADO `SQL` (`COMPLETE`/`PARTIAL`), `lastDecisionAt` SE LEE GLOBALMENTE, UN HECHO SIN VALOR DEJA DE ROTULARSE `MEDIDO` Y LOS HUECOS DE `side`/ventana SE DECLARAN (`Δ decisión motor = 0`)
 
@@ -898,7 +931,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 - **Contrato y UI sin cambio de forma:** `HeaderDto`/`ConcurrencyDto`, `openapi.json`, `schema.d.ts` y `@bolsa/shared` conservan los campos; `contract:check` sin drift. Los valores no medidos siguen viajando `null` + `measurement` (nunca un `0` afirmado).
 - **Límites declarados:** las filas `auto_entry_decision` anteriores a este sello (sin `account_id`) no entran en la lectura global (no hay backfill ni migración); se puebla a partir de la próxima decisión trazada. `SETTLEMENT`/`ENTRY_ORDER` y el resto de productores durables siguen **NO MEDIDO** (deuda ya declarada, no se cierra aquí).
 - **Verificación (este sello):** `ruff` `All checks passed!` · `mypy` `no issues found in 515 source files` · `packages/py/application/tests` **2233 passed** (+16 sobre `2.11.22-beta`) · `test_auto_operational_monitor.py` **34 passed** · `test_auto_operational_audit.py` **7 passed** · monitor PG + seam **14 passed** (PG real) · shared **11 passed** · web `auto-monitor` **8 passed** · `contract:check OK`.
-- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`36978174405`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36978174405) (`ref=refs/tags/v2.88.23-beta`, HEAD `b92744f8`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken`, `mypy no issues found in 515 source files`, **`4211 passed, 42 skipped, 7 warnings in 102.49s`** (`v2.88.22` tenía **`4193 passed, 42 skipped`** ⇒ **+18** = los tests de este sello, con los **mismos `42` skips**). `lifecycle-pg` **VERDE** (gates *fail-if-skipped* cumplidos); `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` / **3340728 B** (LF; sello `3445622 B`), **2ª corrida IDÉNTICA** ⇒ **el artefacto OOS no se mueve: `Δ motor = 0` confirmado en el runner**.
+- **CITA REAL DEL CI (POST-TAG, 2026-10-02):** `Release tag CI` run [`36978174405`](https://github.com/jvelasca/Bolsa_V1/actions/runs/36978174405) (`ref=refs/tags/v2.88.23-beta`, HEAD `b92744f8`) → **`SUCCESS`**: **11 jobs `success`** (`security`, `decision-spine`, `python`, `replay-repro`, `dr-verify`, `a7-gate`, `frontend`, `lifecycle-pg`, `shared`, `playwright (mock E2E)`, `certify`) + `playwright (integrated E2E, opt-in)` `skipped` por diseño. Job `python`: `All checks passed!`, `Contracts: 4 kept, 0 broken`, `mypy no issues found in 515 source files`, **`4211 passed, 42 skipped, 7 warnings in 102.49s`** (`v2.88.22` tenía **`4193 passed, 42 skipped`** ⇒ **+18** = los tests de este sello, con los **mismos `42` skips**). `lifecycle-pg` **VERDE** (gates _fail-if-skipped_ cumplidos); `replay-repro` → `VEREDICTO REPRODUCIDO (mismo CONTENIDO; el sello está en CRLF y este fichero en LF)`, `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` / **3340728 B** (LF; sello `3445622 B`), **2ª corrida IDÉNTICA** ⇒ **el artefacto OOS no se mueve: `Δ motor = 0` confirmado en el runner**.
 
 ## [2.11.22-beta] — `AUTO-MONITOR`: CORRECCIONES SEMÁNTICAS DE `M1` — `SETTLEMENT` DEJA DE AFIRMARSE DESDE UN CICLO CERRADO, "ÚLTIMA DECISIÓN" DEJA DE SER UN HEARTBEAT Y LA CONCURRENCIA SEPARA CLAIMS DE CARRERAS (`Δ motor = 0`)
 
@@ -921,6 +954,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 
 **(A) La matrícula del tick del motor AUTO podía reventar con el `UniqueViolation` del PK.** `PostgresAutoEngineStore.record_tick` hacía `ON CONFLICT DO NOTHING ON CONSTRAINT auto_engine_ticks_engine_seq_uidx` — es decir, nombraba **un árbitro**: `ON CONFLICT` resuelve **solo contra el índice nombrado**, y en la tabla hay **dos** índices únicos sobre la **misma** clave funcional (`auto_engine_ticks_engine_seq_uidx` sobre `(engine_id, seq)` y `auto_engine_ticks_pkey` sobre `tick_id`, que es `f"tick-{engine_id}-{seq}"`). La clave repetida es la misma, pero el árbitro elegido decidía **cuál** de las dos violaciones se absorbía y la otra seguía armada: medido con **sonda pura** (5 insertadores `AsyncSession` concurrentes por intento sobre el mismo `(engine_id, seq)`, **300** intentos) ⇒ **2/300** intentos morían con `psycopg.errors.UniqueViolation` del **PK**. **Segundo hallazgo, medido:** el guardián de no-doble (`if inserted.rowcount == 0`) era **código muerto** — el driver devuelve **−1** en las **125** inserciones de la sonda (**ganadas y omitidas**), así que la rama que debía detectar «ya estaba matriculado» **no se ejecutaba nunca**. **Arreglo:** `on_conflict_do_nothing()` **sin árbitro** (cubre todos los índices únicos utilizables) + **`returning(AutoEngineTickRow.tick_id)`** y omisión leída de **datos** (`scalar_one_or_none() is None` ⇒ `ROLLBACK` del savepoint). **Después:** **0/300** fallos, **300** `tick_id` (**una** matrícula por intento) y **1200** omisiones declaradas.
 **(B) La ventana de gracia de reservas envejecía una reserva recién nacida y otra sesión la retiraba con `cancel`.** El sello de alta (`_v2_instant`) es ISO-UTC **a segundos**, así que la edad **aparente** excede a la **real** en hasta **1 s**; la ventana era de **1 turno** = **1.000 s exactos** en la cadencia de la certificación ⇒ medido: reserva sellada a `16:08:09` vista por un par con reloj `16:08:10.009331` ⇒ edad aparente **1.009 s** > ventana **1.000 s**, con edad **real** de milisegundos y la orden de su dueño **aún sin emitir** (`in_flight = []`). Ese par **AJENO** (`mine=False`) la retiraba declarando `cancel` («nunca materializó») y el fill parcial del dueño llegaba **después**: `released = 200.000000` frente a `Σ APPLIED = 147.000000` (2 tranchas: 100 + 47, **mismo `cycle_id`**) ⇒ **fail-OPEN**: capital de una orden **en vuelo** devuelto al mercado **y** procedencia falsa (exactamente lo que `OBS-14`/`OBS-20` existen para no volver a declarar). **Arreglo:** `V2_RESERVATION_GRACE_STAMP_RESOLUTION = timedelta(seconds=1)` y `reservation_grace_window` lo **SUMA** ⇒ `aged` pasa a implicar edad **REAL** > ventana (el cambio es de **1 s**, no de un turno: no relaja la política de gracia de `OBS-14.b`).
+
 - **Soak:** `test_concurrent_auto_pg.py` — **antes** ~**66** corridas con **3** fallos (2 × `IntegrityError` del PK + 1 × `cancel` falso); **después** **60/60** y **10/10** de re-confirmación tras los últimos edits (0 fallos).
 - **Guarda y mutación:** `test_reservation_grace_window_sums_the_stamp_resolution` (hermética, determinista, sin reloj ni PG) + **mutante** que la mata al quitar el término de resolución (árbol restaurado **byte a byte**).
 - **Hipótesis propia medida y DESCARTADA (declarada):** se probó **también** invertir el **orden de lectura** de la evidencia durable en `_v2_reconcile_reservations`; el fallo persistió **idéntico** y el cambio se **revirtió** (**Δ `src` = 0** por ese concepto).
@@ -965,7 +999,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 
 ### Paso `2b` de `W4` — unificación de las lecturas de precio al tick de BARRA (`Δ ≠ 0` acotado)
 
-- **Hallazgo:** la coherencia temporal del precio quedó a medias en `W3`: el *fill* ya usaba el tick de barra (`_settle`), pero la **decisión**, el **mark** de equity, la **protección** y el **coste de oportunidad** leían `self._minute`, que avanza cada 60 s. Con precio constante era inocuo; con precio real, decisión y *fill* leerían instantes distintos.
+- **Hallazgo:** la coherencia temporal del precio quedó a medias en `W3`: el _fill_ ya usaba el tick de barra (`_settle`), pero la **decisión**, el **mark** de equity, la **protección** y el **coste de oportunidad** leían `self._minute`, que avanza cada 60 s. Con precio constante era inocuo; con precio real, decisión y _fill_ leerían instantes distintos.
 - **Cambio:** **5 lecturas** pasan a `self._v2_bar_tick()` (se unen a la sexta, que ya lo usaba). **No** se toca la protección legacy (`protection_exit_reason(..., minute=self._minute)`), que es el `ProtectionClock` v2 deliberado (`W5`).
 - **`Δ` medido (A/B aislado):** batería `pytest apps/api-python/tests -k auto` ⇒ **`1 failed, 475 passed`** con `2b` (el rojo es el PG **pre-existente**) vs **`2 failed, 474 passed`** sin `2b` (pre-existente + el test nuevo del contrato). **Ninguna otra expectativa se movió** (los scripts que cuentan llamadas ignoran el `tick`; `_rising_price` vive en una sola barra ⇒ constante).
 - **`replay-repro` intacto (`Δ = 0`):** `ReplayCursor.price_script` **ignora el `tick`** ⇒ regenerar el artefacto con el seed congelado da el **mismo** `sha256 = 697526ED…C298967` (y `3 448 185 bytes`) que antes de `2b`. **Golden day `1 passed`** (precio hermético constante). ⚠️ **Ese digest es el render LOCAL en Windows (drift de plataforma), NO el sello** — la autoridad es el par del `assert-artifact` de `replay-repro`: **`1E3ADAC2…929A37E7` / `3 340 728 B`** (LF) y **`240662250347A2AA…6D9F54F0` / `3 445 622 B`** (CRLF); ver `evidence/v2.88.17` §1.3 «Nota OBS».
@@ -1088,7 +1122,7 @@ Implementa, sobre el piloto de `v2.88.51`, el **`AUTO UI SEMANTIC MODEL 1.0`** c
 intactos, sin backdating); **NO enmienda el ADR 010**.
 
 - **Revisa (no sustituye) el diseño de `v2.88.12`.** Conserva el **diagnóstico** (el dato es **diario**, el bucle es de
-  **60 s**; precio plano `flat_price_script = 100.0`; *fill* con `seed = minute`) y **cambia el modelo**: de una única
+  **60 s**; precio plano `flat_price_script = 100.0`; _fill_ con `seed = minute`) y **cambia el modelo**: de una única
   `OperativeGranularity` a **relojes separados** (`DecisionClock` / `ProtectionClock` / `ExecutionModel` /
   `EvidenceBucket`), con el **heartbeat de infraestructura FUERA** del value object.
 - **Contrato de protección D1 explícito (fail-closed).** Se declaran dos modelos — **A: OHLC de barra**
@@ -1100,7 +1134,7 @@ intactos, sin backdating); **NO enmienda el ADR 010**.
 - **Contrato de `record_tick`.** Inventario de consumidores (auditoría/heartbeat/recovery/ventanas/diagnóstico) **antes**
   de reducir su frecuencia; separación de `DecisionEvent`/`ProtectionEvent`/`SettlementEvent`/`HeartbeatEvent`.
 - **Fase A ≠ Fase B.** A (short-circuit) es **semánticamente neutra**: golden de equivalencia con `Δfills = Δcycles =
-  ΔPnL = Δreservations = Δsettlements = Δevidence = 0`. B (`OPEN(D+1)`) **puede** cambiar resultados y se compara
+ΔPnL = Δreservations = Δsettlements = Δevidence = 0`. B (`OPEN(D+1)`) **puede** cambiar resultados y se compara
   contra un **golden nuevo**.
 - **`1wk` declarada pero NO habilitada** (gap del lunes sin pruebas temporales). **`OBS-21` está CERRADA** en
   `v2.88.11-beta` (la auditoría la daba por pendiente); **`OBS-23`** (flake del test PG) sigue **ABIERTA**.
@@ -1122,7 +1156,7 @@ intactos, sin backdating); **NO enmienda el ADR 010** (sólo añade un enlace **
 - **Hallazgo medido.** En producción `AutoSimRuntime` se construye **sin `price_script`** ⇒ el motor usa
   `flat_price_script` (**100.0 constante**); el **único** punto con cuotas reales (`MarketPriceSnapshot`) es el script
   `v2_76_forward_market_material.py`. Es decir: miles de iteraciones sobre un precio que no se mueve.
-- **Incoherencia de granularidad.** El *fill* usa `seed = minute` y `base_mid = price_script(...)` (precio por tick)
+- **Incoherencia de granularidad.** El _fill_ usa `seed = minute` y `base_mid = price_script(...)` (precio por tick)
   mientras la **decisión** se toma sobre **barras D1** cerradas.
 - **La propuesta (no implementada).** Una **única fuente de verdad** `OperativeGranularity` (VO puro; `1d`/`1wk`
   hoy, seam intradía **fail-closed**) de la que **se derivan** régimen/ATR/señal, cadencia, modelo de protección,
@@ -1139,10 +1173,10 @@ intactos, sin backdating); **NO enmienda el ADR 010** (sólo añade un enlace **
   `test_simulated_finance_pg.py::test_permanent_rejection_materializes_failed_not_retry` (`1 failed, 165 passed`) —
   **NO es el motor** (sello docs-only; código idéntico al verde `v2.88.11`), sino un **test flaky** (`OBS-23`): el
   test genera un `instrument_id` **aleatorio** y `simulated_fill_schedule` → `draw_queue_noise(seed, side,
-  instrument_id)` cae en una cola TERMINAL sin fill con probabilidad `0.010+0.025+0.005+0.012+0.004 = 5,6 %`.
+instrument_id)` cae en una cola TERMINAL sin fill con probabilidad `0.010+0.025+0.005+0.012+0.004 = 5,6 %`.
   **attempt 2** (rerun de los jobs fallidos) → **SUCCESS**: `certify` **GREEN** (10 jobs requeridos verdes +
   `playwright (integrated)` `skipped` por diseño); `python` **`3118 passed, 38 skipped`** (Ruff `All checks
-  passed!`); `lifecycle-pg` **`166 passed`** (0 fallos, 0 skips). Los **dos intentos** se citan; ningún rojo se oculta.
+passed!`); `lifecycle-pg` **`166 passed`** (0 fallos, 0 skips). Los **dos intentos** se citan; ningún rojo se oculta.
 
 ## [2.11.11-beta] — `OBS-21` **CERRADA**: el terminal del fill deja de confundir **TRANSITORIO** con **PERMANENTE** (un rechazo determinista del dominio pasa a `FAILED`, no a un `RETRY` indefinido) — 2026-09-30
 
@@ -1248,7 +1282,7 @@ líneas de `src`.** Sin cambios en umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-
 
 - **El cierre del hallazgo que `v2.88.8` dejó instrumentado.** Aquel sello hizo **visible** el `RETRY` mudo y
   el rojo llegó **en el mismo tag** (`36681305812`) **con traza**: `ValueError: No tienes suficientes acciones.
-  En cartera: 0.0` al ejecutar la pata **SELL** (`...-finselle3a415b3#2` y `#3`). Con la traza en la mano, la
+En cartera: 0.0` al ejecutar la pata **SELL** (`...-finselle3a415b3#2` y `#3`). Con la traza en la mano, la
   causa se aisló **en un turno**.
 - **Lo que NO era (tres hipótesis REFUTADAS).** **(a)** Orden/visibilidad entre las patas del mismo ciclo:
   las dos patas corren **secuencialmente** con `await` en la **misma** sesión. **(b)** Desajuste
@@ -1256,7 +1290,7 @@ líneas de `src`.** Sin cambios en umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-
   local): la causa es una **función pura**. La sospecha de **clave de idempotencia** ya había caído: la
   excepción es del **repositorio de cartera**, no un `IdempotencyKeyReused`.
 - **Lo que SÍ era (mecanismo, función pura).** `draw_queue_noise` y `mid_cut` derivan de **`(seed, side,
-  instrument_id)`** — de la **PATA**, no de la orden, y **nunca** del `venue_order_id` —, así que con el
+instrument_id)`** — de la **PATA**, no de la orden, y **nunca** del `venue_order_id` —, así que con el
   **mismo** seed la pata `buy` puede cortar sus parciales **antes** que la `sell`. Con `quantity=60` y
   `fill_chunks=3` cada pata sólo puede acabar en **30** (cortada) o **60**. En el rojo real
   (`instrument_id = inst-fin-59e064e70b`, primer seed válido = `2`):
@@ -1272,6 +1306,7 @@ líneas de `src`.** Sin cambios en umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-
   rechazó (`fail-closed`) una venta que no cabía en la cartera.** El selector clásico del test
   (`_seed_with_fills`) exigía «algún fill en cada pata» —y eso lo cumplían las dos—: nunca exigió que **la
   venta cupiera en la cartera**.
+
 - **Medido (determinista, 20 000 sorteos de `instrument_id`).** Fixture **viejo**: **1336 rojos = 6,68 %**,
   con el patrón de tranchas **`(2,3)` en el 100 %** de ellos. Fixture **arreglado**: **0**. Sin regresiones
   nuevas. Y **el «no reproducible en local» queda explicado**: la causa es la **lotería** del `uuid4` que el
@@ -1297,7 +1332,7 @@ líneas de `src`.** Sin cambios en umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-
   `packages/py/application/tests/test_simulated_finance.py` (**fichero ya cableado a CI** desde `OBS-19` en
   `v2.88.8`), sin PG: (i) fijan la **asimetría** con el **`instrument_id` real del rojo**; (ii) exigen que el
   **espejo puro del dominio** rechace el plan viejo (`sim_roundtrip_accounting` → `ValueError: sell exceeds
-  the held position`); (iii) comprueban sobre una rejilla **fija** que el dimensionado nuevo **nunca**
+the held position`); (iii) comprueban sobre una rejilla **fija** que el dimensionado nuevo **nunca**
   sobrevende —**exigiendo además que la rejilla alcance al fallo** que arregla (un gate que no cubre el fallo
   que arregla no sella nada).
 - **Derivada registrada (`OBS-21`, ABIERTA — NO arreglada aquí).** La traza dejó a la vista algo que el
@@ -1313,7 +1348,7 @@ líneas de `src`.** Sin cambios en umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-
   arreglo **la clase entera desaparece** (`0/20 000`), así que la pregunta deja de tener efecto práctico. Se
   declara en lugar de reclamar un cierre perfecto.
 - **Verificación.** `ruff` con la **invocación exacta del CI** (`--config pyproject.toml`) → `All checks
-  passed!`; `mypy` con el **gate del CI** → `no issues found in 508 source files`; `12 passed` entre el
+passed!`; `mypy` con el **gate del CI** → `no issues found in 508 source files`; `12 passed` entre el
   fichero hermético (**11**: 8 previos + 3 nuevos) y el test PG objetivo. **Alcance:** proceso/tests (rojo
   **espurio** en la certificación) — **no** toca el motor, ni el sello del replay OOS de `v2.88.7`.
 - **Informe:** [`docs/engineering/flake-1-causa-raiz-2026-09-30.md`](./docs/engineering/flake-1-causa-raiz-2026-09-30.md) ·
@@ -1326,12 +1361,12 @@ líneas de `src`.** Sin cambios en umbrales `TOP_N`/`REGIME`/`RISK`/`SIGNALS`/A-
   `3152 − 37`, con los **mismos `37` skips**), y la cuenta **`+3`** se confirma por segunda vía en `main`
   (`Python CI` **`36685885987`**, verde): `quality` pasa de `3101` a **`3104 passed, 40 skipped`**.
   **`lifecycle-pg` —el job que daba el rojo— VERDE:** `165 passed, 2 warnings in 100,62 s` con **0 skips**
-  (los gates *fail-if-skipped* se cumplieron), más `45 passed` account-isolation, `1` golden day, `1`
+  (los gates _fail-if-skipped_ se cumplieron), más `45 passed` account-isolation, `1` golden day, `1`
   crash/recovery, `3` concurrent AUTO, `2` hard-kill, `2` crash injection y `1` multiprocess (`113,14 s`); el
   head **`046_fill_reference_mid`** queda **confirmado en el propio log** del job. **`replay-repro` (segunda
   certificación a nivel de tag):** `# sembrado 20 instrumentos, 25700 barras D1`, `watch congelado: 20
-  símbolos`, render **LF** `3 290 062` B / `A4DA036C…13CB`, **`VEREDICTO 2ª corrida IDÉNTICA`** + `DIGEST
-  igual en las dos corridas` y **`VEREDICTO REPRODUCIDO`** (artefacto **`11083079436`**, `285 944` B);
+símbolos`, render **LF** `3 290 062` B / `A4DA036C…13CB`, **`VEREDICTO 2ª corrida IDÉNTICA`** + `DIGEST
+igual en las dos corridas` y **`VEREDICTO REPRODUCIDO`** (artefacto **`11083079436`**, `285 944` B);
   `certify` publica `"status": "GREEN"` (artefacto **`11083039890`**). **Límite declarado:** un solo verde
   **NO demuestra** el arreglo —el rojo era una lotería del **6,68 %** sobre el `instrument_id` sorteado—: lo
   demuestran la medida **`0/20 000`** y el contraste contra PG con el **mismo `instrument_id`** (ROJO con
@@ -1370,7 +1405,7 @@ el resto es cableado de CI (**`+7`** en `python-ci.yml`, **`+166/−1`** en `rel
 - **No reproducible en local (medido): `0` rojos en `59` corridas.** `50` corridas directas del test
   objetivo (dos políticas de selector) + **9** del **comando exacto del CI** (`lifecycle-pg`, con BD scratch
   **fresca** drop+create+migrate por iteración: 8 con `161 passed, 4 skipped` y una con `165 passed,
-  0 skipped`). La variable es del **entorno** (runner de 2 vCPU frente a local), **no** del motor.
+0 skipped`). La variable es del **entorno** (runner de 2 vCPU frente a local), **no** del motor.
   **⚠️ CORRECCIÓN POST-SELLO (`2026-09-30`), medida sobre los logs crudos: el recuento `59` estaba
   INFLADO.** La tanda de `50` murió **entera** con `psycopg.InterfaceError: ProactorEventLoop`
   (`0,00–0,06 s`: nunca llegó al dominio) y las `8` iteraciones del comando exacto duraron `0,1–0,6 s` con
@@ -1380,7 +1415,7 @@ el resto es cableado de CI (**`+7`** en `python-ci.yml`, **`+166/−1`** en `rel
   Conclusión honesta: **no se arregla lo que no se reproduce.**
 - **El arreglo: hacer visible lo que se tragaba (lo único accionable sin repro).**
   `simulated_finance._apply` registra ahora `logger.exception(...)` con el `execution_id` y el
-  `instrument_id` **antes** de devolver `False`. **El contrato NO cambia:** sigue *fail-closed* y **jamás**
+  `instrument_id` **antes** de devolver `False`. **El contrato NO cambia:** sigue _fail-closed_ y **jamás**
   marca `APPLIED` por excepción. Gate nuevo
   `test_applier_keeps_fail_closed_and_LOGS_the_swallowed_cause`, que afirma las **dos** mitades (devuelve
   `False` **y** la traza queda en el log; pytest la muestra en «Captured log call» cuando el test falla).
@@ -1395,13 +1430,13 @@ el resto es cableado de CI (**`+7`** en `python-ci.yml`, **`+166/−1`** en `rel
   **no** la causa estructural.
 - **La cuenta del recuento cierra por TRES vías independientes (identidad `+8`).** (i) Batería offline con el
   **comando EXACTO** extraído del workflow (`118` líneas: `uv run pytest` + **78** rutas + **39** `--ignore`
-  + `-q`) sobre PG real: **`1 failed, 3148 passed in 94,20 s`** ⇒ **`3149`** recogidos (los **`3141`** del
-  sello + **`8`**); el único rojo es el **PG-local pre-existente**
-  (`test_auto_v70_auto23_evidence_validation.py::test_the_validation_reads_real_postgres_material_and_seals_it`),
-  que el job offline **skippea** (dentro de los `37`). (ii) En `main`, `quality` pasa de **`3093`** a
-  **`3101 passed, 40 skipped`** (`Python CI` run **`36678944192`**, verde) = **`+8`**. (iii) El fichero mide
-  **`8`** tests. ⇒ **El esperado del job `python` del tag es `3112 passed, 37 skipped`** (identidad
-  *recogidos local − `37` skips* = `3149 − 37`), **con los mismos `37` skips**.
+  - `-q`) sobre PG real: **`1 failed, 3148 passed in 94,20 s`** ⇒ **`3149`** recogidos (los **`3141`** del
+    sello + **`8`**); el único rojo es el **PG-local pre-existente**
+    (`test_auto_v70_auto23_evidence_validation.py::test_the_validation_reads_real_postgres_material_and_seals_it`),
+    que el job offline **skippea** (dentro de los `37`). (ii) En `main`, `quality` pasa de **`3093`** a
+    **`3101 passed, 40 skipped`** (`Python CI` run **`36678944192`**, verde) = **`+8`**. (iii) El fichero mide
+    **`8`** tests. ⇒ **El esperado del job `python` del tag es `3112 passed, 37 skipped`** (identidad
+    _recogidos local − `37` skips_ = `3149 − 37`), **con los mismos `37` skips**.
 - **PRIMERA certificación de `replay-repro` en un TAG real.** El job se añadió **después** del sello
   `v2.88.7` —su propia evidencia lo declara—, así que aquel tag se selló **sin** él y su primera
   certificación a nivel de tag es **este** sello, sobre el **mismo** código de motor que `v2.88.7-beta`:
@@ -1415,7 +1450,7 @@ el resto es cableado de CI (**`+7`** en `python-ci.yml`, **`+166/−1`** en `rel
 La traza que añade este sello se disparó **en su primer uso**: el rojo del tag (§ «CITA REAL» abajo) publica
 `ValueError: No tienes suficientes acciones. En cartera: 0.0` desde
 `portfolio_repository.execute_trade:383`, es decir **la pata `sell` se liquida con la cartera a `0.0` y el
-repositorio la rechaza** (rechazo **correcto** y *fail-closed*). **Queda por aislar** el *por qué* —las dos
+repositorio la rechaza** (rechazo **correcto** y _fail-closed_). **Queda por aislar** el _por qué_ —las dos
 candidatas declaradas son **orden/visibilidad entre las dos patas del mismo ciclo** y **desajuste de
 cuenta/cartera entre patas**—, y **no** se declara cerrado por eso; el estado del hallazgo en
 [`deuda-p3`](./docs/engineering/deuda-p3-post-auditoria-v2.70-2026-09-26.md) pasa a
@@ -1433,7 +1468,7 @@ que siguen **ABIERTAS**.
 `21c85c0a`) → **`FAILURE`** (`attempt 1`; `07:00:49Z → 07:08:02Z`, **~7m13s**). **11 jobs reales: 9 verdes,
 `lifecycle-pg` rojo, `playwright` integrado `skipped` por diseño y `certify` rojo** (agrega, como debe).
 **(1) Lo que el sello compraba, y lo compró:** **`replay-repro` → `success`** — **primera certificación a
-nivel de tag** del job que se añadió *después* del sello `v2.88.7`: siembra la entrada congelada, regenera el
+nivel de tag** del job que se añadió _después_ del sello `v2.88.7`: siembra la entrada congelada, regenera el
 artefacto con el **mismo** script y asserta el SHA-256 (hasta ahora solo había corrido por
 `workflow_dispatch` sobre `main`). **(2) El job `python`, `verbatim`:** `ruff All checks passed!` ·
 `Contracts: 4 kept, 0 broken` · `Success: no issues found in 508 source files` · **`3112 passed, 37 skipped,
@@ -1502,7 +1537,7 @@ Base del diff: `032ae7cc` (= `v2.88.6-beta`). **SÍ se toca el motor.**
   → **`SUCCESS` en la PRIMERA pasada** (`attempt 1`; `~8m39s`), **10 jobs reales verdes + `certify` verde**
   y `playwright` integrado `skipped` por diseño; job `python` **verbatim** `ruff All checks passed!` /
   `Contracts: 4 kept, 0 broken` / `mypy 508 source files` / **`3104 passed, 37 skipped, 6 warnings in
-  55.36s`** ⇒ **ESPERADO `3104/37` = OBSERVADO `3104/37`**; `lifecycle-pg` **`220 passed`** en **8**
+55.36s`** ⇒ **ESPERADO `3104/37` = OBSERVADO `3104/37`**; `lifecycle-pg` **`220 passed`** en **8**
   invocaciones (**0 failed / 0 skipped**), incluido **`Pytest Crash/Recovery Day` `1 passed in 9.34s`**
   — **el paso que salió ROJO en el tag de `v2.88.6`** — y `Pytest Concurrent AUTO` `3 passed`. En `main`
   (push `5cbe84b0`) `quality` **`3093 passed, 40 skipped`** con los 4 jobs PG per-commit verdes. Cita
@@ -1606,7 +1641,7 @@ diferencia de `v2.88.4`): +91 / −20 en `auto_simulation_worker.py` (5 hunks).
   A **sí materializa** (capital reservado ≠ materializado). El **mismo fail-OPEN** de `v2.88.1`, por la
   pata que el CI **no** ejercitaba (en el arranque simultáneo la ventana es nula). **Ya existía en
   `v2.85.2`**: no es una regresión de la serie `v2.88`.
-- **El mecanismo (PROPIEDAD *o* EDAD):** `V2_RESERVATION_GRACE_TURNS = 1` y
+- **El mecanismo (PROPIEDAD _o_ EDAD):** `V2_RESERVATION_GRACE_TURNS = 1` y
   `reservation_grace_window()` derivada de la **cadencia real del loop**
   (`AUTO_ENGINE_SIM_INTERVAL_SECONDS`, default **60 s**) ⇒ ventana de **60 s**, **no** un número mágico. La
   regla 2 retira si `mine = only_ids is not None and res_id in only_ids` **o** si la reserva **ya
@@ -1645,8 +1680,8 @@ diferencia de `v2.88.4`): +91 / −20 en `auto_simulation_worker.py` (5 hunks).
   → **`SUCCESS` en la PRIMERA pasada** (`attempt 1`; `~9m00s`), **10 jobs reales verdes + `certify` verde**
   y `playwright` integrado `skipped` por diseño; job `python` **verbatim** `ruff All checks passed!` /
   `Contracts: 4 kept, 0 broken` / `mypy 508 source files` / **`3049 passed, 37 skipped, 6 warnings in
-  63.71s`** ⇒ **ESPERADO `3049/37` = OBSERVADO `3049/37`**; además `decision-spine 604 passed`, `a7-gate
-  7 passed` y `lifecycle-pg` **`220 passed`** en **8** invocaciones (**0 failed / 0 skipped**: crash/recovery,
+63.71s`** ⇒ **ESPERADO `3049/37` = OBSERVADO `3049/37`**; además `decision-spine 604 passed`, `a7-gate
+7 passed` y `lifecycle-pg` **`220 passed`** en **8** invocaciones (**0 failed / 0 skipped**: crash/recovery,
   3 sesiones concurrentes, golden day, aislamiento de cuenta, HardKill y multiprocess). Cita cruda:
   [`evidencia-ci-tag-v2.88.5-2026-09-29.txt`](./docs/engineering/evidencia-ci-tag-v2.88.5-2026-09-29.txt).
 - **Sigue ABIERTO** (no lo cierra esta fase): `OBS-15` (techo de 1000 `APPLIED`), `OBS-16` (costuras
@@ -1921,7 +1956,7 @@ nada). **No** se bajaron `min cycles`/`min R`/`folds`/`min_episodes` ni se forza
 
 - **Autocontención (`OBS-3`/`OBS-4`).** `Release tag CI` sólo corre al empujar el tag ⇒ la cita de su
   resultado no puede vivir dentro del propio tag. A diferencia de `v2.83`/`v2.84` (que dejaron un
-  *placeholder*), `v2.85-beta` **no** creó ninguno: sus docs decían literalmente `(pendiente)`. Ahora
+  _placeholder_), `v2.85-beta` **no** creó ninguno: sus docs decían literalmente `(pendiente)`. Ahora
   `v2.85.1-beta` viaja con la **cita del CI de `v2.85` DENTRO**
   ([evidencia](./docs/engineering/evidencia-ci-tag-v2.85.1-2026-09-28.txt)): `Release tag CI`
   **`36392052899` SUCCESS** en la primera pasada (`python` **`3023 passed / 37 skipped`** = `3022 + 1`;
@@ -2138,7 +2173,7 @@ deja la **ventana ≥4 días** como operación del propietario.
 
 - **Funnel de operabilidad (nuevo, puro)** `packages/py/application/src/bolsa_application/operability_window.py`:
   `build_operability_funnel` publica diez escalones (`universe → marketData → regimeAllowed → signals →
-  topN → risk → reservation → orders → fills → cycles`) como `{count, source, measured}`. Los escalones
+topN → risk → reservation → orders → fills → cycles`) como `{count, source, measured}`. Los escalones
   superiores sólo se miden con la EVIDENCIA del runner (`--forward`); sin ella se declaran `None`. Los
   durables son la aritmética **declarada** del censo de ENTRADA (`decided` menos la familia que cada
   compuerta quitó). Un prerrequisito ausente deja `None` sus dependientes: **nunca** un `0` de relleno.
@@ -2205,7 +2240,7 @@ fase: **el censo declara su contrato** —un motivo sin catalogar deja de ser un
   **aviso**, no un fallo duro (ratificado): la corrida no se tumba.
 - **Serie diaria de la ventana (nuevo, puro)** `packages/py/application/src/bolsa_application/operability_window.py`:
   `build_window_row(day, *, account, entries, position_entries, cycles, fills, price_sources, versions,
-  symbols_observed, instruments, captured_at)` reutiliza **la misma puerta del censo** que
+symbols_observed, instruments, captured_at)` reutiliza **la misma puerta del censo** que
   `market_operability` (`collect_journal_reasons`/`split_journal_reasons`/`classify_veto_reasons`) y **el
   mismo R** que el informe (`measured_r`); publica el **linaje** (`account`, `instruments`, `versions`,
   `cycleIds`) y declara sus huecos como `None`/`UNKNOWN` (nunca un `0` inventado: `pairCapable`/
@@ -2266,7 +2301,7 @@ instala esta fase: **una entrada = una decisión de ENTRADA**.
 - **El puro (corrección)** `packages/py/application/src/bolsa_application/market_operability.py`:
   `ENTRY_DECISION_EVENT = "auto_entry_decision"` y `POSITION_JOURNAL_EVENTS`
   (`auto_position_management`/`auto_position_decision`/`auto_position_skip`); `collect_journal_reasons(
-  entries, *, events)` es la **única puerta** del censo; `NON_VETO_REASON_CODES` incorpora
+entries, *, events)` es la **única puerta** del censo; `NON_VETO_REASON_CODES` incorpora
   `POSITION_ATTRIBUTION_REASONS`; `VETO_BUCKET_BY_REASON` declara `OPTIMIZER_REASONS` (default `risk`,
   con `top_n`/`liquidity`/`data` explícitos), `ADAPTIVE_STRATEGY_PAUSED` y los dos vetos de reserva;
   `build_operability_record` publica `positionEventByCode`/`positionEventCounted`; el `render` añade,
@@ -2357,8 +2392,8 @@ sobrescribe nada en `evidence_runs/`/`evidence_validations/`.
 `v2.76` dejó el forward PAPER operando con **precio y régimen de MERCADO** y el bloqueo localizado,
 pero el veredicto diario (¿por qué no hubo material?) vivía **disperso** en el JSON de cada corrida.
 Esta fase lo convierte en una **serie diaria** y reparte cada veto en su familia declarada, para
-responder **sin sesgo** a la pregunta que decide el siguiente paso: *¿la falta de material es
-estadística o la causa estructuralmente el gobernador / TOP_N?* El invariante que instala: **el no
+responder **sin sesgo** a la pregunta que decide el siguiente paso: _¿la falta de material es
+estadística o la causa estructuralmente el gobernador / TOP_N?_ El invariante que instala: **el no
 operar se declara por su CAUSA (familia) y la arquitectura lista (`pairCapable`) no se confunde con
 la operación real (`pairActive`)**.
 
@@ -2445,7 +2480,7 @@ entrar hoy — la diversidad de cubos exige tiempo real y NO se fabrica.**
   `.../tests/test_auto_forward_deciders.py`.
 - **Runner forward + preflight de mercado** (nuevo)
   `apps/api-python/scripts/v2_76_forward_market_material.py` (solo I/O): `worker(price_script=snapshot,
-  clock=default_clock)` + `AutoSimRuntime`, `snapshot.refresh()` **entre** ticks (el refresh vive en el
+clock=default_clock)` + `AutoSimRuntime`, `snapshot.refresh()` **entre** ticks (el refresh vive en el
   runner, no en el worker congelado), **sin** fijar `AUTO_ENGINE_SIM_V2_REGIME`, watch derivado del
   catálogo real (activo + sector + `≥60` barras D1) y veredicto leído con **la misma pieza que el gate**
   (`build_paper_material_readiness`). `--preflight-only` es **read-only** (no siembra cuenta ni
@@ -2615,7 +2650,7 @@ que instala: **el nivel que se publica es el que se usó** — vale para el info
 
 - **Clamp en el productor.** `auto_adaptive_regime_evidence.py`: `build_current_regime_evidence`
   calcula `resolved_level = min(max(float(level), ADAPTIVE_INTERVAL_LEVEL_MIN),
-  ADAPTIVE_INTERVAL_LEVEL_MAX)` **antes** de publicarlo, igual que `build_replay_report` y
+ADAPTIVE_INTERVAL_LEVEL_MAX)` **antes** de publicarlo, igual que `build_replay_report` y
   `CalibrationReport`. Antes, con `level=0.0` publicaba `0.0` mientras el bootstrap medía con `0.5`.
 - **Sello subido.** `CURRENT_REGIME_EVIDENCE_METHOD` `current_regime_evidence_v2` →
   **`current_regime_evidence_v3`** (la lectura cambió). Sin consumidor desalineado.
@@ -2816,10 +2851,11 @@ evidencia **se publica, no reparte**. El esquema del artefacto **se mantiene**
 
 **Compuertas.** Frontend **1331 passed** (232 ficheros; **sin** flag de timeout), `typecheck` OK, `lint`
 **0 errores** (23 warnings preexistentes), `build` OK, `contract:check` OK. Python `packages/py/application`
-+ `packages/py/analytics` **3196 passed**; runner api-python **8 passed**; `ruff` **All checks passed!**,
-`import-linter` **4 kept / 0 broken**. Matriz de mutaciones **190/190** medidas, 0 sin fragmento,
-restauración **byte a byte**. **Límite declarado:** el material PAPER real no existe todavía (la corrida
-real es paso operativo del propietario).
+
+- `packages/py/analytics` **3196 passed**; runner api-python **8 passed**; `ruff` **All checks passed!**,
+  `import-linter` **4 kept / 0 broken**. Matriz de mutaciones **190/190** medidas, 0 sin fragmento,
+  restauración **byte a byte**. **Límite declarado:** el material PAPER real no existe todavía (la corrida
+  real es paso operativo del propietario).
 
 ## [1.93.0-beta] — AUTO-21 · `P(R>0)`, correlación entre estrategias y evidencia del régimen actual — 2026-09-25
 
@@ -2847,7 +2883,7 @@ probabilidad y el co-movimiento **se publican, no reparten**. El esquema del art
   el actual) publica, por estrategia, la celda `strategy × regime` **reutilizando el bootstrap de
   `AUTO-19A`**, o el hueco declarado (`no_evidence_for_regime`, `measuredN = 0`) — nunca el agregado.
 - **Render y UI.** El stub `AUTO-21 (fuera de alcance)` **desaparece**: `Current regime` / `Current
-  evidence` y el bloque `correlation (bucket=...)` publican lo medido (o `NO MEDIDO`), con espejo TS que
+evidence` y el bloque `correlation (bucket=...)` publican lo medido (o `NO MEDIDO`), con espejo TS que
   **lee** (no recalcula) y bloque de correlación en la sección de evidencia.
 - **Mutaciones `M182…M187`** (una por invariante): sello sin subir, probabilidad fabricada, sello de
   calibración sin subir, pregunta sin muestra mínima, correlación sin cubos publicando `0.0` y régimen
@@ -2975,8 +3011,8 @@ universo medido. `riskReadSaturated = false` se documenta como "la lectura termi
 envuelve el informe **verbatim**; `render_evidence_report` imprime la tabla del punto 30 (Material /
 Shrinkage / Effective-N / Interval coverage / Edge sign / Confidence / Coverage / Walk-forward efficiency),
 declara `Current regime`/`Current evidence` como `AUTO-21 (fuera de alcance)`, `Allocation change = none`, y
-recuerda la **regla de oro**: *`INCONCLUSIVE` por muestra insuficiente NO se arregla bajando
-`min_is`/`min_oos`/`folds`*.
+recuerda la **regla de oro**: _`INCONCLUSIVE` por muestra insuficiente NO se arregla bajando
+`min_is`/`min_oos`/`folds`_.
 
 **Tests y mutaciones.** Puros nuevos `test_auto_evidence_report.py` y `test_auto_v64_auto20c_artifact.py`;
 ampliación de `test_auto_v63_auto20b_material_manifest.py` (perímetro) y del E2E PG
@@ -3442,11 +3478,11 @@ y **no era reconstruible**: el mid de referencia vivía en la memoria del tick q
 tiraba, así que la pata de **entrada** de un ciclo (liquidada en otro tick) habría quedado fuera de cualquier
 cálculo en memoria. Si la base no viaja con el número, un cambio de procedencia se lee como un cambio de
 rendimiento **justo en el eje con el que `AUTO-12`/`AUTO-13`/`AUTO-14` encogen, rampean y reparten capital**.
-Cierra la **octava pregunta del epic**: `AUTO-9` *«¿cuánto vale?»* · `AUTO-10` *«¿de qué ciclo es?»* · `AUTO-11`
-*«¿dónde vive su memoria?»* · `AUTO-12` *«¿cuánto puedo creérmelo?»* · `AUTO-13` *«¿están sanos los datos con
-los que me lo creo, y cómo vuelvo?»* · `AUTO-14` *«¿el peso que reparto se midió en el régimen en el que voy a
-operar?»* · `AUTO-15` *«¿sobrevive esa prueba a un reinicio?»* · **`AUTO-16` *«el coste que descuenta el neto,
-¿es el que se pagó o el que se supuso?»***. Adaptive **sigue siendo recomendador read-only** y **el flag sigue
+Cierra la **octava pregunta del epic**: `AUTO-9` _«¿cuánto vale?»_ · `AUTO-10` _«¿de qué ciclo es?»_ · `AUTO-11`
+_«¿dónde vive su memoria?»_ · `AUTO-12` _«¿cuánto puedo creérmelo?»_ · `AUTO-13` _«¿están sanos los datos con
+los que me lo creo, y cómo vuelvo?»_ · `AUTO-14` _«¿el peso que reparto se midió en el régimen en el que voy a
+operar?»_ · `AUTO-15` _«¿sobrevive esa prueba a un reinicio?»_ · **`AUTO-16` _«el coste que descuenta el neto,
+¿es el que se pagó o el que se supuso?»_**. Adaptive **sigue siendo recomendador read-only** y **el flag sigue
 OFF por defecto**: con OFF el plan, el journal y la API son **byte a byte iguales** a `v2.56`.
 
 ### Añadido: la referencia cruda del fill (migración `046`) y el lector por ciclo
@@ -3561,11 +3597,11 @@ WORKER 1 → 2 fallos del sink (DEGRADED) → CRASH → WORKER 2 → 0 fallos �
 ```
 
 y **no era reconstruible**: un fallo de escritura no dejó fila en `decision_journal_entries` y el ancla de
-antigüedad mide *publicación*, no *error*. Cierra la **séptima pregunta del epic**: `AUTO-9` *«¿cuánto
-vale?»* · `AUTO-10` *«¿de qué ciclo es?»* · `AUTO-11` *«¿dónde vive su memoria?»* · `AUTO-12` *«¿cuánto
-puedo creérmelo?»* · `AUTO-13` *«¿están sanos los datos con los que me lo creo, y cómo vuelvo?»* ·
-`AUTO-14` *«¿el peso que reparto se midió en el régimen en el que voy a operar?»* · **`AUTO-15`
-*«¿sobrevive esa prueba a un reinicio?»***. Adaptive **sigue siendo recomendador read-only** y **el flag
+antigüedad mide _publicación_, no _error_. Cierra la **séptima pregunta del epic**: `AUTO-9` _«¿cuánto
+vale?»_ · `AUTO-10` _«¿de qué ciclo es?»_ · `AUTO-11` _«¿dónde vive su memoria?»_ · `AUTO-12` _«¿cuánto
+puedo creérmelo?»_ · `AUTO-13` _«¿están sanos los datos con los que me lo creo, y cómo vuelvo?»_ ·
+`AUTO-14` _«¿el peso que reparto se midió en el régimen en el que voy a operar?»_ · **`AUTO-15`
+_«¿sobrevive esa prueba a un reinicio?»_**. Adaptive **sigue siendo recomendador read-only** y **el flag
 sigue OFF por defecto**: con OFF esta fase **no ejecuta ni un I/O nuevo** y el runtime publicado es, en
 comportamiento, el de `v2.53`.
 
@@ -3583,7 +3619,7 @@ comportamiento, el de `v2.53`.
   (`AdaptiveGateState` + `sink_failures_from_state` con clamp defensivo), **gemelo in-memory** con la misma
   semántica y `PostgresAdaptiveGateStore`. **Dos operaciones, y ninguna guarda la fila entera**:
   - `record_failure` — **incremento atómico** (`INSERT … ON CONFLICT (account_id, engine_id) DO UPDATE SET
-    sink_failures = sink_failures + 1`): un `load`+`save` perdería fallos concurrentes, y la racha es justo
+sink_failures = sink_failures + 1`): un `load`+`save` perdería fallos concurrentes, y la racha es justo
     el dato que no puede perderse.
   - `record_success` — **reset sin amplificación** (`UPDATE … WHERE sink_failures > 0`): sin racha viva no
     escribe **nada** (ni crea fila), así que un despliegue sano **no paga una escritura por tick**.
@@ -3645,8 +3681,8 @@ comportamiento, el de `v2.53`.
   (`intacto: la sonda no altero el arbol`).
 - **Compuertas**: `ruff check packages/py apps/api-python --config pyproject.toml` **`All checks passed!`**,
   `mypy` con el comando de CI **`0` errores en `498` ficheros`** e `import-linter` **`4 kept / 0 broken`**.
-  *(Trampa medida: `ruff check <rutas>` **sin** `--config pyproject.toml` resuelve el `pyproject` del
-  paquete y devuelve falsos `I001` —también sobre `kill_switch_store.py`, ya certificado—.)*
+  _(Trampa medida: `ruff check <rutas>` **sin** `--config pyproject.toml` resuelve el `pyproject` del
+  paquete y devuelve falsos `I001` —también sobre `kill_switch_store.py`, ya certificado—.)_
 - **Guardia de head de Alembic bumpeada en el CI del tag** (`test_discovery_evidence_snapshot_pg.py:43`:
   `_ALEMBIC_HEAD` `044_auto_cycle_trace` → `045_adaptive_gate_state`): el primer CI del tag salió **rojo**
   por esa constante (**5** aserciones, solo en los jobs PG) y obligó a un **fix + re-sello** del tag a
@@ -3689,10 +3725,10 @@ celda vive en el **plan** y en la **traza del tick**, nunca en la evidencia dura
 evidencia siguen **intactos**. El invariante que instala: **el reparto no puede mejorar su peso con una
 celda que no se ha medido** — una celda sin muestra suficiente, una celda ausente, un R neto no medido,
 una celda medida no positiva o un régimen ilegible **no mueven el peso**; esa versión cae al **global** de
-su fila y el hueco se **declara**. Cierra la sexta pregunta del epic: `AUTO-9` *«¿cuánto vale?»* · `AUTO-10`
-*«¿de qué ciclo es?»* · `AUTO-11` *«¿dónde vive su memoria?»* · `AUTO-12` *«¿cuánto puedo creérmelo?»* ·
-`AUTO-13` *«¿están sanos los datos con los que me lo creo, y cómo vuelvo?»* · **`AUTO-14` *«¿el peso que
-reparto se midió en el régimen en el que voy a operar?»***. Adaptive **sigue siendo recomendador
+su fila y el hueco se **declara**. Cierra la sexta pregunta del epic: `AUTO-9` _«¿cuánto vale?»_ · `AUTO-10`
+_«¿de qué ciclo es?»_ · `AUTO-11` _«¿dónde vive su memoria?»_ · `AUTO-12` _«¿cuánto puedo creérmelo?»_ ·
+`AUTO-13` _«¿están sanos los datos con los que me lo creo, y cómo vuelvo?»_ · **`AUTO-14` _«¿el peso que
+reparto se midió en el régimen en el que voy a operar?»_**. Adaptive **sigue siendo recomendador
 read-only** y **el flag sigue OFF por defecto**: con OFF el camino de producción es **byte-idéntico** a
 `v2.53`.
 
@@ -3726,7 +3762,7 @@ read-only** y **el flag sigue OFF por defecto**: con OFF el camino de producció
 - **El encogimiento de `AUTO-12` usa la banda de la CELDA** (`StrategyConfidence.by_regime` →
   `RegimeConfidence`): si el peso salió de la celda, se encoge con **su** `effective_n`/`decay`; si salió
   del global, con la de la estrategia. Encoger un peso de celda con la muestra **agregada** (que mezcla
-  regímenes que no se parecen) reintroduciría el *winner chasing* que `AUTO-12` cerró.
+  regímenes que no se parecen) reintroduciría el _winner chasing_ que `AUTO-12` cerró.
 
 ### Modificado: la base de celda se declara sin tocar nada sellado
 
@@ -3776,7 +3812,7 @@ read-only** y **el flag sigue OFF por defecto**: con OFF el camino de producció
   de `apps/api-python` exige PostgreSQL). **Ese límite lo cierra la CI del tag, medida.**
 - **CI del tag `v2.55-beta`** ([run `35889751810`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35889751810)):
   **GREEN** con **`10 success` + `1 skipped`** (`playwright (integrated E2E, opt-in)`) y `certify
-  (aggregate + artifact)` en `success`; job `quality` del tag `ruff` **`All checks passed!`** y `pytest`
+(aggregate + artifact)` en `success`; job `quality` del tag `ruff` **`All checks passed!`** y `pytest`
   **`2575 passed / 38 skipped`** (**+7** passed y **+3** skipped sobre los `2568 / 35` del sello
   `v2.54-beta`; la causa de los `+3` skipped **no se atribuye**: delta medido y declarado), los **4 jobs
   PG** (`grammar-discovery-pg`, `auto-v2-durable-pg`, `lifecycle-pg`, `paper-forward-pg`) **verdes** y
@@ -3806,9 +3842,9 @@ plan y en la traza del tick, nunca en la evidencia durable). El gobernador y su 
 datos** — un dato incompleto se **declara** y **limita la adaptación**, nunca se convierte en «esta
 estrategia es mala»; una vuelta de pausa se **gana** con evidencia medida, nunca por el paso del tiempo;
 y un régimen que no se pudo leer **no** acusa a nadie. Cierra la quinta pregunta del epic: `AUTO-9`
-*«¿cuánto vale?»* · `AUTO-10` *«¿de qué ciclo es?»* · `AUTO-11` *«¿dónde vive su memoria?»* · `AUTO-12`
-*«¿cuánto puedo creérmelo?»* · **`AUTO-13` *«¿están sanos los datos con los que me lo creo, y cómo
-vuelvo?»***. Adaptive **sigue siendo recomendador read-only** y **el flag sigue OFF por defecto**: con
+_«¿cuánto vale?»_ · `AUTO-10` _«¿de qué ciclo es?»_ · `AUTO-11` _«¿dónde vive su memoria?»_ · `AUTO-12`
+_«¿cuánto puedo creérmelo?»_ · **`AUTO-13` _«¿están sanos los datos con los que me lo creo, y cómo
+vuelvo?»_**. Adaptive **sigue siendo recomendador read-only** y **el flag sigue OFF por defecto**: con
 OFF el camino de producción es **byte-idéntico** a `v2.53`.
 
 ### Añadido: el Data Gate, puro (`auto_adaptive_data_gate.py`)
@@ -4027,7 +4063,7 @@ recomendación cuando la evidencia es fina.
 - **Costura del feed** `build_adaptive_confidence_from_fills(...)`: confianza e informe salen del **mismo**
   material (los mismos `fills` + `cycle_risk`), sin segundo productor y **sin I/O nuevo**.
 
-### Modificado: el reparto encoge por muestra (protege del *winner chasing*)
+### Modificado: el reparto encoge por muestra (protege del _winner chasing_)
 
 - **`recommend_allocation(..., confidence=None)`** y **`build_adaptive_plan(..., confidence=None)`**: sin
   la lectura, el plan es **byte-idéntico** al histórico (mismo patrón que `by_regime` en `AUTO-9`). Con ella,
@@ -4065,7 +4101,7 @@ recomendación cuando la evidencia es fina.
   compuesta, cierre por el primer fill y cableado del worker): **12/12 muerden** y la corrida **completa** da
   **`71/71` medidas y `0` etiquetas en `NADA`** con el árbol **intacto** (la trampa de `M39` de `V2.52`,
   usada aquí como gate explícito). La fase **realineó** la sonda heredada `M33` —su fragmento, la llamada
-  *inline* al riesgo por ciclo, dejó de existir al medirlo **una sola vez** en una local compartida por
+  _inline_ al riesgo por ciclo, dejó de existir al medirlo **una sola vez** en una local compartida por
   informe y confianza— sin cambiar su intención: vuelve a morder con **3 rojos**. Se declara porque una
   sonda desalineada **afirma** cobertura que no tiene.
 - **Compuertas**: `ruff` con el comando de CI (`All checks passed!`), `mypy` (`--follow-imports=silent`)
@@ -4075,7 +4111,7 @@ recomendación cuando la evidencia es fina.
   **1178 passed / 0 rojos**.
 - **CI real del tag** (`v2.53-beta` → `a6655e6e`): `Release tag CI`
   [`35836248169`](https://github.com/jvelasca/Bolsa_V1/actions/runs/35836248169) **GREEN** con **`10
-  success` + `1 skipped`** (`playwright` opt-in) y `check-runs` **`27 success` + `1 skipped`** —la misma
+success` + `1 skipped`** (`playwright` opt-in) y `check-runs` **`27 success` + `1 skipped`** —la misma
   forma que `v2.52-beta`—; job `python` offline **`2459 passed / 35 skipped`** frente a los **`2409`** del
   tag anterior: **+50**, exactamente el delta de tests declarado arriba. `Python CI`, `Frontend CI`,
   `Optimize lab` y `Fase 2 scientific` del tag, también en **verde**. La verificación offline **completa**
@@ -4213,7 +4249,7 @@ vive su memoria**.
   aprobado, no preguntado disfrazado, trazas contadas como filas, filas de más silenciadas, antigüedad
   por texto, fecha ilegible silenciada, contador de salida, recuperación que no siembra, reconciliación
   muda, flag OFF ignorado): la **matriz completa** da **`59/59` muerden**, **0** `NADA (la mutacion NO se
-  detecta)`, 0 fragmentos ausentes, 59 restauraciones byte a byte y huella `git status` **idéntica** antes
+detecta)`, 0 fragmentos ausentes, 59 restauraciones byte a byte y huella `git status` **idéntica** antes
   y después. Tres fragmentos derivados por la fase (`M38`, `M40`, `M41`) se reescribieron contra el
   código real: `M38` porque el sink Adaptive es calcado del de `AUTO-10` (el fragmento pasó a aparecer
   **dos** veces y la sonda **abortaba**, que es lo correcto).
@@ -4230,7 +4266,7 @@ vive su memoria**.
 - **`Release tag CI` run `35827266670` → `completed / success`**: los **10 jobs de decisión**
   (`frontend`, `python`, `security`, `a7-gate`, `playwright (mock E2E)`, `decision-spine`, `shared`,
   `lifecycle-pg`, `dr-verify` y el `playwright (integrated E2E)` **`skipped`** opt-in) **+ `certify
-  (aggregate + artifact)`** en `success`.
+(aggregate + artifact)`** en `success`.
 - **Job `python` del tag: `2409 passed, 35 skipped`** (62,04 s), con `ruff` (`All checks passed!`),
   `import-linter` y `mypy` verdes en el mismo job.
 - **`Python CI` de `main` run `35827246615` → `success`**: job `quality` **`2398 passed, 38 skipped`**
@@ -4271,7 +4307,7 @@ el régimen del turno que **decidió**, no el de un instante posterior.
   entrada** (`None`, no-op declarado, nunca un ciclo vacío); un `cycle_id` sin forma `cyc-` **no finge**
   derivación (`decision_id` propio + `cycleIdDerived = False`, para que el lector sepa que el índice no
   lo alcanza); y **régimen ausente = declarado** (`marketRegime = None` **y** `regimeMeasurement =
-  UNKNOWN`, nunca un `UNKNOWN` de relleno que parezca valor).
+UNKNOWN`, nunca un `UNKNOWN` de relleno que parezca valor).
 - **Puerto de escritura en el worker**: el ciclo publica su traza al nacer su reserva de **entrada**
   (`_v2_journal_cycle_regime`), **después** del commit del compromiso de capital: primero el dinero,
   después la traza; si la traza falla, el dinero sigue comprometido y el hueco se declara.
