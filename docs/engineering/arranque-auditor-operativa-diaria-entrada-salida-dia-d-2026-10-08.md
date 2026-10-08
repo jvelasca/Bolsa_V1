@@ -17,6 +17,7 @@ El propietario **reordenó la FASE 3**: la completitud contable de motor (`Portf
 | 2 | [auditoría FASE 2](./auditoria-operativa-auto-fase-2-2026-10-08.md) §8 | Declara el **reorden** y mantiene abiertos `F2-1`…`F2-4` como deuda. |
 | 3 | [plan de cierre de motor](./plan-cierre-operativa-auto-2026-10-08.md) | **PARKED** con dueño y disparador: se retoma **solo si** un pilar `P1`–`P4` lo exige. |
 | 4 | **[auditoría diaria entrada/salida · estrategia/indicadores · DÍA-D](./auditoria-operativa-diaria-entrada-salida-dia-d-2026-10-08.md)** | **El entregable a juzgar.** 12 hallazgos falsables `P2-*`/`P3-*`/`P4-*` con `file:line` + 4 slices derivados `S1`–`S4`. |
+| 5 | [entrega a auditoría externa (MIA) del ciclo](./entrega-auditoria-externa-mia-v2.88.94-reorden-fase-3-2026-10-08.md) | Resumen formal: qué se entrega/NO, cambios, medición, hallazgos abiertos, gates, sello y guion desde GitHub. |
 
 ---
 
