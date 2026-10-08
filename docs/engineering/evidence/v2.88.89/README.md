@@ -68,4 +68,9 @@ Motor AUTO de decisión/ejecución, ledger, posiciones, settlement, contrato HTT
 
 ## 6. Cita POST-TAG
 
-**Pendiente:** tag anotado `v2.88.89-beta` por crear; `Release tag CI` pendiente. Al sellarlo se debe confirmar `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0`** y publicar el `GitHub Release` (pre-release).
+**Tag anotado `v2.88.89-beta`** (objeto `ab26aeba` → commit `b9557c21`) empujado a `origin`. **`Release tag CI` [`37766767402`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37766767402) VERDE** (`12` jobs `success`; `playwright (integrated E2E, opt-in)` `skipped`):
+
+- `certify` `success` · `python` `success` · `frontend` `success` · `shared` `success` · `decision-spine` `success` · `lifecycle-pg` `success` · `dr-verify` `success` · `a7-gate` `success` · `security (gitleaks)` `success` · `playwright (mock E2E)` `success`.
+- **`replay-repro` `success`** — `VEREDICTO **`REPRODUCIDO`**` (mismo CONTENIDO): `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`, `3340728` bytes — huella **idéntica** a la del sello `v2.88.88-beta` ⇒ **`Δ motor = 0` confirmado por CI**.
+
+**`GitHub Release` (pre-release) publicado:** [`v2.88.89-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.89-beta).

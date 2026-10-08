@@ -4,7 +4,7 @@ All notable releases of Bolsa V1.
 
 ## [2.11.89-beta] — `UI` + `AUTO · TOP3`: **UI REFACTOR 5.1 — HOME user-first + fix del TOP3 cross-asset**
 
-**Bump** `2.11.88-beta` → `2.11.89-beta`. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** y **contrato HTTP sin cambio**: el slice es UI/read-model en `apps/web/**` **más un fix de selección puro** en `packages/py/application/**` (no toca motor de decisión/ejecución, ledger, settlement, umbrales ni Alembic). Los 9 CLIs DÍA-D `v2_89`…`v2_97` sellan `2.11.89-beta` junto al `package.json` (guardián `test_dia_d_bump_guard` verde). **Tag anotado `v2.88.89-beta` pendiente de crear** (CI del tag se cita al sellarlo).
+**Bump** `2.11.88-beta` → `2.11.89-beta`. **Sin migración nueva** (head `052_top3_opportunities`). **`Δ motor = 0`** y **contrato HTTP sin cambio**: el slice es UI/read-model en `apps/web/**` **más un fix de selección puro** en `packages/py/application/**` (no toca motor de decisión/ejecución, ledger, settlement, umbrales ni Alembic). Los 9 CLIs DÍA-D `v2_89`…`v2_97` sellan `2.11.89-beta` junto al `package.json` (guardián `test_dia_d_bump_guard` verde). **Tag anotado `v2.88.89-beta`** (objeto `ab26aeba` → commit `b9557c21`) con `Release tag CI` [`37766767402`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37766767402) **VERDE** (`12` jobs `success`; `playwright (integrated E2E, opt-in)` `skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI). `GitHub Release` (pre-release): [`v2.88.89-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.89-beta).
 
 **UI REFACTOR 5.1 — HOME user-first (`UI5-04`/`UI5-12`/`UI5-18`/`UI5-08`):**
 
