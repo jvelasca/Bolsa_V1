@@ -107,7 +107,7 @@ describe("TradingStatusBar · UI 5.0 lenguaje de primer nivel", () => {
     expect(titles).toContain("Beneficio no realizado");
   });
 
-  it("el tooltip de OPERATIVA no contiene el token prohibido `PAPER_D_EXECUTE`", () => {
+  it("el tooltip de OPERATIVA usa lenguaje de resultado (sin jerga de mecanismo)", () => {
     const { container } = renderBar();
     const operativa = container.querySelector(
       '[data-testid="status-bar-operativa-mode"]',
@@ -115,7 +115,10 @@ describe("TradingStatusBar · UI 5.0 lenguaje de primer nivel", () => {
     expect(operativa).toBeTruthy();
     const title = operativa?.getAttribute("title") ?? "";
     expect(title).not.toContain("PAPER_D_EXECUTE");
-    expect(title).toContain("armado ≠ ejecutado");
+    // Lenguaje de resultado, no de mecanismo (`armado`/`≠`).
+    expect(title).toContain("cada operación espera tu confirmación");
+    expect(title).toMatch(/se ejecuta sin confirmación/i);
+    expect(title).not.toMatch(/armado/i);
     expect(container.textContent ?? "").not.toContain("PAPER_D_EXECUTE");
   });
 });

@@ -44,10 +44,10 @@ test.describe("GP-E2E — Confirm LIVE VIRTUAL (mock)", () => {
 
     await expect(page.getByTestId("live-virtual-why")).toBeVisible();
     await expect(page.getByTestId("live-virtual-why-anti")).toContainText(
-      /Ranking ≠ BUY/i,
+      /Estar arriba en la lista no es una orden de compra/i,
     );
     await expect(page.getByTestId("live-virtual-why-anti")).toContainText(
-      /Arm ≠ Execute/i,
+      /Preparar una orden no la ejecuta/i,
     );
 
     await expect(page.getByTestId("confirm-live-venue-badge")).toHaveText(

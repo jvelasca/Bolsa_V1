@@ -50,6 +50,18 @@ describe("filterCommands", () => {
   });
 });
 
+describe("PLATFORM_COMMANDS labels", () => {
+  it("rotula densidad y vista en español, sin rótulos en inglés (`R-G1`)", () => {
+    const labels = PLATFORM_COMMANDS.map((c) => c.label).join(" · ");
+    expect(labels).not.toMatch(/\bComfortable\b/);
+    expect(labels).not.toMatch(/\bCompact\b/);
+    expect(labels).not.toMatch(/\bLayout\b/);
+    expect(labels).not.toMatch(/\bTrader\b/);
+    expect(labels).toContain("Densidad: Cómoda");
+    expect(labels).toContain("Vista: Completa");
+  });
+});
+
 describe("PLATFORM_COMMANDS run", () => {
   it("navigates L1 destinations", () => {
     const ctx = mockCtx();

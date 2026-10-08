@@ -124,6 +124,17 @@ Elevadas a contrato desde el [Mapa de problemas UI 5.0](./auditoria-ui-5-0-mapa-
 | `RT-03` | **Dos lecturas.** Si un usuario básico puede interpretar una pantalla de dos formas distintas, la pantalla todavía no está terminada. | Que un mismo hecho se pinte de dos maneras contradictorias (p. ej. «Controlado» + cuatro huecos sin explicar). |
 | `RT-04` | **Un solo mecanismo de profundidad.** Todo lo avanzado vive detrás de «Más información» / «¿Por qué?» / «Detalle técnico»; no hay disclosures paralelos con etiquetas distintas. | Que coexistan «Detalle técnico», «Detalles avanzados», «Ajustes avanzados» y «Más detalle (avanzado)» como idioms distintos. |
 
+### Bloque E — Reglas globales de lenguaje (enmienda UI 6.x, 2026-10-08)
+
+Elevadas a contrato desde la [auditoría UI 6.x global](./auditoria-ui-6-x-global-2026-10-08.md). **No son una regla nueva de producto: son la formulación falsable** del principio de ADR-045 (§1) y del solape ya existente `UI5-01`/`RT-02`, ahora exigible en **todas** las superficies (no solo AUTO).
+
+| ID | Regla | Falsabilidad |
+| --- | --- | --- |
+| `R-G1` | **Una pantalla se entiende sin conocer cómo está construido el backend.** En el nivel 1 (usuario) no aparece arquitectura interna: identificadores de modelo (`Recommendation`, `DecisionSession`, `Policy Gate`, `OpportunityScore`), de ejecución (`runId`, `cycleId`, `PAPER_D_EXECUTE`, `settlement`) ni de almacén (`ledger`, `fills`, `DÍA-D`, `WFE`/`PBO`/`DSR`, `campaignId`). Esa jerga solo vive dentro del disclosure único (nivel 3). | Que un literal de la lista §8 de la auditoría aparezca en el DOM de primer nivel de una pantalla auditada. |
+| `R-G2` | **Cada pantalla responde una sola pregunta principal.** El primer bloque visible responde esa pregunta antes de explicar mecanismo; preguntas competidoras bajan de nivel. Mapa: Hoy `¿Qué requiere mi atención?` · Mercado `¿Qué está ocurriendo?` · Cartera `¿Qué tengo?` · Asesor `¿Por qué?` · Laboratorio `¿Qué estamos aprendiendo?` · AUTO `¿Qué está haciendo AUTO?` · Confirmar `¿Qué voy a autorizar?`. | Que el primer bloque de una pantalla explique cómo funciona el sistema en vez de responder su pregunta. |
+
+**Solape declarado:** `R-G1` refina `RT-02` (explicación) y `R-G2` refina `UI5-01` (una pantalla = una pregunta). Donde discrepen, `R-G1`/`R-G2` **no sustituyen** a `UI5-01`/`RT-02`: los hacen **válidos para toda la app**, no solo para AUTO. El mecanismo único de profundidad sigue siendo `RT-04` (`TechnicalDetail`, rótulo «Detalle técnico»).
+
 ---
 
 ## 3. Vocabulario oficial (resumen operativo)
@@ -177,9 +188,13 @@ Esta spec **congela**; el estado de implementación se anota aquí regla a regla
 | P2 | Revisión visual global responsive | `UI5-01` | **DONE** (**Oleada B**: nuevo [`gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts`](../../apps/web/e2e/gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts) barre `/trading`, `/mesa`, `/mesa?view=posiciones`, `/confirm` y la command palette a 1366×768 y 390×844 con `axe-core` WCAG 2.0/2.1 A+AA → **0 `critical`/`serious`**, un único `main`+`h1`; fixes AA de contraste, `aria-label` de listbox, `<dt>` en `<dl>` `sr-only` y `tabIndex` de scroll) |
 | P0 | Vocabulario de dato ausente (Opción B) | `UI5-14` | **DONE** (**UI 6.0 P0-D**: helper [`absent-data.ts`](../../apps/web/src/components/absent-data.ts); primer nivel sin `—` en operaciones, barra de estado e historial) |
 | P0 | Densidad · explicación · dos lecturas · un solo detalle | `RT-01`…`RT-04` | **DONE** (**UI 6.0 P1-G + P2**: jerga (`ledger`, `fills`, `trials`, `WFE/PBO/DSR`, JSON crudo) plegada tras **`Detalle técnico`**; idioma único) |
+| P0 | Una pantalla se entiende sin el backend | `R-G1` | **DONE** (**UI 6.x, `2.11.91-beta`**: alcance global — Confirmar · Hoy · Cartera · Mercado · Asesor; jerga (modelo/sesión, `runId`/`cycleId`, `ledger`/`fills`, `DÍA-D`, `WFE/PBO/DSR`) plegada tras el disclosure único; gate falsable [`first-level-gate.ts`](../../apps/web/src/components/first-level-gate.ts)) |
+| P0 | Una pantalla = una pregunta (global) | `R-G2` | **DONE** (**UI 6.x, `2.11.91-beta`**: primer bloque responde la pregunta de la pantalla en Hoy · Mercado · Cartera · Asesor · AUTO · Confirmar) |
 | P1 | Una sola puerta L1 activa · un solo `h1` de Mercado | `UI5-01`, `UI5-04`, `UI5-20` | **DONE** (**UI 6.0 P1-E/P2**: `Cartera` cede `Hoy` en `?view=posiciones`; elimina doble `h1` `Trading`/`Mercado`) |
 
 **Enmienda UI 6.0 (2026-10-08) — implementada.** El [Mapa de problemas UI 5.0](./auditoria-ui-5-0-mapa-problemas-2026-10-08.md) fijó el trabajo y el [plan único UI 6.0](./plan-ui-6-0-2026-10-08.md) lo ordenó en slices: **P0-A** HOME cockpit · **P0-B** Riesgo human-first · **P0-C** una sola escalera · **P0-D** `Sin dato todavía` global · **P1-E** navegación/L1 · **P1-F** modo/canal · **P1-G** lenguaje humano · **P2** pulido. Las reglas `RT-01`…`RT-04` (Bloque D) y el vocabulario Opción B (`UI5-14`) quedan implementados y falsables por test. Cierre medido: `typecheck` OK · `lint` 0 errores (23 avisos preexistentes) · `pnpm --filter @bolsa/web test` **271 ficheros / 1625 passed** · `axe` AUTO **14/14** + `axe` rutas tocadas **9/9** + `live-virtual-confirm` **2/2** · `Δ motor = 0`.
+
+**Enmienda UI 6.x (2026-10-08) — implementada.** La [auditoría UI 6.x global](./auditoria-ui-6-x-global-2026-10-08.md) elevó a contrato las dos reglas globales del **Bloque E**: `R-G1` («una pantalla se entiende sin el backend») y `R-G2` («una pantalla = una pregunta»). El **disclosure único** `RT-04` se materializa en [`technical-detail.tsx`](../../apps/web/src/components/technical-detail.tsx) (rótulo `Detalle técnico`, marca `data-technical-detail`), con un **gate falsable** compartido ([`first-level-gate.ts`](../../apps/web/src/components/first-level-gate.ts)) que falla si la jerga de la lista §8 aparece fuera de nivel 3. Alcance: Confirmar (P0), Hoy (P1) y las superficies de las oleadas 2-6. Cierre medido en `2.11.91-beta`: `typecheck` OK · `lint` 0 errores (23 avisos preexistentes) · `pnpm --filter @bolsa/web test` **276 ficheros / 1662 passed** · `axe` rutas L1 **13/13** (incl. `heading-order` 0) + `live-virtual-confirm` **2/2** · `Δ motor = 0`.
 
 **Cierre del backlog UI 5.0 (Oleada A/B).** Se cierran los hallazgos abiertos del Mapa de problemas UI 5.0. (1) `UI5-09`: un cierre con `closedMeasurement === "COMPLETE"` sigue resolviendo `Posición cerrada` sin exigir traza de materialización intermedia (coherente con el modelo durable y el contrato backend); se cerró el bug de evidencia fabricada (`?? "COMPLETE"`) y el peldaño `Salida final` de la cabina deriva su estado de evidencia (`remainingPct`) declarando hueco sin traza. (2) `account-venue-preference.tsx` conserva un literal `submitted ≠ fill` fuera del alcance de los slices. (3) `mesa-candidates-panel` conserva `Gate N` como dato de decisión (no es término prohibido).
 
@@ -199,6 +214,9 @@ Esta spec **congela**; el estado de implementación se anota aquí regla a regla
 | 6 | «Sin dato todavía» es el único rótulo del hueco. | Que aparezca `0`/`—`/`N/A` para un dato ausente. |
 | 7 | La `AdminRail` separa producto/administración/diagnóstico. | Que siga siendo una lista plana. |
 | 8 | Este contrato no cambia motor ni contrato HTTP. | Que el diff toque el worker, umbrales, Alembic o `contract:gen`. |
+| 9 | Ninguna pantalla auditada muestra arquitectura interna en primer nivel. | Que un literal de la lista §8 (p. ej. `Recommendation`, `ledger`, `fills`, `runId`) se renderice fuera de `Detalle técnico`. |
+| 10 | Cada pantalla responde su pregunta principal antes de explicar mecanismo. | Que el primer bloque visible de una pantalla explique cómo funciona el sistema en vez de responder su pregunta. |
+| 11 | El nivel 3 usa un único disclosure con rótulo «Detalle técnico». | Que coexistan idioms de profundidad (`Ajustes avanzados`, `Más detalle`) fuera de `TechnicalDetail`. |
 
 ---
 

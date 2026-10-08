@@ -72,7 +72,7 @@ export function WorkflowModulesSection() {
             <p>
               Donde <em>estudias</em>: backtests, embudo Play, Finalistas,
               verificación DÍA D y cartera de experimentos. No toca tu dinero
-              demo ni el ledger real de la cuenta.
+              demo ni el historial real de la cuenta.
             </p>
             <p className="mt-2">
               Pantalla: <RouteLink to="/backtests">Laboratorio</RouteLink>{" "}
@@ -87,7 +87,7 @@ export function WorkflowModulesSection() {
             <p className="mt-2">
               Pantalla: <RouteLink to="/trading">Trading</RouteLink> +{" "}
               <RouteLink to="/confirm">Confirmar</RouteLink> +{" "}
-              <RouteLink to="/operations">Libro</RouteLink>.
+              <RouteLink to="/operations">Operaciones</RouteLink>.
             </p>
           </ModuleCard>
         </div>
@@ -191,7 +191,7 @@ export function WorkflowModulesSection() {
             <ul className="list-disc space-y-1 pl-4">
               <li>
                 <RouteLink to="/mesa">Hoy</RouteLink> — inbox del día (Daily
-                Desk). Detalles / Journal / Libro detrás de «Ver detalles».
+                Desk). Detalles / Journal / Cartera detrás de «Ver detalles».
               </li>
               <li>
                 <RouteLink to="/trading">Mercado</RouteLink> — terminal:
@@ -210,7 +210,7 @@ export function WorkflowModulesSection() {
                 supervisada (única firma).
               </li>
               <li>
-                <strong className="text-foreground">Libro</strong> —{" "}
+                <strong className="text-foreground">Cartera</strong> —{" "}
                 <RouteLink to="/operations">Operaciones</RouteLink> +{" "}
                 <RouteLink to="/history">Historial</RouteLink>.
               </li>
@@ -288,8 +288,8 @@ export function WorkflowModulesSection() {
         <h3 className="mb-2 font-semibold">Por detrás (solo referencia)</h3>
         <p className="text-muted-foreground">
           Interfaz React, API Python y PostgreSQL. Datos de mercado vía Yahoo;
-          estrategias y ledger en BD. Para arquitectura y ADRs usa el índice de
-          docs del repo — aquí no se repiten.
+          estrategias y registro contable en BD. Para arquitectura y ADRs usa el
+          índice de docs del repo — aquí no se repiten.
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
           Sync Ayuda {HELP_CONTENT_AS_OF}.

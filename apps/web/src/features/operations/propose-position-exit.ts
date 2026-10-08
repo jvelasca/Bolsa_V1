@@ -20,6 +20,7 @@ import {
   type ProtectStopKindV1,
 } from "@bolsa/shared";
 import type { SupervisedProposePayload } from "@/stores/supervised-f3-queue-store";
+import { absentDataLabel } from "@/components/absent-data";
 import {
   demoBookAllowsEnqueueConfirm,
   loadDemoBookPrefs,
@@ -381,11 +382,11 @@ export function buildPositionExitPayload(opts: {
   const book = loadDemoBookPrefs();
   if (!demoBookAllowsEnqueueConfirm(book.mode)) {
     // V2.88.85 (H1) — en MANUAL el cierre/reducción se hace con Vender (venta directa
-    // sobre el libro DEMO); el resto de tickets siguen exigiendo SEMI.
+    // sobre la cuenta DEMO); el resto de tickets siguen exigiendo SEMI.
     throw new Error(
       intent === "reduce" || intent === "exit_hint"
-        ? "Libro en MANUAL: para desriesgo usa Vender (venta directa sobre el libro DEMO). Cambia a SEMI si quieres encolar un ticket de Confirm."
-        : "Libro en MANUAL: cambia a SEMI en Operativa → Configuración para encolar Confirm.",
+        ? "Modo MANUAL: para desriesgo usa Vender (venta directa sobre la cuenta DEMO). Cambia a SEMI si quieres encolar un ticket de Confirm."
+        : "Modo MANUAL: cambia a SEMI en Operativa → Configuración para encolar Confirm.",
     );
   }
 
@@ -526,7 +527,7 @@ export function buildPositionExitPayload(opts: {
         ? [
             exitMeta.exitSource === "manual"
               ? "Salida MANUAL (firma humana · sin evento ExitPlan TRIGGERED/ARMED)"
-              : `Salida por evento ExitPlan (${exitPlanDto?.primaryReason ?? "—"})`,
+              : `Salida por evento ExitPlan (${exitPlanDto?.primaryReason ?? absentDataLabel()})`,
           ]
         : []),
     ],

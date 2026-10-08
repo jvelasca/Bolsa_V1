@@ -11,7 +11,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   MesaPositionRow,
@@ -36,7 +35,7 @@ export function MesaPositionsSummary({
     <Card data-testid="mesa-positions-summary">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
         <div>
-          <CardTitle className="text-base">Posiciones</CardTitle>
+          <h2 className="text-base font-semibold tracking-tight">Posiciones</h2>
           <CardDescription>
             Una acción principal por posición — Confirm es la firma
           </CardDescription>

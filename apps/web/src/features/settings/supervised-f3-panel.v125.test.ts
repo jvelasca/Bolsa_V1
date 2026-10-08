@@ -15,10 +15,12 @@ const panelPath = join(
 describe("SupervisedF3Panel V1.25 contract", () => {
   const src = readFileSync(panelPath, "utf8");
 
-  it("T-SIZE-08: assessments gated by advancedOpen", () => {
-    expect(src).toMatch(/data-testid="f3-advanced-section"/);
+  it("T-SIZE-08: technical assessments live under the single TechnicalDetail", () => {
+    expect(src).toMatch(/<TechnicalDetail/);
+    expect(src).toMatch(/testId="confirm-technical-detail"/);
     expect(src).toMatch(/\{ta \? \(/);
     expect(src).toMatch(/data-testid="f3-advanced-toggle"/);
+    expect(src).not.toMatch(/data-testid="f3-advanced-section"/);
   });
 
   it("T-SIZE-09: ticket wires riskPct not null for TRIGGERED plan", () => {

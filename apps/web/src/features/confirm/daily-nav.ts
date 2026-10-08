@@ -35,7 +35,7 @@ export const ASESOR_LABEL = "Asesor" as const;
 /** Hub científico / ledger (ruta histórica `/research`; nav «Asesor»). */
 export const ASESOR_PATH = "/research" as const;
 export const VER_EN_ASESOR_LABEL = "Ver en Asesor" as const;
-export const LEDGER_ASESOR_LINK_LABEL = "Ledger Asesor →" as const;
+export const LEDGER_ASESOR_LINK_LABEL = "Historial del Asesor →" as const;
 export const CONFIRMAR_LABEL = "Confirmar" as const;
 
 /**
@@ -225,7 +225,7 @@ export const MERCADO_NAV = {
  * Tesis / FA — no es el bucle diario de señales.
  */
 export const ASESOR_TESIS_HINT =
-  "Dictamen y ledger · explica, no opera" as const;
+  "Dictamen e historial · explica, no opera" as const;
 
 /** Copy de mesa para Estudio (API list id `estudio` / ADR-024 no cambia). */
 export const UNIVERSO_EN_VIGILANCIA = "Universo en vigilancia" as const;

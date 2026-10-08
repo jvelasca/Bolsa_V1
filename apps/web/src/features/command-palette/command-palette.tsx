@@ -12,8 +12,16 @@ const GROUP_LABEL: Record<PlatformCommand["group"], string> = {
   config: "Configuración",
   density: "Densidad",
   theme: "Tema",
-  layout: "Layout",
+  layout: "Vista",
 };
+
+/** Los grupos de ajuste se separan de la navegación (`UI5-17`). */
+const SETTINGS_GROUPS: readonly PlatformCommand["group"][] = [
+  "config",
+  "density",
+  "theme",
+  "layout",
+];
 
 type CommandPaletteProps = {
   open: boolean;
@@ -126,9 +134,19 @@ export function CommandPalette({
               return (
                 <li key={cmd.id} role="presentation">
                   {showGroup ? (
-                    <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {GROUP_LABEL[cmd.group]}
-                    </div>
+                    <>
+                      {SETTINGS_GROUPS.includes(cmd.group) &&
+                      cmd.group === "config" ? (
+                        <div
+                          aria-hidden="true"
+                          data-testid="command-palette-settings-divider"
+                          className="mx-3 my-1 border-t border-border"
+                        />
+                      ) : null}
+                      <div className="px-3 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {GROUP_LABEL[cmd.group]}
+                      </div>
+                    </>
                   ) : null}
                   <button
                     type="button"

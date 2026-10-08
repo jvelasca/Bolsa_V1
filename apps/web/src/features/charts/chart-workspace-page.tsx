@@ -479,7 +479,7 @@ export function ChartWorkspacePage() {
   if (!activeTab || !chartConfig) {
     return (
       <div className="flex h-full min-h-0 flex-col gap-1">
-        <h1 className="shrink-0 px-0.5 text-sm font-semibold">
+        <h1 className="shrink-0 px-0.5 text-2xl font-semibold tracking-tight">
           {MERCADO_LABEL}
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -570,7 +570,9 @@ export function ChartWorkspacePage() {
   return (
     <div className="chart-workspace-shell flex h-full min-h-0 flex-col gap-1">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-0.5">
-        <h1 className="text-sm font-semibold">{MERCADO_LABEL}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {MERCADO_LABEL}
+        </h1>
         {showQuickTrade ? (
           <div
             role="group"

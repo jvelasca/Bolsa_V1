@@ -1,5 +1,5 @@
 /**
- * F3 — Assessments → DecisionRuntime → Recommendation (supervisado).
+ * F3 — Assessments → decisión → propuesta firmable (supervisado).
  *
  * Cola cliente (`useSupervisedF3QueueStore`) con badges de origen
  * (Finalistas / Scan / Gráfico / Manual). Callout Confirm reforzado si origen Finalistas.
@@ -37,8 +37,9 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
+import { TechnicalDetail } from "@/components/technical-detail";
+import { ABSENT_DATA_NOT_MEASURED } from "@/components/absent-data";
 import {
   useActiveAccount,
   useActiveAccountSettings,
@@ -235,7 +236,7 @@ export function SupervisedF3Panel() {
   );
   /** Escalera LIVE VIRTUAL (simulado) — solo UI Confirm; no flip venue. */
   const [liveVirtualStep, setLiveVirtualStep] =
-    useState<LiveVirtualLadderStep>("proposed");
+    useState<LiveVirtualLadderStep>("preparada");
 
   const queueItems = useSupervisedF3QueueStore((s) => s.items);
   const activeId = useSupervisedF3QueueStore((s) => s.activeId);
@@ -287,7 +288,7 @@ export function SupervisedF3Panel() {
   }, [activeId, quantity, price, stopField]);
 
   useEffect(() => {
-    setLiveVirtualStep("proposed");
+    setLiveVirtualStep("preparada");
   }, [activeId]);
 
   useEffect(() => {
@@ -444,7 +445,7 @@ export function SupervisedF3Panel() {
     },
     onSuccess: (rec) => {
       setPending(rec);
-      setLiveVirtualStep("proposed");
+      setLiveVirtualStep("preparada");
       enqueue(rec, { origin: "manual" });
       if (rec.lastClose != null && !price.trim()) {
         setPrice(String(rec.lastClose));
@@ -463,7 +464,7 @@ export function SupervisedF3Panel() {
         throw new Error("Falta recommendation o cuenta");
       if (execute && !demoBookAllowsExecute(loadDemoBookPrefs().mode)) {
         throw new Error(
-          "Libro no está en SEMI: no se puede ejecutar. Cambia el modo en el rail Coach.",
+          "El modo de ejecución no es SEMI: no se puede ejecutar. Cambia el modo desde los ajustes de la cuenta.",
         );
       }
       const qty = Number(quantity);
@@ -595,7 +596,7 @@ export function SupervisedF3Panel() {
     mutationFn: async () => {
       if (!effectiveAccountId) throw new Error("Sin cuenta DEMO");
       if (!demoBookAllowsExecute(loadDemoBookPrefs().mode)) {
-        throw new Error("Libro no está en SEMI");
+        throw new Error("El modo de ejecución no permite operar en lote");
       }
       const selected = new Set(selectedIds);
       const targets = rankedQueueItems.filter((i) => selected.has(i.id));
@@ -883,7 +884,7 @@ export function SupervisedF3Panel() {
     activeItem?.symbol ??
     instrumentsForSelect.find((i) => i.id === pending?.instrumentId)?.symbol ??
     pending?.instrumentId?.slice(0, 8) ??
-    "—";
+    ABSENT_DATA_NOT_MEASURED;
 
   const liveVirtualWhy = useMemo(
     () =>
@@ -925,14 +926,16 @@ export function SupervisedF3Panel() {
   return (
     <Card id="supervised-f3-panel">
       <CardHeader>
-        <CardTitle>{PAPER_PATH_SUPERVISED.shortTitle}</CardTitle>
+        <h2 className="text-lg font-semibold leading-none tracking-tight">
+          {PAPER_PATH_SUPERVISED.shortTitle}
+        </h2>
         <CardDescription>
-          SEMI · Assessment(s) → Recommendation → Confirm. Cola: Finalistas,
-          Radar, Scan, Gráfico.
+          Revisa la operación propuesta y fírmala cuando estés de acuerdo. Nada
+          se envía sin tu firma.
           {account
             ? ` Cuenta: ${account.name}.`
             : " Selecciona una cuenta activa."}
-          {` Modo libro: ${bookMode.toUpperCase()}.`}
+          {` Modo: ${bookMode.toUpperCase()}.`}
           {cash > 0 ? ` Cash: ${formatNumber0(cash)}.` : ""}
         </CardDescription>
       </CardHeader>
@@ -965,8 +968,7 @@ export function SupervisedF3Panel() {
               </div>
             </div>
             <p className="text-[10px] text-muted-foreground">
-              Orden: óptimo → geo ({countryPrefer.replace("_", " ")} · home{" "}
-              {homeCountry})
+              Ordenadas por interés para ti (afinidad con {homeCountry}).
             </p>
             <ul className="max-h-36 space-y-1 overflow-y-auto text-[11px]">
               {rankedQueueItems.map((item) => {
@@ -1031,7 +1033,7 @@ export function SupervisedF3Panel() {
               title={
                 canExecute
                   ? executeCtaLabel(brokerVenue)
-                  : "Pasa el libro a SEMI para ejecutar"
+                  : "Cambia a SEMI para ejecutar"
               }
               onClick={() => confirmSelected.mutate()}
             >
@@ -1085,9 +1087,10 @@ export function SupervisedF3Panel() {
 
         {!canExecute ? (
           <p className="rounded-md border border-border px-3 py-2 text-[11px] text-muted-foreground">
-            Libro en <strong>{bookMode.toUpperCase()}</strong>: puedes proponer
-            e inspeccionar, pero la ejecución DEMO solo en <strong>SEMI</strong>{" "}
-            (rail Coach → Libro DEMO).
+            Modo <strong>{bookMode.toUpperCase()}</strong>: puedes preparar y
+            revisar operaciones, pero la ejecución solo está disponible en{" "}
+            <strong>SEMI</strong>. Cambia el modo desde los ajustes de la
+            cuenta.
           </p>
         ) : null}
 
@@ -1243,7 +1246,9 @@ export function SupervisedF3Panel() {
           onClick={() => setAdvancedOpen((v) => !v)}
           data-testid="f3-advanced-toggle"
         >
-          {advancedOpen ? "Ocultar ajustes avanzados" : "Ajustes avanzados"}
+          {advancedOpen
+            ? "Ocultar opciones de análisis"
+            : "Opciones de análisis"}
         </button>
         {advancedOpen && ticketPreview ? (
           <F3TicketPreviewBlock ticket={ticketPreview} />
@@ -1252,7 +1257,11 @@ export function SupervisedF3Panel() {
         {showLiveVirtualPath && pending ? (
           <LiveVirtualOrderGateway
             symbol={liveVirtualSymbol}
-            proposalRef={pending.recommendationId || pending.decisionId || "—"}
+            proposalRef={
+              pending.recommendationId ||
+              pending.decisionId ||
+              ABSENT_DATA_NOT_MEASURED
+            }
             ticket={ticketPreview}
             stop={
               signedStop ??
@@ -1322,7 +1331,7 @@ export function SupervisedF3Panel() {
                       ? "Persistir stop operativo (≠ orden broker)"
                       : canExecute
                         ? executeCtaLabel(brokerVenue)
-                        : "Cambia a SEMI en Libro DEMO"
+                        : "Cambia el modo a SEMI para ejecutar"
             }
             onClick={() => confirm.mutate(true)}
           >
@@ -1332,175 +1341,176 @@ export function SupervisedF3Panel() {
           </button>
         </div>
 
-        {advancedOpen ? (
-          <div className="space-y-3" data-testid="f3-advanced-section">
-            {ta ? (
-              <AssessmentBlock
-                title="Technical Assessment"
-                bias={ta.bias}
-                score={ta.score}
-                confidence={ta.confidence}
-                coverage={ta.coverage}
-                facts={ta.narrativeFacts ?? ta.facts}
-                warnings={ta.warnings}
-                components={ta.components}
-              />
-            ) : null}
-            {fa ? (
-              <AssessmentBlock
-                title="Fundamental Assessment"
-                bias={fa.bias}
-                score={fa.score}
-                confidence={fa.confidence}
-                coverage={fa.coverage}
-                facts={fa.narrativeFacts ?? fa.facts}
-                warnings={fa.warnings}
-                components={fa.components}
-              />
-            ) : null}
-            {ma ? (
-              <AssessmentBlock
-                title="Macro Assessment"
-                bias={ma.bias}
-                score={ma.score}
-                confidence={ma.confidence}
-                coverage={ma.coverage}
-                facts={ma.narrativeFacts ?? ma.facts}
-                warnings={ma.warnings}
-                components={ma.components}
-                extra={`${ma.regime} / ${ma.tradability}`}
-              />
-            ) : null}
-            {ea ? (
-              <AssessmentBlock
-                title="Evidence Assessment"
-                score={ea.score}
-                confidence={ea.confidence}
-                facts={ea.narrativeFacts ?? ea.facts}
-                warnings={ea.warnings}
-                extra={`band=${ea.band} · cred=${ea.credibility}`}
-              />
-            ) : null}
-            {na && na.eventCount > 0 ? (
-              <AssessmentBlock
-                title="News Assessment"
-                bias={na.bias}
-                score={na.score}
-                confidence={na.confidence}
-                coverage={na.coverage}
-                facts={na.narrativeFacts ?? na.facts}
-                warnings={na.warnings}
-                extra={`${na.eventCount} evento(s) · sent ${na.sentiment.toFixed(2)}`}
-              />
-            ) : null}
-          </div>
-        ) : null}
-
         {pending ? (
-          <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs space-y-1">
-            <p>
-              <span className="font-medium text-foreground">
-                Recommendation
-              </span>
-              {" · "}
-              {pending.recommendationId} · <strong>{pending.action}</strong>
-              {pending.suggestedPrice != null
-                ? ` @ ${pending.suggestedPrice}`
-                : ""}
-            </p>
-            {pending.weightContext ? (
-              <div className="rounded border border-border/60 bg-muted/30 px-2 py-1.5 space-y-1">
-                <p className="font-medium text-foreground">
-                  Fusión Runtime
-                  {pending.combinedScore != null
-                    ? ` · score ${pending.combinedScore.toFixed(3)}`
-                    : ""}
-                </p>
-                <p className="text-muted-foreground">
-                  {pending.weightContext.horizon} ·{" "}
-                  {pending.weightContext.regime}
-                  {" · "}v{pending.weightContext.ruleVersion}
-                </p>
-                <p className="text-muted-foreground">
-                  TA {(pending.weightContext.weights.ta * 100).toFixed(0)}% ·
-                  FUND {(pending.weightContext.weights.fund * 100).toFixed(0)}%
-                  · Macro{" "}
-                  {(pending.weightContext.weights.macro * 100).toFixed(0)}% ·
-                  News {(pending.weightContext.weights.news * 100).toFixed(0)}%
-                </p>
-                {pending.weightContext.rationale ? (
-                  <p className="text-[10px] text-muted-foreground/90">
-                    {pending.weightContext.rationale}
-                  </p>
-                ) : null}
-                {pending.weightContext.missingAssessments?.length ? (
-                  <p className="text-[10px] text-amber-700 dark:text-amber-400">
-                    Faltan:{" "}
-                    {pending.weightContext.missingAssessments.join(", ")} (peso
-                    redistribuido)
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-            {pending.decisionSession?.sessionId ? (
-              <p className="text-muted-foreground">
-                DecisionSession:{" "}
-                <code className="text-[10px]">
-                  {pending.decisionSession.sessionId}
-                </code>
+          <TechnicalDetail testId="confirm-technical-detail">
+            <div className="space-y-3" data-testid="f3-technical-assessments">
+              {ta ? (
+                <AssessmentBlock
+                  title="Technical Assessment"
+                  bias={ta.bias}
+                  score={ta.score}
+                  confidence={ta.confidence}
+                  coverage={ta.coverage}
+                  facts={ta.narrativeFacts ?? ta.facts}
+                  warnings={ta.warnings}
+                  components={ta.components}
+                />
+              ) : null}
+              {fa ? (
+                <AssessmentBlock
+                  title="Fundamental Assessment"
+                  bias={fa.bias}
+                  score={fa.score}
+                  confidence={fa.confidence}
+                  coverage={fa.coverage}
+                  facts={fa.narrativeFacts ?? fa.facts}
+                  warnings={fa.warnings}
+                  components={fa.components}
+                />
+              ) : null}
+              {ma ? (
+                <AssessmentBlock
+                  title="Macro Assessment"
+                  bias={ma.bias}
+                  score={ma.score}
+                  confidence={ma.confidence}
+                  coverage={ma.coverage}
+                  facts={ma.narrativeFacts ?? ma.facts}
+                  warnings={ma.warnings}
+                  components={ma.components}
+                  extra={`${ma.regime} / ${ma.tradability}`}
+                />
+              ) : null}
+              {ea ? (
+                <AssessmentBlock
+                  title="Evidence Assessment"
+                  score={ea.score}
+                  confidence={ea.confidence}
+                  facts={ea.narrativeFacts ?? ea.facts}
+                  warnings={ea.warnings}
+                  extra={`band=${ea.band} · cred=${ea.credibility}`}
+                />
+              ) : null}
+              {na && na.eventCount > 0 ? (
+                <AssessmentBlock
+                  title="News Assessment"
+                  bias={na.bias}
+                  score={na.score}
+                  confidence={na.confidence}
+                  coverage={na.coverage}
+                  facts={na.narrativeFacts ?? na.facts}
+                  warnings={na.warnings}
+                  extra={`${na.eventCount} evento(s) · sent ${na.sentiment.toFixed(2)}`}
+                />
+              ) : null}
+            </div>
+            <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs space-y-1">
+              <p>
+                <span className="font-medium text-foreground">
+                  Recommendation
+                </span>
                 {" · "}
-                {pending.decisionSession.kind}/{pending.decisionSession.status}
-                {" · "}
-                <button
-                  type="button"
-                  className="text-[10px] text-primary underline-offset-2 hover:underline"
-                  onClick={() => {
-                    const sessionId = pending.decisionSession?.sessionId;
-                    if (!sessionId) return;
-                    window.dispatchEvent(
-                      new CustomEvent("bolsa:open-help", {
-                        detail: {
-                          section: "value-analysis",
-                          sessionId,
-                        },
-                      }),
-                    );
-                  }}
-                >
-                  Abrir Replay
-                </button>
-              </p>
-            ) : null}
-            {pending.policyGate?.status ? (
-              <p className="text-muted-foreground">
-                Policy Gate: {pending.policyGate.status}
-                {pending.policyGate.message
-                  ? ` — ${pending.policyGate.message}`
+                {pending.recommendationId} · <strong>{pending.action}</strong>
+                {pending.suggestedPrice != null
+                  ? ` @ ${pending.suggestedPrice}`
                   : ""}
               </p>
-            ) : null}
-            {(pending.assessments as AssessmentV1[] | undefined)?.length ? (
-              <p className="text-muted-foreground">
-                Assessments:{" "}
-                {(pending.assessments as AssessmentV1[])
-                  .map((a) => a.type)
-                  .join(", ")}
-              </p>
-            ) : null}
-            {pending.decisionSession?.predictions?.length ? (
-              <p className="text-muted-foreground">
-                Prediction: {pending.decisionSession.predictions.length} (no
-                decide) ·{" "}
-                {String(
-                  (
-                    pending.decisionSession.predictions[0] as {
-                      modelId?: string;
-                    }
-                  )?.modelId ?? "model",
-                )}
-              </p>
-            ) : null}
-          </div>
+              {pending.weightContext ? (
+                <div className="rounded border border-border/60 bg-muted/30 px-2 py-1.5 space-y-1">
+                  <p className="font-medium text-foreground">
+                    Fusión Runtime
+                    {pending.combinedScore != null
+                      ? ` · score ${pending.combinedScore.toFixed(3)}`
+                      : ""}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {pending.weightContext.horizon} ·{" "}
+                    {pending.weightContext.regime}
+                    {" · "}v{pending.weightContext.ruleVersion}
+                  </p>
+                  <p className="text-muted-foreground">
+                    TA {(pending.weightContext.weights.ta * 100).toFixed(0)}% ·
+                    FUND {(pending.weightContext.weights.fund * 100).toFixed(0)}
+                    % · Macro{" "}
+                    {(pending.weightContext.weights.macro * 100).toFixed(0)}% ·
+                    News {(pending.weightContext.weights.news * 100).toFixed(0)}
+                    %
+                  </p>
+                  {pending.weightContext.rationale ? (
+                    <p className="text-[10px] text-muted-foreground/90">
+                      {pending.weightContext.rationale}
+                    </p>
+                  ) : null}
+                  {pending.weightContext.missingAssessments?.length ? (
+                    <p className="text-[10px] text-amber-700 dark:text-amber-400">
+                      Faltan:{" "}
+                      {pending.weightContext.missingAssessments.join(", ")}{" "}
+                      (peso redistribuido)
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              {pending.decisionSession?.sessionId ? (
+                <p className="text-muted-foreground">
+                  DecisionSession:{" "}
+                  <code className="text-[10px]">
+                    {pending.decisionSession.sessionId}
+                  </code>
+                  {" · "}
+                  {pending.decisionSession.kind}/
+                  {pending.decisionSession.status}
+                  {" · "}
+                  <button
+                    type="button"
+                    className="text-[10px] text-primary underline-offset-2 hover:underline"
+                    onClick={() => {
+                      const sessionId = pending.decisionSession?.sessionId;
+                      if (!sessionId) return;
+                      window.dispatchEvent(
+                        new CustomEvent("bolsa:open-help", {
+                          detail: {
+                            section: "value-analysis",
+                            sessionId,
+                          },
+                        }),
+                      );
+                    }}
+                  >
+                    Abrir Replay
+                  </button>
+                </p>
+              ) : null}
+              {pending.policyGate?.status ? (
+                <p className="text-muted-foreground">
+                  Policy Gate: {pending.policyGate.status}
+                  {pending.policyGate.message
+                    ? ` — ${pending.policyGate.message}`
+                    : ""}
+                </p>
+              ) : null}
+              {(pending.assessments as AssessmentV1[] | undefined)?.length ? (
+                <p className="text-muted-foreground">
+                  Assessments:{" "}
+                  {(pending.assessments as AssessmentV1[])
+                    .map((a) => a.type)
+                    .join(", ")}
+                </p>
+              ) : null}
+              {pending.decisionSession?.predictions?.length ? (
+                <p className="text-muted-foreground">
+                  Prediction: {pending.decisionSession.predictions.length} (no
+                  decide) ·{" "}
+                  {String(
+                    (
+                      pending.decisionSession.predictions[0] as {
+                        modelId?: string;
+                      }
+                    )?.modelId ?? "model",
+                  )}
+                </p>
+              ) : null}
+            </div>
+          </TechnicalDetail>
         ) : null}
         {log ? <p className="text-xs text-foreground/80">{log}</p> : null}
       </CardContent>

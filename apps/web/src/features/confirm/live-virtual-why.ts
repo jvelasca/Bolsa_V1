@@ -1,5 +1,5 @@
 /**
- * Narrativa «Para ti (por qué)» desde datos Confirm existentes.
+ * Narrativa «Por qué se propone» desde datos Confirm existentes.
  * No inventa motor de decisión ni PASS; huecos honestos.
  */
 
@@ -100,7 +100,7 @@ export function buildLiveVirtualWhyBlocks(input: {
   const orden: string[] = [];
   if (input.bookMode) {
     orden.push(
-      `Libro ${input.bookMode.toUpperCase()} · Confirm = firma humana (nunca sola).`,
+      `Modo ${input.bookMode.toUpperCase()} · Confirm = firma humana (nunca sola).`,
     );
   } else {
     orden.push("Confirm = firma humana · nunca se envía sola.");
@@ -109,19 +109,21 @@ export function buildLiveVirtualWhyBlocks(input: {
     orden.push(`Condición entrada: ${input.tradePlan.entryCondition}.`);
   }
   if (input.tradePlan?.executionAllowed === false) {
-    orden.push("Plan: executionAllowed=false (inspecciona antes de firmar).");
+    orden.push(
+      "Plan: la ejecución no está permitida (revisa antes de firmar).",
+    );
   }
   if (input.policyGateStatus) {
-    orden.push(`Policy gate: ${input.policyGateStatus}.`);
+    orden.push(`Filtro de política: ${input.policyGateStatus}.`);
   }
   if (orden.length === 0) {
     orden.push("Sin explicación disponible.");
   }
 
   const anti = [
-    "Ranking ≠ BUY.",
-    "Arm ≠ Execute.",
-    "LIVE VIRTUAL ≠ capital real · respuesta broker simulada.",
+    "Estar arriba en la lista no es una orden de compra.",
+    "Preparar una orden no la ejecuta.",
+    "LIVE VIRTUAL no es capital real · la respuesta del bróker es simulada.",
   ];
 
   return [

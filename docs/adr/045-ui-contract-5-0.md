@@ -34,6 +34,10 @@ La aplicación debe leerse como **una sola aplicación**, con un **único lengua
    - **`RT-04` Un solo mecanismo de profundidad:** «Más información» / «¿Por qué?» / «Detalle técnico», sin disclosures paralelos.
    - **`Cartera`** se conserva como **vista rotulada** de `/mesa` (sin ruta propia de L1).
    - **`AdminRail`** queda **administrativa/técnica**: no duplica las cinco puertas L1.
+5. **Reglas globales de lenguaje (enmienda UI 6.x, 2026-10-08 — Bloque E).** Se elevan a contrato dos reglas falsables de **alcance global** (no solo AUTO), formuladas en la [auditoría UI 6.x global](./../engineering/auditoria-ui-6-x-global-2026-10-08.md):
+   - **`R-G1` Una pantalla se entiende sin conocer cómo está construido el backend.** El nivel 1 (usuario) no muestra arquitectura interna (identificadores de modelo/motor, `runId`/`cycleId`, `ledger`/`fills`, `DÍA-D`); esa jerga solo vive tras el disclosure único.
+   - **`R-G2` Cada pantalla responde una sola pregunta principal.** El primer bloque visible responde esa pregunta antes de explicar mecanismo; pregunta por pantalla: Hoy `¿Qué requiere mi atención?` · Mercado `¿Qué está ocurriendo?` · Cartera `¿Qué tengo?` · Asesor `¿Por qué?` · Laboratorio `¿Qué estamos aprendiendo?` · AUTO `¿Qué está haciendo AUTO?` · Confirmar `¿Qué voy a autorizar?`.
+   - **Solape declarado:** `R-G1` refina `RT-02` y `R-G2` refina `UI5-01`; los hacen válidos para **toda la app**. El disclosure único sigue siendo `RT-04` (`TechnicalDetail`, rótulo «Detalle técnico»); las reglas nuevas no crean idioms de profundidad paralelos.
 
 ---
 

@@ -20,6 +20,7 @@ import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import { useNotificationPrefsStore } from "@/stores/notification-prefs-store";
 import { useAlertsStore } from "@/stores/alerts-store";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { TechnicalDetail } from "@/components/technical-detail";
 import { cn } from "@/lib/utils";
 
 function todayIso(): string {
@@ -306,13 +307,13 @@ export function AsesorDailyOpsPanel() {
               <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-800 dark:text-sky-200">
                 Trades {report.tradesToday.length}
               </span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground">
-                Ledger {report.ledgerToday.length}
-              </span>
               <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-900 dark:text-amber-200">
                 F3 pendiente {report.f3PendingCount}
               </span>
             </div>
+            <TechnicalDetail testId="asesor-daily-ops-technical">
+              <p>Movimientos registrados hoy: {report.ledgerToday.length}</p>
+            </TechnicalDetail>
             {report.tradesToday.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 Sin compras/ventas registradas hoy.
@@ -408,7 +409,7 @@ export function AsesorDailyOpsPanel() {
                 Semana en curso
               </h3>
               <p className="text-[10px] text-muted-foreground">
-                Barras = trades · línea = balance ledger
+                Barras = operaciones · línea = evolución del balance
               </p>
             </div>
             <WeekActivityChart week={report.week} />

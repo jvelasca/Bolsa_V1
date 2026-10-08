@@ -68,7 +68,7 @@ describe("daily-nav", () => {
       "/research?tab=history&trialId=id+%26+x",
     );
     expect(VER_EN_ASESOR_LABEL).toBe("Ver en Asesor");
-    expect(LEDGER_ASESOR_LINK_LABEL).toBe("Ledger Asesor →");
+    expect(LEDGER_ASESOR_LINK_LABEL).toBe("Historial del Asesor →");
     expect(VER_EN_ASESOR_LABEL).not.toMatch(/Research/i);
   });
 

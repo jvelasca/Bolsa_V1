@@ -10,6 +10,7 @@ import { Bell, BrainCircuit, Loader2 } from "lucide-react";
 import { SIGNAL_KIND_LABELS, ENTRIES_BLOCKED_PROPOSE_MSG } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
+import { absentDataLabel } from "@/components/absent-data";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { openHitInTrading } from "@/features/screeners/open-hit-in-trading";
@@ -93,8 +94,10 @@ function AlarmRow({
             </span>
           </p>
           <p className="text-[10px] tabular-nums text-muted-foreground">
-            {item.price != null ? `@ ${item.price.toFixed(2)}` : "—"} ·{" "}
-            {formatWhen(item.createdAt)}
+            {item.price != null
+              ? `@ ${item.price.toFixed(2)}`
+              : absentDataLabel()}{" "}
+            · {formatWhen(item.createdAt)}
           </p>
         </button>
         <div className="flex shrink-0 flex-col items-end gap-0.5">
@@ -171,7 +174,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
       const book = loadDemoBookPrefs();
       if (!demoBookAllowsEnqueueConfirm(book.mode)) {
         throw new Error(
-          "Libro en MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.",
+          "Modo MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.",
         );
       }
       if (
@@ -194,7 +197,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
       }
       if (summary.positionsCount >= book.maxOpenPositions) {
         throw new Error(
-          `Tope de posiciones (${book.maxOpenPositions}). Cierra alguna o sube el máximo en Libro DEMO.`,
+          `Tope de posiciones (${book.maxOpenPositions}). Cierra alguna o sube el máximo en Operativa.`,
         );
       }
       const res = await api.proposeRecommendation({

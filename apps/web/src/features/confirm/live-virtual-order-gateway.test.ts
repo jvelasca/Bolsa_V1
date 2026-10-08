@@ -18,48 +18,50 @@ import {
 } from "@/features/confirm/live-virtual-banner";
 import { executeCtaLabel } from "@bolsa/shared";
 
-/** Tokens ingleses que `UI5-09`/`UI5-20` prohíben en primer nivel. */
+/** Tokens ingleses que `UI5-09`/`UI5-20` prohíben en el DOM de la escalera. */
 const RAW_ENGLISH_LADDER_TOKENS =
   /proposed|signed|submitted|filled\*|filled\b|rejected|not_wired/;
 
 describe("live-virtual-ladder", () => {
-  it("maps adapter fillStatus to honest steps", () => {
-    expect(liveVirtualStepFromFillStatus("submitted")).toBe("submitted");
-    expect(liveVirtualStepFromFillStatus("not_wired")).toBe("not_wired");
-    expect(liveVirtualStepFromFillStatus("rejected")).toBe("rejected");
-    expect(liveVirtualStepFromFillStatus("executed")).toBe("filled");
-    expect(liveVirtualStepFromFillStatus("unknown")).toBe("unknown");
+  it("maps adapter fillStatus to honest Spanish steps", () => {
+    expect(liveVirtualStepFromFillStatus("submitted")).toBe("enviada");
+    expect(liveVirtualStepFromFillStatus("not_wired")).toBe("no_cableado");
+    expect(liveVirtualStepFromFillStatus("rejected")).toBe("rechazada");
+    expect(liveVirtualStepFromFillStatus("executed")).toBe("completada");
+    expect(liveVirtualStepFromFillStatus("unknown")).toBe("desconocida");
   });
 
-  it("keeps proposed until firma; Intent → signed; execute uses fill", () => {
-    expect(resolveLiveVirtualLadderStep({ hasPending: true })).toBe("proposed");
+  it("keeps preparada until firma; Intent → firmada; execute uses fill", () => {
+    expect(resolveLiveVirtualLadderStep({ hasPending: true })).toBe(
+      "preparada",
+    );
     expect(
       resolveLiveVirtualLadderStep({
         hasPending: true,
         intentStatus: "authorized",
         execute: false,
       }),
-    ).toBe("signed");
+    ).toBe("firmada");
     expect(
       resolveLiveVirtualLadderStep({
         hasPending: true,
         execute: true,
         fillStatus: "submitted",
       }),
-    ).toBe("submitted");
+    ).toBe("enviada");
     expect(
       resolveLiveVirtualLadderStep({
         hasPending: true,
         execute: true,
         fillStatus: "executed",
       }),
-    ).toBe("filled");
+    ).toBe("completada");
   });
 
-  it("filled* copy never claims real settlement", () => {
-    expect(LIVE_VIRTUAL_LADDER_COPY.filled).toMatch(/SIMULADO/i);
-    expect(LIVE_VIRTUAL_LADDER_COPY.filled).toMatch(/settlement/i);
-    expect(LIVE_VIRTUAL_LADDER_COPY.submitted).toMatch(/simulado/i);
+  it("completada copy never claims real settlement", () => {
+    expect(LIVE_VIRTUAL_LADDER_COPY.completada).toMatch(/SIMULADO/i);
+    expect(LIVE_VIRTUAL_LADDER_COPY.completada).toMatch(/liquidación/i);
+    expect(LIVE_VIRTUAL_LADDER_COPY.enviada).toMatch(/simulado/i);
   });
 });
 
@@ -70,8 +72,10 @@ describe("live-virtual-why", () => {
       /Sin explicación disponible/,
     );
     const anti = blocks.find((b) => b.id === "anti");
-    expect(anti?.bullets.join(" ")).toMatch(/Ranking ≠ BUY/);
-    expect(anti?.bullets.join(" ")).toMatch(/Arm ≠ Execute/);
+    expect(anti?.bullets.join(" ")).toMatch(
+      /Estar arriba en la lista no es una orden de compra/,
+    );
+    expect(anti?.bullets.join(" ")).toMatch(/Preparar una orden no la ejecuta/);
     expect(anti?.bullets.join(" ")).toMatch(/VIRTUAL/);
   });
 
@@ -126,7 +130,7 @@ describe("LiveVirtualOrderGateway DOM (UI5-09 / UI5-20)", () => {
         symbol: "AAPL",
         proposalRef: "rec-1",
         ticket: null,
-        ladderStep: "submitted",
+        ladderStep: "enviada",
         whyBlocks: [],
       }),
     );
@@ -135,7 +139,9 @@ describe("LiveVirtualOrderGateway DOM (UI5-09 / UI5-20)", () => {
       '[data-testid="live-virtual-ladder"]',
     );
     expect(ladder).not.toBeNull();
-    expect(ladder?.textContent).toContain("Enviada (simulado) · no fill");
+    expect(ladder?.textContent).toContain(
+      "Enviada (simulado) · sin ejecución real",
+    );
 
     const text = container.textContent ?? "";
     expect(text).not.toMatch(RAW_ENGLISH_LADDER_TOKENS);
@@ -148,7 +154,7 @@ describe("LiveVirtualOrderGateway DOM (UI5-09 / UI5-20)", () => {
         symbol: "AAPL",
         proposalRef: "rec-2",
         ticket: null,
-        ladderStep: "rejected",
+        ladderStep: "rechazada",
         whyBlocks: [],
       }),
     );
@@ -156,7 +162,7 @@ describe("LiveVirtualOrderGateway DOM (UI5-09 / UI5-20)", () => {
     const terminal = container.querySelector(
       '[data-testid="live-virtual-ladder-terminal"]',
     );
-    expect(terminal?.textContent).toContain(LIVE_VIRTUAL_LADDER_COPY.rejected);
+    expect(terminal?.textContent).toContain(LIVE_VIRTUAL_LADDER_COPY.rechazada);
     expect(container.textContent ?? "").not.toMatch(RAW_ENGLISH_LADDER_TOKENS);
   });
 });

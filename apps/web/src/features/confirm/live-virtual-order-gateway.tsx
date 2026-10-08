@@ -1,6 +1,6 @@
 /**
- * Pasarela LIVE VIRTUAL híbrida dentro de Confirm (telegrama + por qué).
- * No mesa nueva · no chat social · no inventa fill real.
+ * Pasarela LIVE VIRTUAL híbrida dentro de Confirm (resumen de la orden + por qué).
+ * No mesa nueva · no chat social · no inventa una ejecución real.
  * @see docs/engineering/design-live-virtual-order-gateway-ui-2026-09-07.md
  */
 
@@ -25,6 +25,12 @@ type LiveVirtualOrderGatewayProps = {
   ladderStep: LiveVirtualLadderStep;
   whyBlocks: LiveVirtualWhyBlock[];
   className?: string;
+};
+
+/** Etiqueta de usuario para el tipo de orden (sin tokens ingleses en el DOM). */
+const ORDER_TYPE_LABEL: Record<"LIMIT" | "MARKET", string> = {
+  LIMIT: "Límite",
+  MARKET: "Mercado",
 };
 
 function TelegramRow({
@@ -52,12 +58,12 @@ function TelegramRow({
 }
 
 function LadderVisual({ step }: { step: LiveVirtualLadderStep }) {
-  const primary: LiveVirtualLadderStep[] = ["proposed", "signed", "submitted"];
+  const primary: LiveVirtualLadderStep[] = ["preparada", "firmada", "enviada"];
   const terminal =
-    step === "filled" ||
-    step === "rejected" ||
-    step === "not_wired" ||
-    step === "unknown";
+    step === "completada" ||
+    step === "rechazada" ||
+    step === "no_cableado" ||
+    step === "desconocida";
 
   return (
     <div className="space-y-1.5" data-testid="live-virtual-ladder">
@@ -66,7 +72,7 @@ function LadderVisual({ step }: { step: LiveVirtualLadderStep }) {
       </p>
       <ol className="space-y-0.5 text-[11px]">
         {primary.map((rung) => {
-          const active = step === rung || (rung === "submitted" && terminal);
+          const active = step === rung || (rung === "enviada" && terminal);
           const past =
             LIVE_VIRTUAL_LADDER_ORDER.indexOf(step) >
             LIVE_VIRTUAL_LADDER_ORDER.indexOf(rung);
@@ -97,12 +103,12 @@ function LadderVisual({ step }: { step: LiveVirtualLadderStep }) {
           <span>
             {terminal
               ? LIVE_VIRTUAL_LADDER_COPY[step]
-              : `${LIVE_VIRTUAL_LADDER_COPY.filled} | ${LIVE_VIRTUAL_LADDER_COPY.rejected} | ${LIVE_VIRTUAL_LADDER_COPY.not_wired}`}
+              : `${LIVE_VIRTUAL_LADDER_COPY.completada} | ${LIVE_VIRTUAL_LADDER_COPY.rechazada} | ${LIVE_VIRTUAL_LADDER_COPY.no_cableado}`}
           </span>
         </li>
       </ol>
       <p className="text-[10px] text-muted-foreground">
-        *respuesta SIMULADA · enviada ≠ fill real
+        *respuesta simulada · enviada no es una ejecución real
       </p>
     </div>
   );
@@ -118,7 +124,11 @@ export function LiveVirtualOrderGateway({
   whyBlocks,
   className,
 }: LiveVirtualOrderGatewayProps) {
-  const sideLabel = ticket ? (ticket.side === "buy" ? "BUY" : "SELL") : "—";
+  const sideLabel = ticket
+    ? ticket.side === "buy"
+      ? "Compra"
+      : "Venta"
+    : ABSENT_DATA_NOT_MEASURED;
   const qty = ticket?.quantity;
   const price = ticket?.price;
   const money = (n: number) =>
@@ -132,9 +142,8 @@ export function LiveVirtualOrderGateway({
       )}
       data-testid="live-virtual-order-gateway"
     >
-      {/* `compact` evita la línea inglesa `submitted ≠ fill real` (fuera del alcance editable:
-          el banner vive en `live-virtual-banner.tsx`). La honestidad se conserva en el pie de la
-          escalera en español (`enviada ≠ fill real`). */}
+      {/* `compact` evita la línea de nivel 2 del banner; la honestidad VIRTUAL se
+          mantiene aquí abajo en lenguaje de resultado. */}
       <LiveVirtualBanner compact />
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -143,12 +152,12 @@ export function LiveVirtualOrderGateway({
           data-testid="live-virtual-telegram"
         >
           <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
-            Telegrama al broker
+            Orden propuesta
           </p>
           <div className="space-y-0.5">
-            <TelegramRow label="DE" value="Mesa Bolsa" />
-            <TelegramRow label="A" value="Broker (VIRTUAL)" />
-            <TelegramRow label="REF" value={proposalRef} mono />
+            <TelegramRow label="Desde" value="Mesa Bolsa" />
+            <TelegramRow label="Para" value="Broker (VIRTUAL)" />
+            <TelegramRow label="Referencia" value={proposalRef} mono />
           </div>
           <p className="pt-1 text-sm font-semibold tabular-nums text-foreground">
             {sideLabel} {symbol}
@@ -157,26 +166,35 @@ export function LiveVirtualOrderGateway({
           </p>
           <div className="space-y-0.5">
             {orderTypeHint ? (
-              <TelegramRow label="Tipo" value={orderTypeHint} />
+              <TelegramRow
+                label="Tipo"
+                value={ORDER_TYPE_LABEL[orderTypeHint]}
+              />
             ) : (
               <TelegramRow label="Tipo" value={ABSENT_DATA_NOT_MEASURED} />
             )}
             {stop != null && Number.isFinite(stop) ? (
-              <TelegramRow label="STOP plan" value={formatPrice(stop)} />
+              <TelegramRow label="Stop previsto" value={formatPrice(stop)} />
             ) : (
-              <TelegramRow label="STOP plan" value="—" />
+              <TelegramRow
+                label="Stop previsto"
+                value={ABSENT_DATA_NOT_MEASURED}
+              />
             )}
             {ticket ? (
               <>
                 <TelegramRow
-                  label="Notional ~"
+                  label="Importe aprox."
                   value={money(ticket.notional)}
                 />
-                <TelegramRow label="Fees ~" value={money(ticket.fees.total)} />
+                <TelegramRow
+                  label="Comisiones aprox."
+                  value={money(ticket.fees.total)}
+                />
               </>
             ) : (
               <p className="text-[10px] text-muted-foreground">
-                Sin ticket preview resoluble.
+                Falta el cálculo de la orden.
               </p>
             )}
           </div>
@@ -188,7 +206,7 @@ export function LiveVirtualOrderGateway({
           data-testid="live-virtual-why"
         >
           <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
-            Para ti (por qué)
+            Por qué se propone
           </p>
           {whyBlocks.map((block) => (
             <div key={block.id} data-testid={`live-virtual-why-${block.id}`}>
@@ -203,13 +221,13 @@ export function LiveVirtualOrderGateway({
             </div>
           ))}
           <p className="text-[10px] text-muted-foreground">
-            Fuentes: TradePlan · DECISIÓN · risk / ticket Confirm (existentes).
+            Fuentes: tu plan de operación y el análisis de esta propuesta.
           </p>
         </div>
       </div>
 
       <p className="text-[10px] text-muted-foreground">
-        Confirm = firma humana · nunca se envía sola · CTA abajo.
+        Nada se envía sin tu firma. Usa el botón de abajo para autorizar.
       </p>
     </section>
   );

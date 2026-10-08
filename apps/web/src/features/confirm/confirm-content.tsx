@@ -38,7 +38,9 @@ export function ConfirmContent({
       <div>
         <div className="flex flex-wrap items-center gap-1.5">
           {!compact ? (
-            <h1 className="text-2xl font-semibold tracking-tight">Confirmar</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              ¿Qué vas a autorizar?
+            </h1>
           ) : null}
           <MesaTipButton tip="confirm-firmar" />
           {showFullPageLink ? (
@@ -46,8 +48,8 @@ export function ConfirmContent({
           ) : null}
         </div>
         <p className="text-sm text-muted-foreground">
-          La app propone operaciones sobre tu Universo. Tú las firmas aquí.
-          Nunca se envían solas.
+          Aquí autorizas con tu firma la operación que verás abajo. Si no hay
+          ninguna, no hay nada que autorizar ahora.
         </p>
         {showFullPageLink ? (
           <Link

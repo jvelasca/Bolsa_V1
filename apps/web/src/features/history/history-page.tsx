@@ -8,7 +8,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { AccountScopeSelector } from "@/features/accounts/account-scope-selector";
@@ -18,21 +17,21 @@ import { absentDataLabel } from "@/components/absent-data";
 import { formatDateTimeCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-type HistoryTab = "ledger" | "trades";
+type HistoryTab = "movements" | "trades";
 
 function formatDateTime(iso: string) {
   return formatDateTimeCompact(iso);
 }
 
-function ledgerTypeLabel(entry: LedgerEntryDto): string {
+function movementTypeLabel(entry: LedgerEntryDto): string {
   return formatLedgerEntryLabel(entry);
 }
 
-function LedgerTable({ entries }: { entries: LedgerEntryDto[] }) {
+function MovementsTable({ entries }: { entries: LedgerEntryDto[] }) {
   if (entries.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        Sin movimientos en el ledger.
+        Sin movimientos contables.
       </p>
     );
   }
@@ -60,7 +59,7 @@ function LedgerTable({ entries }: { entries: LedgerEntryDto[] }) {
               </td>
               <td className="px-2 py-2">
                 <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase">
-                  {ledgerTypeLabel(entry)}
+                  {movementTypeLabel(entry)}
                 </span>
               </td>
               <td className="px-2 py-2 text-xs">
@@ -148,11 +147,11 @@ function TradesTable({ transactions }: { transactions: TransactionDto[] }) {
 }
 
 export function HistoryPage() {
-  const [tab, setTab] = useState<HistoryTab>("ledger");
+  const [tab, setTab] = useState<HistoryTab>("movements");
   const { account, effectiveAccountId } = useActiveAccount();
 
-  const ledgerQuery = useQuery({
-    queryKey: ["ledger", effectiveAccountId],
+  const movementsQuery = useQuery({
+    queryKey: ["movimientos", effectiveAccountId],
     queryFn: async () => {
       if (!effectiveAccountId) return [];
       return (await api.getAccountLedger(effectiveAccountId, 100)).data;
@@ -166,9 +165,9 @@ export function HistoryPage() {
     enabled: Boolean(effectiveAccountId),
   });
 
-  const ledgerEntries = ledgerQuery.data ?? [];
+  const movements = movementsQuery.data ?? [];
   const transactions = transactionsQuery.data?.data ?? [];
-  const feeTotal = ledgerEntries
+  const feeTotal = movements
     .filter((e) => e.type === "fee")
     .reduce((sum, e) => sum + Math.abs(e.amount), 0);
 
@@ -176,11 +175,9 @@ export function HistoryPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Libro · Historial
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Historial</h1>
           <p className="text-sm text-muted-foreground">
-            Ledger y fills del Libro
+            Movimientos y ejecuciones de tu cuenta
             {account ? ` · ${account.name}` : ""}.
           </p>
         </div>
@@ -197,7 +194,7 @@ export function HistoryPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Cuenta</CardTitle>
+          <h2 className="text-base font-semibold tracking-tight">Cuenta</h2>
           <CardDescription>
             {account?.settings?.commission.label ?? "Perfil de comisiones"} ·
             fiscal {account?.settings?.tax.jurisdiction ?? absentDataLabel()}
@@ -208,7 +205,7 @@ export function HistoryPage() {
           {feeTotal > 0 && (
             <div className="text-sm">
               <p className="text-xs text-muted-foreground">
-                Comisiones acumuladas (ledger)
+                Comisiones acumuladas
               </p>
               <p className="font-medium tabular-nums">
                 {formatPrice(feeTotal)}
@@ -221,7 +218,7 @@ export function HistoryPage() {
       <div className="flex gap-1 border-b border-border">
         {(
           [
-            ["ledger", "Ledger contable"],
+            ["movements", "Movimientos contables"],
             ["trades", "Operaciones"],
           ] as const
         ).map(([id, label]) => (
@@ -237,9 +234,9 @@ export function HistoryPage() {
             )}
           >
             {label}
-            {id === "ledger" && ledgerEntries.length > 0 && (
+            {id === "movements" && movements.length > 0 && (
               <span className="ml-1 text-xs opacity-70">
-                ({ledgerEntries.length})
+                ({movements.length})
               </span>
             )}
             {id === "trades" && transactions.length > 0 && (
@@ -253,11 +250,11 @@ export function HistoryPage() {
 
       <Card>
         <CardContent className="pt-4">
-          {(ledgerQuery.isLoading || transactionsQuery.isLoading) && (
+          {(movementsQuery.isLoading || transactionsQuery.isLoading) && (
             <p className="text-sm text-muted-foreground">Cargando historial…</p>
           )}
-          {tab === "ledger" && !ledgerQuery.isLoading && (
-            <LedgerTable entries={ledgerEntries} />
+          {tab === "movements" && !movementsQuery.isLoading && (
+            <MovementsTable entries={movements} />
           )}
           {tab === "trades" && !transactionsQuery.isLoading && (
             <TradesTable transactions={transactions} />

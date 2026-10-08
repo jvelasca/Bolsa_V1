@@ -1,5 +1,5 @@
 /**
- * Libro absorbido en Mesa — posiciones + pendientes + NoTrade (V1.19).
+ * Posiciones absorbidas en Mesa — posiciones + pendientes + NoTrade (V1.19).
  */
 
 import { Link } from "react-router-dom";
@@ -36,7 +36,7 @@ export function MesaLibroPanel({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Libro · Posiciones</h2>
+          <h2 className="text-base font-semibold">Posiciones</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Plan persistido y pendientes — CTAs encolan Confirm
             {accountName ? ` · ${accountName}` : ""}
@@ -90,7 +90,7 @@ export function MesaLibroPanel({
         <CardHeader>
           <CardTitle className="text-base">Posiciones y pendientes</CardTitle>
           <CardDescription>
-            Misma superficie que el Libro histórico — Confirm es la firma.
+            Misma superficie que el Historial — Confirm es la firma.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">

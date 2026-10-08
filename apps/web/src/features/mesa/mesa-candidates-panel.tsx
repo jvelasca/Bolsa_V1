@@ -29,9 +29,9 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { absentDataLabel, formatOrAbsent } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 import { mesaJournalTesisHref } from "@/features/mesa/mesa-nav-links";
 import { OpportunityDrawer } from "@/features/mesa/opportunity-drawer";
@@ -143,6 +143,23 @@ function CandidateNextAction({
   );
 }
 
+/**
+ * V6.x (H-03) — el permiso diario se cuenta en lenguaje de usuario; el literal
+ * «Gate» + su valor crudo no se muestran en primer nivel.
+ */
+function gateHumanLabel(gate: string | null | undefined): string {
+  switch (gate?.toUpperCase()) {
+    case "PASS":
+      return "Sin bloqueos";
+    case "VETO":
+      return "Bloqueado";
+    case "DEFERRED":
+      return "Aplazado";
+    default:
+      return absentDataLabel();
+  }
+}
+
 function categoryTone(category: OpportunityCategoryV1): string {
   switch (category) {
     case "TOP":
@@ -185,8 +202,10 @@ function OpportunityCard({
 }) {
   const row = rankRow.candidate;
   const study = row.study;
-  const opinion =
-    study?.opinion != null ? JOURNAL_STUDY_OPINION_LABELS[study.opinion] : "—";
+  const opinion = formatOrAbsent(
+    study?.opinion,
+    (value) => JOURNAL_STUDY_OPINION_LABELS[value],
+  );
   const priority = rankRow.operationalPriority;
   const result = opportunityResultLabel(rankRow, entriesBlocked);
 
@@ -222,7 +241,7 @@ function OpportunityCard({
             {rankRow.categoryReason ? ` · ${rankRow.categoryReason}` : ""}
           </p>
           <p className="text-xs text-muted-foreground">
-            {row.statusLabel} · Gate {row.gate}
+            {row.statusLabel} · {gateHumanLabel(row.gate)}
           </p>
         </div>
         <div className="text-right">
@@ -259,9 +278,10 @@ function OpportunityCard({
         <div>
           <dt className="text-muted-foreground">Vigencia</dt>
           <dd>
-            {study?.vigencia
-              ? JOURNAL_STUDY_VIGENCIA_LABELS[study.vigencia]
-              : "—"}
+            {formatOrAbsent(
+              study?.vigencia,
+              (value) => JOURNAL_STUDY_VIGENCIA_LABELS[value],
+            )}
           </dd>
         </div>
         {study?.hasOperationalPlan ? (
@@ -282,7 +302,7 @@ function OpportunityCard({
           className="mt-1 text-[10px] text-amber-800 dark:text-amber-200"
           data-testid={`mesa-candidate-sector-missing-${row.symbol}`}
         >
-          Sector: — (dato incompleto)
+          Sector: {absentDataLabel()} (dato incompleto)
         </p>
       ) : null}
       {!priority.operability.operable &&
@@ -463,12 +483,12 @@ export function MesaCandidatesPanel({
   const smallUniverse = (funnel?.universeCount ?? 0) < 20;
   const needsScanCta = Boolean(funnel?.scanStale || smallUniverse);
   const bands = opportunityQualityBandCounts(all);
-  const updatedLabel = funnel?.asOf
-    ? new Date(funnel.asOf).toLocaleTimeString(undefined, {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "—";
+  const updatedLabel = formatOrAbsent(funnel?.asOf, (asOf) =>
+    new Date(asOf).toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+  );
 
   const visibleSections = showAll
     ? categorySections(all)
@@ -477,9 +497,9 @@ export function MesaCandidatesPanel({
   return (
     <Card data-testid="mesa-candidates-panel">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">
+        <h2 className="text-base font-semibold leading-none tracking-tight">
           Mejores oportunidades para mi cartera
-        </CardTitle>
+        </h2>
         <CardDescription>
           {entriesBlocked ? (
             <span className="text-rose-600 dark:text-rose-400">
@@ -525,14 +545,14 @@ export function MesaCandidatesPanel({
                 : "No hay un scan reciente del universo"}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Añade valores a Estudio y ejecuta Actualizar / un scan sobre
-              Estudio para alimentar oportunidades. Esto no ejecuta órdenes.
+              Añade valores a tu universo de análisis y ejecuta Actualizar / un
+              scan para alimentar oportunidades. Esto no ejecuta órdenes.
             </p>
             <Link
               to={mesaScreenersUniverseHref(universeListId)}
               className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
             >
-              Abrir Señales · lista {universeListId} →
+              Abrir Señales y revisar tu universo →
             </Link>
           </div>
         ) : null}
@@ -563,8 +583,8 @@ export function MesaCandidatesPanel({
           >
             <p className="font-medium">Hoy no hay operaciones recomendadas</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              La decisión correcta puede ser no operar. Añade valores a Estudio
-              o corre Actualizar / scan sobre Estudio.
+              La decisión correcta puede ser no operar. Añade valores a tu
+              universo de análisis o ejecuta Actualizar / un scan.
             </p>
             <Link
               to={mesaScreenersUniverseHref(universeListId)}

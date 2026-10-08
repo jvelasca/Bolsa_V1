@@ -570,7 +570,7 @@ export function MesaHoyPage() {
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatHoyDate()}
-              {account ? ` · ${account.name}` : ""} — ¿qué debo hacer?
+              {account ? ` · ${account.name}` : ""} — ¿Qué requiere mi atención?
             </p>
             <div className="mt-2">
               <MesaDatosChip
@@ -629,8 +629,8 @@ export function MesaHoyPage() {
               role="alert"
               aria-live="assertive"
             >
-              Nuevas entradas: BLOQUEADAS · Automatismos: BLOQUEADOS ·
-              Posiciones: VISIBLES · Desriesgo humano: DISPONIBLE
+              No se abren nuevas entradas ni automatismos. Tus posiciones siguen
+              visibles y puedes desriesgar.
             </p>
             <Link
               to={mesaOperationalConsoleHref()}
@@ -658,8 +658,8 @@ export function MesaHoyPage() {
                   Estado: {operationalHeader.operationalStatusLabel}
                 </p>
                 <p className="text-muted-foreground">
-                  Ranking Estudio, Libro y Decisiones viven en Ver detalles —
-                  Hoy no es Mercado.
+                  Todo lo que requiere tu atención está aquí arriba.
+                  Oportunidades y posiciones siguen en «Avanzado».
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">

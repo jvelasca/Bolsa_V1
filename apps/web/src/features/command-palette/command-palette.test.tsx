@@ -30,7 +30,7 @@ const GROUP_HEADER: Record<CommandGroup, string> = {
   config: "Configuración",
   density: "Densidad",
   theme: "Tema",
-  layout: "Layout",
+  layout: "Vista",
 };
 
 function mockCtx(): CommandRunContext {
@@ -113,6 +113,29 @@ describe("CommandPalette — grupos separados (UI5-17)", () => {
     expect(
       screen.getByRole("option", { name: "Abrir Configuración" }),
     ).toBeInTheDocument();
+  });
+
+  it("no muestra rótulos en inglés de densidad ni de vista (`R-G1`)", () => {
+    renderPalette();
+    const list = listbox();
+    for (const english of ["Comfortable", "Compact", "Layout", "Trader"]) {
+      expect(
+        within(list).queryByText(new RegExp(`\\b${english}\\b`)),
+      ).toBeNull();
+    }
+    // Los rótulos visibles viajan en español.
+    expect(within(list).getByText("Densidad: Cómoda")).toBeInTheDocument();
+    expect(within(list).getByText("Densidad: Compacta")).toBeInTheDocument();
+    expect(within(list).getByText("Vista: Completa")).toBeInTheDocument();
+  });
+
+  it("separa navegación de ajustes con un divisor visible (`UI5-17`)", () => {
+    renderPalette();
+    // El divisor es decorativo (`aria-hidden`): un `role="separator"` dentro del
+    // `listbox` violaría `aria-required-children`.
+    expect(
+      within(listbox()).getByTestId("command-palette-settings-divider"),
+    ).toHaveAttribute("aria-hidden", "true");
   });
 
   it("mantiene cada comando dentro del bloque de su grupo", () => {

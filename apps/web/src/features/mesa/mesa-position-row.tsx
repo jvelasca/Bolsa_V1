@@ -23,7 +23,8 @@ import {
 } from "@bolsa/shared";
 import type { PositionDto } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
-import { formatPrice } from "@/features/charts/chart-utils";
+import { formatPriceOrAbsent } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 import {
@@ -43,7 +44,7 @@ import {
 } from "@/features/operations/use-in-flight-submit-intents";
 
 function formatR(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return absentDataLabel();
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}R`;
 }
@@ -378,23 +379,12 @@ export function MesaPositionRow({
         </div>
         <div className="hidden text-[10px] sm:block">
           <p className="text-muted-foreground">
-            Plan{" "}
-            {protection.plan.value != null
-              ? formatPrice(protection.plan.value)
-              : "—"}
+            Plan {formatPriceOrAbsent(protection.plan.value)}
           </p>
           <p className="text-muted-foreground">
-            Sug.{" "}
-            {protection.proposal.value != null
-              ? formatPrice(protection.proposal.value)
-              : "—"}
+            Sug. {formatPriceOrAbsent(protection.proposal.value)}
           </p>
-          <p>
-            Ejec.{" "}
-            {protection.executed.value != null
-              ? formatPrice(protection.executed.value)
-              : "—"}
-          </p>
+          <p>Ejec. {formatPriceOrAbsent(protection.executed.value)}</p>
         </div>
         <div
           className={cn(
@@ -415,9 +405,7 @@ export function MesaPositionRow({
             pnlUp ? "text-emerald-600 dark:text-emerald-400" : "text-red-500",
           )}
         >
-          {position.unrealizedPnl != null
-            ? formatPrice(position.unrealizedPnl)
-            : "—"}
+          {formatPriceOrAbsent(position.unrealizedPnl)}
         </div>
         <div className="ml-auto">
           <MesaPositionNextActionButton

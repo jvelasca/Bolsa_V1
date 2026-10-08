@@ -1,6 +1,6 @@
 /**
  * Operational Console — excepciones operativas (V1.55).
- * Incidentes · recon · birth_failed · UNKNOWN. Diagnóstico técnico detrás de detalles.
+ * Incidentes · recon · birth_failed · estado desconocido. Diagnóstico técnico detrás de detalles.
  */
 
 import { useState } from "react";
@@ -21,6 +21,7 @@ import {
   OpsRuntimeSection,
   OpsSelfEvalSection,
 } from "@/features/operational-console/operational-console-sections";
+import { TechnicalDetail } from "@/components/technical-detail";
 import { OpsAutoEvidenceSection } from "@/features/operational-console/auto-evidence-section";
 import {
   OpsIncidentsSection,
@@ -89,7 +90,7 @@ export function OperationalConsolePage() {
               to="/mesa?view=posiciones"
               className="text-primary underline hover:underline"
             >
-              Libro · Operaciones
+              Posiciones
             </Link>
             . Confirm = única firma.
           </p>
@@ -159,11 +160,8 @@ export function OperationalConsolePage() {
         />
       </div>
 
-      <details className="rounded-lg border border-border/60 p-4">
-        <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
-          Detalle técnico (readiness · self-eval · Estudio AUTO)
-        </summary>
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <TechnicalDetail testId="ops-technical-detail">
+        <div className="grid gap-4 lg:grid-cols-2">
           <OpsReadinessSection report={report} />
           <OpsRuntimeSection report={report} />
           <OpsSelfEvalSection report={report} />
@@ -177,7 +175,7 @@ export function OperationalConsolePage() {
             }}
           />
         </div>
-      </details>
+      </TechnicalDetail>
     </div>
   );
 }

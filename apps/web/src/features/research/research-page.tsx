@@ -4,7 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import type { ResearchTrialDto, ResearchTrialSort } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { formatPct } from "@/features/charts/chart-utils";
-import { ResearchLabEvidenceSummary } from "@/features/research/research-lab-evidence-summary";
+import { summarizeLabEvidenceFromTrial } from "@/features/research/research-lab-evidence";
 import { ResearchTrialResultBlock } from "@/features/research/research-trial-result-block";
 import { AsesorOpinionesPanel } from "@/features/research/asesor-opiniones-panel";
 import { AsesorDailyOpsPanel } from "@/features/research/asesor-daily-ops-panel";
@@ -14,8 +14,9 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
+import { TechnicalDetail } from "@/components/technical-detail";
+import { absentDataLabel, formatOrAbsent } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 type HubTab = "dashboard" | "diario" | "history" | "opiniones" | "journal";
@@ -160,10 +161,21 @@ export function ResearchPage() {
     setSearchParams(nextParams, { replace: true });
   }
 
-  const summary = summaryQuery.data?.data;
-  const labHealth = labHealthQuery.data?.data;
-  const trials = trialsQuery.data?.data ?? [];
-  const total = trialsQuery.data?.total ?? 0;
+  // Payload defensivo (`UNKNOWN ≠ 0`): una respuesta incompleta se declara ausente,
+  // nunca se renderiza como `undefined` ni rompe la pantalla.
+  const summaryRaw = summaryQuery.data?.data;
+  const summary =
+    summaryRaw && typeof summaryRaw.totalTrials === "number"
+      ? summaryRaw
+      : null;
+  const labHealthRaw = labHealthQuery.data?.data;
+  const labHealth =
+    labHealthRaw && typeof labHealthRaw.coverage === "object"
+      ? labHealthRaw
+      : null;
+  const trialsRaw = trialsQuery.data?.data;
+  const trials = Array.isArray(trialsRaw) ? trialsRaw : [];
+  const total = trialsQuery.data?.total ?? trials.length;
   const selected: ResearchTrialDto | undefined = trialDetailQuery.data?.data;
 
   return (
@@ -229,7 +241,7 @@ export function ResearchPage() {
       {tab === "journal" && (
         <Card data-testid="asesor-journal-bridge">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Journal de decisiones</CardTitle>
+            <SectionTitle>Journal de decisiones</SectionTitle>
             <CardDescription>
               ¿Qué decidimos, por qué, qué ocurrió? No es la mesa operativa —
               firmar sigue en Confirm.
@@ -293,12 +305,8 @@ export function ResearchPage() {
                   value={String(summary.activeInstruments)}
                 />
                 <Stat
-                  label="Calidad media (Sharpe)"
-                  value={
-                    summary.avgSharpe == null
-                      ? "—"
-                      : summary.avgSharpe.toFixed(2)
-                  }
+                  label="Calidad media"
+                  value={formatOrAbsent(summary.avgSharpe, (v) => v.toFixed(2))}
                 />
               </div>
 
@@ -310,21 +318,16 @@ export function ResearchPage() {
               {labHealth && (
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">
-                      Salud del laboratorio
-                    </CardTitle>
+                    <SectionTitle>Salud del laboratorio</SectionTitle>
                     <CardDescription>
                       Cobertura de métricas y campañas
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
-                    <details
+                    <TechnicalDetail
                       className="space-y-3"
-                      data-testid="research-lab-health-technical"
+                      testId="research-lab-health-technical"
                     >
-                      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-                        Detalle técnico
-                      </summary>
                       <div className="grid gap-2 sm:grid-cols-3">
                         <Stat
                           label="Sharpe presente"
@@ -365,7 +368,7 @@ export function ResearchPage() {
                       <p className="text-xs text-muted-foreground">
                         {labHealth.caveat}
                       </p>
-                    </details>
+                    </TechnicalDetail>
                   </CardContent>
                 </Card>
               )}
@@ -373,7 +376,7 @@ export function ResearchPage() {
               <div className="grid gap-4 lg:grid-cols-2">
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Por instrumento</CardTitle>
+                    <SectionTitle>Por instrumento</SectionTitle>
                     <CardDescription>
                       Experimentos, pruebas y calidad media
                     </CardDescription>
@@ -381,7 +384,7 @@ export function ResearchPage() {
                   <CardContent>
                     {summary.byInstrument.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        Aún no hay experimentos.
+                        {absentDataLabel()}
                       </p>
                     ) : (
                       <ul className="space-y-2 text-sm">
@@ -404,9 +407,9 @@ export function ResearchPage() {
                             <span className="text-muted-foreground tabular-nums">
                               {row.trials} exp · {row.kConsumed} pruebas ·
                               calidad{" "}
-                              {row.avgSharpe == null
-                                ? "—"
-                                : row.avgSharpe.toFixed(2)}
+                              {formatOrAbsent(row.avgSharpe, (v) =>
+                                v.toFixed(2),
+                              )}
                             </span>
                           </li>
                         ))}
@@ -417,32 +420,32 @@ export function ResearchPage() {
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">
-                      Según cómo se propuso
-                    </CardTitle>
+                    <SectionTitle>Según cómo se propuso</SectionTitle>
                     <CardDescription>Cómo llegó cada prueba</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {summary.byOrigin.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        Sin datos.
+                        {absentDataLabel()}
                       </p>
                     ) : (
-                      <ul className="space-y-2 text-sm">
-                        {summary.byOrigin.map((row) => (
-                          <li
-                            key={row.proposedBy}
-                            className="flex justify-between gap-2 border-b border-border/60 pb-2 last:border-0"
-                          >
-                            <span className="font-medium">
-                              {row.proposedBy}
-                            </span>
-                            <span className="text-muted-foreground tabular-nums">
-                              {row.trials} exp · {row.kConsumed} pruebas
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
+                      <TechnicalDetail testId="research-origin-technical">
+                        <ul className="space-y-2 text-sm">
+                          {summary.byOrigin.map((row) => (
+                            <li
+                              key={row.proposedBy}
+                              className="flex justify-between gap-2 border-b border-border/60 pb-2 last:border-0"
+                            >
+                              <span className="font-medium">
+                                {row.proposedBy}
+                              </span>
+                              <span className="text-muted-foreground tabular-nums">
+                                {row.trials} exp · {row.kConsumed} pruebas
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </TechnicalDetail>
                     )}
                   </CardContent>
                 </Card>
@@ -450,31 +453,35 @@ export function ResearchPage() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Por configuración</CardTitle>
+                  <SectionTitle>Por configuración</SectionTitle>
                 </CardHeader>
                 <CardContent>
                   {summary.byPreset.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Sin datos.</p>
+                    <p className="text-sm text-muted-foreground">
+                      {absentDataLabel()}
+                    </p>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {summary.byPreset.map((row) => (
-                        <button
-                          key={row.presetKey}
-                          type="button"
-                          className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-accent"
-                          onClick={() => {
-                            patchHistoryFilters({
-                              presetKey:
-                                row.presetKey === "unknown"
-                                  ? ""
-                                  : row.presetKey,
-                            });
-                          }}
-                        >
-                          {row.presetKey} · {row.trials}
-                        </button>
-                      ))}
-                    </div>
+                    <TechnicalDetail testId="research-preset-technical">
+                      <div className="flex flex-wrap gap-2">
+                        {summary.byPreset.map((row) => (
+                          <button
+                            key={row.presetKey}
+                            type="button"
+                            className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-accent"
+                            onClick={() => {
+                              patchHistoryFilters({
+                                presetKey:
+                                  row.presetKey === "unknown"
+                                    ? ""
+                                    : row.presetKey,
+                              });
+                            }}
+                          >
+                            {row.presetKey} · {row.trials}
+                          </button>
+                        ))}
+                      </div>
+                    </TechnicalDetail>
                   )}
                 </CardContent>
               </Card>
@@ -497,9 +504,7 @@ export function ResearchPage() {
         <div className="grid gap-4 lg:grid-cols-5">
           <Card className="lg:col-span-3">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">
-                Historial de experimentos
-              </CardTitle>
+              <SectionTitle>Historial de experimentos</SectionTitle>
               <CardDescription>
                 Cada fila es un experimento de investigación
               </CardDescription>
@@ -526,20 +531,17 @@ export function ResearchPage() {
                   onChange={(e) => setSort(e.target.value as ResearchTrialSort)}
                 >
                   <option value="created_at">Fecha</option>
-                  <option value="sharpe">Calidad (Sharpe)</option>
+                  <option value="sharpe">Calidad</option>
                   <option value="pnl">Resultado (PnL)</option>
                   <option value="commission">Comisión</option>
                   <option value="k_contribution">Pruebas</option>
                 </select>
               </div>
-              <details
+              <TechnicalDetail
                 className="text-xs"
-                data-testid="research-history-technical-filters"
+                testId="research-history-technical-filters"
               >
-                <summary className="cursor-pointer text-muted-foreground">
-                  Detalle técnico
-                </summary>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2">
                   <select
                     className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                     value={proposedBy}
@@ -563,7 +565,7 @@ export function ResearchPage() {
                     }}
                   />
                 </div>
-              </details>
+              </TechnicalDetail>
 
               {trialsQuery.isLoading && (
                 <p className="text-sm text-muted-foreground">
@@ -613,20 +615,19 @@ export function ResearchPage() {
                               trial.instrumentId.slice(0, 6)}
                           </td>
                           <td className="px-2 py-1.5">
-                            {trial.presetKey ?? "—"}
+                            {formatOrAbsent(trial.presetKey, (v) => v)}
                           </td>
                           <td className="px-2 py-1.5">{trial.proposedBy}</td>
                           <td className="px-2 py-1.5 tabular-nums">
-                            {pnl == null ? "—" : formatPct(pnl)}
+                            {formatOrAbsent(pnl, formatPct)}
                           </td>
                           <td className="px-2 py-1.5 tabular-nums">
-                            {sharpe == null ? "—" : sharpe.toFixed(2)}
+                            {formatOrAbsent(sharpe, (v) => v.toFixed(2))}
                           </td>
                           <td className="max-w-[14rem] truncate px-2 py-1.5">
-                            <ResearchLabEvidenceSummary
-                              trial={trial}
-                              variant="cell"
-                            />
+                            {summarizeLabEvidenceFromTrial(trial).hasLab
+                              ? "Validada"
+                              : absentDataLabel()}
                           </td>
                           <td className="px-2 py-1.5 tabular-nums">
                             {trial.kContribution}
@@ -687,7 +688,7 @@ export function ResearchPage() {
 
           <Card className="lg:col-span-2">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Detalle</CardTitle>
+              <SectionTitle>Detalle</SectionTitle>
               <CardDescription>Registro del experimento</CardDescription>
             </CardHeader>
             <CardContent>
@@ -717,13 +718,10 @@ export function ResearchPage() {
                       Origen optimizador — sin prueba vinculada.
                     </p>
                   )}
-                  <details
+                  <TechnicalDetail
                     className="space-y-2"
-                    data-testid="research-trial-technical"
+                    testId="research-trial-technical"
                   >
-                    <summary className="cursor-pointer text-[10px] font-medium uppercase text-muted-foreground">
-                      Detalle técnico
-                    </summary>
                     <div className="rounded-md border border-border bg-muted/30 p-2">
                       <p className="text-[10px] font-medium uppercase text-muted-foreground">
                         Parámetros
@@ -742,7 +740,7 @@ export function ResearchPage() {
                         </pre>
                       </div>
                     )}
-                  </details>
+                  </TechnicalDetail>
                 </div>
               )}
             </CardContent>
@@ -750,6 +748,14 @@ export function ResearchPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function SectionTitle({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="text-lg font-semibold leading-none tracking-tight">
+      {children}
+    </h2>
   );
 }
 

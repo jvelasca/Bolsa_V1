@@ -56,15 +56,15 @@ export const HOY_DETAIL_ITEMS: ReadonlyArray<{
 }> = [
   {
     id: "oportunidades",
-    label: "Ranking Estudio",
+    label: "Oportunidades",
     href: hoyViewHref(HOY_VIEW.oportunidades),
-    hint: "Ranking Estudio — no es una orden · Ranking ≠ BUY",
+    hint: "Las candidatas ordenadas por atractivo — todavía no son órdenes",
   },
   {
     id: "decisiones",
     label: "Decisiones",
     href: hoyViewHref(HOY_VIEW.decisiones),
-    hint: "Sesiones, gates y vetos",
+    hint: "Propuestas, bloqueos y descartes",
   },
   {
     id: "journal",
@@ -74,9 +74,9 @@ export const HOY_DETAIL_ITEMS: ReadonlyArray<{
   },
   {
     id: "posiciones",
-    label: "Libro / Posiciones",
+    label: "Posiciones",
     href: hoyViewHref(HOY_VIEW.posiciones),
-    hint: "Posiciones abiertas y órdenes",
+    hint: "Tus posiciones abiertas y órdenes pendientes",
   },
   {
     id: "consola",

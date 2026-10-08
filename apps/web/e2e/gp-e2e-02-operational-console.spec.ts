@@ -1,7 +1,7 @@
 /**
  * GP-E2E-02 — Operational Console smoke (spec-v156 §2).
  *
- * Asserts `/operational-console` is excepciones-only: header copy, link to Libro/Mesa,
+ * Asserts `/operational-console` is excepciones-only: header copy, link to Posiciones/Mesa,
  * no duplicate Daily Desk inbox buckets.
  *
  * Run (auto-starts Vite; API mocked — no Python stack):
@@ -21,7 +21,7 @@ test.describe("GP-E2E-02 — Operational Console", () => {
     await installApiMocks(page);
   });
 
-  test("shows excepciones-only chrome with Libro link and no Daily Desk inbox", async ({
+  test("shows excepciones-only chrome with a Posiciones link and no Daily Desk inbox", async ({
     page,
   }) => {
     await page.goto("/operational-console");
@@ -29,7 +29,7 @@ test.describe("GP-E2E-02 — Operational Console", () => {
     await expect(page.getByTestId("operational-console")).toBeVisible();
     await expect(page.getByText(/Resolver excepciones/i)).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Libro · Operaciones/i }).first(),
+      page.getByRole("link", { name: /Posiciones/i }).first(),
     ).toBeVisible();
 
     await expect(page.getByTestId("daily-desk-inbox")).toHaveCount(0);

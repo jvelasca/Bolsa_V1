@@ -6,7 +6,7 @@
  * Hoy: cuando lo es, Hoy NO debe aparecer como puerta activa.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -75,8 +75,8 @@ vi.mock("@/features/command-palette/command-palette-host", () => ({
 vi.mock("@/features/command-palette/named-layout", () => ({
   NAMED_LAYOUT_LABELS: {
     simple: "Simple",
-    trader: "Trader",
-    analista: "Analista",
+    trader: "Completa",
+    analista: "Análisis",
   },
 }));
 
@@ -149,5 +149,34 @@ describe("AppTopBar — una sola puerta L1 activa", () => {
       "text-primary",
     );
     expect(activeDoorCount()).toBe(1);
+  });
+});
+
+describe("AppTopBar — lenguaje de primer nivel (`R-G1`/`R-G2`/`RT-01`)", () => {
+  it("declara la pregunta acordada de Hoy en su title", () => {
+    renderTopBar("/mesa");
+    expect(
+      screen.getByRole("link", { name: "Hoy" }).getAttribute("title"),
+    ).toBe("¿Qué requiere mi atención?");
+  });
+
+  it("no deja la toolbar avanzada en el primer nivel", () => {
+    const { container } = renderTopBar("/trading");
+    expect(screen.queryByRole("group", { name: "Paneles Mercado" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: /layout/i })).toBeNull();
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/watchlist/i);
+    expect(text).not.toMatch(/DECISIÓN/);
+    expect(text).not.toMatch(/\bCustom\b/);
+    expect(text).not.toMatch(/\bTrader\b/);
+  });
+
+  it("en Mercado pliega paneles y disposición tras «Ajustes de vista»", () => {
+    renderTopBar("/trading");
+    fireEvent.click(screen.getByRole("button", { name: "Ajustes de vista" }));
+    expect(screen.getByText("Listas")).toBeTruthy();
+    expect(screen.getByText("Operaciones")).toBeTruthy();
+    expect(screen.getByText("Completa")).toBeTruthy();
+    expect(screen.getByText("Abrir en otra pestaña")).toBeTruthy();
   });
 });

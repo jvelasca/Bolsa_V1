@@ -2,11 +2,12 @@
  * Cabecera operativa Mesa · Hoy (V1.16+) — chips read-only con métricas separadas.
  */
 
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { MesaOperationalHeaderV1 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
+import { TechnicalDetail } from "@/components/technical-detail";
 import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
 
 type MesaOperationalHeaderProps = {
@@ -61,22 +62,20 @@ function freshnessTone(
 }
 
 function formatR(value: number | null): string {
-  if (value == null) return "—";
+  if (value == null) return absentDataLabel();
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)} R`;
 }
 
 export function MesaOperationalHeaderStrip({
   header,
 }: MesaOperationalHeaderProps) {
-  const [expanded, setExpanded] = useState(false);
-
-  const regime = header.regimeHint ?? "—";
+  const regime = header.regimeHint ?? absentDataLabel();
   const capital =
     header.equity != null
       ? header.investedPct != null
         ? `${formatPrice(header.equity)} · ${header.investedPct}% inv.`
         : formatPrice(header.equity)
-      : "—";
+      : absentDataLabel();
 
   return (
     <section
@@ -90,7 +89,7 @@ export function MesaOperationalHeaderStrip({
           value={regime}
           tone="neutral"
           title={
-            regime === "—"
+            header.regimeHint == null
               ? "Régimen no disponible — no se asume operable"
               : undefined
           }
@@ -117,19 +116,12 @@ export function MesaOperationalHeaderStrip({
           tone={freshnessTone(header.dataFreshness.state)}
           title="DS-05 — no se asume frescura si el dato no está disponible; muestra parcial ≠ cartera completa"
         />
-        <button
-          type="button"
-          className="text-left"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-        >
-          <Chip
-            label="Estado operativo"
-            value={header.operationalStatusLabel}
-            tone={statusTone(header.operationalStatus)}
-            title={header.operationalPrimaryReason ?? "Click para detalle"}
-          />
-        </button>
+        <Chip
+          label="Estado operativo"
+          value={header.operationalStatusLabel}
+          tone={statusTone(header.operationalStatus)}
+          title={header.operationalPrimaryReason ?? undefined}
+        />
         <Chip
           label="Modo"
           value={header.modeLabel}
@@ -138,61 +130,62 @@ export function MesaOperationalHeaderStrip({
         />
       </div>
 
-      {expanded ? (
-        <div
-          className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs"
-          data-testid="mesa-operational-detail"
+      <TechnicalDetail testId="mesa-operational-detail">
+        <dl className="grid gap-1 sm:grid-cols-2">
+          <div>
+            <dt className="text-muted-foreground">Datos</dt>
+            <dd>{header.dataFreshness.label}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Control de riesgo</dt>
+            <dd>
+              {header.operationalStatus === "blocked"
+                ? "Bloqueado"
+                : "Sin bloqueos"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">P&L / Open / Stress</dt>
+            <dd>
+              {formatR(header.portfolioPnLR)} /{" "}
+              {formatR(header.portfolioOpenRiskR)} /{" "}
+              {formatR(header.portfolioStressRiskR)}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Límite riesgo</dt>
+            <dd>{header.portfolioRiskLimitR}R</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Broker</dt>
+            <dd>{header.brokerVenue ?? absentDataLabel()}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">
+              Ejecución automática (entorno)
+            </dt>
+            <dd data-testid="mesa-paper-d-execute-env">
+              {header.paperDExecuteEnv
+                ? "Disponible · no ejecuta por sí sola"
+                : "Desactivada"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Preparación</dt>
+            <dd>{header.readinessState ?? absentDataLabel()}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Motivo</dt>
+            <dd>{header.operationalPrimaryReason ?? absentDataLabel()}</dd>
+          </div>
+        </dl>
+        <Link
+          to={mesaOperationalConsoleHref()}
+          className="mt-2 inline-block text-primary hover:underline"
         >
-          <dl className="grid gap-1 sm:grid-cols-2">
-            <div>
-              <dt className="text-muted-foreground">Datos</dt>
-              <dd>{header.dataFreshness.label}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Risk Gate</dt>
-              <dd>
-                {header.operationalStatus === "blocked" ? "Bloqueado" : "OK"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">P&L / Open / Stress</dt>
-              <dd>
-                {formatR(header.portfolioPnLR)} /{" "}
-                {formatR(header.portfolioOpenRiskR)} /{" "}
-                {formatR(header.portfolioStressRiskR)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Límite riesgo</dt>
-              <dd>{header.portfolioRiskLimitR}R</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Broker</dt>
-              <dd>{header.brokerVenue ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">PAPER_D execute (env)</dt>
-              <dd data-testid="mesa-paper-d-execute-env">
-                {header.paperDExecuteEnv ? "ON · arm UI ≠ execute" : "OFF"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Readiness</dt>
-              <dd>{header.readinessState ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Motivo</dt>
-              <dd>{header.operationalPrimaryReason ?? "—"}</dd>
-            </div>
-          </dl>
-          <Link
-            to={mesaOperationalConsoleHref()}
-            className="mt-2 inline-block text-primary hover:underline"
-          >
-            Consola operacional →
-          </Link>
-        </div>
-      ) : null}
+          Consola operacional →
+        </Link>
+      </TechnicalDetail>
     </section>
   );
 }

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   BOLSA_NAVIGATE_EVENT,
   CONFIRM_PATH,
+  HOY_ATTENTION_QUESTION,
   confirmNavAriaLabel,
   formatConfirmNavBadge,
   isConfirmNavigateTarget,
@@ -27,7 +28,16 @@ describe("confirm-nav", () => {
     expect(formatConfirmNavBadge(1)).toBe("1");
     expect(formatConfirmNavBadge(9)).toBe("9");
     expect(formatConfirmNavBadge(10)).toBe("9+");
-    expect(confirmNavAriaLabel(3)).toBe("3 pendientes de firma");
+  });
+
+  it("rotula los pendientes con lenguaje de resultado (sin jerga de firma)", () => {
+    expect(confirmNavAriaLabel(1)).toBe("1 requiere tu atención");
+    expect(confirmNavAriaLabel(3)).toBe("3 requieren tu atención");
+    expect(confirmNavAriaLabel(3)).not.toMatch(/firma/i);
+  });
+
+  it("declara la pregunta de primer nivel de Hoy (`R-G2`)", () => {
+    expect(HOY_ATTENTION_QUESTION).toBe("¿Qué requiere mi atención?");
   });
 
   it("allows only the internal /confirm navigate target", () => {

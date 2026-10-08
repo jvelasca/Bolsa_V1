@@ -8,6 +8,8 @@ import {
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
 import { ResearchLabEvidenceSummary } from "@/features/research/research-lab-evidence-summary";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { TechnicalDetail } from "@/components/technical-detail";
+import { absentDataLabel, formatOrAbsent } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 function metricNum(
@@ -83,6 +85,13 @@ export function ResearchTrialResultBlock({
 
   if (!id && !metrics && !trial) return null;
 
+  const verdict =
+    excess == null
+      ? "Resultado de la prueba frente a comprar y mantener."
+      : excess >= 0
+        ? "La prueba superó a comprar y mantener."
+        : "La prueba quedó por debajo de comprar y mantener.";
+
   async function copyId() {
     if (!id) return;
     try {
@@ -104,26 +113,10 @@ export function ResearchTrialResultBlock({
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {ASESOR_LABEL}
           </p>
-          <p className="mt-0.5 font-mono text-sm text-foreground">
-            trialId: {id ?? "—"}
-            {id && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="ml-1 h-7 px-2"
-                onClick={() => void copyId()}
-              >
-                Copiar
-              </Button>
-            )}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            K contribution:{" "}
-            <span className="text-foreground font-medium">{k}</span>
-            {preset ? ` · Preset ${preset}` : ""}
-            {` · Proposed by ${proposedBy}`}
-          </p>
+          <h3 className="mt-0.5 text-sm font-semibold text-foreground">
+            ¿Por qué?
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">{verdict}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {id && (
@@ -145,38 +138,75 @@ export function ResearchTrialResultBlock({
         </div>
       </div>
 
-      {trial && <ResearchLabEvidenceSummary trial={trial} variant="panel" />}
+      <div className="grid gap-2 sm:grid-cols-3">
+        <Mini label="Resultado" value={formatOrAbsent(pnl, formatPct)} />
+        <Mini
+          label="Comprar y mantener"
+          value={formatOrAbsent(buyHold, formatPct)}
+        />
+        <Mini label="Diferencia" value={formatOrAbsent(excess, formatPct)} />
+      </div>
 
-      <div>
-        <p className="mb-2 text-xs font-medium text-foreground">
-          Performance (IS)
-        </p>
-        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          <Mini label="PnL" value={formatMetric(pnl, "pct")} />
-          <Mini label="Buy & hold" value={formatMetric(buyHold, "pct")} />
-          <Mini label="Vs B&H" value={formatMetric(excess, "pct")} />
-          <Mini label="Sharpe" value={formatMetric(sharpe)} />
-          <Mini label="Sortino" value={formatMetric(sortino)} />
-          <Mini label="Calmar" value={formatMetric(calmar)} />
-          <Mini label="Max DD" value={formatMetric(maxDd, "pct")} />
-          <Mini label="Profit Factor" value={formatMetric(pf)} />
-          <Mini
-            label="Win Rate"
-            value={wr == null ? "—" : `${(wr * 100).toFixed(1)}%`}
-          />
-          <Mini label="Commission" value={formatMetric(commission, "money")} />
+      <TechnicalDetail testId="research-trial-technical">
+        <div className="space-y-1">
+          <p className="font-mono text-xs text-foreground">
+            {id ?? absentDataLabel()}
+            {id && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-1 h-7 px-2"
+                onClick={() => void copyId()}
+              >
+                Copiar
+              </Button>
+            )}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Pruebas aplicadas:{" "}
+            <span className="font-medium text-foreground">{k}</span>
+            {preset ? ` · Configuración ${preset}` : ""}
+            {` · Propuesto por ${proposedBy}`}
+          </p>
         </div>
-      </div>
 
-      <div>
-        <p className="mb-1 text-xs font-medium text-foreground">
-          Costes aplicados
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Commission: {commissionBps ?? 0} bps · Slippage: {slippageBps ?? 0}{" "}
-          bps · Spread: {spreadBps ?? 0} bps
-        </p>
-      </div>
+        {trial && <ResearchLabEvidenceSummary trial={trial} variant="panel" />}
+
+        <div>
+          <p className="mb-2 text-xs font-medium text-foreground">
+            Rendimiento (dentro de muestra)
+          </p>
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            <Mini label="PnL" value={formatMetric(pnl, "pct")} />
+            <Mini label="Buy & hold" value={formatMetric(buyHold, "pct")} />
+            <Mini label="Vs B&H" value={formatMetric(excess, "pct")} />
+            <Mini label="Sharpe" value={formatMetric(sharpe)} />
+            <Mini label="Sortino" value={formatMetric(sortino)} />
+            <Mini label="Calmar" value={formatMetric(calmar)} />
+            <Mini label="Max DD" value={formatMetric(maxDd, "pct")} />
+            <Mini label="Profit Factor" value={formatMetric(pf)} />
+            <Mini
+              label="Win Rate"
+              value={wr == null ? "—" : `${(wr * 100).toFixed(1)}%`}
+            />
+            <Mini
+              label="Commission"
+              value={formatMetric(commission, "money")}
+            />
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-1 text-xs font-medium text-foreground">
+            Costes aplicados
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Commission: {commissionBps ?? 0} bps · Slippage: {slippageBps ?? 0}{" "}
+            bps · Spread: {spreadBps ?? 0} bps
+          </p>
+        </div>
+      </TechnicalDetail>
     </div>
   );
 }

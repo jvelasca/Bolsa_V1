@@ -26,6 +26,7 @@ import AxeBuilder from "@axe-core/playwright";
 import {
   e2eEnabled,
   E2E_SKIP_REASON,
+  installApiMocks,
   installHoyPaperDayApiMocks,
   installLiveVirtualConfirmMocks,
   installMercadoApiMocks,
@@ -85,6 +86,26 @@ const ROUTES: readonly RouteCase[] = [
       });
     },
   },
+  {
+    name: "asesor",
+    path: "/research",
+    install: installApiMocks,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Asesor" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  },
+  {
+    name: "historial",
+    path: "/history",
+    install: installApiMocks,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Historial" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  },
 ];
 
 /** Falla con detalle accionable si hay violaciones `critical`/`serious`. */
@@ -106,6 +127,30 @@ async function expectNoCriticalSerious(page: Page, context: string) {
     )
     .join("\n");
   expect(blocking, `[${context}] ${detail}`).toEqual([]);
+}
+
+/**
+ * UI 6.x — deuda `heading-order` (best-practice). Exige jerarquía `h1→h2→h3` sin saltos
+ * en las rutas L1 tocadas. `heading-order` no pertenece a los tags WCAG, por eso se pide
+ * explícitamente con `withRules`.
+ */
+async function expectNoHeadingOrderViolations(page: Page, context: string) {
+  const results = await new AxeBuilder({ page })
+    .withRules(["heading-order"])
+    .analyze();
+  const detail = results.violations
+    .map(
+      (violation) =>
+        `· ${violation.id} ×${violation.nodes.length} — ${violation.help}\n    ${violation.nodes
+          .slice(0, 6)
+          .map(
+            (node) =>
+              `${node.target.join(" ")} :: ${(node.html ?? "").slice(0, 120)}`,
+          )
+          .join("\n    ")}`,
+    )
+    .join("\n");
+  expect(results.violations, `[${context}] ${detail}`).toEqual([]);
 }
 
 async function expectSingleMain(page: Page) {
@@ -138,6 +183,7 @@ test.describe("GP-E2E UI5-0 — rutas tocadas (axe)", () => {
         await route.ready(page);
         await expectSingleMain(page);
         await expectSingleH1(page);
+        await expectNoHeadingOrderViolations(page, `${route.path} @${vp.name}`);
         await expectNoCriticalSerious(page, `${route.path} @${vp.name}`);
       });
     }

@@ -328,10 +328,11 @@ describe("Hoy Daily Desk chrome (V1.42 F6)", () => {
     expect(spineAt).toBeGreaterThan(inboxAt);
   });
 
-  it("footer points to ranking without embedding ranking panel", () => {
+  it("footer states the result without internal architecture nor Libro alias", () => {
     expect(src).toMatch(/daily-desk-footer/);
     expect(src).toMatch(/daily-desk-link-oportunidades/);
-    expect(src).toMatch(/Hoy no es\s+Mercado/);
+    expect(src).not.toMatch(/Hoy no es\s+Mercado/);
+    expect(src).not.toMatch(/Ranking Estudio, Libro y Decisiones/);
   });
 
   it("A4 — no duplicate Hoy-level Consola affordance (rail/menu keep it)", () => {

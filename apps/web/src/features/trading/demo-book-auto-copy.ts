@@ -1,5 +1,5 @@
 /**
- * Libro DEMO — modo AUTO / «Libro AUTO» (cuenta).
+ * Operativa AUTO — modo AUTO / «Modo AUTO» (cuenta).
  * Thaw BETA-D (ADR-023 Accepted 2026-08-25): UI seleccionable tras armado local.
  * Execute sigue detrás de `PAPER_D_EXECUTE=1` (opt-in; default off).
  * V1.33 A-β: paridad SEMI (TradePlan TRIGGERED + risk_signature); solo salta Confirm.
@@ -8,23 +8,23 @@
  * No confundir con Lista AUTO del Laboratorio (`list-auto-activity-store`).
  */
 
-/** Flag de producto: pill Libro AUTO habilitada tras thaw BETA-D. */
+/** Flag de producto: pill AUTO habilitada tras thaw BETA-D. */
 export const DEMO_BOOK_AUTO_UI_ENABLED = true;
 
 /** Etiqueta si un build legacy desactiva el flag. */
 export const DEMO_BOOK_AUTO_UNAVAILABLE_LABEL = "No disponible";
 
-/** Tooltip de mesa — Libro AUTO condicionado. */
+/** Tooltip de mesa — Modo AUTO condicionado. */
 export const DEMO_BOOK_AUTO_TOOLTIP =
-  "Libro AUTO (F8): escribe «ACTIVAR AUTO» para armar; execute solo con PAPER_D_EXECUTE=1. Arm ≠ execute. Misma disciplina SEMI (TradePlan) sin Confirm. ≠ LIVE · ≠ thaw estricto.";
+  "Modo AUTO (F8): escribe «ACTIVAR AUTO» para armar; execute solo con PAPER_D_EXECUTE=1. Arm ≠ execute. Misma disciplina SEMI (TradePlan) sin Confirm. ≠ LIVE · ≠ thaw estricto.";
 
 /** Líneas de riesgo del panel. */
 export const DEMO_BOOK_AUTO_RISK_LINES = [
-  "Libro AUTO = mismos objetos que SEMI; omite firma humana (F8). No broker live · no sizing libro paralelo.",
+  "Modo AUTO = mismos objetos que SEMI; omite firma humana (F8). No broker live · no sizing paralelo.",
   "Armado UI (frase ACTIVAR AUTO) obligatorio; execute solo con PAPER_D_EXECUTE=1 + Gate / kill switch.",
   "Con PAPER_D_EXECUTE=0: «AUTO armado · ejecución off». Aperturas: TradePlan TRIGGERED + risk_signature.",
 ] as const;
 
 /** Pie del panel Config operativa. */
 export const DEMO_BOOK_AUTO_FOOTER =
-  "SEMI = Confirm humano. Libro AUTO = armar «ACTIVAR AUTO» · sin firma · PAPER_D_EXECUTE opt-in (default off).";
+  "SEMI = Confirm humano. Modo AUTO = armar «ACTIVAR AUTO» · sin firma · PAPER_D_EXECUTE opt-in (default off).";

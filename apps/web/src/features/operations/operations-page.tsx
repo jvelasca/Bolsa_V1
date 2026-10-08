@@ -37,9 +37,7 @@ export function OperationsPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Libro · Operaciones
-          </h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Posiciones</h2>
           <p className="text-sm text-muted-foreground">
             Posiciones primero — plan persistido, desriesgo vía Confirmar
             {account ? ` · ${account.name}` : ""}.
@@ -59,7 +57,7 @@ export function OperationsPage() {
             className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary"
           >
             <History className="h-4 w-4" />
-            Libro · Historial
+            Historial
           </Link>
         </div>
       </div>

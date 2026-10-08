@@ -34,9 +34,15 @@ export function formatConfirmNavBadge(count: number): string | null {
 }
 
 /**
- * `aria-label` del pill cuando hay pendientes («N pendientes de firma»).
+ * `aria-label` / `title` del pill cuando hay pendientes.
+ *
+ * Lenguaje de resultado, sin jerga de mecanismo (`R-G1`): sobre la navegación
+ * `Hoy` el contador dice cuántos asuntos requieren atención, no «firmas».
  */
 export function confirmNavAriaLabel(count: number): string | undefined {
   if (count <= 0) return undefined;
-  return `${count} pendientes de firma`;
+  return `${count} ${count === 1 ? "requiere" : "requieren"} tu atención`;
 }
+
+/** Pregunta de primer nivel de Hoy (`R-G2`): una pantalla = una pregunta. */
+export const HOY_ATTENTION_QUESTION = "¿Qué requiere mi atención?" as const;

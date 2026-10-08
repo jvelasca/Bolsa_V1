@@ -29,14 +29,10 @@ import {
   FlaskConical,
   LayoutGrid,
   LineChart,
-  List,
   Microscope,
-  PanelBottom,
-  PanelRight,
-  RotateCcw,
   Search,
   Settings,
-  SquareArrowOutUpRight,
+  SlidersHorizontal,
   User,
 } from "lucide-react";
 import { AppHelpMenu } from "@/features/help/app-help-menu";
@@ -54,6 +50,7 @@ import { useTradingLayoutStore } from "@/stores/trading-layout-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useAsesorAlarmaBadge } from "@/features/research/use-asesor-alarma-badge";
 import {
+  HOY_ATTENTION_QUESTION,
   confirmNavAriaLabel,
   formatConfirmNavBadge,
 } from "@/features/confirm/confirm-nav";
@@ -140,26 +137,6 @@ interface MenuItem {
   checked?: boolean;
   disabled?: boolean;
   hint?: string;
-}
-
-/** Duplica la URL actual en otra pestaña (p. ej. segundo monitor). */
-function OpenAppInNewTabButton({ className }: { className?: string }) {
-  return (
-    <button
-      type="button"
-      title="Abrir esta vista en otra pestaña (segundo monitor)"
-      aria-label="Abrir en otra pestaña"
-      onClick={() => {
-        window.open(window.location.href, "_blank", "noopener,noreferrer");
-      }}
-      className={cn(
-        "rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground",
-        className,
-      )}
-    >
-      <SquareArrowOutUpRight className="h-3.5 w-3.5" />
-    </button>
-  );
 }
 
 function DropdownMenu({
@@ -382,6 +359,52 @@ export function AppTopBar() {
     },
   ];
 
+  // `RT-01` / `R-G1`: la toolbar avanzada de Mercado (densidad de paneles,
+  // disposición nombrada, reset, abrir en otra pestaña) no vive en el primer
+  // nivel; se pliega tras un único menú de vista. Sin «watchlist»/«DECISIÓN».
+  const viewMenu: MenuItem[] = [
+    ...(trading
+      ? ([
+          {
+            label: "Listas",
+            hint: "Panel de listas del Mercado",
+            checked: layout.listsOpen,
+            action: layout.toggleLists,
+          },
+          {
+            label: "Operaciones",
+            hint: "Panel de órdenes y ejecuciones",
+            checked: layout.operationsOpen,
+            action: layout.toggleOperations,
+          },
+          {
+            label: "Operativa",
+            hint: "Panel de decisión y disciplina",
+            checked: layout.operativaOpen,
+            action: layout.toggleOperativa,
+          },
+          { separator: true, label: "sep-view-panels" },
+          ...(Object.keys(NAMED_LAYOUT_LABELS) as NamedLayoutId[]).map(
+            (id) => ({
+              label: NAMED_LAYOUT_LABELS[id],
+              hint: "Disposición de paneles",
+              checked: layout.namedLayoutId === id,
+              action: () => layout.applyNamedLayout(id),
+            }),
+          ),
+          { separator: true, label: "sep-view-presets" },
+          { label: "Restablecer paneles", action: layout.resetLayout },
+          { separator: true, label: "sep-view-reset" },
+        ] satisfies MenuItem[])
+      : []),
+    {
+      label: "Abrir en otra pestaña",
+      hint: "Duplica esta vista (segundo monitor)",
+      action: () =>
+        window.open(window.location.href, "_blank", "noopener,noreferrer"),
+    },
+  ];
+
   return (
     <header className="flex h-[var(--density-topbar-h,3rem)] shrink-0 items-center gap-1 border-b border-border bg-card/90 px-2 py-[var(--density-topbar-py)]">
       <div
@@ -439,8 +462,8 @@ export function AppTopBar() {
           }
           title={
             confirmQueueCount > 0
-              ? `${confirmQueueCount} pendientes de firma`
-              : "¿Qué debo hacer hoy?"
+              ? confirmNavAriaLabel(confirmQueueCount)
+              : HOY_ATTENTION_QUESTION
           }
         >
           <HOY_NAV.icon className="h-4 w-4 shrink-0" />
@@ -514,109 +537,18 @@ export function AppTopBar() {
         </div>
       </nav>
 
-      {trading ? (
-        <>
-          <div
-            className="mx-2 hidden h-5 w-px bg-border sm:block"
-            aria-hidden
-          />
-          <div
-            className="flex items-center gap-0.5 rounded-md border border-border/70 bg-background/40 p-0.5"
-            role="group"
-            aria-label="Paneles Mercado"
-          >
-            <button
-              type="button"
-              title={
-                layout.listsOpen ? "Ocultar watchlist" : "Mostrar watchlist"
-              }
-              onClick={layout.toggleLists}
-              className={cn(
-                "rounded p-1.5 hover:bg-accent",
-                layout.listsOpen && "bg-accent text-primary",
-              )}
-            >
-              <List className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              title={
-                layout.operationsOpen
-                  ? "Ocultar operaciones"
-                  : "Mostrar operaciones"
-              }
-              onClick={layout.toggleOperations}
-              className={cn(
-                "rounded p-1.5 hover:bg-accent",
-                layout.operationsOpen && "bg-accent text-primary",
-              )}
-            >
-              <PanelBottom className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              title={
-                layout.operativaOpen ? "Ocultar DECISIÓN" : "Mostrar DECISIÓN"
-              }
-              onClick={layout.toggleOperativa}
-              className={cn(
-                "rounded p-1.5 hover:bg-accent",
-                layout.operativaOpen && "bg-accent text-primary",
-              )}
-            >
-              <PanelRight className="h-4 w-4" />
-            </button>
-            <div className="mx-0.5 h-4 w-px bg-border/80" aria-hidden />
-            <label className="sr-only" htmlFor="named-layout-select">
-              Layout Mercado
-            </label>
-            <select
-              id="named-layout-select"
-              title="Layout nombrado (Simple / Trader / Analista)"
-              value={layout.namedLayoutId ?? ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "simple" || v === "trader" || v === "analista") {
-                  layout.applyNamedLayout(v satisfies NamedLayoutId);
-                }
-              }}
-              className="max-w-[7.5rem] rounded border-0 bg-transparent px-1 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              {layout.namedLayoutId == null ? (
-                <option value="" disabled>
-                  Custom
-                </option>
-              ) : null}
-              {(Object.keys(NAMED_LAYOUT_LABELS) as NamedLayoutId[]).map(
-                (id) => (
-                  <option key={id} value={id}>
-                    {NAMED_LAYOUT_LABELS[id]}
-                  </option>
-                ),
-              )}
-            </select>
-            <button
-              type="button"
-              title="Restablecer paneles (watchlist / operaciones / operativa)"
-              onClick={layout.resetLayout}
-              className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
-            <span className="w-1.5 shrink-0" aria-hidden />
-            <div className="h-4 w-px bg-border/80" aria-hidden />
-            <OpenAppInNewTabButton />
-          </div>
-        </>
-      ) : (
-        <>
-          <div
-            className="mx-2 hidden h-5 w-px bg-border sm:block"
-            aria-hidden
-          />
-          <OpenAppInNewTabButton className="border border-border/70 bg-background/40" />
-        </>
-      )}
+      <div
+        className="mx-1.5 hidden h-5 w-px shrink-0 bg-border sm:block"
+        aria-hidden
+      />
+
+      <DropdownMenu
+        label="Ajustes de vista"
+        icon={SlidersHorizontal}
+        items={viewMenu}
+        align="left"
+        iconOnly
+      />
 
       <div className="ml-auto flex items-center gap-1">
         <button

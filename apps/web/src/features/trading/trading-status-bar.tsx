@@ -2,7 +2,7 @@
  * Barra de estado Trading: cuenta Activa + operativa + métricas (izq.) · Colas/Alarmas (der.).
  *
  * Badge `OPERATIVA: Manual|Semi|Auto` = modo de la cuenta entera (no por valor).
- * AUTO (F8): armado local + ejecución opt-in; armado ≠ ejecutado; omite Confirm.
+ * Semi: cada operación espera confirmación. Auto: se ejecuta sin confirmación.
  * Clic en nombre o badge → `/accounts?selected=…&tab=config&focus=operativa`.
  *
  * @see docs/engineering/estudio-process-status-ui-2026-08-06.md §6
@@ -173,7 +173,7 @@ export function TradingStatusBar() {
                         ? "border-amber-500/60 bg-amber-500/10 text-amber-900 dark:text-amber-200"
                         : "border-border bg-muted/40 text-foreground",
                   )}
-                  title={`Operativa de la cuenta: ${OPERATIVA_MODE_LABEL[bookPrefs.mode]}\nSEMI = Confirm · AUTO = sin firma; armado ≠ ejecutado\nClic → cambiar en Cuentas`}
+                  title={`Operativa de la cuenta: ${OPERATIVA_MODE_LABEL[bookPrefs.mode]}\nSemi: cada operación espera tu confirmación · Auto: se ejecuta sin confirmación\nClic → cambiar en Cuentas`}
                   data-testid="status-bar-operativa-mode"
                 >
                   <span className="text-muted-foreground">OPERATIVA:</span>{" "}

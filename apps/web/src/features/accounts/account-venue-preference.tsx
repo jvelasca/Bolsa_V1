@@ -36,11 +36,11 @@ export function AccountVenuePreference({ accountId }: { accountId: string }) {
       className="space-y-2 rounded-lg border border-border p-3"
       data-testid="account-venue-preference"
     >
-      <p className="text-sm font-medium">Venue de ejecución (cuenta)</p>
+      <p className="text-sm font-medium">Entorno de ejecución (cuenta)</p>
       <p className="text-xs text-muted-foreground">
-        Preferencia Paper | Live de esta cuenta. El toggle de mesa es un
-        override global (gana sobre esta preferencia). LIVE es experimental:
-        enviada no significa ejecutada · operación no aceptada.
+        Preferencia Paper | Live de esta cuenta. El ajuste general de la mesa
+        gana sobre esta preferencia. LIVE es experimental: una orden enviada
+        todavía no es una ejecución confirmada.
       </p>
       <div className="flex flex-wrap items-center gap-1.5">
         {(["paper", "live"] as const).map((v) => {
@@ -67,12 +67,14 @@ export function AccountVenuePreference({ accountId }: { accountId: string }) {
         })}
         <span className="text-[11px] text-muted-foreground">
           Efectivo ahora: {effective === "live" ? "LIVE" : "PAPER"}
-          {preference == null ? " · sin preferencia (cae al global/env)" : ""}
+          {preference == null
+            ? " · sin preferencia (usa el ajuste general)"
+            : ""}
         </span>
       </div>
       {mut.isError ? (
         <p className="text-xs text-destructive">
-          No se pudo guardar la preferencia de venue.
+          No se pudo guardar la preferencia de entorno.
         </p>
       ) : null}
     </div>

@@ -12,6 +12,7 @@ import { fetchEstudioInstrumentIds } from "@/features/trading/estudio-membership
 import { api } from "@/lib/api";
 import { isAuthError } from "@/features/operational-console/lifecycle-panel-query";
 import { formatDateTimeCompact } from "@/lib/format";
+import { absentDataLabel } from "@/components/absent-data";
 
 function markClasses(mark: string): string {
   if (mark === "PASS") {
@@ -31,7 +32,7 @@ function markClasses(mark: string): string {
  *
  * Un 401/403 **no** es «avería de datos»: la API exige un JWT que esta sesión no
  * aporta (`require_jwt_principal` no cae al principal de settings). Decirlo evita
- * que el operador busque el fallo en el outbox o en el ledger, donde no está.
+ * que el operador busque el fallo en el outbox o en el historial contable, donde no está.
  */
 function SectionError({ error, what }: { error: unknown; what: string }) {
   if (isAuthError(error)) {
@@ -109,7 +110,7 @@ export function OpsLifecycleOutboxSection({
                   data-testid="ops-outbox-oldest-age"
                 >
                   {stats?.oldestPendingAgeSeconds == null
-                    ? "—"
+                    ? absentDataLabel()
                     : `${Math.round(stats.oldestPendingAgeSeconds)}s`}
                 </dd>
               </div>
@@ -122,7 +123,7 @@ export function OpsLifecycleOutboxSection({
                   data-testid="ops-outbox-oldest-processing"
                 >
                   {stats?.oldestProcessingAgeSeconds == null
-                    ? "—"
+                    ? absentDataLabel()
                     : `${Math.round(stats.oldestProcessingAgeSeconds)}s`}
                 </dd>
               </div>
@@ -133,7 +134,7 @@ export function OpsLifecycleOutboxSection({
                   data-testid="ops-outbox-oldest-dead"
                 >
                   {stats?.oldestDeadAgeSeconds == null
-                    ? "—"
+                    ? absentDataLabel()
                     : `${Math.round(stats.oldestDeadAgeSeconds)}s`}
                 </dd>
               </div>
@@ -164,7 +165,7 @@ export function OpsLifecycleOutboxSection({
                   )}
                   data-testid="ops-outbox-operational-state"
                 >
-                  {stats?.operationalState ?? "—"}
+                  {stats?.operationalState ?? absentDataLabel()}
                 </dd>
               </div>
             </dl>
@@ -172,7 +173,7 @@ export function OpsLifecycleOutboxSection({
         ) : null}
         <p className="text-xs text-muted-foreground">
           Cola durable PositionState→Lifecycle · SLA ok + dead≠0 ≠ sano · no
-          sustituye el ledger.
+          sustituye el historial contable.
         </p>
       </CardContent>
     </Card>
@@ -212,7 +213,7 @@ export function OpsFinancialIntegritySection({
                 className="font-medium"
                 data-testid="ops-financial-integrity-status"
               >
-                {report?.status ?? "—"}
+                {report?.status ?? absentDataLabel()}
               </dd>
             </div>
             <div>
@@ -228,13 +229,13 @@ export function OpsFinancialIntegritySection({
                 )}
                 data-testid="ops-financial-integrity-ops"
               >
-                {report?.operationalState ?? "—"}
+                {report?.operationalState ?? absentDataLabel()}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">portfolio</dt>
               <dd className="font-medium tabular-nums">
-                {report?.portfolioStatus ?? "—"}
+                {report?.portfolioStatus ?? absentDataLabel()}
               </dd>
             </div>
             <div>
@@ -246,7 +247,7 @@ export function OpsFinancialIntegritySection({
             <div>
               <dt className="text-xs text-muted-foreground">lifecycle</dt>
               <dd className="font-medium">
-                {report?.lifecycle?.status ?? "—"}
+                {report?.lifecycle?.status ?? absentDataLabel()}
               </dd>
             </div>
             <div>
@@ -263,7 +264,8 @@ export function OpsFinancialIntegritySection({
         ) : null}
         <p className="text-xs text-muted-foreground">
           operationalState es la salud operativa (OK / DEGRADED / BLOCKED). SLA
-          ok no implica sano. Detect/report · no auto-heal · ≠ unificar ledger.
+          ok no implica sano. Detect/report · no auto-heal · ≠ unificar
+          historial.
         </p>
       </CardContent>
     </Card>
@@ -301,7 +303,7 @@ export function OpsLifecycleReconSection({
                 className="font-medium"
                 data-testid="ops-lifecycle-recon-status"
               >
-                {report?.status ?? "—"}
+                {report?.status ?? absentDataLabel()}
               </dd>
             </div>
             <div>
@@ -440,8 +442,8 @@ export function OpsSelfEvalSection({
             </p>
             <p className="text-lg font-semibold">{lanes.semi.mark}</p>
             <p className="mt-1 text-xs opacity-80">
-              confirm {lanes.semi.confirmSeed ?? "—"} · journal{" "}
-              {lanes.semi.journalSeed ?? "—"}
+              confirm {lanes.semi.confirmSeed ?? absentDataLabel()} · journal{" "}
+              {lanes.semi.journalSeed ?? absentDataLabel()}
             </p>
           </div>
           <div
@@ -536,7 +538,7 @@ export function OpsReconSection({
           to="/mesa?view=posiciones"
           className="text-xs font-medium text-primary hover:underline"
         >
-          Libro · Operaciones (posiciones)
+          Posiciones
         </Link>
       </CardContent>
     </Card>
@@ -872,16 +874,18 @@ function RecentProposesTable({
                 <td className="py-1 pr-2 whitespace-nowrap">
                   {row.generatedAt
                     ? formatDateTimeCompact(row.generatedAt)
-                    : "—"}
+                    : absentDataLabel()}
                 </td>
-                <td className="py-1 pr-2">{row.executeStatus ?? "—"}</td>
+                <td className="py-1 pr-2">
+                  {row.executeStatus ?? absentDataLabel()}
+                </td>
                 <td className="py-1 pr-2">{row.hitCount}</td>
                 <td className="py-1 pr-2">{row.candidateCount}</td>
                 <td
                   className="py-1 max-w-[10rem] truncate"
                   title={skip || undefined}
                 >
-                  {skip || "—"}
+                  {skip || absentDataLabel()}
                 </td>
               </tr>
             );
