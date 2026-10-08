@@ -119,6 +119,7 @@
 | Tag anotado `v2.88.88-beta` | objeto `b47ecb2f` → **`021afbb4`** | `Release tag CI` [`37748285829`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37748285829) **VERDE** (`replay-repro` `REPRODUCIDO` ⇒ `Δ motor = 0`) |
 
 - **Re-anclaje:** el tag se movió de `a2da85a7` a `021afbb4` tras corregir `H-1` (§4). El run rojo queda citado a propósito: el auditor puede leer la causa y el arreglo.
+- **`GitHub Release` `v2.88.88-beta` publicado** (pre-release): <https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.88-beta>.
 - **`scripts/` no participa del pin** de la ventana (`scripts/lib/window-forward.mjs` **no se toca** en este sello; `pnpm window:test` verde en CI).
 
 ---

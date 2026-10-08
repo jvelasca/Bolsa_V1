@@ -67,3 +67,5 @@ Motor AUTO de decisión/ejecución, ledger, posiciones, settlement, contrato HTT
 - `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` (`sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`, `3340728` bytes; 2ª corrida IDÉNTICA) ⇒ **`Δ motor = 0` confirmado por CI**.
 
 **Antecedente (rojo, corregido antes del sello):** el primer tag apuntaba a `a2da85a7` y su `Release tag CI` [`37741490506`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37741490506) cayó en `playwright (mock E2E)` por el `color-contrast` de los rótulos de grupo de la `AdminRail` (detalle arriba). El tag se re-ancló al tip corregido `021afbb4`.
+
+**`GitHub Release` `v2.88.88-beta` publicado** (pre-release): <https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.88-beta>.
