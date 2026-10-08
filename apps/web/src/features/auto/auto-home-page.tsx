@@ -1,18 +1,22 @@
 /**
- * AUTO · RESUMEN (HOME del cockpit) — `/auto` (ADR-044 + spec 3.0 §2).
+ * AUTO · RESUMEN (HOME del cockpit) — `/auto` (ADR-044 + UI Contract 5.0 §UI5-04).
  *
  * Landing del espacio AUTO: responde en 5 s las preguntas del usuario básico sin obligarle a
  * entrar en Sistema ni a conocer la arquitectura interna.
  *
- *   Seis preguntas · cifras de cuenta · tarjeta de la operación en curso.
- *   Oportunidades, DÍA-D, evidencia e investigación quedan detrás de «Ver actividad».
+ *   Estado → oportunidades → decisión → operación → dinero → enlaces.
+ *
+ * Cada hecho se pinta **una sola vez** en primer nivel (`UI5-04`): el estado del motor vive en el
+ * badge humano y en su pregunta; las operaciones en curso, en un único bloque (contador + tarjetas
+ * + enlaces). Se han retirado la fila de tiles y el bloque «¿Qué está haciendo AUTO?», que
+ * repetían el estado y las operaciones (auditoría `G-01`).
  *
  * Read-only y honesto: compone por enlace (no reimplementa Mesa/Análisis) y todo dato no medido
  * se declara «Sin dato todavía» (`buildAutoHomeSummary`). El semáforo de realidad monetaria ya se
  * monta sobre el `Outlet` del layout, así que esta sección lo hereda en primer nivel.
  *
+ * @see docs/engineering/spec-ui-contract-5-0-2026-10-08.md §UI5-04 §UI5-05
  * @see docs/engineering/spec-auto-ui-refactor-3-0-2026-10-06.md §2
- * @see docs/engineering/spec-auto-operacion-usuario-basico-2026-10-06.md §3 §4
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -47,33 +51,8 @@ import { AutoWhyButton } from "@/features/auto/auto-why-button";
 import { AutoTop3Panel } from "@/features/auto/auto-top3-panel";
 import { useAutoTop3Opportunities } from "@/features/auto/use-auto-top3-opportunities";
 import { AUTO_USER_TEXT } from "@/features/auto/auto-typography";
-import { AUTO_RISK_TONE_CLASS } from "@/features/auto/auto-risk-summary";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-
-function SummaryTile({
-  label,
-  value,
-  valueClass,
-  testId,
-}: {
-  label: string;
-  value: string;
-  valueClass?: string;
-  testId: string;
-}) {
-  return (
-    <div
-      className="rounded-lg border border-border bg-card px-4 py-3"
-      data-testid={testId}
-    >
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className={cn("mt-1 text-lg font-semibold", valueClass)}>{value}</p>
-    </div>
-  );
-}
 
 export function AutoHomePage() {
   const { view, isLoading, isError } = useAutoOperationalMonitor();
@@ -155,8 +134,23 @@ export function AutoHomePage() {
         description="Qué está haciendo AUTO, qué puedes hacer y qué ha pasado. Todo es dinero virtual (DEMO)."
       />
 
+      {/* 1 · ESTADO — único lugar donde se afirma el estado del motor (UI5-04). */}
       <AutoHumanStateBadge state={humanState} testId="auto-home-human-state" />
       <AutoWhyButton why={why} testId="auto-home-why" />
+
+      {summary.isLoading ? (
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="auto-home-loading"
+        >
+          Cargando estado de AUTO…
+        </p>
+      ) : null}
+      {summary.isError ? (
+        <p className="text-sm text-destructive" data-testid="auto-home-error">
+          No se pudo cargar el estado de AUTO.
+        </p>
+      ) : null}
 
       <section
         className="space-y-3"
@@ -180,115 +174,93 @@ export function AutoHomePage() {
             ],
             ["¿Qué dinero utiliza?", basic.moneyLabel, "auto-home-q-money"],
           ] as const
-        ).map(([question, answer, testId]) => (
-          <div key={testId} data-testid={testId}>
-            <p className={cn(AUTO_USER_TEXT, "text-muted-foreground")}>
-              {question}
-            </p>
-            <p className={cn("mt-0.5 font-semibold", AUTO_USER_TEXT)}>
-              {answer}
-            </p>
-          </div>
-        ))}
+        ).map(([question, answer, testId]) => {
+          const isDoing = testId === "auto-home-q-doing";
+          return (
+            <div key={testId} data-testid={testId}>
+              <p className={cn(AUTO_USER_TEXT, "text-muted-foreground")}>
+                {question}
+              </p>
+              <p
+                className={cn("mt-0.5 font-semibold", AUTO_USER_TEXT)}
+                {...(isDoing ? { "data-testid": "auto-home-doing" } : {})}
+              >
+                {answer}
+              </p>
+              {isDoing && summary.loaded ? (
+                <p
+                  className="mt-0.5 text-xs text-muted-foreground"
+                  data-testid="auto-home-last-activity"
+                >
+                  {decisionClockCopy(
+                    summary.lastActivityLabel,
+                    summary.nextStepLabel,
+                  )}
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
       </section>
 
+      {/* 2 · OPORTUNIDADES — TOP3 resumido; el ranking completo vive en Operar (UI5-05/06). */}
       <section
-        className="grid gap-3 sm:grid-cols-2"
-        aria-label="Cifras de la cuenta simulada"
-        data-testid="auto-home-account-figures"
+        className="space-y-2"
+        aria-labelledby="auto-home-opportunities-heading"
+        data-testid="auto-home-opportunities"
       >
-        {figures.map((figure) => (
-          <div key={figure.id} data-testid={`auto-home-figure-${figure.id}`}>
-            <p className={cn(AUTO_USER_TEXT, "text-muted-foreground")}>
-              {figure.label}
-            </p>
-            <p className={cn("mt-0.5 font-semibold", AUTO_USER_TEXT)}>
-              {figure.value}
-            </p>
-          </div>
-        ))}
-      </section>
-
-      {cards.length > 0 ? (
-        <section
-          className="space-y-3"
-          aria-label="Operaciones en curso"
-          data-testid="auto-home-operation-cards"
-        >
-          {cards.map((card) => (
-            <AutoOperationCardView key={card.cycleId} card={card} />
-          ))}
-        </section>
-      ) : null}
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <SummaryTile
-          label="AUTO"
-          value={summary.autoLabel}
-          testId="auto-home-tile-auto"
-        />
-        <SummaryTile
-          label="Operaciones"
-          value={summary.inCourseOperationsLabel}
-          testId="auto-home-tile-operations"
-        />
-        <SummaryTile
-          label="Riesgo"
-          value={summary.riskLabel}
-          valueClass={AUTO_RISK_TONE_CLASS[summary.riskTone]}
-          testId="auto-home-tile-risk"
-        />
-      </div>
-
-      <section className="space-y-2" aria-labelledby="auto-home-doing">
-        <AutoSectionBlockHeading id="auto-home-doing">
-          ¿Qué está haciendo AUTO?
+        <AutoSectionBlockHeading id="auto-home-opportunities-heading">
+          Oportunidades
         </AutoSectionBlockHeading>
-        {summary.isLoading ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="auto-home-loading"
-          >
-            Cargando estado de AUTO…
-          </p>
-        ) : null}
-        {summary.isError ? (
-          <p className="text-sm text-destructive" data-testid="auto-home-error">
-            No se pudo cargar el estado de AUTO.
-          </p>
-        ) : null}
-        {summary.loaded ? (
-          <div className="space-y-1 text-sm">
-            <p className="font-medium" data-testid="auto-home-doing">
-              {summary.activityLabel}
-            </p>
-            <p
-              className="text-muted-foreground"
-              data-testid="auto-home-last-activity"
-            >
-              {decisionClockCopy(
-                summary.lastActivityLabel,
-                summary.nextStepLabel,
-              )}
-            </p>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="space-y-2" aria-labelledby="auto-home-can-do">
-        <AutoSectionBlockHeading id="auto-home-can-do">
-          ¿Qué puedo hacer?
-        </AutoSectionBlockHeading>
-
         <AutoTop3Panel
           view={top3.view}
           isLoading={top3.isLoading}
           isError={top3.isError}
+          compact
           testId="auto-home-top3"
         />
+        <p className="text-sm text-muted-foreground">
+          El universo completo vive en{" "}
+          <Link
+            to={mesaOportunidadesHref()}
+            className="underline hover:text-primary"
+            data-testid="auto-home-opportunities-more-link"
+          >
+            Hoy → Oportunidades
+          </Link>
+          ; aquí se resume el subconjunto que AUTO usa.
+        </p>
+        <p className="text-sm text-muted-foreground">
+          <Link
+            to={AUTO_OPERAR_PATH}
+            className="underline hover:text-primary"
+            data-testid="auto-home-all-operations-link"
+          >
+            Ver todas las operaciones
+          </Link>
+        </p>
+      </section>
 
-        {!summary.isLoading && !summary.isError ? (
-          inCourseOperations.length > 0 ? (
+      {/* 3 · OPERACIÓN EN CURSO — un único bloque: contador + tarjetas + enlaces (UI5-04). */}
+      {!summary.isLoading && !summary.isError ? (
+        <section
+          className="space-y-2"
+          aria-labelledby="auto-home-operations-heading"
+          data-testid="auto-home-operations"
+        >
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <AutoSectionBlockHeading id="auto-home-operations-heading">
+              Operaciones en curso
+            </AutoSectionBlockHeading>
+            <span
+              className="text-xs text-muted-foreground"
+              data-testid="auto-home-tile-operations"
+            >
+              {summary.inCourseOperationsLabel}
+            </span>
+          </div>
+
+          {inCourseOperations.length > 0 ? (
             <ul
               className="space-y-1.5"
               data-testid="auto-home-in-course-operations"
@@ -305,7 +277,7 @@ export function AutoHomePage() {
                       {operation.identity.label}
                     </span>
                     <span className="ml-auto text-xs text-muted-foreground">
-                      Ver historia →
+                      Ver operación →
                     </span>
                   </Link>
                 </li>
@@ -318,29 +290,55 @@ export function AutoHomePage() {
             >
               Sin operaciones en curso.
             </p>
-          )
-        ) : null}
+          )}
 
-        <p className="text-sm text-muted-foreground">
-          <Link
-            to={AUTO_OPERAR_PATH}
-            className="underline hover:text-primary"
-            data-testid="auto-home-all-operations-link"
-          >
-            Ver todas las operaciones
-          </Link>
-        </p>
+          {cards.length > 0 ? (
+            <div
+              className="space-y-3"
+              aria-label="Tarjeta de la operación en curso"
+              data-testid="auto-home-operation-cards"
+            >
+              {cards.map((card) => (
+                <AutoOperationCardView key={card.cycleId} card={card} />
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {/* 4 · DINERO — cifras ya medidas de la cuenta simulada. */}
+      <section
+        className="space-y-2"
+        aria-labelledby="auto-home-money-heading"
+        data-testid="auto-home-account-figures"
+      >
+        <AutoSectionBlockHeading id="auto-home-money-heading">
+          Dinero
+        </AutoSectionBlockHeading>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {figures.map((figure) => (
+            <div key={figure.id} data-testid={`auto-home-figure-${figure.id}`}>
+              <p className={cn(AUTO_USER_TEXT, "text-muted-foreground")}>
+                {figure.label}
+              </p>
+              <p className={cn("mt-0.5 font-semibold", AUTO_USER_TEXT)}>
+                {figure.value}
+              </p>
+            </div>
+          ))}
+        </div>
       </section>
 
+      {/* 5 · ENLACES — el resto de superficies, bajo demanda. */}
       <details className="space-y-2" data-testid="auto-home-activity">
         <summary className={cn("cursor-pointer font-medium", AUTO_USER_TEXT)}>
           Ver actividad
         </summary>
         <section
           className="space-y-2 pt-2"
-          aria-labelledby="auto-home-happened"
+          aria-labelledby="auto-home-happened-heading"
         >
-          <AutoSectionBlockHeading id="auto-home-happened">
+          <AutoSectionBlockHeading id="auto-home-happened-heading">
             ¿Qué ha pasado?
           </AutoSectionBlockHeading>
           <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">

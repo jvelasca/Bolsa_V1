@@ -24,6 +24,7 @@ function renderAt(entry: string) {
         <Route path="/auto" element={<AutoWorkspaceLayout />}>
           <Route path="operar" element={<h1>Operar</h1>} />
           <Route path="cartera" element={<h1>Cartera</h1>} />
+          <Route path="riesgo" element={<h1>Riesgo</h1>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -48,6 +49,26 @@ describe("AutoWorkspaceLayout", () => {
     ]) {
       expect(screen.getByTestId(`auto-nav-${id}`)).toBeTruthy();
     }
+  });
+
+  it("separa las cuatro puertas de las secundarias bajo «Más información» (UI5-03)", () => {
+    renderAt("/auto/operar");
+    for (const id of ["home", "operar", "cartera", "actividad"]) {
+      expect(screen.getByTestId(`auto-nav-${id}`)).toBeTruthy();
+    }
+    // Las rutas secundarias no cambian: siguen existiendo y son compartibles.
+    for (const id of ["riesgo", "analisis", "sistema"]) {
+      expect(screen.getByTestId(`auto-nav-${id}`)).toBeTruthy();
+    }
+    const more = screen.getByTestId("auto-nav-more");
+    expect(more.tagName).toBe("DETAILS");
+    // En una ruta primaria, el disclosure arranca plegado.
+    expect(more.hasAttribute("open")).toBe(false);
+  });
+
+  it("abre «Más información» cuando la ruta activa es secundaria", () => {
+    renderAt("/auto/riesgo");
+    expect(screen.getByTestId("auto-nav-more").hasAttribute("open")).toBe(true);
   });
 
   it("no anida un <main>: el shell aporta el único main", () => {

@@ -115,6 +115,20 @@ describe("AutoOperarPage", () => {
     expect(aapl[1]).toContain("05 oct");
   });
 
+  it("marca cada operación con su modo y su peldaño (UI5-10/09)", () => {
+    renderOperar();
+    const badges = screen.getAllByTestId(/^auto-operar-mode-/);
+    expect(badges).toHaveLength(3);
+    for (const badge of badges) {
+      expect(badge.textContent).toBe("AUTO · SIMULADO");
+      expect(badge.dataset.channel).toBe("SIMULADO");
+    }
+    // Sin evidencia de fill, el peldaño se declara; jamás se salta a «Posición creada».
+    for (const link of screen.getAllByTestId("auto-operar-operation-link")) {
+      expect(link.textContent).not.toContain("Posición creada");
+    }
+  });
+
   it("muestra el bloque Oportunidades como lanzadera a la Mesa", () => {
     renderOperar();
     expect(screen.getByTestId("auto-operar-opportunities")).toBeTruthy();

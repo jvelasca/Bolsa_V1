@@ -71,6 +71,27 @@ export function AutoRiesgoPage() {
         description={AUTO_SECTION_COPY.riesgo.description}
       />
 
+      {/* Veredicto human-first (`UI5-18`): el primer nivel responde «¿cuánto puedo perder?»
+          con una palabra, no con métricas. */}
+      <section
+        className="space-y-1 rounded-lg border border-border bg-card px-4 py-3"
+        data-testid="auto-riesgo-verdict"
+      >
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Veredicto
+        </p>
+        <p
+          className={cn(
+            "text-lg font-semibold",
+            AUTO_RISK_TONE_CLASS[risk.verdictTone],
+          )}
+          data-testid="auto-riesgo-verdict-label"
+        >
+          {risk.verdict}
+        </p>
+        <p className="text-sm text-muted-foreground">{risk.verdictSentence}</p>
+      </section>
+
       <section className="space-y-3" aria-labelledby="auto-riesgo-now">
         <AutoSectionBlockHeading id="auto-riesgo-now">
           Riesgo actual

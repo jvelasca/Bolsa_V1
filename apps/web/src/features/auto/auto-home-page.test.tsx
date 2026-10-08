@@ -101,6 +101,10 @@ function renderHome() {
   );
 }
 
+function countOccurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
+
 describe("AutoHomePage", () => {
   it("expone un solo h1 y el semáforo no se duplica aquí (lo aporta el layout)", () => {
     renderHome();
@@ -109,20 +113,26 @@ describe("AutoHomePage", () => {
     expect(h1[0]?.textContent).toBe("Resumen");
   });
 
+  it("pinta cada hecho una sola vez (UI5-04): sin tiles ni bloque duplicados", () => {
+    renderHome();
+    // Se retiraron la fila de tiles y el bloque «¿Qué está haciendo AUTO?».
+    expect(screen.queryByTestId("auto-home-tile-auto")).toBeNull();
+    expect(screen.queryByTestId("auto-home-tile-risk")).toBeNull();
+    // El estado del motor se afirma una sola vez en el primer nivel (la insignia usa otra caja).
+    const text = document.body.textContent ?? "";
+    expect(countOccurrences(text, "Funcionando")).toBe(1);
+    // Las operaciones en curso se cuentan en un único lugar.
+    expect(countOccurrences(text, "1 en curso")).toBe(1);
+  });
+
   it("responde las preguntas clave con datos legibles", () => {
     renderHome();
-    expect(screen.getByTestId("auto-home-tile-auto").textContent).toContain(
-      "Funcionando",
-    );
     expect(
       screen.getByTestId("auto-home-tile-operations").textContent,
     ).toContain("1 en curso");
     expect(
       screen.getByTestId("auto-home-tile-operations").textContent,
     ).not.toContain("abierta");
-    expect(screen.getByTestId("auto-home-tile-risk").textContent).toContain(
-      "Normal",
-    );
     expect(screen.getByTestId("auto-home-q-working").textContent).toContain(
       "Funcionando",
     );

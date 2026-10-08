@@ -1,14 +1,18 @@
 /**
- * AUTO · OPERAR — cockpit de la operación (ADR-044).
+ * AUTO · OPERAR — cockpit de la operación (ADR-044 + UI Contract 5.0).
  *
  * Dos bloques, en el orden de las preguntas del usuario básico:
- * 1. **Oportunidades** — *lanzadera honesta* a la Mesa. El ranking vive en Mesa
- *    (`mesaOportunidadesHref()`); aquí NO se recalcula para no fabricar una segunda cifra.
- * 2. **Operaciones** — la operación única es el objeto canónico. Cada fila se identifica en
- *    lenguaje humano (`AAPL · 03 oct · Largo · Precio aplicado`) y enlaza a su historia canónica.
+ * 1. **Oportunidades** — el TOP3 que AUTO situó en los primeros puestos de su último análisis
+ *    (subconjunto del universo completo de `Hoy → Oportunidades`; `UI5-07`). El ranking se copia
+ *    ya producido, no se recalcula.
+ * 2. **Operaciones** — la operación única es el objeto canónico. Cada fila lleva la **insignia de
+ *    modo** (`AUTO · SIMULADO`, `UI5-10`) y su **peldaño** de la escalera universal
+ *    (`UI5-09`/`UI5-20`), en lenguaje humano, y enlaza a su historia canónica.
  *
- * Read-only: un hueco se declara NO MEDIDO, nunca 0. Estados propios (carga/error/vacío) en vez
- * de presentar la ausencia de datos como lista vacía.
+ * Read-only: un hueco se declara «Sin dato todavía», nunca 0. Estados propios (carga/error/vacío)
+ * en vez de presentar la ausencia de datos como lista vacía.
+ *
+ * @see docs/engineering/spec-ui-contract-5-0-2026-10-08.md §UI5-07 §UI5-09 §UI5-10 §UI5-17
  */
 
 import { Link } from "react-router-dom";
@@ -16,8 +20,13 @@ import {
   AutoSectionBlockHeading,
   AutoSectionHeading,
 } from "@/components/layout/auto-workspace-layout";
+import { ModeBadge } from "@/components/mode-badge";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 import { buildOperationIdentity } from "@/features/auto/auto-operation-identity";
+import {
+  OPERATION_LADDER_NOTES,
+  operationLadderRungFromCycle,
+} from "@/features/auto/auto-operation-ladder";
 import {
   autoOperacionHref,
   AUTO_ACTIVIDAD_PATH,
@@ -25,6 +34,7 @@ import {
 import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
 import { AutoTop3Panel } from "@/features/auto/auto-top3-panel";
 import { useAutoTop3Opportunities } from "@/features/auto/use-auto-top3-opportunities";
+import { AUTO_OPERATION_MODE } from "@/features/operations/operation-mode";
 import { mesaOportunidadesHref } from "@/features/mesa/mesa-nav-links";
 import { OPERATIONAL_CONSOLE_PATH } from "@/features/confirm/daily-nav";
 
@@ -56,20 +66,22 @@ export function AutoOperarPage() {
           testId="auto-operar-top3"
         />
         <p className="text-sm text-muted-foreground">
-          El ranking completo y su explicación viven en la Mesa: allí se rankean
-          y se decide. Aquí se copia el TOP3 ya producido por AUTO, sin repetir
-          el cálculo para que no existan dos cifras distintas.
+          Este TOP3 es el subconjunto de oportunidades que AUTO situó en los
+          primeros puestos de su último análisis. El universo completo y su
+          explicación viven en{" "}
+          <Link
+            to={mesaOportunidadesHref()}
+            data-testid="auto-operar-opportunities-link"
+            className="underline hover:text-primary"
+          >
+            Hoy → Oportunidades
+          </Link>
+          .
         </p>
         <p className="text-xs text-amber-600 dark:text-amber-400">
-          Ranking ≠ orden: estar arriba en la lista no equivale a comprar ya.
+          {OPERATION_LADDER_NOTES.rankingIsNotDecision}: estar arriba en la
+          lista no equivale a comprar ya.
         </p>
-        <Link
-          to={mesaOportunidadesHref()}
-          data-testid="auto-operar-opportunities-link"
-          className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm font-medium hover:bg-accent hover:text-foreground"
-        >
-          Ver oportunidades en la Mesa
-        </Link>
         <p className="text-sm text-muted-foreground">
           <Link
             to={AUTO_ACTIVIDAD_PATH}
@@ -116,7 +128,13 @@ export function AutoOperarPage() {
         {hasOperations ? (
           <ul className="space-y-1.5">
             {cycles.map((cycle) => {
-              const identity = buildOperationIdentity(cycle);
+              const ladder = operationLadderRungFromCycle(cycle);
+              // Un término = un significado (`UI5-20`): la fila usa el peldaño canónico, no
+              // el `statusLabel` local del monitor.
+              const identity = buildOperationIdentity({
+                ...cycle,
+                statusLabel: ladder.label,
+              });
               return (
                 <li key={cycle.cycleId}>
                   <Link
@@ -124,11 +142,20 @@ export function AutoOperarPage() {
                     data-testid="auto-operar-operation-link"
                     data-cycle-id={cycle.cycleId}
                     title={identity.label}
-                    className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-accent hover:text-foreground"
+                    className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border border-border px-3 py-2 text-sm hover:bg-accent hover:text-foreground"
                   >
                     <span className="font-medium">{identity.label}</span>
+                    <ModeBadge
+                      badge={AUTO_OPERATION_MODE}
+                      testId={`auto-operar-mode-${cycle.cycleId}`}
+                    />
+                    {ladder.note ? (
+                      <span className="text-[10px] text-muted-foreground">
+                        {ladder.note}
+                      </span>
+                    ) : null}
                     <span className="ml-auto text-xs text-muted-foreground">
-                      Ver historia →
+                      Ver operación →
                     </span>
                   </Link>
                 </li>

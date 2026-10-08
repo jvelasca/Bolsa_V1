@@ -10,6 +10,7 @@ import {
   AUTO_USER_TEXT,
   AUTO_USER_TITLE,
 } from "@/features/auto/auto-typography";
+import { ModeBadge } from "@/components/mode-badge";
 import { cn } from "@/lib/utils";
 
 export function AutoOperationSheetView({
@@ -26,14 +27,17 @@ export function AutoOperationSheetView({
     >
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <p className={cn("font-semibold", AUTO_USER_TITLE)}>{sheet.symbol}</p>
-        <p
-          className={cn(
-            "text-xs uppercase tracking-wide text-muted-foreground",
-          )}
-        >
-          {sheet.modeLabel}
-        </p>
+        <ModeBadge badge={sheet.mode} testId="auto-operation-sheet-mode" />
       </header>
+      <p
+        className={cn(AUTO_USER_TEXT, "text-muted-foreground")}
+        data-testid="auto-operation-sheet-ladder"
+      >
+        <span className="font-medium text-foreground">
+          {sheet.ladder.label}
+        </span>
+        {sheet.ladder.note ? ` · ${sheet.ladder.note}` : ""}
+      </p>
       <dl className="space-y-1.5">
         {sheet.blocks.map((block) => (
           <div

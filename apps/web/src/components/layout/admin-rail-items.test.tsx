@@ -64,6 +64,37 @@ describe("AdminRail profiles + stats", () => {
   });
 });
 
+describe("AdminRail groups (UI5-08)", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("expone los tres grupos y sitúa AUTO en Administración", () => {
+    render(
+      <MemoryRouter>
+        <AdminRail />
+      </MemoryRouter>,
+    );
+    // Expandido para que los encabezados de grupo sean visibles.
+    fireEvent.mouseEnter(screen.getByTestId("admin-rail"));
+    expect(
+      screen.getByTestId("admin-rail-group-product").textContent,
+    ).toContain("Producto");
+    const admin = screen.getByTestId("admin-rail-group-admin");
+    expect(admin.textContent).toContain("Administración");
+    expect(admin.textContent).toContain("AUTO");
+    // AUTO vive dentro del bloque Administración, no en una lista plana.
+    expect(admin.contains(screen.getByTestId("admin-rail-auto"))).toBe(true);
+    expect(
+      screen.getByTestId("admin-rail-group-diagnostic").textContent,
+    ).toContain("Diagnóstico");
+  });
+});
+
 describe("AdminRail pin modes", () => {
   afterEach(() => {
     cleanup();

@@ -13,6 +13,8 @@ import {
   AUTO_LABEL,
   AUTO_MONITOR_PATH,
   AUTO_NAV,
+  AUTO_NAV_PRIMARY,
+  AUTO_NAV_SECONDARY,
   AUTO_OPERACION_BASE_PATH,
   AUTO_OPERAR_PATH,
   AUTO_RIESGO_PATH,
@@ -27,13 +29,13 @@ import {
 import { DAILY_NAV_ORDER, MESA_LABEL } from "@/features/confirm/daily-nav";
 
 describe("auto-nav — contrato de secciones", () => {
-  it("expone las secciones en orden de producto (HOME primero)", () => {
+  it("expone las secciones en orden de producto (cuatro puertas primero)", () => {
     expect(AUTO_NAV.label).toBe("AUTO");
     expect(AUTO_NAV.items.map((i) => i.id)).toEqual([
       "home",
       "operar",
-      "actividad",
       "cartera",
+      "actividad",
       "riesgo",
       "analisis",
       "sistema",
@@ -41,11 +43,33 @@ describe("auto-nav — contrato de secciones", () => {
     expect(AUTO_NAV.items.map((i) => i.label)).toEqual([
       "Resumen",
       "Operar",
-      "Actividad",
       "Cartera",
+      "Actividad",
       "Riesgo",
       "Análisis",
       "Sistema",
+    ]);
+  });
+
+  it("separa cuatro puertas visibles de las secundarias (UI5-03)", () => {
+    expect(AUTO_NAV_PRIMARY.map((i) => i.label)).toEqual([
+      "Resumen",
+      "Operar",
+      "Cartera",
+      "Actividad",
+    ]);
+    expect(AUTO_NAV_SECONDARY.map((i) => i.label)).toEqual([
+      "Riesgo",
+      "Análisis",
+      "Sistema",
+    ]);
+    expect(AUTO_NAV_PRIMARY.every((i) => i.tier === "primary")).toBe(true);
+    expect(AUTO_NAV_SECONDARY.every((i) => i.tier === "secondary")).toBe(true);
+    // Las rutas no cambian: siguen existiendo y son compartibles.
+    expect(AUTO_NAV_SECONDARY.map((i) => i.path)).toEqual([
+      "/auto/riesgo",
+      "/auto/analisis",
+      "/auto/sistema",
     ]);
   });
 

@@ -12,7 +12,10 @@ import {
   AutoSectionHeading,
 } from "@/components/layout/auto-workspace-layout";
 import { OperationsPanel } from "@/features/trading/operations-panel";
-import { CARTERA_RIESGO_PATH } from "@/features/confirm/daily-nav";
+import {
+  CARTERA_POSICIONES_PATH,
+  CARTERA_RIESGO_PATH,
+} from "@/features/confirm/daily-nav";
 import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
 
 export function AutoCarteraPage() {
@@ -28,10 +31,13 @@ export function AutoCarteraPage() {
         data-testid="auto-cartera-demo-banner"
         className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
       >
-        <p className="font-semibold">CARTERA DEMO — posiciones simuladas</p>
+        <p className="font-semibold">
+          CARTERA DEMO — vista simulada de la misma cuenta
+        </p>
         <p className="text-muted-foreground">
-          No se envían órdenes reales a XTB. Reducir o salir encola una
-          propuesta; Confirm es la única firma.
+          No es una segunda cartera: son las posiciones de la cuenta simulada
+          que ves también en Cartera. No se envían órdenes reales a XTB. Reducir
+          o salir encola una propuesta; Confirm es la única firma.
         </p>
       </div>
 
@@ -50,6 +56,14 @@ export function AutoCarteraPage() {
           Historial y cuentas
         </AutoSectionBlockHeading>
         <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <li>
+            <Link
+              to={CARTERA_POSICIONES_PATH}
+              className="underline hover:text-primary"
+            >
+              Cartera · misma cuenta
+            </Link>
+          </li>
           <li>
             <Link to="/history" className="underline hover:text-primary">
               Historial · ledger y fills

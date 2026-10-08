@@ -17,6 +17,8 @@ import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { ModeBadge } from "@/components/mode-badge";
+import { operationModeForPosition } from "@/features/operations/operation-mode";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { mesaPositionShowsRoute } from "@/features/mesa/mesa-position-row";
@@ -277,6 +279,7 @@ export function OperationsPanel({
                     orderPending,
                     submitIntent,
                   });
+                  const modeBadge = operationModeForPosition(pos, surface);
                   const aggregate = buildInvestmentPositionAggregate({
                     position: pos,
                     study,
@@ -295,6 +298,13 @@ export function OperationsPanel({
                       <tr className="border-b border-border/50 hover:bg-accent/30">
                         <td className="px-2 py-1">
                           <div className="font-medium">{pos.symbol}</div>
+
+                          <div className="mt-0.5">
+                            <ModeBadge
+                              badge={modeBadge}
+                              testId={`ops-mode-${pos.symbol}`}
+                            />
+                          </div>
 
                           <div className="truncate text-[10px] text-muted-foreground">
                             {operational

@@ -74,6 +74,21 @@ describe("AutoRiesgoPage", () => {
     );
   });
 
+  it("abre el primer nivel con un veredicto humano (UI5-18)", () => {
+    renderPage();
+    expect(screen.getByTestId("auto-riesgo-verdict-label").textContent).toBe(
+      "Controlado",
+    );
+  });
+
+  it("sin lectura, el veredicto es «Sin dato todavía», nunca «Controlado»", () => {
+    financialState.data = null;
+    renderPage();
+    expect(screen.getByTestId("auto-riesgo-verdict-label").textContent).toBe(
+      "Sin dato todavía",
+    );
+  });
+
   it("declara «Sin dato todavía» lo que AUTO no materializa (nunca 0)", () => {
     renderPage();
     for (const testId of [

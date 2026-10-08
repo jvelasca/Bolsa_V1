@@ -5,7 +5,7 @@
 > Fronteras: [ADR-015](./adr/015-scientific-domain-vs-trading-domain.md) (objetos) · [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) (universos UI LAB vs TRADING).  
 > Actualizar **aquí** (o enmienda RFC-000) al introducir términos nuevos — no en ADRs filosóficos sueltos.
 
-**Última sync:** 2026-08-02 (universos LAB / TRADING · Mandato operativo ADR-020).
+**Última sync:** 2026-10-08 (UI Contract 5.0 — lenguaje operativo único, estados y escalera de operación).
 
 ---
 
@@ -151,6 +151,25 @@ Detalle de plataforma: ADR-010, docs operativos — **no** mezclar en schemas de
 Canónico cuentas: [account-premises-demo-vs-paper-2026-07-31.md](./engineering/account-premises-demo-vs-paper-2026-07-31.md).  
 Canónico universos: [ADR-019](./adr/019-dual-universes-lab-vs-trading.md).  
 Canónico mandato: [ADR-020](./adr/020-operating-mandate-tenure.md).
+
+### 4.2 Lenguaje operativo de UI (UI Contract 5.0)
+
+Vocabulario **único** de presentación en toda la app. Una palabra → un significado. Canónico: [UI Contract 5.0](./engineering/spec-ui-contract-5-0-2026-10-08.md).
+
+| Término (permitido)              | Definición oficial                                                     | **No** significa                                        |
+| -------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Sin dato todavía**             | Estado oficial del dato ausente: hay superficie, falta el hecho       | `0` · `—` · `N/A` · `UNKNOWN` · un fallo                |
+| **CONFIRMADO / PARCIAL-PENDIENTE / SIN DATO TODAVÍA / BLOQUEADO** | Los cuatro tonos oficiales de estado (bloqueo solo con evidencia) | Cuatro colores decorativos                              |
+| **Modo de operación** (`AUTO` / `SEMI` / `MANUAL`) | Insignia obligatoria por operación, con canal (`SIMULADO`/`LIVE`) | Un atributo deducible o por ticker                      |
+| **Oportunidad**                  | Slot rankeado del análisis (propuesta), `N/100`                        | Una compra; «las mejores acciones»                      |
+| **Ranking ≠ decisión**           | Estar arriba en el ranking no es una decisión de cartera              | Una orden                                             |
+| **Orden preparada / enviada**    | Registro de pedido; «enviada» no implica salida al broker             | Una ejecución                                           |
+| **Esperando ejecución**          | Estado entre orden y fill                                             | «Ejecutándose» sin traza                                |
+| **Ejecución parcial / completada** | Fill medido (parcial o completo)                                    | Una posición                                            |
+| **Posición creada**              | Materialización con traza de apply                                    | Un fill                                                 |
+| **Posición cerrada**             | Cierre con traza                                                      | Una salida intencionada sin fill                        |
+| **Cartera (vista AUTO)**         | Vista de la **misma** cuenta simulada                                 | Una segunda cartera independiente                       |
+| **Cantera / Escalera de operación** | La secuencia `Oportunidad → Decisión → Orden → Ejecución → Posición` | Un solo salto de orden a posición                       |
 
 ---
 

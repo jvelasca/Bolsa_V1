@@ -178,7 +178,7 @@ test.describe("GP-E2E-V28865 — AUTO 3.0 accesibilidad (axe)", () => {
     );
     await page.goto("/auto");
     await expect(page.getByTestId("auto-home-in-course-empty")).toBeVisible();
-    await expect(page.getByTestId("auto-home-tile-auto")).toContainText(
+    await expect(page.getByTestId("auto-home-q-working")).toContainText(
       "Sin dato todavía",
     );
     await expectNoCriticalSerious(page, "/auto (vacío/no-medido)");

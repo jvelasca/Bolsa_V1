@@ -68,7 +68,8 @@ export const OPERATIONAL_CONSOLE_HINT =
 export const LIBRO_HISTORIAL_PATH = "/history" as const;
 export const CARTERA_HISTORIAL_PATH = LIBRO_HISTORIAL_PATH;
 
-export const CARTERA_POSICIONES_HINT = "Posiciones abiertas (en Hoy)" as const;
+export const CARTERA_POSICIONES_HINT =
+  "Posiciones de la cuenta (en Hoy)" as const;
 export const CARTERA_ORDENES_HINT = "Órdenes y pendientes" as const;
 export const CARTERA_HISTORIAL_HINT = "Ledger y fills" as const;
 export const CARTERA_RIESGO_HINT = "Riesgo abierto y límites" as const;

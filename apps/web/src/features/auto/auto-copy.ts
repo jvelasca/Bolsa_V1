@@ -36,7 +36,7 @@ export const AUTO_SECTION_COPY: Record<AutoSectionId, AutoSectionCopy> = {
   cartera: {
     title: "Cartera",
     description:
-      "Qué tienes ahora: posiciones de la cuenta simulada, órdenes en curso y el historial de lo que ya pasó. Antes de reducir o cerrar, la app te pide que confirmes.",
+      "Vista de la misma cuenta que Cartera, en dinero virtual (DEMO): posiciones simuladas, órdenes en curso e historial. Antes de reducir o cerrar, la app te pide que confirmes.",
   },
   riesgo: {
     title: "Riesgo",

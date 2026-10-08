@@ -49,14 +49,21 @@ export const AUTO_SECTION = {
 
 export type AutoSectionId = (typeof AUTO_SECTION)[keyof typeof AUTO_SECTION];
 
+export type AutoNavTier = "primary" | "secondary";
+
 export type AutoNavItem = {
   id: AutoSectionId;
   label: string;
   path: string;
   hint: string;
+  /**
+   * Rango visible (`UI5-03`): las cuatro puertas `primary` van al mismo nivel; las `secondary`
+   * viven bajo «Más información». Las rutas no cambian.
+   */
+  tier: AutoNavTier;
 };
 
-/** Sub-navegación del espacio AUTO (orden de producto): HOME primero. */
+/** Sub-navegación del espacio AUTO (orden de producto): cuatro puertas + «Más información». */
 export const AUTO_NAV: { label: string; items: readonly AutoNavItem[] } = {
   label: AUTO_LABEL,
   items: [
@@ -65,45 +72,62 @@ export const AUTO_NAV: { label: string; items: readonly AutoNavItem[] } = {
       label: "Resumen",
       path: AUTO_HOME_PATH,
       hint: "Qué está haciendo AUTO, qué puedes hacer y qué ha pasado",
+      tier: "primary",
     },
     {
       id: AUTO_SECTION.operar,
       label: "Operar",
       path: AUTO_OPERAR_PATH,
       hint: "Oportunidades, operaciones y la operación seleccionada",
-    },
-    {
-      id: AUTO_SECTION.actividad,
-      label: "Actividad",
-      path: AUTO_ACTIVIDAD_PATH,
-      hint: "Qué ha hecho AUTO, en orden, en una sola línea temporal",
+      tier: "primary",
     },
     {
       id: AUTO_SECTION.cartera,
       label: "Cartera",
       path: AUTO_CARTERA_PATH,
       hint: "Posiciones, órdenes e historial",
+      tier: "primary",
+    },
+    {
+      id: AUTO_SECTION.actividad,
+      label: "Actividad",
+      path: AUTO_ACTIVIDAD_PATH,
+      hint: "Qué ha hecho AUTO, en orden, en una sola línea temporal",
+      tier: "primary",
     },
     {
       id: AUTO_SECTION.riesgo,
       label: "Riesgo",
       path: AUTO_RIESGO_PATH,
       hint: "Riesgo abierto, límites e integridad financiera",
+      tier: "secondary",
     },
     {
       id: AUTO_SECTION.analisis,
       label: "Análisis",
       path: AUTO_ANALISIS_PATH,
       hint: "DÍA-D, evidencia, estrategias e investigación",
+      tier: "secondary",
     },
     {
       id: AUTO_SECTION.sistema,
       label: "Sistema",
       path: AUTO_SISTEMA_PATH,
       hint: "Salud AUTO, simulación, reconciliación y auditoría",
+      tier: "secondary",
     },
   ],
 } as const;
+
+/** Las cuatro puertas visibles (`UI5-03`). */
+export const AUTO_NAV_PRIMARY: readonly AutoNavItem[] = AUTO_NAV.items.filter(
+  (item) => item.tier === "primary",
+);
+
+/** Riesgo · Análisis · Sistema, bajo «Más información». */
+export const AUTO_NAV_SECONDARY: readonly AutoNavItem[] = AUTO_NAV.items.filter(
+  (item) => item.tier === "secondary",
+);
 
 /** Deep-link a la operación canónica. Sin `cycleId`, vuelve a la sección Operar. */
 export function autoOperacionHref(cycleId?: string | null): string {

@@ -40,6 +40,11 @@ export type AutoRiskSummaryV1 = {
   stateTone: AutoHomeRiskTone;
   /** `Normal` | `Atención` | `Bloqueado` | `Sin dato todavía`. */
   stateLabel: string;
+  /** Veredicto human-first (`UI5-18`): `Controlado` | `Atención` | `Bloqueado` | `Sin dato todavía`. */
+  verdict: string;
+  verdictTone: AutoHomeRiskTone;
+  /** Frase de primer nivel del veredicto. */
+  verdictSentence: string;
   /** `Cuadra` | `Con retraso` | `Desajuste` | `Bloqueado` | `Sin dato todavía`. */
   portfolioLabel: string;
   /** `Sin incidencias` | `N incidencias` | `Sin dato todavía`. */
@@ -48,6 +53,60 @@ export type AutoRiskSummaryV1 = {
   positionRiskLabel: string;
   positionRiskAvailable: boolean;
 };
+
+const VERDICT_COPY: Record<AutoHomeRiskTone, string> = {
+  ok: "El riesgo está controlado. No hay bloqueos ni incidencias activas.",
+  attention:
+    "AUTO necesita atención: revisa las incidencias antes de confiar en nuevas entradas.",
+  blocked: "Hay un bloqueo activo. No se deberían abrir nuevas posiciones.",
+  unknown: "Todavía no hay una lectura de riesgo.",
+};
+
+const VERDICT_LABEL: Record<AutoHomeRiskTone, string> = {
+  ok: "Controlado",
+  attention: "Atención",
+  blocked: "Bloqueado",
+  unknown: AUTO_HOME_NO_DATA_LABEL,
+};
+
+/**
+ * Veredicto human-first: colapsa estado operativo, cuadre de cartera e incidencias en un único
+ * tono. `UNKNOWN ≠ 0`: sin lectura, el veredicto es «Sin dato todavía», nunca «Controlado».
+ */
+function riskVerdict(input: {
+  stateTone: AutoHomeRiskTone;
+  portfolioStatus?: string | null;
+  fillLinkIssuesCount?: number | null;
+  loaded: boolean;
+}): { tone: AutoHomeRiskTone; label: string; sentence: string } {
+  if (!input.loaded) {
+    return {
+      tone: "unknown",
+      label: VERDICT_LABEL.unknown,
+      sentence: VERDICT_COPY.unknown,
+    };
+  }
+  const issues = input.fillLinkIssuesCount ?? 0;
+  let tone: AutoHomeRiskTone;
+  if (input.stateTone === "blocked" || input.portfolioStatus === "blocked") {
+    tone = "blocked";
+  } else if (
+    input.stateTone === "attention" ||
+    input.portfolioStatus === "drift" ||
+    issues > 0
+  ) {
+    tone = "attention";
+  } else if (input.stateTone === "unknown") {
+    tone = "unknown";
+  } else {
+    tone = "ok";
+  }
+  return {
+    tone,
+    label: VERDICT_LABEL[tone],
+    sentence: VERDICT_COPY[tone],
+  };
+}
 
 function stateFromOperationalState(state: string | null | undefined): {
   tone: AutoHomeRiskTone;
@@ -98,12 +157,21 @@ export function buildAutoRiskSummary(
   const isError = input.isError === true;
   const loaded = !isLoading && !isError;
   const state = stateFromOperationalState(input.operationalState);
+  const verdict = riskVerdict({
+    stateTone: state.tone,
+    portfolioStatus: input.portfolioStatus,
+    fillLinkIssuesCount: input.fillLinkIssuesCount,
+    loaded,
+  });
   return {
     loaded,
     isLoading,
     isError,
     stateTone: state.tone,
     stateLabel: loaded ? state.label : AUTO_HOME_NO_DATA_LABEL,
+    verdict: verdict.label,
+    verdictTone: verdict.tone,
+    verdictSentence: verdict.sentence,
     portfolioLabel: loaded
       ? portfolioLabelFromStatus(input.portfolioStatus)
       : AUTO_HOME_NO_DATA_LABEL,

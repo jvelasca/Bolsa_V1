@@ -2,11 +2,16 @@
  * AdminRail — barra administrativa icon-first (V1.21+).
  * Por defecto solo iconos (mínimo ancho); al hover se descolapsa el texto.
  * Chincheta cicla: Auto (hover) → Fijo colapsado → Fijo expandido.
- * No es navegación diaria de producto. Overview / Cuentas / Perfiles /
- * Estadísticas (preparado) / Fiscal / Consola.
+ * No es navegación diaria de producto.
+ *
+ * UI Contract 5.0 (`UI5-08`): los ítems se agrupan en tres bloques —
+ * `Producto` (Overview · AUTO), `Administración` (Cuentas · Perfiles · Estadísticas · Fiscal) y
+ * `Diagnóstico` (Consola avanzada). No se cambian rutas; es jerarquía visual. En modo colapsado el
+ * grupo se representa con un separador, no con el rótulo.
  *
  * @see docs/adr/040-user-information-architecture.md (enmienda V1.21)
  * @see docs/adr/041-operational-coherence.md
+ * @see docs/engineering/spec-ui-contract-5-0-2026-10-08.md §UI5-08
  */
 
 import { useEffect, useState, type ComponentType } from "react";
@@ -65,51 +70,56 @@ type AdminActionItem = {
 
 type AdminItem = AdminNavItem | AdminActionItem;
 
-const NAV_ITEMS: AdminNavItem[] = [
-  {
-    kind: "nav",
-    id: "overview",
-    label: "Overview",
-    href: "/overview",
-    icon: LayoutDashboard,
-    hint: "Resumen de cuenta y atajos",
-  },
-  {
-    kind: "nav",
-    id: "accounts",
-    label: "Cuentas",
-    href: "/accounts",
-    icon: Briefcase,
-    hint: "Hub de cuentas e operativa",
-  },
-];
+type AdminGroup = {
+  id: "product" | "admin" | "diagnostic";
+  label: string;
+  items: AdminItem[];
+};
 
-const TRAILING_NAV: AdminNavItem[] = [
-  {
-    kind: "nav",
-    id: "auto",
-    label: AUTO_LABEL,
-    href: AUTO_ROOT_PATH,
-    icon: Radar,
-    hint: "Espacio AUTO: operar · cartera · riesgo · análisis · sistema",
-  },
-  {
-    kind: "nav",
-    id: "fiscal",
-    label: "Fiscal",
-    href: "/fiscal",
-    icon: Receipt,
-    hint: "Plusvalías y ejercicio",
-  },
-  {
-    kind: "nav",
-    id: "operational-console",
-    label: OPERATIONAL_CONSOLE_LABEL,
-    href: OPERATIONAL_CONSOLE_PATH,
-    icon: Wrench,
-    hint: "Diagnóstico operativo",
-  },
-];
+const ITEM_OVERVIEW: AdminNavItem = {
+  kind: "nav",
+  id: "overview",
+  label: "Overview",
+  href: "/overview",
+  icon: LayoutDashboard,
+  hint: "Resumen de cuenta y atajos",
+};
+
+const ITEM_ACCOUNTS: AdminNavItem = {
+  kind: "nav",
+  id: "accounts",
+  label: "Cuentas",
+  href: "/accounts",
+  icon: Briefcase,
+  hint: "Hub de cuentas e operativa",
+};
+
+const ITEM_AUTO: AdminNavItem = {
+  kind: "nav",
+  id: "auto",
+  label: AUTO_LABEL,
+  href: AUTO_ROOT_PATH,
+  icon: Radar,
+  hint: "Espacio AUTO: operar · cartera · riesgo · análisis · sistema",
+};
+
+const ITEM_FISCAL: AdminNavItem = {
+  kind: "nav",
+  id: "fiscal",
+  label: "Fiscal",
+  href: "/fiscal",
+  icon: Receipt,
+  hint: "Plusvalías y ejercicio",
+};
+
+const ITEM_OPERATIONAL_CONSOLE: AdminNavItem = {
+  kind: "nav",
+  id: "operational-console",
+  label: OPERATIONAL_CONSOLE_LABEL,
+  href: OPERATIONAL_CONSOLE_PATH,
+  icon: Wrench,
+  hint: "Diagnóstico operativo",
+};
 
 export function loadAdminRailMode(): AdminRailMode {
   try {
@@ -173,6 +183,51 @@ function modeChrome(mode: AdminRailMode): {
   }
 }
 
+function AdminRailItemButton({
+  item,
+  expanded,
+}: {
+  item: AdminItem;
+  expanded: boolean;
+}) {
+  if (item.kind === "nav") {
+    return (
+      <NavLink
+        to={item.href}
+        title={item.hint}
+        className={({ isActive }) => railButtonClass(expanded, isActive)}
+        data-testid={`admin-rail-${item.id}`}
+      >
+        <item.icon className="h-4 w-4 shrink-0" />
+        {expanded ? <span className="truncate">{item.label}</span> : null}
+      </NavLink>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      title={item.hint}
+      onClick={item.onClick}
+      className={cn(railButtonClass(expanded), item.stub && "opacity-80")}
+      data-testid={`admin-rail-${item.id}`}
+      aria-disabled={item.stub ? true : undefined}
+    >
+      <item.icon className="h-4 w-4 shrink-0" />
+      {expanded ? (
+        <span className="truncate">
+          {item.label}
+          {item.stub ? (
+            <span className="ml-1 text-[10px] text-muted-foreground">
+              · pronto
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
 export function AdminRail() {
   const [mode, setMode] = useState<AdminRailMode>(loadAdminRailMode);
   const [hovered, setHovered] = useState(false);
@@ -204,7 +259,23 @@ export function AdminRail() {
     },
   ];
 
-  const items: AdminItem[] = [...NAV_ITEMS, ...actionItems, ...TRAILING_NAV];
+  const groups: AdminGroup[] = [
+    {
+      id: "product",
+      label: "Producto",
+      items: [ITEM_OVERVIEW],
+    },
+    {
+      id: "admin",
+      label: "Administración",
+      items: [ITEM_ACCOUNTS, ...actionItems, ITEM_FISCAL, ITEM_AUTO],
+    },
+    {
+      id: "diagnostic",
+      label: "Diagnóstico",
+      items: [ITEM_OPERATIONAL_CONSOLE],
+    },
+  ];
 
   useEffect(() => {
     try {
@@ -268,53 +339,31 @@ export function AdminRail() {
         className="flex flex-1 flex-col gap-0.5 p-1.5"
         aria-label="Administración"
       >
-        {items.map((item) => {
-          if (item.kind === "nav") {
-            return (
-              <NavLink
+        {groups.map((group) => (
+          <div
+            key={group.id}
+            className="flex flex-col gap-0.5"
+            data-testid={`admin-rail-group-${group.id}`}
+          >
+            {expanded ? (
+              <p className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+                {group.label}
+              </p>
+            ) : (
+              <span
+                aria-hidden="true"
+                className="mx-auto my-1 h-px w-6 bg-border"
+              />
+            )}
+            {group.items.map((item) => (
+              <AdminRailItemButton
                 key={item.id}
-                to={item.href}
-                title={item.hint}
-                className={({ isActive }) =>
-                  railButtonClass(expanded, isActive)
-                }
-                data-testid={`admin-rail-${item.id}`}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {expanded ? (
-                  <span className="truncate">{item.label}</span>
-                ) : null}
-              </NavLink>
-            );
-          }
-
-          return (
-            <button
-              key={item.id}
-              type="button"
-              title={item.hint}
-              onClick={item.onClick}
-              className={cn(
-                railButtonClass(expanded),
-                item.stub && "opacity-80",
-              )}
-              data-testid={`admin-rail-${item.id}`}
-              aria-disabled={item.stub ? true : undefined}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {expanded ? (
-                <span className="truncate">
-                  {item.label}
-                  {item.stub ? (
-                    <span className="ml-1 text-[10px] text-muted-foreground">
-                      · pronto
-                    </span>
-                  ) : null}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
+                item={item}
+                expanded={expanded}
+              />
+            ))}
+          </div>
+        ))}
       </nav>
 
       <button

@@ -26,6 +26,39 @@ describe("buildAutoRiskSummary", () => {
     // El riesgo por posición no se materializa en el read-model de AUTO.
     expect(risk.positionRiskAvailable).toBe(false);
     expect(risk.positionRiskLabel).toBe("Sin dato todavía");
+    // UI5-18: el primer nivel es un veredicto humano, no una métrica.
+    expect(risk.verdict).toBe("Controlado");
+    expect(risk.verdictTone).toBe("ok");
+    expect(risk.verdictSentence).toContain("controlado");
+  });
+
+  it("el veredicto se degrada con desajuste de cartera o incidencias (UI5-18)", () => {
+    expect(
+      buildAutoRiskSummary({
+        operationalState: "OK",
+        portfolioStatus: "drift",
+        fillLinkIssuesCount: 0,
+      }).verdict,
+    ).toBe("Atención");
+    expect(
+      buildAutoRiskSummary({
+        operationalState: "OK",
+        portfolioStatus: "clean",
+        fillLinkIssuesCount: 2,
+      }).verdictTone,
+    ).toBe("attention");
+    expect(buildAutoRiskSummary({ operationalState: "BLOCKED" }).verdict).toBe(
+      "Bloqueado",
+    );
+  });
+
+  it("sin lectura, el veredicto es «Sin dato todavía», nunca «Controlado»", () => {
+    const risk = buildAutoRiskSummary({
+      operationalState: null,
+      isLoading: true,
+    });
+    expect(risk.verdict).toBe("Sin dato todavía");
+    expect(risk.verdictTone).toBe("unknown");
   });
 
   it("un estado degradado/bloqueado no se disfraza de OK", () => {

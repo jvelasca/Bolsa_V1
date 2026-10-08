@@ -19,6 +19,14 @@ import {
 } from "@/features/auto/auto-basic-home";
 import { AUTO_HOME_NO_DATA_LABEL } from "@/features/auto/auto-home-summary";
 import {
+  operationLadderRungFromCycle,
+  type OperationLadderRungV1,
+} from "@/features/auto/auto-operation-ladder";
+import {
+  AUTO_OPERATION_MODE,
+  type OperationModeBadgeV1,
+} from "@/features/operations/operation-mode";
+import {
   buildAutoOperationCard,
   type AutoOperationCardAccount,
 } from "@/features/auto/auto-operation-card";
@@ -43,7 +51,10 @@ export type AutoOperationSheetBlock = {
 export type AutoOperationSheetV1 = {
   cycleId: string;
   symbol: string;
-  modeLabel: string;
+  /** Insignia de modo (`AUTO · SIMULADO`), obligatoria por operación (`UI5-10`). */
+  mode: OperationModeBadgeV1;
+  /** Peldaño de la escalera universal (`UI5-09`): nunca «Posición creada» sin traza. */
+  ladder: OperationLadderRungV1;
   headline: string;
   blocks: AutoOperationSheetBlock[];
 };
@@ -157,7 +168,8 @@ export function buildAutoOperationSheet(
   return {
     cycleId: card.cycleId,
     symbol: card.symbol,
-    modeLabel: AUTO_SHEET_MODE_LABEL,
+    mode: AUTO_OPERATION_MODE,
+    ladder: operationLadderRungFromCycle(cycle),
     headline: card.headline,
     blocks: BLOCK_LABELS.map((b) => ({
       id: b.id,

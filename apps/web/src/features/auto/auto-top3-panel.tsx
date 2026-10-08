@@ -24,17 +24,24 @@ export function AutoTop3Panel({
   isLoading,
   isError,
   testId = "auto-top3",
+  compact = false,
 }: {
   view: AutoTop3ViewV1 | null;
   isLoading?: boolean;
   isError?: boolean;
   testId?: string;
+  /**
+   * Resumen de primer nivel (HOME): menos peso que la vista completa de Operar
+   * (`UI5-06`: el TOP3 vive en tres niveles, sin duplicar densidad entre HOME y OPERAR).
+   */
+  compact?: boolean;
 }) {
   return (
     <section
       className="space-y-3"
       aria-labelledby={`${testId}-heading`}
       data-testid={testId}
+      data-compact={compact ? "1" : "0"}
     >
       <div className="space-y-1">
         <h3
@@ -44,7 +51,7 @@ export function AutoTop3Panel({
           {AUTO_TOP3_TITLE}
         </h3>
         <p className={cn("text-muted-foreground", AUTO_USER_TEXT)}>
-          Las tres mejores oportunidades operables que AUTO ha detectado en el
+          Las 3 oportunidades que AUTO ha situado en los primeros puestos de su
           último análisis. {view?.rankNote ?? ""}
         </p>
       </div>
@@ -92,9 +99,11 @@ export function AutoTop3Panel({
               <span className={cn("tabular-nums", AUTO_USER_TEXT)}>
                 {slot.scoreLabel}
               </span>
-              <span className={cn(AUTO_USER_TEXT, "text-muted-foreground")}>
-                {slot.strengthLabel}
-              </span>
+              {!compact ? (
+                <span className={cn(AUTO_USER_TEXT, "text-muted-foreground")}>
+                  {slot.strengthLabel}
+                </span>
+              ) : null}
               {slot.reasonLabel ? (
                 <span
                   className={cn(
@@ -114,7 +123,7 @@ export function AutoTop3Panel({
         </ol>
       ) : null}
 
-      {view && !view.isEmpty ? (
+      {view && !view.isEmpty && !compact ? (
         <AutoTechnicalDetail testId={`${testId}-technical`}>
           <dl className="space-y-1">
             <div className="flex gap-2">

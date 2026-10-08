@@ -95,6 +95,14 @@ describe("buildAutoOperationSheet", () => {
     );
   });
 
+  it("sitúa la operación en la escalera universal y declara su modo (UI5-09/10)", () => {
+    const sheet = buildAutoOperationSheet(FILLED);
+    expect(sheet.ladder.label).toBe("Ejecución completada");
+    expect(sheet.ladder.label).not.toBe("Posición creada");
+    expect(sheet.ladder.note).toBe("Precio aplicado ≠ posición creada");
+    expect(sheet.mode).toEqual({ mode: "AUTO", channel: "SIMULADO" });
+  });
+
   it("no filtra vocabulario prohibido de primer nivel", () => {
     const flat = buildAutoOperationSheet(FILLED)
       .blocks.map((b) => `${b.label} ${b.value} ${b.detail ?? ""}`)
