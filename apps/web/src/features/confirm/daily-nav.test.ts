@@ -45,6 +45,7 @@ import {
   asesorHistoryHref,
   formatFueraUniversoOperativaCopy,
   hoyViewHref,
+  isCarteraRoute,
 } from "@/features/confirm/daily-nav";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 
@@ -92,7 +93,10 @@ describe("daily-nav", () => {
     expect(LIBRO_HISTORIAL_PATH).toBe("/history");
     expect(LIBRO_OPERACIONES_PATH).not.toBe(LIBRO_HISTORIAL_PATH);
     expect(LIBRO_OPERACIONES_HINT.toLowerCase()).toMatch(/posicion/);
-    expect(LIBRO_HISTORIAL_HINT.toLowerCase()).toMatch(/ledger|fill/);
+    // UI5-20 — un término = un significado: el historial es «movimientos y
+    // ejecuciones», sin jerga de ingeniería («ledger»/«fill») en primer nivel.
+    expect(LIBRO_HISTORIAL_HINT.toLowerCase()).toMatch(/movimiento|ejecucion/);
+    expect(LIBRO_HISTORIAL_HINT.toLowerCase()).not.toMatch(/ledger|fill/);
     expect(CARTERA_NAV.label).toBe(CARTERA_LABEL);
     expect(CARTERA_NAV.items).toHaveLength(4);
     expect(LIBRO_NAV.label).toBe(CARTERA_LABEL);
@@ -171,11 +175,30 @@ describe("daily-nav", () => {
     );
   });
 
-  it("uses Universo en vigilancia copy for the Estudio gate", () => {
+  it("uses Universo en vigilia copy for the Estudio gate", () => {
     expect(UNIVERSO_EN_VIGILANCIA).toBe("Universo en vigilancia");
     expect(formatFueraUniversoOperativaCopy("SEMI")).toBe(
       "Fuera del Universo en vigilancia — SEMI exige estar en Estudio",
     );
     expect(formatFueraUniversoOperativaCopy("SEMI")).not.toMatch(/membresía/);
+  });
+
+  it("Cartera es vista rotulada de Hoy y gana sobre Hoy (una sola puerta activa)", () => {
+    // Cartera: `?view=posiciones` (y focos legacy que resuelven a posiciones).
+    expect(isCarteraRoute("/mesa", "?view=posiciones")).toBe(true);
+    expect(isCarteraRoute("/mesa", "?view=posiciones&focus=ordenes")).toBe(
+      true,
+    );
+    expect(isCarteraRoute("/mesa", "?view=posiciones&focus=riesgo")).toBe(true);
+    expect(isCarteraRoute("/mesa", "?focus=libro")).toBe(true);
+    // Historial de Cartera.
+    expect(isCarteraRoute("/history", "")).toBe(true);
+    // Hoy: resumen y el resto de sus vistas.
+    expect(isCarteraRoute("/mesa", "")).toBe(false);
+    expect(isCarteraRoute("/mesa", "?view=oportunidades")).toBe(false);
+    expect(isCarteraRoute("/mesa", "?view=decisiones")).toBe(false);
+    expect(isCarteraRoute("/mesa", "?view=journal")).toBe(false);
+    // Otra ruta no es Cartera.
+    expect(isCarteraRoute("/trading", "")).toBe(false);
   });
 });

@@ -1,9 +1,10 @@
 /**
- * AUTO · ANÁLISIS (ADR-044) — DÍA-D · Evidencia · Estrategias · Investigación.
+ * AUTO · ANÁLISIS (ADR-044) — las 4 pestañas como preguntas, sin jerga en el primer nivel.
  *
  * Sub-pestañas con la pestaña activa en la URL (`?tab=`), de modo que la vista
  * es compartible. Reutiliza el panel DÍA-D y la sección de evidencia existentes;
  * Estrategias e Investigación enlazan a Laboratorio y Asesor (no se reimplementan).
+ * El acrónimo `DÍA-D · feedback OOS` sólo aparece tras el «Detalle técnico».
  */
 
 import { Link, useSearchParams } from "react-router-dom";
@@ -14,6 +15,7 @@ import {
 import { DiaDAutoPanel } from "@/features/auto-monitor/dia-d-auto-panel";
 import { OpsAutoEvidenceSection } from "@/features/operational-console/auto-evidence-section";
 import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
+import { AutoTechnicalDetail } from "@/features/auto/auto-technical-detail";
 import { cn } from "@/lib/utils";
 
 /**
@@ -120,8 +122,14 @@ export function AutoAnalisisPage() {
           className="space-y-2"
         >
           <AutoSectionBlockHeading id="auto-analisis-dia-d">
-            DÍA-D · feedback OOS
+            Resultado y contraste con lo que después ocurrió
           </AutoSectionBlockHeading>
+          <AutoTechnicalDetail testId="auto-analisis-dia-d-technical">
+            <p>
+              «DÍA-D · feedback OOS»: comparación entre lo que el replay declaró
+              y lo que después ocurrió realmente (out-of-sample).
+            </p>
+          </AutoTechnicalDetail>
           <DiaDAutoPanel />
         </section>
       ) : null}
@@ -177,7 +185,7 @@ export function AutoAnalisisPage() {
             Investigación
           </AutoSectionBlockHeading>
           <p className="text-sm text-muted-foreground">
-            Dictamen y ledger científico viven en el{" "}
+            Los dictámenes y las explicaciones viven en el{" "}
             <Link to="/research" className="underline hover:text-primary">
               Asesor
             </Link>

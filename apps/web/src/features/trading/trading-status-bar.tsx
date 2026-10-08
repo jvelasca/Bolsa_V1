@@ -2,7 +2,7 @@
  * Barra de estado Trading: cuenta Activa + operativa + métricas (izq.) · Colas/Alarmas (der.).
  *
  * Badge `OPERATIVA: Manual|Semi|Auto` = modo de la cuenta entera (no por valor).
- * AUTO (F8): armado local + PAPER_D_EXECUTE opt-in; arm ≠ execute; omite Confirm.
+ * AUTO (F8): armado local + ejecución opt-in; armado ≠ ejecutado; omite Confirm.
  * Clic en nombre o badge → `/accounts?selected=…&tab=config&focus=operativa`.
  *
  * @see docs/engineering/estudio-process-status-ui-2026-08-06.md §6
@@ -15,7 +15,8 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
-import { formatPrice } from "@/features/charts/chart-utils";
+import { formatPriceOrAbsent } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 import { Dialog } from "@/components/ui/dialog";
@@ -44,17 +45,21 @@ type StatusItemId = "equity" | "cash" | "marketValue" | "pnl" | "positions";
 const STATUS_LABELS: Record<StatusItemId, string> = {
   equity: "Patrimonio",
   cash: "Capital disponible",
-  marketValue: "Valor operaciones",
-  pnl: "Beneficio",
+  marketValue: "Valor en mercado",
+  pnl: "Beneficio no realizado",
   positions: "Posiciones",
 };
 
+/**
+ * Rótulo corto para barra estrecha: palabra real, nunca abreviatura críptica (`RT-01`/`UI5-20`).
+ * El nombre completo viaja en el `title` de cada indicador.
+ */
 const STATUS_LABELS_SHORT: Record<StatusItemId, string> = {
-  equity: "Pat.",
-  cash: "Disp.",
-  marketValue: "Ops.",
-  pnl: "P&L",
-  positions: "Pos.",
+  equity: "Patrimonio",
+  cash: "Disponible",
+  marketValue: "En mercado",
+  pnl: "No realizado",
+  positions: "Posiciones",
 };
 
 const DEFAULT_ITEMS: StatusItemId[] = ["marketValue", "cash", "pnl", "equity"];
@@ -109,11 +114,11 @@ export function TradingStatusBar() {
   const apiOk = healthQuery.isSuccess && !healthQuery.isError;
 
   const values: Record<StatusItemId, string> = {
-    equity: summary ? formatPrice(summary.totalEquity) : "—",
-    cash: summary ? formatPrice(summary.portfolio.cash) : "—",
-    marketValue: summary ? formatPrice(summary.totalMarketValue) : "—",
-    pnl: summary ? formatPrice(summary.totalUnrealizedPnl) : "—",
-    positions: summary ? String(summary.positions.length) : "—",
+    equity: formatPriceOrAbsent(summary?.totalEquity),
+    cash: formatPriceOrAbsent(summary?.portfolio.cash),
+    marketValue: formatPriceOrAbsent(summary?.totalMarketValue),
+    pnl: formatPriceOrAbsent(summary?.totalUnrealizedPnl),
+    positions: summary ? String(summary.positions.length) : absentDataLabel(),
   };
 
   return (
@@ -168,7 +173,7 @@ export function TradingStatusBar() {
                         ? "border-amber-500/60 bg-amber-500/10 text-amber-900 dark:text-amber-200"
                         : "border-border bg-muted/40 text-foreground",
                   )}
-                  title={`Operativa de la cuenta: ${OPERATIVA_MODE_LABEL[bookPrefs.mode]}\nSEMI = Confirm · AUTO = sin firma (arm ≠ execute / PAPER_D_EXECUTE)\nClic → cambiar en Cuentas`}
+                  title={`Operativa de la cuenta: ${OPERATIVA_MODE_LABEL[bookPrefs.mode]}\nSEMI = Confirm · AUTO = sin firma; armado ≠ ejecutado\nClic → cambiar en Cuentas`}
                   data-testid="status-bar-operativa-mode"
                 >
                   <span className="text-muted-foreground">OPERATIVA:</span>{" "}
@@ -192,6 +197,7 @@ export function TradingStatusBar() {
             <span
               key={id}
               className="flex shrink-0 items-center gap-1 whitespace-nowrap"
+              title={STATUS_LABELS[id]}
             >
               <span className="text-muted-foreground">
                 <span className="trading-status-label-full">

@@ -68,6 +68,7 @@ import {
   MERCADO_NAV,
   MESA_LABEL,
   MESA_PATH,
+  isCarteraRoute as isCarteraRouteUrl,
 } from "@/features/confirm/daily-nav";
 import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
@@ -320,12 +321,9 @@ export function AppTopBar() {
   const isBacktestsRoute = location.pathname.startsWith("/backtests");
   const isResearchRoute = location.pathname.startsWith("/research");
   const isHoyRoute = location.pathname.startsWith("/mesa");
-  const searchParams = new URLSearchParams(location.search);
-  const isCarteraRoute =
-    location.pathname.startsWith("/history") ||
-    (isHoyRoute &&
-      (searchParams.get("view") === "posiciones" ||
-        searchParams.get("focus") === "libro"));
+  // Cartera es una vista rotulada de Hoy: cuando lo es, Hoy NO debe pintarse
+  // activa. Así queda exactamente una puerta L1 activa (UI5-01 / UI5-20).
+  const isCarteraRoute = isCarteraRouteUrl(location.pathname, location.search);
   const isMercadoRoute =
     isTradingRoute(location.pathname) ||
     location.pathname.startsWith("/screeners") ||
@@ -348,15 +346,10 @@ export function AppTopBar() {
   const listAutoActive = useListAutoActivityStore((s) => s.active);
   const listAutoSummary = useListAutoActivityStore((s) => s.summary);
 
+  // Duplicidades eliminadas (UI5-20): «Configuración» vive solo en el engranaje
+  // y «Notificaciones» solo en su menú de configuración. El menú de sesión queda
+  // como acción de sesión (cerrar sesión).
   const sessionMenu: MenuItem[] = [
-    {
-      label: "Notificaciones…",
-      action: () => openPlatformConfig("notifications"),
-    },
-    {
-      label: "Configuración…",
-      action: () => openPlatformConfig("general"),
-    },
     { label: "Cerrar sesión", action: clearSession },
   ];
 
@@ -439,7 +432,9 @@ export function AppTopBar() {
           className={({ isActive }) =>
             cn(
               "relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent",
-              (isActive || isHoyRoute) && "bg-accent text-primary",
+              (isActive || isHoyRoute) &&
+                !isCarteraRoute &&
+                "bg-accent text-primary",
             )
           }
           title={

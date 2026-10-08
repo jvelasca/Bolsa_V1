@@ -352,10 +352,6 @@ function AccountsContent() {
             <strong className="text-foreground">Perfiles</strong> — abre el
             catálogo de perfiles de inversor (Configuración).
           </li>
-          <li>
-            <strong className="text-foreground">Estadísticas</strong> — acceso
-            preparado para la cartera en curso (próximamente).
-          </li>
         </ul>
       </section>
       <section>

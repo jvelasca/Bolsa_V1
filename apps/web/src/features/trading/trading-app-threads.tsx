@@ -84,7 +84,7 @@ export function TradingAppThreads() {
           SLOT_CORE_R,
           coreROpenCount > 0
             ? "font-medium text-amber-900 dark:text-amber-200"
-            : "text-muted-foreground/70",
+            : "text-muted-foreground",
         )}
         title={coreRTitle}
       >
@@ -108,7 +108,7 @@ export function TradingAppThreads() {
           SLOT_F3,
           f3Count > 0
             ? "font-medium text-sky-900 dark:text-sky-200"
-            : "text-muted-foreground/70",
+            : "text-muted-foreground",
         )}
         title={
           f3Count > 0

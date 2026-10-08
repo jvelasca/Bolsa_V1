@@ -19,6 +19,17 @@ export const OPERATION_MODE_NO_DATA_LABEL = "Sin dato todavía";
 export type OperationMode = "AUTO" | "SEMI" | "MANUAL";
 export type OperationChannel = "SIMULADO" | "LIVE";
 
+/**
+ * Casing canónico de primer nivel del modo (`UI5-10`): `AUTO`/`SEMI`/`MANUAL`.
+ * Única fuente para superficies que sólo rotulan el modo (p. ej. el libro DEMO),
+ * de modo que nunca convivan `AUTO` con `Auto`/`Manual`/`Semi`.
+ */
+export const OPERATION_MODE_LABEL: Record<OperationMode, string> = {
+  AUTO: "AUTO",
+  SEMI: "SEMI",
+  MANUAL: "MANUAL",
+};
+
 export type OperationModeBadgeV1 = {
   mode: OperationMode | null;
   channel: OperationChannel;

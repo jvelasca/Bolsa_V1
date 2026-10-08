@@ -125,7 +125,7 @@ export function PlatformShell() {
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {trading ? (
               <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <h1 className="sr-only">Trading</h1>
+                {/* El `h1` visible lo aporta la página de Mercado (`Mercado`); no se duplica aquí. */}
                 <TradingLayout>
                   <Outlet />
                 </TradingLayout>

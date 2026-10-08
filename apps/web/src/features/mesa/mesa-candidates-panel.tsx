@@ -1,6 +1,7 @@
 /**
  * Mejores oportunidades para mi cartera (V1.19 Opportunity Discovery).
- * Ranking ≠ Action Queue ≠ BUY. Funnel honesto + TOP 5.
+ * Estar arriba en la lista no significa que ya se haya comprado.
+ * Funnel honesto + TOP 5.
  */
 
 import { useMemo, useState } from "react";
@@ -246,7 +247,9 @@ function OpportunityCard({
       />
       <p className="mt-1 text-[10px] text-muted-foreground">
         Resultado: {result}
-        <span className="ml-1 italic">(provisional · ≠ permiso)</span>
+        <span className="ml-1 italic">
+          (provisional — no autoriza por sí solo)
+        </span>
       </p>
       <dl className="mt-2 grid gap-1 text-[11px] sm:grid-cols-2">
         <div>
@@ -497,7 +500,8 @@ export function MesaCandidatesPanel({
           )}
           {" · "}
           <span className="text-muted-foreground">
-            Ranking provisional · ≠ permiso · ≠ BUY
+            Provisional — estar arriba en la lista no significa que ya se haya
+            comprado
           </span>
         </CardDescription>
       </CardHeader>
@@ -634,7 +638,8 @@ export function MesaCandidatesPanel({
             </h3>
             <p className="mb-2 text-[11px] text-muted-foreground">
               Interesante, pero no operable en el ciclo diario hasta añadirlo a
-              Estudio. Ranking ≠ BUY.
+              Estudio. Estar arriba en la lista no significa que ya se haya
+              comprado.
             </p>
             <ul className="flex flex-wrap gap-2 text-xs">
               {discovered.slice(0, 8).map((row) => (

@@ -9,12 +9,12 @@ export const LIVE_VIRTUAL_BANNER_TEXT =
   "LIVE VIRTUAL · SIMULADO · no capital real";
 
 export const LIVE_VIRTUAL_BANNER_SUB =
-  "Respuesta del broker = simulada · submitted ≠ fill real";
+  "Respuesta del broker = simulada · enviada no significa ejecutada";
 
 export const LIVE_VIRTUAL_BADGE_LABEL = "LIVE VIRTUAL · SIMULADO";
 
 export const LIVE_VIRTUAL_BADGE_TITLE =
-  "LIVE VIRTUAL · SIMULADO · no capital real · submitted ≠ fill · trading not accepted";
+  "LIVE VIRTUAL · SIMULADO · no capital real · enviada no significa ejecutada · operación no aceptada";
 
 type LiveVirtualBannerProps = {
   className?: string;

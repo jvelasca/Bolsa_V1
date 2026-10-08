@@ -26,7 +26,7 @@ export const AUTO_SECTION_COPY: Record<AutoSectionId, AutoSectionCopy> = {
   operar: {
     title: "Operar",
     description:
-      "Elige una oportunidad y revisa tus operaciones. Todo es dinero virtual (DEMO): abrir una operación no mueve dinero real.",
+      "Qué ha elegido AUTO y qué operaciones hay en curso. Todo es dinero virtual (DEMO); no necesitas intervenir.",
   },
   actividad: {
     title: "Actividad",
@@ -41,7 +41,7 @@ export const AUTO_SECTION_COPY: Record<AutoSectionId, AutoSectionCopy> = {
   riesgo: {
     title: "Riesgo",
     description:
-      "Cuánto puedes perder y qué límites te protegen. Es solo lectura: lo que falta se marca NO MEDIDO, nunca se rellena con ceros.",
+      "Cuánto puedes perder y qué límites te protegen. Es solo lectura: lo que falta se marca «Sin dato todavía», nunca se rellena con ceros.",
   },
   analisis: {
     title: "Análisis",

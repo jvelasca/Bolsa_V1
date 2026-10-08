@@ -14,6 +14,7 @@ import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { AccountScopeSelector } from "@/features/accounts/account-scope-selector";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { api } from "@/lib/api";
+import { absentDataLabel } from "@/components/absent-data";
 import { formatDateTimeCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -199,7 +200,7 @@ export function HistoryPage() {
           <CardTitle className="text-base">Cuenta</CardTitle>
           <CardDescription>
             {account?.settings?.commission.label ?? "Perfil de comisiones"} ·
-            fiscal {account?.settings?.tax.jurisdiction ?? "—"}
+            fiscal {account?.settings?.tax.jurisdiction ?? absentDataLabel()}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-4">

@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { OhlcvBarDto } from "@bolsa/shared";
 import sampleBars from "@fixtures/ohlcv-ibe-sample.json";
+import { ABSENT_DATA_NOT_MEASURED } from "@/components/absent-data";
 import {
   barsToChartSeries,
   barsToVolumeSeries,
   CHART_THEME,
   formatPct,
+  formatPctOrAbsent,
   formatPrice,
+  formatPriceOrAbsent,
   formatChartBarPrice,
   formatBarIntraChangeLabel,
   hasChartData,
@@ -70,6 +73,17 @@ describe("chart-utils", () => {
     expect(formatPct(1.25)).toBe("+1.25%");
     expect(formatPct(-2)).toBe("-2.00%");
     expect(formatPct(null)).toBe("—");
+  });
+
+  it("UI5-14 · helpers de nivel 1 declaran el hueco, nunca «—»", () => {
+    expect(formatPriceOrAbsent(null)).toBe(ABSENT_DATA_NOT_MEASURED);
+    expect(formatPriceOrAbsent(undefined)).toBe(ABSENT_DATA_NOT_MEASURED);
+    expect(formatPriceOrAbsent(Number.NaN)).toBe(ABSENT_DATA_NOT_MEASURED);
+    expect(formatPriceOrAbsent(10.5, "EUR")).toBe("10.50 €");
+    expect(formatPctOrAbsent(null)).toBe(ABSENT_DATA_NOT_MEASURED);
+    expect(formatPctOrAbsent(undefined)).toBe(ABSENT_DATA_NOT_MEASURED);
+    expect(formatPctOrAbsent(Number.NaN)).toBe(ABSENT_DATA_NOT_MEASURED);
+    expect(formatPctOrAbsent(1.25)).toBe("+1.25%");
   });
 
   it("formatea variación intra-vela C−O", () => {

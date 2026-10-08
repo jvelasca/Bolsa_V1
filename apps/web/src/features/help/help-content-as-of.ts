@@ -97,7 +97,7 @@
  * (`operating-desk-help.ts`) sin volcar docs/engineering.
  * **2026-08-31b** — Cuentas: Depósito/Retirada simétricos · fecha/hora en
  * movimientos · export CSV/JSON · Operativa MANUAL/SEMI/AUTO más visible ·
- * AdminRail Perfiles + Estadísticas (stub).
+ * AdminRail Perfiles.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *

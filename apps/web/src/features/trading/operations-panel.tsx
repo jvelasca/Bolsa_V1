@@ -16,7 +16,12 @@ import { api } from "@/lib/api";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
-import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import {
+  formatPct,
+  formatPrice,
+  formatPriceOrAbsent,
+} from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { ModeBadge } from "@/components/mode-badge";
 import { operationModeForPosition } from "@/features/operations/operation-mode";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
@@ -58,8 +63,17 @@ export const OPERATIONS_PANEL_SURFACE_LABELS = {
   emptyOpen: EMPTY_OPEN_LABEL,
 } as const;
 
+/**
+ * Rótulo de la columna que antes fundía dos conceptos (`Salida` = Decisión + Ejecución).
+ * Un término = un significado (`UI5-20`): la celda pinta la decisión (acción primaria) y,
+ * debajo, su estado de ejecución; el resultado honesto de ambos es `Resultado`.
+ *
+ * Exportado para falsabilidad.
+ */
+export const OPERATIONS_PANEL_RESULT_COLUMN_LABEL = "Resultado";
+
 function formatR(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return absentDataLabel();
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}R`;
 }
@@ -214,7 +228,7 @@ export function OperationsPanel({
       </div>
 
       {tab === "open" && (
-        <div className="scroll-area min-h-0 flex-1 overflow-auto">
+        <div className="scroll-area min-h-0 flex-1 overflow-auto" tabIndex={0}>
           {portfolioQuery.isLoading && (
             <p className="p-3 text-xs text-muted-foreground">
               Cargando cartera…
@@ -251,7 +265,9 @@ export function OperationsPanel({
 
                   <th className="px-2 py-1 text-right font-medium">T2</th>
 
-                  <th className="px-2 py-1 text-right font-medium">Salida</th>
+                  <th className="px-2 py-1 text-right font-medium">
+                    {OPERATIONS_PANEL_RESULT_COLUMN_LABEL}
+                  </th>
 
                   <th className="px-2 py-1 text-right font-medium">P&amp;L</th>
 
@@ -288,7 +304,8 @@ export function OperationsPanel({
                     aggregate,
                     markPrice: pos.lastPrice ?? null,
                   });
-                  const actionLabel = pot?.primaryCta.label ?? "—";
+                  const actionLabel =
+                    pot?.primaryCta.label ?? absentDataLabel();
                   const executionCopy = pot
                     ? formatPositionOperatingExecutionCopy(pot)
                     : null;
@@ -324,21 +341,15 @@ export function OperationsPanel({
                         </td>
 
                         <td className="px-2 py-1 text-right tabular-nums">
-                          {plan.stopVigente != null
-                            ? formatPrice(plan.stopVigente)
-                            : "—"}
+                          {formatPriceOrAbsent(plan.stopVigente)}
                         </td>
 
                         <td className="px-2 py-1 text-right tabular-nums">
-                          {plan.target1 != null
-                            ? formatPrice(plan.target1)
-                            : "—"}
+                          {formatPriceOrAbsent(plan.target1)}
                         </td>
 
                         <td className="px-2 py-1 text-right tabular-nums">
-                          {plan.target2 != null
-                            ? formatPrice(plan.target2)
-                            : "—"}
+                          {formatPriceOrAbsent(plan.target2)}
                         </td>
 
                         <td className="px-2 py-1 text-right text-muted-foreground">
@@ -360,9 +371,7 @@ export function OperationsPanel({
                             pnlUp ? "text-emerald-400" : "text-red-400",
                           )}
                         >
-                          {pos.unrealizedPnl != null
-                            ? formatPrice(pos.unrealizedPnl)
-                            : "—"}
+                          {formatPriceOrAbsent(pos.unrealizedPnl)}
 
                           {pos.unrealizedPnlPct != null && (
                             <span className="ml-1 text-[10px] opacity-80">
@@ -407,7 +416,7 @@ export function OperationsPanel({
       )}
 
       {tab === "pending" && (
-        <div className="scroll-area min-h-0 flex-1 overflow-auto">
+        <div className="scroll-area min-h-0 flex-1 overflow-auto" tabIndex={0}>
           {scopedPending.length === 0 && (
             <p className="p-4 text-center text-xs text-muted-foreground">
               {scopeInstrumentId

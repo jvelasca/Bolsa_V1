@@ -23,10 +23,17 @@ La aplicación debe leerse como **una sola aplicación**, con un **único lengua
    - **Insignia de modo obligatoria** por operación: `AUTO` / `SEMI` / `MANUAL` (+ `LIVE` cuando exista), con el canal `SIMULADO`/`LIVE`; nunca se deduce.
    - Heredados y elevados a global: `Precio aplicado ≠ posición materializada`, `Ranking ≠ decisión`, **Cartera única** (`AUTO / Cartera` es vista de la misma cuenta).
 3. **Estados y lenguaje**
-   - **«Sin dato todavía»** es el estado oficial del dato ausente; prohibido `0`/`—`/`N/A`/`UNKNOWN` para ese significado.
+   - **Vocabulario de dato ausente (Opción B, enmienda UI 6.0):** «Sin dato todavía» (no medido) · «No aplica» · «No disponible»; `—` solo en nivel 3. Prohibido `0`/`N/A`/`UNKNOWN` para ese significado en primer nivel.
    - Cuatro tonos: `CONFIRMADO` · `PARCIAL/PENDIENTE` · `SIN DATO TODAVÍA` · `BLOQUEADO` (solo con evidencia).
    - **`UNKNOWN ≠ 0`** elevado a contrato global.
    - **Acción ≠ Navegación ≠ Información**; **un término = un significado** ([domain-language](../domain-language.md) es la autoridad).
+4. **Densidad y explicación (enmienda UI 6.0, reglas `RT-01`…`RT-04`).**
+   - **`RT-01` Densidad:** si un dato no cambia lo que el usuario debe hacer **ahora**, no ocupa el primer nivel.
+   - **`RT-02` Explicación:** la aplicación explica el **resultado** del sistema, no cómo está construido.
+   - **`RT-03` Dos lecturas:** si una pantalla admite dos interpretaciones para un usuario básico, todavía no está terminada.
+   - **`RT-04` Un solo mecanismo de profundidad:** «Más información» / «¿Por qué?» / «Detalle técnico», sin disclosures paralelos.
+   - **`Cartera`** se conserva como **vista rotulada** de `/mesa` (sin ruta propia de L1).
+   - **`AdminRail`** queda **administrativa/técnica**: no duplica las cinco puertas L1.
 
 ---
 
@@ -42,7 +49,7 @@ La aplicación debe leerse como **una sola aplicación**, con un **único lengua
 
 - **Sólo presentación, jerarquía, vocabulario y estados.** No toca motor, worker, umbrales, `TOP_N`, contrato HTTP ni Alembic.
 - **`Δ motor = 0`** por construcción.
-- La **implementación** de `UI5-01`…`UI5-20` es un slice posterior (**UI REFACTOR 5.0**); este ADR y la spec asociada **congelan**, no implementan.
+- La **implementación** de `UI5-01`…`UI5-20` corre a cargo de los slices **UI REFACTOR 5.0 / 5.1** y del **cierre del backlog UI 5.0** (`2.11.90-beta`, con `UI5-01`/`UI5-19` a `DONE`); este ADR y la spec asociada **congelan**, no implementan.
 
 ---
 

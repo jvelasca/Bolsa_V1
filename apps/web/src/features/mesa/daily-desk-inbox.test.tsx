@@ -344,4 +344,46 @@ describe("DailyDeskInbox V1.42 F6/F7", () => {
       /AUTO armado|COMPRAR/i,
     );
   });
+
+  it("A4: first level states the ranking result in plain language, no «Ranking ≠ BUY»", () => {
+    render(
+      <MemoryRouter>
+        <DailyDeskInbox inbox={inbox()} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText(/Ranking ≠ BUY/)).toBeNull();
+    expect(screen.getByText(/no es una compra/i)).toBeTruthy();
+  });
+
+  it("A4: a comprar-labelled CTA renders a plain-language chip, never «Ranking ≠ BUY»", () => {
+    const items = [
+      {
+        id: "entry-buy",
+        kind: "entry" as const,
+        bucket: "oportunidades" as const,
+        symbol: "BUYX",
+        attention: "ATTENTION" as const,
+        phrase: "Candidata arriba en el ranking",
+        reason: "#1",
+        ctaLabel: "Comprar",
+        ctaKind: "none" as const,
+        phaseLabel: null,
+        instrumentId: "inst-buyx",
+      },
+    ];
+    const buckets = emptyBuckets().map((b) => {
+      const bucketItems = items.filter((i) => i.bucket === b.id);
+      return { ...b, items: bucketItems, count: bucketItems.length };
+    });
+
+    render(
+      <MemoryRouter>
+        <DailyDeskInbox inbox={inbox({ count: 1, items, buckets })} />
+      </MemoryRouter>,
+    );
+
+    const chip = screen.getByTestId("daily-desk-cta-BUYX");
+    expect(chip.textContent).toBe("Arriba en la lista no es una compra");
+    expect(screen.queryByText(/Ranking ≠ BUY/)).toBeNull();
+  });
 });

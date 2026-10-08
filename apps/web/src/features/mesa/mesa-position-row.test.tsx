@@ -142,3 +142,33 @@ describe("MesaPositionRow showRoute", () => {
     expect(screen.queryByTestId("position-route-AAPL")).toBeNull();
   });
 });
+
+describe("MesaPositionRow mode badge (UI5-10)", () => {
+  it("declara modo y canal junto al símbolo cuando hay evidencia", () => {
+    renderRow(
+      <MesaPositionRow
+        position={position({
+          operational: {
+            status: "OPEN",
+            direction: "long",
+            currentStop: null,
+            target1: null,
+            target2: null,
+            tradePlanId: "manual-2026-10-08-abc",
+          },
+        })}
+      />,
+    );
+    const badge = screen.getByTestId("mesa-position-mode-AAPL");
+    expect(badge.textContent).toBe("MANUAL · SIMULADO");
+    expect(badge.dataset.mode).toBe("MANUAL");
+    expect(badge.dataset.channel).toBe("SIMULADO");
+  });
+
+  it("sin evidencia no inventa el modo: «Sin dato todavía»", () => {
+    renderRow(<MesaPositionRow position={position()} />);
+    expect(screen.getByTestId("mesa-position-mode-AAPL").textContent).toBe(
+      "Sin dato todavía",
+    );
+  });
+});

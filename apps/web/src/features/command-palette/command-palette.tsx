@@ -112,6 +112,7 @@ export function CommandPalette({
         <ul
           id="command-palette-list"
           role="listbox"
+          aria-label="Resultados de comandos"
           className="max-h-[min(50vh,360px)] overflow-auto py-1"
         >
           {results.length === 0 ? (

@@ -131,6 +131,6 @@ describe("OperationalConsolePage V1.55", () => {
     expect(screen.getByTestId("ops-incidents")).toBeTruthy();
     expect(screen.getByTestId("ops-auto-evidence")).toBeTruthy();
     expect(screen.getByText(/Resolver excepciones/i)).toBeTruthy();
-    expect(screen.getByText(/Ver detalles técnicos/i)).toBeTruthy();
+    expect(screen.getByText(/Detalle técnico/i)).toBeTruthy();
   });
 });

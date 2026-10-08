@@ -879,9 +879,11 @@ function PositionCompactBody({
               />
               {/* Compat testids for surface without journey HUD */}
               <dl className="sr-only">
+                <dt className="sr-only">T1</dt>
                 <dd data-testid="position-decision-t1">
                   {formatLevel(view.levels.target1)}
                 </dd>
+                <dt className="sr-only">T2</dt>
                 <dd data-testid="position-decision-t2">
                   {formatLevel(view.levels.target2)}
                 </dd>
@@ -905,12 +907,15 @@ function PositionCompactBody({
             />
             {/* Compat testids for assertOperationalTruth (journey HUD hides Stop KV) */}
             <dl className="sr-only">
+              <dt className="sr-only">Stop</dt>
               <dd data-testid="position-decision-stop">
                 {formatLevel(view.levels.currentStop)}
               </dd>
+              <dt className="sr-only">T1</dt>
               <dd data-testid="position-decision-t1">
                 {formatLevel(view.levels.target1)}
               </dd>
+              <dt className="sr-only">T2</dt>
               <dd data-testid="position-decision-t2">
                 {formatLevel(view.levels.target2)}
               </dd>

@@ -333,4 +333,9 @@ describe("Hoy Daily Desk chrome (V1.42 F6)", () => {
     expect(src).toMatch(/daily-desk-link-oportunidades/);
     expect(src).toMatch(/Hoy no es\s+Mercado/);
   });
+
+  it("A4 — no duplicate Hoy-level Consola affordance (rail/menu keep it)", () => {
+    expect(src).not.toMatch(/daily-desk-link-consola/);
+    expect(src).not.toMatch(/Consola\s*→/);
+  });
 });

@@ -4,6 +4,7 @@
  * @see docs/engineering/design-live-virtual-order-gateway-ui-2026-09-07.md
  */
 
+import { ABSENT_DATA_NOT_MEASURED } from "@/components/absent-data";
 import { formatPrice } from "@/features/charts/chart-utils";
 import {
   LIVE_VIRTUAL_LADDER_COPY,
@@ -80,10 +81,7 @@ function LadderVisual({ step }: { step: LiveVirtualLadderStep }) {
               data-active={step === rung ? "true" : "false"}
             >
               <span aria-hidden>{step === rung ? "→" : past ? "✓" : "·"}</span>
-              <span>
-                {rung}
-                {step === rung ? ` · ${LIVE_VIRTUAL_LADDER_COPY[rung]}` : ""}
-              </span>
+              <span>{LIVE_VIRTUAL_LADDER_COPY[rung]}</span>
             </li>
           );
         })}
@@ -97,13 +95,14 @@ function LadderVisual({ step }: { step: LiveVirtualLadderStep }) {
         >
           <span aria-hidden>{terminal ? "→" : "·"}</span>
           <span>
-            filled* | rejected | not_wired
-            {terminal ? ` · ${LIVE_VIRTUAL_LADDER_COPY[step]}` : ""}
+            {terminal
+              ? LIVE_VIRTUAL_LADDER_COPY[step]
+              : `${LIVE_VIRTUAL_LADDER_COPY.filled} | ${LIVE_VIRTUAL_LADDER_COPY.rejected} | ${LIVE_VIRTUAL_LADDER_COPY.not_wired}`}
           </span>
         </li>
       </ol>
       <p className="text-[10px] text-muted-foreground">
-        *respuesta SIMULADA · submitted ≠ fill real
+        *respuesta SIMULADA · enviada ≠ fill real
       </p>
     </div>
   );
@@ -133,7 +132,10 @@ export function LiveVirtualOrderGateway({
       )}
       data-testid="live-virtual-order-gateway"
     >
-      <LiveVirtualBanner />
+      {/* `compact` evita la línea inglesa `submitted ≠ fill real` (fuera del alcance editable:
+          el banner vive en `live-virtual-banner.tsx`). La honestidad se conserva en el pie de la
+          escalera en español (`enviada ≠ fill real`). */}
+      <LiveVirtualBanner compact />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div
@@ -157,7 +159,7 @@ export function LiveVirtualOrderGateway({
             {orderTypeHint ? (
               <TelegramRow label="Tipo" value={orderTypeHint} />
             ) : (
-              <TelegramRow label="Tipo" value="sin dato" />
+              <TelegramRow label="Tipo" value={ABSENT_DATA_NOT_MEASURED} />
             )}
             {stop != null && Number.isFinite(stop) ? (
               <TelegramRow label="STOP plan" value={formatPrice(stop)} />

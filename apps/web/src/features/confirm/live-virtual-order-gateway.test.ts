@@ -2,18 +2,25 @@
  * LIVE VIRTUAL ladder + why honesty (Confirm híbrido).
  */
 
-import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   LIVE_VIRTUAL_LADDER_COPY,
   liveVirtualStepFromFillStatus,
   resolveLiveVirtualLadderStep,
 } from "@/features/confirm/live-virtual-ladder";
+import { LiveVirtualOrderGateway } from "@/features/confirm/live-virtual-order-gateway";
 import { buildLiveVirtualWhyBlocks } from "@/features/confirm/live-virtual-why";
 import {
   LIVE_VIRTUAL_BADGE_LABEL,
   LIVE_VIRTUAL_BANNER_TEXT,
 } from "@/features/confirm/live-virtual-banner";
 import { executeCtaLabel } from "@bolsa/shared";
+
+/** Tokens ingleses que `UI5-09`/`UI5-20` prohíben en primer nivel. */
+const RAW_ENGLISH_LADDER_TOKENS =
+  /proposed|signed|submitted|filled\*|filled\b|rejected|not_wired/;
 
 describe("live-virtual-ladder", () => {
   it("maps adapter fillStatus to honest steps", () => {
@@ -107,5 +114,49 @@ describe("live-virtual copy surfaces", () => {
       "Firmar · Ejecutar en LIVE VIRTUAL (simulado)",
     );
     expect(executeCtaLabel("paper")).toBe("Ejecutar en PAPER");
+  });
+});
+
+describe("LiveVirtualOrderGateway DOM (UI5-09 / UI5-20)", () => {
+  afterEach(() => cleanup());
+
+  it("renderiza la escalera en español y sin tokens ingleses", () => {
+    const { container } = render(
+      createElement(LiveVirtualOrderGateway, {
+        symbol: "AAPL",
+        proposalRef: "rec-1",
+        ticket: null,
+        ladderStep: "submitted",
+        whyBlocks: [],
+      }),
+    );
+
+    const ladder = container.querySelector(
+      '[data-testid="live-virtual-ladder"]',
+    );
+    expect(ladder).not.toBeNull();
+    expect(ladder?.textContent).toContain("Enviada (simulado) · no fill");
+
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(RAW_ENGLISH_LADDER_TOKENS);
+    expect(text).toContain("Sin dato todavía");
+  });
+
+  it("un peldaño terminal declara el desenlace en español", () => {
+    const { container } = render(
+      createElement(LiveVirtualOrderGateway, {
+        symbol: "AAPL",
+        proposalRef: "rec-2",
+        ticket: null,
+        ladderStep: "rejected",
+        whyBlocks: [],
+      }),
+    );
+
+    const terminal = container.querySelector(
+      '[data-testid="live-virtual-ladder-terminal"]',
+    );
+    expect(terminal?.textContent).toContain(LIVE_VIRTUAL_LADDER_COPY.rejected);
+    expect(container.textContent ?? "").not.toMatch(RAW_ENGLISH_LADDER_TOKENS);
   });
 });

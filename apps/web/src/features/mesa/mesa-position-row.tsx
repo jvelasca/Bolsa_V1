@@ -34,6 +34,8 @@ import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { mesaJournalTesisHref } from "@/features/mesa/mesa-nav-links";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 import { PositionRoutePanel } from "@/features/mesa/position-route-panel";
+import { ModeBadge } from "@/components/mode-badge";
+import { operationModeForPosition } from "@/features/operations/operation-mode";
 import { useInstrumentOrderPending } from "@/features/trading/use-pending-orders";
 import {
   pickSubmitIntentForInstrument,
@@ -320,6 +322,9 @@ export function MesaPositionRow({
       }).nextAction.label;
   const executionCopy = pot ? formatPositionOperatingExecutionCopy(pot) : null;
 
+  // UI5-10 — modo+canal obligatorios por operación (la fila vive en Mesa/Mercado).
+  const modeBadge = operationModeForPosition(position, "market");
+
   return (
     <div
       className="border-b border-border/50 px-3 py-2 last:border-b-0 hover:bg-accent/20"
@@ -327,7 +332,13 @@ export function MesaPositionRow({
     >
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-[88px]">
-          <div className="font-medium">{position.symbol}</div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-medium">{position.symbol}</span>
+            <ModeBadge
+              badge={modeBadge}
+              testId={`mesa-position-mode-${position.symbol}`}
+            />
+          </div>
           <div
             className="text-[10px] text-muted-foreground"
             data-testid={`mesa-position-action-${position.symbol}`}

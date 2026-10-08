@@ -321,7 +321,7 @@ export function AutoOperationStoryPanel({
                 className="h-7 rounded px-2 text-xs"
                 onClick={openTechnicalDetail}
               >
-                Detalle técnico (ventana actual)
+                Detalle técnico
               </Button>
             ) : null}
           </div>

@@ -291,4 +291,30 @@ describe("operator-cabin-ui V2.25 polish", () => {
         .getAttribute("data-cabin-visual"),
     ).toBe("v2.37");
   });
+
+  it("UI5-09 · Salida final is NOT active without a measured remaining", () => {
+    render(
+      <OperatorExitLadder
+        ladder={{
+          profileLabel: "Moderado",
+          remainingPct: null,
+          remainingDetail: "40%",
+          rungs: [
+            {
+              id: "entry",
+              label: "Entrada",
+              detail: "100",
+              status: "done",
+              reducePct: null,
+            },
+          ],
+        }}
+      />,
+    );
+    const finalRung = screen.getByTestId("mission-step-remaining");
+    expect(finalRung.getAttribute("data-status")).not.toBe("active");
+    expect(finalRung.getAttribute("data-status")).toBe("absent");
+    expect(finalRung.textContent).toMatch(/Salida final/);
+    expect(finalRung.textContent).toMatch(/Sin dato todavía/);
+  });
 });

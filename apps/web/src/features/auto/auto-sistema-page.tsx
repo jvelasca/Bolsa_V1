@@ -1,13 +1,11 @@
 /**
- * AUTO · SISTEMA (ADR-044 + spec 3.0 §5) — primero «qué está haciendo AUTO», después el interior.
+ * AUTO · SISTEMA (ADR-044 + spec 3.0 §5 + UI5-19) — solo diagnóstico, sin repetir la HOME.
  *
- * Primer nivel (usuario): estado de AUTO en frases. El reloj copia la última decisión
- * y, si existe, la próxima. Sin ese sello la frase es «Sin dato todavía». Reutiliza
- * `buildAutoHomeSummary`.
- *
- * Detalle técnico (experto), plegado: la ventana cruda del monitor (header + timeline + reservas +
- * concurrencia), broker/ejecución y la reconciliación read-only de la Consola. La auditoría son
- * enlaces y queda accesible en primer nivel.
+ * La HOME ya responde «¿está funcionando AUTO?». Sistema es una ruta secundaria y NO re-espeja
+ * ese primer nivel: el estado/reloj de decisión (antes duplicado) vive ahora dentro del «Detalle
+ * técnico», junto a la ventana cruda del monitor (header + timeline + reservas + concurrencia),
+ * broker/ejecución y la reconciliación read-only de la Consola. La auditoría son enlaces y queda
+ * accesible en primer nivel.
  */
 
 import { Link } from "react-router-dom";
@@ -62,55 +60,55 @@ export function AutoSistemaPage() {
         description={AUTO_SECTION_COPY.sistema.description}
       />
 
-      <section className="space-y-2" aria-labelledby="auto-sistema-estado">
-        <AutoSectionBlockHeading id="auto-sistema-estado">
-          Estado de AUTO
-        </AutoSectionBlockHeading>
-        <AutoHumanStateBadge
-          state={humanState}
-          testId="auto-sistema-human-state"
-        />
-        {status.isLoading ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="auto-sistema-loading"
-          >
-            Cargando estado de AUTO…
-          </p>
-        ) : null}
-        {status.isError ? (
-          <p
-            className="text-sm text-destructive"
-            data-testid="auto-sistema-error"
-          >
-            No se pudo cargar el monitor operativo.
-          </p>
-        ) : null}
-        {status.loaded ? (
-          <div className="space-y-1 text-sm">
-            <p
-              className="text-base font-semibold"
-              data-testid="auto-sistema-auto"
-            >
-              AUTO: {status.autoLabel}
-            </p>
-            <p className="font-medium" data-testid="auto-sistema-doing">
-              {status.activityLabel}
-            </p>
-            <p
-              className="text-muted-foreground"
-              data-testid="auto-sistema-last-activity"
-            >
-              {decisionClockCopy(
-                status.lastActivityLabel,
-                status.nextStepLabel,
-              )}
-            </p>
-          </div>
-        ) : null}
-      </section>
-
       <AutoTechnicalDetail testId="auto-sistema-technical">
+        <section className="space-y-2" aria-labelledby="auto-sistema-estado">
+          <AutoSectionBlockHeading id="auto-sistema-estado">
+            Estado de AUTO
+          </AutoSectionBlockHeading>
+          <AutoHumanStateBadge
+            state={humanState}
+            testId="auto-sistema-human-state"
+          />
+          {status.isLoading ? (
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="auto-sistema-loading"
+            >
+              Cargando estado de AUTO…
+            </p>
+          ) : null}
+          {status.isError ? (
+            <p
+              className="text-sm text-destructive"
+              data-testid="auto-sistema-error"
+            >
+              No se pudo cargar el monitor operativo.
+            </p>
+          ) : null}
+          {status.loaded ? (
+            <div className="space-y-1 text-sm">
+              <p
+                className="text-base font-semibold"
+                data-testid="auto-sistema-auto"
+              >
+                AUTO: {status.autoLabel}
+              </p>
+              <p className="font-medium" data-testid="auto-sistema-doing">
+                {status.activityLabel}
+              </p>
+              <p
+                className="text-muted-foreground"
+                data-testid="auto-sistema-last-activity"
+              >
+                {decisionClockCopy(
+                  status.lastActivityLabel,
+                  status.nextStepLabel,
+                )}
+              </p>
+            </div>
+          ) : null}
+        </section>
+
         <section className="space-y-3" aria-labelledby="auto-sistema-salud">
           <AutoSectionBlockHeading id="auto-sistema-salud">
             Salud AUTO
@@ -182,7 +180,7 @@ export function AutoSistemaPage() {
           </li>
           <li>
             <Link to="/history" className="underline hover:text-primary">
-              Historial · ledger y fills
+              Historial de la cuenta
             </Link>
           </li>
         </ul>

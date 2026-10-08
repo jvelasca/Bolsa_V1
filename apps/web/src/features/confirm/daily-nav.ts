@@ -38,7 +38,15 @@ export const VER_EN_ASESOR_LABEL = "Ver en Asesor" as const;
 export const LEDGER_ASESOR_LINK_LABEL = "Ledger Asesor →" as const;
 export const CONFIRMAR_LABEL = "Confirmar" as const;
 
-/** Cartera (antes Libro) — posiciones / órdenes / historial / riesgo. */
+/**
+ * Cartera — término canónico único para «¿qué tengo?» (UI5-20).
+ *
+ * Un término = un significado: `Cartera` es la puerta que agrupa la cuenta;
+ * `Posiciones` es la vista que lista lo que hay; `Historial` es el registro de
+ * movimientos. `Libro` queda como alias deprecado (no se muestra en la UI).
+ *
+ * @see docs/engineering/spec-ui-contract-5-0-2026-10-08.md (UI5-13, UI5-20)
+ */
 export const CARTERA_LABEL = "Cartera" as const;
 /** @deprecated Use CARTERA_LABEL. */
 export const LIBRO_LABEL = CARTERA_LABEL;
@@ -68,10 +76,9 @@ export const OPERATIONAL_CONSOLE_HINT =
 export const LIBRO_HISTORIAL_PATH = "/history" as const;
 export const CARTERA_HISTORIAL_PATH = LIBRO_HISTORIAL_PATH;
 
-export const CARTERA_POSICIONES_HINT =
-  "Posiciones de la cuenta (en Hoy)" as const;
+export const CARTERA_POSICIONES_HINT = "Posiciones de la cuenta" as const;
 export const CARTERA_ORDENES_HINT = "Órdenes y pendientes" as const;
-export const CARTERA_HISTORIAL_HINT = "Ledger y fills" as const;
+export const CARTERA_HISTORIAL_HINT = "Movimientos y ejecuciones" as const;
 export const CARTERA_RIESGO_HINT = "Riesgo abierto y límites" as const;
 
 /** @deprecated */
@@ -138,6 +145,36 @@ export const CARTERA_NAV = {
     },
   ],
 } as const;
+
+/** Focos legacy de Hoy que resuelven a la vista Cartera (`posiciones`). */
+const CARTERA_FOCUS = new Set(["libro", "ordenes", "riesgo"]);
+
+/**
+ * ¿La URL es una vista de Cartera?
+ *
+ * Cartera es una **vista rotulada** de Hoy (`/mesa?view=posiciones`, más focos
+ * legacy) y su Historial (`/history`). Permite que la barra superior marque
+ * **exactamente una** puerta L1 (Cartera gana sobre Hoy).
+ *
+ * @see docs/adr/040-user-information-architecture.md §12
+ * @see docs/engineering/spec-ui-contract-5-0-2026-10-08.md (UI5-01, UI5-20)
+ */
+export function isCarteraRoute(pathname: string, search: string): boolean {
+  if (pathname.startsWith(CARTERA_HISTORIAL_PATH)) return true;
+  if (!pathname.startsWith(MESA_PATH)) return false;
+  const params = new URLSearchParams(search);
+  const view = params.get("view");
+  if (view === HOY_VIEW.posiciones) return true;
+  // Otra vista válida de Hoy manda sobre el foco legacy (`parseHoyView`).
+  if (
+    view != null &&
+    (Object.values(HOY_VIEW) as readonly string[]).includes(view)
+  ) {
+    return false;
+  }
+  const focus = params.get("focus");
+  return focus != null && CARTERA_FOCUS.has(focus);
+}
 
 /** @deprecated Use CARTERA_NAV. */
 export const LIBRO_NAV = {

@@ -4,6 +4,7 @@ import {
   chartPerfRecordReflowEvent,
   chartPerfRecordReflowRequest,
 } from "@/features/charts/chart-perf-analyzer";
+import { formatOrAbsent } from "@/components/absent-data";
 import { formatDateWith } from "@/lib/format";
 
 export interface ChartCandle {
@@ -285,6 +286,18 @@ export function formatPrice(
   return `${amount} ${c}`;
 }
 
+/**
+ * Precio de primer nivel (UI5-14, Opción B): si no hay valor devuelve el rótulo oficial
+ * de dato ausente en vez de `—`. `formatPrice` se conserva para contextos técnicos
+ * (ejes, nivel 3); esta variante es la que deben usar las superficies de nivel 1.
+ */
+export function formatPriceOrAbsent(
+  value: number | null | undefined,
+  currency?: string | null,
+): string {
+  return formatOrAbsent(value, (v) => formatPrice(v, currency));
+}
+
 /** Precio OHLC en la barra del gráfico (3 decimales, sin símbolo €). */
 export function formatChartBarPrice(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return "—";
@@ -318,6 +331,14 @@ export function formatPct(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return "—";
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
+}
+
+/**
+ * Porcentaje de primer nivel (UI5-14, Opción B): ausencia declarada, nunca `—`.
+ * `formatPct` se conserva para contextos técnicos (ejes, nivel 3).
+ */
+export function formatPctOrAbsent(value: number | null | undefined): string {
+  return formatOrAbsent(value, formatPct);
 }
 
 /** Precio para campos de coordenadas (sin símbolo €, decimales acotados). */

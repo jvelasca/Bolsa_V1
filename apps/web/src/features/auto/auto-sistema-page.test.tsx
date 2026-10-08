@@ -1,8 +1,8 @@
 /**
- * AUTO · SISTEMA — primero «qué está haciendo AUTO», detalle técnico plegado (spec 3.0 §5).
+ * AUTO · SISTEMA — sólo diagnóstico; el estado en frases ya no re-espeja la HOME (UI5-19).
  *
- * Verifica la inversión de jerarquía: el estado en frases arriba (reutilizando el helper de la
- * HOME) y el monitor crudo dentro de un bloque «Detalle técnico» cerrado por defecto.
+ * Verifica que el estado de AUTO (antes duplicado del primer nivel de la HOME) vive ahora dentro
+ * del bloque «Detalle técnico» plegado por defecto, junto al monitor crudo.
  */
 
 import { cleanup, render, screen } from "@testing-library/react";
@@ -91,9 +91,14 @@ function renderPage() {
 }
 
 describe("AutoSistemaPage", () => {
-  it("expone un h1 y el estado en lenguaje de usuario arriba", () => {
+  it("expone un h1 y el estado en lenguaje de usuario dentro del detalle técnico", () => {
     renderPage();
     expect(screen.queryAllByRole("heading", { level: 1 })).toHaveLength(1);
+    const detail = screen.getByTestId("auto-sistema-technical");
+    expect(detail.contains(screen.getByTestId("auto-sistema-auto"))).toBe(true);
+    expect(
+      detail.contains(screen.getByTestId("auto-sistema-human-state")),
+    ).toBe(true);
     expect(screen.getByTestId("auto-sistema-auto").textContent).toContain(
       "Funcionando",
     );

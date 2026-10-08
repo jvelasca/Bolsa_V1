@@ -161,7 +161,7 @@ export function MesaOperationalBar({
         <div
           className="inline-flex items-center gap-0.5"
           data-testid="mesa-broker-venue"
-          title="Venue de ejecución: Paper = simulación; Live = XTB bridge (sin URL → not_wired; submitted ≠ fill salvo filled)"
+          title="Venue de ejecución: Paper = simulación; Live = XTB bridge (sin URL → not_wired; enviada no significa ejecutada; solo la ejecución lo confirma)"
         >
           <span className="mr-1 text-muted-foreground">Venue</span>
           {(["paper", "live"] as const).map((v) => {
@@ -179,7 +179,7 @@ export function MesaOperationalBar({
                 )}
                 title={
                   v === "live"
-                    ? "Live = XTB bridge; sin URL → not_wired; submitted ≠ fill unless filled"
+                    ? "Live = XTB bridge; sin URL → not_wired; enviada no significa ejecutada; solo la ejecución lo confirma"
                     : "Paper = PaperBroker (simulación ledger)"
                 }
                 onClick={() => {

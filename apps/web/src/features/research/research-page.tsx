@@ -263,8 +263,8 @@ export function ResearchPage() {
             <Card>
               <CardContent className="space-y-2 py-4">
                 <p className="text-sm text-muted-foreground">
-                  Aún no hay trials en el ledger. Lanza una prueba en
-                  Backtesting para llenar el Observatory.
+                  Aún no hay experimentos registrados. Lanza una prueba en el
+                  Laboratorio para empezar.
                 </p>
                 <Link
                   to="/backtests?tab=run"
@@ -281,16 +281,19 @@ export function ResearchPage() {
             <>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Stat
-                  label="Total trials"
+                  label="Experimentos"
                   value={String(summary.totalTrials)}
                 />
-                <Stat label="K consumido" value={String(summary.totalK)} />
+                <Stat
+                  label="Pruebas aplicadas"
+                  value={String(summary.totalK)}
+                />
                 <Stat
                   label="Instrumentos"
                   value={String(summary.activeInstruments)}
                 />
                 <Stat
-                  label="Sharpe medio"
+                  label="Calidad media (Sharpe)"
                   value={
                     summary.avgSharpe == null
                       ? "—"
@@ -301,58 +304,68 @@ export function ResearchPage() {
 
               {labHealthQuery.isLoading && (
                 <p className="text-sm text-muted-foreground">
-                  Cargando Lab Health…
+                  Cargando salud del laboratorio…
                 </p>
               )}
               {labHealth && (
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Lab Health</CardTitle>
+                    <CardTitle className="text-base">
+                      Salud del laboratorio
+                    </CardTitle>
                     <CardDescription>
-                      Cobertura de métricas IS, zero-trades y campañas (Q0.1)
+                      Cobertura de métricas y campañas
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      <Stat
-                        label="Sharpe presente"
-                        value={`${labHealth.coverage.sharpeRatio.pct.toFixed(1)}%`}
-                      />
-                      <Stat
-                        label="Sortino presente"
-                        value={`${labHealth.coverage.sortinoRatio.pct.toFixed(1)}%`}
-                      />
-                      <Stat
-                        label="Calmar presente"
-                        value={`${labHealth.coverage.calmarRatio.pct.toFixed(1)}%`}
-                      />
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-3">
-                      <Stat
-                        label="tradeCount=0"
-                        value={`${labHealth.zeroTradePct.toFixed(1)}% (${labHealth.zeroTradeCount})`}
-                      />
-                      <Stat
-                        label="Campañas"
-                        value={String(labHealth.campaignCount)}
-                      />
-                      <Stat
-                        label="Sin trials"
-                        value={`${labHealth.instrumentsWithoutTrials} / ${labHealth.activeInstruments}`}
-                      />
-                    </div>
-                    {labHealth.campaigns.length > 0 && (
+                    <details
+                      className="space-y-3"
+                      data-testid="research-lab-health-technical"
+                    >
+                      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                        Detalle técnico
+                      </summary>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <Stat
+                          label="Sharpe presente"
+                          value={`${labHealth.coverage.sharpeRatio.pct.toFixed(1)}%`}
+                        />
+                        <Stat
+                          label="Sortino presente"
+                          value={`${labHealth.coverage.sortinoRatio.pct.toFixed(1)}%`}
+                        />
+                        <Stat
+                          label="Calmar presente"
+                          value={`${labHealth.coverage.calmarRatio.pct.toFixed(1)}%`}
+                        />
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <Stat
+                          label="tradeCount=0"
+                          value={`${labHealth.zeroTradePct.toFixed(1)}% (${labHealth.zeroTradeCount})`}
+                        />
+                        <Stat
+                          label="Campañas"
+                          value={String(labHealth.campaignCount)}
+                        />
+                        <Stat
+                          label="Sin experimentos"
+                          value={`${labHealth.instrumentsWithoutTrials} / ${labHealth.activeInstruments}`}
+                        />
+                      </div>
+                      {labHealth.campaigns.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Campañas más activas:{" "}
+                          {labHealth.campaigns
+                            .slice(0, 5)
+                            .map((c) => `${c.campaignId} (${c.trials})`)
+                            .join(" · ")}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground">
-                        Top campañas:{" "}
-                        {labHealth.campaigns
-                          .slice(0, 5)
-                          .map((c) => `${c.campaignId} (${c.trials})`)
-                          .join(" · ")}
+                        {labHealth.caveat}
                       </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      {labHealth.caveat}
-                    </p>
+                    </details>
                   </CardContent>
                 </Card>
               )}
@@ -361,12 +374,14 @@ export function ResearchPage() {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Por instrumento</CardTitle>
-                    <CardDescription>Trials, K y Sharpe medio</CardDescription>
+                    <CardDescription>
+                      Experimentos, pruebas y calidad media
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
                     {summary.byInstrument.length === 0 ? (
                       <p className="text-sm text-muted-foreground">
-                        Aún no hay trials.
+                        Aún no hay experimentos.
                       </p>
                     ) : (
                       <ul className="space-y-2 text-sm">
@@ -387,7 +402,8 @@ export function ResearchPage() {
                               {row.symbol}
                             </button>
                             <span className="text-muted-foreground tabular-nums">
-                              {row.trials} tri · K:{row.kConsumed} · S:
+                              {row.trials} exp · {row.kConsumed} pruebas ·
+                              calidad{" "}
                               {row.avgSharpe == null
                                 ? "—"
                                 : row.avgSharpe.toFixed(2)}
@@ -401,8 +417,10 @@ export function ResearchPage() {
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Por origen</CardTitle>
-                    <CardDescription>human / grid / optuna / …</CardDescription>
+                    <CardTitle className="text-base">
+                      Según cómo se propuso
+                    </CardTitle>
+                    <CardDescription>Cómo llegó cada prueba</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {summary.byOrigin.length === 0 ? (
@@ -420,7 +438,7 @@ export function ResearchPage() {
                               {row.proposedBy}
                             </span>
                             <span className="text-muted-foreground tabular-nums">
-                              {row.trials} tri · K:{row.kConsumed}
+                              {row.trials} exp · {row.kConsumed} pruebas
                             </span>
                           </li>
                         ))}
@@ -432,7 +450,7 @@ export function ResearchPage() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Por preset</CardTitle>
+                  <CardTitle className="text-base">Por configuración</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {summary.byPreset.length === 0 ? (
@@ -463,11 +481,11 @@ export function ResearchPage() {
 
               {summary.lastTrialAt && (
                 <p className="text-xs text-muted-foreground">
-                  Último trial: {formatShortDate(summary.lastTrialAt)}
+                  Último experimento: {formatShortDate(summary.lastTrialAt)}
                   {summary.avgProfitFactor != null &&
-                    ` · PF medio ${summary.avgProfitFactor.toFixed(2)}`}
+                    ` · factor de beneficio medio ${summary.avgProfitFactor.toFixed(2)}`}
                   {summary.avgMaxDD != null &&
-                    ` · MaxDD medio ${formatPct(summary.avgMaxDD)}`}
+                    ` · caída máxima media ${formatPct(summary.avgMaxDD)}`}
                 </p>
               )}
             </>
@@ -479,9 +497,11 @@ export function ResearchPage() {
         <div className="grid gap-4 lg:grid-cols-5">
           <Card className="lg:col-span-3">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Historial de trials</CardTitle>
+              <CardTitle className="text-base">
+                Historial de experimentos
+              </CardTitle>
               <CardDescription>
-                Cada fila es un experimento del ledger K
+                Cada fila es un experimento de investigación
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -502,42 +522,52 @@ export function ResearchPage() {
                 </select>
                 <select
                   className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                  value={proposedBy}
-                  onChange={(e) => {
-                    patchHistoryFilters({ proposedBy: e.target.value });
-                  }}
-                >
-                  <option value="">Cualquier origen</option>
-                  <option value="human">human</option>
-                  <option value="grid">grid</option>
-                  <option value="optuna">optuna</option>
-                  <option value="ai">ai</option>
-                  <option value="system">system</option>
-                </select>
-                <input
-                  className="h-9 w-40 rounded-md border border-input bg-background px-2 text-sm"
-                  placeholder="preset key"
-                  value={presetKey}
-                  onChange={(e) => {
-                    patchHistoryFilters({ presetKey: e.target.value });
-                  }}
-                />
-                <select
-                  className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                   value={sort}
                   onChange={(e) => setSort(e.target.value as ResearchTrialSort)}
                 >
                   <option value="created_at">Fecha</option>
-                  <option value="sharpe">Sharpe</option>
-                  <option value="pnl">PnL</option>
+                  <option value="sharpe">Calidad (Sharpe)</option>
+                  <option value="pnl">Resultado (PnL)</option>
                   <option value="commission">Comisión</option>
-                  <option value="k_contribution">K</option>
+                  <option value="k_contribution">Pruebas</option>
                 </select>
               </div>
+              <details
+                className="text-xs"
+                data-testid="research-history-technical-filters"
+              >
+                <summary className="cursor-pointer text-muted-foreground">
+                  Detalle técnico
+                </summary>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <select
+                    className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    value={proposedBy}
+                    onChange={(e) => {
+                      patchHistoryFilters({ proposedBy: e.target.value });
+                    }}
+                  >
+                    <option value="">Cualquier origen</option>
+                    <option value="human">human</option>
+                    <option value="grid">grid</option>
+                    <option value="optuna">optuna</option>
+                    <option value="ai">ai</option>
+                    <option value="system">system</option>
+                  </select>
+                  <input
+                    className="h-9 w-40 rounded-md border border-input bg-background px-2 text-sm"
+                    placeholder="configuración"
+                    value={presetKey}
+                    onChange={(e) => {
+                      patchHistoryFilters({ presetKey: e.target.value });
+                    }}
+                  />
+                </div>
+              </details>
 
               {trialsQuery.isLoading && (
                 <p className="text-sm text-muted-foreground">
-                  Cargando trials…
+                  Cargando experimentos…
                 </p>
               )}
               {trialsQuery.isError && (
@@ -552,13 +582,13 @@ export function ResearchPage() {
                   <thead className="sticky top-0 bg-muted/80 text-muted-foreground">
                     <tr>
                       <th className="px-2 py-2 font-medium">Fecha</th>
-                      <th className="px-2 py-2 font-medium">Inst</th>
-                      <th className="px-2 py-2 font-medium">Preset</th>
-                      <th className="px-2 py-2 font-medium">Origen</th>
-                      <th className="px-2 py-2 font-medium">PnL</th>
-                      <th className="px-2 py-2 font-medium">Sharpe</th>
-                      <th className="px-2 py-2 font-medium">Lab</th>
-                      <th className="px-2 py-2 font-medium">K</th>
+                      <th className="px-2 py-2 font-medium">Valor</th>
+                      <th className="px-2 py-2 font-medium">Configuración</th>
+                      <th className="px-2 py-2 font-medium">Propuesto por</th>
+                      <th className="px-2 py-2 font-medium">Resultado</th>
+                      <th className="px-2 py-2 font-medium">Calidad</th>
+                      <th className="px-2 py-2 font-medium">Evidencia</th>
+                      <th className="px-2 py-2 font-medium">Pruebas</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -612,7 +642,7 @@ export function ResearchPage() {
                             colSpan={8}
                             className="px-2 py-6 text-center text-muted-foreground"
                           >
-                            <p>No hay trials con estos filtros.</p>
+                            <p>No hay experimentos con estos filtros.</p>
                             <Link
                               to="/backtests?tab=run"
                               className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
@@ -628,7 +658,8 @@ export function ResearchPage() {
 
               <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span>
-                  {total} trial{total === 1 ? "" : "s"} · página {page + 1}
+                  {total} experimento{total === 1 ? "" : "s"} · página{" "}
+                  {page + 1}
                 </span>
                 <div className="flex gap-2">
                   <Button
@@ -657,12 +688,12 @@ export function ResearchPage() {
           <Card className="lg:col-span-2">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Detalle</CardTitle>
-              <CardDescription>Asiento inmutable del ledger</CardDescription>
+              <CardDescription>Registro del experimento</CardDescription>
             </CardHeader>
             <CardContent>
               {!selectedTrialId && (
                 <p className="text-sm text-muted-foreground">
-                  Selecciona un trial en la tabla.
+                  Selecciona un experimento en la tabla.
                 </p>
               )}
               {selectedTrialId && trialDetailQuery.isLoading && (
@@ -678,33 +709,40 @@ export function ResearchPage() {
                         buttonVariants({ variant: "outline", size: "sm" }),
                       )}
                     >
-                      Abrir backtest (equity / trades / replay)
+                      Abrir análisis de la prueba
                     </Link>
                   )}
                   {!selected.backtestRunId && selected.optimizationRunId && (
                     <p className="text-xs text-muted-foreground">
-                      Origen grid / optimize — sin backtest_run H0 vinculado
-                      (solo asiento ledger).
+                      Origen optimizador — sin prueba vinculada.
                     </p>
                   )}
-                  <div className="rounded-md border border-border bg-muted/30 p-2">
-                    <p className="text-[10px] font-medium uppercase text-muted-foreground">
-                      Params
-                    </p>
-                    <pre className="mt-1 max-h-40 overflow-auto text-[10px] text-muted-foreground">
-                      {JSON.stringify(selected.params, null, 2)}
-                    </pre>
-                  </div>
-                  {selected.manifestRef && (
+                  <details
+                    className="space-y-2"
+                    data-testid="research-trial-technical"
+                  >
+                    <summary className="cursor-pointer text-[10px] font-medium uppercase text-muted-foreground">
+                      Detalle técnico
+                    </summary>
                     <div className="rounded-md border border-border bg-muted/30 p-2">
                       <p className="text-[10px] font-medium uppercase text-muted-foreground">
-                        Manifest ref
+                        Parámetros
                       </p>
-                      <pre className="mt-1 max-h-32 overflow-auto text-[10px] text-muted-foreground">
-                        {JSON.stringify(selected.manifestRef, null, 2)}
+                      <pre className="mt-1 max-h-40 overflow-auto text-[10px] text-muted-foreground">
+                        {JSON.stringify(selected.params, null, 2)}
                       </pre>
                     </div>
-                  )}
+                    {selected.manifestRef && (
+                      <div className="rounded-md border border-border bg-muted/30 p-2">
+                        <p className="text-[10px] font-medium uppercase text-muted-foreground">
+                          Referencia del manifiesto
+                        </p>
+                        <pre className="mt-1 max-h-32 overflow-auto text-[10px] text-muted-foreground">
+                          {JSON.stringify(selected.manifestRef, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </details>
                 </div>
               )}
             </CardContent>

@@ -167,8 +167,9 @@ export function DailyDeskInbox({
         </p>
       ) : null}
       <p className="text-xs text-muted-foreground">
-        Exception desk · misma CTA/frase que Mercado · Ranking ≠ BUY · Confirm =
-        firma. Si no requiere acción, no ocupa espacio.
+        Lo que requiere tu atención hoy · misma acción y frase que en Mercado ·
+        Confirmar = firma · estar arriba en la lista no es una compra. Si no
+        requiere acción, no ocupa espacio.
       </p>
       <div
         className="grid gap-3 md:grid-cols-2"
@@ -319,7 +320,7 @@ function DailyDeskCta({
         className="rounded border border-border/60 px-2 py-1 text-[11px] text-muted-foreground"
         data-testid={`daily-desk-cta-${item.symbol}`}
       >
-        Ranking ≠ BUY
+        Arriba en la lista no es una compra
       </span>
     );
   }
@@ -467,7 +468,7 @@ function DailyDeskCta({
         <span
           className="rounded border border-sky-700/35 bg-sky-500/10 px-2 py-1 text-[11px] font-medium text-foreground"
           data-testid={`daily-desk-cta-${item.symbol}`}
-          title="PAPER AUTO · Ranking ≠ BUY · arm ≠ execute"
+          title="AUTO simulado · arriba en la lista no es una compra · armado no es ejecución"
         >
           {item.ctaLabel}
         </span>

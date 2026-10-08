@@ -154,3 +154,14 @@ Si hace falta explicar Decision Spine / Consola ops / Journal / Libro para respo
 - Se acepta [ADR-042](./042-operating-excellence.md) y el [spec](../engineering/spec-v142-operating-excellence-2026-08-31.md).
 - Panel derecho de Mercado = **DECISIÓN**. Hoy = command center; Mercado = terminal. Sin nuevas puertas L1.
 - Implementación F1–F8 **parked**. Este ADR no autoriza ExecutionState ni pantallas en este slice.
+
+## 12. Enmienda UI 6.0 — Cartera rotulada y `AdminRail` administrativa
+
+**Fecha:** 2026-10-08
+
+Contexto: el [Mapa de problemas UI 5.0](../engineering/auditoria-ui-5-0-mapa-problemas-2026-10-08.md) y el [plan único UI 6.0](../engineering/plan-ui-6-0-2026-10-08.md) confirman que las cinco puertas L1 son correctas, pero detectan dos ambigüedades que se resuelven **sin abrir rutas nuevas** y **sin reabrir ADR-040**:
+
+- **Cartera** sigue siendo una **vista** de `/mesa` (no se crea ruta L1 propia). Se **rotula inequívocamente** para eliminar el doble activo `Hoy`+`Cartera` en `/mesa?view=posiciones` y la sinonimia `Libro`/`Cartera`/`Historial`/`Posiciones` (`UI5-20`).
+- **`AdminRail`** queda **administrativa/técnica**: no duplica las cinco puertas L1 (que viven en la barra superior). `Producto` = accesos rápidos disponibles (`Overview`).
+
+Se aceptan, además, las reglas de densidad y explicación `RT-01`…`RT-04` de [ADR-045](./045-ui-contract-5-0.md) §1.4. Las cinco puertas L1, `/mesa` como aterrizaje y AUTO como espacio no-L1 permanecen intactos.

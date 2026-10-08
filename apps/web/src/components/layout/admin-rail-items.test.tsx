@@ -1,5 +1,5 @@
 /**
- * Tests — AdminRail Perfiles + Estadísticas preparadas + chincheta 3 modos.
+ * Tests — AdminRail Perfiles (estado preparado) + chincheta 3 modos.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -16,7 +16,7 @@ vi.mock("@/stores/ui-store", () => ({
 
 import { AdminRail, loadAdminRailMode } from "@/components/layout/admin-rail";
 
-describe("AdminRail profiles + stats", () => {
+describe("AdminRail Perfiles", () => {
   afterEach(() => {
     cleanup();
     openPlatformConfig.mockClear();
@@ -24,17 +24,15 @@ describe("AdminRail profiles + stats", () => {
 
   beforeEach(() => {
     localStorage.clear();
-    vi.spyOn(window, "alert").mockImplementation(() => undefined);
   });
 
-  it("renders Perfiles and Estadísticas actions", () => {
+  it("renders Perfiles action alongside the nav items", () => {
     render(
       <MemoryRouter>
         <AdminRail />
       </MemoryRouter>,
     );
     expect(screen.getByTestId("admin-rail-investor-profiles")).toBeTruthy();
-    expect(screen.getByTestId("admin-rail-portfolio-stats")).toBeTruthy();
     expect(screen.getByTestId("admin-rail-overview")).toBeTruthy();
     expect(screen.getByTestId("admin-rail-accounts")).toBeTruthy();
   });
@@ -47,20 +45,6 @@ describe("AdminRail profiles + stats", () => {
     );
     fireEvent.click(screen.getByTestId("admin-rail-investor-profiles"));
     expect(openPlatformConfig).toHaveBeenCalledWith("investor-profile");
-  });
-
-  it("Estadísticas alerts próximamente and does not open config", () => {
-    render(
-      <MemoryRouter>
-        <AdminRail />
-      </MemoryRouter>,
-    );
-    fireEvent.click(screen.getByTestId("admin-rail-portfolio-stats"));
-    expect(window.alert).toHaveBeenCalled();
-    expect(String(vi.mocked(window.alert).mock.calls[0]?.[0])).toMatch(
-      /próximamente/i,
-    );
-    expect(openPlatformConfig).not.toHaveBeenCalled();
   });
 });
 
@@ -92,6 +76,24 @@ describe("AdminRail groups (UI5-08)", () => {
     expect(
       screen.getByTestId("admin-rail-group-diagnostic").textContent,
     ).toContain("Diagnóstico");
+  });
+
+  it("retira el stub «Estadísticas · pronto» y conserva Consola avanzada en Diagnóstico", () => {
+    render(
+      <MemoryRouter>
+        <AdminRail />
+      </MemoryRouter>,
+    );
+    fireEvent.mouseEnter(screen.getByTestId("admin-rail"));
+    // Stub que parecía navegación (`window.alert`): fuera (UI5-17).
+    expect(screen.queryByTestId("admin-rail-portfolio-stats")).toBeNull();
+    expect(screen.queryByText(/Estadísticas/)).toBeNull();
+    // Consola avanzada sigue en Diagnóstico.
+    expect(
+      screen
+        .getByTestId("admin-rail-group-diagnostic")
+        .contains(screen.getByTestId("admin-rail-operational-console")),
+    ).toBe(true);
   });
 });
 

@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import type { PositionDto } from "@bolsa/shared";
 import {
   AUTO_OPERATION_MODE,
+  OPERATION_MODE_LABEL,
   OPERATION_MODE_NO_DATA_LABEL,
   SEMI_OPERATION_MODE,
   operationModeForPosition,
@@ -33,6 +34,16 @@ describe("operationModeLabel", () => {
     expect(operationModeLabel({ mode: null, channel: "SIMULADO" })).toBe(
       OPERATION_MODE_NO_DATA_LABEL,
     );
+  });
+});
+
+describe("OPERATION_MODE_LABEL", () => {
+  it("fija el casing canónico de primer nivel", () => {
+    expect(OPERATION_MODE_LABEL).toEqual({
+      AUTO: "AUTO",
+      SEMI: "SEMI",
+      MANUAL: "MANUAL",
+    });
   });
 });
 

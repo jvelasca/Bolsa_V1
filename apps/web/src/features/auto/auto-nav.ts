@@ -71,7 +71,7 @@ export const AUTO_NAV: { label: string; items: readonly AutoNavItem[] } = {
       id: AUTO_SECTION.home,
       label: "Resumen",
       path: AUTO_HOME_PATH,
-      hint: "Qué está haciendo AUTO, qué puedes hacer y qué ha pasado",
+      hint: "Qué está haciendo AUTO y qué ha ocurrido; no necesitas intervenir salvo que aparezca una acción",
       tier: "primary",
     },
     {

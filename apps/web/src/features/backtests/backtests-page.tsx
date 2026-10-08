@@ -126,9 +126,9 @@ export function BacktestsPage() {
               <UniverseChip force="lab" className="mb-1" />
               <h1
                 className="text-2xl font-semibold tracking-tight"
-                title="Prueba una estrategia sobre un valor y un periodo. El resto de pestañas es secundario. En Probar, arrastra los separadores entre paneles para adaptar el espacio; se guarda en este dispositivo."
+                title="Backtesting · Prueba una estrategia sobre un valor y un periodo. El resto de pestañas es secundario. En Probar, arrastra los separadores entre paneles para adaptar el espacio; se guarda en este dispositivo."
               >
-                Backtesting
+                Laboratorio
               </h1>
               <BacktestDiaDOriginControl
                 diaD={diaD}

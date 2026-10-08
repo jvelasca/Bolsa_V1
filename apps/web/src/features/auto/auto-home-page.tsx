@@ -8,7 +8,8 @@
  *
  * Cada hecho se pinta **una sola vez** en primer nivel (`UI5-04`). El estado del motor vive en
  * la insignia humana; la actividad del último tick, en una única línea bajo ella; las
- * operaciones en curso, en un único bloque; el dinero, en un bloque con su chip `SIMULADO`.
+ * operaciones en curso, en un único bloque; el dinero, en un bloque con sus cifras (el chip
+ * `SIMULADO` lo aporta el semáforo de realidad montado por el layout, no se repite aquí).
  * Se han retirado la batería de seis preguntas («¿AUTO está funcionando?» … «¿Qué dinero
  * utiliza?»), la fila de tiles y el bloque «¿Qué está haciendo AUTO?», que repetían estado,
  * operación y dinero (auditorías `G-01` y HOME user-first 5.1).
@@ -44,10 +45,7 @@ import {
   AUTO_OPERAR_PATH,
 } from "@/features/auto/auto-nav";
 import { mesaOportunidadesHref } from "@/features/mesa/mesa-nav-links";
-import {
-  AUTO_SIMULATION_BANNER,
-  buildAutoBasicHome,
-} from "@/features/auto/auto-basic-home";
+import { buildAutoBasicHome } from "@/features/auto/auto-basic-home";
 import {
   AUTO_HOME_NO_DATA_LABEL,
   buildAutoHomeSummary,
@@ -98,6 +96,12 @@ export function AutoHomePage() {
       : null,
     riskLabel: summary.riskLabel,
   });
+  // Un solo hueco declarado (`UI5-04`): si la cuenta no está medida, no se apilan cifras
+  // «Sin dato todavía». El riesgo es independiente del resumen y se conserva.
+  const accountMeasured = summaryQuery.data != null;
+  const visibleFigures = accountMeasured
+    ? figures
+    : figures.filter((figure) => figure.id === "risk");
   const figureById = (id: string) =>
     figures.find((item) => item.id === id)?.value ?? "";
   const accountForCard = {
@@ -160,7 +164,7 @@ export function AutoHomePage() {
     <div className="space-y-6" data-testid="auto-home-page">
       <AutoSectionHeading
         title="Resumen"
-        description="Qué está haciendo AUTO, qué puedes hacer y qué ha pasado. Todo es dinero virtual (DEMO)."
+        description="Consulta qué está haciendo AUTO y qué ha ocurrido. No necesitas intervenir salvo que aparezca una acción."
       />
 
       {/* 1 · ESTADO — único lugar donde se afirma el estado del motor (UI5-04). */}
@@ -223,15 +227,6 @@ export function AutoHomePage() {
             Hoy → Oportunidades
           </Link>
           ; aquí se resume el subconjunto que AUTO usa.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          <Link
-            to={AUTO_OPERAR_PATH}
-            className="underline hover:text-primary"
-            data-testid="auto-home-all-operations-link"
-          >
-            Ver todas las operaciones
-          </Link>
         </p>
       </section>
 
@@ -318,10 +313,25 @@ export function AutoHomePage() {
               ))}
             </div>
           ) : null}
+
+          {/* El listado completo de operaciones vive en Operar: pertenece a Operación,
+              no a Oportunidades (`UI5-04`, oportunidad ≠ operación). */}
+          <p className="text-sm text-muted-foreground">
+            <Link
+              to={AUTO_OPERAR_PATH}
+              className="underline hover:text-primary"
+              data-testid="auto-home-all-operations-link"
+            >
+              Ver todas las operaciones
+            </Link>{" "}
+            en Operar.
+          </p>
         </section>
       ) : null}
 
-      {/* 5 · DINERO — cifras ya medidas de la cuenta simulada + chip `SIMULADO`. */}
+      {/* 5 · DINERO — cifras ya medidas de la cuenta simulada. El chip `SIMULADO` lo pinta el
+          semáforo de realidad del layout; aquí no se repite (`UI5-04`). Un único hueco
+          declarado: si la cuenta no está medida, no se apilan cifras «Sin dato todavía». */}
       <section
         className="space-y-2"
         aria-labelledby="auto-home-money-heading"
@@ -330,17 +340,16 @@ export function AutoHomePage() {
         <AutoSectionBlockHeading id="auto-home-money-heading">
           Dinero
         </AutoSectionBlockHeading>
-        <p
-          className={cn(
-            "inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 font-medium text-muted-foreground",
-            AUTO_USER_TEXT,
-          )}
-          data-testid="auto-home-money-simulation"
-        >
-          {AUTO_SIMULATION_BANNER}
-        </p>
+        {accountMeasured ? null : (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="auto-home-money-absent"
+          >
+            {AUTO_HOME_NO_DATA_LABEL}
+          </p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
-          {figures.map((figure) => (
+          {visibleFigures.map((figure) => (
             <div key={figure.id} data-testid={`auto-home-figure-${figure.id}`}>
               <p className={cn(AUTO_USER_TEXT, "text-muted-foreground")}>
                 {figure.label}
@@ -415,7 +424,7 @@ export function AutoHomePage() {
                 className="underline hover:text-primary"
                 data-testid="auto-home-technical-detail-link"
               >
-                Ver detalles técnicos
+                Detalle técnico
               </Link>
             </li>
           </ul>

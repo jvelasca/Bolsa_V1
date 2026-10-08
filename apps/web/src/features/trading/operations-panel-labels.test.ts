@@ -6,7 +6,15 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { OPERATIONS_PANEL_SURFACE_LABELS } from "@/features/trading/operations-panel";
+import {
+  ABSENT_DATA_NOT_MEASURED,
+  ABSENT_DATA_TECHNICAL_DASH,
+  absentDataLabel,
+} from "@/components/absent-data";
+import {
+  OPERATIONS_PANEL_RESULT_COLUMN_LABEL,
+  OPERATIONS_PANEL_SURFACE_LABELS,
+} from "@/features/trading/operations-panel";
 
 describe("OperationsPanel — rótulos por superficie", () => {
   it("en AUTO rotula «Posiciones» y no «Operaciones abiertas»", () => {
@@ -37,6 +45,23 @@ describe("OperationsPanel — rótulos por superficie", () => {
       "DINERO REAL",
     ]) {
       expect(autoCopy).not.toContain(forbidden);
+    }
+  });
+
+  it("UI5-20 · la columna de Decisión+Ejecución ya no se fusiona bajo «Salida»", () => {
+    // La celda pinta la acción de la decisión y su estado de ejecución; un solo término honesto.
+    expect(OPERATIONS_PANEL_RESULT_COLUMN_LABEL).toBe("Resultado");
+    expect(OPERATIONS_PANEL_RESULT_COLUMN_LABEL).not.toBe("Salida");
+  });
+
+  it("UI5-14 · primer nivel usa el rótulo oficial de hueco, no «—»", () => {
+    // El hueco de nivel 1 es el rótulo compartido; el guion queda para nivel 3.
+    expect(absentDataLabel()).toBe(ABSENT_DATA_NOT_MEASURED);
+    expect(absentDataLabel()).not.toBe(ABSENT_DATA_TECHNICAL_DASH);
+    for (const label of Object.values(OPERATIONS_PANEL_SURFACE_LABELS).flatMap(
+      (bySurface) => Object.values(bySurface),
+    )) {
+      expect(label).not.toContain(ABSENT_DATA_TECHNICAL_DASH);
     }
   });
 });

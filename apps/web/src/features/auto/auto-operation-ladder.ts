@@ -83,15 +83,18 @@ export function operationLadderRungFromCycle(
   const order = stepOf(cycle, "ORDER");
   const fill = stepOf(cycle, "FILL");
 
-  if (
-    cycle.closed === true &&
-    (cycle.closedMeasurement ?? "COMPLETE") === "COMPLETE"
-  ) {
-    return {
-      id: "position_closed",
-      label: operationLadderLabel("position_closed"),
-      note: null,
-    };
+  if (cycle.closed === true) {
+    // Un cierre se afirma SOLO con medición `COMPLETE` (`UNKNOWN ≠ 0`): sin medición no se
+    // asume el cierre. Antes `closedMeasurement ?? "COMPLETE"` fabricaba evidencia y saltaba a
+    // `Posición cerrada` sin medición, violando `UI5-16`/la escalera `UI5-09`.
+    if (cycle.closedMeasurement === "COMPLETE") {
+      return {
+        id: "position_closed",
+        label: operationLadderLabel("position_closed"),
+        note: null,
+      };
+    }
+    return { id: null, label: AUTO_HOME_NO_DATA_LABEL, note: null };
   }
 
   if (fill?.state === "reached") {

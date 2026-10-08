@@ -658,8 +658,8 @@ export function MesaHoyPage() {
                   Estado: {operationalHeader.operationalStatusLabel}
                 </p>
                 <p className="text-muted-foreground">
-                  Ranking Estudio, Libro, Decisiones y Consola viven en Ver
-                  detalles — Hoy no es Mercado.
+                  Ranking Estudio, Libro y Decisiones viven en Ver detalles —
+                  Hoy no es Mercado.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -673,13 +673,6 @@ export function MesaHoyPage() {
                     ? ` (${opportunityRanking.top.length})`
                     : ""}{" "}
                   →
-                </Link>
-                <Link
-                  to={mesaOperationalConsoleHref()}
-                  className="text-primary hover:underline"
-                  data-testid="daily-desk-link-consola"
-                >
-                  Consola →
                 </Link>
               </div>
             </div>

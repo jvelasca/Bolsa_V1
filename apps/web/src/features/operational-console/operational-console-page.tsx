@@ -80,7 +80,7 @@ export function OperationalConsolePage() {
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Resolver excepciones — recon · incidentes · posición no nacida ·
-            órdenes UNKNOWN
+            órdenes sin estado conocido
             {account ? ` · ${account.name}` : ""}.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -161,7 +161,7 @@ export function OperationalConsolePage() {
 
       <details className="rounded-lg border border-border/60 p-4">
         <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
-          Ver detalles técnicos (readiness · self-eval · Estudio AUTO)
+          Detalle técnico (readiness · self-eval · Estudio AUTO)
         </summary>
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <OpsReadinessSection report={report} />

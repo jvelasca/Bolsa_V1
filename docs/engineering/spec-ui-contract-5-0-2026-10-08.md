@@ -105,13 +105,24 @@ Cada regla es **falsable**. El identificador `UI5-xx` es estable y citable.
 
 | ID | Regla | Falsabilidad |
 | --- | --- | --- |
-| `UI5-14` | **«Sin dato todavía» es el estado oficial del dato ausente.** Prohibido `0`, `—`, `N/A`, `UNKNOWN`, `No` para ese significado en primer nivel. | Que un hueco se pinte `0` o `—`. |
+| `UI5-14` | **Vocabulario de dato ausente (Opción B, enmienda UI 6.0).** Tres rótulos distintos y no intercambiables: **«Sin dato todavía»** = no medido aún; **«No aplica»** = la operación/objeto no tiene ese campo; **«No disponible»** = medido pero no accesible ahora. `—` se reserva al **nivel 3 (auditoría)** y nunca es comodín. Prohibido `0`, `N/A`, `UNKNOWN`, `No` para ese significado en primer nivel. | Que un hueco se pinte `0`, `—` o `N/A`; o que «Sin dato todavía», «No aplica» y «No disponible» se usen como sinónimos. |
 | `UI5-15` | **Cuatro tonos oficiales:** `CONFIRMADO` · `PARCIAL / PENDIENTE` · `SIN DATO TODAVÍA` · `BLOQUEADO` (este último solo con evidencia de bloqueo). | Que se use `BLOQUEADO` sin evidencia, o que `SIN DATO TODAVÍA` se pinte como fallo. |
 | `UI5-16` | **`UNKNOWN ≠ 0`** elevado a contrato global: un hueco se declara; jamás se colapsa a cero ni a un estado verde. | Que una medición `UNKNOWN` se presente como `0` o como confirmada. |
 | `UI5-17` | **Acción ≠ Navegación ≠ Información.** Acción = botón con verbo (`Comprar`/`Vender`/`Confirmar`/`Cancelar`); Navegación = enlace (`Ver operación →`); Información = chip no interactivo (`Simulado`, `Esperando ejecución`, `Sin dato todavía`). | Que un estado (`Simulado`) o un enlace se pinten como botón de acción. |
 | `UI5-18` | **Riesgo human-first:** el primer nivel es un **veredicto** (`Controlado`/`Atención`/`Bloqueado` + frase); exposición, ATR, correlación, risk budget, sector y drawdown quedan en segundo nivel. | Que el primer nivel de Riesgo empiece por métricas. |
 | `UI5-19` | **Sistema fuera del flujo diario:** la HOME responde «¿está funcionando AUTO?»; `Sistema` es diagnóstico, no puerta de entrada. | Que «¿funciona AUTO?» exija entrar en Sistema. |
 | `UI5-20` | **Un término = un significado** en toda la app; [`domain-language.md`](../domain-language.md) es la autoridad. Sinónimos locales en primer nivel están prohibidos. | Que dos pantallas usen palabras distintas para el mismo peldaño/estado. |
+
+### Bloque D — Densidad y explicación (enmienda UI 6.0)
+
+Elevadas a contrato desde el [Mapa de problemas UI 5.0](./auditoria-ui-5-0-mapa-problemas-2026-10-08.md) §7.
+
+| ID | Regla | Falsabilidad |
+| --- | --- | --- |
+| `RT-01` | **Densidad.** Si un dato no cambia lo que el usuario debe hacer **ahora**, no ocupa el primer nivel. | Que un dato secundario compita en el primer nivel. |
+| `RT-02` | **Explicación.** La aplicación explica el **resultado del sistema**, no cómo está construido el sistema. | Que la UI muestre arquitectura interna (`runId`, `cycleId`, `heartbeat`, `ledger`, `fill`, `provenance`) en primer nivel. |
+| `RT-03` | **Dos lecturas.** Si un usuario básico puede interpretar una pantalla de dos formas distintas, la pantalla todavía no está terminada. | Que un mismo hecho se pinte de dos maneras contradictorias (p. ej. «Controlado» + cuatro huecos sin explicar). |
+| `RT-04` | **Un solo mecanismo de profundidad.** Todo lo avanzado vive detrás de «Más información» / «¿Por qué?» / «Detalle técnico»; no hay disclosures paralelos con etiquetas distintas. | Que coexistan «Detalle técnico», «Detalles avanzados», «Ajustes avanzados» y «Más detalle (avanzado)» como idioms distintos. |
 
 ---
 
@@ -127,7 +138,7 @@ Cada regla es **falsable**. El identificador `UI5-xx` es estable y citable.
 | Ejecución completa | «Ejecución completada» | «ejecutada» a secas |
 | Materialización | «Posición creada» | «abierta» |
 | Cierre | «Posición cerrada» | «ejecutada» |
-| Dato ausente | «Sin dato todavía» | `0` / `—` / `N/A` / `UNKNOWN` |
+| Dato ausente | «Sin dato todavía» (no medido) · «No aplica» · «No disponible» | `0` / `N/A` / `UNKNOWN` / `—` en nivel 1 |
 | Canal de dinero | `SIMULADO` / `LIVE` | omitirlo |
 | Modo de operación | `AUTO` / `SEMI` / `MANUAL` | deducirlo |
 
@@ -153,17 +164,24 @@ Esta spec **congela**; el estado de implementación se anota aquí regla a regla
 
 | Prioridad | Mejora | Regla | Estado |
 | --- | --- | --- | --- |
-| P0 | Eliminar duplicidades de la HOME de AUTO | `UI5-04` | **DONE** (5.0 retiró tiles/bloque; 5.1 retiró las seis preguntas → cockpit de 5 bloques) |
-| P0 | Gramática universal de operación | `UI5-09`, `UI5-20` | **DONE** |
-| P0 | Diferenciar definitivamente AUTO/SEMI/MANUAL | `UI5-10` | **DONE** |
+| P0 | Eliminar duplicidades de la HOME de AUTO | `UI5-04` | **DONE** (5.0/5.1; **UI 6.0 P0-A**: un solo chip `SIMULACIÓN — DINERO VIRTUAL`, un solo hueco declarado, «Ver todas las operaciones» fuera de Oportunidades, copy «qué puedes hacer» retirado) |
+| P0 | Gramática universal de operación | `UI5-09`, `UI5-20` | **DONE** (**UI 6.0 P0-C**: `Confirm` renderiza la escalera LIVE VIRTUAL en español; tokens `proposed/signed/submitted/filled*/rejected/not_wired` fuera del DOM; cierre sin medición `COMPLETE` ya no salta a «Posición cerrada`) |
+| P0 | Diferenciar definitivamente AUTO/SEMI/MANUAL | `UI5-10` | **DONE** (**UI 6.0 P1-F**: `ModeBadge` obligatoria en cada fila de Mesa vía `operationModeForPosition(pos, "market")`; `OPERATION_MODE_LABEL` como única fuente de casing) |
 | P1 | Simplificar navegación interna de AUTO | `UI5-03` | **DONE** |
 | P1 | Unificar oportunidades Hoy vs AUTO | `UI5-07` | **DONE** |
 | P1 | Simplificar Cartera (vista única, rotulada) | `UI5-13` | **DONE** |
-| P1 | Primer nivel de Riesgo humano | `UI5-18` | **DONE** (5.1 colapsa los cuatro huecos repetidos en una declaración única) |
-| P1 | Separar navegación de acciones | `UI5-17` | **DONE** |
-| P2 | Refinar `AdminRail` | `UI5-08` | **DONE** (5.1 resuelve la ambigüedad §1.3 por la opción B: `Producto` = accesos rápidos disponibles) |
-| P2 | Compactar Análisis/Sistema | `UI5-19` | **PENDING** |
-| P2 | Revisión visual global responsive | `UI5-01` | **PENDING** |
+| P1 | Primer nivel de Riesgo humano | `UI5-18` | **DONE** (5.1; **UI 6.0 P0-B**: un veredicto + una frase + **un** único hueco declarado; campos solo con valor real) |
+| P1 | Separar navegación de acciones | `UI5-17` | **DONE** (**UI 6.0 P1-E**: retirado el stub `Estadísticas · pronto` del `AdminRail`) |
+| P2 | Refinar `AdminRail` | `UI5-08` | **DONE** (5.1 + **UI 6.0 P1-E**: tres grupos, sin stubs; `Consola avanzada` bajo Diagnóstico; ayuda sincronizada) |
+| P2 | Compactar Análisis/Sistema | `UI5-19` | **DONE** (**UI 6.0 A1**: `/auto/sistema` deja de re-espejar el estado+reloj de la HOME en su primer bloque (vive dentro de `AutoTechnicalDetail`); `/auto/analisis` pliega `DÍA-D · feedback OOS` tras `Detalle técnico` con rótulo humano; `operar.description` deja de prometer acción) |
+| P2 | Revisión visual global responsive | `UI5-01` | **DONE** (**Oleada B**: nuevo [`gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts`](../../apps/web/e2e/gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts) barre `/trading`, `/mesa`, `/mesa?view=posiciones`, `/confirm` y la command palette a 1366×768 y 390×844 con `axe-core` WCAG 2.0/2.1 A+AA → **0 `critical`/`serious`**, un único `main`+`h1`; fixes AA de contraste, `aria-label` de listbox, `<dt>` en `<dl>` `sr-only` y `tabIndex` de scroll) |
+| P0 | Vocabulario de dato ausente (Opción B) | `UI5-14` | **DONE** (**UI 6.0 P0-D**: helper [`absent-data.ts`](../../apps/web/src/components/absent-data.ts); primer nivel sin `—` en operaciones, barra de estado e historial) |
+| P0 | Densidad · explicación · dos lecturas · un solo detalle | `RT-01`…`RT-04` | **DONE** (**UI 6.0 P1-G + P2**: jerga (`ledger`, `fills`, `trials`, `WFE/PBO/DSR`, JSON crudo) plegada tras **`Detalle técnico`**; idioma único) |
+| P1 | Una sola puerta L1 activa · un solo `h1` de Mercado | `UI5-01`, `UI5-04`, `UI5-20` | **DONE** (**UI 6.0 P1-E/P2**: `Cartera` cede `Hoy` en `?view=posiciones`; elimina doble `h1` `Trading`/`Mercado`) |
+
+**Enmienda UI 6.0 (2026-10-08) — implementada.** El [Mapa de problemas UI 5.0](./auditoria-ui-5-0-mapa-problemas-2026-10-08.md) fijó el trabajo y el [plan único UI 6.0](./plan-ui-6-0-2026-10-08.md) lo ordenó en slices: **P0-A** HOME cockpit · **P0-B** Riesgo human-first · **P0-C** una sola escalera · **P0-D** `Sin dato todavía` global · **P1-E** navegación/L1 · **P1-F** modo/canal · **P1-G** lenguaje humano · **P2** pulido. Las reglas `RT-01`…`RT-04` (Bloque D) y el vocabulario Opción B (`UI5-14`) quedan implementados y falsables por test. Cierre medido: `typecheck` OK · `lint` 0 errores (23 avisos preexistentes) · `pnpm --filter @bolsa/web test` **271 ficheros / 1625 passed** · `axe` AUTO **14/14** + `axe` rutas tocadas **9/9** + `live-virtual-confirm` **2/2** · `Δ motor = 0`.
+
+**Cierre del backlog UI 5.0 (Oleada A/B).** Se cierran los hallazgos abiertos del Mapa de problemas UI 5.0. (1) `UI5-09`: un cierre con `closedMeasurement === "COMPLETE"` sigue resolviendo `Posición cerrada` sin exigir traza de materialización intermedia (coherente con el modelo durable y el contrato backend); se cerró el bug de evidencia fabricada (`?? "COMPLETE"`) y el peldaño `Salida final` de la cabina deriva su estado de evidencia (`remainingPct`) declarando hueco sin traza. (2) `account-venue-preference.tsx` conserva un literal `submitted ≠ fill` fuera del alcance de los slices. (3) `mesa-candidates-panel` conserva `Gate N` como dato de decisión (no es término prohibido).
 
 **Copy P2 (DONE).** [`auto-top3-panel.tsx`](../../apps/web/src/features/auto/auto-top3-panel.tsx): «Las 3 oportunidades que AUTO ha situado en los primeros puestos de su último análisis.» (regla `UI5-06`/`UI5-07`; `ranking ≠ decisión`).
 

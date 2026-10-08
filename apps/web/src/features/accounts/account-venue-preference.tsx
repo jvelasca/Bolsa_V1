@@ -40,7 +40,7 @@ export function AccountVenuePreference({ accountId }: { accountId: string }) {
       <p className="text-xs text-muted-foreground">
         Preferencia Paper | Live de esta cuenta. El toggle de mesa es un
         override global (gana sobre esta preferencia). LIVE es experimental:
-        submitted ≠ fill · trading not accepted.
+        enviada no significa ejecutada · operación no aceptada.
       </p>
       <div className="flex flex-wrap items-center gap-1.5">
         {(["paper", "live"] as const).map((v) => {

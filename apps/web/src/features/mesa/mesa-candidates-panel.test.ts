@@ -77,6 +77,14 @@ describe("V1.24 — ranking language in the panel and drawer", () => {
     expect(buyLines.every((line) => /≠\s*BUY/.test(line))).toBe(true);
   });
 
+  it("A4 — first level states the result in plain language, no «Ranking ≠ BUY»", () => {
+    const src = readSource("mesa-candidates-panel.tsx");
+    expect(src).not.toMatch(/Ranking ≠ BUY/);
+    expect(src).toMatch(
+      /Estar arriba en la lista no significa que ya se haya comprado/,
+    );
+  });
+
   it("funnel strip uses the Spanish steps plus three clocks", () => {
     const src = readSource("mesa-candidates-panel.tsx");
     expect(src).toMatch(/buildOpportunityFunnelSteps\(funnel\)/);

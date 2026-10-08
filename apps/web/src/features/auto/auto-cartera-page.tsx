@@ -66,7 +66,7 @@ export function AutoCarteraPage() {
           </li>
           <li>
             <Link to="/history" className="underline hover:text-primary">
-              Historial · ledger y fills
+              Historial de la cuenta
             </Link>
           </li>
           <li>

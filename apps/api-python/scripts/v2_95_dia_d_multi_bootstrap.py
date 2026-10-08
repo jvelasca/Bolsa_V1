@@ -229,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
         seed=int(args.seed),
         venue_band=venue_band,
         meta={
-            "bump": "2.11.89-beta",
+            "bump": "2.11.90-beta",
             "phase": "V2.95 DIA-D AUTO MULTI BOOTSTRAP",
             "nature": "INVESTIGACION",
             "venueBandDraws": int(venue_band.get("draws") or 0),

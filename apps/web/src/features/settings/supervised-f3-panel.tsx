@@ -1278,7 +1278,7 @@ export function SupervisedF3Panel() {
             disabled={propose.isPending || !effectiveAccountId || !instrumentId}
             onClick={() => propose.mutate()}
           >
-            {propose.isPending ? "Evaluando…" : "Proponer Recommendation"}
+            {propose.isPending ? "Evaluando…" : "Proponer recomendación"}
           </button>
           <button
             type="button"

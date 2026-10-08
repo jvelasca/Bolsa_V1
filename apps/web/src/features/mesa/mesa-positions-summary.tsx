@@ -45,13 +45,13 @@ export function MesaPositionsSummary({
           to={mesaOperationsHref()}
           className="text-xs text-primary hover:underline"
         >
-          Ver en Libro
+          Ver en Cartera
         </Link>
       </CardHeader>
       <CardContent className="p-0">
         {positions.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-            Sin posiciones abiertas
+            Sin posiciones
           </p>
         ) : (
           positions.map((position) => {

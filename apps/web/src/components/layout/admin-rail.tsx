@@ -5,7 +5,7 @@
  * No es navegación diaria de producto.
  *
  * UI Contract 5.0 (`UI5-08`): los ítems se agrupan en tres bloques —
- * `Producto` (Overview · AUTO), `Administración` (Cuentas · Perfiles · Estadísticas · Fiscal) y
+ * `Producto` (Overview · AUTO), `Administración` (Cuentas · Perfiles · Fiscal) y
  * `Diagnóstico` (Consola avanzada). No se cambian rutas; es jerarquía visual. En modo colapsado el
  * grupo se representa con un separador, no con el rótulo.
  *
@@ -20,7 +20,6 @@ import {
   BarChart3,
   Briefcase,
   LayoutDashboard,
-  PieChart,
   Pin,
   PinOff,
   Radar,
@@ -243,19 +242,6 @@ export function AdminRail() {
       icon: UserCircle,
       hint: "Catálogo de perfiles de inversor",
       onClick: () => openPlatformConfig("investor-profile"),
-    },
-    {
-      kind: "action",
-      id: "portfolio-stats",
-      label: "Estadísticas",
-      icon: PieChart,
-      hint: "Estadísticas de la cartera en curso (próximamente)",
-      stub: true,
-      onClick: () => {
-        window.alert(
-          "Estadísticas de la cartera: próximamente. El acceso queda preparado en esta barra.",
-        );
-      },
     },
   ];
 

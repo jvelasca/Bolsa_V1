@@ -8,7 +8,21 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+
+// El semáforo de realidad tiene su propio test; aquí se aísla para certificar que la HOME
+// NO lo duplica: se pinta una sola vez (en el layout), con el texto real del banner.
+vi.mock("@/features/auto/auto-reality-strip", async () => {
+  const { AUTO_SIMULATION_BANNER } =
+    await import("@/features/auto/auto-basic-home");
+  return {
+    AutoRealityStrip: () => (
+      <div data-testid="auto-reality-strip">
+        <span data-testid="auto-reality-banner">{AUTO_SIMULATION_BANNER}</span>
+      </div>
+    ),
+  };
+});
 
 const monitorState = vi.hoisted(() => ({
   header: null as Record<string, unknown> | null,
@@ -64,6 +78,7 @@ vi.mock("@/features/operational-console/use-financial-integrity", () => ({
 }));
 
 import { AutoHomePage } from "@/features/auto/auto-home-page";
+import { AutoWorkspaceLayout } from "@/components/layout/auto-workspace-layout";
 
 const OPEN_CYCLE = {
   cycleId: "cyc-1",
@@ -101,6 +116,19 @@ function renderHome() {
   );
 }
 
+/** Render de la ruta `/auto` completa (layout + semáforo + HOME) para contar el banner. */
+function renderAutoPage() {
+  return render(
+    <MemoryRouter initialEntries={["/auto"]}>
+      <Routes>
+        <Route element={<AutoWorkspaceLayout />}>
+          <Route path="/auto" element={<AutoHomePage />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 function countOccurrences(haystack: string, needle: string): number {
   return haystack.split(needle).length - 1;
 }
@@ -111,6 +139,59 @@ describe("AutoHomePage", () => {
     const h1 = screen.queryAllByRole("heading", { level: 1 });
     expect(h1).toHaveLength(1);
     expect(h1[0]?.textContent).toBe("Resumen");
+  });
+
+  it("la simulación se declara una sola vez: en el layout, no en la HOME (UI5-04)", () => {
+    renderAutoPage();
+    // El semáforo (una vez, montado por el layout) es el único portador del banner.
+    expect(screen.getAllByTestId("auto-reality-banner")).toHaveLength(1);
+    // El chip local de la HOME se retira a propósito.
+    expect(screen.queryByTestId("auto-home-money-simulation")).toBeNull();
+    // La frase exacta aparece una sola vez en todo el render de `/auto`.
+    expect(
+      countOccurrences(
+        document.body.textContent ?? "",
+        "SIMULACIÓN — DINERO VIRTUAL",
+      ),
+    ).toBe(1);
+  });
+
+  it("«Ver todas las operaciones» vive en Operación, no bajo Oportunidades (UI5-04)", () => {
+    renderHome();
+    const opportunities = screen.getByTestId("auto-home-opportunities");
+    const link = screen.getByTestId("auto-home-all-operations-link");
+    // El enlace NO es descendiente del bloque de oportunidades (oportunidad ≠ operación).
+    expect(opportunities.contains(link)).toBe(false);
+    expect(
+      opportunities.querySelector(
+        '[data-testid="auto-home-all-operations-link"]',
+      ),
+    ).toBeNull();
+    // En cambio, sí es descendiente del bloque de Operación y apunta a Operar.
+    expect(screen.getByTestId("auto-home-operations").contains(link)).toBe(
+      true,
+    );
+    expect(link.getAttribute("href")).toBe("/auto/operar");
+  });
+
+  it("no promete acciones que no existen (fuera el copy «qué puedes hacer»)", () => {
+    renderAutoPage();
+    expect(document.body.textContent ?? "").not.toContain("qué puedes hacer");
+    expect(
+      screen.getByTestId("auto-nav-home").getAttribute("title") ?? "",
+    ).not.toContain("qué puedes hacer");
+  });
+
+  it("declara el hueco del Dinero una sola vez cuando la cuenta no está medida (UI5-04)", () => {
+    renderHome();
+    const money = screen.getByTestId("auto-home-account-figures");
+    // No se apilan cifras «Sin dato todavía»: el hueco se declara una sola vez.
+    expect(countOccurrences(money.textContent ?? "", "Sin dato todavía")).toBe(
+      1,
+    );
+    expect(screen.getByTestId("auto-home-money-absent")).toBeTruthy();
+    expect(screen.queryByTestId("auto-home-figure-position")).toBeNull();
+    expect(screen.queryByTestId("auto-home-figure-cash")).toBeNull();
   });
 
   it("es un cockpit sin las seis preguntas y cada hecho aparece una sola vez (UI5-04)", () => {
@@ -164,12 +245,12 @@ describe("AutoHomePage", () => {
     expect(screen.getByTestId("auto-home-decision-label").textContent).toBe(
       "Sin dato todavía",
     );
-    expect(
-      screen.getByTestId("auto-home-money-simulation").textContent,
-    ).toContain("SIMULACIÓN — DINERO VIRTUAL");
-    expect(
-      screen.getByTestId("auto-home-figure-position").textContent,
-    ).toContain("Sin dato todavía");
+    // El chip de simulación lo pinta el semáforo del layout: la HOME no lo repite (UI5-04).
+    expect(screen.queryByTestId("auto-home-money-simulation")).toBeNull();
+    // Un solo hueco declarado: sin resumen de cuenta, no se apilan cifras «Sin dato todavía».
+    expect(screen.getByTestId("auto-home-money-absent").textContent).toContain(
+      "Sin dato todavía",
+    );
     expect(screen.getByTestId("auto-home-figure-risk").textContent).toContain(
       "Normal",
     );

@@ -36,11 +36,16 @@ import {
 } from "@/features/trading/demo-book-prefs";
 import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
+import { OPERATION_MODE_LABEL } from "@/features/operations/operation-mode";
 
+/**
+ * `UI5-10`/`UI5-13` — un único vocabulario de modo (`AUTO`/`SEMI`/`MANUAL`).
+ * Se toma del helper canónico para que el libro DEMO no derive su propio casing.
+ */
 const MODE_LABEL: Record<DemoBookMode, string> = {
-  manual: "MANUAL",
-  semi: "SEMI",
-  auto: "AUTO",
+  manual: OPERATION_MODE_LABEL.MANUAL,
+  semi: OPERATION_MODE_LABEL.SEMI,
+  auto: OPERATION_MODE_LABEL.AUTO,
 };
 
 const MODE_HINT: Record<DemoBookMode, string> = {

@@ -20,6 +20,7 @@ import type {
   OperatorPositionPlanV1,
   OperatorPositionPlanStepV1,
 } from "@bolsa/shared";
+import { ABSENT_DATA_NOT_MEASURED, isAbsent } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/features/charts/chart-utils";
 import {
@@ -213,7 +214,7 @@ export function NextActionHero({
       ) : null}
       {action.reasons && action.reasons.length > 0 ? (
         <ul
-          className={cn("mt-1 space-y-0.5 opacity-90", CABIN_TYPE.meta)}
+          className={cn("mt-1 space-y-0.5", CABIN_TYPE.meta)}
           data-testid="next-action-reasons"
         >
           <li className="font-semibold">Porque:</li>
@@ -230,7 +231,7 @@ export function NextActionHero({
       ) : null}
       {action.nextChange ? (
         <p
-          className={cn("mt-0.5 opacity-90", CABIN_TYPE.meta)}
+          className={cn("mt-0.5", CABIN_TYPE.meta)}
           data-testid="next-action-next-change"
         >
           <span className="font-semibold">Próximo cambio:</span>{" "}
@@ -247,7 +248,7 @@ export function NextActionHero({
       ) : null}
       {action.condition ? (
         <p
-          className={cn("mt-0.5 opacity-75", CABIN_TYPE.meta)}
+          className={cn("mt-0.5", CABIN_TYPE.meta)}
           data-testid="next-action-condition"
         >
           <span className="font-semibold">Condición:</span> {action.condition}
@@ -255,7 +256,7 @@ export function NextActionHero({
       ) : null}
       {action.expires ? (
         <p
-          className={cn("mt-0.5 opacity-70", CABIN_TYPE.meta)}
+          className={cn("mt-0.5", CABIN_TYPE.meta)}
           data-testid="next-action-expires"
         >
           <span className="font-semibold">Caduca:</span> {action.expires}
@@ -677,17 +678,20 @@ export function OperatorExitLadder({
     }),
   );
   if (ladder.remainingPct != null || ladder.remainingDetail != null) {
+    // UI5-09 / auditoría UI 5.0 §4.3.2: este peldaño no se afirma `active` sin evidencia.
+    // El único hecho medible disponible en la escalera es `remainingPct`; sin él se declara
+    // el hueco (`absent`, el estado de los peldaños no medidos) y «Sin dato todavía».
+    const remainingMeasured = !isAbsent(ladder.remainingPct);
     steps.push({
       id: "exit",
       missionId: "remaining",
       label: "Salida final",
-      detail:
-        ladder.remainingDetail != null
+      detail: remainingMeasured
+        ? ladder.remainingDetail != null
           ? `RESTANTE ${ladder.remainingDetail}`
-          : ladder.remainingPct != null
-            ? `RESTANTE ${ladder.remainingPct}%`
-            : null,
-      status: "active",
+          : `RESTANTE ${ladder.remainingPct}%`
+        : ABSENT_DATA_NOT_MEASURED,
+      status: remainingMeasured ? "active" : "absent",
       reducePct: null,
     });
   }
@@ -794,7 +798,7 @@ export function OperatorProtectionLine({
       </div>
       {showPlanVsExec ? (
         <p
-          className={cn("leading-snug opacity-85", CABIN_TYPE.meta)}
+          className={cn("leading-snug", CABIN_TYPE.meta)}
           data-testid="operator-protection-plan-vs-exec"
         >
           Plan {planned}

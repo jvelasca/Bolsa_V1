@@ -16,7 +16,10 @@ import {
   strategyTop1ToChartIndicators,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
-import { instrumentForQuickTrade } from "@/features/charts/chart-quick-trade-buttons";
+import {
+  ChartQuickTradeButtons,
+  instrumentForQuickTrade,
+} from "@/features/charts/chart-quick-trade-buttons";
 import { ChartDrawingEditPopover } from "@/features/charts/chart-drawing-edit-popover";
 import { ChartDrawingTemplatesDialog } from "@/features/charts/chart-drawing-templates-dialog";
 import { IndicatorInstanceConfigDialog } from "@/features/charts/indicator-instance-config-dialog";
@@ -37,6 +40,7 @@ import { requestChartReflow } from "@/features/charts/chart-utils";
 import { chartPerfDebug } from "@/features/charts/chart-perf-debug";
 import { clampScaleZoom } from "@/features/charts/chart-scale-utils";
 import { cn } from "@/lib/utils";
+import { MERCADO_LABEL } from "@/features/confirm/daily-nav";
 import {
   useInstrumentDataFreshness,
   invalidateInstrumentDataStatus,
@@ -474,9 +478,14 @@ export function ChartWorkspacePage() {
 
   if (!activeTab || !chartConfig) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Selecciona un instrumento en el panel de listas para abrir un gráfico.
-      </p>
+      <div className="flex h-full min-h-0 flex-col gap-1">
+        <h1 className="shrink-0 px-0.5 text-sm font-semibold">
+          {MERCADO_LABEL}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Selecciona un instrumento en el panel de listas para abrir un gráfico.
+        </p>
+      </div>
     );
   }
 
@@ -541,10 +550,46 @@ export function ChartWorkspacePage() {
     });
   }
 
+  const canQuickTrade = Boolean(instrumentQuery.data?.data);
+  // UI5-17 — acción ≠ información: la barra de estado/densidad del gráfico no
+  // intercala los botones de compra/venta; la acción se agrupa aparte del status.
+  const infoBarConfig = {
+    ...chartToolbarGlobal,
+    visibility: {
+      ...chartToolbarGlobal.visibility,
+      tradeButtons: false,
+    },
+  };
+  function openQuickTrade() {
+    const data = instrumentQuery.data?.data;
+    if (data) openOrderDialog(instrumentForQuickTrade(data, bars));
+  }
+  const showQuickTrade =
+    chartToolbarGlobal.visibility.tradeButtons && canQuickTrade;
+
   return (
     <div className="chart-workspace-shell flex h-full min-h-0 flex-col gap-1">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-0.5">
+        <h1 className="text-sm font-semibold">{MERCADO_LABEL}</h1>
+        {showQuickTrade ? (
+          <div
+            role="group"
+            aria-label="Acciones rápidas de mercado"
+            data-testid="mercado-quick-actions"
+            className="flex shrink-0 items-center gap-1.5"
+          >
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              Acciones
+            </span>
+            <ChartQuickTradeButtons
+              onBuy={openQuickTrade}
+              onSell={openQuickTrade}
+            />
+          </div>
+        ) : null}
+      </div>
       <ChartToolbarGlobalBar
-        config={chartToolbarGlobal}
+        config={infoBarConfig}
         symbol={activeTab.label}
         timeframe={timeframe}
         instrumentId={instrumentId}
@@ -553,7 +598,7 @@ export function ChartWorkspacePage() {
         chartInspectorOpen={chartInspectorOpen}
         dataStatus={dataStatus}
         dataSyncing={dataSyncing}
-        canTrade={Boolean(instrumentQuery.data?.data)}
+        canTrade={canQuickTrade}
         onOpenIndicatorsCatalog={openIndicatorsCatalog}
         onToggleChartInspector={toggleChartInspector}
         finalistTop1={{
@@ -562,14 +607,8 @@ export function ChartWorkspacePage() {
           scope: "all",
           onCheckedChange: onFinalistTop1AllChange,
         }}
-        onQuickBuy={() => {
-          const data = instrumentQuery.data?.data;
-          if (data) openOrderDialog(instrumentForQuickTrade(data, bars));
-        }}
-        onQuickSell={() => {
-          const data = instrumentQuery.data?.data;
-          if (data) openOrderDialog(instrumentForQuickTrade(data, bars));
-        }}
+        onQuickBuy={openQuickTrade}
+        onQuickSell={openQuickTrade}
         onOpenSettings={openChartGlobalBarSettings}
         onSyncData={
           instrumentId

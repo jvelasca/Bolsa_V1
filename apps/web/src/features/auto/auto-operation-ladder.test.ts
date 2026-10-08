@@ -119,6 +119,24 @@ describe("operationLadderRungFromCycle", () => {
     expect(rung.id).toBe("position_closed");
   });
 
+  it("un cierre sin medición COMPLETE no salta a «Posición cerrada» (UNKNOWN ≠ 0)", () => {
+    const partial = operationLadderRungFromCycle({
+      ...cycle([{ id: "ORDER", state: "reached", facts: [ORDER_COMPLETE] }]),
+      closed: true,
+      closedMeasurement: "PARTIAL",
+    });
+    expect(partial.id).toBeNull();
+    expect(partial.label).toBe("Sin dato todavía");
+
+    const unmeasured = operationLadderRungFromCycle({
+      ...cycle([{ id: "ORDER", state: "reached", facts: [ORDER_COMPLETE] }]),
+      closed: true,
+      closedMeasurement: null,
+    });
+    expect(unmeasured.id).not.toBe("position_closed");
+    expect(unmeasured.label).toBe("Sin dato todavía");
+  });
+
   it("un fill sin medición COMPLETE es «Sin dato todavía» (UNKNOWN ≠ 0)", () => {
     const rung = operationLadderRungFromCycle(
       cycle([
