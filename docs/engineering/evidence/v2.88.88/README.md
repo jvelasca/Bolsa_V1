@@ -59,4 +59,10 @@ Motor AUTO de decisión/ejecución, ledger, posiciones, settlement, contrato HTT
 
 ## Cita POST-TAG
 
-Pendiente: tag `v2.88.88-beta` **re-anclado** tras el hallazgo de contraste del run `37741490506` (ver arriba). El primer tag apuntaba a `a2da85a7` y su CI cayó; el tag se re-ancla al tip corregido y su `Release tag CI` se cita aquí al cerrar.
+**`Release tag CI` [`37748285829`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37748285829) VERDE** (tag anotado, objeto `b47ecb2f` → commit `021afbb4`):
+
+- `12` jobs = `11` `success` + `playwright` integrado `skipped`; `certify` `success`.
+- `python` `4594 passed / 45 skipped`; `frontend` `268 ficheros / 1593 passed`; `shared` `817 passed / 1 todo`; `playwright (mock E2E)` `96 passed / 21 skipped`; `lifecycle-pg` (Golden Day 2.0, Crash/Recovery, Concurrent AUTO, HardKill, crash injection, multiprocess AUTO) `success`; `contract:check` `critical=0 · warn=0`.
+- `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` (`sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`, `3340728` bytes; 2ª corrida IDÉNTICA) ⇒ **`Δ motor = 0` confirmado por CI**.
+
+**Antecedente (rojo, corregido antes del sello):** el primer tag apuntaba a `a2da85a7` y su `Release tag CI` [`37741490506`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37741490506) cayó en `playwright (mock E2E)` por el `color-contrast` de los rótulos de grupo de la `AdminRail` (detalle arriba). El tag se re-ancló al tip corregido `021afbb4`.
