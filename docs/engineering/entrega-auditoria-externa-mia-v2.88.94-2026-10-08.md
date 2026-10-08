@@ -6,7 +6,7 @@
 > **Regla del hueco:** una regla que no se puede afirmar se declara **abierta** con su remediación, **nunca** se silencia. Un dato ausente o `UNKNOWN` se rotula «Sin dato todavía»; **jamás** se rellena con `0` ni con verde. `ranking ≠ decisión` y `Precio aplicado ≠ posición materializada` se conservan.
 > **`Δ AUTO decision/execution motor = 0`.** Todo el sello es UI/copy y tests en `apps/web/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin tocar `packages/py/**`**. **El contrato HTTP NO cambia.**
 > **Evidencia cruda:** [`docs/engineering/evidence/v2.88.94/README.md`](./evidence/v2.88.94/README.md).
-> **Cita POST-TAG:** tag anotado `v2.88.94-beta` y `Release tag CI` **VERDE** (`replay-repro` debe seguir **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI) se anotan en el commit post-tag, como en los sellos anteriores.
+> **Cita POST-TAG:** tag anotado `v2.88.94-beta` (objeto `0671ae15` → commit `20fd538c`); `Release tag CI` [`37823112083`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37823112083) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `frontend` `279` ficheros / `1740` passed; `python` `4596 passed / 45 skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 **Sello dirigido (declarado).** Mandato: **una sola aplicación, un único lenguaje operativo en el primer nivel**. No se añaden funciones ni se toca el motor: se elimina la **afirmación falsa** («qué ha elegido AUTO»), se **declara** la deuda durable (`PortfolioDecision`) en vez de inventarla, se separa la **operativa autónoma** de la **firma humana**, se reconcilia la pregunta de **Riesgo** con su read-model, y se reduce la densidad de **Laboratorio/Asesor/Hoy**. AUTO gana una affordance de **primer nivel** (`UI5-21`) **sin** convertirse en sexta puerta L1.
 
@@ -79,7 +79,7 @@
 | `pnpm --filter @bolsa/web exec eslint src` | **0 errores** (23 avisos preexistentes) |
 | `pnpm --filter @bolsa/web exec vitest run` | **279 ficheros / 1740 passed** |
 | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **1 passed** (`2.11.94-beta`) |
-| `replay-repro` — CI | **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0`** (`Release tag CI` **VERDE**) |
+| `replay-repro` — CI | **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0`** (`Release tag CI` [`37823112083`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37823112083) **VERDE**) |
 
 ---
 
@@ -88,7 +88,7 @@
 - **Producto:** `V2.88.94-beta`. **Package:** `2.11.94-beta`. **Sin migración** (Alembic head `052_top3_opportunities`). **Contrato HTTP sin cambio.** `packages/py/**` **sin mover**.
 - **Añadidos:** `apps/web/src/components/layout/operative-mode-chip.tsx` (+ test), `apps/web/src/features/auto/auto-copy.test.ts`, `docs/engineering/evidence/v2.88.94/README.md`, este documento.
 - **Modificados:** `apps/web/src/**` (auto, backtests, research, mesa, layout, components), `package.json`, `apps/api-python/scripts/v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/domain-language.md`, `docs/engineering/spec-ui-contract-5-0-2026-10-08.md`, `docs/adr/040-user-information-architecture.md`, `docs/adr/044-auto-workspace-information-architecture.md`, `docs/adr/045-ui-contract-5-0.md`.
-- **Tag anotado `v2.88.94-beta`** — mensaje `UI 7.0 semantic and basic-user closure (AUTO copy honesty, operative mode chip, lab/asesor/hoy density) - Delta motor = 0`. **`Release tag CI`** **VERDE** (cita en el commit post-tag).
+- **Tag anotado `v2.88.94-beta`** — objeto `0671ae15` → commit `20fd538c`; mensaje `UI 7.0 semantic and basic-user closure (AUTO copy honesty, operative mode chip, lab/asesor/hoy density) - Delta motor = 0`. **`Release tag CI`** [`37823112083`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37823112083) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 ---
 

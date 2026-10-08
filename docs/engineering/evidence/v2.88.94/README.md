@@ -6,6 +6,7 @@
 > **Cierre semántico de usuario básico.** La revisión de `v2.88.93` dejó tres tensiones de producto: AUTO afirmaba una decisión que no existe («qué ha elegido AUTO»), Riesgo prometía una cifra no medida, y AUTO no era descubrible como **forma de operar**. Se cierran **sin falsificar datos** (`UNKNOWN ≠ 0`, `ranking ≠ decisión`) y con tests de copy falsables.
 
 **Base:** [`evidence/v2.88.93/README.md`](../v2.88.93/README.md). Contrato: [`spec-ui-contract-5-0-2026-10-08.md`](../../spec-ui-contract-5-0-2026-10-08.md). Deuda previa: [`evidence/v2.88.93/README.md`](../v2.88.93/README.md) §4.
+**Cita POST-TAG:** tag anotado `v2.88.94-beta` (objeto `0671ae15` → commit `20fd538c`); `Release tag CI` [`37823112083`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37823112083) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `frontend` `279` ficheros / `1740` passed; `python` `4596 passed / 45 skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 ## 1. Cambios (por regla)
 
