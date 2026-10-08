@@ -7,6 +7,7 @@
 
 **Contrato implementado:** [`spec-ui-contract-5-0-2026-10-08.md`](../../spec-ui-contract-5-0-2026-10-08.md) — **nuevo Bloque E** (`R-G1`, `R-G2`) en §2 y enmienda del [ADR-045](../../../adr/045-ui-contract-5-0.md) §1. En §5, `R-G1`/`R-G2` pasan a `DONE`.
 **Base:** [`evidence/v2.88.90/README.md`](../v2.88.90/README.md).
+**Cita POST-TAG:** `Release tag CI` [`37796847434`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37796847434) **VERDE** (`11` jobs `success` + `playwright (integrated E2E, opt-in)` `skipped`; `certify` `success`). El job `replay-repro` dio **`VEREDICTO REPRODUCIDO`** con `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (misma huella que la serie; 2ª corrida idéntica) ⇒ **`Δ motor = 0` confirmado por CI**. Tag anotado `v2.88.91-beta` (objeto `a34a6094` → commit `1e832b30`).
 
 ## 1. Base compartida (Slice 0, bloqueante)
 

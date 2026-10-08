@@ -6,7 +6,7 @@
 > **Regla del hueco:** una regla que no se puede afirmar se declara **abierta** con su remediación, **nunca** se silencia. Un dato ausente o `UNKNOWN` se rotula «Sin dato todavía»; **jamás** se rellena con `0` ni con verde. El guion `—` queda **prohibido** en nivel 1.
 > **`Δ AUTO decision/execution motor = 0`.** Todo el sello es UI/read-model y tests en `apps/web/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin tocar `packages/py/**`**. **El contrato HTTP NO cambia.**
 > **Evidencia cruda:** [`docs/engineering/evidence/v2.88.91/README.md`](./evidence/v2.88.91/README.md).
-> **Cita POST-TAG:** _pendiente_ — se rellenará al confirmar el `Release tag CI` del tag anotado `v2.88.91-beta`.
+> **Cita POST-TAG:** `Release tag CI` [`37796847434`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37796847434) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0` confirmado por CI**). Tag anotado `v2.88.91-beta` (objeto `a34a6094` → commit `1e832b30`).
 
 **Sello dirigido (declarado).** Mandato: **una sola aplicación, un único lenguaje operativo en el primer nivel**. No se añaden funciones ni se toca el motor: se re-corta la superficie ya existente y se hace **falsable** cada afirmación con un gate (`first-level-gate.ts`) que falla si la jerga reaparece fuera del nivel 3.
 
@@ -82,7 +82,7 @@
 | `E2E_RUN=1 … playwright test e2e/gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts` | **13/13** (desktop + 390×844; `heading-order` 0) |
 | `E2E_RUN=1 … playwright test e2e/gp-e2e-live-virtual-confirm-mock.spec.ts` | **2/2** |
 | `E2E_RUN=1 … playwright test e2e/gp-e2e-02-operational-console.spec.ts` | **1/1** |
-| `replay-repro` — CI | _pendiente_ (`REPRODUCIDO` `1E3ADAC2…` ⇒ **`Δ motor = 0`**) |
+| `replay-repro` — CI | **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0`** |
 
 ---
 
@@ -91,7 +91,7 @@
 - **Producto:** `V2.88.91-beta`. **Package:** `2.11.91-beta`. **Sin migración** (Alembic head `052_top3_opportunities`). **Contrato HTTP sin cambio.** `packages/py/**` **sin mover**.
 - **Añadidos:** `apps/web/src/components/technical-detail.tsx` (+ `.test.tsx`), `apps/web/src/components/first-level-gate.ts`, tests falsables de primer nivel (`confirm-first-level`, `mesa-hoy-first-level`, `history-first-level`, `research-first-level`), `docs/engineering/evidence/v2.88.91/README.md`, este documento.
 - **Modificados:** `apps/web/src/**` (confirm + mesa + history + operations + operational-console + charts + command-palette + trading + research + layout), `apps/web/e2e/gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts`, `package.json`, `apps/api-python/scripts/v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`, `docs/engineering/spec-ui-contract-5-0-2026-10-08.md`, `docs/adr/045-ui-contract-5-0.md`.
-- **Tag anotado `v2.88.91-beta`** — _objeto/commit pendientes de crear_; mensaje propuesto `UI 6.x global language · Δ motor = 0`. **`Release tag CI` _pendiente_** (_cita en el commit `docs(seal)` posterior_).
+- **Tag anotado `v2.88.91-beta`** (objeto `a34a6094` → commit `1e832b30`) — mensaje `UI 6.x global language (Confirmar / Hoy / resto de la app) - Delta motor = 0`. **`Release tag CI` [`37796847434`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37796847434) VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0` confirmado por CI**).
 
 ---
 
