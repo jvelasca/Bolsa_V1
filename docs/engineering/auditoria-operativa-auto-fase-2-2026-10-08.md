@@ -110,4 +110,11 @@ Se declaran, no se fabrican: `PortfolioDecision` durable (`F2-2`), traza de mate
 
 ## 8. Continuación
 
-Plan de cierre (con motor): [`plan-cierre-operativa-auto-2026-10-08.md`](./plan-cierre-operativa-auto-2026-10-08.md).
+Plan de cierre (con motor): [`plan-cierre-operativa-auto-2026-10-08.md`](./plan-cierre-operativa-auto-2026-10-08.md) — **PARKED (2026-10-08)**.
+
+**Reorden (2026-10-08).** El propietario fijó las [prioridades de producto `P1`–`P4`](../PROJECT_PREMISES.md) (§6:
+operativa ganadora en rango diario · claridad de entrada/salida · estrategia confirmada con los mejores
+indicadores · evaluación DÍA-D). La completitud contable que perseguía el plan de motor es **deuda declarada**,
+no el objetivo: los hallazgos `F2-1`/`F2-2`/`F2-3` de esta auditoría se mantienen abiertos y **solo** se
+resuelven si un pilar `P1`–`P4` lo exige. La continuidad pasa a la auditoría read-only de los tres pilares:
+[`auditoria-operativa-diaria-entrada-salida-dia-d-2026-10-08.md`](./auditoria-operativa-diaria-entrada-salida-dia-d-2026-10-08.md).

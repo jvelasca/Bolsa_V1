@@ -1,6 +1,6 @@
 # Premisas de proyecto — Bolsa V1
 
-> **AsOf:** 2026-08-22 · **AsOf (operativa §5):** 2026-10-03  
+> **AsOf:** 2026-08-22 · **AsOf (operativa §5):** 2026-10-03 · **AsOf (prioridades de producto §6):** 2026-10-08  
 > **Qué es:** reglas de producto y de ingeniería que aplican a **todo** el monorepo.  
 > **Para quién:** equipo, auditores externos, quien retome el código.  
 > No sustituye ADRs: las ADRs deciden arquitectura; estas premisas fijan _cómo se trabaja y se documenta_.
@@ -92,6 +92,7 @@ R-12 entregó Track A–C, R12-409, EXEC-B-CONC, R12-SCHED, R12-ACCOUNTS, R12-AU
 | Freeze post-auditorías                                | [post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md)                                                      |
 | Orquestación / relevo / anti-alucinación (R-8)        | §4 de este archivo · [plan R-8](./engineering/plan-r8-prevencion-riesgo-2026-08-20.md)                                                                  |
 | **Operativa AUTO/PAPER (ventana forward + `DÍA-D AUTO`)** | §5 de este archivo · [runbook de la ventana](./engineering/runbook-ventana-forward-v2.78-2026-09-27.md) · [criterio de salida `-beta`](./engineering/criterio-salida-beta-2026-10-01.md)                                                       |
+| **Prioridades de producto (operativa diaria · entrada/salida · estrategia/indicadores · DÍA-D)** | §6 de este archivo · [auditoría operativa diaria](./engineering/auditoria-operativa-auto-fase-2-2026-10-08.md)                                           |
 
 Entrada auditoría: [audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md).  
 Índice ingeniería (docs): [engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md).  
@@ -228,6 +229,41 @@ sirve por `GET /api/auto/dia-d-feedback[/{window}]` (read-only) y lo pinta en `/
 - **El veredicto se recalcula sin cambiar código** en cuanto la ventana PAPER opere esos `D`.
 - **El gate global `window_gate` sigue siendo la autoridad** sobre la ventana; el veredicto por valor es
   un **complemento**, no un sustituto.
+
+---
+
+## 6. Premisa — Prioridades de producto (operativa diaria · entrada/salida · estrategia/indicadores · DÍA-D)
+
+> **Ratificada 2026-10-08** (propietario). Fija **qué es prioritario** en el producto. Complementa §5
+> (que gobierna **cómo se opera y se mide** AUTO/PAPER) y no la sustituye. Origen: reorden de la FASE 3
+> tras la [auditoría operativa FASE 2](./engineering/auditoria-operativa-auto-fase-2-2026-10-08.md) y su
+> [plan (PARKED)](./engineering/plan-cierre-operativa-auto-2026-10-08.md).
+
+El foco de producto son **cuatro prioridades**, por este orden. Toda mejora se juzga por si acerca a
+ellas; la completitud contable retrospectiva **no** es el objetivo (es deuda declarada, §6.3).
+
+### 6.1 Las cuatro prioridades
+
+| # | Prioridad | Qué significa | Verificación (falsable) |
+| --- | --- | --- | --- |
+| **P1** | **Operativa ganadora en rango diario** | La operativa objetivo gana en **timeframe diario**; es la vara de producto. | Existe evidencia con R/expectancy en la ventana diaria, citando su `K` y su intervalo de confianza. |
+| **P2** | **Claridad del punto de entrada y salida** | Toda propuesta/posición indica de forma **inequívoca** el punto/zona de **entrada** y el de **salida** (stop y objetivo) en primer nivel, sin que el usuario interprete el gráfico. | La superficie de primer nivel muestra entrada y salida; si falta una, se declara «Sin dato todavía». |
+| **P3** | **Estrategia confirmada con los mejores indicadores** | La operativa se apoya en una estrategia **confirmada por evidencia**, y los **indicadores detectados** que la sustentan son visibles como razón. | La superficie declara la estrategia y los indicadores que la sustentan; sin confirmación, se declara. |
+| **P4** | **Evaluación DÍA-D** (sobre todo) | La comparación **declarado vs ejecutado vs OOS real** es la comprobación central de que la estrategia se sostiene; ninguna operativa se da por buena sin re-medir DÍA-D. | El veredicto DÍA-D (`CONFIRMED`/`MIXED`/`REFUTED`/`NOT_MEASURED`) se recalcula y se cita con su ventana. |
+
+### 6.2 Invariante preservado (no es prioridad nueva)
+
+La separación estricta **SIM/virtual vs dinero real XTB** (§5.1 · `apps/web/src/features/auto/auto-reality.ts`)
+sigue vigente y **no** la relajan estas prioridades.
+
+### 6.3 Qué mueve P1–P4 (y qué no)
+
+- **Mueve:** claridad de entrada/salida a primer nivel, visibilidad de estrategia e indicadores que la
+  sustentan, y la **re-medición DÍA-D** como criterio de confianza.
+- **No mueve (deuda declarada):** `PortfolioDecision` durable, materialización de posición por operación
+  y P&L realizado agregado. El [plan de cierre de motor](./engineering/plan-cierre-operativa-auto-2026-10-08.md)
+  queda **PARKED**; se retoma **solo si** un pilar P1–P4 lo exige.
+- **Regla dura:** ninguna prioridad se resuelve fabricando datos. Sin medición ⇒ «Sin dato todavía» (§5.1.4).
 
 ---
 

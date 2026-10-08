@@ -1,5 +1,11 @@
 # Plan de cierre de la operativa AUTO (FASE 3) — con motor
 
+> **ESTADO: PARKED (2026-10-08).** **No vigente.** Reordenado por las [prioridades de producto `P1`–`P4`](../PROJECT_PREMISES.md)
+> (§6): el foco pasa a claridad de entrada/salida, estrategia/indicadores y evaluación DÍA-D.
+> **Dueño del disparador:** propietario. **Disparador de reactivación:** que un pilar `P1`–`P4` **exija**
+> decisión durable de cartera o materialización de posición para sostener una operativa diaria ganadora.
+> Hasta entonces, este plan **no** se ejecuta.
+
 > **AsOf:** 2026-10-08 · **Base:** `v2.88.94-beta` · **Origen:** [`auditoria-operativa-auto-fase-2-2026-10-08.md`](./auditoria-operativa-auto-fase-2-2026-10-08.md) §5.
 > **Naturaleza:** este plan **SÍ toca motor** — `Δ motor ≠ 0` es un resultado explícito y esperado (a diferencia de UI 6.x/7.0).
 > **Objetivo:** cerrar `F2-1` (posición por operación), `F2-2` (`PortfolioDecision` durable), `F2-3` (resultado realizado agregado a primer nivel) y `F2-5`/`F2-6` (vocabulario de dinero virtual), sin romper `UI5-12` (`ranking ≠ decisión`), `UNKNOWN ≠ 0` ni la separación SIM/XTB.
