@@ -13,6 +13,7 @@ import {
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { OhlcvChart } from "@/features/charts/ohlcv-chart";
 import { InstrumentStrategyTopPanel } from "@/features/backtests/instrument-strategy-top-panel";
 import { InstrumentAnalysisSummary } from "@/features/trading/instrument-analysis-summary";
@@ -174,7 +175,7 @@ export function InstrumentsHubDetailPanel({
               <KeyValueRow label="Precio">
                 {instrument.meta.lastClose != null
                   ? formatPrice(instrument.meta.lastClose)
-                  : "—"}
+                  : absentDataLabel()}
               </KeyValueRow>
               <KeyValueRow
                 label="Δ%"
@@ -188,30 +189,30 @@ export function InstrumentsHubDetailPanel({
               >
                 {instrument.meta.changePct != null
                   ? formatPct(instrument.meta.changePct)
-                  : "—"}
+                  : absentDataLabel()}
               </KeyValueRow>
               <KeyValueRow label="Exchange">{instrument.exchange}</KeyValueRow>
               <KeyValueRow label="Yahoo" valueClassName="font-mono text-[10px]">
                 {instrument.yahooSymbol}
               </KeyValueRow>
               <KeyValueRow label="Sector">
-                {instrument.sector ?? "—"}
+                {instrument.sector ?? absentDataLabel()}
               </KeyValueRow>
               <KeyValueRow label="ISIN" valueClassName="font-mono text-[10px]">
-                {instrument.isin?.trim() || "—"}
+                {instrument.isin?.trim() || absentDataLabel()}
               </KeyValueRow>
               <KeyValueRow label="Barras">
                 {instrument.meta.barCount}
               </KeyValueRow>
               <KeyValueRow label="Últ. vela">
-                {instrument.meta.lastBarDate ?? "—"}
+                {instrument.meta.lastBarDate ?? absentDataLabel()}
               </KeyValueRow>
               <KeyValueRow label="Dictamen">
                 {opinionQuery.isLoading
                   ? "…"
                   : opinion
                     ? `${INSTRUMENT_DAILY_OPINION_STANCE_LABELS[opinion.stance]} · ★${opinion.dictamenStars}`
-                    : "—"}
+                    : absentDataLabel()}
               </KeyValueRow>
             </KeyValueList>
           </DetailSection>

@@ -158,7 +158,7 @@ export function AccountSettingsPanel({
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">
             Perfil simulado aplicado a cada operación. Los importes se registran
-            en el ledger como entradas de tipo fee.
+            en el historial de movimientos como entradas de tipo fee.
           </p>
           {COMMISSION_OPTIONS.map(({ id, hint }) => {
             const preset =

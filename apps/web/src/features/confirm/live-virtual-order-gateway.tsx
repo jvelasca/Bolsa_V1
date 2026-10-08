@@ -108,7 +108,8 @@ function LadderVisual({ step }: { step: LiveVirtualLadderStep }) {
         </li>
       </ol>
       <p className="text-[10px] text-muted-foreground">
-        *respuesta simulada · enviada no es una ejecución real
+        *respuesta simulada · enviar una orden no significa que se haya
+        ejecutado
       </p>
     </div>
   );

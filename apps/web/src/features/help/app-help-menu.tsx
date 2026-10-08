@@ -105,9 +105,9 @@ function GuideContent() {
 
       <p className="text-muted-foreground">
         Bolsa V1 es una plataforma personal de gestión bursátil con terminal de
-        trading, cuentas simuladas, ledger contable y fiscal. Todo el patrimonio
-        y las operaciones se gestionan por <strong>cuenta de inversión</strong>{" "}
-        (modelo estilo XTB). Estás en{" "}
+        trading, cuentas simuladas, historial contable y fiscal. Todo el
+        patrimonio y las operaciones se gestionan por{" "}
+        <strong>cuenta de inversión</strong> (modelo estilo XTB). Estás en{" "}
         <strong className="text-foreground">
           fase de pruebas (BETA / demo · tip v2.10.1-beta)
         </strong>
@@ -365,22 +365,25 @@ function AccountsContent() {
           </li>
           <li>
             <strong>Cerrar</strong> — Soft-delete: deja de operar pero{" "}
-            <em>sigue en BD</em> (ledger e historial para auditoría/fiscal).
+            <em>sigue en BD</em> (movimientos e historial para
+            auditoría/fiscal).
           </li>
           <li>
             <strong>Eliminar</strong> — Solo demos ya cerradas. Borra la fila de
-            cuenta y carteras, posiciones, transacciones, ledger y órdenes. Los
-            perfiles del catálogo se conservan. También desde{" "}
+            cuenta y carteras, posiciones, transacciones, movimientos y órdenes.
+            Los perfiles del catálogo se conservan. También desde{" "}
             <OpenConfigLink tab="bd">Configuración → BD</OpenConfigLink> (lista
             y purga en lote).
           </li>
         </ol>
       </section>
       <section>
-        <h3 className="mb-2 font-semibold text-foreground">Ledger</h3>
+        <h3 className="mb-2 font-semibold text-foreground">
+          Movimientos contables
+        </h3>
         <p>
-          Registro append-only de todos los movimientos: depósitos,
-          compras/ventas, comisiones, custodia. Consultable en{" "}
+          Registro completo de todos los movimientos: depósitos, compras/ventas,
+          comisiones, custodia. Consultable en{" "}
           <RouteLink to="/history">Historial</RouteLink>.
         </p>
       </section>

@@ -34,7 +34,7 @@ export function AccountWizardCommissionsStep({
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
         Perfil de comisiones simuladas. Se aplican en cada operación y se
-        registran en el ledger.
+        registran en el historial de movimientos.
       </p>
       {COMMISSION_OPTIONS.map(({ id, hint }) => {
         const preset =

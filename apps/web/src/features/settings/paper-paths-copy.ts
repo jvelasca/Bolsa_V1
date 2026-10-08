@@ -75,18 +75,18 @@ export const PAPER_PATH_RADAR = {
 } as const;
 
 /**
- * Camino D — plan completo (Composite × FA whitelist) / Libro AUTO Estudio.
+ * Camino D — plan completo (Composite × FA whitelist) / AUTO Estudio.
  * Propose + execute opcional (PAPER_D_EXECUTE + Risk Engine + política paper_auto).
- * Producto Libro: modo AUTO visible en Operativa (A1) pero deshabilitado hasta thaw.
+ * Producto AUTO: modo AUTO visible en Operativa (A1) pero deshabilitado hasta thaw.
  */
 export const PAPER_PATH_D = {
   id: "paper_d_full_auto" as const,
   shortTitle: "Plan D (demo)",
   cta: "Proponer plan D",
   blurb:
-    "Composite × FA whitelist → propose; pipeline semanal; execute opcional en cuenta DEMO vía Risk Engine (modo técnico paper_auto). Libro AUTO = misma disciplina sin Confirm.",
+    "Composite × FA whitelist → propose; pipeline semanal; execute opcional en cuenta DEMO vía Risk Engine (modo técnico paper_auto). AUTO = misma disciplina sin Confirm.",
   warnLine:
-    "Execute: PAPER_D_EXECUTE=1 + checklist thaw. Libro AUTO pill = prep (A1), no activa fills. ≠ radar B ≠ Supervisado C. No es cuenta tipo Paper/broker.",
+    "Execute: PAPER_D_EXECUTE=1 + checklist thaw. AUTO pill = prep (A1), no activa ejecuciones. ≠ radar B ≠ Supervisado C. No es cuenta tipo Paper/broker.",
 } as const;
 
 /**
@@ -97,7 +97,7 @@ export const PAPER_PATH_PRODUCT_DECISION = {
   asOf: "2026-07-31" as const,
   stance: "demo_active_only" as const,
   summary:
-    "Operar solo cuenta activa DEMO. Caminos A/B/C/D → ledger demo. Tipo cuenta Paper = broker real futuro. No unificar A/B/C/D.",
+    "Operar solo cuenta activa DEMO. Caminos A/B/C/D → cartera demo. Tipo cuenta Paper = broker real futuro. No unificar A/B/C/D.",
 } as const;
 
 export const PAPER_PATHS_COMPARE =

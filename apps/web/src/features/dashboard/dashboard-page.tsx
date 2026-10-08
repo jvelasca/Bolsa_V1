@@ -27,6 +27,7 @@ import {
 import { HELP_CONTENT_AS_OF } from "@/features/help/help-content-as-of";
 import { DataSyncSummaryCard } from "@/features/settings/data-sync-summary-card";
 import { formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
@@ -136,15 +137,21 @@ function ActiveAccountPanel() {
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Metric
             label="Patrimonio"
-            value={summary ? formatPrice(summary.totalEquity) : "—"}
+            value={
+              summary ? formatPrice(summary.totalEquity) : absentDataLabel()
+            }
           />
           <Metric
             label="Capital disponible"
-            value={summary ? formatPrice(summary.cash) : "—"}
+            value={summary ? formatPrice(summary.cash) : absentDataLabel()}
           />
           <Metric
             label="Beneficio no realizado"
-            value={summary ? formatPrice(summary.totalUnrealizedPnl) : "—"}
+            value={
+              summary
+                ? formatPrice(summary.totalUnrealizedPnl)
+                : absentDataLabel()
+            }
             tone={
               summary
                 ? summary.totalUnrealizedPnl >= 0
@@ -155,7 +162,7 @@ function ActiveAccountPanel() {
           />
           <Metric
             label="Posiciones abiertas"
-            value={summary ? String(summary.positionsCount) : "—"}
+            value={summary ? String(summary.positionsCount) : absentDataLabel()}
             hint={
               summary
                 ? `Margen libre ${formatPrice(summary.freeMargin)}`
@@ -253,8 +260,8 @@ function RecentLedgerCard() {
             <CardTitle className="text-base">Últimos movimientos</CardTitle>
             <CardDescription>
               {account
-                ? `Ledger de «${account.name}» (cuenta activa)`
-                : "Ledger de la cuenta activa"}
+                ? `Movimientos de «${account.name}» (cuenta activa)`
+                : "Movimientos de la cuenta activa"}
             </CardDescription>
           </div>
           <Link to="/history" className="text-xs text-primary hover:underline">
@@ -578,7 +585,7 @@ export function OverviewPage() {
           />
           <NavCard
             title="Historial"
-            description="Ledger contable, comisiones y trades ejecutados."
+            description="Movimientos contables, comisiones y operaciones ejecutadas."
             icon={History}
             to="/history"
           />

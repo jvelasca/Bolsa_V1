@@ -24,6 +24,7 @@ import {
 import type { TradePlanWhyNotV1 } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { gateHumanLabel } from "@/components/gate-label";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 import { MESA_PATH } from "@/features/confirm/daily-nav";
@@ -217,7 +218,7 @@ export function HoyCommandStrip() {
               {selected.symbol} · {selected.kind}
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Gate {selected.gate} · estado {selected.status}
+              {gateHumanLabel(selected.gate)} · estado {selected.status}
             </p>
             {selected.setup ? (
               <div className="mt-3" data-testid="hoy-setup">

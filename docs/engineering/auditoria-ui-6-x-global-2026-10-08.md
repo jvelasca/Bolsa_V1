@@ -197,3 +197,23 @@ Pregunta principal acordada: **«¿Qué requiere mi atención?»**. La pantalla 
 - **No** se edita el contrato vigente ([`spec-ui-contract-5-0`](./spec-ui-contract-5-0-2026-10-08.md), [`ADR-045`](../adr/045-ui-contract-5-0.md)); la enmienda `R-G1`/`R-G2` se **propone**.
 - **No** se reabre AUTO ni se re-mide el motor.
 - **`Δ motor = 0`** por construcción: el árbol auditado es el del tag `v2.88.90-beta`; comprobable con `git diff --name-only v2.88.89-beta v2.88.90-beta -- packages/py` (vacío) sobre el sello base.
+
+---
+
+## 9. Barrido global — cierre de residuos declarados (rama, sin tag)
+
+> **AsOf:** 2026-10-08 · **Estado:** ejecución en rama `ui6x-barrido-global-residuos`, **sin sello ni tag**.
+> **Naturaleza:** UI/semántica y tests en `apps/web/**`. **`Δ motor = 0`** (el diff no toca `packages/py/**`, worker, umbrales, Alembic, `contract:gen` ni `package.json`/`meta.bump`).
+> **Precedente:** correcciones que `v2.88.91-beta` dejó **abiertas** en su [entrega §4](./entrega-auditoria-externa-mia-v2.88.91-2026-10-08.md).
+
+| # | Residuo declarado en §4 de la entrega | Cierre en este barrido |
+| --- | --- | --- |
+| 1 | `Gate N` residual | `gateHumanLabel` extraído a [`components/gate-label.ts`](../../apps/web/src/components/gate-label.ts) y aplicado en [`hoy-command-strip.tsx`](../../apps/web/src/features/trading/hoy-command-strip.tsx) y [`mesa-entry-queue-panel.tsx`](../../apps/web/src/features/operations/mesa-entry-queue-panel.tsx) (filtro y celda). |
+| 2 | `submitted ≠ fill` | Unificado a «Enviar una orden no significa que se haya ejecutado» en `account-venue-preference.tsx`, `live-virtual-order-gateway.tsx`, `live-virtual-banner.tsx` y `mesa-operational-bar.tsx`. |
+| 3 | `Libro`/`Ledger` de primer nivel | Retirados en dashboard, cuentas (panel/wizard/settings), fiscal, screeners, screeners-page, `backtesting-tracker`, ayuda (`app-help-menu.tsx`, `mesa-tip-catalog.ts`), `paper-paths-copy` y los `*-propose-supervised`/`position-exit-drawer-actions`. Identificadores de código y comentarios no se tocan. |
+| 4 | Barrido del comodín `—` | `findFirstLevelDashes` añadido a [`first-level-gate.ts`](../../apps/web/src/components/first-level-gate.ts); fallbacks `"—"` sustituidos por `absentDataLabel()` en dashboard, cuentas, instrumentos, fiscal y screeners. |
+| 5 | Gates de primer nivel fuera de alcance | Nuevo [`barrido-global-first-level.test.tsx`](../../apps/web/src/features/barrido-global-first-level.test.tsx): Mercado (`chart-workspace-page`, `app-top-bar`), Laboratorio (`backtests-page` + pestañas), chrome (`app-top-bar`, `command-registry`, `command-palette`) y el barrido `—` de las superficies del punto 4. |
+
+**Verificación (local):** `typecheck` OK · `lint` **0 errores** (23 avisos `react-hooks/exhaustive-deps` preexistentes) · **277 ficheros / 1687 passed** (+1 fichero / +25 tests sobre `v2.88.91`) · `git diff --name-only -- packages/py` **vacío** ⇒ **`Δ motor = 0`**.
+
+**Límites de este documento (§8 sigue vigente):** este §9 **sí** implementa y añade tests (a diferencia del cuerpo de solo lectura); **no** crea tag, **no** re-certifica `axe` en vivo ni activa el `playwright` integrado (`opt-in`), y **no** reabre AUTO.

@@ -30,7 +30,7 @@ export function ScreenersPage() {
           >
             {LABORATORIO_LABEL}
           </Link>
-          ; ledger de pruebas en{" "}
+          ; historial de pruebas en{" "}
           <Link
             to={asesorHistoryHref()}
             className="text-primary underline hover:underline"

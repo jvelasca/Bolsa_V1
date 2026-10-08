@@ -6,7 +6,7 @@
  * para el badge de origen en la cola F3.
  *
  * Requisitos UI: cuenta activa (perfil → WeightContext) + TOP `lab_validated`.
- * Libro DEMO en SEMI (MANUAL solo aviso). Qty ≈ % cash; respeta maxOpenPositions.
+ * Cartera DEMO en SEMI (MANUAL solo aviso). Qty ≈ % cash; respeta maxOpenPositions.
  * Tras éxito: encolar en `useSupervisedF3QueueStore` con `origin: 'finalists'`
  * y `openHelpAiPlatform({ panel: 'supervised-f3' })` para foco Confirm.
  *
@@ -46,7 +46,7 @@ export async function proposeFinalistSupervised(opts: {
   const book = loadDemoBookPrefs();
   if (!demoBookAllowsEnqueueConfirm(book.mode)) {
     throw new Error(
-      "Libro en MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.",
+      "Cartera en MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.",
     );
   }
   if (demoBookRequiresEstudioMembership(book.mode)) {
@@ -57,7 +57,7 @@ export async function proposeFinalistSupervised(opts: {
   const summary = (await api.getAccountSummary(opts.accountId)).data;
   if (summary.positionsCount >= book.maxOpenPositions) {
     throw new Error(
-      `Tope de posiciones (${book.maxOpenPositions}). Cierra alguna o sube el máximo en Libro DEMO.`,
+      `Tope de posiciones (${book.maxOpenPositions}). Cierra alguna o sube el máximo en Cartera DEMO.`,
     );
   }
   const priceHint =

@@ -20,8 +20,8 @@ export function AccountWizardReviewStep({
         ))}
       </div>
       <p className="text-xs text-muted-foreground">
-        Se creará la cuenta demo con cartera, depósito en el ledger, perfil
-        inversor activo y preset de comisiones/fiscal.
+        Se creará la cuenta demo con cartera, depósito inicial, perfil inversor
+        activo y preset de comisiones/fiscal.
       </p>
     </div>
   );

@@ -250,7 +250,7 @@ export function PositionExitDrawerActions({
                 data-testid={`position-exit-reduce-${position.symbol}`}
                 title={
                   manualDirectSell
-                    ? "Reducir → Vender directo sobre el libro DEMO (MANUAL)"
+                    ? "Reducir → Vender directo sobre la cartera DEMO (MANUAL)"
                     : "Reducir → cola Confirm (firma SEMI)"
                 }
               >
@@ -271,7 +271,7 @@ export function PositionExitDrawerActions({
                 data-testid={`position-exit-full-${position.symbol}`}
                 title={
                   manualDirectSell
-                    ? "Salir → Vender directo sobre el libro DEMO (MANUAL)"
+                    ? "Salir → Vender directo sobre la cartera DEMO (MANUAL)"
                     : "Salir → cola Confirm (firma SEMI)"
                 }
               >

@@ -18,6 +18,7 @@ import {
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { gateHumanLabel } from "@/components/gate-label";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
@@ -121,7 +122,7 @@ export function MesaEntryQueuePanel({
         >
           {GATE_FILTERS.map((g) => (
             <option key={g} value={g}>
-              Gate {g === "ALL" ? "todos" : g}
+              {g === "ALL" ? "Todos" : gateHumanLabel(g)}
             </option>
           ))}
         </select>
@@ -212,7 +213,7 @@ export function MesaEntryQueuePanel({
                           "text-muted-foreground",
                       )}
                     >
-                      {row.gate}
+                      {gateHumanLabel(row.gate)}
                     </span>
                   </span>
                 </li>

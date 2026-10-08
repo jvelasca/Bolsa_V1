@@ -41,6 +41,7 @@ import { formatPaperLabEvidence } from "@/features/accounts/paper-lab-evidence";
 import { PAPER_PATH_LAB } from "@/features/settings/paper-paths-copy";
 import { useActivateAccount } from "@/features/accounts/use-active-account";
 import { formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { DemoBookModePanel } from "@/features/trading/demo-book-mode-panel";
 import { api } from "@/lib/api";
 import { formatDateTimeCompact, parseLocalizedNumber } from "@/lib/format";
@@ -177,7 +178,9 @@ export function AccountDetailPanel({
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "No se pudo exportar el ledger.",
+        err instanceof Error
+          ? err.message
+          : "No se pudo exportar el historial de movimientos.",
       );
     } finally {
       setExportingLedger(false);
@@ -381,15 +384,21 @@ export function AccountDetailPanel({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Metric
               label="Patrimonio"
-              value={summary ? formatPrice(summary.totalEquity) : "—"}
+              value={
+                summary ? formatPrice(summary.totalEquity) : absentDataLabel()
+              }
             />
             <Metric
               label="Efectivo"
-              value={summary ? formatPrice(summary.cash) : "—"}
+              value={summary ? formatPrice(summary.cash) : absentDataLabel()}
             />
             <Metric
               label="P&amp;L no realizado"
-              value={summary ? formatPrice(summary.totalUnrealizedPnl) : "—"}
+              value={
+                summary
+                  ? formatPrice(summary.totalUnrealizedPnl)
+                  : absentDataLabel()
+              }
               tone={
                 summary
                   ? summary.totalUnrealizedPnl >= 0
@@ -400,7 +409,9 @@ export function AccountDetailPanel({
             />
             <Metric
               label="Posiciones"
-              value={summary ? String(summary.positionsCount) : "—"}
+              value={
+                summary ? String(summary.positionsCount) : absentDataLabel()
+              }
             />
           </div>
         )}
@@ -633,9 +644,10 @@ export function AccountDetailPanel({
             <div className="rounded-md border border-border bg-muted/20 p-3 text-sm">
               <p className="font-medium">Comisiones y fiscal</p>
               <p className="text-muted-foreground">
-                {account.settings?.commission.label ?? "—"} ·{" "}
-                {account.settings?.tax.jurisdiction ?? "—"} ·{" "}
-                {account.settings?.tax.costBasisMethod.toUpperCase() ?? "—"}
+                {account.settings?.commission.label ?? absentDataLabel()} ·{" "}
+                {account.settings?.tax.jurisdiction ?? absentDataLabel()} ·{" "}
+                {account.settings?.tax.costBasisMethod.toUpperCase() ??
+                  absentDataLabel()}
               </p>
               {!isClosed && (
                 <button

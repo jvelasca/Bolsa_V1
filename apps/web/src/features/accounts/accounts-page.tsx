@@ -265,7 +265,7 @@ export function AccountsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Cuentas</h1>
           <p className="text-sm text-muted-foreground">
             La <span className="text-foreground">Activa</span> es la única con
-            la que opera la app (Trading, demo ledger, Coach…). Hoy: solo
+            la que opera la app (Trading, cartera demo, Coach…). Hoy: solo
             cuentas <span className="text-foreground">DEMO</span>. Paper =
             broker real futuro (no crear aún).
           </p>

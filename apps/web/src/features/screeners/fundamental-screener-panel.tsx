@@ -10,6 +10,7 @@ import {
   type FundamentalScreenerRunResultV1,
 } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
+import { absentDataLabel } from "@/components/absent-data";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +22,7 @@ type Props = {
 };
 
 function fmtPct(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
+  if (n == null || !Number.isFinite(n)) return absentDataLabel();
   return `${(n * 100).toFixed(1)}%`;
 }
 
@@ -197,16 +198,20 @@ export function FundamentalScreenerPanel({
                     >
                       <td className="px-2 py-1 font-medium">{h.symbol}</td>
                       <td className="px-2 py-1 tabular-nums">
-                        {h.scoreDisplay100 ?? "—"}
+                        {h.scoreDisplay100 ?? absentDataLabel()}
                       </td>
                       <td className="px-2 py-1 tabular-nums">
-                        {h.trailingPe != null ? h.trailingPe.toFixed(1) : "—"}
+                        {h.trailingPe != null
+                          ? h.trailingPe.toFixed(1)
+                          : absentDataLabel()}
                       </td>
                       <td className="px-2 py-1 tabular-nums">
                         {fmtPct(h.roe)}
                       </td>
                       <td className="px-2 py-1 tabular-nums">
-                        {h.piotroski != null ? `${h.piotroski}/9` : "—"}
+                        {h.piotroski != null
+                          ? `${h.piotroski}/9`
+                          : absentDataLabel()}
                       </td>
                       <td className="px-2 py-1 tabular-nums">
                         {fmtPct(h.dcfUpside)}

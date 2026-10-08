@@ -313,7 +313,7 @@ export const BACKTESTING_IDEAS = [
   {
     id: "ledger",
     title: "Todo deja rastro",
-    body: "Las pruebas quedan en el ledger de research para auditar qué se probó y con qué parámetros.",
+    body: "Las pruebas quedan en el historial de research para auditar qué se probó y con qué parámetros.",
   },
   {
     id: "auto-paths",

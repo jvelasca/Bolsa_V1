@@ -57,3 +57,18 @@ export function findFirstLevelViolations(
   const firstLevel = stripTechnicalDetailBlocks(source);
   return tokens.filter((token) => firstLevel.includes(token));
 }
+
+/**
+ * Comodín `—` de dato ausente en primer nivel (`UI5-14`).
+ *
+ * Detecta el literal de guion (`"—"`, `'—'`, `` `—` ``, `&mdash;`) usado como relleno de
+ * un dato ausente, fuera de los bloques `TechnicalDetail`. El guion de prosa (p. ej. un
+ * inciso «Editar — Nombre») NO es un comodín y no se marca: la coincidencia exige el
+ * literal entrecomillado o la entidad HTML.
+ */
+const DASH_WILDCARD = /["'`]—["'`]|&mdash;/g;
+
+/** Literales de guion `—` de primer nivel (vacío si solo aparece en nivel 3 o en prosa). */
+export function findFirstLevelDashes(source: string): string[] {
+  return stripTechnicalDetailBlocks(source).match(DASH_WILDCARD) ?? [];
+}

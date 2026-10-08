@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { absentDataLabel, formatOrAbsent } from "@/components/absent-data";
+import { gateHumanLabel } from "@/components/gate-label";
 import { cn } from "@/lib/utils";
 import { mesaJournalTesisHref } from "@/features/mesa/mesa-nav-links";
 import { OpportunityDrawer } from "@/features/mesa/opportunity-drawer";
@@ -141,23 +142,6 @@ function CandidateNextAction({
       {label}
     </span>
   );
-}
-
-/**
- * V6.x (H-03) — el permiso diario se cuenta en lenguaje de usuario; el literal
- * «Gate» + su valor crudo no se muestran en primer nivel.
- */
-function gateHumanLabel(gate: string | null | undefined): string {
-  switch (gate?.toUpperCase()) {
-    case "PASS":
-      return "Sin bloqueos";
-    case "VETO":
-      return "Bloqueado";
-    case "DEFERRED":
-      return "Aplazado";
-    default:
-      return absentDataLabel();
-  }
 }
 
 function categoryTone(category: OpportunityCategoryV1): string {

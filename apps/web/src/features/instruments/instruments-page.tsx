@@ -28,6 +28,7 @@ import type { InstrumentWithMetaDto, PositionDto } from "@bolsa/shared";
 import { api, ApiError } from "@/lib/api";
 import { getApiBaseUrl } from "@/stores/auth-store";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import {
   InstrumentStrategyTopBadge,
   instrumentTopBacktestsHref,
@@ -370,7 +371,7 @@ function PortfolioCell({
               : "text-destructive",
         )}
       >
-        {pnl != null ? formatPrice(pnl) : "—"}
+        {pnl != null ? formatPrice(pnl) : absentDataLabel()}
         {pnlPct != null ? (
           <span className="ml-0.5 opacity-80">({formatPct(pnlPct)})</span>
         ) : null}
@@ -790,7 +791,7 @@ export function InstrumentsPage() {
           <span className="tabular-nums">
             {instrument.meta.lastClose != null
               ? formatPrice(instrument.meta.lastClose)
-              : "—"}
+              : absentDataLabel()}
           </span>
         );
       case "changePct":
@@ -807,7 +808,7 @@ export function InstrumentsPage() {
           >
             {instrument.meta.changePct != null
               ? formatPct(instrument.meta.changePct)
-              : "—"}
+              : absentDataLabel()}
           </span>
         );
       case "lists":

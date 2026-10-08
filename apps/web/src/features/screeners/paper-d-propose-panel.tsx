@@ -7,6 +7,7 @@ import { Route } from "lucide-react";
 import { useState } from "react";
 import type { PaperDProposeResultV1 } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
+import { absentDataLabel } from "@/components/absent-data";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -158,7 +159,10 @@ export function PaperDProposePanel({
                 >
                   <span className="font-medium">{c.ticker}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    {c.scoreDisplay100 ?? "—"}/100 · {c.confidence ?? "—"}
+                    {c.scoreDisplay100 != null
+                      ? `${c.scoreDisplay100}/100`
+                      : absentDataLabel()}{" "}
+                    · {c.confidence ?? absentDataLabel()}
                   </span>
                 </li>
               ))}

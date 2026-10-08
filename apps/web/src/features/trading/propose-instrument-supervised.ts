@@ -33,7 +33,7 @@ export async function proposeInstrumentSupervised(opts: {
   const book = loadDemoBookPrefs();
   if (!demoBookAllowsEnqueueConfirm(book.mode)) {
     throw new Error(
-      "Libro en MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.",
+      "Cartera en MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.",
     );
   }
   if (demoBookRequiresEstudioMembership(book.mode)) {
@@ -44,7 +44,7 @@ export async function proposeInstrumentSupervised(opts: {
   const summary = (await api.getAccountSummary(opts.accountId)).data;
   if (summary.positionsCount >= book.maxOpenPositions) {
     throw new Error(
-      `Tope de posiciones (${book.maxOpenPositions}). Cierra alguna o sube el máximo en Libro DEMO.`,
+      `Tope de posiciones (${book.maxOpenPositions}). Cierra alguna o sube el máximo en Cartera DEMO.`,
     );
   }
   const priceHint =

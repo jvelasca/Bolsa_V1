@@ -39,8 +39,8 @@ export function AccountVenuePreference({ accountId }: { accountId: string }) {
       <p className="text-sm font-medium">Entorno de ejecución (cuenta)</p>
       <p className="text-xs text-muted-foreground">
         Preferencia Paper | Live de esta cuenta. El ajuste general de la mesa
-        gana sobre esta preferencia. LIVE es experimental: una orden enviada
-        todavía no es una ejecución confirmada.
+        gana sobre esta preferencia. LIVE es experimental: enviar una orden no
+        significa que se haya ejecutado.
       </p>
       <div className="flex flex-wrap items-center gap-1.5">
         {(["paper", "live"] as const).map((v) => {

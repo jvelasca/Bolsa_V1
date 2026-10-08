@@ -25,6 +25,7 @@ import { useEffectiveBrokerVenue } from "@/features/accounts/use-effective-broke
 import { InstrumentStrategyTopPanel } from "@/features/backtests/instrument-strategy-top-panel";
 import { OhlcvChart } from "@/features/charts/ohlcv-chart";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { focusInstrumentInMercado } from "@/features/trading/focus-instrument-in-mercado";
 import { TradeConfirmPanel } from "@/features/trading/trade-confirm-panel";
@@ -295,7 +296,7 @@ export function InstrumentDetailPage() {
             <p className="text-2xl font-semibold tabular-nums">
               {summary?.lastClose != null
                 ? formatPrice(summary.lastClose)
-                : "—"}
+                : absentDataLabel()}
             </p>
             {summary?.changePct != null && (
               <p
