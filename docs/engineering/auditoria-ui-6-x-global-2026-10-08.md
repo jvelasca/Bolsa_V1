@@ -202,7 +202,7 @@ Pregunta principal acordada: **«¿Qué requiere mi atención?»**. La pantalla 
 
 ## 9. Barrido global — cierre de residuos declarados (sellado en `v2.88.92-beta`)
 
-> **AsOf:** 2026-10-08 · **Estado:** **sellado en `v2.88.92-beta`** (package `2.11.92-beta`; tag anotado, cita de `Release tag CI` post-tag).
+> **AsOf:** 2026-10-08 · **Estado:** **sellado en `v2.88.92-beta`** (package `2.11.92-beta`; tag anotado objeto `6bde9337` → commit `88416aff`; `Release tag CI` [`37802710522`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37802710522) **VERDE**; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0`).
 > **Naturaleza:** UI/semántica y tests en `apps/web/**`. **`Δ motor = 0`** (el diff no toca `packages/py/**`, worker, umbrales, Alembic ni `contract:gen`; el bump solo toca `package.json`/`meta.bump`).
 > **Precedente:** correcciones que `v2.88.91-beta` dejó **abiertas** en su [entrega §4](./entrega-auditoria-externa-mia-v2.88.91-2026-10-08.md).
 

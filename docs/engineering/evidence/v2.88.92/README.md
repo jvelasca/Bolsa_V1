@@ -8,7 +8,7 @@
 **Contrato implementado:** [`spec-ui-contract-5-0-2026-10-08.md`](../../spec-ui-contract-5-0-2026-10-08.md) — Bloque E (`R-G1`, `R-G2`) ya en `DONE` desde `v2.88.91`; este sello **extiende la cobertura** del gate `R-G1` a las superficies que quedaron fuera.
 **Base:** [`evidence/v2.88.91/README.md`](../v2.88.91/README.md).
 **Detalle de origen:** [auditoría UI 6.x global §9](../../auditoria-ui-6-x-global-2026-10-08.md).
-**Cita POST-TAG:** pendiente de `Release tag CI` (tag por crear).
+**Cita POST-TAG:** `Release tag CI` [`37802710522`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37802710522) **VERDE** (`11` jobs `success` + `playwright (integrated E2E, opt-in)` `skipped`; `certify` `success`). El job `replay-repro` dio **`VEREDICTO REPRODUCIDO`** con `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (misma huella que la serie; 2ª corrida idéntica) ⇒ **`Δ motor = 0` confirmado por CI**. Tag anotado `v2.88.92-beta` (objeto `6bde9337` → commit `88416aff`).
 
 ## 1. Barrido (residuos declarados en `v2.88.91` §4)
 

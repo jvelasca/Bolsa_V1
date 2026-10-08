@@ -6,7 +6,7 @@
 > **Regla del hueco:** una regla que no se puede afirmar se declara **abierta** con su remediación, **nunca** se silencia. Un dato ausente o `UNKNOWN` se rotula «Sin dato todavía»; **jamás** se rellena con `0` ni con verde. El guion `—` queda **prohibido** en nivel 1.
 > **`Δ AUTO decision/execution motor = 0`.** Todo el sello es UI/read-model y tests en `apps/web/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin tocar `packages/py/**`**. **El contrato HTTP NO cambia.**
 > **Evidencia cruda:** [`docs/engineering/evidence/v2.88.92/README.md`](./evidence/v2.88.92/README.md).
-> **Cita POST-TAG:** pendiente de `Release tag CI` (tag por crear).
+> **Cita POST-TAG:** `Release tag CI` [`37802710522`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37802710522) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0` confirmado por CI**). Tag anotado `v2.88.92-beta` (objeto `6bde9337` → commit `88416aff`).
 
 **Sello dirigido (declarado).** Mandato: **una sola aplicación, un único lenguaje operativo en el primer nivel, sin residuos**. No se añaden funciones ni se toca el motor: se re-corta la superficie ya existente y se hace **falsable** cada afirmación con el gate (`first-level-gate.ts`, ahora con `findFirstLevelDashes`) que falla si la jerga o el comodín reaparecen fuera del nivel 3.
 
@@ -82,7 +82,7 @@
 - **Producto:** `V2.88.92-beta`. **Package:** `2.11.92-beta`. **Sin migración** (Alembic head `052_top3_opportunities`). **Contrato HTTP sin cambio.** `packages/py/**` **sin mover**.
 - **Añadidos:** `apps/web/src/components/gate-label.ts`, `apps/web/src/features/barrido-global-first-level.test.tsx`, `docs/engineering/evidence/v2.88.92/README.md`, este documento.
 - **Modificados:** `apps/web/src/**` (trading, mesa, operations, confirm, accounts, dashboard, fiscal, instruments, screeners, help, settings, backtests, components), `package.json`, `apps/api-python/scripts/v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`, `docs/engineering/auditoria-ui-6-x-global-2026-10-08.md` (§9).
-- **Tag anotado `v2.88.92-beta`** — mensaje `UI 6.x global sweep (residuos declarados: Gate N, submitted-fill, Libro/Ledger, dash wildcard) - Delta motor = 0`. **`Release tag CI`:** pendiente.
+- **Tag anotado `v2.88.92-beta`** (objeto `6bde9337` → commit `88416aff`) — mensaje `UI 6.x global sweep (residuos declarados: Gate N, submitted-fill, Libro/Ledger, dash wildcard) - Delta motor = 0`. **`Release tag CI` [`37802710522`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37802710522) VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0` confirmado por CI**).
 
 ---
 
