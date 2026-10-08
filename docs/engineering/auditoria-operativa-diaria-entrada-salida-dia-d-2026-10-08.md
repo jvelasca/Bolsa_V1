@@ -112,12 +112,14 @@
 
 | Slice | Pilar | Objetivo | Alcance previsto |
 | --- | --- | --- | --- |
-| `S1-exit-precio` | P2 | Declarar T1/T2 con **precio** en el Plan de salida del ticket | UI-only (`f3-exit-plan-block.tsx`) sobre datos ya presentes |
-| `S2-entrada-literal` | P2 | Etiquetar «Entrada» en `simple` + `prepared` (no solo `Trigger`) | UI-only (`operational-plan-chart-levels.ts`) |
-| `S3-indicadores-razon` | P3 | Mostrar estrategia + indicadores/`reasons` en primer nivel de Finalistas/cockpit | UI-only; reusa `coachFacts.recommendations[].reasons` |
-| `S4-veredicto-unico` | P4 | Un único veredicto que declare declarado↔ejecutado↔OOS y su hueco | Diseño read-only; **sin** emitir `CONFIRMED` (reservado a PAPER) |
+| `S1-exit-precio` | P2 | Declarar T1/T2 con **precio** en el Plan de salida del ticket | UI-only (`f3-exit-plan-block.tsx`) sobre datos ya presentes. **Condición de parada:** si el backend no aporta esos precios, se detiene; **no** se fabrica desde la UI ni desde un porcentaje |
+| `S2-entrada-literal` | P2 | Resolver la **semántica** de niveles en `simple` + `prepared`: `Entrada` = nivel de entrada operativo; `Trigger` = condición/nivel de activación. Coexisten **solo** si son distintos; **no** se duplica la misma línea | UI-only (`operational-plan-chart-levels.ts`) |
+| `S3-indicadores-razon` | P3 | Mostrar en primer nivel la cadena **Estrategia → indicadores que la sustentan → razón** (no una ficha técnica) | UI-only; reusa `coachFacts.recommendations[].reasons`. Si no hay evidencia de un indicador, se declara «Sin dato todavía»; **no** se deduce del catálogo del gráfico |
+| `S4-agregador-evidencia` | P4 | **Agregador de evidencia** (no un veredicto nuevo): compone los veredictos existentes (declarado↔ejecutado · OOS · PAPER) y concluye `NO CONFIRMADO` mientras no haya evidencia PAPER | Diseño read-only. **Prohibido** `OOS_SUPPORTED + MATCH → CONFIRMED`; **sin** emitir `CONFIRMED`. **No se lanza** hasta nacer con el contrato semántico correcto (§5.2 de premises) |
 
 **Regla:** ningún slice toca motor, contrato HTTP ni Alembic. Si un slice **exige** motor (p. ej. emitir `CONFIRMED` con evidencia PAPER), se para y se reabre el [plan PARKED](./plan-cierre-operativa-auto-2026-10-08.md) con dueño y disparador.
+
+**Nota del auditor (2026-10-08).** `S1`–`S3` quedan **aceptados** para diseño/implementación (con los límites de arriba). `S4` se **acepta como objetivo pero no como contrato actual**: se reformula a agregador de evidencia y **no se lanza** todavía. Ver [respuesta del auditor](./respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md).
 
 ---
 

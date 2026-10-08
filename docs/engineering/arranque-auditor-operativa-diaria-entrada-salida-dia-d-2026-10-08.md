@@ -1,9 +1,11 @@
 # Arranque del auditor — **Operativa diaria: entrada/salida · estrategia/indicadores · DÍA-D (reorden FASE 3)**
 
 > **AsOf:** 2026-10-08 · **Objeto:** premisas de producto + reorden de la FASE 3 + auditoría read-only de los tres pilares (**documentación**, no código).
-> **Base de código auditada:** `main` = `origin/main` = `e92e9cf5` (sello [`v2.88.94-beta`](./evidence/v2.88.94/README.md) → commit `20fd538c`).
+> **Base auditada:** `1a2ce597` (commit de `main` en el momento de la auditoría; sobre el sello [`v2.88.94-beta`](./evidence/v2.88.94/README.md) → commit `20fd538c`). El rango `20fd538c → 1a2ce597` es **solo documentación** (`packages/py/**` sin mover): el código auditado sigue siendo el de `v2.88.94-beta`.
 > **Naturaleza:** auditoría **en solo lectura**. **`Δ AUTO decision/execution motor = 0`**: sin contrato HTTP nuevo, sin Alembic, sin bump de versión, sin tocar `packages/py/**`.
 > **Nota de auditabilidad (declarada).** Al ser un cambio **solo de documentación**, **no** hay tag de release ni `Release tag CI` propio para estos documentos; viven en `main`. La evidencia de motor que respaldan es la del sello base: `Release tag CI` [`37823112083`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37823112083) **VERDE** (`replay-repro` reproducido `1E3ADAC2…` ⇒ `Δ motor = 0`).
+>
+> **Dictamen de esta ronda (2026-10-08):** ver [`respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md`](./respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md) — auditoría **ACEPTADA**; `P2`/`P3`/`P4` en **CUMPLE PARCIAL**; 12 hallazgos no refutados; `S1`–`S3` aceptados; `S4` reformulado a **agregador de evidencia**; `§5` realineada al contrato real.
 
 ---
 
@@ -33,7 +35,7 @@ Objeto: auditoría de DOCUMENTACIÓN (no de motor) sobre el reorden de la FASE 3
   - docs/engineering/plan-cierre-operativa-auto-2026-10-08.md (PARKED)
 Punto de entrada: docs/engineering/arranque-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md
 
-Base de código: main = e92e9cf5 (sello v2.88.94-beta). Cambio solo de documentación:
+Base de código: base auditada = 1a2ce597 (sobre el sello v2.88.94-beta). Cambio solo de documentación:
 no hay tag de release ni CI nuevo para estos documentos. Δ motor = 0.
 
 Reglas: una regla que no se pueda afirmar se declara ABIERTA con su remediación, nunca
@@ -71,6 +73,7 @@ aceptas o refutas los 4 slices S1-S4 ANTES de que se lancen.
 5. [plan de cierre de motor PARKED](./plan-cierre-operativa-auto-2026-10-08.md) — dueño y disparador.
 6. **Padres de contrato:** [ADR-040](../adr/040-user-information-architecture.md) · [ADR-045](../adr/045-ui-contract-5-0.md) · [spec UI 5.0](./spec-ui-contract-5-0-2026-10-08.md) · [ADR-021 (DÍA-D)](../adr/021-dia-d-reconciliation.md) · [domain-language](../domain-language.md).
 7. **Evidencia base:** [evidence/v2.88.94](./evidence/v2.88.94/README.md) · [entrega MIA v2.88.94](./entrega-auditoria-externa-mia-v2.88.94-2026-10-08.md) §7.
+8. **Dictamen de esta ronda:** [respuesta del auditor](./respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md) (cierre del circuito).
 
 ---
 
@@ -125,7 +128,7 @@ aceptas o refutas los 4 slices S1-S4 ANTES de que se lancen.
 
 Con el **OK** del auditor sobre premisas + reorden + hallazgos:
 
-1. Aceptar o refutar los **4 slices** de [§5 de la auditoría](./auditoria-operativa-diaria-entrada-salida-dia-d-2026-10-08.md): `S1-exit-precio`, `S2-entrada-literal`, `S3-indicadores-razon`, `S4-veredicto-unico`.
+1. Aceptar o refutar los **4 slices** de [§5 de la auditoría](./auditoria-operativa-diaria-entrada-salida-dia-d-2026-10-08.md): `S1-exit-precio`, `S2-entrada-literal`, `S3-indicadores-razon`, `S4-agregador-evidencia`.
 2. Si algún slice **exige** motor (p. ej. emitir `CONFIRMED` con evidencia PAPER), **parar** y reabrir el [plan PARKED](./plan-cierre-operativa-auto-2026-10-08.md) con dueño y disparador.
 
 Ningún slice mueve el motor: son producto y presentación sobre un motor ya certificado.

@@ -216,19 +216,36 @@ Secretos (`.env`, tokens, `.secrets/`) **nunca** van al remoto. Ver [github-cred
 
 El `DÍA-D AUTO` (`v2.88.33`/`v2.88.34`) sitúa el motor en una **ventana `D0..D1`** con reloj/precio
 inyectados y stores **en memoria** (cuarentena). Por cada instrumento agrega lo **declarado** (replay
-hermético), lo **ejecutado** (hechos durables, leídos read-only) y el **OOS real** posterior, emite un
-**veredicto** `CONFIRMED`/`MIXED`/`REFUTED`/`NOT_MEASURED` y un **catálogo de errores**
-`SOFTWARE`/`OPERATIONAL`/`DATA` (vocabulario existente de `auto_reason_codes`/`market_operability`), lo
-sirve por `GET /api/auto/dia-d-feedback[/{window}]` (read-only) y lo pinta en `/auto-monitor` (sub-vista
-**«Feedback por valor»**).
+hermético), lo **ejecutado** (hechos durables, leídos read-only) y el **OOS real** posterior, y sirve el
+resultado por `GET /api/auto/dia-d-feedback[/{window}]` (read-only) y en `/auto-monitor` (sub-vista
+**«Feedback por valor»**). Incluye un **catálogo de errores** `SOFTWARE`/`OPERATIONAL`/`DATA`
+(vocabulario existente de `auto_reason_codes`/`market_operability`).
+
+**Cuatro capas de veredicto (NO son equivalentes).** El resultado de DÍA-D **no** es un único `CONFIRMED`:
+son **cuatro capas independientes**, de la más débil (¿hay ventana suficiente?) a la más fuerte
+(¿hay evidencia PAPER?). Ninguna se promociona a la siguiente.
+
+```mermaid
+flowchart TD
+    V["VENTANA · window_gate"] -->|"READY / INCONCLUSIVE"| R["RECONCILIACION declarado vs ejecutado · dia_d_auto"]
+    R -->|"MATCH / PARTIAL / DIVERGENT / NOT_MEASURED"| O["EVIDENCIA OOS · dia_d_auto_feedback"]
+    O -->|"OOS_SUPPORTED / MIXED / REFUTED / NOT_MEASURED"| P["EVIDENCIA PAPER (ejecucion real)"]
+    P -->|"CONFIRMED reservado · hoy NO se emite"| C["Confirmacion de la operativa"]
+```
+
+- **Regla dura de no-equivalencia:** `READY ≠ CONFIRMED` · `MATCH ≠ CONFIRMED` · `OOS_SUPPORTED ≠ CONFIRMED`.
+  La evidencia OOS del REPLAY **no** acredita la ejecución PAPER.
+- **`CONFIRMED` está reservado y hoy NO se emite:** `dia_d_auto_feedback.py` solo emite
+  `OOS_SUPPORTED`/`MIXED`/`REFUTED`/`NOT_MEASURED`, y el gate `window_gate` usa `READY`/`INCONCLUSIVE`.
+  Solo la evidencia PAPER que cumpla su contrato podrá emitirlo.
 
 - **`Δ motor = 0`:** no se edita `auto_simulation_worker.py` ni ningún módulo congelado; el barrido los
   **conduce** con stores en memoria.
 - **El suelo de muestra se declara, no se relaja** (`MIN_VALUE_CYCLES = 5`): muestras pequeñas ⇒
   `NOT_MEASURED` será **frecuente**.
-- **El veredicto se recalcula sin cambiar código** en cuanto la ventana PAPER opere esos `D`.
-- **El gate global `window_gate` sigue siendo la autoridad** sobre la ventana; el veredicto por valor es
-  un **complemento**, no un sustituto.
+- **El veredicto de cada capa se recalcula sin cambiar código** en cuanto la ventana PAPER opere esos `D`.
+- **El gate global `window_gate` (capa VENTANA) es la autoridad** sobre la ventana; las capas de evidencia
+  por valor son un **complemento**, no un sustituto.
 
 ---
 
@@ -249,7 +266,7 @@ ellas; la completitud contable retrospectiva **no** es el objetivo (es deuda dec
 | **P1** | **Operativa ganadora en rango diario** | La operativa objetivo gana en **timeframe diario**; es la vara de producto. | Existe evidencia con R/expectancy en la ventana diaria, citando su `K` y su intervalo de confianza. |
 | **P2** | **Claridad del punto de entrada y salida** | Toda propuesta/posición indica de forma **inequívoca** el punto/zona de **entrada** y el de **salida** (stop y objetivo) en primer nivel, sin que el usuario interprete el gráfico. | La superficie de primer nivel muestra entrada y salida; si falta una, se declara «Sin dato todavía». |
 | **P3** | **Estrategia confirmada con los mejores indicadores** | La operativa se apoya en una estrategia **confirmada por evidencia**, y los **indicadores detectados** que la sustentan son visibles como razón. | La superficie declara la estrategia y los indicadores que la sustentan; sin confirmación, se declara. |
-| **P4** | **Evaluación DÍA-D** (sobre todo) | La comparación **declarado vs ejecutado vs OOS real** es la comprobación central de que la estrategia se sostiene; ninguna operativa se da por buena sin re-medir DÍA-D. | El veredicto DÍA-D (`CONFIRMED`/`MIXED`/`REFUTED`/`NOT_MEASURED`) se recalcula y se cita con su ventana. |
+| **P4** | **Evaluación DÍA-D** (sobre todo) | La comparación **declarado vs ejecutado vs OOS real** es la comprobación central de que la estrategia se sostiene; ninguna operativa se da por buena sin re-medir DÍA-D. | La superficie cita la **capa de evidencia real** con su ventana (`READY`/`INCONCLUSIVE` · `MATCH`/`PARTIAL`/`DIVERGENT` · `OOS_SUPPORTED`/`MIXED`/`REFUTED`); **`CONFIRMED` está reservado a PAPER y no se emite** (§5.2). |
 
 ### 6.2 Invariante preservado (no es prioridad nueva)
 
