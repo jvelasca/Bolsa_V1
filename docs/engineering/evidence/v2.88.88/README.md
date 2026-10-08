@@ -35,12 +35,23 @@
 
 - `pnpm --filter @bolsa/web typecheck` → **OK**.
 - `pnpm --filter @bolsa/web lint` → **0 errores** (23 avisos `react-hooks/exhaustive-deps` preexistentes, ajenos a este slice).
-- `pnpm --filter @bolsa/web test` → **268 ficheros / 1592 tests verdes**.
+- `pnpm --filter @bolsa/web test` → **268 ficheros / 1593 tests verdes**.
 - Suites nuevas: `auto-operation-ladder.test.ts`, `operation-mode.test.ts`, `mode-badge.test.tsx`; ampliadas: `auto-nav.test.ts` (orden + tiers), `auto-workspace-layout.test.tsx` (disclosure), `auto-home-page.test.tsx` (cada hecho una sola vez), `auto-risk-summary.test.ts` y `auto-riesgo-page.test.tsx` (veredicto), `auto-pages.test.tsx` (modo + peldaño), `auto-operation-sheet.test.ts` (escalera + modo), `admin-rail-items.test.tsx` (tres grupos + `AUTO` en Administración).
 - **Guardián de bump:** `test_dia_d_bump_guard` **verde** (los 9 CLIs `v2_89`…`v2_97` sellan `2.11.88-beta` junto al `package.json`).
 - **E2E (Playwright, mocks, `E2E_RUN=1`):**
-  - [`gp-e2e-v28865-auto-axe-mock.spec.ts`](../../../../apps/web/e2e/gp-e2e-v28865-auto-axe-mock.spec.ts) → **13/13 verde**: **0 violaciones `critical`/`serious`** en las 8 rutas AUTO (`/auto`, `/auto/operar`, `/auto/operar/operacion/:cycleId`, `/auto/cartera`, `/auto/riesgo`, `/auto/analisis`, `/auto/sistema`, `/auto-monitor`), teclado de las pestañas de ANÁLISIS, responsive 390×844 y estados carga/error/vacío-no-medido. El assert de «vacío/no-medido» pasa de `auto-home-tile-auto` a `auto-home-q-working` (el tile se retiró en `UI5-04`). **Re-certificación de las rutas tocadas: hecha.**
+  - [`gp-e2e-v28865-auto-axe-mock.spec.ts`](../../../../apps/web/e2e/gp-e2e-v28865-auto-axe-mock.spec.ts) → **14/14 verde**: **0 violaciones `critical`/`serious`** en las 8 rutas AUTO (`/auto`, `/auto/operar`, `/auto/operar/operacion/:cycleId`, `/auto/cartera`, `/auto/riesgo`, `/auto/analisis`, `/auto/sistema`, `/auto-monitor`), teclado de las pestañas de ANÁLISIS, teclado/ratón de la `AdminRail` **expandida**, responsive 390×844 y estados carga/error/vacío-no-medido. El assert de «vacío/no-medido» pasa de `auto-home-tile-auto` a `auto-home-q-working` (el tile se retiró en `UI5-04`). **Re-certificación de las rutas tocadas: hecha.**
   - [`gp-e2e-v28856-auto-ui-navigation-mock.spec.ts`](../../../../apps/web/e2e/gp-e2e-v28856-auto-ui-navigation-mock.spec.ts) + [`gp-e2e-v28857-auto-operacion-invalida-mock.spec.ts`](../../../../apps/web/e2e/gp-e2e-v28857-auto-operacion-invalida-mock.spec.ts) → **6/6 verde** (main/h1 únicos por ruta con la sub-navegación nueva, detalle técnico y deep-links).
+
+### Hallazgo del `Release tag CI` (run `37741490506`) — corregido antes del re-anclaje
+
+El primer `Release tag CI` del tag cayó en `playwright (mock E2E)`: el propio `gp-e2e-v28865` detectó **`color-contrast [serious] ×3`** en las 8 rutas AUTO. Nodos: los **rótulos de grupo** de la `AdminRail` (`UI5-08`), que usaban `text-muted-foreground/70` → `#67727f` sobre `#121821` = **3.64:1** (WCAG AA exige `4.5:1` a 10 px / peso normal). El paso local no lo vio porque la rail estaba **colapsada** y `axe` no evalúa los rótulos ocultos: la certificación quedaba a merced del estado de hover.
+
+**Corrección (no se oculta el defecto, se arregla el color):**
+
+1. [`admin-rail.tsx`](../../../../apps/web/src/components/layout/admin-rail.tsx): `text-muted-foreground/70` → `text-muted-foreground` (`#8b98a8` sobre `#121821` = **6.81:1** en oscuro; `#64748b` sobre `#ffffff` = **4.76:1** en claro). Ambas conformes.
+2. [`gp-e2e-v28865`](../../../../apps/web/e2e/gp-e2e-v28865-auto-axe-mock.spec.ts): nuevo test que **ancla la rail expandida** (`hover` → `data-collapsed="0"`, comprueba que `AUTO` vive en el grupo `Administración`) y barre `axe` ahí. Antes del arreglo ese test falla; después, verde. La certificación de los rótulos deja de depender del hover accidental.
+
+Re-verificado tras el arreglo: `typecheck` OK · `lint` 0 errores · `frontend` `1593 passed` · `gp-e2e-v28865` **14/14**.
 
 ## Qué no cambia
 
@@ -48,4 +59,4 @@ Motor AUTO de decisión/ejecución, ledger, posiciones, settlement, contrato HTT
 
 ## Cita POST-TAG
 
-Pendiente de sello. Sin tag `v2.88.88-beta` todavía.
+Pendiente: tag `v2.88.88-beta` **re-anclado** tras el hallazgo de contraste del run `37741490506` (ver arriba). El primer tag apuntaba a `a2da85a7` y su CI cayó; el tag se re-ancla al tip corregido y su `Release tag CI` se cita aquí al cerrar.
