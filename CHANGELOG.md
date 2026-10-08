@@ -26,7 +26,7 @@ All notable releases of Bolsa V1.
 - **UI5-17 Acción ≠ Navegación (`G-08`).** En las superficies tocadas, navegar es enlace subrayado (`Ver operación →`) y el botón queda para acciones reales.
 - **Tests.** Nuevas `auto-operation-ladder.test.ts`, `operation-mode.test.ts`, `mode-badge.test.tsx`; ampliadas `auto-nav.test.ts`, `auto-workspace-layout.test.tsx`, `auto-home-page.test.tsx`, `auto-risk-summary.test.ts`, `auto-riesgo-page.test.tsx`, `auto-pages.test.tsx`, `auto-operation-sheet.test.ts`. Suite web: **268 ficheros / 1593 tests verdes**; `typecheck` y `lint` (0 errores) verdes. E2E `gp-e2e-v28865` `14/14`.
 - **Hallazgo corregido en el `Release tag CI` `37741490506`.** El barrido `axe` en CI detectó `color-contrast [serious] ×3` en las 8 rutas AUTO: los rótulos de grupo de la `AdminRail` (`UI5-08`) usaban `text-muted-foreground/70` → **3.64:1** (AA exige 4.5:1). El paso local no lo vio porque la rail estaba colapsada y `axe` omite los rótulos ocultos. Se corrige el color (`text-muted-foreground` → **6.81:1** oscuro / **4.76:1** claro) y se añade un test que ancla la rail **expandida** para que la certificación no dependa del hover.
-- **Evidencia:** [`docs/engineering/evidence/v2.88.88/README.md`](docs/engineering/evidence/v2.88.88/README.md).
+- **Evidencia:** [`docs/engineering/evidence/v2.88.88/README.md`](docs/engineering/evidence/v2.88.88/README.md). **Entrega a auditoría externa:** [`docs/engineering/entrega-auditoria-externa-mia-v2.88.88-2026-10-08.md`](docs/engineering/entrega-auditoria-externa-mia-v2.88.88-2026-10-08.md).
 
 ## [2.11.87-beta] — `AUTO · UI`: **AUTO/UI REFACTOR 4.0 — estado humano, centro de actividad, «¿Por qué?» transversal, ficha universal y TOP 3 OPORTUNIDADES**
 

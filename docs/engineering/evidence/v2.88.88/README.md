@@ -4,6 +4,7 @@
 
 **Contrato implementado:** [`spec-ui-contract-5-0-2026-10-08.md`](../../spec-ui-contract-5-0-2026-10-08.md) (`UI5-01`…`UI5-20`).
 **Deuda auditada:** [`auditoria-ui-global-v2.88.87-2026-10-08.md`](../../auditoria-ui-global-v2.88.87-2026-10-08.md) (`G-01`…`G-13`).
+**Entrega a auditoría externa:** [`entrega-auditoria-externa-mia-v2.88.88-2026-10-08.md`](../../entrega-auditoria-externa-mia-v2.88.88-2026-10-08.md).
 
 ## Mapeo `UI5-n` → fichero
 
