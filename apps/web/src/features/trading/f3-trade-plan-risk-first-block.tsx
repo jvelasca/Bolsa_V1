@@ -4,6 +4,7 @@
 
 import { type ReactNode } from "react";
 import { formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import type { F3TicketPreviewView } from "@/features/trading/f3-ticket-preview";
 import { cn } from "@/lib/utils";
 
@@ -65,7 +66,7 @@ export function F3TradePlanRiskFirstBlock({
   const lossLabel =
     signedLossAtStop != null && Number.isFinite(signedLossAtStop)
       ? money(signedLossAtStop)
-      : "—";
+      : absentDataLabel();
 
   return (
     <div
@@ -89,7 +90,10 @@ export function F3TradePlanRiskFirstBlock({
       </Section>
 
       <Section title="Riesgo (primero)">
-        <Row label="Stop" value={stop != null ? formatPrice(stop) : "—"} />
+        <Row
+          label="Stop"
+          value={stop != null ? formatPrice(stop) : absentDataLabel()}
+        />
         {riskPerShare != null ? (
           <Row label="Riesgo / acción" value={formatPrice(riskPerShare)} />
         ) : null}
@@ -115,7 +119,10 @@ export function F3TradePlanRiskFirstBlock({
       </Section>
 
       <Section title="Objetivo">
-        <Row label="T1" value={target1 != null ? formatPrice(target1) : "—"} />
+        <Row
+          label="T1"
+          value={target1 != null ? formatPrice(target1) : absentDataLabel()}
+        />
       </Section>
 
       {inputsStale ? (

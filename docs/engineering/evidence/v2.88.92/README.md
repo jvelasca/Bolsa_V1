@@ -42,6 +42,6 @@ El gate falla si cualquiera de esas superficies reintroduce jerga de backend, el
 
 - **Motor AUTO** de decisión/ejecución, worker, umbrales, Alembic (head `052_top3_opportunities`), `contract:gen`, contrato HTTP y esquema. Live/XTB real sigue fuera: el canal se declara `SIMULADO`.
 - **`playwright` integrado** sigue `opt-in`/`skipped`; la certificación `axe` de la serie es **con mocks**.
-- **Residuos fuera de alcance (resto de la app):** el barrido global de `—` se limita a las superficies del punto 4 de §1; quedan superficies con `—` decorativo (**nivel 3**) que no son primer nivel y por tanto no son hallazgo.
+- **Residuos fuera de alcance (resto de la app), corregidos en el sello `v2.88.93-beta`:** el barrido de `—` de este sello se limita a las superficies del punto 4 de §1. La auditoría posterior detectó `—` de primer nivel en superficies hermanas (Caja/Patrimonio/Sector/Vigencia) y el rótulo `Gate` crudo en el drawer de Oportunidades; se corrigen y se añaden al gate, no se reclasifican como «nivel 3 decorativo».
 - **`Gate N` conservado** como dato de decisión (no es término prohibido): solo se humaniza su etiqueta.
 - **Deuda durable backend:** `PortfolioDecision`, materialización SIM, PIT histórico, Execution Analysis.

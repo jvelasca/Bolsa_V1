@@ -20,6 +20,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   findFirstLevelDashes,
+  findFirstLevelGateLiterals,
   findFirstLevelViolations,
   FORBIDDEN_FIRST_LEVEL_TOKENS,
   stripTechnicalDetailBlocks,
@@ -81,6 +82,22 @@ const TOKEN_SURFACES: Array<{ name: string; file: string }> = [
     name: "Chrome · command-palette.tsx",
     file: "features/command-palette/command-palette.tsx",
   },
+  {
+    name: "Mesa · opportunity-drawer.tsx",
+    file: "features/mesa/opportunity-drawer.tsx",
+  },
+  {
+    name: "Operaciones · mesa-operational-bar.tsx",
+    file: "features/operations/mesa-operational-bar.tsx",
+  },
+  {
+    name: "Screeners · saved-strategies-panel.tsx",
+    file: "features/screeners/saved-strategies-panel.tsx",
+  },
+  {
+    name: "Screeners · paper-d-propose-panel.tsx",
+    file: "features/screeners/paper-d-propose-panel.tsx",
+  },
 ];
 
 const DASH_SURFACES: string[] = [
@@ -92,6 +109,12 @@ const DASH_SURFACES: string[] = [
   "features/fiscal/tax-report-page.tsx",
   "features/screeners/fundamental-screener-panel.tsx",
   "features/screeners/paper-d-propose-panel.tsx",
+  "features/operations/mesa-operational-bar.tsx",
+  "features/mesa/mesa-daily-header.tsx",
+  "features/mesa/mesa-what-if-panel.tsx",
+  "features/mesa/operational-plan-view.tsx",
+  "features/trading/f3-confirm-what-if-block.tsx",
+  "features/trading/f3-trade-plan-risk-first-block.tsx",
 ];
 
 describe("barrido global · primer nivel sin jerga de ingeniería (R-G1/RT-02)", () => {
@@ -123,7 +146,6 @@ describe("barrido global · control de falsabilidad del gate", () => {
       expect.arrayContaining(["Recommendation", "runId"]),
     );
   });
-
   it("el gate de guion detecta el literal y respeta prosa y nivel 3", () => {
     expect(findFirstLevelDashes('{x ?? "—"}')).toHaveLength(1);
     expect(findFirstLevelDashes("<p>Editar — Nombre</p>")).toEqual([]);
@@ -136,5 +158,35 @@ describe("barrido global · control de falsabilidad del gate", () => {
     expect(
       stripTechnicalDetailBlocks("<TechnicalDetail>ledger</TechnicalDetail>"),
     ).not.toContain("ledger");
+  });
+});
+
+const GATE_LITERAL_SURFACES: Array<{ name: string; file: string }> = [
+  ...TOKEN_SURFACES,
+  ...DASH_SURFACES.map((file) => ({ name: file, file })),
+];
+
+describe("barrido global · «Gate» sin valor crudo en primer nivel (R-G1 / H-03)", () => {
+  it.each(GATE_LITERAL_SURFACES)(
+    "$name no muestra «Gate» + valor crudo fuera de TechnicalDetail",
+    ({ file }) => {
+      expect(findFirstLevelGateLiterals(readSurface(file))).toEqual([]);
+    },
+  );
+
+  it("el gate de rótulo detecta la fuga y respeta identificadores y nivel 3", () => {
+    expect(findFirstLevelGateLiterals("Estado · Gate ${row.gate}")).toEqual([
+      "Gate ${",
+    ]);
+    expect(findFirstLevelGateLiterals("<p>Gate PASS</p>")).toEqual(["Gate P"]);
+    expect(findFirstLevelGateLiterals("const gateStatus = row.gate;")).toEqual(
+      [],
+    );
+    expect(findFirstLevelGateLiterals("<DecisionGate />")).toEqual([]);
+    expect(
+      findFirstLevelGateLiterals(
+        "<TechnicalDetail>Gate ${x}</TechnicalDetail>",
+      ),
+    ).toEqual([]);
   });
 });

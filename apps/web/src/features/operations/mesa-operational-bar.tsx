@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deriveMesaRegimeHint } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { absentDataLabel } from "@/components/absent-data";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
@@ -128,13 +129,13 @@ export function MesaOperationalBar({
         <span className="text-muted-foreground">
           Caja{" "}
           <span className="font-medium tabular-nums text-foreground">
-            {cash != null ? formatPrice(cash) : "—"}
+            {cash != null ? formatPrice(cash) : absentDataLabel()}
           </span>
         </span>
         <span className="text-muted-foreground">
           Patrimonio{" "}
           <span className="font-medium tabular-nums text-foreground">
-            {equity != null ? formatPrice(equity) : "—"}
+            {equity != null ? formatPrice(equity) : absentDataLabel()}
           </span>
         </span>
         <span className="text-muted-foreground">
@@ -149,7 +150,7 @@ export function MesaOperationalBar({
                   : "text-foreground",
             )}
           >
-            {unrealized != null ? formatPrice(unrealized) : "—"}
+            {unrealized != null ? formatPrice(unrealized) : absentDataLabel()}
           </span>
         </span>
         <span className="text-muted-foreground">

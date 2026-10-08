@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { mesaOperationsHref } from "@/features/mesa/mesa-nav-links";
 
 type MesaDailyHeaderProps = {
@@ -38,23 +39,25 @@ export function MesaDailyHeader({
         <CardHeader className="pb-1">
           <CardDescription>Cuenta</CardDescription>
           <CardTitle className="text-xl tabular-nums">
-            {equity != null ? formatPrice(equity) : "—"}
+            {equity != null ? formatPrice(equity) : absentDataLabel()}
           </CardTitle>
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground">
-          Caja {cash != null ? formatPrice(cash) : "—"}
+          Caja {cash != null ? formatPrice(cash) : absentDataLabel()}
         </CardContent>
       </Card>
       <Card>
         <CardHeader className="pb-1">
           <CardDescription>Cartera</CardDescription>
           <CardTitle className="text-xl tabular-nums">
-            {equity != null ? formatPrice(equity) : "—"}
+            {equity != null ? formatPrice(equity) : absentDataLabel()}
           </CardTitle>
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground">
           <span className={pnlUp ? "text-emerald-600" : "text-red-500"}>
-            {unrealizedPnl != null ? formatPrice(unrealizedPnl) : "—"}
+            {unrealizedPnl != null
+              ? formatPrice(unrealizedPnl)
+              : absentDataLabel()}
           </span>
           {" · "}
           <Link

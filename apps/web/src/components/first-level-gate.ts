@@ -72,3 +72,18 @@ const DASH_WILDCARD = /["'`]—["'`]|&mdash;/g;
 export function findFirstLevelDashes(source: string): string[] {
   return stripTechnicalDetailBlocks(source).match(DASH_WILDCARD) ?? [];
 }
+
+/**
+ * Literal «Gate» + valor crudo de primer nivel (`R-G1`, auditoría UI 6.x §4 H-03).
+ *
+ * Detecta el rótulo «Gate» seguido de un valor crudo (`Gate PASS`, `Gate ${…}`, `Gate {…}`)
+ * fuera de los bloques `TechnicalDetail`. Exige `Gate` como palabra suelta, de modo que los
+ * identificadores TS legítimos (`gateStatus`, `DecisionGate`, `AuthGate`, `decideGate`) NO se
+ * marcan. El comodín de la etiqueta humanizada lo resuelve `gateHumanLabel`.
+ */
+const GATE_LITERAL = /\bGate\b[^\S\n]*(?:\$\{|\{|[A-Z])/g;
+
+/** Literales de «Gate» + valor crudo de primer nivel (vacío si solo vive en nivel 3). */
+export function findFirstLevelGateLiterals(source: string): string[] {
+  return stripTechnicalDetailBlocks(source).match(GATE_LITERAL) ?? [];
+}

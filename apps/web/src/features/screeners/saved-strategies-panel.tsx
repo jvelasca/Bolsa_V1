@@ -29,6 +29,7 @@ import {
 } from "@bolsa/shared";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { absentDataLabel } from "@/components/absent-data";
 import { inputClassName } from "@/components/ui/dialog";
 import {
   OpaqueMenuItem,
@@ -71,7 +72,7 @@ const ORIGIN_LABELS: Record<StrategyOrigin, string> = {
 
 function formatUpdatedAt(value: string): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return absentDataLabel();
   return formatDateTimeCompact(date);
 }
 
@@ -777,7 +778,7 @@ export function SavedStrategiesPanel({
                 {isHybrid && (
                   <>
                     <label className="block text-xs">
-                      Gate preset
+                      Condición de entrada
                       <select
                         value={editGatePreset}
                         onChange={(event) =>

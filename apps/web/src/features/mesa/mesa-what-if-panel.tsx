@@ -14,6 +14,7 @@ import {
   dominantSectorExposure,
   effectiveMaxSectorExposurePct,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -30,7 +31,7 @@ type MesaWhatIfPanelProps = {
 };
 
 function cell(value: string | number | null | undefined, suffix = ""): string {
-  if (value == null || value === "") return "—";
+  if (value == null || value === "") return absentDataLabel();
   return `${value}${suffix}`;
 }
 
@@ -135,12 +136,12 @@ export function MesaWhatIfPanel({
         <dd className="tabular-nums text-right">
           {scenario.current.openRiskR != null
             ? `${scenario.current.openRiskR.toFixed(2)}R`
-            : "—"}
+            : absentDataLabel()}
         </dd>
         <dd className="tabular-nums text-right">
           {scenario.after.openRiskR != null
             ? `${scenario.after.openRiskR.toFixed(2)}R`
-            : "—"}
+            : absentDataLabel()}
         </dd>
         <dt
           className="text-muted-foreground"
@@ -154,24 +155,24 @@ export function MesaWhatIfPanel({
         >
           {portfolioRisk?.portfolioStressRiskR != null
             ? `${portfolioRisk.portfolioStressRiskR.toFixed(2)}R`
-            : "—"}
+            : absentDataLabel()}
         </dd>
         <dd
           className="tabular-nums text-right text-muted-foreground"
           title="cota concurrente stops; sin correlación · no proyectado en scenario"
         >
-          —
+          {absentDataLabel("not_applicable")}
         </dd>
         <dt className="text-muted-foreground">Sector</dt>
         <dd className="text-right tabular-nums">
           {candidatePair
             ? `${candidatePair.sector} ${candidatePair.currentPct}%`
-            : "—"}
+            : absentDataLabel()}
         </dd>
         <dd className="text-right tabular-nums">
           {candidatePair
             ? `${candidatePair.sector} ${candidatePair.afterPct}%`
-            : "—"}
+            : absentDataLabel()}
         </dd>
         {showDominant ? (
           <>
@@ -181,7 +182,9 @@ export function MesaWhatIfPanel({
             <dd className="text-right tabular-nums">
               {`${dominantCurrent.sector} ${dominantCurrent.pct}%`}
             </dd>
-            <dd className="text-right tabular-nums text-muted-foreground">—</dd>
+            <dd className="text-right tabular-nums text-muted-foreground">
+              {absentDataLabel("not_applicable")}
+            </dd>
           </>
         ) : null}
         {unknownPct > 0 ? (
@@ -217,7 +220,7 @@ export function MesaWhatIfPanel({
         Concentración sectorial:{" "}
         {scenario.after.sectorConcentration != null
           ? scenario.after.sectorConcentration.toFixed(2)
-          : "—"}
+          : absentDataLabel()}
       </p>
       <p className="text-muted-foreground">Límite mandato: {limit}R</p>
       <p className="text-muted-foreground">

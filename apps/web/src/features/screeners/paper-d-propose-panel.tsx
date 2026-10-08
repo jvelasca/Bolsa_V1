@@ -8,6 +8,7 @@ import { useState } from "react";
 import type { PaperDProposeResultV1 } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import { absentDataLabel } from "@/components/absent-data";
+import { TechnicalDetail } from "@/components/technical-detail";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -128,10 +129,17 @@ export function PaperDProposePanel({
       </div>
 
       <p className="text-[10px] text-muted-foreground">
-        Dry-run por defecto. Execute exige env API{" "}
-        <code>PAPER_D_EXECUTE=1</code>, política <code>paper_auto</code> con{" "}
-        <code>entry_long</code>, y Gate cognitivo. ≠ radar (B).
+        Simulación por defecto: propone candidatas, no las envía. Activa la
+        ejecución simulada solo si quieres firmarlas; los requisitos del canal
+        están en el detalle técnico.
       </p>
+      <TechnicalDetail testId="paper-d-propose-technical">
+        <p>
+          Dry-run por defecto. Execute exige env API{" "}
+          <code>PAPER_D_EXECUTE=1</code>, política <code>paper_auto</code> con{" "}
+          <code>entry_long</code>, y Gate cognitivo. ≠ radar (B).
+        </p>
+      </TechnicalDetail>
 
       {mutation.isError ? (
         <p className="text-[11px] text-destructive">

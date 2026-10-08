@@ -9,6 +9,7 @@ import {
   dominantSectorExposure,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
+import { absentDataLabel } from "@/components/absent-data";
 
 type F3ConfirmWhatIfBlockProps = {
   scenario: PortfolioScenarioV1;
@@ -17,7 +18,7 @@ type F3ConfirmWhatIfBlockProps = {
 };
 
 function cell(value: string | number | null | undefined, suffix = ""): string {
-  if (value == null || value === "") return "—";
+  if (value == null || value === "") return absentDataLabel();
   return `${value}${suffix}`;
 }
 
@@ -67,12 +68,12 @@ export function F3ConfirmWhatIfBlock({
         <dd className="tabular-nums text-right">
           {scenario.current.openRiskR != null
             ? `${scenario.current.openRiskR.toFixed(2)}R`
-            : "—"}
+            : absentDataLabel()}
         </dd>
         <dd className="tabular-nums text-right">
           {scenario.after.openRiskR != null
             ? `${scenario.after.openRiskR.toFixed(2)}R`
-            : "—"}
+            : absentDataLabel()}
         </dd>
         <dt className="text-muted-foreground">Sector</dt>
         <dd
@@ -81,7 +82,7 @@ export function F3ConfirmWhatIfBlock({
         >
           {candidatePair
             ? `${candidatePair.sector} ${candidatePair.currentPct}%`
-            : "—"}
+            : absentDataLabel()}
         </dd>
         <dd
           className="text-right tabular-nums"
@@ -89,7 +90,7 @@ export function F3ConfirmWhatIfBlock({
         >
           {candidatePair
             ? `${candidatePair.sector} ${candidatePair.afterPct}%`
-            : "—"}
+            : absentDataLabel()}
         </dd>
         {showDominant ? (
           <>
@@ -99,7 +100,9 @@ export function F3ConfirmWhatIfBlock({
             <dd className="text-right tabular-nums">
               {`${dominantCurrent.sector} ${dominantCurrent.pct}%`}
             </dd>
-            <dd className="text-right tabular-nums text-muted-foreground">—</dd>
+            <dd className="text-right tabular-nums text-muted-foreground">
+              {absentDataLabel("not_applicable")}
+            </dd>
           </>
         ) : null}
         <dt className="text-muted-foreground">Fit</dt>

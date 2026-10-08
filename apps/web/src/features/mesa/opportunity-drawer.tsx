@@ -22,6 +22,8 @@ import {
 } from "@bolsa/shared";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { absentDataLabel } from "@/components/absent-data";
+import { gateHumanLabel } from "@/components/gate-label";
 import { MesaWhatIfPanel } from "@/features/mesa/mesa-what-if-panel";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
 import { OpportunityScoreBars } from "@/features/mesa/opportunity-score-bars";
@@ -121,7 +123,9 @@ export function OpportunityDrawer({
       ? ENTRIES_BLOCKED_CTA_LABEL
       : (entryOperatingPrimaryLabel("preparada") ?? "Preparar operación"));
   const opinion =
-    study?.opinion != null ? JOURNAL_STUDY_OPINION_LABELS[study.opinion] : "—";
+    study?.opinion != null
+      ? JOURNAL_STUDY_OPINION_LABELS[study.opinion]
+      : absentDataLabel();
   const sector = row.instrumentId
     ? (sectorByInstrumentId?.[row.instrumentId] ?? null)
     : null;
@@ -188,12 +192,12 @@ export function OpportunityDrawer({
             value={
               study?.vigencia
                 ? JOURNAL_STUDY_VIGENCIA_LABELS[study.vigencia]
-                : "—"
+                : absentDataLabel()
             }
           />
           <Field
             label="Estado"
-            value={`${row.statusLabel} · Gate ${row.gate}`}
+            value={`${row.statusLabel} · ${gateHumanLabel(row.gate)}`}
           />
           {study?.hasOperationalPlan ? (
             <div className="sm:col-span-2 space-y-2">
@@ -208,7 +212,7 @@ export function OpportunityDrawer({
               {NO_OPERATIONAL_PLAN_COPY}
             </div>
           )}
-          <Field label="Sector" value={sector?.trim() || "—"} />
+          <Field label="Sector" value={sector?.trim() || absentDataLabel()} />
         </dl>
 
         <MesaWhatIfPanel

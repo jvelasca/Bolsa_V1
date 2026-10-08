@@ -10,6 +10,7 @@ import {
   type OperationalPlanViewV1,
 } from "@bolsa/shared";
 import { formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 type OperationalPlanViewProps = {
@@ -80,7 +81,7 @@ export function OperationalPlanView({
     plan.stopInicial !== plan.stopVigente
       ? `inicial ${formatPrice(plan.stopInicial)}`
       : plan.stopInicial == null && plan.stopVigente != null
-        ? "inicial —"
+        ? `inicial ${absentDataLabel().toLowerCase()}`
         : null;
 
   const trailingApplied =
@@ -113,26 +114,36 @@ export function OperationalPlanView({
       <dl className="space-y-1">
         <Row
           label="Entrada"
-          value={plan.entry != null ? formatPrice(plan.entry) : "—"}
+          value={
+            plan.entry != null ? formatPrice(plan.entry) : absentDataLabel()
+          }
         />
         {!omitLiveMetrics && plan.currentPrice != null ? (
           <Row label="Actual" value={formatPrice(plan.currentPrice)} />
         ) : null}
         <Row
           label="🛡 Stop operativo"
-          value={plan.stopVigente != null ? formatPrice(plan.stopVigente) : "—"}
+          value={
+            plan.stopVigente != null
+              ? formatPrice(plan.stopVigente)
+              : absentDataLabel()
+          }
           hint={stopTrace}
           tone="stop"
         />
         <Row
           label="T1"
-          value={plan.target1 != null ? formatPrice(plan.target1) : "—"}
+          value={
+            plan.target1 != null ? formatPrice(plan.target1) : absentDataLabel()
+          }
           hint={targetProgressHint(plan.target1Touched, plan.target1Managed)}
           tone="target"
         />
         <Row
           label="T2"
-          value={plan.target2 != null ? formatPrice(plan.target2) : "—"}
+          value={
+            plan.target2 != null ? formatPrice(plan.target2) : absentDataLabel()
+          }
           hint={targetProgressHint(plan.target2Touched, plan.target2Managed)}
           tone="target"
         />
@@ -162,7 +173,9 @@ export function OperationalPlanView({
             <Row
               label="Stop operativo"
               value={
-                plan.stopVigente != null ? formatPrice(plan.stopVigente) : "—"
+                plan.stopVigente != null
+                  ? formatPrice(plan.stopVigente)
+                  : absentDataLabel()
               }
               tone="stop"
             />
@@ -187,7 +200,7 @@ export function OperationalPlanView({
               value={
                 plan.trailingStopHint != null
                   ? formatPrice(plan.trailingStopHint)
-                  : "—"
+                  : absentDataLabel()
               }
               tone="stop"
             />
