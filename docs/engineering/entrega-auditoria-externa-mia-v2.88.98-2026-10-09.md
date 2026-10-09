@@ -4,9 +4,10 @@
 > **Base:** `v2.88.97-beta` (tag anotado objeto `30bdd642` → commit `d9df6de4`; `Release tag CI` [`37912404394`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37912404394) **VERDE**).
 > **Unidad de esta auditoría:** responder, en orden, a los hallazgos del auditor externo sobre el sello `v2.88.97`: **`P1`** (el rollup OOS colapsaba `null` a `0`), **`P2-4`** (`T1`/`T2` en `sr-only`, no visibles), **`P4`** (validación E2E de «Por qué AUTO no operó») y el **contrato durable de evidencia PAPER**.
 > **Regla del hueco:** una regla que no se puede afirmar se declara **abierta** con su remediación, **nunca** se silencia. Un dato ausente se rotula «Sin dato todavía»; **jamás** se rellena con `0` ni con verde. `ranking ≠ decisión` y `propuesta ≠ posición materializada` se conservan.
-> **`Δ motor = 0`.** El diff vive en `apps/web/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin tocar `packages/py/**`**. **El contrato HTTP NO cambia.**
+> **`Δ motor = 0`.** El diff vive en `apps/web/**`, `packages/shared/src/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin tocar `packages/py/**`**. **El contrato HTTP NO cambia.**
 > **Evidencia cruda:** [`docs/engineering/evidence/v2.88.98/README.md`](./evidence/v2.88.98/README.md).
-> **Cita POST-TAG:** **PENDIENTE** (se añade en el commit siguiente al push del tag `v2.88.98-beta`).
+> **Re-sello.** El primer `Release tag CI` ([`37922388038`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37922388038)) salió **ROJO** en `playwright (mock E2E)`; se corrige el anidado de `T1`/`T2` haciendo **incondicional** el peldaño-objetivo en el plan de la posición (ver §1 #2). El resto del run (frontend, python, shared, lifecycle-pg, decision-spine, a7-gate, dr-verify, `replay-repro` `REPRODUCIDO` `1E3ADAC2…`) fue **VERDE**.
+> **Cita POST-TAG:** **PENDIENTE** (se añade en el commit siguiente al push del tag `v2.88.98-beta` con CI VERDE).
 
 ---
 
@@ -15,7 +16,7 @@
 **Se entrega** la respuesta verificable a la revisión externa de `v2.88.97`, en un único commit:
 
 1. **`P1` — rollup OOS sin colapso de `null` a `0`.** [`buildOosLayer`](../../apps/web/src/features/auto-monitor/dia-d-evidence-aggregate.ts) exige los tres contadores (`oosSupported`, `mixed`, `refuted`) estrictamente no nulos **y** `notMeasured === 0` **antes** de afirmar `OOS_SUPPORTED` / `MIXED` / `REFUTED`; en cualquier otro caso devuelve la capa `gap` («Sin dato todavía») conservando la línea de medición parcial. Razones de hueco tipadas en `dia-d-evidence-aggregate-labels.ts`.
-2. **`P2-4` — `T1`/`T2` visibles en la escalera.** Se retira el bloque `sr-only` duplicado; los `data-testid` contractuales `position-decision-t1`/`position-decision-t2` se anidan en los **peldaños visibles** vía `LevelTestIds` (alias `journey-t1`/`journey-t2`).
+2. **`P2-4` — `T1`/`T2` visibles en la escalera.** El peldaño-objetivo `T1`/`T2` del plan de la posición se monta **siempre** (no solo si el legado ya se ha disparado): `buildOperatorPositionPlan` deja de filtrar por `status !== "absent"` y el detalle lleva el precio objetivo (`trigger`) o «Sin dato todavía». Se retira el bloque `sr-only` duplicado; los `data-testid` contractuales `position-decision-t1`/`position-decision-t2` se anidan en esos **peldaños visibles** vía `LevelTestIds` (alias `journey-t1`/`journey-t2`).
 3. **`P4` — validación E2E.** Nuevo `auto-no-trade-panel.integration.test.tsx` (10 tests) sobre el contenedor real `AutoNoTradePanel`.
 4. **Contrato durable PAPER.** Doc `docs/engineering/contrato-evidencia-paper-confirmacion-2026-10-09.md` + read-model puro `paper-confirmation-contract.ts` (7 criterios falsables) con `verdict` literal `"NO_CONFIRMED"`.
 
@@ -35,7 +36,7 @@
 | --- | --- | --- | --- |
 | 1 | `P1` rollup OOS | `dia-d-evidence-aggregate.ts`, `dia-d-evidence-aggregate-labels.ts` | `null ≠ 0`: exige 3 contadores no nulos + `notMeasured === 0`; si no ⇒ `gap`. |
 | 2 | Regresión `P1` | `dia-d-evidence-aggregate.test.ts`, `dia-d-evidence-aggregate-panel.test.tsx` | Ausente / uno ausente / `notMeasured > 0` ⇒ hueco; `UNKNOWN ≠ 0`; UI sin veredicto afirmado. |
-| 3 | `P2-4` `T1`/`T2` visibles | `decision-surface-compact.tsx`, `decision-surface-journey.test.tsx` | Retira `sr-only`; `testid` en peldaños visibles vía `LevelTestIds`; `assertOperationalTruth` + `axe` intactos. |
+| 3 | `P2-4` `T1`/`T2` visibles | `operator-cabin-view.ts`, `decision-surface-compact.tsx`, `decision-surface-journey.test.tsx` | Peldaño-objetivo siempre visible; retira `sr-only`; `testid` en peldaños visibles vía `LevelTestIds`; `assertOperationalTruth` + `axe` intactos. |
 | 4 | `P4` validación E2E | `auto-no-trade-panel.integration.test.tsx` | 10 tests: causa↔registro, filtro por día, `absent` vs `unknown`, error de lectura, `unavailable` vs `empty`. |
 | 5 | Contrato PAPER | `contrato-evidencia-paper-confirmacion-2026-10-09.md`, `paper-confirmation-contract.ts`, `paper-confirmation-contract-labels.ts`, `paper-confirmation-contract.test.ts` | 7 criterios falsables; `verdict` literal `"NO_CONFIRMED"`; `UNKNOWN ≠ 0`. |
 | Bump | — | `package.json` + `apps/api-python/scripts/v2_89`…`v2_97` | `2.11.98-beta` + `meta.bump` (guardián `test_dia_d_bump_guard.py`). |
@@ -44,8 +45,10 @@
 
 ## 3. Medición
 
-- **Motor:** sin cambio. `replay-repro` debe seguir **`REPRODUCIDO`** (`sha256 1E3ADAC2…`) ⇒ **`Δ motor = 0`**; se confirma por CI al crear el tag.
+- **Motor:** sin cambio. `replay-repro` **`REPRODUCIDO`** (`sha256 1E3ADAC2…`) ⇒ **`Δ motor = 0`** (ya confirmado en el run [`37922388038`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37922388038), donde ese job fue **VERDE**; se re-confirma al re-sellar el tag).
 - **Frontend local:** `typecheck` **OK** (exit 0); `eslint src` **0 errores** (23 avisos `react-hooks/exhaustive-deps` preexistentes); **288 ficheros / 2007 tests verdes** (+2 ficheros / +25 sobre `v2.88.97`); `contract:check` **OK**.
+- **Read-model UI local:** `pnpm --filter @bolsa/shared build` **OK**; `pnpm --filter @bolsa/shared test` **817 passed** (+1 todo).
+- **E2E local (specs que fallaron en CI):** `gp-v177|gp-v178|gp-v179|gp-v181|gp-v183` → **18 passed** (fix confirmado; `GP-V178-03` pasó en aislamiento — flake de servidor local).
 - **Bump guard:** `pytest apps/api-python/tests/test_dia_d_bump_guard.py` **1 passed** (`2.11.98-beta`).
 - **`Δ motor = 0` local:** `git diff --name-only -- packages/py` → **vacío**.
 
@@ -71,9 +74,11 @@
 | `pnpm --filter @bolsa/web exec eslint src` | **0 errores** (23 avisos preexistentes) |
 | `pnpm --filter @bolsa/web exec vitest run` | **288 ficheros / 2007 passed** |
 | `pnpm --filter @bolsa/web run contract:check` | **OK** |
+| `pnpm --filter @bolsa/shared build` + `test` | **OK** / **817 passed** |
+| E2E local `gp-v177|gp-v178|gp-v179|gp-v181|gp-v183` | **18 passed** (fix del `Release tag CI` ROJO) |
 | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **1 passed** (`2.11.98-beta`) |
 | `git diff --name-only -- packages/py` | **vacío** ⇒ **`Δ motor = 0`** |
-| `replay-repro` — CI | **PENDIENTE** de tag (debe dar `REPRODUCIDO` `1E3ADAC2…` ⇒ **`Δ motor = 0`**) |
+| `replay-repro` — CI | **`REPRODUCIDO`** `1E3ADAC2…` en el run [`37922388038`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37922388038) ⇒ **`Δ motor = 0`** |
 
 ---
 
@@ -81,8 +86,8 @@
 
 - **Producto:** `V2.88.98-beta`. **Package:** `2.11.98-beta`. **Sin migración** (Alembic head `052_top3_opportunities`). **Contrato HTTP sin cambio.** `packages/py/**` **sin mover**.
 - **Añadidos:** `docs/engineering/evidence/v2.88.98/README.md`, este documento, `docs/engineering/contrato-evidencia-paper-confirmacion-2026-10-09.md`; `apps/web/src/features/auto/auto-no-trade-panel.integration.test.tsx`; `apps/web/src/features/auto-monitor/paper-confirmation-contract{,-labels}.ts` y `paper-confirmation-contract.test.ts`.
-- **Modificados:** `dia-d-evidence-aggregate.ts`, `dia-d-evidence-aggregate-labels.ts`, `dia-d-evidence-aggregate.test.ts`, `dia-d-evidence-aggregate-panel.test.tsx`, `decision-surface-compact.tsx`, `decision-surface-journey.test.tsx`, `package.json`, `apps/api-python/scripts/v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
-- **Tag anotado `v2.88.98-beta`:** **PENDIENTE** (se crea en el siguiente paso; cita POST-TAG en el commit de cierre).
+- **Modificados:** `packages/shared/src/cognitive/operator-cabin-view.ts`, `dia-d-evidence-aggregate.ts`, `dia-d-evidence-aggregate-labels.ts`, `dia-d-evidence-aggregate.test.ts`, `dia-d-evidence-aggregate-panel.test.tsx`, `decision-surface-compact.tsx`, `decision-surface-journey.test.tsx`, `package.json`, `apps/api-python/scripts/v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
+- **Tag anotado `v2.88.98-beta`:** creado y empujado sobre `d18e0e30`; su primer `Release tag CI` ([`37922388038`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37922388038)) salió **ROJO** en `playwright (mock E2E)`. Se **re-ancla** al commit del fix (`P2-4` incondicional) y se re-lanza; la cita POST-TAG se añade al quedar CI VERDE.
 
 ---
 

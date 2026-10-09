@@ -1153,7 +1153,11 @@ export function buildOperatorPositionPlan(
       reducePct: null,
     });
   }
-  if (t1 && t1.status !== "absent") {
+  // P2-4 (UI 5.0) — el peldaño T1/T2 es SIEMPRE visible (objetivo del plan), no
+  // solo cuando ya se ha disparado: así el testid contractual (`position-decision-t1`)
+  // vive en un nodo visible de la escalera y existe aunque el legado venga `absent`.
+  // El detalle lleva el precio objetivo (`trigger`); sin objetivo → «Sin dato todavía».
+  if (t1) {
     steps.push({
       id: "t1",
       missionId: "t1",
@@ -1163,7 +1167,7 @@ export function buildOperatorPositionPlan(
       reducePct: journey.t1.qtyFractionPct,
     });
   }
-  if (t2 && t2.status !== "absent") {
+  if (t2) {
     steps.push({
       id: "t2",
       missionId: "t2",
