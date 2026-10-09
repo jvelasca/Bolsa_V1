@@ -6,7 +6,7 @@
 > **Origen.** Es el sello de un doble trabajo: (a) el **barrido `UI5-14`** que retira el comodín de dato ausente `—` del primer nivel; (b) **`S4-agregador-evidencia`**, que **pasa a LANZADO** como agregador read-only de las cuatro capas de §5.2 y que **nunca emite `CONFIRMED`**. Proviene del estado de `v2.88.96-beta`, donde `S4` seguía «NO LANZADO».
 
 **Base:** [`evidence/v2.88.96/README.md`](../v2.88.96/README.md).
-**Cita POST-TAG:** tag anotado `v2.88.97-beta` (objeto pendiente → commit pendiente); `Release tag CI` **pendiente**.
+**Cita POST-TAG:** tag anotado `v2.88.97-beta` (objeto `30bdd642` → commit `d9df6de4`); `Release tag CI` [`37912404394`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37912404394) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `frontend` `286` ficheros / `1982` passed; `python` `4596 passed / 45 skipped`; `playwright (mock E2E)` `109 passed / 21 skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 ## 1. Cambios (por trabajo)
 
@@ -19,6 +19,7 @@
 | 5 | **`S4-agregador-evidencia` (LANZADO)** | Read-model puro de las 4 capas de `PROJECT_PREMISES` §5.2 —**ventana · reconciliación · evidencia OOS · evidencia PAPER**— que compone y devuelve SIEMPRE `NO_CONFIRMED`. | [`dia-d-evidence-aggregate.ts`](../../../../apps/web/src/features/auto-monitor/dia-d-evidence-aggregate.ts), [`dia-d-evidence-aggregate-labels.ts`](../../../../apps/web/src/features/auto-monitor/dia-d-evidence-aggregate-labels.ts) |
 | 6 | **Superficie + wiring `S4`** | Una sola superficie (`DiaDEvidenceAggregatePanel`) montada una sola vez sobre el toolbar de sub-vistas; reuso pasivo de caché vía override `{ enabled }` en los 2 hooks. | [`dia-d-evidence-aggregate-panel.tsx`](../../../../apps/web/src/features/auto-monitor/dia-d-evidence-aggregate-panel.tsx), [`dia-d-auto-panel.tsx`](../../../../apps/web/src/features/auto-monitor/dia-d-auto-panel.tsx), [`use-auto-dia-d-feedback.ts`](../../../../apps/web/src/features/auto-monitor/use-auto-dia-d-feedback.ts), [`use-auto-dia-d-replay.ts`](../../../../apps/web/src/features/auto-monitor/use-auto-dia-d-replay.ts) |
 | 7 | **Regresión `S4`** | Powerset completo → `NO_CONFIRMED`; word-boundary `/\bCONFIRMED\b/`; rollup OOS por contradicción; `UNKNOWN ≠ 0`; exclusión del lens `SAME_CONFIRMED`. | [`dia-d-evidence-aggregate.test.ts`](../../../../apps/web/src/features/auto-monitor/dia-d-evidence-aggregate.test.ts), [`dia-d-evidence-aggregate-panel.test.tsx`](../../../../apps/web/src/features/auto-monitor/dia-d-evidence-aggregate-panel.test.tsx) |
+| 8 | **Compat contractual + `a11y` `T1`/`T2`** | Restaura en `sr-only` los `data-testid` contractuales `position-decision-t1`/`position-decision-t2` (cuando la escalera visible no monta el peldaño, legado `absent`) **sin `<dl>`/`<dd>`** — un `<dl>` sin `<dt>` viola la regla `axe` `definition-list` — preservando el `getByTestId` de `assertOperationalTruth` y sin romper el barrido `axe` de CI. | [`decision-surface-compact.tsx`](../../../../apps/web/src/features/trading/decision-surface-compact.tsx) |
 | Bump | — | `package.json` (`2.11.97-beta`) + `meta.bump` de `v2_89`…`v2_97`. | [`test_dia_d_bump_guard.py`](../../../../apps/api-python/tests/test_dia_d_bump_guard.py) |
 
 ## 2. Reglas que NO cambian
