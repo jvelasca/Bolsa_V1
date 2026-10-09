@@ -68,11 +68,11 @@
 
 El auditor detectó que el paquete documental citaba `e92e9cf5`/`3f98cf48` como `main` vivo. **Corregido:** todo ancla a **`base auditada = 1a2ce597`** y `Δ motor = 0` se expresa con el rango estable respecto al sello `git diff --name-only 20fd538c 1a2ce597 -- packages/py` (vacío).
 
-## 7. Acciones resultantes (docs-only)
+## 7. Acciones resultantes
 
 1. `§5.2` y fila `P4` de `§6.1` realineadas al contrato real (cuatro capas + no-equivalencias).
 2. `S2` reformulado (semántica) y `S4` reformulado a **agregador de evidencia** (no lanzado).
 3. SHA anclados a `1a2ce597`; retirado `e92e9cf5`/`3f98cf48`.
-4. `S1`–`S3` quedan listos para implementar **después** de este cierre documental, con sus condiciones; `S4` **no se lanza**.
+4. **`S1`–`S3` implementados** en [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547) (`apps/web/**` + `packages/shared/**`, `Δ motor = 0`, sin contrato HTTP ni Alembic): `S1` objetivos T1/T2 con precio (backend-provided), `S2` `Entrada`≠`Trigger` coexistentes sin duplicar, `S3` cadena estrategia→indicadores→razón en Finalistas. `S4` **sigue no lanzado**.
 
 **Sin motor:** no se toca `packages/py/**`, contrato HTTP ni Alembic; no se emite `CONFIRMED` ni se re-mide DÍA-D.

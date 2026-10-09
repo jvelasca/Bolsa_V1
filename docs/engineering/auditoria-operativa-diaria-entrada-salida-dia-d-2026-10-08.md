@@ -1,6 +1,7 @@
 # Auditoría read-only — operativa diaria: entrada/salida · estrategia/indicadores · DÍA-D
 
 > **AsOf:** 2026-10-08 · **Base:** `v2.88.94-beta` · **Naturaleza:** auditoría **read-only** (no toca motor, contrato HTTP ni Alembic; **no** re-mide DÍA-D).
+> **Actualización (2026-10-09):** los slices `S1`–`S3` de §5 se **implementaron** en [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547) (`apps/web/**` + `packages/shared/**`, `Δ motor = 0`); `S4` sigue **no lanzado**.
 > **Premisas auditadas:** [`PROJECT_PREMISES.md` §6](../PROJECT_PREMISES.md) — `P2` (claridad entrada/salida), `P3` (estrategia confirmada con los mejores indicadores), `P4` (evaluación DÍA-D).
 > **Origen:** reorden de la FASE 3 — [auditoría FASE 2](./auditoria-operativa-auto-fase-2-2026-10-08.md) §8 y [plan de motor PARKED](./plan-cierre-operativa-auto-2026-10-08.md).
 > **Punto de entrada para el auditor:** [`arranque-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md`](./arranque-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md).
@@ -106,20 +107,20 @@
 
 ---
 
-## 5. Slices derivados (definidos, **NO ejecutados**)
+## 5. Slices derivados (`S1`–`S3` **implementados** · `S4` **no lanzado**)
 
-> Los slices se definen aquí y **no se ejecutan** en este ciclo. Prioridad por relación coste/valor sobre `P1`–`P4`.
+> `S1`–`S3` se **implementaron** tras la auditoría (commit [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547), UI-only + `packages/shared`, **`Δ motor = 0`**). `S4` permanece **no lanzado**. Prioridad por relación coste/valor sobre `P1`–`P4`.
 
-| Slice | Pilar | Objetivo | Alcance previsto |
-| --- | --- | --- | --- |
-| `S1-exit-precio` | P2 | Declarar T1/T2 con **precio** en el Plan de salida del ticket | UI-only (`f3-exit-plan-block.tsx`) sobre datos ya presentes. **Condición de parada:** si el backend no aporta esos precios, se detiene; **no** se fabrica desde la UI ni desde un porcentaje |
-| `S2-entrada-literal` | P2 | Resolver la **semántica** de niveles en `simple` + `prepared`: `Entrada` = nivel de entrada operativo; `Trigger` = condición/nivel de activación. Coexisten **solo** si son distintos; **no** se duplica la misma línea | UI-only (`operational-plan-chart-levels.ts`) |
-| `S3-indicadores-razon` | P3 | Mostrar en primer nivel la cadena **Estrategia → indicadores que la sustentan → razón** (no una ficha técnica) | UI-only; reusa `coachFacts.recommendations[].reasons`. Si no hay evidencia de un indicador, se declara «Sin dato todavía»; **no** se deduce del catálogo del gráfico |
-| `S4-agregador-evidencia` | P4 | **Agregador de evidencia** (no un veredicto nuevo): compone los veredictos existentes (declarado↔ejecutado · OOS · PAPER) y concluye `NO CONFIRMADO` mientras no haya evidencia PAPER | Diseño read-only. **Prohibido** `OOS_SUPPORTED + MATCH → CONFIRMED`; **sin** emitir `CONFIRMED`. **No se lanza** hasta nacer con el contrato semántico correcto (§5.2 de premises) |
+| Slice | Pilar | Objetivo | Alcance | Estado |
+| --- | --- | --- | --- | --- |
+| `S1-exit-precio` | P2 | Declarar T1/T2 con **precio** en el Plan de salida del ticket | UI (`f3-exit-plan-block.tsx`) + meta en `propose-position-exit.ts`; precio desde `position.operational.target*`; si falta → «Sin dato todavía» (**no** se fabrica) | **IMPLEMENTADO** `704c4547` |
+| `S2-entrada-literal` | P2 | Resolver la **semántica** de niveles en `simple` + `prepared`: `Entrada` (fill) y `Trigger` (activación) coexisten **solo** si el precio difiere; **no** se duplica la línea | UI (`operational-plan-chart-levels.ts`) | **IMPLEMENTADO** `704c4547` |
+| `S3-indicadores-razon` | P3 | Mostrar en primer nivel la cadena **Estrategia → indicadores que la sustentan → razón** | UI (`instrument-strategy-top-panel.tsx`) + helper en `strategy-top1-chart-indicators.ts`; indicadores de `definition.indicatorSpecs`→`presetIndicatorSpecs` (**nunca** el catálogo del gráfico); `reasons` persistidas en `coachFacts.recommendations[]`; hueco → «Sin dato todavía» | **IMPLEMENTADO** `704c4547` |
+| `S4-agregador-evidencia` | P4 | **Agregador de evidencia** (no un veredicto nuevo): compone los veredictos existentes (declarado↔ejecutado · OOS · PAPER) y concluye `NO CONFIRMADO` mientras no haya evidencia PAPER | Diseño read-only. **Prohibido** `OOS_SUPPORTED + MATCH → CONFIRMED`; **sin** emitir `CONFIRMED`. **No se lanza** hasta nacer con el contrato semántico correcto (§5.2 de premises) | **NO LANZADO** |
 
-**Regla:** ningún slice toca motor, contrato HTTP ni Alembic. Si un slice **exige** motor (p. ej. emitir `CONFIRMED` con evidencia PAPER), se para y se reabre el [plan PARKED](./plan-cierre-operativa-auto-2026-10-08.md) con dueño y disparador.
+**Regla:** ningún slice toca motor, contrato HTTP ni Alembic. Si un slice **exige** motor (p. ej. emitir `CONFIRMED` con evidencia PAPER), se para y se reabre el [plan PARKED](./plan-cierre-operativa-auto-2026-10-08.md) con dueño y disparador. Se cumplió: `S1`–`S3` viven en `apps/web/**` + `packages/shared/**`; `git diff --name-only -- packages/py` **vacío**.
 
-**Nota del auditor (2026-10-08).** `S1`–`S3` quedan **aceptados** para diseño/implementación (con los límites de arriba). `S4` se **acepta como objetivo pero no como contrato actual**: se reformula a agregador de evidencia y **no se lanza** todavía. Ver [respuesta del auditor](./respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md).
+**Nota del auditor (2026-10-08).** `S1`–`S3` quedaron **aceptados** para diseño/implementación (con los límites de arriba) y **ya están implementados**; `S4` se **acepta como objetivo pero no como contrato actual**: queda reformulado a agregador de evidencia y **no se lanza**. Ver [respuesta del auditor](./respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md).
 
 ---
 
@@ -129,7 +130,7 @@
 - Lo ausente se declara («Sin dato todavía»), sin fabricar.
 - Los veredictos `P2`/`P3`/`P4` son **CUMPLE PARCIAL**; ninguno se declara cerrado.
 - `P4` **no** se re-mide: la auditoría solo juzga si la medición es suficiente.
-- Ningún slice del §5 se ha ejecutado antes de fijar estos hallazgos.
+- **Ningún slice se ejecutó antes** de fijar estos hallazgos; `S1`–`S3` se implementaron **después** (`704c4547`), con los límites aquí declarados. `P2`/`P3`/`P4` siguen en **CUMPLE PARCIAL** (los slices son mejoras de presentación; los hallazgos `P2-2`… se mitigan, no se re-auditan aquí).
 
 ## 7. Fuera de alcance
 

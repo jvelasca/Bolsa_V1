@@ -1,7 +1,8 @@
 # Entrega a auditoría externa (MIA) — reorden de la FASE 3 (`docs-only` · `Δ motor = 0`)
 
-> **Fecha:** 2026-10-08 · **Producto:** `V2.88.94-beta` (sin cambio) · **Package:** `2.11.94-beta` (sin bump) · **Alembic head:** `052_top3_opportunities` (**sin migración**).
+> **Fecha:** 2026-10-08 (S1–S3 implementados 2026-10-09) · **Producto:** `V2.88.94-beta` (sin cambio) · **Package:** `2.11.94-beta` (sin bump) · **Alembic head:** `052_top3_opportunities` (**sin migración**).
 > **Base auditada:** `1a2ce597` (commit de `main` en el momento de la auditoría; sobre el sello [`v2.88.94-beta`](./evidence/v2.88.94/README.md) → commit `20fd538c`). El rango `20fd538c → 1a2ce597` es **solo documentación** (`packages/py/**` sin mover) ⇒ el **código auditado sigue siendo el de `v2.88.94-beta`**.
+> **Continuación (2026-10-09):** los slices `S1`–`S3` se **implementaron** en [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547) (`apps/web/**` + `packages/shared/**`, `Δ motor = 0`); `S4` **no lanzado**. Ver §4.bis.
 > **Unidad de esta entrega:** **documentar** las prioridades de producto del propietario (`P1`–`P4`), **reordenar** la FASE 3 (parkear el motor con dueño y disparador) y **auditar read-only** los tres pilares reales (entrada/salida · estrategia/indicadores · DÍA-D) con hallazgos falsables, para que el auditor decida **antes** de que se lancen los slices.
 > **Regla del hueco:** una regla que no se puede afirmar se declara **abierta** con su remediación, **nunca** se silencia. Un dato ausente o `UNKNOWN` se rotula «Sin dato todavía»; **jamás** se rellena con `0` ni con verde. `ranking ≠ decisión` y `propuesta ≠ posición materializada` se conservan.
 > **`Δ motor = 0`.** Todo el diff es **documentación** en `docs/**`: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin `packages/py/**`, sin bump**. **El contrato HTTP NO cambia.**
@@ -62,19 +63,31 @@ git diff --stat 20fd538c 1a2ce597
 
 ## 4. Hallazgos abiertos (declarados, con remediación)
 
-> Salen de la auditoría de los tres pilares. **No** se cierran aquí: son la materia de los slices.
+> Salen de la auditoría de los tres pilares. Los que tienen slice asociado se **mitigan** con `S1`–`S3` (implementados en `704c4547`); **no** se re-auditan aquí. `P4`/`F2` siguen abiertos.
 
-| ID | Pilar | Gap declarado | Remediación prevista |
+| ID | Pilar | Gap declarado | Remediación | Estado |
+| --- | --- | --- | --- | --- |
+| `P2-2` | Entrada/salida | El `ExitPlan` del ticket **no** declara precio de salida por peldaño. | Slice `S1-exit-precio`. | **MITIGADO** `704c4547` |
+| `P2-3` | Entrada/salida | En `focus simple` + `prepared` la línea «Entrada» no se dibuja (se usa `Trigger`). | Slice `S2-entrada-literal`. | **MITIGADO** `704c4547` |
+| `P2-4` | Entrada/salida | Con Journey activo, T1/T2 quedan en `sr-only`. | Diseño de primer nivel (fuera de `S1`–`S3`). | **ABIERTO** |
+| `P3-1`/`P3-3`/`P3-4` | Estrategia/indicadores | Los indicadores detectados y las `reasons` **no** se muestran en primer nivel. | Slice `S3-indicadores-razon`. | **MITIGADO** `704c4547` |
+| `P4-2` | DÍA-D | `CONFIRMED` está **reservado** y **no se emite**; el lado ejecutado queda `NOT_MEASURED`. | Slice `S4-agregador-evidencia` (read-only) **sin** emitir `CONFIRMED`. | **NO LANZADO** |
+| `P4-3` | DÍA-D | La medición es por **artefacto CLI**, no en vivo. | Diseño, no código, en este ciclo. | **ABIERTO** |
+| `P4-4` | DÍA-D | Veredicto **fragmentado** en tres superficies. | Slice `S4-agregador-evidencia`. | **NO LANZADO** |
+| — | Doc ↔ código | **§5 de `PROJECT_PREMISES.md` describe un veredicto `CONFIRMED` que el código no emite** (el gate usa `READY`/`INCONCLUSIVE`). | **Resuelto**: `§5.2` realineada a la jerarquía de 4 capas (VENTANA · RECONCILIACIÓN · EVIDENCIA OOS · EVIDENCIA PAPER); `CONFIRMED` reservado. Ver [respuesta del auditor](./respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md). | **RESUELTO** |
+| `F2-1`…`F2-4` | FASE 2 | Completitud contable: `PortfolioDecision` durable, posición por operación, P&L agregado, motivo de ranking por ciclo. | **Deuda PARKED**; solo si `P1`–`P4` lo exige. | **PARKED** |
+
+---
+
+## 4.bis Slices `S1`–`S3` (implementados)
+
+| Slice | Commit | Alcance | Gate |
 | --- | --- | --- | --- |
-| `P2-2` | Entrada/salida | El `ExitPlan` del ticket **no** declara precio de salida por peldaño. | Slice `S1-exit-precio` (UI-only). |
-| `P2-3` | Entrada/salida | En `focus simple` + `prepared` la línea «Entrada» no se dibuja (se usa `Trigger`). | Slice `S2-entrada-literal` (UI-only). |
-| `P2-4` | Entrada/salida | Con Journey activo, T1/T2 quedan en `sr-only`. | Incluido en `S1`/diseño de primer nivel. |
-| `P3-1`/`P3-3`/`P3-4` | Estrategia/indicadores | Los indicadores detectados y las `reasons` **no** se muestran en primer nivel. | Slice `S3-indicadores-razon` (UI-only). |
-| `P4-2` | DÍA-D | `CONFIRMED` está **reservado** y **no se emite**; el lado ejecutado queda `NOT_MEASURED`. | Slice `S4-agregador-evidencia` (read-only) **sin** emitir `CONFIRMED`. |
-| `P4-3` | DÍA-D | La medición es por **artefacto CLI**, no en vivo. | Diseño, no código, en este ciclo. |
-| `P4-4` | DÍA-D | Veredicto **fragmentado** en tres superficies. | Slice `S4-agregador-evidencia`. |
-| — | Doc ↔ código | **§5 de `PROJECT_PREMISES.md` describe un veredicto `CONFIRMED` que el código no emite** (el gate usa `READY`/`INCONCLUSIVE`). | **Resuelto** en este ciclo: `§5.2` realineada a la jerarquía de 4 capas (VENTANA · RECONCILIACIÓN · EVIDENCIA OOS · EVIDENCIA PAPER); `CONFIRMED` reservado. Ver [respuesta del auditor](./respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md). |
-| `F2-1`…`F2-4` | FASE 2 | Completitud contable: `PortfolioDecision` durable, posición por operación, P&L agregado, motivo de ranking por ciclo. | **Deuda PARKED**; solo si `P1`–`P4` lo exige. |
+| `S1-exit-precio` | [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547) | `f3-exit-plan-block.tsx` + `propose-position-exit.ts` (T1/T2 de `position.operational.target*`) | `Δ motor = 0` |
+| `S2-entrada-literal` | [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547) | `operational-plan-chart-levels.ts` (`Entrada`≠`Trigger`, sin duplicar) | `Δ motor = 0` |
+| `S3-indicadores-razon` | [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547) | `instrument-strategy-top-panel.tsx` + `strategy-top1-chart-indicators.ts` + `coach-facts-api.ts` (persistir `reasons`) | `Δ motor = 0` |
+
+Verificación: `typecheck` web **OK** · `vitest run` web **156 ficheros / 935 passed** · `packages/shared` build **OK** · `S4` **no lanzado**.
 
 ---
 
@@ -86,7 +99,8 @@ git diff --stat 20fd538c 1a2ce597
 | Cambio de contrato HTTP (`contract:gen`) | **sin cambio** |
 | Migraciones Alembic | **sin migración nueva** (head `052_top3_opportunities`) |
 | `Release tag CI` (sello base `v2.88.94-beta`) | [`37823112083`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37823112083) **VERDE** (`replay-repro` `REPRODUCIDO` `1E3ADAC2…`) |
-| Tag de release de **esta** entrega | **no aplica** (docs-only) |
+| `Tag de release de **esta** entrega** | **no aplica** a `1a2ce597` (docs-only) |
+| **Slices `S1`–`S3` (implementación)** [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547) | `typecheck` web **OK** · `vitest` web **156 ficheros / 935 passed** · `packages/shared` build **OK** · **`Δ motor = 0`** (`git diff --name-only -- packages/py` **vacío**) |
 
 ---
 

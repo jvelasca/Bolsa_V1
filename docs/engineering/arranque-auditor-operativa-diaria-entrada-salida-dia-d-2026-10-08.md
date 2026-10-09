@@ -131,4 +131,6 @@ Con el **OK** del auditor sobre premisas + reorden + hallazgos:
 1. Aceptar o refutar los **4 slices** de [§5 de la auditoría](./auditoria-operativa-diaria-entrada-salida-dia-d-2026-10-08.md): `S1-exit-precio`, `S2-entrada-literal`, `S3-indicadores-razon`, `S4-agregador-evidencia`.
 2. Si algún slice **exige** motor (p. ej. emitir `CONFIRMED` con evidencia PAPER), **parar** y reabrir el [plan PARKED](./plan-cierre-operativa-auto-2026-10-08.md) con dueño y disparador.
 
+**Estado (2026-10-09).** El auditor **aceptó** `S1`–`S3` y reformuló `S4`. `S1`–`S3` quedan **implementados** en [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547) (`apps/web/**` + `packages/shared/**`, `Δ motor = 0`); `S4` **no lanzado**. Dictamen: [respuesta del auditor](./respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md).
+
 Ningún slice mueve el motor: son producto y presentación sobre un motor ya certificado.
