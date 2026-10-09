@@ -7,7 +7,7 @@
 > **`Δ motor = 0`.** El diff vive en `apps/web/**`, `packages/shared/src/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin tocar `packages/py/**`**. **El contrato HTTP NO cambia.**
 > **Evidencia cruda:** [`docs/engineering/evidence/v2.88.98/README.md`](./evidence/v2.88.98/README.md).
 > **Re-sello.** El primer `Release tag CI` ([`37922388038`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37922388038)) salió **ROJO** en `playwright (mock E2E)`; se corrige el anidado de `T1`/`T2` haciendo **incondicional** el peldaño-objetivo en el plan de la posición (ver §1 #2). El resto del run (frontend, python, shared, lifecycle-pg, decision-spine, a7-gate, dr-verify, `replay-repro` `REPRODUCIDO` `1E3ADAC2…`) fue **VERDE**.
-> **Cita POST-TAG:** **PENDIENTE** (se añade en el commit siguiente al push del tag `v2.88.98-beta` con CI VERDE).
+> **Cita POST-TAG:** **Tag anotado `v2.88.98-beta`** (objeto `afad1005` → commit `2b1db61c`). `Release tag CI` [`37925008738`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37925008738) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0`). Primer run ([`37922388038`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37922388038)) **ROJO** → corregido y tag re-anclado.
 
 ---
 
@@ -45,7 +45,7 @@
 
 ## 3. Medición
 
-- **Motor:** sin cambio. `replay-repro` **`REPRODUCIDO`** (`sha256 1E3ADAC2…`) ⇒ **`Δ motor = 0`** (ya confirmado en el run [`37922388038`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37922388038), donde ese job fue **VERDE**; se re-confirma al re-sellar el tag).
+- **Motor:** sin cambio. `replay-repro` **`REPRODUCIDO`** (`sha256 1E3ADAC2…`) ⇒ **`Δ motor = 0`** (confirmado en el `Release tag CI` [`37925008738`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37925008738)).
 - **Frontend local:** `typecheck` **OK** (exit 0); `eslint src` **0 errores** (23 avisos `react-hooks/exhaustive-deps` preexistentes); **288 ficheros / 2007 tests verdes** (+2 ficheros / +25 sobre `v2.88.97`); `contract:check` **OK**.
 - **Read-model UI local:** `pnpm --filter @bolsa/shared build` **OK**; `pnpm --filter @bolsa/shared test` **817 passed** (+1 todo).
 - **E2E local (specs que fallaron en CI):** `gp-v177|gp-v178|gp-v179|gp-v181|gp-v183` → **18 passed** (fix confirmado; `GP-V178-03` pasó en aislamiento — flake de servidor local).
@@ -78,7 +78,7 @@
 | E2E local `gp-v177|gp-v178|gp-v179|gp-v181|gp-v183` | **18 passed** (fix del `Release tag CI` ROJO) |
 | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **1 passed** (`2.11.98-beta`) |
 | `git diff --name-only -- packages/py` | **vacío** ⇒ **`Δ motor = 0`** |
-| `replay-repro` — CI | **`REPRODUCIDO`** `1E3ADAC2…` en el run [`37922388038`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37922388038) ⇒ **`Δ motor = 0`** |
+| `replay-repro` — CI | **`REPRODUCIDO`** `1E3ADAC2…` en el run [`37925008738`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37925008738) ⇒ **`Δ motor = 0`** |
 
 ---
 
@@ -87,7 +87,7 @@
 - **Producto:** `V2.88.98-beta`. **Package:** `2.11.98-beta`. **Sin migración** (Alembic head `052_top3_opportunities`). **Contrato HTTP sin cambio.** `packages/py/**` **sin mover**.
 - **Añadidos:** `docs/engineering/evidence/v2.88.98/README.md`, este documento, `docs/engineering/contrato-evidencia-paper-confirmacion-2026-10-09.md`; `apps/web/src/features/auto/auto-no-trade-panel.integration.test.tsx`; `apps/web/src/features/auto-monitor/paper-confirmation-contract{,-labels}.ts` y `paper-confirmation-contract.test.ts`.
 - **Modificados:** `packages/shared/src/cognitive/operator-cabin-view.ts`, `dia-d-evidence-aggregate.ts`, `dia-d-evidence-aggregate-labels.ts`, `dia-d-evidence-aggregate.test.ts`, `dia-d-evidence-aggregate-panel.test.tsx`, `decision-surface-compact.tsx`, `decision-surface-journey.test.tsx`, `package.json`, `apps/api-python/scripts/v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
-- **Tag anotado `v2.88.98-beta`:** creado y empujado sobre `d18e0e30`; su primer `Release tag CI` ([`37922388038`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37922388038)) salió **ROJO** en `playwright (mock E2E)`. Se **re-ancla** al commit del fix (`P2-4` incondicional) y se re-lanza; la cita POST-TAG se añade al quedar CI VERDE.
+- **Tag anotado `v2.88.98-beta`:** objeto `afad1005` → commit `2b1db61c`. Primer `Release tag CI` ([`37922388038`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37922388038)) **ROJO** en `playwright (mock E2E)`; corregido (`P2-4` incondicional) y **re-anclado**. `Release tag CI` [`37925008738`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37925008738) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` `REPRODUCIDO` `1E3ADAC2…`).
 
 ---
 
