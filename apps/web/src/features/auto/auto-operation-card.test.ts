@@ -7,8 +7,10 @@ import { describe, expect, it } from "vitest";
 import { AUTO_HOME_NO_DATA_LABEL } from "@/features/auto/auto-home-summary";
 import {
   AUTO_CARD_ACCOUNT_SCOPE,
+  AUTO_CARD_INCOMPLETE,
   AUTO_CARD_ORDER_NOTED,
   AUTO_CARD_PARTIAL,
+  AUTO_CARD_REJECTED,
   AUTO_CARD_SLOT_ABSENT,
   AUTO_CARD_SLOT_DONE,
   AUTO_CARD_SLOT_PENDING,
@@ -145,5 +147,41 @@ describe("buildAutoOperationCard", () => {
     expect(slot(card, "order").state).toBe(AUTO_HOME_NO_DATA_LABEL);
     expect(slot(card, "execution").state).toBe(AUTO_HOME_NO_DATA_LABEL);
     expect(slot(card, "simulation").state).toBe(AUTO_HOME_NO_DATA_LABEL);
+  });
+
+  it("una lectura PARCIAL se llama Incompleto, no Sin dato todavía", () => {
+    const card = buildAutoOperationCard({
+      cycleId: "c",
+      instrumentId: "AAPL",
+      steps: [
+        { ...ORDER_REACHED, facts: [entryOrder(10, 10)] },
+        { id: "FILL", state: "reached", measurement: "PARTIAL" },
+      ],
+    });
+    expect(slot(card, "execution").state).toBe(AUTO_CARD_INCOMPLETE);
+    expect(slot(card, "execution").state).not.toBe(AUTO_HOME_NO_DATA_LABEL);
+  });
+
+  it("la decisión durable se lee del hecho: aprobada Hecho, vetada Rechazado", () => {
+    const approved = buildAutoOperationCard({
+      cycleId: "c",
+      decision: { approved: true, action: "BUY" },
+      steps: [ORDER_REACHED],
+    });
+    expect(slot(approved, "decision").state).toBe(AUTO_CARD_SLOT_DONE);
+
+    const rejected = buildAutoOperationCard({
+      cycleId: "c",
+      decision: { approved: false, action: "HOLD" },
+      steps: [ORDER_REACHED],
+    });
+    expect(slot(rejected, "decision").state).toBe(AUTO_CARD_REJECTED);
+
+    // Sin hecho durable, la decisión sigue siendo un hueco declarado (no se deduce del ranking).
+    const noDecision = buildAutoOperationCard({
+      cycleId: "c",
+      steps: [ORDER_REACHED],
+    });
+    expect(slot(noDecision, "decision").state).toBe(AUTO_HOME_NO_DATA_LABEL);
   });
 });

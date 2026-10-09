@@ -135,6 +135,16 @@ class Settings(BaseSettings):
     core_r_cron_interval_seconds: float = Field(
         default=300.0, validation_alias="CORE_R_CRON_INTERVAL_SECONDS"
     )
+    # Frente B (protocolo longitudinal PAPER) — captura periódica de la foto durable de
+    # evidencia PAPER en el spine (``auto_paper_evidence_snapshot``, idempotente por
+    # ``(cuenta, día)``). Off-by-default: encenderlo en la ventana PAPER como política de
+    # operación; con el flag OFF el worker es no-op y ``Δ motor = 0``.
+    paper_evidence_snapshot_enabled: bool = Field(
+        default=False, validation_alias="PAPER_EVIDENCE_SNAPSHOT_ENABLED"
+    )
+    paper_evidence_snapshot_interval_seconds: float = Field(
+        default=3600.0, validation_alias="PAPER_EVIDENCE_SNAPSHOT_INTERVAL_SECONDS"
+    )
     # R-10 F4b — job periódico de custodia (mueve ApplyCustodyFees del GET al
     # scheduler). On-by-default: reemplaza el side-effect que hoy hace el GET.
     custody_job_enabled: bool = Field(

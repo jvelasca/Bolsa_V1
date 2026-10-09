@@ -116,8 +116,39 @@ export type AutoMonitorStepV1 = {
   note?: string | null;
 };
 
+/** F2-2 — decisión de cartera durable del ciclo (leída del hecho, nunca inferida del ranking). */
+export type AutoMonitorCycleDecisionV1 = {
+  decisionId?: string | null;
+  approved?: boolean | null;
+  action?: string | null;
+  opportunityId?: string | null;
+  allocation?: unknown;
+  tradePlan?: unknown;
+  reasonCodes?: string[] | null;
+  at?: string | null;
+  measurement: string;
+};
+
+/** F2-1 — traza durable de la posición materializada por la operación. */
+export type AutoMonitorCyclePositionV1 = {
+  state: string;
+  measurement: string;
+  at?: string | null;
+  facts: AutoMonitorFactV1[];
+};
+
 export type AutoMonitorCycleV1 = {
   cycleId: string;
+  // Identidad de PRIMERA CLASE de la oportunidad (estable por señal/barra, exenta de ranking).
+  // `null` = el hecho durable no la declara: se rotula ausencia, no se finge.
+  opportunityId?: string | null;
+  // F2-2 — decisión de cartera DURABLE que produjo el ciclo (o `null`): el eslabón
+  // `oportunidad → decisión` deja de ser un hueco cuando el hecho existe. Nunca se infiere
+  // del ranking.
+  decision?: AutoMonitorCycleDecisionV1 | null;
+  // F2-1 — traza DURABLE de la posición materializada por el ciclo (o `null`): la escalera no
+  // salta de un fill a «posición creada».
+  position?: AutoMonitorCyclePositionV1 | null;
   instrumentId?: string | null;
   strategyVersion?: string | null;
   direction?: string;

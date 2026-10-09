@@ -24,6 +24,10 @@ from bolsa_api.api.dependencies import get_db_session
 from bolsa_api.api.v1.routes.auto_paper_evidence import AutoPaperEvidenceDto
 from bolsa_api.main import create_app
 from bolsa_application.auto_operational_monitor import AUTO_CYCLE_SETTLEMENT_EVENT
+from bolsa_application.paper_evidence_protocol import (
+    PAPER_EVIDENCE_SNAPSHOT_EVENT,
+    build_paper_evidence_snapshot_entry,
+)
 from bolsa_application.paper_evidence_reader import empty_paper_evidence
 
 _ACCOUNT = "acc-http-1"
@@ -119,11 +123,43 @@ class _FakeStore:
 
 
 class _FakeRepository:
+    """Doble del spine durable: soporta lectura por decisión, ``list_entries`` y ``append``.
+
+    ``append`` modela la idempotencia real del repositorio (``ON CONFLICT DO NOTHING`` sobre
+    ``dedupe_key``): repetir la misma identidad natural no duplica la fila.
+    """
+
     def __init__(self, entries: list[_Entry]) -> None:
         self._entries = entries
 
     async def list_by_decision_ids(self, decision_ids: list[str]) -> list[_Entry]:
         return list(self._entries)
+
+    async def list_entries(
+        self,
+        *,
+        account_id: str,
+        instrument_id: str | None = None,
+        since: str | None = None,
+        event_type: str | None = None,
+        engine_id: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[Any], int]:
+        rows = [
+            entry
+            for entry in self._entries
+            if getattr(entry, "account_id", None) == account_id
+            and (event_type is None or getattr(entry, "event_type", None) == event_type)
+        ]
+        return rows[offset : offset + limit], len(rows)
+
+    async def append(self, entry: Any) -> Any:
+        key = getattr(entry, "dedupe_key", None)
+        if key and any(getattr(existing, "dedupe_key", None) == key for existing in self._entries):
+            return entry
+        self._entries.append(entry)
+        return entry
 
 
 def _patch_sources(
@@ -139,11 +175,21 @@ def _patch_sources(
     )
 
 
+class _Session:
+    """Doble de ``AsyncSession``: solo lo que usan las rutas (``commit``/``rollback``)."""
+
+    async def commit(self) -> None:  # pragma: no cover — trivially exercised by the POST route
+        return None
+
+    async def rollback(self) -> None:  # pragma: no cover
+        return None
+
+
 def _app_with_dummy_session():  # noqa: ANN202 — helper de test
     app = create_app()
 
     async def _session():  # noqa: ANN202 — doble: las fuentes ignoran la sesión
-        yield object()
+        yield _Session()
 
     app.dependency_overrides[get_db_session] = _session
     return app
@@ -207,3 +253,149 @@ async def test_no_account_scope_is_fail_closed_over_http(monkeypatch: pytest.Mon
     assert {item["status"] for item in body["criteria"]} == {"unknown"}
     assert body["fillsTotalForAccount"] is None
     assert body["verdict"] == "NO_CONFIRMED"
+
+
+# ── Frente B — protocolo longitudinal PAPER (histórico + captura durable) ────────────────────
+
+
+def _evidence(as_of: str) -> dict[str, Any]:
+    """Lectura de evidencia mínima (la que consumiría el snapshot)."""
+    return {
+        "schemaVersion": "paper-evidence/1",
+        "asOf": as_of,
+        "metCriterionIds": ["operations"],
+        "unmetCriterionIds": ["sessions"],
+        "unknownCriterionIds": ["window"],
+        "contradictions": [],
+        "blockers": [],
+        "fillsWindowFull": False,
+        "fillsTotalForAccount": 3,
+    }
+
+
+async def _post(app, path: str, *, headers: dict[str, str] | None = None):  # noqa: ANN001
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        return await client.post(path, headers=headers)
+
+
+@pytest.mark.asyncio
+async def test_history_returns_durable_series_oldest_first_and_never_confirms(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La serie sale del spine (una fila por día), ordenada, y jamás emite la confirmación."""
+    app = _app_with_dummy_session()
+    repo = _FakeRepository(
+        [
+            build_paper_evidence_snapshot_entry(
+                account_id=_ACCOUNT, evidence=_evidence("2026-10-09T00:00:00Z")
+            ),
+            build_paper_evidence_snapshot_entry(
+                account_id=_ACCOUNT, evidence=_evidence("2026-10-08T00:00:00Z")
+            ),
+            # Ruido: otra cuenta y otro tipo de evento no entran en la serie.
+            build_paper_evidence_snapshot_entry(
+                account_id=_OTHER_ACCOUNT, evidence=_evidence("2026-10-07T00:00:00Z")
+            ),
+            _Entry(account_id=_ACCOUNT, event_type="auto_entry_decision", payload={}),
+        ]
+    )
+    _patch_sources(monkeypatch, _FakeStore([], []), repo)
+
+    async def _scope(_request, account_id):  # noqa: ANN001
+        return account_id
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
+
+    response = await _get(
+        app, "/api/auto/paper-evidence/history", headers={"X-Account-Id": _ACCOUNT}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["readOnly"] is True
+    assert body["verdict"] == "NO_CONFIRMED"
+    assert body["accountId"] == _ACCOUNT
+    assert [snapshot["asOf"] for snapshot in body["snapshots"]] == [
+        "2026-10-08T00:00:00Z",
+        "2026-10-09T00:00:00Z",
+    ]
+    assert body["snapshots"][0]["metCount"] == 1
+    assert body["snapshots"][0]["unmetCount"] == 1
+    assert body["snapshots"][0]["unknownCount"] == 1
+
+
+@pytest.mark.asyncio
+async def test_history_without_account_is_empty_and_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _app_with_dummy_session()
+
+    async def _no_scope(_request, account_id):  # noqa: ANN001
+        return None
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _no_scope)
+
+    response = await _get(app, "/api/auto/paper-evidence/history")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["accountId"] is None
+    assert body["snapshots"] == []
+    assert body["notes"] == ["no_account_scope"]
+    assert body["verdict"] == "NO_CONFIRMED"
+
+
+@pytest.mark.asyncio
+async def test_snapshot_post_records_one_durable_point_and_is_idempotent_per_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La captura escribe UNA fila durable por día; repetirla no duplica ni pisa la primera."""
+    app = _app_with_dummy_session()
+    repo = _FakeRepository([])
+    _patch_sources(monkeypatch, _FakeStore([], []), repo)
+
+    async def _scope(_request, account_id):  # noqa: ANN001
+        return account_id
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
+
+    first = await _post(
+        app, "/api/auto/paper-evidence/snapshot", headers={"X-Account-Id": _ACCOUNT}
+    )
+    second = await _post(
+        app, "/api/auto/paper-evidence/snapshot", headers={"X-Account-Id": _ACCOUNT}
+    )
+
+    assert first.status_code == 200
+    assert first.json()["recorded"] is True
+    assert first.json()["verdict"] == "NO_CONFIRMED"
+    assert second.status_code == 200
+    recorded = [
+        entry
+        for entry in repo._entries
+        if getattr(entry, "event_type", None) == PAPER_EVIDENCE_SNAPSHOT_EVENT
+    ]
+    assert len(recorded) == 1
+
+
+@pytest.mark.asyncio
+async def test_snapshot_post_without_account_does_not_write(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _app_with_dummy_session()
+    repo = _FakeRepository([])
+    _patch_sources(monkeypatch, _FakeStore([], []), repo)
+
+    async def _no_scope(_request, account_id):  # noqa: ANN001
+        return None
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _no_scope)
+
+    response = await _post(app, "/api/auto/paper-evidence/snapshot")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["recorded"] is False
+    assert body["note"] == "no_account_scope"
+    assert repo._entries == []

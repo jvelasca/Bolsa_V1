@@ -1190,6 +1190,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/paper-evidence/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Paper Evidence History
+         * @description Serie longitudinal PAPER durable (read-only, acotada por cuenta).
+         *
+         *     Solo lee los snapshots ``auto_paper_evidence_snapshot`` del spine (``decision_journal_entries``)
+         *     y los ordena. Una cuenta sin snapshots devuelve serie vacía con ``NO_CONFIRMED`` (fail-closed,
+         *     sin inventar hitos).
+         */
+        get: operations["get_auto_paper_evidence_history_api_auto_paper_evidence_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/paper-evidence/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Auto Paper Evidence Snapshot
+         * @description Registra UNA foto durable de la evidencia PAPER del día (driver de la serie longitudinal).
+         *
+         *     NO es el GET read-only: esta ruta **escribe** la traza del protocolo. La separación es
+         *     deliberada — ``GET /auto/paper-evidence`` declara ``readOnly = true`` y no puede escribir. La
+         *     identidad ``(cuenta, día)`` es idempotente: repetir la foto del mismo día no duplica ni pisa la
+         *     primera. El ``verdict`` es el literal reservado ``NO_CONFIRMED``; la promoción es humana.
+         */
+        post: operations["post_auto_paper_evidence_snapshot_api_auto_paper_evidence_snapshot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/self-evaluation": {
         parameters: {
             query?: never;
@@ -4371,6 +4420,30 @@ export interface components {
             /** Successfulclaimsmeasurement */
             successfulClaimsMeasurement: string;
         };
+        /** AutoMonitorCycleDecisionDto */
+        AutoMonitorCycleDecisionDto: {
+            /** Action */
+            action?: string | null;
+            /** Allocation */
+            allocation?: unknown;
+            /** Approved */
+            approved?: boolean | null;
+            /** At */
+            at?: string | null;
+            /** Decisionid */
+            decisionId?: string | null;
+            /**
+             * Measurement
+             * @default UNKNOWN
+             */
+            measurement: string;
+            /** Opportunityid */
+            opportunityId?: string | null;
+            /** Reasoncodes */
+            reasonCodes?: string[] | null;
+            /** Tradeplan */
+            tradePlan?: unknown;
+        };
         /** AutoMonitorCycleDto */
         AutoMonitorCycleDto: {
             /** Closed */
@@ -4382,6 +4455,7 @@ export interface components {
             closedMeasurement: string;
             /** Cycleid */
             cycleId: string;
+            decision?: components["schemas"]["AutoMonitorCycleDecisionDto"] | null;
             /**
              * Direction
              * @default long
@@ -4391,11 +4465,28 @@ export interface components {
             instrumentId?: string | null;
             /** Notes */
             notes?: string[];
+            /** Opportunityid */
+            opportunityId?: string | null;
+            position?: components["schemas"]["AutoMonitorCyclePositionDto"] | null;
             result?: components["schemas"]["AutoMonitorCycleResultDto"] | null;
             /** Steps */
             steps?: components["schemas"]["AutoMonitorStepDto"][];
             /** Strategyversion */
             strategyVersion?: string | null;
+        };
+        /** AutoMonitorCyclePositionDto */
+        AutoMonitorCyclePositionDto: {
+            /** At */
+            at?: string | null;
+            /** Facts */
+            facts?: components["schemas"]["AutoMonitorFactDto"][];
+            /**
+             * Measurement
+             * @default UNKNOWN
+             */
+            measurement: string;
+            /** State */
+            state: string;
         };
         /** AutoMonitorCycleResultDto */
         AutoMonitorCycleResultDto: {
@@ -9564,6 +9655,25 @@ export interface components {
             /** Strategyversion */
             strategyVersion?: string | null;
         };
+        /**
+         * PaperEvidenceHistoryDto
+         * @description Serie longitudinal PAPER (read-only): snapshots durables, más antiguo → más nuevo.
+         */
+        PaperEvidenceHistoryDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Notes */
+            notes?: string[];
+            /** Readonly */
+            readOnly: boolean;
+            /** Snapshots */
+            snapshots?: components["schemas"]["PaperEvidenceSnapshotDto"][];
+            /**
+             * Verdict
+             * @default NO_CONFIRMED
+             */
+            verdict: string;
+        };
         /** PaperEvidencePerVersionDto */
         PaperEvidencePerVersionDto: {
             /** Closedoperations */
@@ -9615,6 +9725,66 @@ export interface components {
             windowDays?: number | null;
             /** Windowepisodes */
             windowEpisodes?: number | null;
+        };
+        /** PaperEvidenceSnapshotDto */
+        PaperEvidenceSnapshotDto: {
+            /** Asof */
+            asOf?: string | null;
+            /** Blockers */
+            blockers?: string[];
+            /** Contradictions */
+            contradictions?: string[];
+            /** Fillstotalforaccount */
+            fillsTotalForAccount?: number | null;
+            /**
+             * Fillswindowfull
+             * @default false
+             */
+            fillsWindowFull: boolean;
+            /**
+             * Metcount
+             * @default 0
+             */
+            metCount: number;
+            /** Metcriterionids */
+            metCriterionIds?: string[];
+            /** Snapshotid */
+            snapshotId?: string | null;
+            /**
+             * Unknowncount
+             * @default 0
+             */
+            unknownCount: number;
+            /** Unknowncriterionids */
+            unknownCriterionIds?: string[];
+            /**
+             * Unmetcount
+             * @default 0
+             */
+            unmetCount: number;
+            /** Unmetcriterionids */
+            unmetCriterionIds?: string[];
+            /**
+             * Verdict
+             * @default NO_CONFIRMED
+             */
+            verdict: string;
+        };
+        /** PaperEvidenceSnapshotRecordedDto */
+        PaperEvidenceSnapshotRecordedDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Asof */
+            asOf?: string | null;
+            /** Note */
+            note?: string | null;
+            /** Recorded */
+            recorded: boolean;
+            /**
+             * Verdict
+             * @default NO_CONFIRMED
+             */
+            verdict: string;
         };
         /** PendingOrderDto */
         PendingOrderDto: {
@@ -13854,6 +14024,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutoPaperEvidenceDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_paper_evidence_history_api_auto_paper_evidence_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperEvidenceHistoryDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_auto_paper_evidence_snapshot_api_auto_paper_evidence_snapshot_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaperEvidenceSnapshotRecordedDto"];
                 };
             };
             /** @description Validation Error */

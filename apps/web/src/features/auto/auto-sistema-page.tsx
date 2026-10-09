@@ -33,6 +33,10 @@ import {
 } from "@/features/auto/auto-home-summary";
 import { buildAutoHumanState } from "@/features/auto/auto-human-state";
 import { AutoHumanStateBadge } from "@/features/auto/auto-human-state-badge";
+import { buildPlainReconciliation } from "@/features/auto/auto-plain-reconciliation";
+import { AUTO_RISK_TONE_CLASS } from "@/features/auto/auto-risk-summary";
+import { portfolioReconStatusFromReport } from "@/features/operational-console/use-ops-self-eval";
+import { cn } from "@/lib/utils";
 
 export function AutoSistemaPage() {
   const { view, isLoading, isError } = useAutoOperationalMonitor();
@@ -53,12 +57,54 @@ export function AutoSistemaPage() {
     isError,
   });
 
+  // Frente C — la conciliación, en lenguaje llano y en el primer nivel (antes vivía solo en el
+  // `Detalle técnico`). Reutiliza los estados ya publicados; `UNKNOWN ≠ 0` (sin lectura, hueco).
+  const plainReconciliation = buildPlainReconciliation({
+    portfolioStatus: portfolioReconStatusFromReport(selfEval.data),
+    lifecycleStatus: lifecycle.data?.status ?? null,
+    driftCount: lifecycle.data?.driftCount ?? null,
+    lagCount: lifecycle.data?.lagCount ?? null,
+    blockedCount: lifecycle.data?.blockedCount ?? null,
+    portfolioLoading: selfEval.isLoading,
+    portfolioError: selfEval.isError,
+    lifecycleLoading: lifecycle.isLoading,
+    lifecycleError: lifecycle.isError,
+  });
+
   return (
     <div className="space-y-6" data-testid="auto-sistema-page">
       <AutoSectionHeading
         title={AUTO_SECTION_COPY.sistema.title}
         description={AUTO_SECTION_COPY.sistema.description}
       />
+
+      <section
+        className="space-y-1 rounded-lg border border-border bg-card px-4 py-3"
+        aria-labelledby="auto-sistema-recon-plain-heading"
+        data-testid="auto-sistema-recon-plain"
+      >
+        <p
+          id="auto-sistema-recon-plain-heading"
+          className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+        >
+          Conciliación
+        </p>
+        <p
+          className={cn(
+            "text-lg font-semibold",
+            AUTO_RISK_TONE_CLASS[plainReconciliation.tone],
+          )}
+          data-testid="auto-sistema-recon-plain-label"
+        >
+          {plainReconciliation.label}
+        </p>
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="auto-sistema-recon-plain-sentence"
+        >
+          {plainReconciliation.sentence}
+        </p>
+      </section>
 
       <AutoTechnicalDetail testId="auto-sistema-technical">
         <section className="space-y-2" aria-labelledby="auto-sistema-estado">

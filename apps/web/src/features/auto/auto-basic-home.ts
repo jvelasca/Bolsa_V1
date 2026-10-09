@@ -39,6 +39,12 @@ export type AutoBasicCycle = {
   instrumentId?: string | null;
   closed?: boolean | null;
   closedMeasurement?: string | null;
+  // F2-2 — decisión de cartera DURABLE de la operación (leída del hecho, nunca del ranking).
+  // Ausente/`null` = sin traza: la ranura «Decisión» queda en «Sin dato todavía».
+  decision?: {
+    approved?: boolean | null;
+    action?: string | null;
+  } | null;
   steps?: readonly AutoBasicStep[] | null;
 };
 

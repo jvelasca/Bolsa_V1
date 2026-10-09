@@ -166,6 +166,7 @@ from bolsa_application.auto_operational_audit import (
     RECONCILIATION_RELEASE,
     build_cycle_settlement_entry,
     build_entry_order_entry,
+    build_position_materialized_entry,
     build_protection_entry,
     build_reservation_claim_entry,
     build_reservation_reconciliation_entry,
@@ -3117,6 +3118,40 @@ class AutoSimulationWorker:
         )
         await self._v2_audit_emit(
             self._v2_seal_audit_identity(entry), label="entry_order"
+        )
+
+    async def _v2_journal_position_materialized(
+        self,
+        *,
+        instrument_id: str,
+        quantity: Any,
+        entry_price: Any,
+        execution_id: str | None,
+        strategy_version: str | None,
+        cycle_id: str | None,
+    ) -> None:
+        """(F2-1) sella el HECHO durable append-only de materialización de POSICIÓN.
+
+        Cierra ``position_not_durable``: la escalera ``fill → posición`` solo sube con una traza
+        por operación. El espejo ``sim_auto_positions`` es por ``(cuenta, motor, símbolo)`` y se
+        reescribe al reutilizar el símbolo; esta entrada, ligada a su ``cycle_id``, es historia.
+        Best-effort y aditivo: sin sink es un no-op (Δ = 0).
+        """
+        if self._operational_audit_sink is None:
+            return
+        entry = build_position_materialized_entry(
+            instrument_id=instrument_id,
+            quantity=quantity,
+            entry_price=entry_price,
+            execution_id=execution_id,
+            strategy_version=strategy_version,
+            cycle_id=cycle_id,
+            actor=self._engine_id,
+            as_of=self._v2_instant(),
+            account_id=self._account_id,
+        )
+        await self._v2_audit_emit(
+            self._v2_seal_audit_identity(entry), label="position_materialized"
         )
 
     async def _v2_journal_cycle_settlement(
@@ -6269,6 +6304,18 @@ class AutoSimulationWorker:
                 if self._v2_enabled and held <= 0:
                     await self._v2_track_entry(symbol, price, applied_qty)
                 await self._persist_position(symbol, materialized)
+                # F2-1 — la POSICIÓN materializada por esta operación deja un hecho durable
+                # append-only (solo al ABRIR desde plano). Así la escalera ``fill → posición``
+                # sube con TRAZA y la reutilización del símbolo no borra la historia del ciclo.
+                if held <= 0:
+                    await self._v2_journal_position_materialized(
+                        instrument_id=symbol,
+                        quantity=applied_qty,
+                        entry_price=price,
+                        execution_id=first_execution_id,
+                        strategy_version=effective_version,
+                        cycle_id=cycle_id,
+                    )
                 report.opened += 1
                 # AUTO-1b: lo MATERIALIZADO deja de ser reserva y pasa a ser posición.
                 # Con fill parcial la liberación es parcial y la cola sigue comprometida.

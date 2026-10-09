@@ -786,6 +786,92 @@
         "title": "AutoMonitorConcurrencyDto",
         "type": "object"
       },
+      "AutoMonitorCycleDecisionDto": {
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "allocation": {
+            "title": "Allocation"
+          },
+          "approved": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "decisionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisionid"
+          },
+          "measurement": {
+            "default": "UNKNOWN",
+            "title": "Measurement",
+            "type": "string"
+          },
+          "opportunityId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opportunityid"
+          },
+          "reasonCodes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoncodes"
+          },
+          "tradePlan": {
+            "title": "Tradeplan"
+          }
+        },
+        "title": "AutoMonitorCycleDecisionDto",
+        "type": "object"
+      },
       "AutoMonitorCycleDto": {
         "properties": {
           "closed": {
@@ -807,6 +893,16 @@
           "cycleId": {
             "title": "Cycleid",
             "type": "string"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoMonitorCycleDecisionDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "direction": {
             "default": "long",
@@ -830,6 +926,27 @@
             },
             "title": "Notes",
             "type": "array"
+          },
+          "opportunityId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opportunityid"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoMonitorCyclePositionDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "result": {
             "anyOf": [
@@ -864,6 +981,42 @@
           "cycleId"
         ],
         "title": "AutoMonitorCycleDto",
+        "type": "object"
+      },
+      "AutoMonitorCyclePositionDto": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/AutoMonitorFactDto"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "measurement": {
+            "default": "UNKNOWN",
+            "title": "Measurement",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "AutoMonitorCyclePositionDto",
         "type": "object"
       },
       "AutoMonitorCycleResultDto": {
@@ -16269,6 +16422,50 @@
         "title": "PaperEvidenceCycleDto",
         "type": "object"
       },
+      "PaperEvidenceHistoryDto": {
+        "description": "Serie longitudinal PAPER (read-only): snapshots durables, más antiguo → más nuevo.",
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "snapshots": {
+            "items": {
+              "$ref": "#/components/schemas/PaperEvidenceSnapshotDto"
+            },
+            "title": "Snapshots",
+            "type": "array"
+          },
+          "verdict": {
+            "default": "NO_CONFIRMED",
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "readOnly"
+        ],
+        "title": "PaperEvidenceHistoryDto",
+        "type": "object"
+      },
       "PaperEvidencePerVersionDto": {
         "properties": {
           "closedOperations": {
@@ -16416,6 +16613,156 @@
           "settlementsUnmatched"
         ],
         "title": "PaperEvidenceReconciliationDto",
+        "type": "object"
+      },
+      "PaperEvidenceSnapshotDto": {
+        "properties": {
+          "asOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asof"
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "contradictions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Contradictions",
+            "type": "array"
+          },
+          "fillsTotalForAccount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fillstotalforaccount"
+          },
+          "fillsWindowFull": {
+            "default": false,
+            "title": "Fillswindowfull",
+            "type": "boolean"
+          },
+          "metCount": {
+            "default": 0,
+            "title": "Metcount",
+            "type": "integer"
+          },
+          "metCriterionIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metcriterionids",
+            "type": "array"
+          },
+          "snapshotId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshotid"
+          },
+          "unknownCount": {
+            "default": 0,
+            "title": "Unknowncount",
+            "type": "integer"
+          },
+          "unknownCriterionIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknowncriterionids",
+            "type": "array"
+          },
+          "unmetCount": {
+            "default": 0,
+            "title": "Unmetcount",
+            "type": "integer"
+          },
+          "unmetCriterionIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmetcriterionids",
+            "type": "array"
+          },
+          "verdict": {
+            "default": "NO_CONFIRMED",
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "title": "PaperEvidenceSnapshotDto",
+        "type": "object"
+      },
+      "PaperEvidenceSnapshotRecordedDto": {
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "asOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asof"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "recorded": {
+            "title": "Recorded",
+            "type": "boolean"
+          },
+          "verdict": {
+            "default": "NO_CONFIRMED",
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recorded"
+        ],
+        "title": "PaperEvidenceSnapshotRecordedDto",
         "type": "object"
       },
       "PendingOrderDto": {
@@ -25925,6 +26272,118 @@
           }
         },
         "summary": "Get Auto Paper Evidence",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/paper-evidence/history": {
+      "get": {
+        "description": "Serie longitudinal PAPER durable (read-only, acotada por cuenta).\n\nSolo lee los snapshots ``auto_paper_evidence_snapshot`` del spine (``decision_journal_entries``)\ny los ordena. Una cuenta sin snapshots devuelve serie vacía con ``NO_CONFIRMED`` (fail-closed,\nsin inventar hitos).",
+        "operationId": "get_auto_paper_evidence_history_api_auto_paper_evidence_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperEvidenceHistoryDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Paper Evidence History",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/paper-evidence/snapshot": {
+      "post": {
+        "description": "Registra UNA foto durable de la evidencia PAPER del día (driver de la serie longitudinal).\n\nNO es el GET read-only: esta ruta **escribe** la traza del protocolo. La separación es\ndeliberada — ``GET /auto/paper-evidence`` declara ``readOnly = true`` y no puede escribir. La\nidentidad ``(cuenta, día)`` es idempotente: repetir la foto del mismo día no duplica ni pisa la\nprimera. El ``verdict`` es el literal reservado ``NO_CONFIRMED``; la promoción es humana.",
+        "operationId": "post_auto_paper_evidence_snapshot_api_auto_paper_evidence_snapshot_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperEvidenceSnapshotRecordedDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Auto Paper Evidence Snapshot",
         "tags": [
           "auto"
         ]

@@ -45,6 +45,7 @@ from bolsa_application.auto_cycle_journal import cycle_decision_id
 from bolsa_application.auto_operational_monitor import (
     AUTO_CYCLE_SETTLEMENT_EVENT,
     AUTO_ENTRY_ORDER_EVENT,
+    AUTO_POSITION_MATERIALIZED_EVENT,
     AUTO_PROTECTION_EVENT,
     AUTO_RESERVATION_CLAIM_EVENT,
     AUTO_RESERVATION_RECONCILIATION_EVENT,
@@ -61,6 +62,7 @@ __all__ = [
     "REASON_SESSION_OWNED",
     "build_cycle_settlement_entry",
     "build_entry_order_entry",
+    "build_position_materialized_entry",
     "build_protection_entry",
     "build_reservation_claim_entry",
     "build_reservation_reconciliation_entry",
@@ -153,6 +155,11 @@ def durable_fact_dedupe_key(
             return None
         return _bounded_dedupe_key(
             f"{AUTO_ENTRY_ORDER_EVENT}:{account}:{engine}:{cycle}:{order}"
+        )
+    if event == AUTO_POSITION_MATERIALIZED_EVENT:
+        # Una materialización por ciclo y motor: el mismo hecho reintentado no duplica.
+        return _bounded_dedupe_key(
+            f"{AUTO_POSITION_MATERIALIZED_EVENT}:{account}:{engine}:{cycle}"
         )
     if event == AUTO_PROTECTION_EVENT:
         resolved_kind = _text(kind)
@@ -384,6 +391,55 @@ def build_entry_order_entry(
         id=f"JNL-{uuid4().hex[:12]}",
         decision_id=decision_id,
         event_type=AUTO_ENTRY_ORDER_EVENT,
+        actor=str(actor or ""),
+        created_at=_stamp(as_of),
+        session_id=None,
+        account_id=_text(account_id),
+        instrument_id=instrument,
+        payload=payload,
+    )
+
+
+def build_position_materialized_entry(
+    *,
+    instrument_id: str | None,
+    quantity: Any,
+    entry_price: Any,
+    execution_id: str | None,
+    strategy_version: str | None,
+    cycle_id: str | None,
+    actor: str,
+    as_of: str | None,
+    account_id: str | None = None,
+) -> DecisionJournalEntryRecord | None:
+    """(PURA) entrada append-only del HECHO durable de materialización de POSICIÓN (F2-1).
+
+    La escalera ``fill → posición`` no puede subir de un fill: solo un hecho append-only por
+    operación demuestra que la posición se creó. El espejo ``sim_auto_positions`` es por
+    ``(cuenta, motor, símbolo)`` y se reescribe al reutilizar el símbolo, así que **no** es
+    historia por operación; esta entrada sí (una por apertura desde plano, ligada a su
+    ``cycle_id``). Sin instrumento/ciclo no se finge el hecho: ``None``.
+    """
+    instrument = _text(instrument_id)
+    cycle = _text(cycle_id)
+    if instrument is None or cycle is None:
+        return None
+    decision_id, derived = _decision_id(cycle)
+    payload: dict[str, Any] = {
+        "event": AUTO_POSITION_MATERIALIZED_EVENT,
+        "instrumentId": instrument,
+        "quantity": _number(quantity),
+        "entryPrice": _number(entry_price),
+        "executionId": _text(execution_id),
+        "strategyVersion": _text(strategy_version),
+        "at": _stamp(as_of),
+        "cycleIdDerived": derived,
+        "cycleId": cycle,
+    }
+    return DecisionJournalEntryRecord(
+        id=f"JNL-{uuid4().hex[:12]}",
+        decision_id=decision_id,
+        event_type=AUTO_POSITION_MATERIALIZED_EVENT,
         actor=str(actor or ""),
         created_at=_stamp(as_of),
         session_id=None,

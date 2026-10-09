@@ -1234,7 +1234,7 @@ def test_protection_exit_requested_without_materialization_is_declared() -> None
     assert step["note"] == "protection_exit_requested_without_materialization"
 
 
-# ── Recorrido integral de un ciclo por las 10 etapas (auditoría por ``cycle_id``) ──
+# ── Recorrido integral de un ciclo por las 9 etapas (auditoría por ``cycle_id``) ──
 
 
 def _decision_entry(**overrides: Any) -> Any:
@@ -1258,7 +1258,7 @@ def _decision_entry(**overrides: Any) -> Any:
     )
 
 
-def test_a_full_cycle_reaches_all_ten_steps_only_from_durable_facts() -> None:
+def test_a_full_cycle_reaches_all_nine_steps_only_from_durable_facts() -> None:
     """Un ciclo con TODOS sus hechos durables recorre SIGNAL..CYCLE_CLOSED sin proyección.
 
     Cada etapa se enciende por su hecho (decisión, orden de entrada, reserva, fills,

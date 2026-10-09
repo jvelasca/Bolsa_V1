@@ -52,6 +52,9 @@ from bolsa_api.background.optimization_worker import (  # type: ignore[import-un
 from bolsa_api.background.paper_auto_engine_worker import (  # type: ignore[import-untyped]
     start_paper_auto_engine_worker,
 )
+from bolsa_api.background.paper_evidence_snapshot_worker import (  # type: ignore[import-untyped]
+    start_paper_evidence_snapshot_worker,
+)
 from bolsa_api.background.scan_worker import (  # type: ignore[import-untyped]
     start_scan_worker,
 )
@@ -83,6 +86,8 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
         start_execution_event_reaper_worker,
         # V2.21/A8 (M4): AUTO Engine continuo SAFE/dry.
         start_paper_auto_engine_worker,
+        # Frente B (ADR-046): driver periódico de la foto durable PAPER.
+        start_paper_evidence_snapshot_worker,
         # V2.22/A9 (M5): AUTO bucle continuo SIM-ONLY (env-gated, default OFF).
         start_auto_sim_worker,
         # V2.26/A10: orquestador del Strategy Lifecycle (env-gated, default OFF,

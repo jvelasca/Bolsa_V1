@@ -46,6 +46,9 @@ from bolsa_api.background.opportunity_daily_scan_worker import (
     start_opportunity_daily_scan_worker,
 )
 from bolsa_api.background.paper_auto_engine_worker import start_paper_auto_engine_worker
+from bolsa_api.background.paper_evidence_snapshot_worker import (
+    start_paper_evidence_snapshot_worker,
+)
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
 from bolsa_infrastructure.config import get_settings
@@ -74,6 +77,9 @@ def _event_loop_starters() -> list[Any]:
         start_execution_event_reaper_worker,
         # V2.21/A8 (M4): AUTO Engine continuo SAFE/dry (nunca ejecuta por sí).
         start_paper_auto_engine_worker,
+        # Frente B (ADR-046): driver periódico de la foto durable PAPER
+        # (``auto_paper_evidence_snapshot``, idempotente por cuenta y día).
+        start_paper_evidence_snapshot_worker,
         # V2.22/A9 (M5): AUTO bucle continuo SIM-ONLY (env-gated, default OFF).
         start_auto_sim_worker,
         # V2.26/A10: orquestador del Strategy Lifecycle (env-gated, default OFF,

@@ -39,8 +39,26 @@ describe("plainStateLabel", () => {
     expect(plainStateLabel("ABSENT", "ausente")).toBe("No ocurrió");
   });
 
+  it("separa «Incompleto» (parcial) y «Rechazado» de «Sin dato todavía»", () => {
+    expect(plainStateLabel("INCOMPLETE", "PARCIAL")).toBe("Incompleto");
+    expect(plainStateLabel("REJECTED", "vetado")).toBe("Rechazado");
+    // No se mezclan: tres estados distintos, tres textos distintos.
+    expect(plainStateLabel("INCOMPLETE", "x")).not.toBe(
+      plainStateLabel("NOT_MEASURED", "x"),
+    );
+    expect(plainStateLabel("REJECTED", "x")).not.toBe(
+      plainStateLabel("NOT_MEASURED", "x"),
+    );
+  });
+
+  it("NUNCA emite «Confirmado» (token reservado al contrato PAPER)", () => {
+    expect(Object.values(AUTO_STORY_PLAIN_STATE_LABELS)).not.toContain(
+      "Confirmado",
+    );
+  });
+
   it("un estado desconocido degrada a la etiqueta técnica recibida", () => {
     expect(plainStateLabel("RARO", "estado X")).toBe("estado X");
-    expect(Object.keys(AUTO_STORY_PLAIN_STATE_LABELS)).toHaveLength(4);
+    expect(Object.keys(AUTO_STORY_PLAIN_STATE_LABELS)).toHaveLength(6);
   });
 });

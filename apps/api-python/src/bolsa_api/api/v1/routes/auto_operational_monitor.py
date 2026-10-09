@@ -58,10 +58,40 @@ class AutoMonitorCycleResultDto(BaseModel):
     closedAt: str | None = None
 
 
+class AutoMonitorCycleDecisionDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    # F2-2 — decisión de cartera DURABLE del ciclo (leída del hecho, nunca del ranking).
+    decisionId: str | None = None
+    approved: bool | None = None
+    action: str | None = None
+    opportunityId: str | None = None
+    allocation: Any = None
+    tradePlan: Any = None
+    reasonCodes: list[str] | None = None
+    at: str | None = None
+    measurement: str = "UNKNOWN"
+
+
+class AutoMonitorCyclePositionDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    # F2-1 — traza DURABLE de la posición materializada por la operación.
+    state: str
+    measurement: str = "UNKNOWN"
+    at: str | None = None
+    facts: list[AutoMonitorFactDto] = Field(default_factory=list)
+
+
 class AutoMonitorCycleDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     cycleId: str
+    # Frente A — identidad de PRIMERA CLASE de la oportunidad (estable, exenta de ranking).
+    opportunityId: str | None = None
+    # F2-2 / F2-1 — decisión durable y traza de posición por operación (``None`` = sin hecho).
+    decision: AutoMonitorCycleDecisionDto | None = None
+    position: AutoMonitorCyclePositionDto | None = None
     instrumentId: str | None = None
     strategyVersion: str | None = None
     direction: str = "long"

@@ -34,12 +34,33 @@ vi.mock("@/features/accounts/use-active-account", () => ({
   }),
 }));
 
+const reconState = vi.hoisted(() => ({
+  selfEval: undefined as
+    | { portfolioReconciliation?: { status?: string } }
+    | undefined,
+  lifecycle: undefined as
+    | {
+        status: string;
+        driftCount: number;
+        lagCount: number;
+        blockedCount: number;
+      }
+    | undefined,
+}));
+
 vi.mock("@/features/operational-console/use-ops-self-eval", () => ({
-  useOpsSelfEval: () => ({ data: undefined, isLoading: false, isError: false }),
+  useOpsSelfEval: () => ({
+    data: reconState.selfEval,
+    isLoading: false,
+    isError: false,
+  }),
+  portfolioReconStatusFromReport: (
+    report: { portfolioReconciliation?: { status?: string } } | undefined,
+  ) => report?.portfolioReconciliation?.status ?? null,
 }));
 vi.mock("@/features/operational-console/use-lifecycle-reconciliation", () => ({
   useLifecycleReconciliation: () => ({
-    data: undefined,
+    data: reconState.lifecycle,
     isLoading: false,
     isError: false,
     error: null,
@@ -78,6 +99,8 @@ beforeEach(() => {
   };
   monitorState.isLoading = false;
   monitorState.isError = false;
+  reconState.selfEval = undefined;
+  reconState.lifecycle = undefined;
 });
 
 afterEach(cleanup);
@@ -159,5 +182,39 @@ describe("AutoSistemaPage", () => {
     monitorState.view = null;
     renderPage();
     expect(screen.getByTestId("auto-sistema-loading")).toBeTruthy();
+  });
+
+  it("la conciliación se lee en llano en el primer nivel (Frente C)", () => {
+    reconState.selfEval = { portfolioReconciliation: { status: "ok" } };
+    reconState.lifecycle = {
+      status: "ok",
+      driftCount: 0,
+      lagCount: 0,
+      blockedCount: 0,
+    };
+    renderPage();
+    expect(
+      screen.getByTestId("auto-sistema-recon-plain-label").textContent,
+    ).toBe("Cuadra");
+    // No vive dentro del detalle técnico plegado.
+    const detail = screen.getByTestId("auto-sistema-technical");
+    expect(
+      detail.contains(screen.getByTestId("auto-sistema-recon-plain")),
+    ).toBe(false);
+  });
+
+  it("sin lectura de conciliación declara el hueco, no «Cuadra»", () => {
+    renderPage();
+    expect(
+      screen.getByTestId("auto-sistema-recon-plain-label").textContent,
+    ).toBe("Sin dato todavía");
+  });
+
+  it("un desajuste de cartera se traduce a «Revisar»", () => {
+    reconState.selfEval = { portfolioReconciliation: { status: "drift" } };
+    renderPage();
+    expect(
+      screen.getByTestId("auto-sistema-recon-plain-label").textContent,
+    ).toBe("Revisar");
   });
 });

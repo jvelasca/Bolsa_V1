@@ -97,6 +97,11 @@ AUTO_CYCLE_SETTLEMENT_EVENT = "auto_cycle_settlement"
 #: trailing, salida pedida). Cierra ``protection_not_durable`` del paso ``PROTECTION``: sin este
 #: evento el paso se declara ``unknown`` (jamás ``reached`` desde la proyección).
 AUTO_PROTECTION_EVENT = "auto_protection_event"
+#: Frente A / F2-1 — el HECHO durable de que una operación MATERIALIZÓ una posición (apertura
+#: desde plano). Cierra ``position_not_durable``: la escalera ``fill → posición`` solo puede
+#: subir con una traza append-only por operación; el espejo ``sim_auto_positions`` es por
+#: ``(cuenta, motor, símbolo)`` y se reescribe al reutilizar el símbolo, así que no es historia.
+AUTO_POSITION_MATERIALIZED_EVENT = "auto_position_materialized"
 
 #: Motivos de liberación que cuentan como retirada FORZADA (no por fill materializado).
 _FORCED_RELEASE_REASONS: frozenset[str] = frozenset({"cancel", "restart", "tail_dead", "rollback"})
@@ -196,6 +201,103 @@ def _entry_payload(entry: Any) -> Mapping[str, Any]:
     return payload if isinstance(payload, Mapping) else {}
 
 
+def _cycle_opportunity_id(entries: Sequence[Any]) -> str | None:
+    """Identidad de la OPORTUNIDAD del ciclo, leída del hecho durable de la decisión.
+
+    Es la identidad de PRIMERA CLASE (``payload.opportunityId``, exenta de ranking), no el
+    ``rank`` posicional. ``None`` si el hecho no la declara: la ausencia se declara, no se finge.
+    """
+    for entry in entries:
+        if _get(entry, "event_type", "eventType") == AUTO_ENTRY_DECISION_EVENT:
+            value = _entry_payload(entry).get("opportunityId")
+            text = str(value).strip() if value is not None else ""
+            if text:
+                return text
+    return None
+
+
+def _cycle_decision(entries: Sequence[Any]) -> dict[str, Any] | None:
+    """F2-2 — DECISIÓN de cartera DURABLE del ciclo, o ``None`` si no hay hecho que la registre.
+
+    La decisión de cartera que produjo el ciclo viaja sellada en la entrada durable
+    ``auto_entry_decision`` (``PortfolioDecision`` + ``cycleId``): se **lee** de ahí, no se
+    infiere del ranking (``TOP_N``) ni de la orden. Sin hecho durable la decisión es ``None``
+    (la UI la rotula «Sin dato todavía», nunca la fabrica desde el ranking).
+    """
+    for entry in entries:
+        if _get(entry, "event_type", "eventType") != AUTO_ENTRY_DECISION_EVENT:
+            continue
+        payload = _entry_payload(entry)
+        return {
+            "decisionId": _get(entry, "decision_id", "decisionId"),
+            "approved": payload.get("approved"),
+            "action": payload.get("action"),
+            "opportunityId": payload.get("opportunityId"),
+            "allocation": payload.get("risk"),
+            "tradePlan": payload.get("tradePlan"),
+            "reasonCodes": payload.get("reasonCodes"),
+            "at": _iso(_parse_instant(_get(entry, "created_at", "createdAt"))),
+            "measurement": MEASUREMENT_COMPLETE,
+        }
+    return None
+
+
+def _cycle_position(
+    entries: Sequence[Any], position: Mapping[str, Any] | None
+) -> dict[str, Any] | None:
+    """F2-1 — traza DURABLE de la POSICIÓN materializada por el ciclo, o ``None`` si no consta.
+
+    Se prefiere el HECHO append-only ``auto_position_materialized`` (una traza por operación,
+    que sobrevive a la reutilización del símbolo). Si el hecho no está en la ventana, se cae al
+    espejo durable ``sim_auto_positions`` ligado al ciclo por ``positionState.cycleId``. Un fill
+    **no** crea posición, así que sin ninguna de las dos trazas el ciclo declara ``None`` (la
+    escalera se detiene en «Ejecución completada»). Cada campo viaja con su medición (``_fact``):
+    un valor ausente es ``UNKNOWN``, jamás un ``0`` fabricado.
+    """
+    event = next(
+        (
+            entry
+            for entry in entries
+            if _get(entry, "event_type", "eventType") == AUTO_POSITION_MATERIALIZED_EVENT
+        ),
+        None,
+    )
+    if event is not None:
+        payload = _entry_payload(event)
+        return {
+            "state": STEP_REACHED,
+            "measurement": MEASUREMENT_COMPLETE,
+            "at": _iso(_parse_instant(_get(event, "created_at", "createdAt")))
+            or payload.get("at"),
+            "facts": [
+                _fact("quantity", payload.get("quantity")),
+                _fact("entryPrice", payload.get("entryPrice")),
+                _fact("executionId", payload.get("executionId")),
+                _fact("strategyVersion", payload.get("strategyVersion")),
+                _fact("provenance", AUTO_POSITION_MATERIALIZED_EVENT),
+            ],
+        }
+    if not isinstance(position, Mapping):
+        return None
+    state = position.get("positionState")
+    active = state if isinstance(state, Mapping) else {}
+    return {
+        "state": STEP_REACHED,
+        "measurement": MEASUREMENT_COMPLETE,
+        "at": active.get("openedAt") or active.get("entryAt"),
+        "facts": [
+            _fact("quantity", active.get("quantity")),
+            _fact("entryPrice", position.get("entryPrice", active.get("entryPrice"))),
+            _fact("stopPrice", position.get("stopPrice")),
+            _fact("highWatermark", position.get("highWatermark")),
+            _fact("lifecycleState", active.get("lifecycleState")),
+            _fact("t1State", position.get("t1State")),
+            _fact("trailingState", position.get("trailingState")),
+            _fact("provenance", "sim_auto_positions"),
+        ],
+    }
+
+
 def _net_open_qty(fills: Sequence[Any]) -> tuple[float, int]:
     """Cantidad neta viva del ciclo (compras − ventas) y nº de fills con ``side`` NO clasificable.
 
@@ -292,6 +394,10 @@ def _entry_decision_step(
             facts.append(_fact("instrumentId", payload.get("instrumentId")))
         if payload.get("strategyVersion"):
             facts.append(_fact("strategyVersion", payload.get("strategyVersion")))
+        # Frente A — la identidad de la OPORTUNIDAD (estable, no el ``rank``): permite
+        # demostrar ``oportunidad → decisión`` sin depender del ranking de la corrida.
+        if payload.get("opportunityId"):
+            facts.append(_fact("opportunityId", payload.get("opportunityId")))
         if payload.get("opportunityScore") is not None:
             facts.append(_fact("score", payload.get("opportunityScore")))
     elif step_id == "TOP_N":
@@ -745,6 +851,13 @@ def _build_cycle(
         closed_measurement = MEASUREMENT_COMPLETE
     return {
         "cycleId": cycle_id,
+        "opportunityId": _cycle_opportunity_id(cycle_journal),
+        # F2-2 — la DECISIÓN de cartera durable que produjo el ciclo (o ``None``): el eslabón
+        # ``oportunidad → decisión`` deja de ser un hueco cuando el hecho existe.
+        "decision": _cycle_decision(cycle_journal),
+        # F2-1 — la traza durable de la POSICIÓN por operación (o ``None`` si el ciclo no la
+        # materializó): la escalera no salta de un fill a «posición creada».
+        "position": _cycle_position(cycle_journal, positions_by_cycle.get(cycle_id)),
         "instrumentId": _get(reservation, "instrument_id", "instrumentId"),
         "strategyVersion": _get(reservation, "strategy_version_id", "strategyVersionId"),
         "direction": "short" if side == "sell" else "long",

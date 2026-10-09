@@ -1483,6 +1483,7 @@ def plan_v2_tick(
                 # ranking que la situó, para que ``SIGNAL``/``TOP_N`` sean demostrables
                 # en la operación tomada (no sólo en los rechazos sin ciclo).
                 signal_id=signal.signal_id,
+                opportunity_id=auto_opportunity_id(signal=signal),
                 score=entry_score,
                 # La economía de la candidata APROBADA: la que midió el optimizador o, si
                 # no corrió, la de su propia geometría. Un rechazo no publica economía.
@@ -1815,6 +1816,30 @@ def auto_cycle_id(*, account_id: str, signal: V2Signal) -> str:
         return f"cyc-{uuid4().hex[:12]}"
     key = f"{str(account_id or '').strip()}\x1f{signal_id}"
     return f"cyc-{sha256(key.encode('utf-8')).hexdigest()[:12]}"
+
+
+def auto_opportunity_id(*, signal: V2Signal) -> str:
+    """Frente A (trazabilidad financiera) — identidad de PRIMERA CLASE de la oportunidad.
+
+    Hasta ahora la oportunidad se referenciaba por ``signalId`` + ``rank``: el ``rank`` es
+    posicional de UNA corrida de ranking y se reasigna en la siguiente, así que **no** es una
+    identidad estable de la oportunidad. Esta función acuña una identidad propia y **exenta de
+    ranking** a partir de la identidad de señal/barra
+    (``signal.signal_id`` = ``instrumento|versión|timeframe|barra|hash``).
+
+    Es del **mercado**, no de la cuenta: la MISMA oportunidad tomada por dos cuentas produce dos
+    decisiones (y dos ciclos) que comparten ``opportunityId``. El vínculo con el dinero se cierra
+    por ``cycle_id`` (``cuenta + signal_id``), nunca por el ranking.
+
+    Sin identidad de señal (señal sin barra) se conserva el fallback aleatorio histórico: no hay
+    clave estable que acuñar.
+    """
+    signal_id = str(signal.signal_id or "").strip()
+    if not signal_id:
+        from uuid import uuid4
+
+        return f"opp-{uuid4().hex[:12]}"
+    return f"opp-{sha256(signal_id.encode('utf-8')).hexdigest()[:12]}"
 
 
 def candidate_key(signal: V2Signal, *, allow_distinct_strategies: bool = False) -> str:
@@ -2284,6 +2309,7 @@ def _journal_entry(
     strategy_version: str | None = None,
     cycle_id: str | None = None,
     signal_id: str | None = None,
+    opportunity_id: str | None = None,
     score: OpportunityScore | None = None,
     expected_value: ExpectedValue | None = None,
     adaptive: AdaptivePlan | None = None,
@@ -2320,6 +2346,12 @@ def _journal_entry(
     # si no hay dato: la ausencia es información, jamás un relleno.
     if str(signal_id or "").strip():
         payload["signalId"] = str(signal_id)
+    # Frente A — identidad de PRIMERA CLASE de la oportunidad, EXENTA de ranking: el ``rank``
+    # es posicional de una corrida y se reasigna; este id es estable por señal/barra. Viaja
+    # con la decisión para que el vínculo ``oportunidad → decisión → ciclo → PnL`` sea
+    # demostrable sin depender del ranking. La clave se OMITE si no hay dato.
+    if str(opportunity_id or "").strip():
+        payload["opportunityId"] = str(opportunity_id)
     if decision.opportunity_score is not None:
         payload["opportunityScore"] = decision.opportunity_score
     if score is not None and score.rank is not None:
@@ -2702,6 +2734,7 @@ __all__ = [
     "candidate_key",
     "canonical_candidate_key",
     "auto_cycle_id",
+    "auto_opportunity_id",
     "edge_from_package",
     "entry_decision_id",
     "entry_direction",

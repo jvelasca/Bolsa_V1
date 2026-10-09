@@ -5,6 +5,10 @@
  * **texto visible** del panel de la historia: el modelo semántico de `@bolsa/shared` NO se toca y
  * el término técnico se conserva en el detalle (`title`). `data-stage`/`data-state` tampoco cambian.
  *
+ * Frente C — vocabulario de estados que NO se mezclan entre sí: «Sin dato todavía» (no medido),
+ * «Incompleto» (medido a medias, `PARTIAL`) y «Rechazado» (el hecho ocurrió y fue un veto). El
+ * token `CONFIRMED` NO entra aquí: sigue **reservado** al contrato PAPER (nunca lo emite la UI).
+ *
  * @see docs/engineering/spec-auto-cockpit-usuario-basico-2026-10-05.md §F4
  */
 
@@ -51,6 +55,11 @@ export const AUTO_STORY_PLAIN_STATE_LABELS: Record<string, string> = {
   PENDING: "Pendiente",
   ABSENT: "No ocurrió",
   NOT_MEASURED: "Sin dato todavía",
+  // Frente C — estados que NO se confunden con «Sin dato todavía»:
+  // «Incompleto» = el dato existe pero es PARCIAL (medido a medias, no es un hueco);
+  // «Rechazado» = el hecho ocurrió y fue un veto/negativa, no una ausencia de dato.
+  INCOMPLETE: "Incompleto",
+  REJECTED: "Rechazado",
 };
 
 export function plainStateLabel(state: string, technicalLabel: string): string {

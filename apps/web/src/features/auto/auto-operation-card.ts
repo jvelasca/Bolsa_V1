@@ -20,6 +20,10 @@ export const AUTO_CARD_SLOT_PENDING = "Pendiente";
 export const AUTO_CARD_SLOT_ABSENT = "No ocurrió";
 export const AUTO_CARD_ORDER_NOTED = "Orden anotada";
 export const AUTO_CARD_PARTIAL = "Ejecución parcial";
+// Frente C — estados que no se mezclan: «Incompleto» (dato PARCIAL, no un hueco) y «Rechazado»
+// (la decisión durable fue un veto). «Confirmado» NO se emite aquí: sigue reservado a PAPER.
+export const AUTO_CARD_INCOMPLETE = "Incompleto";
+export const AUTO_CARD_REJECTED = "Rechazado";
 export const AUTO_CARD_ACCOUNT_SCOPE = "en la cuenta simulada";
 
 export type AutoCardSlotId =
@@ -104,6 +108,11 @@ function executionSlot(
     return { state: AUTO_CARD_SLOT_ABSENT, detail: null };
   }
   if (!fillReached) return { state: AUTO_HOME_NO_DATA_LABEL, detail: null };
+  if (fill.measurement === "PARTIAL") {
+    // Hay medición pero NO está completa: se rotula «Incompleto», nunca «Sin dato todavía»
+    // (que es para lo NO medido). Los dos huecos no se mezclan.
+    return { state: AUTO_CARD_INCOMPLETE, detail: null };
+  }
   if (fill.measurement != null && fill.measurement !== "COMPLETE") {
     return { state: AUTO_HOME_NO_DATA_LABEL, detail: null };
   }
@@ -123,6 +132,21 @@ function executionSlot(
       state: AUTO_CARD_SLOT_DONE,
       detail: `${applied}/${requested}`,
     };
+  }
+  return { state: AUTO_HOME_NO_DATA_LABEL, detail: null };
+}
+
+function decisionSlot(
+  cycle: AutoBasicCycle,
+): Pick<AutoCardSlot, "state" | "detail"> {
+  // F2-2 — la decisión de cartera DURABLE: se lee del hecho, no se deduce del ranking. Aprobada
+  // ⇒ «Hecho»; vetada ⇒ «Rechazado»; sin traza ⇒ «Sin dato todavía» (jamás se fabrica).
+  const decision = cycle.decision;
+  if (decision == null) return { state: AUTO_HOME_NO_DATA_LABEL, detail: null };
+  if (decision.approved === true)
+    return { state: AUTO_CARD_SLOT_DONE, detail: null };
+  if (decision.approved === false) {
+    return { state: AUTO_CARD_REJECTED, detail: null };
   }
   return { state: AUTO_HOME_NO_DATA_LABEL, detail: null };
 }
@@ -163,7 +187,7 @@ export function buildAutoOperationCard(
     AutoCardSlotId,
     Pick<AutoCardSlot, "state" | "detail">
   > = {
-    decision: { state: AUTO_HOME_NO_DATA_LABEL, detail: null },
+    decision: decisionSlot(cycle),
     order: orderSlot(cycle),
     execution: executionSlot(cycle),
     simulation: { state: AUTO_HOME_NO_DATA_LABEL, detail: null },
