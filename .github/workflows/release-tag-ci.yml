@@ -308,13 +308,17 @@ jobs:
       # endpoint real (sin mocks) y declara NO_CONFIRMED; cubre reinicio (reload), hueco por
       # lectura no disponible, dato parcial y aislamiento por cuenta. Opt-in: NO es gate de
       # ``certify``; se certifica con una ejecución explícita citada en la evidencia.
+      # (FIX v2.88.102 — la 1ª ejecución real del job lo destapó) `pnpm e2e -- <filtros>`
+      # NO filtra en CI: pnpm reenvía el `--` y Playwright recibe `test -- <filtros>`, con lo
+      # que IGNORA los filtros y corre los 135 tests (incluidos specs fuera de esta lista).
+      # Se invoca el binario directamente para que los filtros lleguen verbatim.
       - name: Run integrated browser E2E
         working-directory: apps/web
         env:
           E2E_RUN: '1'
           E2E_INTEGRATION: '1'
           E2E_ALLOW_DEV_DB: '1'
-        run: pnpm e2e -- gp-v164-ui gp-v167 gp-v168 gp-v170-list gp-v187
+        run: pnpm exec playwright test gp-v164-ui gp-v167 gp-v168 gp-v170-list gp-v187
 
   python:
     name: python (ruff/imports/mypy/pytest offline)
