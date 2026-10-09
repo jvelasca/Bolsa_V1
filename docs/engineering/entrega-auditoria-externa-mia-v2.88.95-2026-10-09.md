@@ -7,6 +7,7 @@
 > **`Δ motor = 0`.** El diff funcional vive en `apps/web/src/**` y `packages/shared/src/**`; el resto es `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin tocar `packages/py/**`**. **El contrato HTTP NO cambia.**
 > **Evidencia cruda:** [`docs/engineering/evidence/v2.88.95/README.md`](./evidence/v2.88.95/README.md).
 > **Cita POST-TAG:** tag anotado `v2.88.95-beta` (objeto `778c5ec9` → commit `52ba2a26`); `Release tag CI` [`37892237594`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37892237594) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `frontend` `281` ficheros / `1750` passed; `python` `4596 passed / 45 skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
+> **Continuación (2026-10-09):** las 2 observaciones menores del self-review quedan cerradas en [`v2.88.96-beta`](./entrega-auditoria-externa-mia-v2.88.96-2026-10-09.md) (cobertura `S2` en `completo` + `indicatorSpecs` reales en `S3`), sin cambiar la semántica de los slices.
 
 **Sello dirigido (declarado).** Mandato: cerrar los hallazgos `P2-2`, `P2-3`, `P3-1`/`P3-3`/`P3-4` **solo con presentación** sobre datos ya existentes, y **no** cerrar `P4`. No se añaden funciones al motor ni se inventa ningún dato ausente.
 

@@ -2,6 +2,21 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.96-beta] — `FASE 3`: **cierre de las 2 observaciones de `S1`–`S3` (cobertura `S2` completo + `indicatorSpecs` reales en `S3`) (UI-only · Δ motor = 0)**
+
+**Naturaleza:** UI/producto, `Δ motor = 0`, contrato HTTP sin cambio, sin Alembic (head `052_top3_opportunities`). Todo el diff vive en `apps/web/src/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D. **Bump** `2.11.95-beta` → `2.11.96-beta`; los 9 CLIs DÍA-D `v2_89`…`v2_97` sellan `2.11.96-beta` (guardián `test_dia_d_bump_guard` verde).
+
+Cierra las dos observaciones menores del self-review del sello [`v2.88.95-beta`](docs/engineering/entrega-auditoria-externa-mia-v2.88.95-2026-10-09.md). No cambia la semántica de los slices; refuerza su falsabilidad y su fuente de datos:
+
+- **`S2` — cobertura `completo`.** Nuevo test que fija que en `focusMode = "completo"` + `phase = "prepared"` con `Entrada ≠ Trigger` coexisten ambas líneas, igual que en `simple` (la rama es compartida; ahora queda blindada). [`operational-plan-chart-levels.test.ts`](apps/web/src/features/charts/operational-plan-chart-levels.test.ts).
+- **`S3` — `indicatorSpecs` reales.** El panel de Finalistas deja de usar solo el `presetKey` del summary: resuelve hasta ~3 `strategyDefinitionId` vía `GET /api/strategies/{id}` (`StrategyDefinitionDetailDto.definition`) y toma `definition.indicatorSpecs` como **fuente preferida**, cayendo a `presetIndicatorSpecs(strategyType)` solo si el detalle no está. Extraído a helper puro y falsable `buildStrategyDefinitionRefMap`. [`instrument-strategy-top-panel.tsx`](apps/web/src/features/backtests/instrument-strategy-top-panel.tsx), [`finalist-indicators-reason.test.ts`](apps/web/src/features/backtests/finalist-indicators-reason.test.ts). Sigue sin deducir indicadores del catálogo del gráfico; hueco → «Sin dato todavía».
+
+**`S4-agregador-evidencia` sigue NO LANZADO** (no se emite `CONFIRMED`).
+
+**Verificación (local, cierre).** `pnpm --filter @bolsa/web exec tsc --noEmit` **OK** · `eslint src` **0 errores** (23 avisos preexistentes) · `vitest run` web **281 ficheros / 1753 passed** (+3) · `test_dia_d_bump_guard` **1 passed** (`2.11.96-beta`) · **`Δ motor = 0`** (`git diff --name-only -- packages/py` vacío; sin contrato HTTP, sin Alembic). Evidencia: [`docs/engineering/evidence/v2.88.96/README.md`](docs/engineering/evidence/v2.88.96/README.md). Entrega: [`docs/engineering/entrega-auditoria-externa-mia-v2.88.96-2026-10-09.md`](docs/engineering/entrega-auditoria-externa-mia-v2.88.96-2026-10-09.md).
+
+**Cita POST-TAG.** Tag anotado `v2.88.96-beta` (objeto pendiente → commit pendiente); `Release tag CI` **pendiente**.
+
 ## [2.11.95-beta] — `FASE 3`: **reorden de la FASE 3 — slices `S1`–`S3` (entrada/salida literal · objetivo con precio · estrategia→indicadores→razón) (UI-only · Δ motor = 0)**
 
 **Naturaleza:** UI/producto + `packages/shared`, `Δ motor = 0`, contrato HTTP sin cambio, sin Alembic (head `052_top3_opportunities`). Todo el diff vive en `apps/web/src/**`, `packages/shared/src/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D. **Bump** `2.11.94-beta` → `2.11.95-beta`; los 9 CLIs DÍA-D `v2_89`…`v2_97` sellan `2.11.95-beta` (guardián `test_dia_d_bump_guard` verde).

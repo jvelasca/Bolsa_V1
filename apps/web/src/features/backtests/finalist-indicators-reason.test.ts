@@ -7,7 +7,10 @@
 import { describe, expect, it } from "vitest";
 import { strategySlotToIndicatorLabels } from "@bolsa/shared";
 import type { InstrumentStrategyTopSlotV1 } from "@bolsa/shared";
-import { readRecommendationReasons } from "@/features/backtests/instrument-strategy-top-panel";
+import {
+  buildStrategyDefinitionRefMap,
+  readRecommendationReasons,
+} from "@/features/backtests/instrument-strategy-top-panel";
 
 function slot(
   partial: Partial<InstrumentStrategyTopSlotV1> = {},
@@ -75,5 +78,50 @@ describe("readRecommendationReasons (S3)", () => {
     expect(
       readRecommendationReasons({ recommendations: [{ rank: 1 }] }, 1),
     ).toEqual([]);
+  });
+});
+
+describe("buildStrategyDefinitionRefMap (S3 — el detalle manda sobre el summary)", () => {
+  it("usa los indicatorSpecs del detalle y resuelve indicadores (definition)", () => {
+    const map = buildStrategyDefinitionRefMap({
+      summaries: [{ id: "s1", presetKey: "sma_crossover" }],
+      details: [
+        {
+          id: "s1",
+          definition: {
+            indicatorSpecs: [
+              { definitionId: "rsi", parameters: { period: 14 } },
+            ],
+            presetKey: "sma_crossover",
+          },
+        },
+      ],
+    });
+    const ref = map.get("s1");
+    expect(ref?.indicatorSpecs).toEqual([
+      { definitionId: "rsi", parameters: { period: 14 } },
+    ]);
+    const resolved = strategySlotToIndicatorLabels({
+      slot: slot({ strategyType: "sma_crossover" }),
+      definition: ref ?? null,
+    });
+    expect(resolved.source).toBe("definition");
+    expect(resolved.labels).toEqual(["RSI"]);
+  });
+
+  it("sin detalle conserva el presetKey del summary (fallback a preset)", () => {
+    const map = buildStrategyDefinitionRefMap({
+      summaries: [{ id: "s2", presetKey: "sma_crossover" }],
+      details: [null, undefined],
+    });
+    expect(map.get("s2")).toEqual({
+      indicatorSpecs: [],
+      presetKey: "sma_crossover",
+    });
+    const resolved = strategySlotToIndicatorLabels({
+      slot: slot({ strategyType: "sma_crossover" }),
+      definition: map.get("s2") ?? null,
+    });
+    expect(resolved.source).toBe("preset");
   });
 });

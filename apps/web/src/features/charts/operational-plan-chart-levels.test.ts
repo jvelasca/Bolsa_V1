@@ -141,6 +141,17 @@ describe("buildOperationalPlanChartLevels", () => {
     expect(levels.filter((l) => l.kind === "trigger")).toHaveLength(1);
   });
 
+  it("S2 — Completo con Entrada ≠ Trigger: coexisten (misma semántica que Simple)", () => {
+    const levels = buildOperationalPlanChartLevels({
+      plan: plan({ phase: "prepared", phaseLabel: "Preparada", entry: 100 }),
+      showLevels: true,
+      triggerPrice: 102,
+      focusMode: "completo",
+    });
+    expect(levels.find((l) => l.kind === "trigger")!.price).toBe(102);
+    expect(levels.find((l) => l.kind === "entry")!.price).toBe(100);
+  });
+
   it("V2.14 — bootstrap stop is advisory amber, not technical red", () => {
     const levels = buildOperationalPlanChartLevels({
       plan: plan(),

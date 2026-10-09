@@ -16,8 +16,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { InstrumentStrategyTopV1 } from "@bolsa/shared";
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import type {
+  InstrumentStrategyTopV1,
+  StrategyDefinitionSummaryDto,
+  StrategyDefinitionV1,
+} from "@bolsa/shared";
 import { strategySlotToIndicatorLabels } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -103,6 +112,50 @@ export type FinalistSlotUse = {
   label: string;
   rank: number;
 };
+
+/** S3 — fuente de indicadores de una estrategia (subset usado por la cadena). */
+export type SlotDefinitionRef = Pick<
+  StrategyDefinitionV1,
+  "indicatorSpecs" | "presetKey"
+>;
+
+/**
+ * S3 — merge de la fuente de indicadores por id de estrategia. El summary
+ * (`/api/strategies`) solo trae `presetKey`; el detalle (`/api/strategies/{id}`)
+ * trae `definition.indicatorSpecs`, que es la fuente **preferida**. El detalle
+ * manda; si un id solo tiene summary, se conserva su `presetKey` (fallback a
+ * `presetIndicatorSpecs`). Nunca se deduce del catálogo del gráfico.
+ */
+export function buildStrategyDefinitionRefMap(input: {
+  summaries: ReadonlyArray<
+    Pick<StrategyDefinitionSummaryDto, "id" | "presetKey">
+  >;
+  details: ReadonlyArray<
+    | {
+        id: string;
+        definition?: Pick<
+          StrategyDefinitionV1,
+          "indicatorSpecs" | "presetKey"
+        > | null;
+      }
+    | null
+    | undefined
+  >;
+}): Map<string, SlotDefinitionRef> {
+  const map = new Map<string, SlotDefinitionRef>();
+  for (const summary of input.summaries) {
+    map.set(summary.id, { indicatorSpecs: [], presetKey: summary.presetKey });
+  }
+  for (const detail of input.details) {
+    if (!detail?.definition) continue;
+    const existing = map.get(detail.id);
+    map.set(detail.id, {
+      indicatorSpecs: detail.definition.indicatorSpecs ?? [],
+      presetKey: detail.definition.presetKey ?? existing?.presetKey,
+    });
+  }
+  return map;
+}
 
 export function InstrumentStrategyTopBadge({
   instrumentId,
@@ -395,20 +448,38 @@ export function InstrumentStrategyTopPanel({
   });
 
   /**
-   * S3 — resumen de definición por id (solo `presetKey`; el detalle con
-   * `indicatorSpecs` no viene en el summary). La resolución de indicadores es
-   * `definition.indicatorSpecs` → `presetIndicatorSpecs(strategyType)`.
+   * S3 — definición por id para la cadena estrategia → indicadores. El summary
+   * (`/api/strategies`) solo trae `presetKey`; el detalle
+   * (`/api/strategies/{id}`) trae `definition.indicatorSpecs`, que es la fuente
+   * preferida. Si el detalle aún no está, se cae al `presetKey` del summary
+   * (→ `presetIndicatorSpecs(strategyType)`); nunca se deduce del gráfico.
    */
-  type SlotDefinitionRef = NonNullable<
-    Parameters<typeof strategySlotToIndicatorLabels>[0]["definition"]
-  >;
-  const definitionByStrategyId = useMemo(() => {
-    const map = new Map<string, SlotDefinitionRef>();
-    for (const s of strategiesQuery.data?.data ?? []) {
-      map.set(s.id, { indicatorSpecs: [], presetKey: s.presetKey });
+  const strategyDefinitionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const slot of top?.slots ?? []) {
+      if (slot.strategyDefinitionId) ids.add(slot.strategyDefinitionId);
     }
-    return map;
-  }, [strategiesQuery.data?.data]);
+    return Array.from(ids);
+  }, [top?.slots]);
+  const strategyDetailQueries = useQueries({
+    queries: strategyDefinitionIds.map((id) => ({
+      queryKey: ["strategy", id],
+      queryFn: () => api.getStrategy(id),
+      staleTime: 60_000,
+    })),
+  });
+  const definitionByStrategyId = useMemo(
+    () =>
+      buildStrategyDefinitionRefMap({
+        summaries: strategiesQuery.data?.data ?? [],
+        details: strategyDefinitionIds.map((id, index) => ({
+          id,
+          definition:
+            strategyDetailQueries[index]?.data?.data?.definition ?? null,
+        })),
+      }),
+    [strategiesQuery.data?.data, strategyDefinitionIds, strategyDetailQueries],
+  );
 
   const repairedRef = useRef<string | null>(null);
   useEffect(() => {
