@@ -10,6 +10,8 @@
  *   El agregado reporta la capa más fuerte medida y lo declara con su nota de no promoción.
  * - **`UNKNOWN ≠ 0`.** Un hueco es la variante `gap` con el rótulo de `absent-data`
  *   («Sin dato todavía»); jamás se colapsa a 0 ni a un veredicto afirmado.
+ * - **El rollup OOS exige los tres recuentos medidos.** Un contador ausente (o evidencia sin
+ *   medir) no se interpreta como 0: la capa se declara hueco en vez de afirmar `OOS_SUPPORTED`.
  *
  * No toca motor, contrato HTTP ni almacenamiento: es UI pura (`Δ motor = 0`).
  *
@@ -22,6 +24,9 @@ import {
   DIA_D_EVIDENCE_GLOBAL_VERDICT_LABEL,
   DIA_D_EVIDENCE_LAYER_COPY,
   DIA_D_EVIDENCE_NON_PROMOTION_NOTE,
+  DIA_D_EVIDENCE_OOS_EMPTY_REASON,
+  DIA_D_EVIDENCE_OOS_INSUFFICIENT_COUNTERS_REASON,
+  DIA_D_EVIDENCE_OOS_NOT_MEASURED_REASON,
   DIA_D_EVIDENCE_OPEN_SUBVIEW_REASON,
   DIA_D_EVIDENCE_PAPER_REASON,
   OOS_VERDICT_LABELS,
@@ -239,18 +244,38 @@ function buildOosLayer(
     return gapLayer(
       "oos",
       facts
-        ? "La evidencia fuera de muestra todavía no se ha medido."
+        ? DIA_D_EVIDENCE_OOS_EMPTY_REASON
         : DIA_D_EVIDENCE_OPEN_SUBVIEW_REASON,
     );
   }
-  const supported = num(facts.oosSupported) ?? 0;
-  const mixed = num(facts.mixed) ?? 0;
-  const refuted = num(facts.refuted) ?? 0;
-  if (supported + mixed + refuted <= 0) {
+  const supported = num(facts.oosSupported);
+  const mixed = num(facts.mixed);
+  const refuted = num(facts.refuted);
+  const notMeasured = num(facts.notMeasured);
+  const measurement = [
+    part("soportados", supported),
+    part("mixtos", mixed),
+    part("refutados", refuted),
+    part("sin medir", notMeasured),
+  ].join(" · ");
+
+  // `UNKNOWN ≠ 0`: para afirmar el veredicto OOS hacen falta los tres recuentos. Un contador
+  // ausente NO se interpreta como 0; sin él no se puede descartar una contradicción, así que la
+  // capa se declara hueco (conservando la muestra parcial) en vez de un veredicto afirmado.
+  if (supported === null || mixed === null || refuted === null) {
     return gapLayer(
       "oos",
-      "La evidencia fuera de muestra todavía no se ha medido.",
+      DIA_D_EVIDENCE_OOS_INSUFFICIENT_COUNTERS_REASON,
+      measurement,
     );
+  }
+  // Un instrumento sin medir podría ser una refutación: mientras quede muestra sin medir, el
+  // veredicto no se afirma.
+  if ((notMeasured ?? 0) > 0) {
+    return gapLayer("oos", DIA_D_EVIDENCE_OOS_NOT_MEASURED_REASON, measurement);
+  }
+  if (supported + mixed + refuted <= 0) {
+    return gapLayer("oos", DIA_D_EVIDENCE_OOS_EMPTY_REASON, measurement);
   }
   // Rollup con contradicción declarada: soportados y refutados a la vez ⇒ MIXED (la evidencia
   // se contradice); sólo refutados ⇒ REFUTED; sólo mixtos ⇒ MIXED; si no, OOS_SUPPORTED.
@@ -262,12 +287,6 @@ function buildOosLayer(
         : mixed > 0
           ? "MIXED"
           : "OOS_SUPPORTED";
-  const measurement = [
-    part("soportados", num(facts.oosSupported)),
-    part("mixtos", num(facts.mixed)),
-    part("refutados", num(facts.refuted)),
-    part("sin medir", num(facts.notMeasured)),
-  ].join(" · ");
   return measuredLayer(
     "oos",
     token,

@@ -621,8 +621,10 @@ function JourneyHudBlock({
             plan={positionPlan}
             detailTestIds={{
               stop: "position-decision-stop",
-              t1: "journey-t1",
-              t2: "journey-t2",
+              // P2-4 (UI 5.0) — el nodo VISIBLE lleva el testid contractual y el de journey,
+              // sin bloque `sr-only` duplicado.
+              t1: ["position-decision-t1", "journey-t1"],
+              t2: ["position-decision-t2", "journey-t2"],
             }}
           />
         </div>
@@ -832,18 +834,14 @@ function PositionCompactBody({
                     },
                   );
                 })()}
+                detailTestIds={{
+                  // P2-4 (UI 5.0) — el nodo VISIBLE lleva el testid contractual, sin
+                  // bloque `sr-only` duplicado. El Stop lo cubre el `<dl>` de nivel 2.
+                  t1: "position-decision-t1",
+                  t2: "position-decision-t2",
+                }}
               />
             </OperatorCabinLevel>
-            {/* Compat testids for assertOperationalTruth: T1/T2 contractuales estables
-                aunque la escalera visible no incluya el peldaño (legado `absent`). */}
-            <div className="sr-only" aria-hidden="true">
-              <span data-testid="position-decision-t1">
-                {formatLevel(view.levels.target1)}
-              </span>
-              <span data-testid="position-decision-t2">
-                {formatLevel(view.levels.target2)}
-              </span>
-            </div>
           </>
         )}
         {!hud && journey ? (
@@ -860,16 +858,6 @@ function PositionCompactBody({
               }
               plannedStop={journey.risk.initialStop}
             />
-            {/* Compat testids: T1/T2 contractuales estables aunque la escalera visible
-                no incluya el peldaño (legado `absent`). El Stop lo cubre el plan. */}
-            <div className="sr-only" aria-hidden="true">
-              <span data-testid="position-decision-t1">
-                {formatLevel(view.levels.target1)}
-              </span>
-              <span data-testid="position-decision-t2">
-                {formatLevel(view.levels.target2)}
-              </span>
-            </div>
           </>
         ) : null}
       </div>

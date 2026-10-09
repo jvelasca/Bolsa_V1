@@ -37,6 +37,21 @@ export const DIA_D_EVIDENCE_OPEN_SUBVIEW_REASON =
 export const DIA_D_EVIDENCE_PAPER_REASON =
   "La evidencia de ejecución real todavía no se emite.";
 
+/**
+ * Motivo del hueco cuando la capa OOS tiene contadores ausentes: sin los tres recuentos no
+ * se puede descartar una contradicción y el veredicto NO se afirma (`UNKNOWN ≠ 0`).
+ */
+export const DIA_D_EVIDENCE_OOS_INSUFFICIENT_COUNTERS_REASON =
+  "El veredicto fuera de muestra no se afirma: faltan recuentos por medir y no se interpretan como cero.";
+
+/** Motivo del hueco cuando la capa OOS tiene instrumentos todavía sin medir. */
+export const DIA_D_EVIDENCE_OOS_NOT_MEASURED_REASON =
+  "El veredicto fuera de muestra no se afirma: quedan instrumentos sin medir.";
+
+/** Motivo del hueco cuando la capa OOS está cargada pero no ha medido ninguna evidencia. */
+export const DIA_D_EVIDENCE_OOS_EMPTY_REASON =
+  "La evidencia fuera de muestra todavía no se ha medido.";
+
 /** Copy por capa: título, nota de honestidad y origen (sin jerga de motor). */
 export const DIA_D_EVIDENCE_LAYER_COPY: Record<
   DiaDEvidenceLayerId,

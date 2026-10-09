@@ -38,7 +38,7 @@ describe("DiaDEvidenceAggregateView", () => {
         oosSupported: 1,
         mixed: 0,
         refuted: 0,
-        notMeasured: 2,
+        notMeasured: 0,
       },
     });
 
@@ -63,5 +63,27 @@ describe("DiaDEvidenceAggregateView", () => {
     expect(stateText).not.toContain("OOS_SUPPORTED");
     expect(stateText).not.toContain("MATCH");
     expect(stateText).not.toContain("READY");
+  });
+
+  it("declara la evidencia OOS como hueco cuando falta un contador", () => {
+    const aggregate = buildDiaDEvidenceAggregate({
+      oos: {
+        loaded: true,
+        oosSupported: 2,
+        mixed: null,
+        refuted: null,
+        notMeasured: null,
+      },
+    });
+
+    render(<DiaDEvidenceAggregateView aggregate={aggregate} />);
+
+    const oos = screen
+      .getAllByTestId("dia-d-evidence-aggregate-layer")
+      .find((layer) => layer.getAttribute("data-layer") === "oos");
+    expect(oos?.getAttribute("data-state")).toBe("gap");
+    expect(oos?.textContent).toContain("Sin dato todavía");
+    expect(oos?.textContent).toContain("soportados 2");
+    expect(oos?.textContent).not.toContain("Soportado fuera de muestra");
   });
 });

@@ -40,7 +40,7 @@ const OOS: DiaDEvidenceOosFacts = {
   oosSupported: 1,
   mixed: 0,
   refuted: 0,
-  notMeasured: 2,
+  notMeasured: 0,
 };
 
 function input(
@@ -115,6 +115,94 @@ describe("buildDiaDEvidenceAggregate · rollup OOS con contradicción", () => {
       expect(oos.verdictToken).toBe("REFUTED");
     } else {
       throw new Error("la capa OOS debería estar medida");
+    }
+  });
+});
+
+describe("buildDiaDEvidenceAggregate · OOS con contadores ausentes (UNKNOWN != 0)", () => {
+  function oosLayer(over: Partial<DiaDEvidenceOosFacts>) {
+    const result = buildDiaDEvidenceAggregate(
+      input({ oos: { ...OOS, ...over } }),
+    );
+    return {
+      result,
+      oos: result.layers.find((layer) => layer.id === "oos"),
+    };
+  }
+
+  it("soportados medidos y mixtos/refutados ausentes ⇒ hueco, no «Soportado»", () => {
+    // Caso exacto del audit: 2 soportados, sin dato en mixtos y refutados.
+    const { result, oos } = oosLayer({
+      oosSupported: 2,
+      mixed: null,
+      refuted: null,
+      notMeasured: 0,
+    });
+    expect(oos?.state).toBe("gap");
+    if (oos && oos.state === "gap") {
+      expect(oos.gapLabel).toBe("Sin dato todavía");
+      // La muestra parcial se conserva: no se colapsa a 0 ni se pierde.
+      expect(oos.measurement).toContain("soportados 2");
+    }
+    expect(result.maxLayerReached).not.toBe("oos");
+  });
+
+  it("basta un contador ausente para no afirmar el veredicto", () => {
+    const { oos } = oosLayer({
+      oosSupported: 1,
+      mixed: 0,
+      refuted: null,
+      notMeasured: 0,
+    });
+    expect(oos?.state).toBe("gap");
+  });
+
+  it("con los tres contadores pero evidencia sin medir ⇒ hueco", () => {
+    const { oos } = oosLayer({
+      oosSupported: 1,
+      mixed: 0,
+      refuted: 0,
+      notMeasured: 2,
+    });
+    expect(oos?.state).toBe("gap");
+    if (oos && oos.state === "gap") {
+      expect(oos.measurement).toContain("sin medir 2");
+    }
+  });
+
+  it("nunca colapsa un contador ausente a 0 en la muestra parcial", () => {
+    const { oos } = oosLayer({
+      oosSupported: null,
+      mixed: null,
+      refuted: null,
+      notMeasured: null,
+    });
+    expect(oos?.state).toBe("gap");
+    if (oos && oos.state === "gap") {
+      expect(oos.measurement).not.toMatch(/\b0\b/);
+    }
+  });
+
+  it("con datos suficientes el veredicto sí se afirma", () => {
+    const supported = oosLayer({
+      oosSupported: 2,
+      mixed: 0,
+      refuted: 0,
+      notMeasured: 0,
+    });
+    expect(supported.oos?.state).toBe("measured");
+    if (supported.oos && supported.oos.state === "measured") {
+      expect(supported.oos.verdictToken).toBe("OOS_SUPPORTED");
+    }
+    const mixed = oosLayer({
+      oosSupported: 2,
+      mixed: 0,
+      refuted: 1,
+      notMeasured: 0,
+    });
+    expect(mixed.oos?.state).toBe("measured");
+    if (mixed.oos && mixed.oos.state === "measured") {
+      expect(mixed.oos.verdictToken).toBe("MIXED");
     }
   });
 });

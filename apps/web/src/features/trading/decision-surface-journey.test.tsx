@@ -263,6 +263,18 @@ describe("DecisionSurfaceCompact journey HUD V2.0", () => {
     const t1Node = screen.getByTestId("journey-t1");
     expect(t1Node.closest('[data-testid="operator-exit-ladder"]')).toBeTruthy();
     expect(t1Node.closest(".sr-only")).toBeNull();
+    // P2-4 — el testid contractual vive en el MISMO nodo visible (sin `sr-only` duplicado).
+    const contractualT1 = screen.getByTestId("position-decision-t1");
+    const contractualT2 = screen.getByTestId("position-decision-t2");
+    expect(screen.getAllByTestId("position-decision-t1")).toHaveLength(1);
+    expect(screen.getAllByTestId("position-decision-t2")).toHaveLength(1);
+    expect(contractualT1.closest(".sr-only")).toBeNull();
+    expect(contractualT2.closest(".sr-only")).toBeNull();
+    expect(
+      contractualT1.closest('[data-testid="operator-exit-ladder"]'),
+    ).toBeTruthy();
+    expect(contractualT1.textContent).toMatch(String(decision.plan.t1));
+    expect(contractualT2.textContent).toMatch(String(decision.plan.t2));
     expect(screen.queryByTestId("position-card-plan-levels")).toBeNull();
     expect(screen.getByTestId("journey-remaining").textContent).toMatch(
       String(decision.remaining?.remainingPct),
