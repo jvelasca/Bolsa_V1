@@ -1,24 +1,21 @@
 """Tax-report tras una operación redonda real (buy + SELL con plusvalía).
 
-Nota de operativa (V1.32) — **por qué la venta va por Confirm y no por
-`/portfolio/trade`**:
+Nota de operativa — **la venta va por HTTP porque la posición nació manual**:
 
     1. La compra es una apertura humana por HTTP (`POST /portfolio/trade`), que el
-       OpeningGate permite (el test la habilita con `seed_http_opening_allow`).
-    2. La venta de una **posición abierta** por HTTP está VETADA a propósito:
-       `ExecuteGatedPortfolioTrade` lanza `ExitVetoedError("position_exit_requires_confirm")`
-       y la API responde 403. Ese 403 es **política**, no un bug: la salida humana de una
-       posición abierta debe recorrer el Confirm SEMI (ExitPermission / firma humana).
-    3. Por eso el SELL que produce la plusvalía que lee `/tax-report` se ejecuta por el
-       camino real: `POST /ai/intents/confirm` con `action="reduce"` y `execute=true`.
-       El Confirm infiere el lado (`sell`) de la dirección de la posición persistida
-       (`effective_package_for_side`) y firma la pata de salida con `plannedQty`.
+       OpeningGate permite (el test la habilita con `seed_http_opening_allow`). El sync
+       post-fill sintetiza el snapshot `manual-{tx}` ⇒ la posición nace `HUMAN_MANUAL`.
+    2. Una posición `HUMAN_MANUAL` **cierra por HTTP** (V2.88.85 / H1,
+       `row_is_human_manual`): quien abrió en MANUAL puede cerrar. El fence de venta
+       (`ExitVetoedError` → 403 `position_exit_requires_confirm`) sigue vigente **solo**
+       para posiciones SEMI/AUTO (origen != manual), cubierto por
+       `packages/py/application/tests/test_execute_gated_portfolio_trade.py`.
+    3. La operación redonda se completa por el MISMO canal manual (buy + sell por
+       `POST /portfolio/trade`); el SELL alimenta el ledger que lee `/tax-report`.
 
 `/tax-report` construye FIFO sobre el ledger; con comisión "none" la ganancia realizada
 debe ser exactamente (120 − 100) × 5 = 100.0.
 """
-
-from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -86,8 +83,9 @@ async def test_tax_report_after_round_trip_trade() -> None:
             )
             assert buy.status_code == 200
 
-            # El HTTP sell de la posición abierta es política, no camino: se veta (403).
-            vetoed_sell = await client.post(
+            # --- Pata de SALIDA real: sell humana por HTTP. La posición nació
+            # HUMAN_MANUAL, así que el fence de venta (V2.88.85) NO aplica: cierra por HTTP.
+            sell = await client.post(
                 "/api/portfolio/trade",
                 headers={"X-Account-Id": account_id},
                 json={
@@ -95,45 +93,10 @@ async def test_tax_report_after_round_trip_trade() -> None:
                     "type": "sell",
                     "quantity": 5,
                     "price": 120,
-                    "idempotencyKey": "tax-sell-vetoed-abcdefghij",
+                    "idempotencyKey": "tax-sell-1-abcdefghij",
                 },
             )
-            assert vetoed_sell.status_code == 403, vetoed_sell.text
-            assert "position_exit_requires_confirm" in vetoed_sell.json()["detail"]
-
-            # --- Pata de SALIDA real: Confirm SEMI (reduce) → SELL en el ledger.
-            # `decisionId` ÚNICO por corrida: el submit-intent durable se indexa por
-            # decisionId, así que reutilizarlo haría que una segunda ejecución recuperara
-            # el intent previo ("crash_after_fill_unconfirmed") en vez de operar.
-            decision_id = f"tax-exit-{uuid4().hex[:12]}"
-            exit_resp = await client.post(
-                "/api/ai/intents/confirm",
-                json={
-                    "recommendation": {
-                        "decisionId": decision_id,
-                        "instrumentId": instrument_id,
-                        "action": "reduce",
-                        "suggestedQuantity": 5.0,
-                        "suggestedPrice": 120.0,
-                        "decisionPackage": {
-                            "operativaIntent": "reduce",
-                            "exitSource": "event",
-                            "plannedQty": 5.0,
-                            "exitPlan": {
-                                "status": "TRIGGERED",
-                                "suggestedAction": "reduce",
-                                "primaryReason": "TARGET_1",
-                                "suggestedQty": 5.0,
-                            },
-                        },
-                    },
-                    "accountId": account_id,
-                    "execute": True,
-                },
-            )
-            assert exit_resp.status_code == 200, exit_resp.text
-            exit_trade = exit_resp.json()["data"].get("trade") or {}
-            assert exit_trade.get("status") == "executed", exit_resp.text
+            assert sell.status_code == 200, sell.text
 
             from datetime import datetime
 

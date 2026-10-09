@@ -275,9 +275,10 @@ jobs:
       #     la deuda del incidente 2026-09-08 (BD recién sembrada sin `instrument_lists`).
       #   - test_workspaces.py: el rojo era RESIDUO de workspaces de sesiones previas (la
       #     guarda de borrado decide por CONTEO); el conftest ahora los purga a `is_default=false`.
-      #   - integration/test_tax_report.py: la venta humana de una posición abierta NO va por
-      #     `/portfolio/trade` (403 `position_exit_requires_confirm`, política V1.32), va por
-      #     Confirm SEMI (`/ai/intents/confirm`, reduce), que es la vía real del SELL del ledger.
+      #   - integration/test_tax_report.py: la venta de una posición abierta está VETADA (403
+      #     `position_exit_requires_confirm`) SOLO si la posición NO es manual; una posición
+      #     `HUMAN_MANUAL` (nacida por el canal manual) cierra por HTTP (V2.88.85 / H1), y ese
+      #     es el camino que usa el test para producir el SELL del ledger que lee `/tax-report`.
       - name: Pytest W-G2/4 lists/workspaces/tax batch (3 files, OBS-19/G2)
         run: >
           uv run pytest
