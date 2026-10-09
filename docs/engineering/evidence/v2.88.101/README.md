@@ -44,4 +44,11 @@
 
 ## 5. Cita POST-TAG
 
-**Pendiente.** Tag previsto **`v2.88.101-beta`** (objeto y commit se anclarán al cerrar). Se dará por certificado cuando `Python CI` (Ruff → `import-linter` → `mypy` → `pytest` **ejecutados**), `Frontend CI` y `Release tag CI` (11 jobs + `certify` verdes; `replay-repro` **`REPRODUCIDO`**) queden en verde, y el `E2E integrado` omitido **no** se cuente como superado. La cita se añadirá aquí y en el `CHANGELOG` una vez emitido el tag.
+**Tag anotado `v2.88.101-beta`** (objeto `8623bfdf` → commit `d322e1ca`).
+
+- **`Python CI` (tag)** run [`37953831105`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37953831105) **VERDE** — `quality` (Ruff → import-linter → mypy → pytest **ejecutados**) + los 4 jobs PG (`lifecycle-pg`, `paper-forward-pg`, `grammar-discovery-pg`, `auto-v2-durable-pg`) `success`.
+- **`Python CI` (`main`)** run [`37953815615`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37953815615) **VERDE**.
+- **`Frontend CI`** (tag [`37953831020`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37953831020) · `main` [`37953815525`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37953815525)) **VERDE**.
+- **`Release tag CI`** run [`37953831215`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37953831215) **VERDE**: **11 jobs `success`** + `certify` `success`; `playwright (integrated E2E, opt-in)` `skipped` (opt-in, **no** cuenta como superado); `replay-repro` **`REPRODUCIDO`** (`sha256 LF` `1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`) ⇒ `Δ motor = 0` semántico confirmado por CI.
+- **`Fase 2 scientific`** ([`37953830875`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37953830875)) · **`Optimize lab`** ([`37953831058`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37953831058)) · **`Gitleaks`** ([`37953815506`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37953815506)) **VERDES**.
+- **Firma del tag no verificada** (`unsigned` en GitHub): limitación de certificación, no defecto funcional.
