@@ -24,6 +24,7 @@ import {
   OpaqueMenuLabel,
   OpaqueMenuPanel,
 } from "@/components/ui/opaque-menu-panel";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 import {
   STRATEGY_MATRIX_FILTER_LABELS,
@@ -544,7 +545,7 @@ export function BacktestStrategyMatrixPanel({
             )}
             title={row.error}
           >
-            {statusLabel(row) || "—"}
+            {statusLabel(row) || absentDataLabel()}
           </span>
         );
       case "returnPct":
@@ -552,7 +553,7 @@ export function BacktestStrategyMatrixPanel({
           <span className="tabular-nums">
             {row.status === "ok"
               ? formatPct(row.totalReturnPct)
-              : statusLabel(row) || "—"}
+              : statusLabel(row) || absentDataLabel()}
           </span>
         );
       case "excessPct":
@@ -567,13 +568,17 @@ export function BacktestStrategyMatrixPanel({
                   : "",
             )}
           >
-            {row.status === "ok" ? formatPct(row.excessReturnPct) : "—"}
+            {row.status === "ok"
+              ? formatPct(row.excessReturnPct)
+              : absentDataLabel()}
           </span>
         );
       case "buyHoldPct":
         return (
           <span className="tabular-nums">
-            {row.status === "ok" ? formatPct(row.buyHoldReturnPct) : "—"}
+            {row.status === "ok"
+              ? formatPct(row.buyHoldReturnPct)
+              : absentDataLabel()}
           </span>
         );
       case "drawdownPct":
@@ -581,13 +586,15 @@ export function BacktestStrategyMatrixPanel({
           <span className="tabular-nums">
             {row.status === "ok" && row.maxDrawdownPct != null
               ? formatPct(row.maxDrawdownPct)
-              : "—"}
+              : absentDataLabel()}
           </span>
         );
       case "tradeCount":
         return (
           <span className="tabular-nums">
-            {row.status === "ok" ? (row.tradeCount ?? "—") : "—"}
+            {row.status === "ok"
+              ? (row.tradeCount ?? absentDataLabel())
+              : absentDataLabel()}
           </span>
         );
       case "actions":
@@ -608,7 +615,7 @@ export function BacktestStrategyMatrixPanel({
                 Ver
               </Button>
             ) : (
-              <span className="text-muted-foreground">—</span>
+              <span className="text-muted-foreground">{absentDataLabel()}</span>
             )}
           </div>
         );
@@ -633,7 +640,7 @@ export function BacktestStrategyMatrixPanel({
                 Biblio
               </Button>
             ) : (
-              <span className="text-muted-foreground">—</span>
+              <span className="text-muted-foreground">{absentDataLabel()}</span>
             )}
           </div>
         );
@@ -658,7 +665,7 @@ export function BacktestStrategyMatrixPanel({
                 Borrar
               </Button>
             ) : (
-              <span className="text-muted-foreground">—</span>
+              <span className="text-muted-foreground">{absentDataLabel()}</span>
             )}
           </div>
         );

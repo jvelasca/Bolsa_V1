@@ -98,6 +98,22 @@ const TOKEN_SURFACES: Array<{ name: string; file: string }> = [
     name: "Screeners · paper-d-propose-panel.tsx",
     file: "features/screeners/paper-d-propose-panel.tsx",
   },
+  {
+    name: "AUTO · auto-no-trade-labels.ts",
+    file: "features/auto/auto-no-trade-labels.ts",
+  },
+  {
+    name: "AUTO · auto-no-trade-explanation.ts",
+    file: "features/auto/auto-no-trade-explanation.ts",
+  },
+  {
+    name: "AUTO · dia-d-evidence-aggregate-labels.ts",
+    file: "features/auto-monitor/dia-d-evidence-aggregate-labels.ts",
+  },
+  {
+    name: "AUTO · dia-d-evidence-aggregate-panel.tsx",
+    file: "features/auto-monitor/dia-d-evidence-aggregate-panel.tsx",
+  },
 ];
 
 const DASH_SURFACES: string[] = [
@@ -115,6 +131,103 @@ const DASH_SURFACES: string[] = [
   "features/mesa/operational-plan-view.tsx",
   "features/trading/f3-confirm-what-if-block.tsx",
   "features/trading/f3-trade-plan-risk-first-block.tsx",
+  "features/trading/operator-cabin-ui.tsx",
+  "features/trading/decision-surface-compact.tsx",
+  "features/trading/hoy-command-strip.tsx",
+  "features/trading/position-decision-surface.ts",
+  "features/trading/entry-decision-surface.ts",
+  // Oleada UI5-14 · zonas operativas (trading/mesa/auto-monitor)
+  "features/trading/instrument-analysis-summary.tsx",
+  "features/trading/instrument-db-tab.tsx",
+  "features/trading/instrument-info-dialog.tsx",
+  "features/trading/lists-tab/list-item-accordion.tsx",
+  "features/trading/lists-tab/list-process-status-cell.tsx",
+  "features/trading/lists-tab/list-sync-status-cell.tsx",
+  "features/trading/lists-tab/list-hub-panel.tsx",
+  "features/trading/lists-tab/visualization-log-dialog.tsx",
+  "features/trading/f3-risk-signature-block.tsx",
+  "features/trading/f3-exit-risk-signature-block.tsx",
+  "features/trading/f3-protect-stop-block.tsx",
+  "features/trading/f3-order-projection.ts",
+  "features/trading/order-dialog.tsx",
+  "features/trading/auto-desk-panel.tsx",
+  "features/trading/trading-operativa-panel.tsx",
+  "features/trading/operativa-pulse.tsx",
+  "features/trading/operativa-outcomes.tsx",
+  "features/trading/operativa-dictamen.tsx",
+  "features/trading/mandate-timeline-panel.tsx",
+  "features/trading/use-trade-notional.ts",
+  "features/trading/estudio-process-status.ts",
+  "features/trading/dia-d-trades-panel.tsx",
+  "features/trading/dia-d-reconciliation-panel.tsx",
+  "features/trading/dia-d-evidence-archive-io.ts",
+  "features/trading/trading-background-sync-summary.ts",
+  "features/mesa/mesa-opportunity-language.ts",
+  "features/mesa/decision-spine-detail-panel.tsx",
+  "features/auto-monitor/dia-d-auto-error-list.tsx",
+  "features/auto-monitor/dia-d-auto-panel.tsx",
+  "features/auto-monitor/dia-d-auto-feedback-panel.tsx",
+  // Oleada UI5-14 · resto de features/** (charts)
+  "features/charts/chart-data-status-badge.tsx",
+  "features/charts/chart-database-panel.tsx",
+  "features/charts/chart-instrument-zone.tsx",
+  "features/charts/chart-inspector-panel.tsx",
+  "features/charts/chart-indicator-template-zone.tsx",
+  "features/charts/chart-analysis-score-buttons.tsx",
+  "features/charts/indicator-draft-feedback.tsx",
+  // Oleada UI5-14 · resto de features/** (instruments + research)
+  "features/instruments/fundamental-card-panel.tsx",
+  "features/instruments/composite-leg-labels.ts",
+  "features/instruments/instruments-hub-trackers.ts",
+  "features/instruments/instruments-hub-column-layout.ts",
+  "features/research/research-lab-evidence.ts",
+  "features/research/asesor-daily-ops-panel.tsx",
+  "features/research/asesor-opiniones-panel.tsx",
+  // Oleada UI5-14 · resto de features/** (journal/screeners/settings/config/alerts/accounts)
+  "features/decision-journal/journal-studies-table.tsx",
+  "features/decision-journal/decision-ficha-panel.tsx",
+  "features/decision-journal/journal-evolution-panel.tsx",
+  "features/screeners/tracker-alarms.ts",
+  "features/screeners/strategy-draft-feedback.tsx",
+  "features/screeners/fa-weekly-pipeline-panel.tsx",
+  "features/settings/effectiveness-panel.tsx",
+  "features/config/platform-config-dialog.tsx",
+  "features/alerts/alerts-page.tsx",
+  "features/alerts/signal-alerts-section.tsx",
+  "features/accounts/paper-lab-evidence.ts",
+  // Oleada UI5-14 · resto de features/** (backtests · helpers)
+  "features/backtests/backtest-strategy-matrix.ts",
+  "features/backtests/dia-d-favorites.ts",
+  "features/backtests/backtest-date-format.ts",
+  "features/backtests/coach-profile-policy.ts",
+  "features/backtests/backtest-list-auto-board.ts",
+  "features/backtests/backtest-list-member-fa.ts",
+  // Oleada UI5-14 · resto de features/** (backtests · paneles)
+  "features/backtests/backtest-mass-compare-panel.tsx",
+  "features/backtests/backtest-ranking-table.tsx",
+  "features/backtests/backtest-list-auto-board-panel.tsx",
+  "features/backtests/backtest-optimize-panel.tsx",
+  "features/backtests/lab-board-activity-banner.tsx",
+  "features/backtests/backtest-instrument-preview.tsx",
+  "features/backtests/backtest-strategy-matrix-panel.tsx",
+  "features/backtests/backtest-explore-battery-table.tsx",
+  "features/backtests/backtest-optimize-compare.tsx",
+  "features/backtests/backtest-cursor-panel.tsx",
+  "features/backtests/backtest-movie-hud.tsx",
+  "features/backtests/backtest-result-detail.tsx",
+  "features/backtests/strategy-monitor-panel.tsx",
+  "features/backtests/backtest-result-view.tsx",
+  "features/backtests/backtest-global-bar.tsx",
+  "features/backtests/backtest-explore-stars-grid.tsx",
+  // Oleada UI5-14 · cierres puntuales (guion embebido detectado por el gate endurecido)
+  "features/trading/trading-app-threads.tsx",
+  // Oleada UI5-14 · nodos JSX desnudos (detectados por el gate endurecido)
+  "features/screeners/scan-results-table.tsx",
+  "features/charts/indicators-catalog-dialog.tsx",
+  "features/charts/chart-cursor-zone.tsx",
+  // Oleada S4 · agregador de evidencia (P4 · DÍA-D)
+  "features/auto-monitor/dia-d-evidence-aggregate-labels.ts",
+  "features/auto-monitor/dia-d-evidence-aggregate-panel.tsx",
 ];
 
 describe("barrido global · primer nivel sin jerga de ingeniería (R-G1/RT-02)", () => {
@@ -151,6 +264,20 @@ describe("barrido global · control de falsabilidad del gate", () => {
     expect(findFirstLevelDashes("<p>Editar — Nombre</p>")).toEqual([]);
     expect(
       findFirstLevelDashes('<TechnicalDetail>{"—"}</TechnicalDetail>'),
+    ).toEqual([]);
+  });
+
+  it("el gate de guion detecta el guion embebido junto al delimitador", () => {
+    expect(findFirstLevelDashes('const label = "Velas · —";')).toHaveLength(1);
+    expect(findFirstLevelDashes("const label = `CORE-R —`;")).toHaveLength(1);
+    expect(findFirstLevelDashes('const label = "— algo";')).toHaveLength(1);
+  });
+
+  it("el gate de guion detecta el nodo JSX desnudo y respeta el placeholder de prosa", () => {
+    expect(findFirstLevelDashes("<span>—</span>")).toHaveLength(1);
+    expect(findFirstLevelDashes("<span>\n  —\n</span>")).toHaveLength(1);
+    expect(
+      findFirstLevelDashes('<option value="">— elegir —</option>'),
     ).toEqual([]);
   });
 

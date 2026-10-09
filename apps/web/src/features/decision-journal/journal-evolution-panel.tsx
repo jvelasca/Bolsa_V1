@@ -8,6 +8,7 @@ import {
   type JournalStudyOpinion,
   type JournalStudyUserStatus,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { api } from "@/lib/api";
@@ -29,7 +30,7 @@ function formatStudiedAt(iso: string): string {
 }
 
 function hitRateLabel(rate: number | null | undefined): string {
-  if (rate == null || !Number.isFinite(rate)) return "—";
+  if (rate == null || !Number.isFinite(rate)) return absentDataLabel();
   return `${Math.round(rate * 100)}%`;
 }
 
@@ -195,7 +196,7 @@ export function JournalEvolutionPanel({
                   ? JOURNAL_STUDY_OPINION_LABELS[
                       study.opinion as JournalStudyOpinion
                     ]
-                  : "—";
+                  : absentDataLabel();
                 const status =
                   JOURNAL_STUDY_STATUS_LABELS[
                     study.status as JournalStudyUserStatus

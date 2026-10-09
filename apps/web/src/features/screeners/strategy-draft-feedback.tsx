@@ -7,6 +7,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { DraftStrategyFromPromptResultDto } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 interface StrategyDraftFeedbackProps {
@@ -82,7 +83,7 @@ export function StrategyDraftFeedback({
               >
                 <span className="text-muted-foreground">{signal.label}: </span>
                 <span className="font-medium text-foreground">
-                  {signal.detail ?? "—"}
+                  {signal.detail ?? absentDataLabel()}
                 </span>
               </li>
             ))}

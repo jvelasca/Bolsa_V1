@@ -24,6 +24,10 @@ import {
   resolveEstudioListId,
   type InstrumentStrategyTopV1,
 } from "@bolsa/shared";
+import {
+  strategySelectionStatusLabel,
+  strategyValidationLabel,
+} from "@/features/backtests/strategy-concept-labels";
 import { formatPaperLabEvidence } from "@/features/accounts/paper-lab-evidence";
 import {
   buildStrategyMonitorRow,
@@ -862,8 +866,11 @@ export function StrategyMonitorPanel({
                           ) : null}
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                          {row.topStatus ?? "—"} · {row.evidenceLevel ?? "—"} ·
-                          TF {row.timeframe}
+                          Selección:{" "}
+                          {strategySelectionStatusLabel(row.topStatus)} ·
+                          Validación:{" "}
+                          {strategyValidationLabel(row.evidenceLevel)} · TF{" "}
+                          {row.timeframe}
                           {row.slot1Label
                             ? ` · #1 ${row.slot1Label}${row.slot1Stars ? ` ★${row.slot1Stars}` : ""}`
                             : ""}

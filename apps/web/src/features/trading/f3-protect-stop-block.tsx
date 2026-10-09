@@ -6,6 +6,7 @@
  */
 
 import { bootstrapProtectStopLabel } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import type { OperativaProtectMetaV1 } from "@/features/operations/propose-position-exit";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { MesaTipButton } from "@/features/help/mesa-tip-button";
@@ -53,7 +54,7 @@ export function F3ProtectStopBlock({
 }: F3ProtectStopBlockProps) {
   const narrow = useNarrowCabin();
   const money = (n: number | null) =>
-    n != null ? `${formatPrice(n)} ${currency}` : "—";
+    n != null ? `${formatPrice(n)} ${currency}` : absentDataLabel();
   const isBootstrap = meta.protectKind === "bootstrap";
   const emergency = bootstrapProtectStopLabel();
 

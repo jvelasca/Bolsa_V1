@@ -245,7 +245,7 @@ describe("DecisionJournalPage", () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId("study-row")).toBeTruthy());
     expect(screen.getByText("AAPL")).toBeTruthy();
-    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sin dato todavía").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByTestId("study-row"));
     await waitFor(() =>
       expect(screen.getByTestId("decision-ficha")).toBeTruthy(),

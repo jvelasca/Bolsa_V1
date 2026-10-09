@@ -10,11 +10,20 @@
  * @see docs/engineering/list-auto-ops-2026-07-29.md
  */
 
-import type { InstrumentStrategyTopV1 } from '@bolsa/shared';
-import type { ListAutoRowPhase } from '@/features/backtests/backtest-list-auto-board';
-import { formatFreshnessAge } from '@/features/backtests/backtest-finalists-freshness';
+import type { InstrumentStrategyTopV1 } from "@bolsa/shared";
+import type { ListAutoRowPhase } from "@/features/backtests/backtest-list-auto-board";
+import { formatFreshnessAge } from "@/features/backtests/backtest-finalists-freshness";
+import {
+  strategySelectionStatusLabel,
+  strategyValidationLabel,
+} from "@/features/backtests/strategy-concept-labels";
 
-export type ListMemberStatusTone = 'muted' | 'amber' | 'sky' | 'emerald' | 'violet';
+export type ListMemberStatusTone =
+  | "muted"
+  | "amber"
+  | "sky"
+  | "emerald"
+  | "violet";
 
 export type ListMemberBacktestStatus = {
   primary: string;
@@ -31,32 +40,41 @@ function formatStars(n: number): string {
 }
 
 function formatExcess(pct: number | null | undefined): string | null {
-  if (typeof pct !== 'number' || !Number.isFinite(pct)) return null;
-  const sign = pct > 0 ? '+' : '';
+  if (typeof pct !== "number" || !Number.isFinite(pct)) return null;
+  const sign = pct > 0 ? "+" : "";
   return `${sign}${pct.toFixed(1)}% vs B&H`;
 }
 
 function bestSlot(top: InstrumentStrategyTopV1) {
   if (!top.slots.length) return null;
-  return [...top.slots].sort((a, b) => b.stars - a.stars || b.score - a.score)[0] ?? null;
+  return (
+    [...top.slots].sort((a, b) => b.stars - a.stars || b.score - a.score)[0] ??
+    null
+  );
 }
 
-function autoPhaseStatus(phase: ListAutoRowPhase): ListMemberBacktestStatus | null {
+function autoPhaseStatus(
+  phase: ListAutoRowPhase,
+): ListMemberBacktestStatus | null {
   switch (phase) {
-    case 'running':
-      return { primary: 'AUTO · en curso', tone: 'sky', rankScore: 5 };
-    case 'saved':
-      return { primary: 'AUTO · guardado', tone: 'emerald', rankScore: 4 };
-    case 'omitted':
-      return { primary: 'AUTO · omitido (fresco)', tone: 'violet', rankScore: 3 };
-    case 'same':
-      return { primary: 'AUTO · sin cambio', tone: 'muted', rankScore: 2 };
-    case 'skipped':
-      return { primary: 'AUTO · skip Lab', tone: 'amber', rankScore: 2 };
-    case 'aborted':
-      return { primary: 'AUTO · detenido', tone: 'muted', rankScore: 1 };
-    case 'queued':
-      return { primary: 'AUTO · en cola', tone: 'muted', rankScore: 1 };
+    case "running":
+      return { primary: "AUTO · en curso", tone: "sky", rankScore: 5 };
+    case "saved":
+      return { primary: "AUTO · guardado", tone: "emerald", rankScore: 4 };
+    case "omitted":
+      return {
+        primary: "AUTO · omitido (fresco)",
+        tone: "violet",
+        rankScore: 3,
+      };
+    case "same":
+      return { primary: "AUTO · sin cambio", tone: "muted", rankScore: 2 };
+    case "skipped":
+      return { primary: "AUTO · skip Lab", tone: "amber", rankScore: 2 };
+    case "aborted":
+      return { primary: "AUTO · detenido", tone: "muted", rankScore: 1 };
+    case "queued":
+      return { primary: "AUTO · en cola", tone: "muted", rankScore: 1 };
     default:
       return null;
   }
@@ -77,46 +95,48 @@ export function summarizeListMemberBacktest(opts: {
   let topStatus: ListMemberBacktestStatus;
   if (!top || !slot || top.slots.length === 0) {
     topStatus = {
-      primary: 'Sin Finalistas',
-      secondary: 'pendiente de embudo',
-      tone: 'muted',
+      primary: "Sin Finalistas",
+      secondary: "pendiente de embudo",
+      tone: "muted",
       rankScore: 0,
     };
   } else {
-    const evidence =
-      top.evidenceLevel === 'lab_validated' ? 'Lab' : 'IS';
-    const statusLabel =
-      top.status === 'active' ? 'Activo' : top.status === 'semifinal' ? 'Semifinal' : 'Borrador';
+    const selectionLabel = strategySelectionStatusLabel(top.status);
+    const validationLabel = strategyValidationLabel(top.evidenceLevel);
     const excess = formatExcess(slot.excessReturnPct);
     const age = formatFreshnessAge(top.updatedAt);
     topStatus = {
-      primary: `${formatStars(slot.stars)} ${statusLabel} · ${evidence}`,
-      secondary: [excess, age !== '—' ? age : null, `${top.slots.length} slot(s)`]
+      primary: `${formatStars(slot.stars)} · ${selectionLabel} · Validación: ${validationLabel}`,
+      secondary: [
+        excess,
+        age !== "—" ? age : null,
+        `${top.slots.length} slot(s)`,
+      ]
         .filter(Boolean)
-        .join(' · '),
+        .join(" · "),
       tone:
-        top.status === 'active'
-          ? 'emerald'
-          : top.status === 'semifinal'
-            ? 'sky'
-            : 'amber',
+        top.status === "active"
+          ? "emerald"
+          : top.status === "semifinal"
+            ? "sky"
+            : "amber",
       rankScore:
-        top.status === 'active'
-          ? top.evidenceLevel === 'lab_validated'
+        top.status === "active"
+          ? top.evidenceLevel === "lab_validated"
             ? 4
             : 3
-          : top.status === 'semifinal'
+          : top.status === "semifinal"
             ? 2
             : 1,
     };
   }
 
-  if (!auto || auto.primary.startsWith('AUTO · en cola')) {
+  if (!auto || auto.primary.startsWith("AUTO · en cola")) {
     // En cola no aporta mucho si ya hay TOP; si no hay TOP, sí.
-    if (auto?.primary.startsWith('AUTO · en cola') && topStatus.rankScore > 0) {
+    if (auto?.primary.startsWith("AUTO · en cola") && topStatus.rankScore > 0) {
       return topStatus;
     }
-    if (auto?.primary.startsWith('AUTO · en cola')) {
+    if (auto?.primary.startsWith("AUTO · en cola")) {
       return { ...auto, secondary: topStatus.primary };
     }
     return topStatus;
@@ -125,7 +145,9 @@ export function summarizeListMemberBacktest(opts: {
   // Campaña viva / settle: mostrar AUTO + TOP debajo
   return {
     primary: auto.primary,
-    secondary: topStatus.primary + (topStatus.secondary ? ` · ${topStatus.secondary}` : ''),
+    secondary:
+      topStatus.primary +
+      (topStatus.secondary ? ` · ${topStatus.secondary}` : ""),
     tone: auto.tone,
     rankScore: Math.max(auto.rankScore, topStatus.rankScore),
   };
@@ -133,15 +155,15 @@ export function summarizeListMemberBacktest(opts: {
 
 export function listMemberStatusClass(tone: ListMemberStatusTone): string {
   switch (tone) {
-    case 'emerald':
-      return 'text-emerald-700 dark:text-emerald-300';
-    case 'sky':
-      return 'text-sky-700 dark:text-sky-300';
-    case 'amber':
-      return 'text-amber-700 dark:text-amber-300';
-    case 'violet':
-      return 'text-violet-700 dark:text-violet-300';
+    case "emerald":
+      return "text-emerald-700 dark:text-emerald-300";
+    case "sky":
+      return "text-sky-700 dark:text-sky-300";
+    case "amber":
+      return "text-amber-700 dark:text-amber-300";
+    case "violet":
+      return "text-violet-700 dark:text-violet-300";
     default:
-      return 'text-muted-foreground';
+      return "text-muted-foreground";
   }
 }

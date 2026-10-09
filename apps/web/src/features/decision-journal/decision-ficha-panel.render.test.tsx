@@ -103,7 +103,9 @@ describe("DecisionFichaPanel V2.27 spine + RESULTADO", () => {
     expect(screen.getByTestId("journal-initial-risk-r").textContent).toMatch(
       /1R/,
     );
-    expect(screen.getByTestId("journal-final-r").textContent).toBe("—");
+    expect(screen.getByTestId("journal-final-r").textContent).toBe(
+      "Sin dato todavía",
+    );
     expect(screen.getByTestId("journal-learning-verdict").textContent).toMatch(
       /Acierto/,
     );

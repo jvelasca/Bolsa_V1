@@ -3,6 +3,8 @@
  * predeterminados (visibles vía …) + personalizados editables/borrables.
  */
 
+import { absentDataLabel } from "@/components/absent-data";
+
 export const DIA_D_CAROUSEL_KEY = "bolsa-dia-d-carousel-v1";
 /** Legacy: solo fechas ISO personalizadas. */
 export const DIA_D_FAVORITES_KEY = "bolsa-dia-d-favorites-v1";
@@ -84,7 +86,7 @@ export function defaultDiaDCarouselPrefs(): DiaDCarouselPrefs {
 
 export function formatDiaDDisplay(iso: string): string {
   const raw = iso.trim();
-  if (!isValidDiaDIso(raw)) return raw || "—";
+  if (!isValidDiaDIso(raw)) return raw || absentDataLabel();
   const [y, m, d] = raw.split("-");
   return `${d}/${m}/${y}`;
 }

@@ -185,7 +185,11 @@ function ListsCell({
     return <span className="text-[10px] text-muted-foreground">…</span>;
   }
   if (memberships.length === 0) {
-    return <span className="text-[10px] text-muted-foreground">—</span>;
+    return (
+      <span className="text-[10px] text-muted-foreground">
+        {absentDataLabel()}
+      </span>
+    );
   }
 
   const { visible, overflow } = pickListChips(memberships, 2);
@@ -244,7 +248,11 @@ function ScoreCell({
     return <span className="text-[10px] text-muted-foreground">…</span>;
   }
   if (value == null || !Number.isFinite(value)) {
-    return <span className="text-[10px] text-muted-foreground">—</span>;
+    return (
+      <span className="text-[10px] text-muted-foreground">
+        {absentDataLabel()}
+      </span>
+    );
   }
   const tone =
     value >= 60
@@ -349,7 +357,11 @@ function PortfolioCell({
     return <span className="text-[10px] text-muted-foreground">…</span>;
   }
   if (!position) {
-    return <span className="text-[10px] text-muted-foreground">—</span>;
+    return (
+      <span className="text-[10px] text-muted-foreground">
+        {absentDataLabel()}
+      </span>
+    );
   }
   const pnl = position.unrealizedPnl;
   const pnlPct = position.unrealizedPnlPct;

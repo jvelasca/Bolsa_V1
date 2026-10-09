@@ -5,6 +5,7 @@ import type {
   InstrumentDbInventoryDto,
   InstrumentXtbValidationDto,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { formatPrice } from "@/features/charts/chart-utils";
 import {
   DATA_STATUS_COLORS,
@@ -33,7 +34,7 @@ const XTB_CARD_STYLES: Record<string, string> = {
 };
 
 function formatDateTime(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return absentDataLabel();
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return formatDateTimeCompact(d);
@@ -93,10 +94,10 @@ function OhlcvLayersTable({
                 {formatNumber(layer.barCount)}
               </td>
               <td className="px-2 py-1 text-right tabular-nums">
-                {layer.firstDate ?? "—"}
+                {layer.firstDate ?? absentDataLabel()}
               </td>
               <td className="px-2 py-1 text-right tabular-nums">
-                {layer.lastDate ?? "—"}
+                {layer.lastDate ?? absentDataLabel()}
               </td>
             </tr>
           ))}
@@ -146,7 +147,7 @@ function XtbValidationCard({
             <p className="text-sm font-semibold tabular-nums">
               {result.dbLastClose != null
                 ? formatPrice(result.dbLastClose)
-                : "—"}
+                : absentDataLabel()}
             </p>
             <p className="text-[10px] text-muted-foreground">
               {result.dbLastDate ?? "sin fecha"}
@@ -155,7 +156,9 @@ function XtbValidationCard({
           <div className="rounded bg-muted/40 p-2">
             <p className="text-[10px] text-muted-foreground">XTB en vivo</p>
             <p className="text-sm font-semibold tabular-nums">
-              {result.xtbLast != null ? formatPrice(result.xtbLast) : "—"}
+              {result.xtbLast != null
+                ? formatPrice(result.xtbLast)
+                : absentDataLabel()}
             </p>
             <p className="text-[10px] text-muted-foreground">
               {result.xtbTimestamp
@@ -182,8 +185,14 @@ function XtbValidationCard({
         )}
         {(result.xtbBid != null || result.xtbAsk != null) && (
           <p className="mt-1 text-center text-[10px] text-muted-foreground tabular-nums">
-            Bid {result.xtbBid != null ? formatPrice(result.xtbBid) : "—"} · Ask{" "}
-            {result.xtbAsk != null ? formatPrice(result.xtbAsk) : "—"}
+            Bid{" "}
+            {result.xtbBid != null
+              ? formatPrice(result.xtbBid)
+              : absentDataLabel()}{" "}
+            · Ask{" "}
+            {result.xtbAsk != null
+              ? formatPrice(result.xtbAsk)
+              : absentDataLabel()}
           </p>
         )}
       </div>
@@ -385,7 +394,7 @@ export function InstrumentDbTab({
           />
           <InventoryRow
             label="Última vela"
-            value={dataStatus.lastBarDate ?? "—"}
+            value={dataStatus.lastBarDate ?? absentDataLabel()}
           />
           <InventoryRow
             label="Esperada"
@@ -394,7 +403,7 @@ export function InstrumentDbTab({
           {dataStatus.lastSyncAt && (
             <InventoryRow
               label="Último sync Yahoo"
-              value={`${formatDateTime(dataStatus.lastSyncAt)} (${dataStatus.lastSyncStatus ?? "—"})`}
+              value={`${formatDateTime(dataStatus.lastSyncAt)} (${dataStatus.lastSyncStatus ?? absentDataLabel()})`}
             />
           )}
           {statusColor && (

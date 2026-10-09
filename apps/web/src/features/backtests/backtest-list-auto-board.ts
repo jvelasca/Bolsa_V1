@@ -13,6 +13,7 @@
 import type { FullCycleSettleReason } from "@/features/backtests/backtest-list-auto";
 import type { CoreRJudgment } from "@/features/backtests/core-r-judgment";
 import type { ListAutoChangeKind } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 
 /** Δ Finalistas respecto al TOP previo al ciclo de ese ticker (hogar: @bolsa/shared). */
 export type { ListAutoChangeKind } from "@bolsa/shared";
@@ -332,6 +333,6 @@ export function listAutoChangeLabel(change: ListAutoChangeKind): string {
     case "same":
       return "Igual";
     default:
-      return "—";
+      return absentDataLabel();
   }
 }

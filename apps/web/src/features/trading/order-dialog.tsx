@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createIdempotencyKey } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import {
   Dialog,
   DialogTabs,
@@ -286,7 +287,7 @@ export function OrderDialog() {
       className="max-w-lg"
     >
       <p className="mb-3 text-xs text-muted-foreground">
-        Último: {lastPrice ? formatPrice(lastPrice) : "—"} ·{" "}
+        Último: {lastPrice ? formatPrice(lastPrice) : absentDataLabel()} ·{" "}
         {instrumentCurrency}
       </p>
 
@@ -372,7 +373,7 @@ export function OrderDialog() {
         {sizeMode === "volume" ? (
           <FieldRow
             label="Volumen"
-            hint={`Valor estimado: ${Number.isFinite(estValueInstrument) ? formatPrice(estValueInstrument) : "—"} ${instrumentCurrency}${notionalAccount != null ? ` ≈ ${formatPrice(notionalAccount)} ${accountCurrency}` : ""}`}
+            hint={`Valor estimado: ${Number.isFinite(estValueInstrument) ? formatPrice(estValueInstrument) : absentDataLabel()} ${instrumentCurrency}${notionalAccount != null ? ` ≈ ${formatPrice(notionalAccount)} ${accountCurrency}` : ""}`}
           >
             <input
               className={inputClassName}
@@ -383,7 +384,7 @@ export function OrderDialog() {
         ) : (
           <FieldRow
             label={`Valor mercado (${accountCurrency})`}
-            hint={`Acciones aprox.: ${lastPrice > 0 && Number.isFinite(estValueInstrument) ? Math.floor(estValueInstrument / lastPrice) : "—"}`}
+            hint={`Acciones aprox.: ${lastPrice > 0 && Number.isFinite(estValueInstrument) ? Math.floor(estValueInstrument / lastPrice) : absentDataLabel()}`}
           >
             <input
               className={inputClassName}

@@ -23,12 +23,18 @@ export function useAutoDiaDFeedbackList(input?: { enabled?: boolean }) {
   });
 }
 
-export function useAutoDiaDFeedback(window: string | null) {
+export function useAutoDiaDFeedback(
+  window: string | null,
+  input?: { enabled?: boolean },
+) {
   const { effectiveAccountId } = useActiveAccount();
   return useQuery({
     queryKey: ["auto-dia-d-feedback", effectiveAccountId, window],
     queryFn: () => api.getAutoDiaDFeedback(window as string),
-    enabled: Boolean(window) && Boolean(effectiveAccountId),
+    enabled:
+      (input?.enabled ?? true) &&
+      Boolean(window) &&
+      Boolean(effectiveAccountId),
     staleTime: 30_000,
     retry: false,
   });

@@ -7,6 +7,7 @@ import {
   type StrategyOrigin,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
+import { absentDataLabel } from "@/components/absent-data";
 import type { ResolvedBacktestWindow } from "@/features/backtests/backtest-period";
 import { periodReturnsFromEquity } from "@/features/backtests/backtest-period-returns";
 import {
@@ -451,7 +452,7 @@ export async function runStrategyMatrixBattery(
 }
 
 export function formatPct(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return absentDataLabel();
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
 }

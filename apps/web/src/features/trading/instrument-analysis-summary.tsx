@@ -5,6 +5,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { useEnsureInstrumentFundamentals } from "@/features/instruments/use-ensure-instrument-fundamentals";
 import { api } from "@/lib/api";
@@ -17,7 +18,7 @@ type Props = {
 };
 
 function fmt(n: number | null | undefined, digits = 2): string {
-  if (n == null || !Number.isFinite(n)) return "—";
+  if (n == null || !Number.isFinite(n)) return absentDataLabel();
   return n.toFixed(digits);
 }
 
@@ -107,10 +108,10 @@ export function InstrumentAnalysisSummary({ instrumentId, symbol }: Props) {
                   >
                     {card.scoreDisplay100 != null
                       ? `${card.scoreDisplay100}/100`
-                      : "—"}
+                      : absentDataLabel()}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
-                    {card.metadata?.confidence ?? "—"} · conf.
+                    {card.metadata?.confidence ?? absentDataLabel()} · conf.
                   </span>
                 </div>
                 <KeyValueList>
@@ -125,25 +126,26 @@ export function InstrumentAnalysisSummary({ instrumentId, symbol }: Props) {
                     %
                   </KeyValueRow>
                   <KeyValueRow label="Piotroski">
-                    {card.derived?.piotroski ?? "—"}
+                    {card.derived?.piotroski ?? absentDataLabel()}
                   </KeyValueRow>
                   <KeyValueRow label="ROIC">
                     {card.derived?.roic != null
                       ? `${(card.derived.roic * 100).toFixed(1)}%`
-                      : "—"}
+                      : absentDataLabel()}
                   </KeyValueRow>
                   <KeyValueRow label="Beneish M">
                     {fmt(card.derived?.beneishM)}
                   </KeyValueRow>
                   <KeyValueRow label="WACC">
                     {card.derived?.wacc != null
-                      ? `${(card.derived.wacc * 100).toFixed(1)}% (${card.derived.waccMethod ?? "—"})`
-                      : "—"}
+                      ? `${(card.derived.wacc * 100).toFixed(1)}% (${card.derived.waccMethod ?? absentDataLabel()})`
+                      : absentDataLabel()}
                   </KeyValueRow>
                 </KeyValueList>
                 {fundLeg ? (
                   <p className="text-[10px] text-muted-foreground">
-                    Pierna FA: {fmt(fundLeg.score)} · {fundLeg.method ?? "—"}
+                    Pierna FA: {fmt(fundLeg.score)} ·{" "}
+                    {fundLeg.method ?? absentDataLabel()}
                   </p>
                 ) : null}
               </>
@@ -165,7 +167,7 @@ export function InstrumentAnalysisSummary({ instrumentId, symbol }: Props) {
                   Comp.{" "}
                   {composite.scoreDisplay100 != null
                     ? `${composite.scoreDisplay100}/100`
-                    : "—"}
+                    : absentDataLabel()}
                 </span>
                 <span className="text-[10px] text-muted-foreground">
                   {composite.metadata?.paperDUnlocked
@@ -177,11 +179,11 @@ export function InstrumentAnalysisSummary({ instrumentId, symbol }: Props) {
             <KeyValueList>
               <KeyValueRow label="Pierna TA">
                 {techLeg
-                  ? `${fmt(techLeg.score)} · ${techLeg.method ?? "—"}`
-                  : "—"}
+                  ? `${fmt(techLeg.score)} · ${techLeg.method ?? absentDataLabel()}`
+                  : absentDataLabel()}
               </KeyValueRow>
               <KeyValueRow label="Finalistas 1d">
-                {topSlots.length || "—"}
+                {topSlots.length || absentDataLabel()}
               </KeyValueRow>
             </KeyValueList>
             {topSlots.slice(0, 3).map((slot, i) => (

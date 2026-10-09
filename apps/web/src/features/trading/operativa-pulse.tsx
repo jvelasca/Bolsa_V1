@@ -6,6 +6,7 @@
  */
 
 import { cn } from "@/lib/utils";
+import { absentDataLabel } from "@/components/absent-data";
 import {
   estudioRankProgressPct,
   formatEstudioRankLabel,
@@ -73,7 +74,7 @@ function Gauge({
   const c = 2 * Math.PI * r;
   const dash = value == null ? 0 : (pct / 100) * c;
   const title = [
-    `${meta.short} (${meta.caption}): ${value ?? "—"} · ${scoreBand(value)}`,
+    `${meta.short} (${meta.caption}): ${value ?? absentDataLabel()} · ${scoreBand(value)}`,
     meta.blurb,
   ].join("\n");
 
@@ -126,7 +127,7 @@ function Gauge({
           )}
           style={{ fontSize: 13 }}
         >
-          {value ?? "—"}
+          {value ?? absentDataLabel()}
         </text>
       </svg>
       <div className="text-center leading-tight">
@@ -265,13 +266,15 @@ export function OperativaPulseSummary({
 }) {
   if (rank == null || total <= 0) {
     return (
-      <span className={cn("tabular-nums", scoreTone(io))}>IO {io ?? "—"}</span>
+      <span className={cn("tabular-nums", scoreTone(io))}>
+        IO {io ?? absentDataLabel()}
+      </span>
     );
   }
   return (
     <span className="truncate text-[10px] text-muted-foreground">
       <span className={cn("font-semibold tabular-nums", scoreTone(io))}>
-        IO {io ?? "—"}
+        IO {io ?? absentDataLabel()}
       </span>
       {" · "}
       {rank}/{total}

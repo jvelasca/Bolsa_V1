@@ -7,6 +7,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import { absentDataLabel } from "@/components/absent-data";
 import { useEnsureInstrumentFundamentals } from "@/features/instruments/use-ensure-instrument-fundamentals";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -60,7 +61,7 @@ function ScoreChip({
         />
       ) : (
         <span className="tabular-nums">
-          {score100 != null ? score100 : "—"}
+          {score100 != null ? score100 : absentDataLabel()}
         </span>
       )}
     </Link>

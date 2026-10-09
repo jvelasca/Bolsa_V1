@@ -24,6 +24,7 @@ import {
   type MandateTenureCashflow,
 } from "@/features/platform/mandate-tenure-pnl";
 import { cn } from "@/lib/utils";
+import { absentDataLabel } from "@/components/absent-data";
 
 function useMandateRevision(): number {
   return useSyncExternalStore(
@@ -53,7 +54,9 @@ function TenureRow({
       )}
     >
       <p className="font-medium text-foreground">
-        {t.strategyLabelSnapshot ?? t.strategyDefinitionId?.slice(0, 8) ?? "—"}
+        {t.strategyLabelSnapshot ??
+          t.strategyDefinitionId?.slice(0, 8) ??
+          absentDataLabel()}
         {open ? " · vigente" : ""}
       </p>
       <p>{formatMandateTenureRange(t)}</p>

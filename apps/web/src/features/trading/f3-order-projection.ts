@@ -9,6 +9,7 @@
  */
 
 import type { DecisionAction } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import {
   DECISION_ACTION_CHIP_LABEL,
   parseDecisionAction,
@@ -110,7 +111,7 @@ export function resolveF3ProjectionActionLabel(input: {
 
 /** Formato compacto para el eje (sin €; la escala ya es precio). */
 export function formatF3ProjectionPrice(price: number): string {
-  if (!Number.isFinite(price)) return "—";
+  if (!Number.isFinite(price)) return absentDataLabel();
   const abs = Math.abs(price);
   if (abs >= 1000) return price.toFixed(2);
   if (abs >= 1) return price.toFixed(2);

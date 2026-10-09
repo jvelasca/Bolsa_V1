@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ResearchTrialDto } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { summarizeLabEvidenceFromTrial } from "@/features/research/research-lab-evidence";
 
 function trial(partial: Partial<ResearchTrialDto>): ResearchTrialDto {
@@ -19,8 +20,8 @@ describe("summarizeLabEvidenceFromTrial (Observatory P5)", () => {
   it("returns empty when blocks have no lab validation", () => {
     const s = summarizeLabEvidenceFromTrial(trial({ blocks: { foo: 1 } }));
     expect(s.hasLab).toBe(false);
-    expect(s.compact).toBe("—");
-    expect(s.modeLabel).toBe("—");
+    expect(s.compact).toBe(absentDataLabel());
+    expect(s.modeLabel).toBe(absentDataLabel());
   });
 
   it("summarizes hold-out OOS", () => {

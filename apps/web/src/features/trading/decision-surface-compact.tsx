@@ -27,6 +27,7 @@ import {
   reconPhraseFromPortfolioStatus,
   resolveOperatorNextAction,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/features/charts/chart-utils";
 import {
@@ -104,7 +105,7 @@ function SectionLabel({ children }: { children: string }) {
 }
 
 function formatMoney(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return absentDataLabel();
   return formatPrice(value);
 }
 
@@ -222,7 +223,7 @@ function EntryCompactBody({
   const qty =
     sizing.quantity != null && Number.isFinite(sizing.quantity)
       ? `${sizing.quantity}`
-      : "—";
+      : absentDataLabel();
   const headline = entryPhaseHeadline(phase);
   const hud = density === "hud";
   const nextAction = resolveOperatorNextAction({ kind: "entry", truth });
@@ -484,25 +485,6 @@ function EntryCompactBody({
   );
 }
 
-function formatLegStatus(
-  status: PositionJourneyReadoutV1["t1"]["status"],
-): string {
-  switch (status) {
-    case "executed":
-      return "✓ ejecutado";
-    case "triggered":
-      return "● disparado";
-    case "pending":
-      return "○ pendiente";
-    case "failed":
-      return "fallido";
-    case "absent":
-      return "—";
-    default:
-      return String(status);
-  }
-}
-
 function JourneyHudBlock({
   journey,
   birthQuantity,
@@ -590,7 +572,7 @@ function JourneyHudBlock({
             <dd className={cabinNumClass()} data-testid="journey-initial-risk">
               {journey.risk.initialRisk != null
                 ? String(journey.risk.initialRisk)
-                : "—"}
+                : absentDataLabel()}
             </dd>
           </div>
           <div className="flex justify-between gap-2">
@@ -598,7 +580,7 @@ function JourneyHudBlock({
             <dd className={cabinNumClass()} data-testid="journey-realized-r">
               {journey.risk.realizedR != null
                 ? formatRSigned(journey.risk.realizedR)
-                : "—"}
+                : absentDataLabel()}
             </dd>
           </div>
           <div className="flex justify-between gap-2">
@@ -621,7 +603,7 @@ function JourneyHudBlock({
             <dd className={cabinNumClass()} data-testid="journey-realized-pct">
               {reduction.realizedPct != null
                 ? `${reduction.realizedPct}%`
-                : "—"}
+                : absentDataLabel()}
             </dd>
           </div>
           <div className="flex justify-between gap-2">
@@ -635,41 +617,15 @@ function JourneyHudBlock({
 
       <OperatorCabinLevel level={3}>
         <div data-testid="operator-exit-ladder">
-          <OperatorPositionPlan plan={positionPlan} />
+          <OperatorPositionPlan
+            plan={positionPlan}
+            detailTestIds={{
+              stop: "position-decision-stop",
+              t1: "journey-t1",
+              t2: "journey-t2",
+            }}
+          />
         </div>
-        {/* Precios T1/T2/Trail para tests journey-* existentes */}
-        <dl className="sr-only" data-testid="position-card-plan-levels">
-          <div>
-            <dt>T1</dt>
-            <dd data-testid="journey-t1">
-              {formatLevel(journey.t1.trigger)}
-              {journey.t1.qtyFractionPct != null
-                ? ` · ${journey.t1.qtyFractionPct}%`
-                : ""}{" "}
-              · {formatLegStatus(journey.t1.status)}
-            </dd>
-          </div>
-          <div>
-            <dt>T2</dt>
-            <dd data-testid="journey-t2">
-              {formatLevel(journey.t2.trigger)}
-              {journey.t2.qtyFractionPct != null
-                ? ` · ${journey.t2.qtyFractionPct}%`
-                : ""}{" "}
-              · {formatLegStatus(journey.t2.status)}
-            </dd>
-          </div>
-          <div>
-            <dt>Trailing</dt>
-            <dd data-testid="journey-trail">
-              {!journey.trail.activationEligible
-                ? "Tras T1"
-                : journey.trail.active
-                  ? `Activo · stop ${formatLevel(journey.trail.currentStop)}`
-                  : "Listo · sin ratchet"}
-            </dd>
-          </div>
-        </dl>
       </OperatorCabinLevel>
 
       <OperatorCabinLevel level={4}>
@@ -693,7 +649,7 @@ function JourneyHudBlock({
               data-testid="journey-stage-label"
               title="stage derivado · el log es la historia"
             >
-              Ciclo: {journey.stageLabel ?? "—"}
+              Ciclo: {journey.stageLabel ?? absentDataLabel()}
               {journey.lineagePathLabel
                 ? ` · clasificación ${journey.lineagePathLabel}`
                 : ""}
@@ -877,18 +833,17 @@ function PositionCompactBody({
                   );
                 })()}
               />
-              {/* Compat testids for surface without journey HUD */}
-              <dl className="sr-only">
-                <dt className="sr-only">T1</dt>
-                <dd data-testid="position-decision-t1">
-                  {formatLevel(view.levels.target1)}
-                </dd>
-                <dt className="sr-only">T2</dt>
-                <dd data-testid="position-decision-t2">
-                  {formatLevel(view.levels.target2)}
-                </dd>
-              </dl>
             </OperatorCabinLevel>
+            {/* Compat testids for assertOperationalTruth: T1/T2 contractuales estables
+                aunque la escalera visible no incluya el peldaño (legado `absent`). */}
+            <div className="sr-only" aria-hidden="true">
+              <span data-testid="position-decision-t1">
+                {formatLevel(view.levels.target1)}
+              </span>
+              <span data-testid="position-decision-t2">
+                {formatLevel(view.levels.target2)}
+              </span>
+            </div>
           </>
         )}
         {!hud && journey ? (
@@ -905,21 +860,16 @@ function PositionCompactBody({
               }
               plannedStop={journey.risk.initialStop}
             />
-            {/* Compat testids for assertOperationalTruth (journey HUD hides Stop KV) */}
-            <dl className="sr-only">
-              <dt className="sr-only">Stop</dt>
-              <dd data-testid="position-decision-stop">
-                {formatLevel(view.levels.currentStop)}
-              </dd>
-              <dt className="sr-only">T1</dt>
-              <dd data-testid="position-decision-t1">
+            {/* Compat testids: T1/T2 contractuales estables aunque la escalera visible
+                no incluya el peldaño (legado `absent`). El Stop lo cubre el plan. */}
+            <div className="sr-only" aria-hidden="true">
+              <span data-testid="position-decision-t1">
                 {formatLevel(view.levels.target1)}
-              </dd>
-              <dt className="sr-only">T2</dt>
-              <dd data-testid="position-decision-t2">
+              </span>
+              <span data-testid="position-decision-t2">
                 {formatLevel(view.levels.target2)}
-              </dd>
-            </dl>
+              </span>
+            </div>
           </>
         ) : null}
       </div>

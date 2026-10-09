@@ -8,6 +8,7 @@ import {
 } from "@bolsa/shared";
 import { Landmark } from "lucide-react";
 
+import { absentDataLabel } from "@/components/absent-data";
 import { ChartBarZoneIconAnchor } from "@/features/charts/chart-bar-zone-rail-button";
 import { ChartBarZonePicker } from "@/features/charts/chart-bar-zone-picker";
 import {
@@ -65,14 +66,14 @@ function renderInstrumentChip(
     case "sector":
       return (
         <span className={CHART_BAR_ZONE_CHIP_MUTED}>
-          {instrument.sector ?? "—"}
+          {instrument.sector ?? absentDataLabel()}
         </span>
       );
     case "listSource":
       return listLabel ? (
         <span className="truncate text-primary">{listLabel}</span>
       ) : (
-        <span className={CHART_BAR_ZONE_CHIP_MUTED}>—</span>
+        <span className={CHART_BAR_ZONE_CHIP_MUTED}>{absentDataLabel()}</span>
       );
     default:
       return null;

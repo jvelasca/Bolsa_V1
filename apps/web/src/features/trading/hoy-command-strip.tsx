@@ -24,6 +24,7 @@ import {
 import type { TradePlanWhyNotV1 } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { gateHumanLabel } from "@/components/gate-label";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
@@ -51,7 +52,7 @@ function setupLine(setup: HoySetupEvidenceV1): string {
   if (setup.effort && setup.effort !== "none") {
     parts.push(setup.effort.replaceAll("_", " "));
   }
-  return parts.length > 0 ? parts.join(" · ") : "—";
+  return parts.length > 0 ? parts.join(" · ") : absentDataLabel();
 }
 
 function thesisHealthLine(health: ThesisHealthV1): string {
@@ -73,7 +74,7 @@ function protectPlanLine(plan: ProtectPlanV1): string {
   if (plan.suggestedProtectStop != null) {
     parts.push(`proteger @ ${plan.suggestedProtectStop}`);
   }
-  return parts.length > 0 ? parts.join(" · ") : "—";
+  return parts.length > 0 ? parts.join(" · ") : absentDataLabel();
 }
 
 function exitRadarLine(radar: ExitRadarV1): string {
@@ -94,7 +95,7 @@ function mfeMaeLine(metrics: MfeMaeV1): string {
     parts.push(metrics.status);
   }
   if (metrics.source === "close_proxy") parts.push("proxy");
-  return parts.length > 0 ? parts.join(" · ") : "—";
+  return parts.length > 0 ? parts.join(" · ") : absentDataLabel();
 }
 
 function expectancyLine(exp: ExpectancyV1): string {
@@ -134,7 +135,7 @@ function bracketPlanLine(plan: BracketPlanV1): string {
     );
   }
   parts.push("display only");
-  return parts.length > 1 ? parts.join(" · ") : "—";
+  return parts.length > 1 ? parts.join(" · ") : absentDataLabel();
 }
 
 export function HoyCommandStrip() {

@@ -13,6 +13,7 @@ import {
   RANKING_RESULT_ENCAJA,
   RANKING_RESULT_VIGILABLE,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 
 export const PRIORITY_SCORE_PREFIX = QUALITY_SCORE_PREFIX;
 export const PRIORITY_NOT_AN_ORDER = "NO ES UNA ORDEN" as const;
@@ -175,16 +176,16 @@ export const HOY_FUNNEL_CLOCK_LABELS = {
 export type OpportunityFunnelClockV1 = {
   id: keyof typeof HOY_FUNNEL_CLOCK_LABELS;
   label: string;
-  /** Ya formateado; «—» cuando no hay dato (nunca inventar «ahora»). */
+  /** Ya formateado; rótulo de dato ausente si no hay dato (nunca inventar «ahora»). */
   value: string;
   asOf: string | null;
 };
 
-/** Hora corta, o «—» si el dato no existe o no es parseable. */
+/** Hora corta, o el rótulo de dato ausente si no existe o no es parseable. */
 export function formatFunnelClock(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return absentDataLabel();
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return absentDataLabel();
   return d.toLocaleString(undefined, {
     day: "2-digit",
     month: "short",

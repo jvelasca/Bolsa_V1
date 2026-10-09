@@ -340,7 +340,9 @@ export function InstrumentDetailPage() {
                 {formatPrice(liveQuote.xtb.last)}
               </p>
             ) : (
-              <p className="text-sm text-muted-foreground">—</p>
+              <p className="text-sm text-muted-foreground">
+                {absentDataLabel()}
+              </p>
             )}
           </CardContent>
         </Card>

@@ -8,6 +8,7 @@
  */
 
 import { useMemo } from "react";
+import { absentDataLabel } from "@/components/absent-data";
 import { formatPct } from "@/features/charts/chart-utils";
 import {
   sortExploreRows,
@@ -109,7 +110,8 @@ export function BacktestExploreBatteryTable({
             </thead>
             <tbody>
               {ranked.map((row, index) => {
-                const rank = row.status === "ok" ? index + 1 : "—";
+                const rank =
+                  row.status === "ok" ? index + 1 : absentDataLabel();
                 const selected = Boolean(
                   row.runId && row.runId === selectedRunId,
                 );
@@ -151,7 +153,7 @@ export function BacktestExploreBatteryTable({
                     >
                       {row.totalReturnPct != null
                         ? formatPct(row.totalReturnPct)
-                        : "—"}
+                        : absentDataLabel()}
                     </td>
                     <td
                       className={cn(
@@ -162,12 +164,12 @@ export function BacktestExploreBatteryTable({
                     >
                       {row.excessReturnPct != null
                         ? formatPct(row.excessReturnPct)
-                        : "—"}
+                        : absentDataLabel()}
                     </td>
                     <td className="p-1.5 tabular-nums text-destructive">
                       {row.maxDrawdownPct != null
                         ? formatPct(row.maxDrawdownPct)
-                        : "—"}
+                        : absentDataLabel()}
                     </td>
                     <td className="p-1.5 text-muted-foreground">
                       {row.status === "ok"
@@ -178,7 +180,7 @@ export function BacktestExploreBatteryTable({
                             ? "Error"
                             : row.status === "skipped"
                               ? "Skip"
-                              : "—"}
+                              : absentDataLabel()}
                     </td>
                     <td className="p-1.5 text-right">
                       {onOptimizeCandidate && canLab ? (
@@ -197,7 +199,7 @@ export function BacktestExploreBatteryTable({
                         </Button>
                       ) : (
                         <span className="text-[10px] text-muted-foreground">
-                          —
+                          {absentDataLabel()}
                         </span>
                       )}
                     </td>

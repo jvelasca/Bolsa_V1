@@ -11,6 +11,7 @@ import {
 } from "@/features/backtests/backtest-hud-prefs";
 import { BacktestStatDonut } from "@/features/backtests/backtest-stat-donut";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -203,7 +204,7 @@ export function BacktestGlobalBar({
           negative={finalStats.losers}
           positiveCaption={`${finalStats.winners} gan.`}
           negativeCaption={`${finalStats.losers} perd.`}
-          centerLabel={closed > 0 ? `${winPct}%` : "—"}
+          centerLabel={closed > 0 ? `${winPct}%` : absentDataLabel()}
           title={`${finalStats.winners} operaciones ganadoras (${winPct}%) · ${finalStats.losers} perdedoras`}
         />
       )}
@@ -213,7 +214,7 @@ export function BacktestGlobalBar({
           negative={finalStats.moneyLost}
           positiveCaption={`+${formatPrice(finalStats.moneyWon)}`}
           negativeCaption={`−${formatPrice(finalStats.moneyLost)}`}
-          centerLabel={moneyTotal > 0 ? `${moneyWinPct}%` : "—"}
+          centerLabel={moneyTotal > 0 ? `${moneyWinPct}%` : absentDataLabel()}
           title={`Dinero en ganadoras ${formatPrice(finalStats.moneyWon)} · en perdedoras ${formatPrice(finalStats.moneyLost)}`}
         />
       )}

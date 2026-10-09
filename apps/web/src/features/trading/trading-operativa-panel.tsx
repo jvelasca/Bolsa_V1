@@ -13,6 +13,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
+import { absentDataLabel } from "@/components/absent-data";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { instrumentTopBacktestsHref } from "@/features/backtests/instrument-strategy-top-panel";
 import {
@@ -99,7 +100,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const activeChartId = useWorkspaceStore((s) => s.workspace.activeChartId);
   const active = charts.find((c) => c.id === activeChartId) ?? charts[0];
   const instrumentId = active?.instrumentId ?? null;
-  const symbol = active?.label ?? "—";
+  const symbol = active?.label ?? absentDataLabel();
   const timeframe = (active?.timeframe as string) || "1d";
   const { effectiveAccountId } = useActiveAccount();
   const accountScope = useActiveAccountQueryKey();

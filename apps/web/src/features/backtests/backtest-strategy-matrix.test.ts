@@ -9,6 +9,7 @@ import {
   strategyMatrixFiltersWithSelection,
 } from "@/features/backtests/backtest-strategy-matrix";
 import { ALL_PRESET_COACH_KEYS } from "@/features/backtests/backtest-explore-value";
+import { ABSENT_DATA_NOT_MEASURED } from "@/components/absent-data";
 
 describe("backtest-strategy-matrix", () => {
   it("builds preset rows and merges saved strategies", () => {
@@ -108,7 +109,7 @@ describe("backtest-strategy-matrix", () => {
   it("formats percent", () => {
     expect(formatPct(12.34)).toBe("+12.3%");
     expect(formatPct(-1)).toBe("-1.0%");
-    expect(formatPct(null)).toBe("—");
+    expect(formatPct(null)).toBe(ABSENT_DATA_NOT_MEASURED);
   });
 
   it("annotates and filters finalists by strategyDefinitionId", () => {

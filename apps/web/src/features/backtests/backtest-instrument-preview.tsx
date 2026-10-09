@@ -31,6 +31,7 @@ import {
   formatPrice,
 } from "@/features/charts/chart-utils";
 import { observeStableSize } from "@/features/charts/chart-stable-resize";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -192,7 +193,7 @@ export function BacktestInstrumentPreview({
                   (buyHoldPct ?? 0) >= 0 ? "text-success" : "text-destructive",
                 )}
               >
-                {buyHoldPct != null ? formatPct(buyHoldPct) : "—"}
+                {buyHoldPct != null ? formatPct(buyHoldPct) : absentDataLabel()}
               </p>
             </div>
             <div className="text-xs text-muted-foreground">

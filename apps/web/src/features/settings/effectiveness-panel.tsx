@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { absentDataLabel } from "@/components/absent-data";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -110,7 +111,9 @@ export function EffectivenessPanel({ compact }: { compact?: boolean }) {
               <Metric
                 label="Credibility"
                 value={
-                  data.credibility != null ? data.credibility.toFixed(1) : "—"
+                  data.credibility != null
+                    ? data.credibility.toFixed(1)
+                    : absentDataLabel()
                 }
               />
               <Metric label="Trials N" value={data.trialsN} />

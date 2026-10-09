@@ -3,7 +3,11 @@
  * Solo formatea FundamentalChipDto — no recalcula Score_FUND.
  */
 
-import type { FundamentalChipDto, FundamentalDataConfidence } from '@bolsa/shared';
+import type {
+  FundamentalChipDto,
+  FundamentalDataConfidence,
+} from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 
 export type ListMemberFaChipView = {
   primary: string;
@@ -13,9 +17,9 @@ export type ListMemberFaChipView = {
 };
 
 export function faConfidenceToneClass(c: FundamentalDataConfidence): string {
-  if (c === 'HIGH') return 'text-emerald-700 dark:text-emerald-300';
-  if (c === 'MEDIUM') return 'text-amber-800 dark:text-amber-300';
-  return 'text-destructive';
+  if (c === "HIGH") return "text-emerald-700 dark:text-emerald-300";
+  if (c === "MEDIUM") return "text-amber-800 dark:text-amber-300";
+  return "text-destructive";
 }
 
 export function summarizeListMemberFa(
@@ -25,13 +29,13 @@ export function summarizeListMemberFa(
   const score =
     chip.scoreDisplay100 != null && Number.isFinite(chip.scoreDisplay100)
       ? `FUND ${chip.scoreDisplay100}`
-      : 'FUND —';
+      : `FUND ${absentDataLabel()}`;
   const parts: string[] = [chip.confidence];
-  if (chip.isStale) parts.push('stale');
-  if (chip.distress) parts.push('distress');
+  if (chip.isStale) parts.push("stale");
+  if (chip.distress) parts.push("distress");
   return {
     primary: score,
-    secondary: parts.join(' · '),
+    secondary: parts.join(" · "),
     confidence: chip.confidence,
     toneClass: faConfidenceToneClass(chip.confidence),
   };

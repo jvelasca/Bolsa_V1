@@ -9,12 +9,13 @@ import {
   formatWfe,
   wfeBandLabel,
 } from "@/features/backtests/backtest-walk-forward-metrics";
+import { absentDataLabel } from "@/components/absent-data";
 
 /** Compact line for paper account detail (P7). */
 export function formatPaperLabEvidence(
   snapshot?: PaperLabEvidenceSnapshot | null,
 ): string {
-  if (!snapshot) return "—";
+  if (!snapshot) return absentDataLabel();
   const kind = snapshot.kind ?? "none";
   if (kind === "none" && !snapshot.edgeBand && snapshot.pbo == null) {
     return "Sin validación lab";
@@ -50,5 +51,5 @@ export function formatPaperLabEvidence(
   if (snapshot.persistedEdgeReportId) {
     parts.push(`ER ${snapshot.persistedEdgeReportId.slice(0, 10)}…`);
   }
-  return parts.join(" · ") || "—";
+  return parts.join(" · ") || absentDataLabel();
 }

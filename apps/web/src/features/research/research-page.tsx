@@ -637,6 +637,7 @@ export function ResearchPage() {
                       const pnl = metricNum(trial.isMetrics, "totalReturnPct");
                       const sharpe = metricNum(trial.isMetrics, "sharpeRatio");
                       const active = trial.id === selectedTrialId;
+                      const labEvidence = summarizeLabEvidenceFromTrial(trial);
                       return (
                         <tr
                           key={trial.id}
@@ -663,9 +664,14 @@ export function ResearchPage() {
                           <td className="px-2 py-1.5 tabular-nums">
                             {formatOrAbsent(sharpe, (v) => v.toFixed(2))}
                           </td>
-                          <td className="max-w-[14rem] truncate px-2 py-1.5">
-                            {summarizeLabEvidenceFromTrial(trial).hasLab
-                              ? "Validada"
+                          <td
+                            className="max-w-[14rem] truncate px-2 py-1.5"
+                            title={
+                              labEvidence.hasLab ? labEvidence.title : undefined
+                            }
+                          >
+                            {labEvidence.hasLab
+                              ? labEvidence.modeLabel
                               : absentDataLabel()}
                           </td>
                           <td className="px-2 py-1.5 tabular-nums">

@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { absentDataLabel } from "@/components/absent-data";
 import { OptimizeCardHeader } from "@/features/backtests/optimize-card-header";
 import { OptimizeEmptyTip } from "@/features/backtests/optimize-empty-tip";
 import { OptimizeSummaryStrip } from "@/features/backtests/optimize-summary-strip";
@@ -1254,7 +1255,10 @@ export const BacktestOptimizePanel = forwardRef<
     onAdoptReadyChange?.({
       canAdopt: zoneImproved,
       improved: zoneImproved,
-      label: bestVsAnchor?.best.paramsLabel ?? seed?.strategyLabel ?? "—",
+      label:
+        bestVsAnchor?.best.paramsLabel ??
+        seed?.strategyLabel ??
+        absentDataLabel(),
       score: bestVsAnchor?.best.score ?? 0,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

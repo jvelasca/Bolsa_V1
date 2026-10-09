@@ -36,6 +36,7 @@ import {
   syncAfterListDeleted,
 } from "@/lib/list-sync";
 import { setManualListSelection } from "@/lib/list-selection-guard";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { FieldRow, inputClassName } from "@/components/ui/dialog";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
@@ -388,7 +389,8 @@ export function ListHubPanel() {
 
   const activeLabel = isVirtualListId(activeListId)
     ? VIRTUAL_LIST_LABELS[activeListId as keyof typeof VIRTUAL_LIST_LABELS]
-    : (apiLists.find((list) => list.id === activeListId)?.name ?? "—");
+    : (apiLists.find((list) => list.id === activeListId)?.name ??
+      absentDataLabel());
 
   return (
     <ListHubColumnLayoutProvider>

@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { KeyValueList, KeyValueRow } from "@/components/ui/key-value-list";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/features/charts/chart-utils";
 import type { DecisionBoardV1, DecisionGate } from "@bolsa/shared";
@@ -111,7 +112,7 @@ function SemiF3QueueCard({ queue }: { queue: DecisionBoardV1["semiF3Queue"] }) {
                 className="flex items-center justify-between gap-2 border-b border-border/50 py-1 text-[11px] last:border-0"
               >
                 <span className="font-medium text-foreground">
-                  {q.symbol ?? q.instrumentId ?? "—"}
+                  {q.symbol ?? q.instrumentId ?? absentDataLabel()}
                 </span>
                 <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-sky-800 dark:text-sky-200">
                   {q.status}

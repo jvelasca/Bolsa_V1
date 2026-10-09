@@ -5,6 +5,7 @@
 
 import { Activity, FlaskConical, RefreshCcw } from "lucide-react";
 import { useMemo } from "react";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 import {
   ESTUDIO_SUPERVISION_EVENT,
@@ -147,7 +148,7 @@ export function ListProcessTimestampCell({
         day: "2-digit",
         month: "short",
       })
-    : "—";
+    : absentDataLabel();
 
   return (
     <span

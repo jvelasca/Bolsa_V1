@@ -2,6 +2,7 @@ import { templateHasIndicators, type IndicatorTemplate } from "@bolsa/shared";
 import { LayoutTemplate } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { absentDataLabel } from "@/components/absent-data";
 import { ChartBarZonePicker } from "@/features/charts/chart-bar-zone-picker";
 import { ChartBarZoneIconAnchor } from "@/features/charts/chart-bar-zone-rail-button";
 import { CHART_BAR_ZONE_ROW_CLASS } from "@/features/charts/chart-bar-zone-styles";
@@ -136,7 +137,7 @@ export function ChartIndicatorTemplateZone({
       onToggleFavorite={toggleFavorite}
       onSelectOption={tryApply}
       getButtonLabel={(id) =>
-        templateShortLabel(templateById.get(id)?.name ?? "—")
+        templateShortLabel(templateById.get(id)?.name ?? absentDataLabel())
       }
       isButtonVisible={(id) => Boolean(templateById.get(id))}
       trailing={

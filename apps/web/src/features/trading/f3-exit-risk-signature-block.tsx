@@ -3,6 +3,7 @@
  */
 
 import type { ExitRiskSignatureV1 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { MesaTipButton } from "@/features/help/mesa-tip-button";
 import { cn } from "@/lib/utils";
 
@@ -59,7 +60,7 @@ export function F3ExitRiskSignatureBlock({
         <div className="flex justify-between gap-2">
           <span className="text-muted-foreground">Qty máx. plan</span>
           <span className="tabular-nums">
-            {signature.maxQty ?? signature.plannedQty ?? "—"}
+            {signature.maxQty ?? signature.plannedQty ?? absentDataLabel()}
           </span>
         </div>
         {signature.excess != null ? (

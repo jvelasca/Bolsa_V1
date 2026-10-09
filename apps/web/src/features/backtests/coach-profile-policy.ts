@@ -16,6 +16,7 @@ import type {
   RiskTolerance,
   StrategyPresetCategory,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import type { CoachConfidence } from "@/features/backtests/coach-dual-audit";
 
 export const COACH_PROFILE_POLICY_VERSION = "coach-profile-v1" as const;
@@ -235,8 +236,8 @@ export function formatCoachProfileRailLabel(
   policy: CoachProfilePolicy,
 ): string {
   const name = policy.profileName?.trim() || "sin perfil";
-  const horizon = policy.horizon ?? "—";
-  const risk = policy.riskTolerance ?? "—";
+  const horizon = policy.horizon ?? absentDataLabel();
+  const risk = policy.riskTolerance ?? absentDataLabel();
   return `Perfil: ${name} · ${horizon} · riesgo ${risk}`;
 }
 

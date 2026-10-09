@@ -22,6 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { absentDataLabel } from "@/components/absent-data";
 
 type StrategySource = "preset" | "saved";
 
@@ -381,7 +382,7 @@ function SignalAlertRow({
   const strategyLabel =
     subscription.presetKey != null
       ? BACKTEST_STRATEGIES[subscription.presetKey].label
-      : (subscription.strategyDefinitionId?.slice(0, 8) ?? "—");
+      : (subscription.strategyDefinitionId?.slice(0, 8) ?? absentDataLabel());
 
   return (
     <tr className="border-b border-border/60">
@@ -429,7 +430,7 @@ function SignalAlertRow({
             {formatDateTime(subscription.lastTriggeredAt)}
           </>
         ) : (
-          "—"
+          absentDataLabel()
         )}
       </td>
       <td className="py-2 text-right">

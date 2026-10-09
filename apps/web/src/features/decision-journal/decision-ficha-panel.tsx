@@ -19,6 +19,7 @@ import {
   type PositionDto,
   type SubmitIntentListItemV1,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { IconButton } from "@/components/ui/icon-button";
 import { DecisionStudyChart } from "@/features/decision-journal/decision-study-chart";
 import { openDecisionReplay } from "@/features/decision-journal/decision-journal-helpers";
@@ -102,7 +103,7 @@ function formatStoryAsOf(asOf: string): string {
 }
 
 function formatRMetric(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return absentDataLabel();
   const abs = Math.abs(value);
   const body = Number.isInteger(abs) ? String(abs) : abs.toFixed(2);
   return `${value < 0 ? "−" : ""}${body}R`;
@@ -157,10 +158,10 @@ export function DecisionFichaPanel({
   const pct = journalStudyConsensusPercents(study.consensus);
   const opinionLabel = study.opinion
     ? JOURNAL_STUDY_OPINION_LABELS[study.opinion as JournalStudyOpinion]
-    : "—";
+    : absentDataLabel();
   const periodLabel = study.period
     ? JOURNAL_STUDY_PERIOD_LABELS[study.period as JournalStudyPeriod]
-    : "—";
+    : absentDataLabel();
   const statusLabel =
     JOURNAL_STUDY_STATUS_LABELS[study.status as JournalStudyUserStatus] ??
     study.status;
@@ -319,7 +320,7 @@ export function DecisionFichaPanel({
               {study.trends.map((trend) => (
                 <li key={trend.key} className="flex justify-between gap-2">
                   <span className="text-muted-foreground">{trend.label}</span>
-                  <span>{trend.display ?? "—"}</span>
+                  <span>{trend.display ?? absentDataLabel()}</span>
                 </li>
               ))}
             </ul>
@@ -586,7 +587,7 @@ export function DecisionFichaPanel({
                     >
                       {spine.result.mfeMae.mfeR != null
                         ? `+${spine.result.mfeMae.mfeR}R`
-                        : "—"}
+                        : absentDataLabel()}
                     </dd>
                   </div>
                   <div>
@@ -597,7 +598,7 @@ export function DecisionFichaPanel({
                     >
                       {spine.result.mfeMae.maeR != null
                         ? `${spine.result.mfeMae.maeR}R`
-                        : "—"}
+                        : absentDataLabel()}
                     </dd>
                   </div>
                 </dl>
@@ -672,7 +673,7 @@ export function DecisionFichaPanel({
           </summary>
           <div className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
             <p>
-              decisionId: <code>{study.decisionId ?? "—"}</code>
+              decisionId: <code>{study.decisionId ?? absentDataLabel()}</code>
             </p>
             <p>
               sessionId: <code>{study.sessionId}</code>

@@ -26,6 +26,12 @@ vi.mock("@/features/auto-monitor/use-auto-operational-monitor", () => ({
   }),
 }));
 
+// P4 — el panel «Por qué AUTO no operó» tiene su propio test; aquí se aísla para no
+// requerir QueryClientProvider ni las consultas de descubrimiento.
+vi.mock("@/features/auto/auto-no-trade-panel", () => ({
+  AutoNoTradePanel: () => <div data-testid="auto-no-trade-panel-stub" />,
+}));
+
 import { AutoActividadPage } from "@/features/auto/auto-actividad-page";
 
 beforeEach(() => {

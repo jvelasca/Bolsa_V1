@@ -10,6 +10,7 @@ import {
 } from "@/features/backtests/backtest-optimize-space";
 import { formatPct } from "@/features/charts/chart-utils";
 import { Button } from "@/components/ui/button";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 export type OptimizeCompareRow = {
@@ -58,7 +59,7 @@ function DeltaCell({
   suffix?: string;
 }) {
   if (value == null || !Number.isFinite(value)) {
-    return <span className="text-muted-foreground">—</span>;
+    return <span className="text-muted-foreground">{absentDataLabel()}</span>;
   }
   const good = invert ? value < 0 : value > 0;
   const bad = invert ? value > 0 : value < 0;
@@ -176,7 +177,7 @@ export function BacktestOptimizeCompareTable({
                 <td className="p-2 tabular-nums">{row.paramsLabel}</td>
                 <td className="p-2 tabular-nums text-muted-foreground">
                   {row.deltaFast == null && row.deltaSlow == null ? (
-                    "—"
+                    absentDataLabel()
                   ) : (
                     <>
                       {row.deltaFast != null && row.deltaFast !== 0 && (
@@ -211,10 +212,12 @@ export function BacktestOptimizeCompareTable({
                     <td className="p-2 tabular-nums">
                       {row.oosMetrics
                         ? formatPct(row.oosMetrics.totalReturnPct)
-                        : "—"}
+                        : absentDataLabel()}
                     </td>
                     <td className="p-2 tabular-nums">
-                      {row.oosMetrics ? row.oosMetrics.score.toFixed(2) : "—"}
+                      {row.oosMetrics
+                        ? row.oosMetrics.score.toFixed(2)
+                        : absentDataLabel()}
                     </td>
                     <td className="p-2">
                       <DeltaCell value={row.deltaOosScore} suffix="" />
@@ -225,7 +228,9 @@ export function BacktestOptimizeCompareTable({
                 {onSave && (
                   <td className="p-2 text-right">
                     {row.status === "anchor" ? (
-                      <span className="text-muted-foreground">—</span>
+                      <span className="text-muted-foreground">
+                        {absentDataLabel()}
+                      </span>
                     ) : (
                       <Button
                         type="button"

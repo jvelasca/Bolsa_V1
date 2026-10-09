@@ -5,6 +5,7 @@
  * @see docs/engineering/instruments-hub-2026-07-31.md
  */
 
+import { absentDataLabel } from "@/components/absent-data";
 import {
   formatDate,
   formatDateTimeCompact,
@@ -309,7 +310,7 @@ export function formatInstrumentLastBarLabel(opts: {
   const sync = opts.lastSyncAt?.trim() || null;
 
   if (!bar && !sync) {
-    return { primary: "—", sortKey: null };
+    return { primary: absentDataLabel(), sortKey: null };
   }
 
   if (bar && bar.includes("T")) {

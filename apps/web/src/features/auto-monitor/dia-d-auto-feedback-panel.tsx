@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { components } from "@/api/schema";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -135,7 +136,7 @@ function ValueRow({
       <td className="py-1.5 pr-3 tabular-nums text-[11px]">
         {value.measuredCycles}
         <span className="text-muted-foreground">
-          /{value.limits?.minCycles ?? "—"}
+          /{value.limits?.minCycles ?? absentDataLabel()}
         </span>
       </td>
       <td className="py-1.5 pr-3 tabular-nums text-[11px]">
@@ -263,11 +264,11 @@ export function DiaDAutoFeedbackPanel() {
             >
               Gate de ventana{" "}
               <span className="font-semibold text-foreground/80">
-                {String(artifact.gate.verdict ?? "—")}
+                {String(artifact.gate.verdict ?? absentDataLabel())}
               </span>{" "}
-              · días {String(artifact.gate.days ?? "—")} · episodios{" "}
-              {String(artifact.gate.episodes ?? "—")} · ciclos{" "}
-              {String(artifact.gate.cycles ?? "—")}
+              · días {String(artifact.gate.days ?? absentDataLabel())} ·
+              episodios {String(artifact.gate.episodes ?? absentDataLabel())} ·
+              ciclos {String(artifact.gate.cycles ?? absentDataLabel())}
             </p>
           ) : null}
         </CardContent>

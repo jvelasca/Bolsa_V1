@@ -10,6 +10,7 @@ import {
   type ScanRunResultDto,
   type SignalEventV1,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 
 export const ALARM_SAFE_MODES: readonly ExecutionMode[] = [
   "inform_only",
@@ -27,7 +28,7 @@ export function formatScanHitAlarmToast(hit: ScanHitDto): string {
   const price =
     typeof hit.signal.price === "number" && Number.isFinite(hit.signal.price)
       ? hit.signal.price.toFixed(2)
-      : "—";
+      : absentDataLabel();
   return `Radar · ${hit.symbol}: ${kind} @ ${price}`;
 }
 

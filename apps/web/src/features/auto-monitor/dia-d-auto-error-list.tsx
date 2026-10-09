@@ -7,6 +7,7 @@
  */
 
 import type { components } from "@/api/schema";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 type DiaDFeedbackErrorDto = components["schemas"]["DiaDFeedbackErrorDto"];
@@ -139,10 +140,10 @@ export function DiaDAutoErrorList({
                 className="border-t border-border/40"
               >
                 <td className="px-2 py-1 font-mono text-[10px] tabular-nums">
-                  {error.day || "—"}
+                  {error.day || absentDataLabel()}
                 </td>
                 <td className="px-2 py-1 font-mono text-[10px]">
-                  {error.symbol || "—"}
+                  {error.symbol || absentDataLabel()}
                 </td>
                 <td className="px-2 py-1">
                   <KindBadge kind={error.kind} />

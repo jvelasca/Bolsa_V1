@@ -4,6 +4,7 @@ import type {
   DataFreshnessStatus,
   InstrumentDataStatusDto,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { ChartDatabaseDialog } from "@/features/charts/chart-database-dialog";
 import { formatDate, formatDateTimeWith } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,7 @@ import { cn } from "@/lib/utils";
 const FLASH_MS = 5000;
 
 function formatStatusDate(iso: string | null, timeframe: ChartTimeframe) {
-  if (!iso) return "—";
+  if (!iso) return absentDataLabel();
   const isDaily = timeframe === "1d" || iso.length === 10;
   const d = isDaily ? new Date(`${iso.slice(0, 10)}T12:00:00`) : new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;

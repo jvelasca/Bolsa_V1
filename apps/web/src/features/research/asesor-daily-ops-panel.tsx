@@ -19,6 +19,7 @@ import {
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import { useNotificationPrefsStore } from "@/stores/notification-prefs-store";
 import { useAlertsStore } from "@/stores/alerts-store";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { TechnicalDetail } from "@/components/technical-detail";
 import { cn } from "@/lib/utils";
@@ -326,7 +327,8 @@ export function AsesorDailyOpsPanel() {
                     className="flex items-center justify-between gap-2 border-b border-border/50 py-1"
                   >
                     <span className="font-medium text-foreground">
-                      {t.type.toUpperCase()} {t.symbol ?? t.instrumentId ?? "—"}
+                      {t.type.toUpperCase()}{" "}
+                      {t.symbol ?? t.instrumentId ?? absentDataLabel()}
                     </span>
                     <span className="tabular-nums text-muted-foreground">
                       {t.quantity != null ? `${t.quantity} × ` : ""}

@@ -1,4 +1,5 @@
 import type { ResearchTrialDto } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import {
   extractOosEvidenceFromTrial,
   type OosEvidence,
@@ -35,7 +36,7 @@ function modeLabel(kind: OosEvidenceKind): string {
     case "cpcv":
       return "CPCV";
     default:
-      return "—";
+      return absentDataLabel();
   }
 }
 
@@ -79,8 +80,8 @@ export function summarizeLabEvidenceFromTrial(
   if (evidence.kind === "none") {
     return {
       kind: "none",
-      modeLabel: "—",
-      compact: "—",
+      modeLabel: absentDataLabel(),
+      compact: absentDataLabel(),
       title: "Sin validación lab (hold-out / WF / CPCV) en blocks",
       hasLab: false,
     };

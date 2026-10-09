@@ -9,6 +9,7 @@ import {
   buildFundamentalGate,
   type FaWeeklyPipelineResultV1,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -208,7 +209,7 @@ export function FaWeeklyPipelinePanel({
                 >
                   <span className="font-medium">{c.ticker}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    {c.scoreDisplay100 ?? "—"}/100
+                    {c.scoreDisplay100 ?? absentDataLabel()}/100
                   </span>
                 </li>
               ))}

@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Info, Sparkles } from "lucide-react";
 import type { DraftIndicatorFromPromptResultDto } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 interface IndicatorDraftFeedbackProps {
@@ -75,7 +76,7 @@ export function IndicatorDraftFeedback({
               >
                 <span className="text-muted-foreground">{signal.label}: </span>
                 <span className="font-medium text-foreground">
-                  {signal.detail ?? "—"}
+                  {signal.detail ?? absentDataLabel()}
                 </span>
               </li>
             ))}

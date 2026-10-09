@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { absentDataLabel } from "@/components/absent-data";
 import { Dialog, DialogTabs, checkboxClassName } from "@/components/ui/dialog";
 import { GeneralSettingsSection } from "@/features/settings/general-settings-section";
 import { MarketProvidersStatusCard } from "@/features/settings/market-providers-status-card";
@@ -77,12 +78,13 @@ function AccountSettingsCard() {
             <GeneralProfileSummary activeProfileId={account.activeProfileId} />
             <p className="mt-1">
               <span className="text-muted-foreground">Comisiones:</span>{" "}
-              {account.settings?.commission.label ?? "—"}
+              {account.settings?.commission.label ?? absentDataLabel()}
             </p>
             <p className="mt-1">
               <span className="text-muted-foreground">Fiscal:</span>{" "}
-              {account.settings?.tax.jurisdiction ?? "—"} ·{" "}
-              {account.settings?.tax.costBasisMethod.toUpperCase() ?? "—"}
+              {account.settings?.tax.jurisdiction ?? absentDataLabel()} ·{" "}
+              {account.settings?.tax.costBasisMethod.toUpperCase() ??
+                absentDataLabel()}
             </p>
             <div className="mt-2 flex flex-wrap gap-3">
               <button

@@ -3,7 +3,7 @@ import { formatPaperLabEvidence } from "@/features/accounts/paper-lab-evidence";
 
 describe("formatPaperLabEvidence (P7)", () => {
   it("shows empty state", () => {
-    expect(formatPaperLabEvidence(null)).toBe("—");
+    expect(formatPaperLabEvidence(null)).toBe("Sin dato todavía");
     expect(formatPaperLabEvidence({ kind: "none" })).toBe("Sin validación lab");
   });
 

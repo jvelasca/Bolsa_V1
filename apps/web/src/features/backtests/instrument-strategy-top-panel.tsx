@@ -40,6 +40,10 @@ import {
 } from "@/features/settings/paper-paths-copy";
 import { activeTopProfileMismatch } from "@/features/backtests/coach-profile-policy";
 import { libraryHrefForSavedStrategy } from "@/features/backtests/library-nav";
+import {
+  strategySelectionStatusLabel,
+  strategyValidationLabel,
+} from "@/features/backtests/strategy-concept-labels";
 import { clearLocalFreshnessFingerprint } from "@/features/backtests/backtest-finalists-freshness";
 import {
   buildTrackerFromFinalistSlot,
@@ -184,9 +188,9 @@ export function InstrumentStrategyTopBadge({
           : "bg-amber-500/15 text-amber-900 dark:text-amber-200",
         className,
       )}
-      title={`${top.slots.length} estrategias · ${top.status} · v${top.version}`}
+      title={`${top.slots.length} estrategias · ${strategySelectionStatusLabel(top.status)} · v${top.version}`}
     >
-      TOP {top.slots.length} · {top.status}
+      TOP {top.slots.length} · {strategySelectionStatusLabel(top.status)}
     </span>
   );
 }
@@ -690,16 +694,15 @@ export function InstrumentStrategyTopPanel({
               ) ?? undefined
             }
           >
-            {top.status} · v{top.version} · TF {top.timeframe}
+            Selección: {strategySelectionStatusLabel(top.status)} · v
+            {top.version} · TF {top.timeframe} · Validación:{" "}
+            {strategyValidationLabel(top.evidenceLevel)}
             {(() => {
               const snap = readLabEvidenceFromCoachFacts(
                 top.coachFacts as Record<string, unknown> | null | undefined,
               );
               const badge = formatFinalistsStabilityBadge(snap);
-              if (badge) return ` · ${badge}`;
-              return top.evidenceLevel === "lab_validated"
-                ? " · lab OOS"
-                : " · in-sample";
+              return badge ? ` · Evidencia: ${badge}` : "";
             })()}
             {diaDActive
               ? ` · DÍA D ${effectiveDiaD(diaD)} (F-hoy intacto)`

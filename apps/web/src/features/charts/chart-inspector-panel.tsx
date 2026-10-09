@@ -32,6 +32,7 @@ import {
   SlidersHorizontal,
   ChartCandlestick,
 } from "lucide-react";
+import { absentDataLabel } from "@/components/absent-data";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useChartCursorStore } from "@/stores/chart-cursor-store";
@@ -510,17 +511,26 @@ export function ChartInspectorPanel({
                 Instrumento
               </h3>
               <dl>
-                <DetailRow label="Símbolo" value={instrument?.symbol ?? "—"} />
+                <DetailRow
+                  label="Símbolo"
+                  value={instrument?.symbol ?? absentDataLabel()}
+                />
                 <DetailRow
                   label="Nombre"
                   value={
                     <span className="line-clamp-2 max-w-[9rem] text-right text-[11px]">
-                      {instrument?.name ?? "—"}
+                      {instrument?.name ?? absentDataLabel()}
                     </span>
                   }
                 />
-                <DetailRow label="Bolsa" value={instrument?.exchange ?? "—"} />
-                <DetailRow label="Lista origen" value={listLabel ?? "—"} />
+                <DetailRow
+                  label="Bolsa"
+                  value={instrument?.exchange ?? absentDataLabel()}
+                />
+                <DetailRow
+                  label="Lista origen"
+                  value={listLabel ?? absentDataLabel()}
+                />
               </dl>
             </section>
 
@@ -631,7 +641,7 @@ export function ChartInspectorPanel({
                               activeBar.open) *
                               100,
                           )
-                        : "—"
+                        : absentDataLabel()
                     }
                   />
                   <DetailRow

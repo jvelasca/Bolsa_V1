@@ -259,6 +259,11 @@ describe("DecisionSurfaceCompact journey HUD V2.0", () => {
     expect(screen.getByTestId("journey-t2").textContent).toMatch(
       String(decision.plan.t2),
     );
+    // P2-4 (UI 5.0) — T1/T2 viven en la escalera VISIBLE, no en un bloque sr-only.
+    const t1Node = screen.getByTestId("journey-t1");
+    expect(t1Node.closest('[data-testid="operator-exit-ladder"]')).toBeTruthy();
+    expect(t1Node.closest(".sr-only")).toBeNull();
+    expect(screen.queryByTestId("position-card-plan-levels")).toBeNull();
     expect(screen.getByTestId("journey-remaining").textContent).toMatch(
       String(decision.remaining?.remainingPct),
     );
@@ -268,5 +273,34 @@ describe("DecisionSurfaceCompact journey HUD V2.0", () => {
     expect(
       screen.getByTestId("exit-ladder-rung-t2").getAttribute("data-reduce-pct"),
     ).toBe(String(decision.plan.t2Pct));
+  });
+
+  it("UI5-14 · journey declara «Sin dato todavía» en vez del guion", () => {
+    const journey = buildPositionJourneyReadout({
+      view,
+      direction: "long",
+      lifecycle: { stage: null, lineagePath: null, events: [] },
+    });
+
+    render(
+      <DecisionSurfaceCompact
+        variant="position"
+        position={position}
+        symbol="NVDA"
+        view={view}
+        journey={journey}
+      />,
+    );
+
+    expect(screen.getByTestId("journey-initial-risk").textContent).toBe(
+      "Sin dato todavía",
+    );
+    expect(screen.getByTestId("journey-realized-r").textContent).toBe(
+      "Sin dato todavía",
+    );
+    fireEvent.click(screen.getByTestId("journey-advanced-toggle"));
+    expect(screen.getByTestId("journey-stage-label").textContent).toMatch(
+      /Sin dato todavía/,
+    );
   });
 });

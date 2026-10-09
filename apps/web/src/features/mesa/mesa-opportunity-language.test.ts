@@ -1,6 +1,6 @@
 /**
  * Tests — lenguaje de producto del ranking (V1.24 honesty).
- * Calidad ≠ Prioridad compuesta; Encaja ≠ Preparada cockpit; sin scan → «—».
+ * Calidad ≠ Prioridad compuesta; Encaja ≠ Preparada cockpit; sin scan → «Sin dato todavía».
  */
 
 import { describe, expect, it } from "vitest";
@@ -135,7 +135,7 @@ describe("funnel language", () => {
     expect(formatFunnelTitle(2)).toBe("¿Por qué quedan sólo 2?");
   });
 
-  it("shows three clocks and renders — when a clock is null", () => {
+  it("shows three clocks and renders the absent label when a clock is null", () => {
     const clocks = buildOpportunityFunnelClocks({
       marketDataAsOf: null,
       analysisAsOf: null,
@@ -146,7 +146,11 @@ describe("funnel language", () => {
       "Análisis",
       "Ranking",
     ]);
-    expect(clocks.map((c) => c.value)).toEqual(["—", "—", "—"]);
+    expect(clocks.map((c) => c.value)).toEqual([
+      "Sin dato todavía",
+      "Sin dato todavía",
+      "Sin dato todavía",
+    ]);
   });
 
   it("never invents a clock for a missing scan", () => {
@@ -159,13 +163,15 @@ describe("funnel language", () => {
     });
     expect(ranking.funnel.asOf).toBeNull();
     const clocks = buildOpportunityFunnelClocks(ranking.funnel);
-    expect(clocks.every((c) => c.value === "—")).toBe(true);
+    expect(clocks.every((c) => c.value === "Sin dato todavía")).toBe(true);
   });
 
   it("formatFunnelClock tolerates null and garbage", () => {
-    expect(formatFunnelClock(null)).toBe("—");
-    expect(formatFunnelClock(undefined)).toBe("—");
-    expect(formatFunnelClock("not-a-date")).toBe("—");
-    expect(formatFunnelClock("2026-08-27T09:30:00.000Z")).not.toBe("—");
+    expect(formatFunnelClock(null)).toBe("Sin dato todavía");
+    expect(formatFunnelClock(undefined)).toBe("Sin dato todavía");
+    expect(formatFunnelClock("not-a-date")).toBe("Sin dato todavía");
+    expect(formatFunnelClock("2026-08-27T09:30:00.000Z")).not.toBe(
+      "Sin dato todavía",
+    );
   });
 });

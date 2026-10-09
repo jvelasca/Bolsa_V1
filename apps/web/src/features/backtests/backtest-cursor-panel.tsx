@@ -13,6 +13,7 @@ import {
   type BacktestCursorPanelPos,
 } from "@/features/backtests/backtest-hud-prefs";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -268,7 +269,7 @@ export function BacktestCursorPanel({
                 value={
                   snapshot.volume != null && Number.isFinite(snapshot.volume)
                     ? formatNumber(snapshot.volume)
-                    : "—"
+                    : absentDataLabel()
                 }
               />
             )}

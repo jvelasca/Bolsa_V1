@@ -9,6 +9,7 @@ import {
 } from "@/features/backtests/dia-d-reconciliation";
 import { instrumentTopBacktestsHref } from "@/features/backtests/instrument-strategy-top-panel";
 import { cn } from "@/lib/utils";
+import { absentDataLabel } from "@/components/absent-data";
 
 export function DiaDReconciliationPanel({
   result,
@@ -49,7 +50,7 @@ export function DiaDReconciliationPanel({
         <li>
           F-D #1:{" "}
           <span className="text-foreground">
-            {result.experimentLabel ?? "—"}
+            {result.experimentLabel ?? absentDataLabel()}
           </span>
           {result.oosReturnPct != null &&
           Number.isFinite(result.oosReturnPct) ? (
@@ -66,7 +67,8 @@ export function DiaDReconciliationPanel({
         <li>
           F-hoy #1:{" "}
           <span className="text-foreground">
-            {result.productionLabel ?? "— (sin Finalistas operativos)"}
+            {result.productionLabel ??
+              `${absentDataLabel()} (sin Finalistas operativos)`}
           </span>
           {result.counterfactual?.status === "ready" &&
           result.counterfactual.returnPct != null ? (

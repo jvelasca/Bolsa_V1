@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/format";
 import { SignalAlertsSection } from "@/features/alerts/signal-alerts-section";
@@ -378,7 +379,7 @@ function AlertRow({
             {formatDateTime(alert.triggeredAt)}
           </>
         ) : (
-          "—"
+          absentDataLabel()
         )}
       </td>
       <td className="py-2 text-right">

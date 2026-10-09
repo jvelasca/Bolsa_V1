@@ -19,6 +19,7 @@ import {
   type PositionJourneyReadoutV1,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
+import { absentDataLabel } from "@/components/absent-data";
 import {
   patchDemoBookPrefs,
   type DemoBookMode,
@@ -341,7 +342,9 @@ export function AutoDeskPanel({
                   "font-medium text-foreground",
                 )}
               >
-                {planPreview.trailingAutomatic ? "Automático ✓" : "—"}
+                {planPreview.trailingAutomatic
+                  ? "Automático ✓"
+                  : absentDataLabel()}
               </dd>
             </div>
           </dl>

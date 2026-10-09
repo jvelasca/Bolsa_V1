@@ -3,6 +3,7 @@ import type {
   InstrumentWithMetaDto,
   ListDataFreshnessStatus,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { formatDate, formatDateTimeWith, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -28,14 +29,14 @@ function resolveVisualState(item: InstrumentWithMetaDto): SyncVisualState {
 }
 
 function formatShortDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return absentDataLabel();
   const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
   return formatDate(d);
 }
 
 function formatSyncAt(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return absentDataLabel();
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return formatDateTimeWith(d, {
@@ -63,7 +64,7 @@ function buildTooltip(
     `Última vela: ${formatShortDate(item.meta.lastBarDate)}`,
     `Esperada: ${formatShortDate(item.meta.expectedLastBarDate)}`,
     `Barras 1D: ${formatNumber(item.meta.barCount)}`,
-    `Último sync: ${formatSyncAt(item.meta.lastSync?.syncedAt)} (${item.meta.lastSync?.status ?? "—"})`,
+    `Último sync: ${formatSyncAt(item.meta.lastSync?.syncedAt)} (${item.meta.lastSync?.status ?? absentDataLabel()})`,
   ];
   if (item.meta.lastSync?.error) {
     lines.push(item.meta.lastSync.error);

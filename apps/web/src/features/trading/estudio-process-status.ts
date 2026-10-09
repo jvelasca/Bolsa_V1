@@ -24,6 +24,7 @@ import {
   readEstudioLaneStamp,
 } from "@/features/trading/estudio-lane-stamps";
 import { formatDateTimeWith } from "@/lib/format";
+import { absentDataLabel } from "@/components/absent-data";
 import { useCoreRReviewQueueStore } from "@/stores/core-r-review-queue-store";
 
 export type EstudioProcessLaneId = "vigilance" | "freshness" | "rediscover";
@@ -93,9 +94,9 @@ function stateLabel(state: EstudioProcessLaneState): string {
 }
 
 function formatShortAt(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return absentDataLabel();
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return absentDataLabel();
   return formatDateTimeWith(d, {
     day: "2-digit",
     month: "short",

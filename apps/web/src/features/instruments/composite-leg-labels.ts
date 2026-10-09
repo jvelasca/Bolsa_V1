@@ -3,6 +3,8 @@
  * Python emite keys (`adv_mega`, `mcap_large`…); la UI solo traduce.
  */
 
+import { absentDataLabel } from "@/components/absent-data";
+
 const LIQUIDITY_METHOD_LABELS: Record<string, string> = {
   adv_mega: "ADV mega",
   adv_very_high: "ADV muy alta",
@@ -32,7 +34,7 @@ export function formatCompositeLegMethod(
 export function formatCompositeLegStatus(
   status: string | null | undefined,
 ): string {
-  if (!status || !status.trim()) return "—";
+  if (!status || !status.trim()) return absentDataLabel();
   switch (status.trim()) {
     case "not_evaluated":
       return "no en Composite (Fit en gate)";

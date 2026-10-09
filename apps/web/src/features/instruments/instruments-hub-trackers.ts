@@ -6,6 +6,7 @@
  */
 
 import type { ExecutionMode, TrackerDefinitionDetailDto } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import type { HubListMembership } from "@/features/instruments/instruments-hub-enrichment";
 
 export type HubTrackerCoverage = "pin" | "list";
@@ -34,7 +35,7 @@ export function hubExecutionModeShort(mode: string | null | undefined): string {
     case "live_auto":
       return "live";
     default:
-      return "—";
+      return absentDataLabel();
   }
 }
 
@@ -145,7 +146,7 @@ export function hubTrackerChipTitle(chip: HubTrackerChip): string {
     chip.name,
     chip.timeframe,
     chip.scheduleLabel,
-    chip.modeShort !== "—" ? chip.modeShort : "sin política",
+    chip.modeShort !== absentDataLabel() ? chip.modeShort : "sin política",
     chip.coverage === "pin" ? "pin" : "vía lista",
     chip.enabled ? null : "pausado",
   ].filter(Boolean);

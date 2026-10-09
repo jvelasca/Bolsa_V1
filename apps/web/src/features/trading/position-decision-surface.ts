@@ -11,6 +11,7 @@ import type {
   PositionOperationalStateV1,
 } from "@bolsa/shared";
 import { assertNever } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 
 export type PovVisualToneV1 = "emerald" | "amber" | "rose" | "muted";
 
@@ -169,18 +170,18 @@ export function mapPovPrimaryActionToExitCtaKind(
 }
 
 export function formatLevel(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return absentDataLabel();
   return value.toFixed(2);
 }
 
 export function formatPctSigned(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return absentDataLabel();
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
 }
 
 export function formatRSigned(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return absentDataLabel();
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}R`;
 }

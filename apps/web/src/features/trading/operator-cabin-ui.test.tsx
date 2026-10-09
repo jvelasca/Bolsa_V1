@@ -317,4 +317,56 @@ describe("operator-cabin-ui V2.25 polish", () => {
     expect(finalRung.textContent).toMatch(/Salida final/);
     expect(finalRung.textContent).toMatch(/Sin dato todavía/);
   });
+
+  it("UI5-14 · caja de riesgo declara el hueco en vez del guion", () => {
+    render(
+      <OperatorRiskBox
+        box={{
+          capital: 10000,
+          riskPct: 1,
+          maxLoss: null,
+          entry: null,
+          stop: null,
+          lossAtStop: null,
+          rrT1: null,
+          rrT2: null,
+          quantity: 20,
+          positionValue: null,
+          portfolioPct: null,
+          stopDistancePct: null,
+        }}
+      />,
+    );
+    expect(screen.getByTestId("risk-box-rr-t1").textContent).toBe(
+      "Sin dato todavía",
+    );
+    expect(screen.getByTestId("risk-box-rr-t2").textContent).toBe(
+      "Sin dato todavía",
+    );
+    expect(screen.queryByText("—")).toBeNull();
+  });
+
+  it("UI5-14 · peldaño sin detalle declara «Sin dato todavía»", () => {
+    render(
+      <OperatorExitLadder
+        ladder={{
+          profileLabel: null,
+          remainingPct: null,
+          remainingDetail: null,
+          rungs: [
+            {
+              id: "entry",
+              label: "Entrada",
+              detail: null,
+              status: "pending",
+              reducePct: null,
+            },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByTestId("mission-step-entry").textContent).toMatch(
+      /Sin dato todavía/,
+    );
+  });
 });

@@ -4,6 +4,7 @@ import type {
   InstrumentProfileSectionDto,
   InstrumentProfileTabDto,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { Dialog, DialogTabs } from "@/components/ui/dialog";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { InstrumentAnalysisSummary } from "@/features/trading/instrument-analysis-summary";
@@ -69,7 +70,9 @@ function ProfileTabContent({
               <div key={event.date} className="contents">
                 <dt className="text-muted-foreground">{event.date}</dt>
                 <dd className="text-right tabular-nums">
-                  {event.amount != null ? formatPrice(event.amount) : "—"}
+                  {event.amount != null
+                    ? formatPrice(event.amount)
+                    : absentDataLabel()}
                 </dd>
               </div>
             ))}
@@ -134,12 +137,16 @@ export function InstrumentInfoDialog() {
         <dd>{detail?.yahooSymbol ?? instrument.yahooSymbol}</dd>
         <dt className="text-muted-foreground">ISIN</dt>
         <dd className="font-mono text-xs">
-          {detailQuery.isLoading && !isin ? "…" : isin?.trim() || "—"}
+          {detailQuery.isLoading && !isin
+            ? "…"
+            : isin?.trim() || absentDataLabel()}
         </dd>
         <dt className="text-muted-foreground">Sector</dt>
-        <dd>{sector ?? "—"}</dd>
+        <dd>{sector ?? absentDataLabel()}</dd>
         <dt className="text-muted-foreground">Último cierre</dt>
-        <dd>{lastClose != null ? formatPrice(lastClose) : "—"}</dd>
+        <dd>
+          {lastClose != null ? formatPrice(lastClose) : absentDataLabel()}
+        </dd>
       </dl>
       {!detailQuery.isLoading && !isin?.trim() && (
         <p className="mb-3 text-[10px] text-muted-foreground">

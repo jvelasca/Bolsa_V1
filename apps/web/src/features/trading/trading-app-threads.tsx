@@ -11,6 +11,7 @@
 import { BrainCircuit, FlaskConical, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
+import { absentDataLabel } from "@/components/absent-data";
 import {
   formatCoreROpenSymbolsKey,
   formatCoreRStatusTitle,
@@ -58,7 +59,7 @@ export function TradingAppThreads() {
       ? coreROpenCount > 99
         ? "CORE-R 99+"
         : `CORE-R ${coreROpenCount}`
-      : "CORE-R —";
+      : `CORE-R ${absentDataLabel()}`;
 
   const f3Label = f3Count > 99 ? "F3 99+" : `F3 ${f3Count}`;
 

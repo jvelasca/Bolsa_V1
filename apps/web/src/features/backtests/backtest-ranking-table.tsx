@@ -1,3 +1,4 @@
+import { absentDataLabel } from "@/components/absent-data";
 import { formatPct } from "@/features/charts/chart-utils";
 import {
   sortBatchRows,
@@ -31,7 +32,7 @@ type Props = {
 function statusLabel(row: BatchRankRow): string {
   if (row.status === "ok") return "OK";
   if (row.status === "running") return "…";
-  if (row.status === "pending") return "—";
+  if (row.status === "pending") return absentDataLabel();
   if (row.status === "skipped") return "Skip";
   return "Error";
 }
@@ -105,7 +106,7 @@ export function BacktestRankingTable({
           </thead>
           <tbody>
             {ranked.map((row, index) => {
-              const rank = row.status === "ok" ? index + 1 : "—";
+              const rank = row.status === "ok" ? index + 1 : absentDataLabel();
               const selected =
                 Boolean(row.runId && row.runId === selectedRunId) ||
                 Boolean(
@@ -160,7 +161,7 @@ export function BacktestRankingTable({
                   >
                     {row.totalReturnPct != null
                       ? formatPct(row.totalReturnPct)
-                      : "—"}
+                      : absentDataLabel()}
                   </td>
                   <td
                     className={cn(
@@ -172,7 +173,7 @@ export function BacktestRankingTable({
                   >
                     {row.buyHoldReturnPct != null
                       ? formatPct(row.buyHoldReturnPct)
-                      : "—"}
+                      : absentDataLabel()}
                   </td>
                   <td
                     className={cn(
@@ -183,20 +184,22 @@ export function BacktestRankingTable({
                   >
                     {row.excessReturnPct != null
                       ? formatPct(row.excessReturnPct)
-                      : "—"}
+                      : absentDataLabel()}
                   </td>
                   <td className="p-2 tabular-nums text-destructive">
                     {row.maxDrawdownPct != null
                       ? formatPct(row.maxDrawdownPct)
-                      : "—"}
+                      : absentDataLabel()}
                   </td>
                   <td className="p-2 tabular-nums">
-                    {row.sharpeRatio != null ? row.sharpeRatio.toFixed(2) : "—"}
+                    {row.sharpeRatio != null
+                      ? row.sharpeRatio.toFixed(2)
+                      : absentDataLabel()}
                   </td>
                   <td className="p-2 tabular-nums">
                     {row.tradeCount != null
                       ? `${row.tradeCount}/${row.winCount ?? 0}`
-                      : "—"}
+                      : absentDataLabel()}
                   </td>
                   <td className="p-2 text-xs text-muted-foreground">
                     {statusLabel(row)}

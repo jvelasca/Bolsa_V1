@@ -1,6 +1,7 @@
 import { FileJson, LineChart, SlidersHorizontal, Table } from "lucide-react";
 import { PAPER_PATH_LAB } from "@/features/settings/paper-paths-copy";
 import { ApiError } from "@/lib/api";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { DiaDVerifyHost } from "@/features/backtests/dia-d-verify-host";
 import {
@@ -256,7 +257,8 @@ export function BacktestResultDetail({
                     <ul className="mt-1 space-y-0.5 text-muted-foreground">
                       <li>Motor: {manifestSummary.engine}</li>
                       <li>
-                        Versión datos: {manifestSummary.dataVersion ?? "—"}
+                        Versión datos:{" "}
+                        {manifestSummary.dataVersion ?? absentDataLabel()}
                       </li>
                       <li>
                         Barras: {manifestSummary.barCount ?? detail.barCount}

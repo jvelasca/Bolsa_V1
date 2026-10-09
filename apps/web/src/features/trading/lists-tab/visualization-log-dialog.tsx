@@ -1,4 +1,5 @@
 import { VIRTUAL_LIST_LABELS, VIRTUAL_LIST_VISUALIZATION } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { formatDateTimeWith } from "@/lib/format";
@@ -73,7 +74,7 @@ export function VisualizationLogDialog() {
                   </td>
                   <td className="px-2 py-1.5">{SOURCE_LABELS[entry.source]}</td>
                   <td className="px-2 py-1.5 text-muted-foreground">
-                    {entry.searchQuery ?? "—"}
+                    {entry.searchQuery ?? absentDataLabel()}
                   </td>
                 </tr>
               ))}

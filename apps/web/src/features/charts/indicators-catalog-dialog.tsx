@@ -28,6 +28,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { requestChartReflow } from "@/features/charts/chart-utils";
@@ -578,7 +579,7 @@ export function IndicatorsCatalogDialog({
                           </button>
                         ) : (
                           <span className="inline-block w-6 text-center text-muted-foreground">
-                            —
+                            {absentDataLabel()}
                           </span>
                         )}
                       </td>

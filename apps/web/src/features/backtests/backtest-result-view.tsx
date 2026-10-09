@@ -6,6 +6,7 @@
  */
 
 import type { ReactNode } from "react";
+import { absentDataLabel } from "@/components/absent-data";
 import {
   startTransition,
   useCallback,
@@ -475,7 +476,7 @@ export function BacktestResultView({
                     {formatPrice(trade.price)}
                   </td>
                   <td className="max-w-[10rem] truncate p-2 text-muted-foreground">
-                    {trade.reason?.summary ?? "—"}
+                    {trade.reason?.summary ?? absentDataLabel()}
                   </td>
                 </tr>
               );

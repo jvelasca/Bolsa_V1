@@ -10,6 +10,7 @@ import type {
   ExecutionStateV1,
 } from "@bolsa/shared";
 import { assertNever } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 
 export type EntryVisualToneV1 = "sky" | "amber" | "teal" | "rose" | "muted";
 
@@ -99,6 +100,6 @@ export function entryDecisionLabel(primaryCta: EntryOperatingCtaV1): string {
 }
 
 export function formatEntryLevel(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "—";
+  if (value == null || !Number.isFinite(value)) return absentDataLabel();
   return value.toFixed(2);
 }

@@ -7,6 +7,7 @@ import {
 } from "@/features/backtests/backtest-hud-prefs";
 import { BacktestStatDonut } from "@/features/backtests/backtest-stat-donut";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -139,7 +140,7 @@ export function BacktestMovieHud({
       negative={stats.losers}
       positiveCaption={`${stats.winners} gan.`}
       negativeCaption={`${stats.losers} perd.`}
-      centerLabel={closed > 0 ? `${winPct}%` : "—"}
+      centerLabel={closed > 0 ? `${winPct}%` : absentDataLabel()}
       title={`${stats.winners} operaciones ganadoras (${winPct}%) · ${stats.losers} perdedoras (${closed > 0 ? 100 - winPct : 0}%)`}
     />
   ) : null;
@@ -153,7 +154,7 @@ export function BacktestMovieHud({
       negative={stats.moneyLost}
       positiveCaption={`+${formatPrice(stats.moneyWon)}`}
       negativeCaption={`−${formatPrice(stats.moneyLost)}`}
-      centerLabel={moneyTotal > 0 ? `${moneyWinPct}%` : "—"}
+      centerLabel={moneyTotal > 0 ? `${moneyWinPct}%` : absentDataLabel()}
       title={`Dinero en ganadoras ${formatPrice(stats.moneyWon)} (${moneyWinPct}%) · en perdedoras ${formatPrice(stats.moneyLost)} (${moneyTotal > 0 ? 100 - moneyWinPct : 0}%)`}
     />
   ) : null;
@@ -199,7 +200,7 @@ export function BacktestMovieHud({
                 Balance
               </p>
               <p className="text-sm font-semibold leading-tight tabular-nums text-foreground">
-                {balance != null ? formatPrice(balance) : "—"}
+                {balance != null ? formatPrice(balance) : absentDataLabel()}
                 {returnPct != null && (
                   <span
                     className={cn(

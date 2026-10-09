@@ -5,6 +5,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { absentDataLabel } from "@/components/absent-data";
 import { useAlertsStore } from "@/stores/alerts-store";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +23,7 @@ function formatShort(iso: string): string {
 }
 
 function hitRateLabel(rate: number | null | undefined): string {
-  if (rate == null || !Number.isFinite(rate)) return "—";
+  if (rate == null || !Number.isFinite(rate)) return absentDataLabel();
   return `${Math.round(rate * 100)}%`;
 }
 

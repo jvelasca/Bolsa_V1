@@ -3,6 +3,7 @@
  */
 
 import type { SyncQueueItemDto, SyncSettingsDto } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 
 export type BackgroundSyncTone = "off" | "idle" | "active" | "warn";
 
@@ -34,7 +35,7 @@ export function summarizeBackgroundSync(opts: {
   const queue = opts.queue ?? [];
   if (!settings) {
     return {
-      label: "Velas · —",
+      label: `Velas · ${absentDataLabel()}`,
       detail: "Sin datos de auto-sync",
       tone: "off",
     };

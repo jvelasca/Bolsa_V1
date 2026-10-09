@@ -64,7 +64,7 @@ describe("estudio-process-status", () => {
   });
 
   it("formatEstudioProcessTimestamp", () => {
-    expect(formatEstudioProcessTimestamp(null)).toBe("—");
+    expect(formatEstudioProcessTimestamp(null)).toBe("Sin dato todavía");
   });
 
   it("vigilance ok when local stamp exists (sin cola CORE-R)", () => {

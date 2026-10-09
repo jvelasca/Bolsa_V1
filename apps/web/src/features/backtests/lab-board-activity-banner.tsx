@@ -3,6 +3,7 @@
  */
 
 import { Loader2 } from "lucide-react";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 import type { OptimizeProgressPhase } from "@/features/backtests/backtest-optimize-progress";
 
@@ -51,7 +52,7 @@ function chipLabel(phase: OptimizeProgressPhase | null): string {
     case "failed":
       return "Error";
     default:
-      return "—";
+      return absentDataLabel();
   }
 }
 

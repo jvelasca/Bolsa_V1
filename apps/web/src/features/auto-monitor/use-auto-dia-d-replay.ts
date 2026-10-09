@@ -22,12 +22,16 @@ export function useAutoDiaDReplayDays(input?: { enabled?: boolean }) {
   });
 }
 
-export function useAutoDiaDReplay(day: string | null) {
+export function useAutoDiaDReplay(
+  day: string | null,
+  input?: { enabled?: boolean },
+) {
   const { effectiveAccountId } = useActiveAccount();
   return useQuery({
     queryKey: ["auto-dia-d-replay", effectiveAccountId, day],
     queryFn: () => api.getAutoDiaDReplay(day as string),
-    enabled: Boolean(day) && Boolean(effectiveAccountId),
+    enabled:
+      (input?.enabled ?? true) && Boolean(day) && Boolean(effectiveAccountId),
     staleTime: 30_000,
     retry: false,
   });

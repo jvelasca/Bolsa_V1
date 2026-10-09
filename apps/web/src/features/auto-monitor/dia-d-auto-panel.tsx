@@ -10,10 +10,12 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { components } from "@/api/schema";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { DiaDAutoFeedbackPanel } from "@/features/auto-monitor/dia-d-auto-feedback-panel";
+import { DiaDEvidenceAggregatePanel } from "@/features/auto-monitor/dia-d-evidence-aggregate-panel";
 import {
   useAutoDiaDReplay,
   useAutoDiaDReplayDays,
@@ -255,10 +257,10 @@ export function DiaDAutoSandbox() {
                 ) : null}
               </div>
               <p className="text-[10px] text-muted-foreground">
-                cuenta {String(detail.meta?.account ?? "—")} · versión{" "}
-                {String(detail.meta?.versionA ?? "—")} · replay{" "}
-                {String(detail.meta?.replayStart ?? "—")} →{" "}
-                {String(detail.meta?.replayEnd ?? "—")}
+                cuenta {String(detail.meta?.account ?? absentDataLabel())} ·
+                versión {String(detail.meta?.versionA ?? absentDataLabel())} ·
+                replay {String(detail.meta?.replayStart ?? absentDataLabel())} →{" "}
+                {String(detail.meta?.replayEnd ?? absentDataLabel())}
               </p>
             </CardHeader>
             <CardContent>
@@ -427,6 +429,7 @@ export function DiaDAutoPanel() {
   };
   return (
     <div className="space-y-4" data-testid="dia-d-auto-root" data-view={view}>
+      <DiaDEvidenceAggregatePanel activeView={view} />
       <DiaDAutoViewToolbar view={view} onChange={setView} />
       <section
         role="tabpanel"

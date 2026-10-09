@@ -20,6 +20,7 @@ import {
   type AutoActivityKind,
 } from "@/features/auto/auto-activity-feed";
 import { autoOperacionHref } from "@/features/auto/auto-nav";
+import { AutoNoTradePanel } from "@/features/auto/auto-no-trade-panel";
 import { AUTO_USER_TEXT } from "@/features/auto/auto-typography";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,9 @@ export function AutoActividadPage() {
         title={AUTO_SECTION_COPY.actividad.title}
         description={AUTO_SECTION_COPY.actividad.description}
       />
+
+      {/* P4 — «Por qué no operó»: explica un día sin operaciones antes del «qué ha pasado». */}
+      <AutoNoTradePanel />
 
       <section className="space-y-3" aria-labelledby="auto-actividad-feed">
         <AutoSectionBlockHeading id="auto-actividad-feed">

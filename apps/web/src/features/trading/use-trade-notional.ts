@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { absentDataLabel } from "@/components/absent-data";
 import { formatFxRate } from "@/lib/format";
 
 export function useTradeNotional(
@@ -32,7 +33,7 @@ export function useTradeNotional(
       ? `1 ${instrumentCurrency} = ${formatFxRate(fxRate)} ${accountCurrency}`
       : fxQuery.isLoading
         ? "Cargando…"
-        : "—";
+        : absentDataLabel();
 
   return {
     needsFx,

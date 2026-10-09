@@ -9,6 +9,7 @@
  * `backtest-explore-panel.tsx` (feature-slicing M5, frente backtest-explore, E.5).
  */
 
+import { absentDataLabel } from "@/components/absent-data";
 import { formatPct } from "@/features/charts/chart-utils";
 import {
   isOptimizableStrategy,
@@ -140,7 +141,7 @@ export function BacktestExploreStarsGrid({
               <p className="text-[10px] tabular-nums text-muted-foreground">
                 {rec.row.totalReturnPct != null
                   ? `Total ${formatPct(rec.row.totalReturnPct)}`
-                  : "—"}
+                  : absentDataLabel()}
                 {rec.lateReturnPct != null
                   ? ` · reciente ${rec.lateReturnPct >= 0 ? "+" : ""}${rec.lateReturnPct.toFixed(1)}%`
                   : ""}

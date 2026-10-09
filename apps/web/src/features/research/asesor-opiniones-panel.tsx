@@ -17,6 +17,7 @@ import {
   mapOpinionToChannel,
   type InstrumentDailyOpinionHintV1,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { api } from "@/lib/api";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { focusInstrumentInMercado } from "@/features/trading/focus-instrument-in-mercado";
@@ -43,7 +44,7 @@ import {
 } from "@/components/ui/card";
 
 function pctLabel(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return "—";
+  if (v == null || Number.isNaN(v)) return absentDataLabel();
   return `${(v * 100).toFixed(0)}%`;
 }
 

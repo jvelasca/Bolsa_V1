@@ -4,6 +4,7 @@
  */
 
 import type { RiskSignatureV1 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { MesaTipButton } from "@/features/help/mesa-tip-button";
 import { cn } from "@/lib/utils";
@@ -80,8 +81,8 @@ export function F3RiskSignatureBlock({
 
   const qtyLabel =
     signature.suggestedQty != null
-      ? `${signature.suggestedQty} (máx. ${signature.maxQty ?? "—"})`
-      : "—";
+      ? `${signature.suggestedQty} (máx. ${signature.maxQty ?? absentDataLabel()})`
+      : absentDataLabel();
 
   return (
     <div

@@ -18,6 +18,7 @@ import {
 import { CHART_BAR_ZONE_ROW_CLASS } from "@/features/charts/chart-bar-zone-styles";
 import { useChartCursorFieldFavorites } from "@/features/charts/use-chart-bar-zone-favorites";
 import { useChartCursorStore } from "@/stores/chart-cursor-store";
+import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 const MENU_OPTIONS = Object.fromEntries(
@@ -93,7 +94,7 @@ function renderCursorChip(field: ChartCursorBarField, bar: OhlcvBarDto) {
       if (!change) {
         return (
           <span className="inline-block w-full truncate text-muted-foreground">
-            —
+            {absentDataLabel()}
           </span>
         );
       }

@@ -574,4 +574,58 @@ describe("HoyCommandStrip", () => {
     expect(bracket.textContent).toMatch(/T2 120/);
     expect(bracket.textContent).toMatch(/display only/i);
   });
+
+  it("UI5-14 · Bracket sin datos declara «Sin dato todavía» en vez de guion", async () => {
+    vi.mocked(api.getDecisionBoard).mockResolvedValue({
+      data: {
+        ...board(),
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: {
+                  decisionId: "d1",
+                  instrumentId: "i1",
+                  direction: "long",
+                  status: "TRIGGERED",
+                  quantity: 10,
+                  riskPct: 1,
+                  whyNot: [],
+                  executionAllowed: true,
+                },
+                bracketPlan: {
+                  status: "picture",
+                  entry: null,
+                  stop: null,
+                  target1: null,
+                  target2: null,
+                  target1R: 1,
+                  target2R: 2,
+                  legT1QtyFrac: null,
+                  legT2QtyFrac: null,
+                  why: ["no_broker_oco"],
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("hoy-item-SAN"));
+    const bracket = await screen.findByTestId("hoy-bracket-plan");
+    expect(bracket.textContent).toMatch(/Sin dato todavía/);
+  });
 });

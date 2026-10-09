@@ -20,6 +20,7 @@ import {
   ZapOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { formatFreshnessAge } from "@/features/backtests/backtest-finalists-freshness";
 import {
@@ -104,7 +105,9 @@ function PhaseIcon({ phase }: { phase: ListAutoRowPhase }) {
 function ChangeBadge({ change }: { change: ListAutoChangeKind }) {
   const label = listAutoChangeLabel(change);
   if (change === "unknown") {
-    return <span className="text-muted-foreground/70">—</span>;
+    return (
+      <span className="text-muted-foreground/70">{absentDataLabel()}</span>
+    );
   }
   return (
     <span
@@ -134,7 +137,9 @@ const REEVAL_CLASS: Record<CoreRVerdict, string> = {
 
 function ReevalBadge({ reeval }: { reeval?: CoreRJudgment | null }) {
   if (!reeval) {
-    return <span className="text-muted-foreground/70">—</span>;
+    return (
+      <span className="text-muted-foreground/70">{absentDataLabel()}</span>
+    );
   }
   return (
     <span
@@ -367,7 +372,9 @@ export function BacktestListAutoBoardPanel({
                       onClick={(e) => e.stopPropagation()}
                     >
                       {actions.length === 0 ? (
-                        <span className="text-muted-foreground/70">—</span>
+                        <span className="text-muted-foreground/70">
+                          {absentDataLabel()}
+                        </span>
                       ) : (
                         <span className="inline-flex flex-wrap gap-1">
                           {actions.slice(0, 3).map((a) => (
@@ -386,7 +393,7 @@ export function BacktestListAutoBoardPanel({
                   )}
                   {!compact && (
                     <td className="max-w-[12rem] truncate px-2 py-1.5 text-muted-foreground">
-                      {row.reeval?.reason ?? row.detail ?? "—"}
+                      {row.reeval?.reason ?? row.detail ?? absentDataLabel()}
                     </td>
                   )}
                 </tr>

@@ -13,6 +13,7 @@ import {
   type DiaDSessionEvidenceV1,
 } from "@/features/trading/dia-d-session-evidence";
 import type { DiaDEvidenceArchiveItem } from "@/stores/dia-d-evidence-archive-store";
+import { absentDataLabel } from "@/components/absent-data";
 
 export type DiaDEvidenceExportV1 = {
   schemaVersion: "dia_d_evidence_export_v1";
@@ -37,7 +38,7 @@ export function formatDiaDArchiveRowLabel(
   const retStr =
     typeof ret === "number" && Number.isFinite(ret)
       ? `${ret >= 0 ? "+" : ""}${ret.toFixed(1)}%`
-      : "—";
+      : absentDataLabel();
   return `${item.diaD} · ${item.mode} · ${band} · ${retStr}`;
 }
 

@@ -7,6 +7,7 @@ import {
   type InstrumentDailyOpinionV1,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
+import { absentDataLabel } from "@/components/absent-data";
 
 function starsLabel(n: number): string {
   return `${"★".repeat(n)}${"☆".repeat(Math.max(0, 5 - n))}`;
@@ -66,7 +67,7 @@ export function OperativaDictamenBlock({
         className,
       )}
       data-testid="operativa-dictamen"
-      title={`Dictamen ★${opinion.dictamenStars} · Estrategia ★${opinion.strategyStars ?? "—"} · ${opinion.reasons?.join(", ") ?? ""}`}
+      title={`Dictamen ★${opinion.dictamenStars} · Estrategia ★${opinion.strategyStars ?? absentDataLabel()} · ${opinion.reasons?.join(", ") ?? ""}`}
     >
       <p className="text-[9px] font-medium uppercase tracking-wide opacity-70">
         Postura sugerida hoy

@@ -22,6 +22,7 @@ import {
   type JournalStudyUserStatus,
   type JournalStudyVigencia,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import {
   OpaqueMenuItem,
@@ -78,7 +79,7 @@ function opinionClass(opinion: string | null): string {
 }
 
 function dash(value: string | number | null | undefined): string {
-  if (value == null || value === "") return "—";
+  if (value == null || value === "") return absentDataLabel();
   return String(value);
 }
 
@@ -122,7 +123,8 @@ function ColumnResizeHandle({
 }
 
 function StrengthBar({ value }: { value: number | null }) {
-  if (value == null) return <span className="text-muted-foreground">—</span>;
+  if (value == null)
+    return <span className="text-muted-foreground">{absentDataLabel()}</span>;
   const pct = Math.min(100, Math.max(0, value * 10));
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -663,11 +665,12 @@ function renderCell(
         <span className={opinionClass(study.opinion)}>
           {study.opinion
             ? JOURNAL_STUDY_OPINION_LABELS[study.opinion as JournalStudyOpinion]
-            : "—"}
+            : absentDataLabel()}
         </span>
       );
     case "targets":
-      if (!study.hasOperationalPlan || study.target1 == null) return "—";
+      if (!study.hasOperationalPlan || study.target1 == null)
+        return absentDataLabel();
       return study.target2 != null
         ? `${formatPrice(study.target1)} / ${formatPrice(study.target2)}`
         : formatPrice(study.target1);
@@ -694,11 +697,11 @@ function renderCell(
     case "entry":
       return study.hasOperationalPlan && study.entry != null
         ? formatPrice(study.entry)
-        : "—";
+        : absentDataLabel();
     case "vigencia":
       return study.vigencia
         ? JOURNAL_STUDY_VIGENCIA_LABELS[study.vigencia as JournalStudyVigencia]
-        : "—";
+        : absentDataLabel();
     case "actions":
       return (
         <div className="relative flex justify-center">

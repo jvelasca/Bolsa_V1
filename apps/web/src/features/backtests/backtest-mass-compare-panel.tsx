@@ -4,6 +4,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { BacktestStrategyType } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import type { ResolvedBacktestWindow } from "@/features/backtests/backtest-period";
 import {
@@ -212,7 +213,7 @@ export function BacktestMassComparePanel({
                       >
                         {cell?.status === "ok"
                           ? cell.sharpeRatio == null
-                            ? "—"
+                            ? absentDataLabel()
                             : cell.sharpeRatio.toFixed(2)
                           : cell?.status === "error"
                             ? "err"
@@ -235,8 +236,9 @@ export function BacktestMassComparePanel({
             <li key={r.instrumentId}>
               <span className="font-medium text-foreground">{r.symbol}</span>
               {" · "}
-              Sharpe medio {r.avgSharpe == null
-                ? "—"
+              Sharpe medio{" "}
+              {r.avgSharpe == null
+                ? absentDataLabel()
                 : r.avgSharpe.toFixed(2)}{" "}
               ({r.okCount} ok)
             </li>

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { ChevronDown, ChevronRight, Info, ListPlus, Plus } from "lucide-react";
 
+import { absentDataLabel } from "@/components/absent-data";
 import { api } from "@/lib/api";
 
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
@@ -244,20 +245,20 @@ export function ListItemAccordion({
                 column.id === "ioScore"
                   ? recommendation?.io != null
                     ? String(recommendation.io)
-                    : "—"
+                    : absentDataLabel()
                   : column.id === "taScore"
                     ? recommendation?.ta != null
                       ? String(Math.round(recommendation.ta))
-                      : "—"
+                      : absentDataLabel()
                     : column.id === "faScore"
                       ? recommendation?.fa != null
                         ? String(Math.round(recommendation.fa))
-                        : "—"
+                        : absentDataLabel()
                       : column.id === "dictamenStars"
                         ? recommendation?.dictamenStars != null
                           ? `★${recommendation.dictamenStars}`
-                          : "—"
-                        : (recommendation?.stanceLabel ?? "—");
+                          : absentDataLabel()
+                        : (recommendation?.stanceLabel ?? absentDataLabel());
               return (
                 <div
                   key={column.id}
@@ -473,7 +474,7 @@ function ListItemExpandedDetail({
         <div className="min-w-0">
           <div className="text-[9px] text-muted-foreground">Apert.</div>
           <div className="truncate font-medium">
-            {dayOpen != null ? formatPrice(dayOpen) : "—"}
+            {dayOpen != null ? formatPrice(dayOpen) : absentDataLabel()}
           </div>
         </div>
         <div className="min-w-0">
@@ -484,7 +485,7 @@ function ListItemExpandedDetail({
               priceFlashClassName(closeFlash),
             )}
           >
-            {dayClose != null ? formatPrice(dayClose) : "—"}
+            {dayClose != null ? formatPrice(dayClose) : absentDataLabel()}
           </div>
         </div>
         <div className="min-w-0">
@@ -492,13 +493,13 @@ function ListItemExpandedDetail({
           <div className="truncate font-medium">
             {dayHigh != null && dayLow != null
               ? `${formatPrice(dayHigh)}/${formatPrice(dayLow)}`
-              : "—"}
+              : absentDataLabel()}
           </div>
         </div>
         <div className="min-w-0">
           <div className="text-[9px] text-muted-foreground">Spread</div>
           <div className="truncate font-medium">
-            {spreadPct != null ? formatPct(spreadPct) : "—"}
+            {spreadPct != null ? formatPct(spreadPct) : absentDataLabel()}
           </div>
         </div>
         <div className="min-w-0">
@@ -513,7 +514,7 @@ function ListItemExpandedDetail({
                   : "text-red-500",
             )}
           >
-            {changePct != null ? formatPct(changePct) : "—"}
+            {changePct != null ? formatPct(changePct) : absentDataLabel()}
           </div>
         </div>
       </div>
@@ -545,7 +546,7 @@ function ListItemExpandedDetail({
                       ? "toca"
                       : lane.state === "running"
                         ? "…"
-                        : "—"}
+                        : absentDataLabel()}
                   )
                 </span>
               </span>

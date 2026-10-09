@@ -2,6 +2,7 @@ import type { BacktestRunDetailDto } from "@bolsa/shared";
 import { formatDateDdMmYyyy } from "@/features/backtests/backtest-date-format";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { cn } from "@/lib/utils";
+import { absentDataLabel } from "@/components/absent-data";
 
 interface Props {
   detail: BacktestRunDetailDto | null | undefined;
@@ -81,7 +82,7 @@ export function DiaDTradesPanel({
                   >
                     {typeof t.reason === "string"
                       ? t.reason
-                      : (t.reason?.summary ?? "—")}
+                      : (t.reason?.summary ?? absentDataLabel())}
                   </td>
                 </tr>
               );

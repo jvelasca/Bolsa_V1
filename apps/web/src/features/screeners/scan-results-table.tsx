@@ -26,6 +26,7 @@ import {
   OpaqueMenuPanel,
 } from "@/components/ui/opaque-menu-panel";
 import { cn } from "@/lib/utils";
+import { absentDataLabel } from "@/components/absent-data";
 import { openHitInTrading } from "@/features/screeners/open-hit-in-trading";
 import type { ScanRunnerConfig } from "@/features/screeners/scan-runner-form";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -148,13 +149,13 @@ function ScoreBadge({ score }: { score: number }) {
 
 function RatingCell({ hit }: { hit: ScanHitDto }) {
   if (hit.aiScore == null)
-    return <span className="text-muted-foreground">—</span>;
+    return <span className="text-muted-foreground">{absentDataLabel()}</span>;
   return <ScoreBadge score={hit.aiScore} />;
 }
 
 function DataQualityCell({ hit }: { hit: ScanHitDto }) {
   if (hit.dataQualityScore == null)
-    return <span className="text-muted-foreground">—</span>;
+    return <span className="text-muted-foreground">{absentDataLabel()}</span>;
   return (
     <div className="min-w-0">
       <ScoreBadge score={hit.dataQualityScore} />
@@ -174,7 +175,7 @@ function DataQualityCell({ hit }: { hit: ScanHitDto }) {
 
 function GlobalScoreCell({ hit }: { hit: ScanHitDto }) {
   if (hit.globalScore == null)
-    return <span className="text-muted-foreground">—</span>;
+    return <span className="text-muted-foreground">{absentDataLabel()}</span>;
   const quality = qualityFromScore(hit.globalScore);
   return (
     <div className="min-w-0">
@@ -193,7 +194,7 @@ function GlobalScoreCell({ hit }: { hit: ScanHitDto }) {
 
 function QualityCell({ hit }: { hit: ScanHitDto }) {
   if (hit.aiScore == null)
-    return <span className="text-muted-foreground">—</span>;
+    return <span className="text-muted-foreground">{absentDataLabel()}</span>;
   const quality = qualityFromScore(hit.aiScore);
   return (
     <div className="min-w-0">
@@ -211,7 +212,8 @@ function QualityCell({ hit }: { hit: ScanHitDto }) {
 }
 
 function SubScoreCell({ value }: { value?: number }) {
-  if (value == null) return <span className="text-muted-foreground">—</span>;
+  if (value == null)
+    return <span className="text-muted-foreground">{absentDataLabel()}</span>;
   return <span className="tabular-nums">{Math.round(value)}</span>;
 }
 

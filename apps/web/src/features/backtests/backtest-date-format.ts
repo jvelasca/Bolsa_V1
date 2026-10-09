@@ -1,9 +1,11 @@
 /** Display dates as dd/mm/yyyy for movie / result UI. */
 
+import { absentDataLabel } from "@/components/absent-data";
+
 export function formatDateDdMmYyyy(
   timestamp: string | null | undefined,
 ): string {
-  if (!timestamp) return "—";
+  if (!timestamp) return absentDataLabel();
   const day = timestamp.slice(0, 10);
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
   if (match) {

@@ -20,7 +20,11 @@ import type {
   OperatorPositionPlanV1,
   OperatorPositionPlanStepV1,
 } from "@bolsa/shared";
-import { ABSENT_DATA_NOT_MEASURED, isAbsent } from "@/components/absent-data";
+import {
+  ABSENT_DATA_NOT_MEASURED,
+  absentDataLabel,
+  isAbsent,
+} from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/features/charts/chart-utils";
 import {
@@ -275,17 +279,17 @@ export function NextActionHero({
 }
 
 function money(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
+  if (n == null || !Number.isFinite(n)) return absentDataLabel();
   return `${Math.round(n)} €`;
 }
 
 function level(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
+  if (n == null || !Number.isFinite(n)) return absentDataLabel();
   return formatPrice(n);
 }
 
 function rr(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
+  if (n == null || !Number.isFinite(n)) return absentDataLabel();
   return `1 : ${n.toFixed(2)}`;
 }
 
@@ -453,7 +457,7 @@ function missionMark(status: OperatorMissionStepV1["status"]): {
     case "pending":
       return { symbol: "○", sr: "pendiente" };
     default:
-      return { symbol: "—", sr: "sin estado" };
+      return { symbol: ABSENT_DATA_NOT_MEASURED, sr: "sin estado" };
   }
 }
 
@@ -503,7 +507,7 @@ export function OperatorMissionChecklist({
               {step.label}
             </span>
             <span className={cn(CABIN_NUM.base, CABIN_NUM.neu)}>
-              {step.detail ?? "—"}
+              {step.detail ?? absentDataLabel()}
             </span>
           </li>
         );
@@ -525,6 +529,34 @@ function ladderRungTone(status: OperatorExitLadderRungV1["status"]): string {
 }
 
 /**
+ * UI 5.0 · P2-4 — envuelve el valor VISIBLE del peldaño con sus testids.
+ * `ids` admite uno o varios; se anidan para que un mismo nodo visible sirva al
+ * contrato (`position-decision-t1`) y a los tests de journey (`journey-t1`), sin
+ * necesidad de un bloque `sr-only` duplicado.
+ */
+function LevelTestIds({
+  ids,
+  children,
+}: {
+  ids?: string | readonly string[];
+  children: ReactNode;
+}) {
+  if (ids == null) return <>{children}</>;
+  const list = typeof ids === "string" ? [ids] : ids;
+  if (list.length === 0) return <>{children}</>;
+  return (
+    <>
+      {list.reduceRight<ReactNode>(
+        (node, id) => (
+          <span data-testid={id}>{node}</span>
+        ),
+        children,
+      )}
+    </>
+  );
+}
+
+/**
  * V2.28 — single PLAN DE LA POSICIÓN (Mission + Exit Route).
  * V2.37 — numbers-first: detail operativa · labels meta.
  * Exposes mission-step-* + exit-ladder-* testids for contractual surfaces.
@@ -532,9 +564,16 @@ function ladderRungTone(status: OperatorExitLadderRungV1["status"]): string {
 export function OperatorPositionPlan({
   plan,
   className,
+  detailTestIds,
 }: {
   plan: OperatorPositionPlanV1;
   className?: string;
+  /**
+   * UI 5.0 · P2-4 — testids contractuales sobre el detalle visible del peldaño.
+   * Clave = `ladderId` ("stop" | "t1" | "t2" | "trail" | "entry"). Varios ids se
+   * anidan (el primero es el nodo externo). Evita duplicar el nivel en `sr-only`.
+   */
+  detailTestIds?: Partial<Record<string, string | readonly string[]>>;
 }) {
   if (plan.steps.length === 0) return null;
   return (
@@ -614,7 +653,9 @@ export function OperatorPositionPlan({
                     CABIN_NUM.neu,
                   )}
                 >
-                  {step.detail ?? "—"}
+                  <LevelTestIds ids={detailTestIds?.[ladderId ?? ""]}>
+                    {step.detail ?? absentDataLabel()}
+                  </LevelTestIds>
                 </span>
               </div>
               {!isLast ? (
@@ -639,7 +680,9 @@ export function OperatorPositionPlan({
             data-testid="exit-ladder-remaining-value"
           >
             {plan.remainingDetail ??
-              (plan.remainingPct != null ? `${plan.remainingPct}%` : "—")}
+              (plan.remainingPct != null
+                ? `${plan.remainingPct}%`
+                : absentDataLabel())}
           </span>
         </p>
       ) : null}

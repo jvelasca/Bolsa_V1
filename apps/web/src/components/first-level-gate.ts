@@ -61,12 +61,18 @@ export function findFirstLevelViolations(
 /**
  * Comodín `—` de dato ausente en primer nivel (`UI5-14`).
  *
- * Detecta el literal de guion (`"—"`, `'—'`, `` `—` ``, `&mdash;`) usado como relleno de
- * un dato ausente, fuera de los bloques `TechnicalDetail`. El guion de prosa (p. ej. un
- * inciso «Editar — Nombre») NO es un comodín y no se marca: la coincidencia exige el
- * literal entrecomillado o la entidad HTML.
+ * Detecta el guion usado como relleno de un dato ausente, fuera de los bloques
+ * `TechnicalDetail`. Cubre tres formas, que las variantes anteriores dejaban escapar:
+ * 1. Literal entrecomillado: `"—"`, `'—'`, `` `—` ``.
+ * 2. Guion **embebido junto a un delimitador de cadena**: `"Velas · —"`, `` `CORE-R —` ``.
+ * 3. Nodo de texto JSX que es **solo** un guion: `<span>—</span>`, incluso multilínea.
+ *
+ * El guion de prosa (p. ej. un inciso «Editar — Nombre» o un `<option>— elegir —</option>`)
+ * NO es un comodín y no se marca: exige la raya adyacente a una comilla/backtick, la
+ * entidad HTML, o un nodo JSX cuyo único contenido sea el guion. Cada guion produce como
+ * máximo una coincidencia (lookaround), de modo que `"—"` cuenta 1, no 2.
  */
-const DASH_WILDCARD = /["'`]—["'`]|&mdash;/g;
+const DASH_WILDCARD = /(?<=["'`])—|—(?=["'`])|>\s*—\s*<|&mdash;/g;
 
 /** Literales de guion `—` de primer nivel (vacío si solo aparece en nivel 3 o en prosa). */
 export function findFirstLevelDashes(source: string): string[] {

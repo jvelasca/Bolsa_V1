@@ -19,6 +19,7 @@ import type {
   InstrumentFilingMetaV1,
   InstrumentFilingSummarizeResponseV1,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { AiInfoButton } from "@/features/ai/ai-info-button";
 import {
@@ -46,22 +47,22 @@ const PILLAR_LABELS: Record<keyof FundamentalPillarsV1, string> = {
 };
 
 function fmtNum(n: number | null | undefined, digits = 2): string {
-  if (n == null || !Number.isFinite(n)) return "—";
+  if (n == null || !Number.isFinite(n)) return absentDataLabel();
   return n.toFixed(digits);
 }
 
 function fmtPctRatio(n: number | null | undefined, digits = 1): string {
-  if (n == null || !Number.isFinite(n)) return "—";
+  if (n == null || !Number.isFinite(n)) return absentDataLabel();
   return `${(n * 100).toFixed(digits)}%`;
 }
 
 function fmtPe(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
+  if (n == null || !Number.isFinite(n)) return absentDataLabel();
   return n.toFixed(1);
 }
 
 function fmtMcap(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n) || n <= 0) return "—";
+  if (n == null || !Number.isFinite(n) || n <= 0) return absentDataLabel();
   if (n >= 1e12) return `${(n / 1e12).toFixed(2)} T`;
   if (n >= 1e9) return `${(n / 1e9).toFixed(1)} B`;
   if (n >= 1e6) return `${(n / 1e6).toFixed(0)} M`;
@@ -388,7 +389,7 @@ export function FundamentalCardPanel({
   if (!card) return null;
 
   const pe = card.facts.forwardPe ?? card.facts.trailingPe;
-  const sector = card.facts.sector ?? "—";
+  const sector = card.facts.sector ?? absentDataLabel();
 
   if (compact) {
     return (
@@ -414,7 +415,9 @@ export function FundamentalCardPanel({
                 scoreTone(card.scoreDisplay100),
               )}
             >
-              {card.scoreDisplay100 != null ? `${card.scoreDisplay100}` : "—"}
+              {card.scoreDisplay100 != null
+                ? `${card.scoreDisplay100}`
+                : absentDataLabel()}
               <span className="ml-0.5 text-[10px] font-normal text-muted-foreground">
                 /100
               </span>
@@ -487,7 +490,9 @@ export function FundamentalCardPanel({
                 scoreTone(card.scoreDisplay100),
               )}
             >
-              {card.scoreDisplay100 != null ? card.scoreDisplay100 : "—"}
+              {card.scoreDisplay100 != null
+                ? card.scoreDisplay100
+                : absentDataLabel()}
               <span className="ml-1 text-sm font-normal text-muted-foreground">
                 /100
               </span>
@@ -609,7 +614,7 @@ export function FundamentalCardPanel({
             value={
               card.derived.piotroski != null
                 ? `${card.derived.piotroski}/9`
-                : "—"
+                : absentDataLabel()
             }
           />
           <MetricCell label="ROIC" value={fmtPctRatio(card.derived.roic)} />
@@ -681,7 +686,8 @@ export function FundamentalCardPanel({
           ) : null}
           {card.derived.dcfMethod ? (
             <p className="mt-1 text-[10px] text-muted-foreground">
-              DCF {card.derived.dcfMethod ?? "—"}: FCF 5y + Gordon (r=
+              DCF {card.derived.dcfMethod ?? absentDataLabel()}: FCF 5y + Gordon
+              (r=
               {card.derived.waccMethod === "fund_capm_v1"
                 ? "CAPM ke"
                 : "WACC sector"}
@@ -739,7 +745,7 @@ export function FundamentalCardPanel({
                   scoreTone(composite.scoreDisplay100),
                 )}
               >
-                {composite.scoreDisplay100 ?? "—"}
+                {composite.scoreDisplay100 ?? absentDataLabel()}
               </span>
               <span className="text-muted-foreground">
                 /100 · {composite.metadata.confidence}
@@ -771,7 +777,9 @@ export function FundamentalCardPanel({
                       {leg.label}
                     </p>
                     <p className="mt-0.5 text-sm tabular-nums text-foreground">
-                      {leg.score != null ? fmtNum(leg.score, 2) : "—"}
+                      {leg.score != null
+                        ? fmtNum(leg.score, 2)
+                        : absentDataLabel()}
                       <span className="ml-1 text-[10px] text-muted-foreground">
                         · {formatCompositeLegStatus(leg.status)}
                         {leg.weight > 0 ? ` · w${fmtNum(leg.weight, 2)}` : ""}
@@ -1029,7 +1037,8 @@ export function FundamentalCardPanel({
       </CardSection>
 
       <p className="text-[10px] text-muted-foreground">
-        {card.metadata.provider} · {card.metadata.sourceVersion ?? "—"} ·{" "}
+        {card.metadata.provider} ·{" "}
+        {card.metadata.sourceVersion ?? absentDataLabel()} ·{" "}
         {card.metadata.scoreVersion}
         {card.scoreFund != null ? (
           <span className="tabular-nums">

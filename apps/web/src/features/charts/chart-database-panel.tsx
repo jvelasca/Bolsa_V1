@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { absentDataLabel } from "@/components/absent-data";
 import { formatDateWith, formatDateTimeWith, formatNumber } from "@/lib/format";
 import type {
   ChartTimeframe,
@@ -7,7 +8,7 @@ import type {
 } from "@bolsa/shared";
 
 function formatBarDate(iso: string | null, timeframe: ChartTimeframe) {
-  if (!iso) return "—";
+  if (!iso) return absentDataLabel();
   const isDaily = timeframe === "1d" || iso.length === 10;
   const d = isDaily ? new Date(`${iso.slice(0, 10)}T12:00:00`) : new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -28,7 +29,7 @@ function formatBarDate(iso: string | null, timeframe: ChartTimeframe) {
 }
 
 function formatDateTime(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return absentDataLabel();
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return formatDateTimeWith(d, {
@@ -165,7 +166,7 @@ export function ChartDatabaseInstrumentTab({
         />
         <DetailRow
           label="Resultado"
-          value={status.lastSyncStatus ?? "—"}
+          value={status.lastSyncStatus ?? absentDataLabel()}
           valueClassName="text-right font-medium capitalize text-foreground"
         />
       </PanelSection>
@@ -243,7 +244,7 @@ export function ChartDatabaseQualityTab({
           value={
             status.xtbVsCloseDeviationPct != null
               ? `${status.xtbVsCloseDeviationPct.toFixed(2)} %`
-              : "—"
+              : absentDataLabel()
           }
         />
         <DetailRow
@@ -317,7 +318,7 @@ export function ChartDatabaseActivityTab({
         />
         <DetailRow
           label="Resultado sync"
-          value={status.lastSyncStatus ?? "—"}
+          value={status.lastSyncStatus ?? absentDataLabel()}
           valueClassName="text-right font-medium capitalize text-foreground"
         />
         <DetailRow
