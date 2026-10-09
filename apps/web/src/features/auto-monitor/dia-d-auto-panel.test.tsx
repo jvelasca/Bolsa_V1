@@ -18,6 +18,33 @@ import { MemoryRouter } from "react-router-dom";
 
 vi.mock("@/lib/api", () => ({
   api: {
+    getAutoPaperEvidence: vi.fn(async () => ({
+      schemaVersion: "paper_evidence_adapter_v1",
+      readOnly: true,
+      verdict: "NO_CONFIRMED",
+      criteria: [],
+      contradictions: [],
+      notes: [],
+      reconciliation: {
+        fillsLoaded: false,
+        settlementsLoaded: false,
+        fillsTotal: 0,
+        fillsWithCycle: 0,
+        duplicateExecutions: 0,
+        orphanExecutions: 0,
+        closedCycles: 0,
+        anonymousClosedCycles: 0,
+        windowDays: null,
+        windowEpisodes: null,
+        settlementsTotal: 0,
+        settlementsReconciled: 0,
+        settlementsDivergent: 0,
+        settlementsUnmatched: 0,
+        cycles: [],
+        contradictions: [],
+        notes: [],
+      },
+    })),
     getAutoDiaDReplayDays: vi.fn(async () => ({
       readOnly: true,
       days: ["2026-09-30", "2026-09-29"],

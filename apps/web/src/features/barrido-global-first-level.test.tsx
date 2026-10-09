@@ -114,6 +114,14 @@ const TOKEN_SURFACES: Array<{ name: string; file: string }> = [
     name: "AUTO · dia-d-evidence-aggregate-panel.tsx",
     file: "features/auto-monitor/dia-d-evidence-aggregate-panel.tsx",
   },
+  {
+    name: "AUTO · paper-evidence-panel.tsx",
+    file: "features/auto-monitor/paper-evidence-panel.tsx",
+  },
+  {
+    name: "AUTO · paper-confirmation-contract-labels.ts",
+    file: "features/auto-monitor/paper-confirmation-contract-labels.ts",
+  },
 ];
 
 const DASH_SURFACES: string[] = [

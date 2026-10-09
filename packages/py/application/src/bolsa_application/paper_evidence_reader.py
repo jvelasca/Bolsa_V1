@@ -11,6 +11,11 @@ Regla dura: una lectura que falla se **declara** (``fills_loaded``/``settlements
 declara; no se presenta como el universo completo. Y lo que no se puede leer (fills sin
 ``cycle_id``, fuera del alcance de las fuentes por ciclo) se cuenta y se declara, no se esconde.
 
+Aislamiento por cuenta (PAPER-2.1): un cierre durable **sin cuenta atribuible** (``account_id``
+nulo o vacío) NO se incorpora al ámbito de la cuenta consultada. Se cuenta y se declara como
+``unattributed_settlements_excluded``; jamás se lee como evidencia de esta cuenta. Un cierre de
+OTRA cuenta tampoco entra.
+
 @see packages/py/application/src/bolsa_application/paper_evidence_adapter.py
 @see apps/api-python/src/bolsa_api/api/v1/routes/auto_paper_evidence.py
 """
@@ -48,6 +53,8 @@ NOTE_FILLS_NOT_LOADED = "fills_not_loaded"
 NOTE_SETTLEMENTS_NOT_LOADED = "settlements_not_loaded"
 NOTE_FILLS_WINDOW_TRUNCATED = "fills_window_truncated"
 NOTE_UNATTRIBUTED_FILLS = "unattributed_fills_present"
+#: Cierres durables EXCLUIDOS por no declarar una cuenta atribuible al ámbito consultado.
+NOTE_UNATTRIBUTED_SETTLEMENTS = "unattributed_settlements_excluded"
 
 
 def _payload_of(entry: Any) -> Mapping[str, Any]:
@@ -78,10 +85,11 @@ async def read_paper_evidence(
     ciclo** de esos mismos fills (nunca por ``payload->>'cycleId'``). Sin cuenta legible el
     llamante debe resolver el scope antes (fail-closed ``no_account_scope``).
     """
-    from bolsa_application.sim_durable_store import PostgresSimFillFinanceContextStore
     from bolsa_infrastructure.database.repositories.journal_repository import (
         SqlAlchemyJournalRepository,
     )
+
+    from bolsa_application.sim_durable_store import PostgresSimFillFinanceContextStore
 
     context_store = PostgresSimFillFinanceContextStore(session, autocommit=False)
     repository = SqlAlchemyJournalRepository(session)
@@ -120,6 +128,7 @@ async def read_paper_evidence(
 
     settlements: list[dict[str, Any]] = []
     settlements_loaded = True
+    unattributed_settlements = 0
     try:
         settlement_cycle_ids = sorted({_cycle_of(fill) for fill in fills} - {""})
         decision_ids = [
@@ -129,9 +138,16 @@ async def read_paper_evidence(
             await repository.list_by_decision_ids(decision_ids) if decision_ids else []
         )
         for entry in entries:
-            if getattr(entry, "account_id", None) not in (None, account_id):
-                continue
             if getattr(entry, "event_type", None) != AUTO_CYCLE_SETTLEMENT_EVENT:
+                continue
+            entry_account = getattr(entry, "account_id", None)
+            if entry_account is None or not str(entry_account).strip():
+                # Cierre sin cuenta atribuible: NO se incorpora al ámbito consultado (fail-closed).
+                # Se cuenta y se declara; jamás se lee como evidencia de esta cuenta.
+                unattributed_settlements += 1
+                continue
+            if str(entry_account) != account_id:
+                # Cierre de OTRA cuenta: no entra (una fila de otra cuenta no casa nunca).
                 continue
             payload = dict(_payload_of(entry))
             if payload:
@@ -141,6 +157,8 @@ async def read_paper_evidence(
         settlements_loaded = False
         settlements = []
         notes.append(NOTE_SETTLEMENTS_NOT_LOADED)
+    if unattributed_settlements and settlements_loaded:
+        notes.append(NOTE_UNATTRIBUTED_SETTLEMENTS)
 
     if not fills_window_full:
         notes.append(NOTE_FILLS_WINDOW_TRUNCATED)
@@ -150,6 +168,7 @@ async def read_paper_evidence(
         settlements=settlements,
         fills_loaded=fills_loaded,
         settlements_loaded=settlements_loaded,
+        unattributed_settlements=(unattributed_settlements if settlements_loaded else 0),
     )
 
     requested = [str(v) for v in (versions or []) if str(v).strip()] or known_versions

@@ -81,6 +81,21 @@ async def _wipe(factory: async_sessionmaker[AsyncSession], account_id: str) -> N
         await session.commit()
 
 
+async def _wipe_cycle_settlements(
+    factory: async_sessionmaker[AsyncSession], cycle_id: str
+) -> None:
+    """Borra los cierres del ciclo SIN filtrar por cuenta (cubre ``account_id`` nulo u otra cuenta)."""
+    from bolsa_application.auto_cycle_journal import cycle_decision_id
+
+    decision_id = cycle_decision_id(cycle_id)
+    async with factory() as session:
+        await session.execute(
+            text("DELETE FROM decision_journal_entries WHERE decision_id = :decision_id"),
+            {"decision_id": decision_id},
+        )
+        await session.commit()
+
+
 async def _seed_fill(
     session: AsyncSession,
     *,
@@ -117,7 +132,7 @@ async def _seed_fill(
 async def _seed_settlement(
     session: AsyncSession,
     *,
-    account_id: str,
+    account_id: str | None,
     cycle_id: str,
     instrument: str,
     pnl: float,
@@ -273,3 +288,154 @@ async def test_a_contradictory_closure_is_declared_and_never_looks_complete(
         assert dto["verdict"] == "NO_CONFIRMED"
     finally:
         await _wipe(paper_pg_factory, account_id)
+
+
+@pytest.mark.asyncio
+async def test_a_settlement_without_account_is_excluded_and_declared(
+    paper_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Un cierre durable SIN cuenta no entra en el ámbito: se declara, no se lee como favorable."""
+    from bolsa_application.paper_evidence_reader import read_paper_evidence
+
+    account_id = f"acc-paper-{uuid.uuid4().hex[:10]}"
+    suffix = uuid.uuid4().hex[:10]
+    cycle_id = f"cyc-{suffix}"
+    await _wipe(paper_pg_factory, account_id)
+    try:
+        async with paper_pg_factory() as session:
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument="CCC",
+                side="buy",
+                price=100.0,
+                execution_id=f"EX-{suffix}-buy",
+            )
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument="CCC",
+                side="sell",
+                price=110.0,
+                execution_id=f"EX-{suffix}-sell",
+            )
+            # Cierre SIN cuenta (``account_id=None``) y cierre CON cuenta, mismo ciclo.
+            await _seed_settlement(
+                session, account_id=None, cycle_id=cycle_id, instrument="CCC", pnl=100.0
+            )
+            await _seed_settlement(
+                session, account_id=account_id, cycle_id=cycle_id, instrument="CCC", pnl=100.0
+            )
+            await session.commit()
+
+        async with paper_pg_factory() as session:
+            dto = await read_paper_evidence(session, account_id, versions=["orb-1"])
+
+        rec = dto["reconciliation"]
+        assert rec["settlementsTotal"] == 1  # solo el cierre CON cuenta entra en el ámbito
+        assert "unattributed_settlements_excluded" in dto["notes"]
+        assert any(c.startswith("settlement_without_account") for c in dto["contradictions"])
+        assert dto["verdict"] == "NO_CONFIRMED"
+    finally:
+        await _wipe(paper_pg_factory, account_id)
+        await _wipe_cycle_settlements(paper_pg_factory, cycle_id)
+
+
+@pytest.mark.asyncio
+async def test_a_settlement_of_another_account_is_not_admitted(
+    paper_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Un cierre de OTRA cuenta no aparece en el DTO de esta cuenta."""
+    from bolsa_application.paper_evidence_reader import read_paper_evidence
+
+    account_id = f"acc-paper-{uuid.uuid4().hex[:10]}"
+    other_account = f"acc-other-{uuid.uuid4().hex[:10]}"
+    suffix = uuid.uuid4().hex[:10]
+    cycle_id = f"cyc-{suffix}"
+    await _wipe(paper_pg_factory, account_id)
+    try:
+        async with paper_pg_factory() as session:
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument="DDD",
+                side="buy",
+                price=100.0,
+                execution_id=f"EX-{suffix}-buy",
+            )
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument="DDD",
+                side="sell",
+                price=110.0,
+                execution_id=f"EX-{suffix}-sell",
+            )
+            await _seed_settlement(
+                session,
+                account_id=other_account,
+                cycle_id=cycle_id,
+                instrument="DDD",
+                pnl=100.0,
+            )
+            await session.commit()
+
+        async with paper_pg_factory() as session:
+            dto = await read_paper_evidence(session, account_id, versions=["orb-1"])
+
+        rec = dto["reconciliation"]
+        assert rec["settlementsTotal"] == 0
+        assert "unattributed_settlements_excluded" not in dto["notes"]
+    finally:
+        await _wipe(paper_pg_factory, account_id)
+        await _wipe_cycle_settlements(paper_pg_factory, cycle_id)
+
+
+@pytest.mark.asyncio
+async def test_a_read_failure_is_declared_and_never_favorable(
+    paper_pg_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con filas reales presentes, un fallo de LECTURA no se transforma en evidencia favorable."""
+    from bolsa_application.paper_evidence_reader import read_paper_evidence
+
+    account_id = f"acc-paper-{uuid.uuid4().hex[:10]}"
+    suffix = uuid.uuid4().hex[:10]
+    cycle_id = f"cyc-{suffix}"
+    await _wipe(paper_pg_factory, account_id)
+    try:
+        async with paper_pg_factory() as session:
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument="EEE",
+                side="buy",
+                price=100.0,
+                execution_id=f"EX-{suffix}-buy",
+            )
+            await session.commit()
+
+        async def _boom(self: object, account_id: object, *, limit: int = 500) -> list[str]:
+            raise RuntimeError("durable fills unavailable")
+
+        monkeypatch.setattr(
+            "bolsa_application.sim_durable_store.PostgresSimFillFinanceContextStore.list_recent_cycle_ids",
+            _boom,
+        )
+
+        async with paper_pg_factory() as session:
+            dto = await read_paper_evidence(session, account_id, versions=["orb-1"])
+
+        rec = dto["reconciliation"]
+        assert rec["fillsLoaded"] is False
+        assert "fills_not_loaded" in dto["notes"]
+        assert "non_contradiction" in dto["unknownCriterionIds"]
+        assert dto["verdict"] == "NO_CONFIRMED"
+    finally:
+        await _wipe(paper_pg_factory, account_id)
+        await _wipe_cycle_settlements(paper_pg_factory, cycle_id)

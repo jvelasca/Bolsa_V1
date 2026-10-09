@@ -11,6 +11,10 @@ criterio completo.** Un recuento ausente viaja ``None`` + ``UNKNOWN``; jamás un
 afirmaría "no lo hay". Ningún criterio se marca ``met`` sin fuente cargada. Y el veredicto es
 siempre ``NO_CONFIRMED``: definir la vara **no** es emitir la confirmación.
 
+PAPER-2.1: un PnL o una cantidad de cierre sin medir **no** reconcilia, y un cierre duplicado por
+ciclo o sin cuenta atribuible se declara como contradicción. El compositor no necesita código
+nuevo: esas contradicciones ya degradan ``closure_reconciliation`` y ``non_contradiction``.
+
 Puro y determinista: sin I/O, sin red, sin reloj (el ``asOf`` lo aporta el llamante). Los
 umbrales están espejados desde el contrato TS y son parametrizables, nunca se bajan para forzar
 un veredicto.
@@ -31,6 +35,7 @@ from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_UNKNOWN,
     MeasurementStatus,
 )
+
 from bolsa_application.paper_evidence_reconciliation import PaperEvidenceReconciliation
 
 __all__ = [

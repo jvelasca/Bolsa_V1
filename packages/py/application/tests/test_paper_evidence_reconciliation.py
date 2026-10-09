@@ -15,12 +15,18 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
 from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE
+
 from bolsa_application.paper_evidence_reconciliation import (
     RECON_DUPLICATE_EXECUTION,
+    RECON_DUPLICATE_SETTLEMENT,
     RECON_ORPHAN_FILL,
     RECON_PNL_MISMATCH,
+    RECON_PNL_UNMEASURED,
     RECON_QTY_MISMATCH,
+    RECON_QTY_UNMEASURED,
+    RECON_SETTLEMENT_WITHOUT_ACCOUNT,
     RECON_SETTLEMENT_WITHOUT_CLOSURE,
     reconcile_paper_evidence,
 )
@@ -222,3 +228,103 @@ def test_window_days_and_episodes_come_from_the_durable_fills() -> None:
 
     assert result.window_days == 2
     assert result.window_episodes == 2
+
+
+def test_an_unmeasured_fifo_pnl_does_not_reconcile_as_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un PnL FIFO ilegible NO se colapsa a ``0``: el ciclo queda sin reconciliar.
+
+    ``cycles_from_fills`` siempre emite hoy un ``Decimal`` finito; el test INYECTA un ciclo
+    cerrado sin PnL para fijar la regla: la ausencia de medición no puede compararse como cero.
+    """
+
+    def _closed_without_pnl(_fills: object) -> tuple[dict[str, object], ...]:
+        return ({"cycleId": _CYCLE, "strategyVersion": "orb-trend", "pnl": None},)
+
+    monkeypatch.setattr(
+        "bolsa_application.paper_evidence_reconciliation.cycles_from_fills",
+        _closed_without_pnl,
+    )
+    result = reconcile_paper_evidence(
+        fills=_round_trip(),
+        settlements=[_settlement(pnl="100", closed_qty="10")],
+    )
+
+    assert result.settlements_reconciled == 0
+    assert result.settlements_divergent == 1
+    assert RECON_PNL_UNMEASURED in result.cycles[0].notes
+    assert any(c.startswith(RECON_PNL_UNMEASURED) for c in result.contradictions)
+
+
+def test_a_settlement_without_a_measured_pnl_does_not_reconcile() -> None:
+    """Un cierre con PnL no medido tampoco reconcilia (el hueco simétrico del FIFO)."""
+    result = reconcile_paper_evidence(
+        fills=_round_trip(),
+        settlements=[_settlement(pnl=None, closed_qty="10", measurement="UNKNOWN")],
+    )
+
+    assert result.settlements_reconciled == 0
+    assert result.settlements_divergent == 1
+    assert RECON_PNL_UNMEASURED in result.cycles[0].notes
+    assert any(c.startswith(RECON_PNL_UNMEASURED) for c in result.contradictions)
+
+
+def test_a_settlement_without_a_declared_quantity_does_not_reconcile() -> None:
+    """Una cantidad de cierre ausente NO se acepta como válida: la conciliación queda incompleta."""
+    result = reconcile_paper_evidence(
+        fills=_round_trip(),
+        settlements=[_settlement(pnl="100", closed_qty=None)],
+    )
+
+    assert result.settlements_reconciled == 0
+    assert result.settlements_divergent == 1
+    assert RECON_QTY_UNMEASURED in result.cycles[0].notes
+    assert any(c.startswith(RECON_QTY_UNMEASURED) for c in result.contradictions)
+
+
+def test_duplicate_settlements_for_a_cycle_are_declared_not_overwritten() -> None:
+    """Dos cierres para el mismo ciclo son una duplicidad DECLARADA, no una sobreescritura."""
+    result = reconcile_paper_evidence(
+        fills=_round_trip(),
+        settlements=[
+            _settlement(pnl="100", closed_qty="10"),
+            _settlement(pnl="100", closed_qty="10"),
+        ],
+    )
+
+    assert result.settlements_total == 2
+    assert result.settlements_reconciled == 0
+    assert result.settlements_divergent == 1
+    assert RECON_DUPLICATE_SETTLEMENT in result.cycles[0].notes
+    assert any(c.startswith(RECON_DUPLICATE_SETTLEMENT) for c in result.contradictions)
+
+
+def test_duplicate_settlements_on_a_not_closed_cycle_are_still_declared() -> None:
+    """La duplicidad se declara también cuando el material NO probó el cierre del ciclo."""
+    result = reconcile_paper_evidence(
+        fills=[
+            _fill("buy", price="100", qty="100", execution="d#buy"),
+            _fill("sell", price="110", qty="10", execution="d#sell"),
+        ],
+        settlements=[
+            _settlement(pnl="100", closed_qty="100"),
+            _settlement(pnl="100", closed_qty="100"),
+        ],
+    )
+
+    assert result.settlements_reconciled == 0
+    assert RECON_DUPLICATE_SETTLEMENT in result.cycles[0].notes
+    assert any(c.startswith(RECON_DUPLICATE_SETTLEMENT) for c in result.contradictions)
+    assert RECON_SETTLEMENT_WITHOUT_CLOSURE in result.cycles[0].notes
+
+
+def test_unattributed_settlements_are_declared_as_contradiction() -> None:
+    """Un cierre excluido por no declarar cuenta se declara: no puede leerse como material limpio."""
+    result = reconcile_paper_evidence(
+        fills=_round_trip(),
+        settlements=[],
+        unattributed_settlements=1,
+    )
+
+    assert any(c.startswith(RECON_SETTLEMENT_WITHOUT_ACCOUNT) for c in result.contradictions)

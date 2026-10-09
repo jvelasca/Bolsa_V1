@@ -17,6 +17,33 @@ import { MemoryRouter } from "react-router-dom";
 vi.mock("@/lib/api", () => ({
   // El mock devuelve el DTO directo (como el endpoint), NO `{ data: dto }`.
   api: {
+    getAutoPaperEvidence: vi.fn(async () => ({
+      schemaVersion: "paper_evidence_adapter_v1",
+      readOnly: true,
+      verdict: "NO_CONFIRMED",
+      criteria: [],
+      contradictions: [],
+      notes: [],
+      reconciliation: {
+        fillsLoaded: false,
+        settlementsLoaded: false,
+        fillsTotal: 0,
+        fillsWithCycle: 0,
+        duplicateExecutions: 0,
+        orphanExecutions: 0,
+        closedCycles: 0,
+        anonymousClosedCycles: 0,
+        windowDays: null,
+        windowEpisodes: null,
+        settlementsTotal: 0,
+        settlementsReconciled: 0,
+        settlementsDivergent: 0,
+        settlementsUnmatched: 0,
+        cycles: [],
+        contradictions: [],
+        notes: [],
+      },
+    })),
     getAutoOperationalMonitor: vi.fn(async () => ({
       key: "auto_operational_monitor_v1",
       readOnly: true,

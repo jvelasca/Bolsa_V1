@@ -6,7 +6,7 @@ define **siete criterios** de suficiencia, pero un contrato que solo cuenta fila
 módulo aporta la mitad que faltaba: los **cruces falsables** entre operaciones, ejecuciones,
 cierres y resultados, con la procedencia de cada cifra y la contradicción **declarada**.
 
-Tres reglas duras, declaradas en vez de asumidas:
+Reglas duras, declaradas en vez de asumidas:
 
 * **Sin dato no es cero.** Un recuento que no se pudo medir viaja ``None``/``UNKNOWN``; jamás se
   colapsa a un ``0`` que afirmaría "no lo hay" cuando la verdad es "no lo miré" (``UNKNOWN ≠ 0``).
@@ -18,6 +18,11 @@ Tres reglas duras, declaradas en vez de asumidas:
   (``AUTO-7``), la MISMA autoridad que alimenta el informe, la confianza y el readiness. Este
   módulo no reimplementa un segundo FIFO: si divergiera, la calibración y la conciliación
   medirían ciclos distintos y nadie lo vería.
+* **Un cruce sin AMBAS mediciones no reconcilia (PAPER-2.1).** Si falta el PnL FIFO del material,
+  el PnL del cierre o la cantidad cerrada declarada, el ciclo **no** se da por conciliado
+  (``settlement_pnl_unmeasured`` / ``settlement_quantity_unmeasured``): la ausencia no se confunde
+  con un cero. Un ciclo con **dos** cierres durables se declara (``duplicate_settlement_cycle``) y
+  bloquea su conciliación limpia en vez de sobrescribir el primero.
 
 Puro y determinista: sin I/O, sin red, sin reloj. La lectura de las filas es del llamante.
 
@@ -39,6 +44,7 @@ from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_UNKNOWN,
     MeasurementStatus,
 )
+
 from bolsa_application.applied_cost import (
     APPLIED_COST_UNBALANCED_ROUND_TRIP,
     APPLIED_COST_WITHOUT_ROUND_TRIP,
@@ -48,10 +54,14 @@ from bolsa_application.auto_self_evaluation_feed import cycles_from_fills
 
 __all__ = [
     "RECON_DUPLICATE_EXECUTION",
+    "RECON_DUPLICATE_SETTLEMENT",
     "RECON_MULTIPLE_VERSIONS",
     "RECON_ORPHAN_FILL",
     "RECON_PNL_MISMATCH",
+    "RECON_PNL_UNMEASURED",
     "RECON_QTY_MISMATCH",
+    "RECON_QTY_UNMEASURED",
+    "RECON_SETTLEMENT_WITHOUT_ACCOUNT",
     "RECON_SETTLEMENT_WITHOUT_CLOSURE",
     "CycleEvidence",
     "PaperEvidenceReconciliation",
@@ -66,8 +76,17 @@ RECON_ORPHAN_FILL = "fill_without_cycle"
 RECON_SETTLEMENT_WITHOUT_CLOSURE = "settlement_without_closed_cycle"
 #: El PnL del cierre discrepa del PnL FIFO del material más allá de la tolerancia declarada.
 RECON_PNL_MISMATCH = "settlement_pnl_mismatch"
+#: El PnL del cierre (o el FIFO del material) NO se pudo MEDIR: no reconcilia (``UNKNOWN ≠ 0``).
+#: Un PnL ausente NUNCA se colapsa a ``0`` para poder cerrar el cruce.
+RECON_PNL_UNMEASURED = "settlement_pnl_unmeasured"
 #: La cantidad cerrada del settlement no cuadra con el round-trip balanceado del material.
 RECON_QTY_MISMATCH = "settlement_quantity_mismatch"
+#: La cantidad cerrada del settlement NO se declaró: no se puede probar el cierre ⇒ no reconcilia.
+RECON_QTY_UNMEASURED = "settlement_quantity_unmeasured"
+#: El MISMO ciclo declara DOS cierres durables: la duplicidad se declara, no se sobrescribe.
+RECON_DUPLICATE_SETTLEMENT = "duplicate_settlement_cycle"
+#: Un cierre durable sin cuenta atribuible al ámbito consultado: no se incorpora como evidencia.
+RECON_SETTLEMENT_WITHOUT_ACCOUNT = "settlement_without_account"
 #: El ciclo declara DOS versiones de estrategia: la atribución no se reparte, se declara.
 RECON_MULTIPLE_VERSIONS = "cycle_with_multiple_versions"
 
@@ -281,6 +300,7 @@ def reconcile_paper_evidence(
     settlements: Iterable[Any],
     fills_loaded: bool = True,
     settlements_loaded: bool = True,
+    unattributed_settlements: int = 0,
     pnl_tolerance: Decimal = _PNL,
 ) -> PaperEvidenceReconciliation:
     """(PURA) concilia operaciones, ejecuciones, cierres y resultados del material PAPER.
@@ -288,12 +308,15 @@ def reconcile_paper_evidence(
     ``fills`` son las filas durables (``sim_fill_finance_context``) y ``settlements`` los
     payloads de los eventos ``auto_cycle_settlement``. ``fills_loaded``/``settlements_loaded``
     declaran si la lectura se pudo hacer: una fuente no leída deja sus cruces **sin dato**, no
-    limpios.
+    limpios. ``unattributed_settlements`` cuenta los cierres durables EXCLUIDOS por no declarar
+    una cuenta atribuible al ámbito (los aporta el lector): se declaran como contradicción para
+    que no puedan leerse como material limpio.
 
     Para cada ciclo se publica su material bruto (lados, cantidades, balance), si ``cycles_from_fills``
     lo declaró **cerrado** (autoridad de cierre ``AUTO-17``), si hay un settlement durable y si
-    ambos **concuerdan**. Un settlement sin cierre, o con cantidad/PnL discrepantes, se declara
-    como contradicción; jamás se promedia ni se descarta en silencio.
+    ambos **concuerdan**. Un settlement sin cierre, o con cantidad/PnL discrepantes o ausentes, se
+    declara como contradicción; jamás se promedia ni se descarta en silencio. Un PnL o una cantidad
+    sin medir **no** reconcilia (``UNKNOWN ≠ 0``): la ausencia no se confunde con un cero.
     """
     fill_rows = list(fills)
     settlement_rows = list(settlements)
@@ -310,7 +333,10 @@ def reconcile_paper_evidence(
 
     # ── Autoridad de cierre: el MISMO FIFO que alimenta el informe (AUTO-7) ────────────────
     fifo_cycles = cycles_from_fills(fill_rows)
-    closed_pnl: dict[str, Decimal] = {}
+    #: Pertenecer al mapa = el ciclo está CERRADO; el valor ``None`` = cerrado pero con el PnL
+    #: FIFO NO medido. Se conserva ``None`` (jamás un ``0`` de relleno): un PnL ausente no puede
+    #: compararse como si fuera cero (``UNKNOWN ≠ 0``).
+    closed_pnl: dict[str, Decimal | None] = {}
     closed_version: dict[str, str] = {}
     anonymous_closed_cycles = 0
     for row in fifo_cycles:
@@ -321,8 +347,7 @@ def reconcile_paper_evidence(
             # que ``operation_lineage`` no pueda darse por cumplido ocultándola.
             anonymous_closed_cycles += 1
             continue
-        pnl = _dec(_field_of(row, "pnl"))
-        closed_pnl[key] = pnl if pnl is not None else Decimal("0")
+        closed_pnl[key] = _dec(_field_of(row, "pnl"))
         version = _version_of(row)
         if version:
             closed_version[key] = version
@@ -333,11 +358,20 @@ def reconcile_paper_evidence(
     )
 
     # ── Cierres durables indexados por ciclo, ignorando los que no declaran ciclo ──────────
+    # Un ciclo con DOS cierres durables es una duplicidad DECLARADA, no una sobreescritura: se
+    # conserva el PRIMERO (determinista) y se bloquea su conciliación limpia.
     settlements_by_cycle: dict[str, Mapping[str, Any]] = {}
+    duplicate_settlement_cycles: set[str] = set()
+    duplicate_settlements = 0
     for settlement in settlement_rows:
         key = _cycle_of(settlement)
-        if key:
-            settlements_by_cycle[key] = settlement
+        if not key:
+            continue
+        if key in settlements_by_cycle:
+            duplicate_settlements += 1
+            duplicate_settlement_cycles.add(key)
+            continue
+        settlements_by_cycle[key] = settlement
 
     all_keys = sorted(set(grouped) | set(closed_pnl) | set(settlements_by_cycle))
     cycles: list[CycleEvidence] = []
@@ -372,28 +406,50 @@ def reconcile_paper_evidence(
         elif not both_sides and rows:
             notes.append(APPLIED_COST_WITHOUT_ROUND_TRIP)
 
+        # Duplicidad del cierre: se declara en el propio ciclo (esté cerrado o no). Bloquea su
+        # conciliación limpia en vez de sobrescribir el primer cierre en silencio.
+        duplicate_here = settlement_present and key in duplicate_settlement_cycles
+        if duplicate_here:
+            notes.append(RECON_DUPLICATE_SETTLEMENT)
+            contradictions.append(f"{RECON_DUPLICATE_SETTLEMENT}:{key}")
+
         # Cruce cierre↔settlement: la cantidad balanceada del material debe cuadrar con la
-        # cantidad cerrada declarada; y el PnL, cuando ambos están medidos COMPLETE.
+        # cantidad cerrada declarada; y el PnL solo reconcilia si AMBOS lados están medidos.
+        # La ausencia de cantidad o de PnL NO es un cero: deja el ciclo sin reconciliar.
         reconciled = False
         if settlement_present and closed:
-            qty_ok = (
-                settlement_closed_qty is None
-                or (balanced and buy_qty is not None and abs(buy_qty - settlement_closed_qty) <= _QTY)
-            )
-            pnl_ok = True
-            if (
-                fifo_pnl is not None
-                and settlement_pnl is not None
-                and settlement_pnl_measurement == MEASUREMENT_COMPLETE
-            ):
+            if settlement_closed_qty is None:
+                # Sin cantidad declarada no se puede probar el cierre: no se asume que cuadre.
+                qty_ok = False
+                notes.append(RECON_QTY_UNMEASURED)
+                contradictions.append(f"{RECON_QTY_UNMEASURED}:{key}")
+            else:
+                qty_ok = (
+                    balanced
+                    and buy_qty is not None
+                    and abs(buy_qty - settlement_closed_qty) <= _QTY
+                )
+                if not qty_ok:
+                    notes.append(RECON_QTY_MISMATCH)
+                    contradictions.append(f"{RECON_QTY_MISMATCH}:{key}")
+
+            if fifo_pnl is None:
+                # El FIFO del material no declara su PnL: no hay referencia con la que cruzar.
+                pnl_ok = False
+                notes.append(RECON_PNL_UNMEASURED)
+                contradictions.append(f"{RECON_PNL_UNMEASURED}:{key}")
+            elif settlement_pnl is None or settlement_pnl_measurement != MEASUREMENT_COMPLETE:
+                # El cierre declara un PnL no medido: tampoco reconcilia.
+                pnl_ok = False
+                notes.append(RECON_PNL_UNMEASURED)
+                contradictions.append(f"{RECON_PNL_UNMEASURED}:{key}")
+            else:
                 pnl_ok = abs(fifo_pnl - settlement_pnl) <= pnl_tolerance
                 if not pnl_ok:
                     notes.append(RECON_PNL_MISMATCH)
                     contradictions.append(f"{RECON_PNL_MISMATCH}:{key}")
-            if not qty_ok:
-                notes.append(RECON_QTY_MISMATCH)
-                contradictions.append(f"{RECON_QTY_MISMATCH}:{key}")
-            reconciled = qty_ok and pnl_ok
+
+            reconciled = qty_ok and pnl_ok and not duplicate_here
         elif settlement_present and not closed:
             # Un settlement de un ciclo que el material NO declaró cerrado: o falta material, o
             # el cierre durable es de otra operación. Se declara; no se da por bueno.
@@ -447,8 +503,16 @@ def reconcile_paper_evidence(
     duplicate_executions = _duplicate_executions(fill_rows)
     if duplicate_executions:
         contradictions.append(f"{RECON_DUPLICATE_EXECUTION}:{duplicate_executions}")
+    # Cierres duplicados por ciclo: la duplicidad se declara (y bloquea la limpieza del ciclo).
+    if duplicate_settlements:
+        contradictions.append(f"{RECON_DUPLICATE_SETTLEMENT}:{duplicate_settlements}")
+    # Cierres excluidos por NO declarar cuenta atribuible: no son evidencia de esta cuenta.
+    if unattributed_settlements:
+        contradictions.append(f"{RECON_SETTLEMENT_WITHOUT_ACCOUNT}:{unattributed_settlements}")
     # Un settlement sin ciclo legible no se puede conciliar con nada: se declara.
-    unkeyed_settlements = len(settlement_rows) - len(settlements_by_cycle)
+    unkeyed_settlements = (
+        len(settlement_rows) - len(settlements_by_cycle) - duplicate_settlements
+    )
     if unkeyed_settlements:
         contradictions.append(f"{RECON_SETTLEMENT_WITHOUT_CLOSURE}:unkeyed:{unkeyed_settlements}")
 

@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE
+
 from bolsa_application.paper_evidence_adapter import (
     PAPER_EVIDENCE_CRITERIA_ORDER,
     PaperEvidenceInput,
@@ -162,6 +163,53 @@ def test_a_contradictory_closure_blocks_the_non_contradiction_criterion() -> Non
     assert statuses["closure_reconciliation"] == "unmet"
     assert statuses["non_contradiction"] == "unmet"
     assert any(c.startswith("settlement_pnl_mismatch") for c in dto["contradictions"])
+
+
+def test_a_settlement_without_a_measured_pnl_degrades_closure() -> None:
+    """Un PnL no medido NO se lee como cero: degrada cierre, resultados y no-contradicción."""
+    fills, settlements = _cycles(32)
+    settlements[0] = {**settlements[0], "pnl": None, "pnlMeasurement": "UNKNOWN"}
+    dto = _build(fills, settlements)
+
+    statuses = _statuses(dto)
+    assert statuses["closure_reconciliation"] == "unmet"
+    assert statuses["non_contradiction"] == "unmet"
+    # El PnL no medido no cuenta como resultado medido: 31 < 32.
+    assert statuses["durable_results"] == "unmet"
+    assert any(c.startswith("settlement_pnl_unmeasured") for c in dto["contradictions"])
+
+
+def test_a_settlement_without_a_declared_quantity_degrades_closure() -> None:
+    """Una cantidad de cierre ausente NO se acepta: degrada cierre y no-contradicción."""
+    fills, settlements = _cycles(32)
+    settlements[0] = {**settlements[0], "closedQty": None}
+    dto = _build(fills, settlements)
+
+    statuses = _statuses(dto)
+    assert statuses["closure_reconciliation"] == "unmet"
+    assert statuses["non_contradiction"] == "unmet"
+    assert any(c.startswith("settlement_quantity_unmeasured") for c in dto["contradictions"])
+
+
+def test_duplicate_settlements_block_closure_and_non_contradiction() -> None:
+    """Dos cierres para el mismo ciclo bloquean la conciliación limpia (duplicidad declarada)."""
+    fills, settlements = _cycles(32)
+    settlements.append(dict(settlements[0]))  # mismo ``cycleId`` duplicado
+    dto = _build(fills, settlements)
+
+    statuses = _statuses(dto)
+    assert statuses["closure_reconciliation"] == "unmet"
+    assert statuses["non_contradiction"] == "unmet"
+    assert any(c.startswith("duplicate_settlement_cycle") for c in dto["contradictions"])
+
+
+def test_unattributed_settlements_block_non_contradiction() -> None:
+    """Un cierre excluido por no declarar cuenta se declara como contradicción."""
+    fills, settlements = _cycles(32)
+    dto = _build(fills, settlements, unattributed_settlements=1)
+
+    assert _statuses(dto)["non_contradiction"] == "unmet"
+    assert any(c.startswith("settlement_without_account") for c in dto["contradictions"])
 
 
 def test_each_criterion_declares_its_durable_source() -> None:

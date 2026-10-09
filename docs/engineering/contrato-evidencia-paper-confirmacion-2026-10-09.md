@@ -57,6 +57,20 @@ Cada criterio se evalúa a **cumplido / incumplido / sin dato todavía**. Sin da
 
 > Nota de método: cada criterio se mide de forma **independiente**; ninguno rellena el hueco de otro. Un contador ausente (`null`) produce «Sin dato todavía», **no** un `0` incumplido.
 
+### 2.1 Conciliación estricta y aislamiento por cuenta (PAPER-2.1)
+
+Endurecimiento de `closure_reconciliation` y `non_contradiction` sobre el material durable. Ninguna de estas reglas emite `CONFIRMED`; todas degradan a **contradicción declarada** cuando no se puede probar el cruce:
+
+| Regla | Enunciado | Código de contradicción |
+| --- | --- | --- |
+| **PnL sin medir** | Si falta el PnL FIFO del material **o** el PnL del cierre (o su medición no es `COMPLETE`), el ciclo **no** reconcilia. La ausencia de PnL **no** se colapsa a `0`. | `settlement_pnl_unmeasured` |
+| **Cantidad sin declarar** | Si el cierre no declara cantidad cerrada, no se puede probar el cierre: el ciclo **no** reconcilia (antes se aceptaba por omisión). | `settlement_quantity_unmeasured` |
+| **Cierre duplicado** | Dos cierres durables para el mismo `cycle_id` se declaran; se conserva el primero y se bloquea la conciliación limpia. Nunca se sobrescribe en silencio. | `duplicate_settlement_cycle` |
+| **Cierre sin cuenta** | Un cierre durable sin cuenta atribuible al ámbito consultado **no** se incorpora como evidencia (fail-closed). Se declara y cuenta. | `settlement_without_account` |
+
+> Consecuencia declarada: el aislamiento estricto puede **reducir** `reconciled == settlements` respecto a versiones previas de material histórico que reconciliaban por ausencia. Es el comportamiento *fail-closed* esperado, no una regresión.
+
+
 ---
 
 ## 3. Regla de no promoción

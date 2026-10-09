@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { DiaDAutoFeedbackPanel } from "@/features/auto-monitor/dia-d-auto-feedback-panel";
 import { DiaDEvidenceAggregatePanel } from "@/features/auto-monitor/dia-d-evidence-aggregate-panel";
+import { PaperEvidencePanel } from "@/features/auto-monitor/paper-evidence-panel";
 import {
   useAutoDiaDReplay,
   useAutoDiaDReplayDays,
@@ -430,6 +431,7 @@ export function DiaDAutoPanel() {
   return (
     <div className="space-y-4" data-testid="dia-d-auto-root" data-view={view}>
       <DiaDEvidenceAggregatePanel activeView={view} />
+      <PaperEvidencePanel />
       <DiaDAutoViewToolbar view={view} onChange={setView} />
       <section
         role="tabpanel"

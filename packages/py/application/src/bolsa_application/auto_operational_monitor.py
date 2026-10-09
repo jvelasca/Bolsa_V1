@@ -41,6 +41,7 @@ from bolsa_analytics.cognitive.measurement import (
     MeasurementStatus,
     coerce_measurement,
 )
+
 from bolsa_application.auto_cycle_journal import cycle_decision_id
 from bolsa_application.auto_self_evaluation_feed import cycles_from_fills
 
@@ -298,9 +299,22 @@ def _entry_decision_step(
         if payload.get("rank") is not None:
             facts.append(_fact("rank", payload.get("rank")))
     elif step_id == "RISK":
-        for key in ("quantity", "riskAmount", "stop", "entry", "riskPct"):
-            if payload.get(key) is not None:
-                facts.append(_fact(key, payload.get(key)))
+        # El envoltorio de riesgo de la decisión vive DURABLE y ANIDADO en la propia
+        # entrada: la asignación del sizing en ``payload.risk`` (``quantity``/
+        # ``riskAmount``/``riskPct``) y la entrada y el stop estructural en
+        # ``payload.tradePlan``. Se lee de ahí y no de claves planas que el productor
+        # nunca selló — que era justo por lo que ``RISK`` no era demostrable.
+        allocation = payload.get("risk")
+        if isinstance(allocation, Mapping):
+            for key in ("quantity", "riskAmount", "riskPct"):
+                if allocation.get(key) is not None:
+                    facts.append(_fact(key, allocation.get(key)))
+        plan = payload.get("tradePlan")
+        if isinstance(plan, Mapping):
+            if plan.get("entry") is not None:
+                facts.append(_fact("entry", plan.get("entry")))
+            if plan.get("structuralStop") is not None:
+                facts.append(_fact("stop", plan.get("structuralStop")))
     if not facts:
         return _step(step_id, state=STEP_UNKNOWN, measurement=MEASUREMENT_UNKNOWN, note=note_absent)
     return _step(step_id, state=STEP_REACHED, at=at, facts=facts)
@@ -552,6 +566,8 @@ def _protection_step(
 def _settlement_step(
     settlement: Mapping[str, Any] | None,
     fills: Sequence[Any],
+    *,
+    duplicate: bool = False,
 ) -> dict[str, Any]:
     """``SETTLEMENT`` — SOLO desde un hecho durable explícito de liquidación.
 
@@ -590,6 +606,19 @@ def _settlement_step(
             else (pnl_measurement or MEASUREMENT_COMPLETE),
         )
     )
+    if duplicate:
+        # DOS settlements del mismo ciclo: cuál es la liquidación autoritativa no se puede
+        # afirmar. Se conserva uno de forma determinista y el hecho se declara CONTRADICHO
+        # (``PARTIAL`` + nota), nunca se pisa en silencio — el mismo criterio que la
+        # conciliación de evidencia PAPER-2.1.
+        return _step(
+            "SETTLEMENT",
+            state=STEP_REACHED,
+            at=settlement.get("settledAt"),
+            measurement=MEASUREMENT_PARTIAL,
+            facts=facts,
+            note="duplicate_settlement_cycle",
+        )
     return _step(
         "SETTLEMENT",
         state=STEP_REACHED,
@@ -674,6 +703,7 @@ def _build_cycle(
     settlement_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
     protection_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
     window_truncated: bool = False,
+    duplicate_settlement: bool = False,
 ) -> dict[str, Any]:
     reservation = reservations[0] if reservations else None
     cycle_journal = _journal_for_cycle(journal, cycle_id)
@@ -694,13 +724,17 @@ def _build_cycle(
         _order_step(orders, cycle_journal),
         _fill_step(cycle_fills, window_full=window_truncated),
         _protection_step(positions_by_cycle.get(cycle_id), protection),
-        _settlement_step(settlement, cycle_fills),
+        _settlement_step(settlement, cycle_fills, duplicate=duplicate_settlement),
         _cycle_closed_step(closed, window_truncated=window_truncated),
     ]
     notes: list[str] = []
     for step in steps:
         if step["state"] == STEP_UNKNOWN and step["note"]:
             notes.append(step["note"])
+    if duplicate_settlement:
+        # Se declara en el resumen del ciclo (no sólo en el paso): un settlement duplicado
+        # es una CONTRADICCIÓN de la identidad del ciclo, no un detalle del paso.
+        notes.append("duplicate_settlement_cycle")
     # ``closed`` deja de ser un booleano ciego: con la ventana truncada o un ``side`` no
     # clasificable no se puede AFIRMAR el cierre (el neto puede estar incompleto), así que
     # viaja ``None`` + ``PARTIAL``. Con la ventana completa se afirma True/False sin ambigüedad.
@@ -1214,12 +1248,21 @@ def build_operational_monitor(
             positions_by_cycle.setdefault(key, position)
 
     # Un settlement durable por ciclo (costura de ``M2``): sin entradas el paso se declara
-    # ``unknown``; nunca se deriva de ``CYCLE_CLOSED``.
+    # ``unknown``; nunca se deriva de ``CYCLE_CLOSED``. DOS settlements del mismo ciclo NO se
+    # pisan en silencio: se conserva el PRIMERO de forma determinista y el ciclo se marca
+    # contradictorio (``duplicate_settlement_cycle``), igual que la conciliación de PAPER-2.1.
+    # El ``dedupe_key`` ya lo previene en escritura; esto cubre filas legacy o un productor
+    # sin identidad determinista.
     settlement_by_cycle: dict[str, Mapping[str, Any]] = {}
+    duplicate_settlement_cycles: set[str] = set()
     for row in settlements:
         key = _cycle_id_of(row)
-        if key and isinstance(row, Mapping):
-            settlement_by_cycle[key] = row
+        if not key or not isinstance(row, Mapping):
+            continue
+        if key in settlement_by_cycle:
+            duplicate_settlement_cycles.add(key)
+            continue
+        settlement_by_cycle[key] = row
 
     # v2.88.26 — HECHOS durables de protección por ciclo. Un ciclo puede tener VARIAS
     # transiciones (nacimiento, ratchet, T1/T2, salida): el paso expone la ÚLTIMA, comparando
@@ -1267,6 +1310,7 @@ def build_operational_monitor(
                 fills_total_by_cycle=fills_total_by_cycle,
                 fills_window_full=fills_window_full,
             ),
+            duplicate_settlement=key in duplicate_settlement_cycles,
         )
         for key in ordered
     ]
@@ -1345,15 +1389,16 @@ async def read_operational_monitor(
     Read-only: solo hay ``SELECT``. Un fallo de lectura de un bloque opcional se declara (el
     ``notes`` del DTO) y NO tumba el resto — un hueco declarado, nunca un ``0`` fingido.
     """
+    from bolsa_infrastructure.database.repositories.journal_repository import (
+        SqlAlchemyJournalRepository,
+    )
+
     from bolsa_application.auto_engine_state_store import PostgresAutoEngineStore
     from bolsa_application.exit_order_store import PostgresExitOrderStore
     from bolsa_application.reservation_store import PostgresReservationStore
     from bolsa_application.sim_durable_store import (
         PostgresSimAutoPositionStore,
         PostgresSimFillFinanceContextStore,
-    )
-    from bolsa_infrastructure.database.repositories.journal_repository import (
-        SqlAlchemyJournalRepository,
     )
 
     reservation_store = PostgresReservationStore(session, autocommit=False)
@@ -1408,7 +1453,6 @@ async def read_operational_monitor(
     engine_ticks = 0
     try:
         import sqlalchemy as sa
-
         from bolsa_infrastructure.database.models.tables import AutoEngineTickRow
 
         engine_ticks = int(

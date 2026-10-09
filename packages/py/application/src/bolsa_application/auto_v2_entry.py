@@ -90,6 +90,8 @@ from bolsa_analytics.cognitive.signal_identity import (
 )
 from bolsa_analytics.cognitive.trade_context import DEFAULT_MAX_AGE_DAYS, TradeContext
 from bolsa_analytics.indicators.compute import compute_atr
+from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
+
 from bolsa_application.auto_daily_journal import OpportunityRow
 from bolsa_application.auto_investment_system import trade_plan_to_decision_package
 from bolsa_application.auto_reason_codes import (
@@ -122,7 +124,6 @@ from bolsa_application.position_manager import (
     PositionManagerSkip,
     manage_position_outcome,
 )
-from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
 
 logger = logging.getLogger(__name__)
 
@@ -1479,6 +1480,11 @@ def plan_v2_tick(
                 as_of=as_of,
                 strategy_version=signal.strategy_version,
                 cycle_id=cycle_id,
+                # V2.88.99 — identidad de la oportunidad: la señal que la originó y el
+                # ranking que la situó, para que ``SIGNAL``/``TOP_N`` sean demostrables
+                # en la operación tomada (no sólo en los rechazos sin ciclo).
+                signal_id=signal.signal_id,
+                score=entry_score,
                 # La economía de la candidata APROBADA: la que midió el optimizador o, si
                 # no corrió, la de su propia geometría. Un rechazo no publica economía.
                 expected_value=(
@@ -2278,6 +2284,8 @@ def _journal_entry(
     as_of: str,
     strategy_version: str | None = None,
     cycle_id: str | None = None,
+    signal_id: str | None = None,
+    score: OpportunityScore | None = None,
     expected_value: ExpectedValue | None = None,
     adaptive: AdaptivePlan | None = None,
 ) -> DecisionJournalEntryRecord:
@@ -2304,6 +2312,19 @@ def _journal_entry(
     # que une esta decisión con su reserva, su orden, su fill, su posición y su PnL.
     if str(cycle_id or "").strip():
         payload["cycleId"] = str(cycle_id)
+    # V2.88.99 — la IDENTIDAD de la OPORTUNIDAD viaja con la decisión para que el monitor
+    # pueda demostrar la etapa ``oportunidad → decisión`` de una operación TOMADA: el
+    # ``signalId`` que la originó, su ``opportunityScore`` combinado y el ``rank`` del
+    # ranking. Los candidatos RECHAZADOS ya publican score/rank, pero su ``decision_id``
+    # (``REJ-…``) no enlaza con el ciclo; sin estas claves la etapa ``TOP_N`` quedaba
+    # estructuralmente indemostrable para lo que de verdad se operó. Cada clave se OMITE
+    # si no hay dato: la ausencia es información, jamás un relleno.
+    if str(signal_id or "").strip():
+        payload["signalId"] = str(signal_id)
+    if decision.opportunity_score is not None:
+        payload["opportunityScore"] = decision.opportunity_score
+    if score is not None and score.rank is not None:
+        payload["rank"] = score.rank
     # V2.48/AUTO-8 — la asignación Adaptive que estrechó (o dejó intacto) el techo de
     # riesgo de esta estrategia. Solo se publica cuando Adaptive está activo Y hay algo
     # que declarar (multiplicador < 1): con el flag OFF o sin estrechamiento, el payload
