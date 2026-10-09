@@ -2,6 +2,21 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.95-beta] — `FASE 3`: **reorden de la FASE 3 — slices `S1`–`S3` (entrada/salida literal · objetivo con precio · estrategia→indicadores→razón) (UI-only · Δ motor = 0)**
+
+**Naturaleza:** UI/producto + `packages/shared`, `Δ motor = 0`, contrato HTTP sin cambio, sin Alembic (head `052_top3_opportunities`). Todo el diff vive en `apps/web/src/**`, `packages/shared/src/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D. **Bump** `2.11.94-beta` → `2.11.95-beta`; los 9 CLIs DÍA-D `v2_89`…`v2_97` sellan `2.11.95-beta` (guardián `test_dia_d_bump_guard` verde).
+
+Implementa los tres slices que el auditor externo **aceptó** en el [reorden de la FASE 3](docs/engineering/entrega-auditoria-externa-mia-v2.88.94-reorden-fase-3-2026-10-08.md) y cuyo dictamen está en la [respuesta del auditor](docs/engineering/respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md); el cuarto (`S4-agregador-evidencia`) queda **no lanzado** (no se emite `CONFIRMED`).
+
+- **`S1-exit-precio` (`P2-2`).** El Plan de salida del ticket declara `Objetivo T1`/`Objetivo T2` con **precio** tomado del backend (`position.operational.target1/2`, pasado por `OperativaExitMetaV1`). Si el backend no aporta el dato, la UI declara «Sin dato todavía» (`ABSENT_DATA_NOT_MEASURED`); **nunca** se fabrica desde la UI ni desde un porcentaje. Test falsable nuevo [`f3-exit-plan-block.test.tsx`](apps/web/src/features/trading/f3-exit-plan-block.test.tsx).
+- **`S2-entrada-literal` (`P2-3`).** En `focus simple` + `phase = "prepared"`, [`operational-plan-chart-levels.ts`](apps/web/src/features/charts/operational-plan-chart-levels.ts) dibuja `Entrada` (fill) y `Trigger` (activación) como dos niveles **solo** si el precio difiere; si coinciden, una única línea `Trigger` los representa y **no** se duplica. Test [`operational-plan-chart-levels.test.ts`](apps/web/src/features/charts/operational-plan-chart-levels.test.ts).
+- **`S3-indicadores-razon` (`P3-1`/`P3-3`/`P3-4`).** El primer nivel de Finalistas ([`instrument-strategy-top-panel.tsx`](apps/web/src/features/backtests/instrument-strategy-top-panel.tsx)) muestra la cadena **Estrategia → indicadores → razón**: los indicadores se resuelven con `strategySlotToIndicatorLabels` (`definition.indicatorSpecs` → `presetIndicatorSpecs(strategyType)`, **nunca** desde el catálogo del gráfico) y la razón se lee de `coachFacts.recommendations[].reasons` (ahora **persistidas** en [`coach-facts-api.ts`](packages/shared/src/coach-facts-api.ts) y [`backtest-deep-coach.ts`](apps/web/src/features/backtests/backtest-deep-coach.ts)). Sin evidencia → «Sin dato todavía». Tests [`finalist-indicators-reason.test.ts`](apps/web/src/features/backtests/finalist-indicators-reason.test.ts) y [`propose-position-exit.test.ts`](apps/web/src/features/operations/propose-position-exit.test.ts).
+- **`S4-agregador-evidencia` (`P4-2`/`P4-4`) — NO LANZADO.** Sigue sin implementarse: no hay veredicto único que emita `CONFIRMED` ni `OOS_SUPPORTED + MATCH → CONFIRMED`. `READY ≠ CONFIRMED`, `MATCH ≠ CONFIRMED`, `OOS_SUPPORTED ≠ CONFIRMED`.
+
+**Verificación (local, cierre).** `pnpm --filter @bolsa/web exec tsc --noEmit` **OK** · `eslint src` **0 errores** (23 avisos preexistentes) · `vitest run` web **281 ficheros / 1750 passed** · `@bolsa/shared` build **OK** · `test_dia_d_bump_guard` **1 passed** (`2.11.95-beta`) · **`Δ motor = 0`** (`git diff --name-only -- packages/py` vacío; sin contrato HTTP, sin Alembic). Evidencia: [`docs/engineering/evidence/v2.88.95/README.md`](docs/engineering/evidence/v2.88.95/README.md). Entrega: [`docs/engineering/entrega-auditoria-externa-mia-v2.88.95-2026-10-09.md`](docs/engineering/entrega-auditoria-externa-mia-v2.88.95-2026-10-09.md).
+
+**Cita POST-TAG.** Tag anotado `v2.88.95-beta` (objeto pendiente → commit pendiente); `Release tag CI` **pendiente**.
+
 ## [2.11.94-beta] — `UI`: **UI 7.0 — cierre semántico y de usuario básico (UI-only · Δ motor = 0)**
 
 **Naturaleza:** UI-only, `Δ motor = 0`, contrato HTTP sin cambio, sin Alembic (head `052_top3_opportunities`). Todo el diff vive en `apps/web/src/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D. **Bump** `2.11.93-beta` → `2.11.94-beta`; los 9 CLIs DÍA-D `v2_89`…`v2_97` sellan `2.11.94-beta` (guardián `test_dia_d_bump_guard` verde).
