@@ -20,6 +20,7 @@ Módulo puro + stores in-memory: sin I/O, sin reloj real, sin PostgreSQL.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 
@@ -486,3 +487,68 @@ def test_a_position_state_stays_constructible_without_a_cycle() -> None:
         updated_at="2026-09-15T09:00:00Z",
     )
     assert position.cycle_id is None
+
+
+# ── AUTO-9 — mirada inversa ``posición → fill → reserva`` por el MISMO ``cycle_id`` ──────────
+
+
+def test_position_fill_and_reservation_link_back_to_the_same_cycle() -> None:
+    """La identidad del ciclo es UNA: desde el ``cycle_id`` de la posición se recuperan su fill
+    y su reserva; ninguna de las tres piezas inventa un ciclo distinto."""
+    import asyncio
+
+    from bolsa_application.sim_durable_store import (
+        InMemorySimFillFinanceContextStore,
+        SimFillFinanceContext,
+    )
+
+    cycle = "cyc-inverse"
+    position = build_position_state_from_fill(
+        _trade_plan(),
+        fill_price=100.0,
+        fill_quantity=10.0,
+        filled_at="2026-09-15T09:00:00Z",
+        cycle_id=cycle,
+    )
+    assert position is not None
+    assert position.cycle_id == cycle
+
+    reservation = build_reservation(
+        reservation_id="RES-inv",
+        account_id="acc-1",
+        tick_id="2026-09-15T09:00:00Z",
+        instrument_id="AAA",
+        side="buy",
+        quantity=10.0,
+        entry=100.0,
+        stop=98.0,
+        cycle_id=cycle,
+    )
+    reservations = InMemoryReservationStore([reservation])
+
+    fills = InMemorySimFillFinanceContextStore()
+    asyncio.run(
+        fills.save(
+            SimFillFinanceContext(
+                execution_id="EX-inv",
+                instrument_id="AAA",
+                side="buy",
+                quantity=Decimal("10"),
+                price=Decimal("100"),
+                account_id="acc-1",
+                strategy_version_id="v42",
+                cycle_id=cycle,
+                created_at=datetime(2026, 9, 15, 9, 0, tzinfo=UTC),
+            )
+        )
+    )
+
+    # Mirada inversa: el ``cycle_id`` de la POSICIÓN recupera fill y reserva del ciclo.
+    assert [
+        row.execution_id
+        for row in asyncio.run(fills.list_by_cycle_ids("acc-1", [position.cycle_id]))
+    ] == ["EX-inv"]
+    assert [
+        row.reservation_id
+        for row in asyncio.run(reservations.list_by_cycle_ids("acc-1", [position.cycle_id]))
+    ] == ["RES-inv"]

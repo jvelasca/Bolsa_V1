@@ -1234,4 +1234,111 @@ def test_protection_exit_requested_without_materialization_is_declared() -> None
     assert step["note"] == "protection_exit_requested_without_materialization"
 
 
+# ── Recorrido integral de un ciclo por las 10 etapas (auditoría por ``cycle_id``) ──
 
+
+def _decision_entry(**overrides: Any) -> Any:
+    """Entrada durable ``auto_entry_decision`` con el envoltorio de riesgo y el plan."""
+    payload: dict[str, Any] = {
+        "cycleId": "cyc-1",
+        "instrumentId": "AAPL",
+        "strategyVersion": "sv-1",
+        "rank": 1,
+        "opportunityScore": 0.9,
+        "risk": {"quantity": 10.0, "riskAmount": 50.0, "riskPct": 0.5},
+        "tradePlan": {"entry": 100.0, "structuralStop": 95.0},
+    }
+    payload.update(overrides)
+    return SimpleNamespace(
+        decision_id="dec-1",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        created_at="2026-01-01T12:00:00Z",
+        session_id="sess-a",
+        payload=payload,
+    )
+
+
+def test_a_full_cycle_reaches_all_ten_steps_only_from_durable_facts() -> None:
+    """Un ciclo con TODOS sus hechos durables recorre SIGNAL..CYCLE_CLOSED sin proyección.
+
+    Cada etapa se enciende por su hecho (decisión, orden de entrada, reserva, fills,
+    protección, settlement y cierre FIFO), nunca por inferencia del estado del motor.
+    """
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        cycle_id="cyc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100, price_source="MARKET_CLOSE"),
+            _fill(side="sell", qty=10, price=110, price_source="MARKET_CLOSE"),
+        ],
+        journal=[_decision_entry(), _entry_order_entry()],
+        protection_events=[dict(_protection_event().payload)],
+        settlements=[dict(_settlement_event().payload)],
+    )
+
+    cycle = dto["cycles"][0]
+    assert [step["id"] for step in cycle["steps"]] == list(OPERATIONAL_STEPS)
+    for step_id in OPERATIONAL_STEPS:
+        step = _step(cycle["steps"], step_id)
+        assert step["state"] == STEP_REACHED, (step_id, step)
+    # El resultado del cierre sale del MISMO FIFO (AUTO-17) que alimenta el informe.
+    assert cycle["closed"] is True
+    assert cycle["result"]["pnl"] == 100
+
+
+def test_a_cycle_without_durable_facts_reaches_no_step_by_projection() -> None:
+    """Sin los hechos durables, NINGUNA etapa se enciende por proyección (``*_not_durable``).
+
+    Hay reserva viva y una posición proyectada en el motor: aun así SIGNAL/TOP_N/RISK/ORDER/
+    PROTECTION/SETTLEMENT quedan ``unknown`` con su nota, y CYCLE_CLOSED no se afirma.
+    """
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        cycle_id="cyc-1",
+        reservations=[_reservation()],
+        positions={
+            "AAPL": {
+                "positionState": {"cycleId": "cyc-1", "currentStop": 99.0},
+                "stopPrice": 99.0,
+                "highWatermark": 101.0,
+                "t1State": "pending",
+                "trailingState": "off",
+            }
+        },
+    )
+
+    steps = dto["cycles"][0]["steps"]
+    for step_id, note in (
+        ("SIGNAL", "signal_not_durable"),
+        ("TOP_N", "top_n_not_durable"),
+        ("RISK", "risk_not_durable"),
+        ("ORDER", "entry_order_not_durable"),
+        ("PROTECTION", "protection_not_durable"),
+        ("SETTLEMENT", "settlement_not_durable"),
+    ):
+        step = _step(steps, step_id)
+        assert step["state"] == STEP_UNKNOWN, step_id
+        assert step["note"] == note, (step_id, step)
+    # La RESERVA sí es durable: es la única etapa encendida por su propio hecho.
+    assert _step(steps, "RESERVATION")["state"] == STEP_REACHED
+
+
+def test_cycle_result_pnl_uses_the_single_fifo_not_the_settlement() -> None:
+    """El PnL del cierre sale del FIFO (AUTO-17); un settlement con otra cifra NO lo reescribe."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        cycle_id="cyc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100),
+            _fill(side="sell", qty=10, price=110),
+        ],
+        settlements=[dict(_settlement_event(pnl=999.0).payload)],
+    )
+
+    cycle = dto["cycles"][0]
+    # Autoridad ÚNICA de cierre: el FIFO reconstruido de los propios fills.
+    assert cycle["result"]["pnl"] == 100
+    # El settlement es un hecho INDEPENDIENTE: no se promedia ni sustituye el PnL del ciclo.
+    assert _fact(_step(cycle["steps"], "SETTLEMENT"), "pnl")["value"] == 999.0

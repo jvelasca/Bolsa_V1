@@ -20,8 +20,14 @@ from typing import Any
 import pytest
 
 from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
-from bolsa_application.auto_operational_audit import durable_fact_dedupe_key
-from bolsa_application.auto_operational_monitor import AUTO_PROTECTION_EVENT
+from bolsa_application.auto_operational_audit import (
+    build_entry_order_entry,
+    durable_fact_dedupe_key,
+)
+from bolsa_application.auto_operational_monitor import (
+    AUTO_ENTRY_ORDER_EVENT,
+    AUTO_PROTECTION_EVENT,
+)
 from bolsa_application.protection_event_kind import PROTECTION_EVENT_KINDS
 
 _ACCOUNT = "acc-prot"
@@ -50,6 +56,9 @@ def _worker(sink: Any) -> AutoSimulationWorker:
     worker._engine_id = _ENGINE
     worker._operational_audit_sink = sink
     worker._time = SimpleNamespace(strftime=lambda _fmt: "2026-10-02T10:00:00Z")
+    # Fuente de precio hermética: el hecho de ENTRADA sella la fuente realmente usada.
+    worker._price_source = None
+    worker._price_script = lambda _symbol, _tick: 100.0
     return worker
 
 
@@ -111,3 +120,68 @@ async def test_without_a_revision_the_fact_declares_no_identity() -> None:
     assert len(sink.raw) == 1
     assert sink.raw[0].dedupe_key is None
     assert sink.by_key == {}
+
+
+# ── ORDER — exactly-once del hecho durable de la orden de ENTRADA ───────────────────────────
+
+
+async def _emit_order(worker: AutoSimulationWorker, order_id: str | None) -> None:
+    await worker._v2_journal_entry_order(
+        order_id=order_id,
+        instrument_id="AAA",
+        requested_qty=10.0,
+        applied_qty=10.0,
+        partial=False,
+        cycle_id=_CYCLE,
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_same_entry_order_is_one_durable_fact() -> None:
+    """Reemitir la MISMA orden de entrada (mismo ``orderId``) ⇒ una sola fila durable."""
+    sink = _DedupingSink()
+    worker = _worker(sink)
+    await _emit_order(worker, "ORD-1")
+    await _emit_order(worker, "ORD-1")
+
+    assert len(sink.raw) == 2, "el productor emite en cada intento"
+    assert len(sink.by_key) == 1, "pero el hecho durable es UNO"
+    entry = sink.raw[0]
+    assert entry.event_type == AUTO_ENTRY_ORDER_EVENT
+    assert entry.dedupe_key == durable_fact_dedupe_key(
+        event_type=AUTO_ENTRY_ORDER_EVENT,
+        account_id=_ACCOUNT,
+        engine_id=_ENGINE,
+        cycle_id=_CYCLE,
+        order_id="ORD-1",
+    )
+
+
+@pytest.mark.asyncio
+async def test_two_entry_orders_on_a_cycle_are_two_facts() -> None:
+    """Dos órdenes legítimas del mismo ciclo (otro ``orderId``) ⇒ dos hechos distintos."""
+    sink = _DedupingSink()
+    worker = _worker(sink)
+    await _emit_order(worker, "ORD-1")
+    await _emit_order(worker, "ORD-2")
+    assert len(sink.by_key) == 2
+
+
+def test_an_entry_order_without_identity_is_not_fabricated() -> None:
+    """Sin orden o sin instrumento no se finge un hecho: la entrada es ``None``."""
+    base: dict[str, Any] = {
+        "order_id": "ORD-1",
+        "instrument_id": "AAA",
+        "side": "buy",
+        "requested_qty": 10.0,
+        "applied_qty": 10.0,
+        "partial": False,
+        "price_source": None,
+        "cycle_id": _CYCLE,
+        "actor": "auto-sim",
+        "as_of": "2026-10-02T10:00:00Z",
+        "account_id": _ACCOUNT,
+    }
+    assert build_entry_order_entry(**{**base, "order_id": None}) is None
+    assert build_entry_order_entry(**{**base, "instrument_id": None}) is None
+    assert build_entry_order_entry(**base) is not None

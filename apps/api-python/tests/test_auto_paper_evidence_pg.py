@@ -439,3 +439,65 @@ async def test_a_read_failure_is_declared_and_never_favorable(
     finally:
         await _wipe(paper_pg_factory, account_id)
         await _wipe_cycle_settlements(paper_pg_factory, cycle_id)
+
+
+@pytest.mark.asyncio
+async def test_a_settlements_read_failure_is_declared_and_never_favorable(
+    paper_pg_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con filas reales presentes, un fallo de LECTURA de los CIERRES tampoco se vuelve favorable.
+
+    El hueco simétrico del fallo de ``fills``: sin la fuente de cierres, ``closure_reconciliation``,
+    ``durable_results`` y ``non_contradiction`` quedan SIN DATO (``UNKNOWN ≠ 0``).
+    """
+    from bolsa_application.paper_evidence_reader import read_paper_evidence
+
+    account_id = f"acc-paper-{uuid.uuid4().hex[:10]}"
+    suffix = uuid.uuid4().hex[:10]
+    cycle_id = f"cyc-{suffix}"
+    await _wipe(paper_pg_factory, account_id)
+    try:
+        async with paper_pg_factory() as session:
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument="FFF",
+                side="buy",
+                price=100.0,
+                execution_id=f"EX-{suffix}-buy",
+            )
+            await _seed_fill(
+                session,
+                account_id=account_id,
+                cycle_id=cycle_id,
+                instrument="FFF",
+                side="sell",
+                price=110.0,
+                execution_id=f"EX-{suffix}-sell",
+            )
+            await session.commit()
+
+        async def _boom(self: object, decision_ids: object) -> list[object]:
+            raise RuntimeError("durable settlements unavailable")
+
+        monkeypatch.setattr(
+            "bolsa_infrastructure.database.repositories.journal_repository."
+            "SqlAlchemyJournalRepository.list_by_decision_ids",
+            _boom,
+        )
+
+        async with paper_pg_factory() as session:
+            dto = await read_paper_evidence(session, account_id, versions=["orb-1"])
+
+        rec = dto["reconciliation"]
+        assert rec["fillsLoaded"] is True
+        assert rec["settlementsLoaded"] is False
+        assert "settlements_not_loaded" in dto["notes"]
+        for criterion_id in ("closure_reconciliation", "durable_results", "non_contradiction"):
+            assert criterion_id in dto["unknownCriterionIds"]
+        assert dto["verdict"] == "NO_CONFIRMED"
+    finally:
+        await _wipe(paper_pg_factory, account_id)
+        await _wipe_cycle_settlements(paper_pg_factory, cycle_id)

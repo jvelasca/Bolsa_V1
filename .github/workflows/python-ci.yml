@@ -420,6 +420,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
           --ignore=apps/api-python/tests/test_auto_paper_evidence_pg.py
+          --ignore=apps/api-python/tests/test_auto_paper_evidence_restart_pg.py
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
@@ -739,6 +740,10 @@ jobs:
       # huérfanos, cierres contradictorios). Solo se certifica contra PG real: sin PG el test
       # skipearía en mudo y la conciliación quedaría como certificación fantasma.
       PAPER_EVIDENCE_PG_REQUIRED: '1'
+      # PAPER-2 (reinicio REAL de proceso): la evidencia durable compuesta por un proceso debe
+      # reconstruirse IDÉNTICA en un proceso NUEVO (sin estado compartido). Solo se certifica
+      # contra PG real y con el proceso hijo de verdad.
+      PAPER_EVIDENCE_RESTART_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -817,6 +822,7 @@ jobs:
             apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py \
             apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py \
             apps/api-python/tests/test_auto_paper_evidence_pg.py \
+            apps/api-python/tests/test_auto_paper_evidence_restart_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 
       - name: Fail on skipped AUTO 2.0 durable PG (no skip silencioso)

@@ -1,0 +1,65 @@
+# Evidencia `v2.88.102-beta` — **Demostración E2E de PAPER (`GP-V187`) + auditoría de AUTO por `cycle_id` (10 etapas durables)** (`Δ motor = 0` · `Δ decisión = 0` · solo pruebas y cableado de CI)
+
+**Producto:** `V2.88.102-beta` · **Package:** `2.11.102-beta` · **AsOf:** 2026-10-09. **Sin migración nueva** (head `052_top3_opportunities`). Los 9 CLIs DÍA-D `v2_89`…`v2_97` sellan `2.11.102-beta` junto al `package.json` (guardián [`test_dia_d_bump_guard`](../../../../apps/api-python/tests/test_dia_d_bump_guard.py)).
+
+> **Naturaleza (honesta).** Sello **exclusivamente de pruebas y cableado de CI**: el diff vive en `apps/api-python/tests/**`, `packages/py/application/tests/**`, `apps/web/e2e/**`, `.github/workflows/**` y el `package.json`/`meta.bump` de los 9 CLIs DÍA-D. **No se toca ningún fichero de `packages/py/**/src/**` ni de `apps/web/src/**`**: `git diff --name-only -- packages/py` **no** incluye `src`. Por tanto **`Δ motor = 0` ESTRICTO** y **`Δ decisión = 0`**: sin motor de decisión/ejecución, sin worker, sin umbrales, sin Alembic, sin scheduler, sin contrato HTTP (`contract:check` **OK**), sin UI. No hizo falta el «slice de producto mínimo» de la Fase 1.5.
+> **Qué demuestra.** (1) La cadena PAPER (`sim_fill_finance_context` + `decision_journal_entries` → `read_paper_evidence` → `GET /api/auto/paper-evidence` → panel `P2`) se certifica de punta a punta contra **API real** con **fallo de lectura**, **reinicio real** de proceso, **datos parciales** (`UNKNOWN ≠ 0`) y **aislamiento por cuenta**, por una **ejecución integrada explícita** (opt-in, **no** gate). (2) La auditoría de AUTO recorre un ciclo por sus **10 etapas** (`SIGNAL`…`CYCLE_CLOSED`) **solo desde hechos durables**, sin promoción por proyección, con exactly-once de `ORDER`/`PROTECTION`, mirada inversa `posición → fill → reserva` y **una sola autoridad FIFO** de cierre.
+
+**Base:** [`evidence/v2.88.101/README.md`](../v2.88.101/README.md) (`PAPER-2.1` + panel `P2` + identidad de la oportunidad; sello corrector de imports, sin funcionalidad nueva).
+
+---
+
+## 1. Cambios (por bloque)
+
+| # | Bloque | Qué demuestra | Implementación |
+| --- | --- | --- | --- |
+| 1 | **PAPER · fallo de lectura de CIERRES (simétrico al de fills)** | Sin la fuente de cierres, `closure_reconciliation`, `durable_results` y `non_contradiction` quedan SIN DATO (`UNKNOWN ≠ 0`); se declara `settlements_not_loaded`, nunca limpio. Cubierto a nivel lector (hermético) y contra **PostgreSQL real** con filas presentes y el repositorio de cierres caído. | [`test_auto_paper_evidence_reader.py`](../../../../apps/api-python/tests/test_auto_paper_evidence_reader.py), [`test_auto_paper_evidence_pg.py`](../../../../apps/api-python/tests/test_auto_paper_evidence_pg.py) |
+| 2 | **PAPER · aislamiento por cuenta a nivel HTTP** | El handler real de `GET /api/auto/paper-evidence` respeta la cabecera `X-Account-Id` (TestClient + dobles de las fuentes): un settlement de OTRA cuenta no entra en el DTO; sin cuenta → `empty_paper_evidence("", note="no_account_scope")` fail-closed (todos los criterios `unknown`). | [`test_auto_paper_evidence_route.py`](../../../../apps/api-python/tests/test_auto_paper_evidence_route.py) |
+| 3 | **PAPER · `cost_coverage` PARTIAL + `cycle_with_multiple_versions`** | Una pata sin `reference_mid` deja el coste `PARTIAL` (`complete = 31/32`), nunca `COMPLETE`, y `cost_coverage` **no** cumple; dos versiones en el MISMO ciclo se declaran (`multiple_strategy_versions`), no se reparten. Cubierto en conciliación y adaptador. | [`test_paper_evidence_reconciliation.py`](../../../../packages/py/application/tests/test_paper_evidence_reconciliation.py), [`test_paper_evidence_adapter.py`](../../../../packages/py/application/tests/test_paper_evidence_adapter.py) |
+| 4 | **PAPER · reinicio REAL de proceso (PG)** | Sembrar fills + settlement durables, leer en el proceso del test y **releer en un proceso NUEVO** (`subprocess.run([sys.executable, "-c", …])`): la firma (`closedCycles`, `settlementsReconciled`, contradicciones, estado de los 7 criterios y `verdict = NO_CONFIRMED`) es **idéntica** sin estado compartido. Guard anti-skip (`PAPER_EVIDENCE_RESTART_PG_REQUIRED=1`) en el job `auto-v2-durable-pg`. | [`test_auto_paper_evidence_restart_pg.py`](../../../../apps/api-python/tests/test_auto_paper_evidence_restart_pg.py), [`python-ci.yml`](../../../../.github/workflows/python-ci.yml) |
+| 5 | **PAPER · E2E integrado del panel (`GP-V187`)** | Nuevo spec contra **API real** (sin mocks del camino base): cuenta leída y vacía declara ceros MEDIDOS (`unmet`, no `unknown`); el veredicto `NO_CONFIRMED` sobrevive a `page.reload()`; el scope por cuenta no se cruza; una lectura no disponible rotula «Sin dato todavía» (7/7 `unknown`); un dato parcial solo afecta al criterio afectado. Opt-in: registrado en el step `Run integrated browser E2E` **fuera** del `needs` de `certify`. | [`gp-v187-paper-evidence-integrated.spec.ts`](../../../../apps/web/e2e/gp-v187-paper-evidence-integrated.spec.ts), [`release-tag-ci.yml`](../../../../.github/workflows/release-tag-ci.yml) |
+| 6 | **AUTO · recorrido de un ciclo por las 10 etapas** | Con los hechos durables presentes, `SIGNAL`…`CYCLE_CLOSED` se encienden **uno a uno por su hecho** (decisión, orden de entrada, reserva, fills, protección, settlement, cierre FIFO) y el `result.pnl` sale del **mismo FIFO** (AUTO-17). Caso negativo: **sin** hecho durable, ninguna etapa se promueve por proyección (`signal_not_durable`, `entry_order_not_durable`, `protection_not_durable`, `settlement_not_durable`…), ni siquiera con una posición proyectada viva. | [`test_auto_operational_monitor.py`](../../../../packages/py/application/tests/test_auto_operational_monitor.py) |
+| 7 | **AUTO · exactly-once de `ORDER`/`PROTECTION`** | La misma orden de entrada es **un** hecho durable; dos órdenes distintas son **dos** hechos; una orden sin identidad **no** se fabrica. | [`test_auto_v88_28_protection_exactly_once.py`](../../../../apps/api-python/tests/test_auto_v88_28_protection_exactly_once.py) |
+| 8 | **AUTO · mirada inversa `posición → fill → reserva`** | Desde el `cycle_id` de la **posición** se recuperan su **fill** (`execution_id`) y su **reserva** (`reservation_id`) del MISMO ciclo; ninguna de las tres piezas inventa un ciclo distinto. | [`test_auto_v47_cycle_trace.py`](../../../../packages/py/application/tests/test_auto_v47_cycle_trace.py) |
+| 9 | **AUTO · SETTLEMENT/PnL con un único FIFO** | El `result.pnl` del ciclo sale del FIFO reconstruido de los fills; un settlement con otra cifra queda como hecho **independiente** y **no** reescribe el PnL del ciclo (autoridad única). | [`test_auto_operational_monitor.py`](../../../../packages/py/application/tests/test_auto_operational_monitor.py) |
+| Bump | — | `package.json` (`2.11.102-beta`) + `meta.bump` de `v2_89`…`v2_97`. | [`test_dia_d_bump_guard.py`](../../../../apps/api-python/tests/test_dia_d_bump_guard.py) |
+
+**Sobre el bloque 2 (alcance del aislamiento).** El DTO y el lector ya aislamiento por cuenta venían de `PAPER-2.1`; este sello añade la **prueba a nivel de ruta HTTP** (TestClient sobre el handler real con dobles de las fuentes durables), que faltaba: antes solo se validaba el DTO. No cambia código de producto.
+
+## 2. Reglas que NO cambian
+
+- **`UNKNOWN ≠ 0`.** Fuente no leída o dato parcial ⇒ criterio `unknown` y contadores `null` («Sin dato todavía»); fuente leída y vacía ⇒ cero **medido** (`unmet`, jamás `unknown`).
+- **Confirmación reservada.** El `verdict` sigue siendo el literal `NO_CONFIRMED`; el token suelto `CONFIRMED` no aparece. Ninguna etapa ni criterio promociona a confirmación.
+- **Toda etapa, desde un hecho durable.** `reached` exige el hecho (`auto_entry_decision`, `auto_entry_order`, `auto_protection_event`, `auto_cycle_settlement`, claim/reconciliación de reserva); sin él, `*_not_durable`/`unknown`. Nunca por proyección del estado del motor.
+- **Una sola noción de cierre.** `cycles_from_fills` (AUTO-17) es la única autoridad de FIFO/PnL; el settlement durable no la sustituye ni la promedia.
+- **Motor y decisión intactos.** Sin cambios en `packages/py/**/src/**` ni `apps/web/src/**`: sin motor, sin worker, sin umbrales, sin Alembic, sin scheduler, sin re-emitir `CONFIRMED`.
+
+## 3. Verificación (local)
+
+- `uv run ruff check packages/py apps/api-python --config pyproject.toml` → **`All checks passed!`**.
+- `uv run lint-imports --config packages/py/.importlinter` → **4 kept, 0 broken**.
+- `uv run mypy packages/py/domain/src packages/py/market/src packages/py/infrastructure/src packages/py/application/src apps/api-python/src --follow-imports=silent` → **Success: no issues found in 542 source files**.
+- `uv run pytest packages/py/application/tests -q` → **2569 passed** (+7 sobre `v2.88.101`).
+- `uv run pytest …` (conciliación + adaptador + monitor + traza + lector/router PAPER + exactly-once + guardián DÍA-D) → **128 passed**.
+- `uv run pytest apps/api-python/tests/test_auto_paper_evidence_pg.py apps/api-python/tests/test_auto_paper_evidence_restart_pg.py -q` → **8 passed** contra **PostgreSQL real** (cadena durable, ausencia medida, cierre contradictorio, duplicidad, aislamiento por cuenta y **reinicio de proceso nuevo**).
+- `pnpm --filter @bolsa/web run typecheck` (`tsc -b --noEmit`) → **OK** (exit 0).
+- `pnpm --filter @bolsa/web run contract:check` → **OK** (contrato HTTP sin cambio).
+- `pnpm --filter @bolsa/web run test` → **290 ficheros / 2021 passed**.
+- `uv run pytest apps/api-python/tests/test_dia_d_bump_guard.py -q` → **1 passed** (`2.11.102-beta`).
+- **E2E integrado (ejecución local explícita, opt-in):** `E2E_INTEGRATION=1 E2E_RUN=1 E2E_ALLOW_DEV_DB=1 pnpm --filter @bolsa/web e2e -- gp-v187` → **5 passed** (`GP-V187-01`…`GP-V187-05`) contra el stack real (`:5173` + API).
+- **`Δ motor = 0` estricto / `Δ decisión = 0`**: el diff no toca `packages/py/**/src/**` ni `apps/web/src/**`; `replay-repro` lo certifica en el CI del tag.
+
+## 4. Qué no cambia / límites de certificación declarados (sin fabricar)
+
+Este sello **demuestra** la evidencia PAPER y el recorrido durable de AUTO **donde el producto ya lo soporta**. Lo que **no** se puede demostrar hoy se declara como límite, no se fabrica:
+
+- **No existe un `opportunity_id` de primera clase.** La oportunidad se referencia por `signalId` + `rank`/`opportunityScore` (sellados en el payload durable de `auto_entry_decision`); no hay entidad `opportunity` con identidad propia. La trazabilidad `oportunidad → decisión` es por esos campos, no por un id único de oportunidad.
+- **No existe agregador backend de las 4 capas de evidencia.** El `S4-agregador-evidencia` ([`dia-d-evidence-aggregate.ts`](../../../../apps/web/src/features/auto-monitor/dia-d-evidence-aggregate.ts)) es un **read-model PURO de UI**; no hay endpoint backend que agregue las 4 capas. El panel PAPER `P2` consume `GET /api/auto/paper-evidence` (una capa), no un agregado servidor.
+- **`F2-1`/`F2-2` siguen PARKED.** Materialización de **posición por operación** (`F2-1`) y `PortfolioDecision` **durable** (`F2-2`) permanecen como deuda de **motor** declarada (ver [`auditoria-operativa-auto-fase-2-2026-10-08.md`](../../auditoria-operativa-auto-fase-2-2026-10-08.md) §5–§7; plan de cierre [PARKED](../../plan-cierre-operativa-auto-2026-10-08.md)). No se resuelven aquí.
+- **Sin `AUTO_OPERATIONAL_AUDIT=1` los hechos M2 no se escriben.** `auto_entry_order`, `auto_protection_event` y `auto_cycle_settlement` solo se escriben tras el flag (**default OFF**); las pruebas que los necesitan los inyectan explícitamente (`AUTO_OPERATIONAL_AUDIT=1`). Sin el flag, el monitor queda en `*_not_durable` — comportamiento correcto y fail-closed, no un defecto.
+- **El tag anotado se emite `unsigned`** (sin firma criptográfica verificable en GitHub): limitación de certificación, no defecto funcional.
+- **El E2E integrado es opt-in.** Se certifica con una **ejecución explícita** (local citada en §3; en CI `workflow_dispatch` con `run_e2e_integration=true`); el job `playwright-integrated` sigue **fuera** del `needs` de `certify`, así que un `skipped` **no** cuenta como prueba superada.
+
+## 5. Cita POST-TAG
+
+**PENDIENTE.** El tag anotado `v2.88.102-beta` y la ejecución integrada explícita en CI se citan aquí (URL del run) una vez publicados, según el patrón del repo. Mientras no se emita el tag, la certificación de este sello es **local** (§3): los resultados de §3 no sustituyen a `Release tag CI` / `Python CI` / `Frontend CI` en verde.

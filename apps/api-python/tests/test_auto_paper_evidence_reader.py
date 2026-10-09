@@ -106,10 +106,13 @@ class _FakeStore:
 
 
 class _FakeRepository:
-    def __init__(self, entries: list[_Entry]) -> None:
+    def __init__(self, entries: list[_Entry], *, fail: bool = False) -> None:
         self._entries = entries
+        self._fail = fail
 
     async def list_by_decision_ids(self, decision_ids: list[str]) -> list[_Entry]:
+        if self._fail:
+            raise RuntimeError("durable settlements unavailable")
         return list(self._entries)
 
 
@@ -204,3 +207,27 @@ async def test_a_fill_without_a_cycle_is_counted_as_orphan(monkeypatch: pytest.M
     assert rec["orphanExecutions"] == 1
     assert rec["fillsWithCycle"] == 0
     assert any(c.startswith("fill_without_cycle") for c in dto["contradictions"])
+
+
+@pytest.mark.asyncio
+async def test_an_unreadable_settlements_source_is_declared_never_clean(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un fallo de LECTURA de los cierres se declara; jamás se degrada a evidencia limpia.
+
+    El hueco simétrico del fallo de fills: sin la fuente de cierres, ``closure_reconciliation``,
+    ``durable_results`` y ``non_contradiction`` quedan SIN DATO (``UNKNOWN ≠ 0``).
+    """
+    cycle = "cyc-settlements-fail"
+    store = _FakeStore(fills=_round_trip(cycle), cycle_ids=[cycle])
+    _patch(monkeypatch, store, _FakeRepository([], fail=True))
+
+    dto = await read_paper_evidence(object(), _ACCOUNT)
+
+    rec = dto["reconciliation"]
+    assert rec["fillsLoaded"] is True
+    assert rec["settlementsLoaded"] is False
+    assert "settlements_not_loaded" in dto["notes"]
+    for criterion_id in ("closure_reconciliation", "durable_results", "non_contradiction"):
+        assert criterion_id in dto["unknownCriterionIds"]
+    assert dto["verdict"] == "NO_CONFIRMED"

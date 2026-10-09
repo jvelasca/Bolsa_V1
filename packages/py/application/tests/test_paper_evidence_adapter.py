@@ -221,3 +221,24 @@ def test_each_criterion_declares_its_durable_source() -> None:
     cell = next(item for item in dto["perVersion"] if item["strategyVersion"] == _VERSION)
     assert cell["closedOperations"] == 32
     assert cell["meetsMinimum"] is True
+
+
+def test_cost_coverage_is_partial_when_a_leg_lacks_the_reference() -> None:
+    """Una pata sin ``reference_mid`` deja el coste ``PARTIAL``: no cumple ``cost_coverage``."""
+    fills, settlements = _cycles(32)
+    fills[0] = _Fill(
+        fills[0].execution_id,
+        fills[0].side,
+        fills[0].price,
+        fills[0].quantity,
+        reference_mid=None,  # pata sin referencia: la fricción no se puede medir
+        cycle_id=fills[0].cycle_id,
+        created_at=fills[0].created_at,
+    )
+    dto = _build(fills, settlements)
+
+    cost = _criterion(dto, "cost_coverage")
+    assert cost["status"] == "unmet"
+    assert cost["measurement"] == "PARTIAL"
+    assert cost["counts"]["complete"] == 31  # una operación sin coste completo
+    assert dto["verdict"] == "NO_CONFIRMED"

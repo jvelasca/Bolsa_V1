@@ -17,10 +17,11 @@ from decimal import Decimal
 
 import pytest
 
-from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE
+from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE, MEASUREMENT_PARTIAL
 from bolsa_application.paper_evidence_reconciliation import (
     RECON_DUPLICATE_EXECUTION,
     RECON_DUPLICATE_SETTLEMENT,
+    RECON_MULTIPLE_VERSIONS,
     RECON_ORPHAN_FILL,
     RECON_PNL_MISMATCH,
     RECON_PNL_UNMEASURED,
@@ -328,3 +329,30 @@ def test_unattributed_settlements_are_declared_as_contradiction() -> None:
     )
 
     assert any(c.startswith(RECON_SETTLEMENT_WITHOUT_ACCOUNT) for c in result.contradictions)
+
+
+def test_a_leg_without_reference_leaves_the_cost_partial_not_complete() -> None:
+    """Una pata sin ``reference_mid`` no mide la fricción del ciclo: coste ``PARTIAL``, no ``COMPLETE``."""
+    fills = [
+        _Fill("c#buy", "buy", Decimal("100"), Decimal("10"), Decimal("100"), _CYCLE, "orb-trend"),
+        _Fill("c#sell", "sell", Decimal("110"), Decimal("10"), None, _CYCLE, "orb-trend"),
+    ]
+    result = reconcile_paper_evidence(fills=fills, settlements=[])
+
+    cycle = result.cycles[0]
+    assert cycle.closed is True
+    assert cycle.balanced is True
+    # El cierre es medible, pero el COSTE es un suelo: se declara ``PARTIAL``, nunca ``COMPLETE``.
+    assert cycle.cost_measurement == MEASUREMENT_PARTIAL
+    assert cycle.cost_complete is False
+
+
+def test_a_cycle_with_two_strategy_versions_is_declared() -> None:
+    """Dos versiones en el MISMO ciclo no se reparten: la atribución se declara."""
+    fills = [
+        _fill("buy", version="orb-trend", execution="multi#buy"),
+        _fill("sell", price="110", version="orb-range", execution="multi#sell"),
+    ]
+    result = reconcile_paper_evidence(fills=fills, settlements=[])
+
+    assert RECON_MULTIPLE_VERSIONS in result.cycles[0].notes
