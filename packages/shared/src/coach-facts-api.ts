@@ -47,5 +47,7 @@ export type CoachFactsV1Dto = {
     usedSoftFallback?: boolean;
     qualityFlagged?: boolean;
     runId?: string;
+    /** S3 — razones (texto humano) que sustentan la recomendación. */
+    reasons?: string[];
   }>;
 };

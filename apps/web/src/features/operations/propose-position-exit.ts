@@ -75,6 +75,13 @@ export type OperativaExitMetaV1 = {
   operativaIntent: "reduce" | "exit_hint";
   exitSource: "event" | "manual";
   plannedQty: number;
+  /**
+   * S1 — precios de objetivo del plan de la posición (T1/T2) tal como los aporta
+   * el backend (`OperationalPositionDto.target1/target2`). Son el destino de la
+   * salida; si faltan, la UI declara «Sin dato todavía» (nunca se inventan).
+   */
+  target1?: number | null;
+  target2?: number | null;
   exitPlan: {
     status: string;
     suggestedAction: string;
@@ -491,6 +498,13 @@ export function buildPositionExitPayload(opts: {
           operativaIntent: intent,
           exitSource: resolveExitSource(exitPlanDto),
           plannedQty: qty,
+          // S1 — T1/T2 del plan vivo; backend-provided (no se calculan en la UI).
+          target1: finitePositive(operational.target1)
+            ? operational.target1
+            : null,
+          target2: finitePositive(operational.target2)
+            ? operational.target2
+            : null,
           exitPlan: exitPlanDto
             ? {
                 status: exitPlanDto.status,

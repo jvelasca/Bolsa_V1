@@ -11,6 +11,8 @@ import {
   formatExitSuggestedActionLabel,
 } from "@bolsa/shared";
 import { MesaTipButton } from "@/features/help/mesa-tip-button";
+import { formatPrice } from "@/features/charts/chart-utils";
+import { absentDataLabel } from "@/components/absent-data";
 import type { OperativaExitMetaV1 } from "@/features/operations/propose-position-exit";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +28,8 @@ export function F3ExitPlanBlock({
   className,
 }: F3ExitPlanBlockProps) {
   const plan = meta.exitPlan;
+  const priceOrAbsent = (n: number | null | undefined) =>
+    n != null && Number.isFinite(n) ? formatPrice(n) : absentDataLabel();
   const exceeds =
     signedQty != null &&
     Number.isFinite(signedQty) &&
@@ -107,6 +111,25 @@ export function F3ExitPlanBlock({
             salida (MANUAL).
           </p>
         )}
+        {/* S1 — destino de la salida con precio por peldaño (backend-provided). */}
+        <div className="flex justify-between gap-2">
+          <span className="text-muted-foreground">Objetivo T1</span>
+          <span
+            className="font-medium tabular-nums text-foreground"
+            data-testid="f3-exit-target1"
+          >
+            {priceOrAbsent(meta.target1)}
+          </span>
+        </div>
+        <div className="flex justify-between gap-2">
+          <span className="text-muted-foreground">Objetivo T2</span>
+          <span
+            className="font-medium tabular-nums text-foreground"
+            data-testid="f3-exit-target2"
+          >
+            {priceOrAbsent(meta.target2)}
+          </span>
+        </div>
       </div>
       {exceeds ? (
         <p className="text-[11px] text-amber-800 dark:text-amber-300">

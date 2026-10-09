@@ -119,6 +119,11 @@ export type CoachFactsV1 = {
     usedSoftFallback?: boolean;
     qualityFlagged?: boolean;
     runId?: string;
+    /**
+     * S3 — razones que sustentan la recomendación (texto humano ya producido por
+     * el coach). Se persisten para poder mostrarlas en primer nivel.
+     */
+    reasons?: string[];
   }>;
 };
 
@@ -1032,6 +1037,7 @@ export function buildCoachFacts(
       usedSoftFallback: Boolean(r.usedSoftFallback),
       qualityFlagged: Boolean(r.qualityFlagged),
       runId: r.row.runId,
+      reasons: r.reasons,
     })),
   };
 }

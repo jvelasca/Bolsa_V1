@@ -7,6 +7,8 @@
  * V2.14 — trigger line · bootstrap stop = advisory (ámbar), no rojo técnico.
  * V2.30 — Chart Focus: Simple (Entrada · Stop · próximo objetivo) /
  * Completo (todas) · T1 alcanzado discreto (sin competir con T2).
+ * S3/S2 — en `prepared`, `Entrada` (fill) y `Trigger` (activación) coexisten
+ * (Simple y Completo) solo si son precios distintos; nunca se duplica la línea.
  *
  * @see docs/engineering/diseno-mercado-2-0-cockpit-2026-08-27.md §2
  */
@@ -106,7 +108,7 @@ function formatT2Title(opts: {
  * sin plan no se dibuja Entrada/Stop/T1/T2.
  *
  * V2.30 `focusMode`:
- * - `simple` — Entrada (o Trigger en prepared) · Stop · próximo objetivo
+ * - `simple` — Entrada/Trigger (prepared, si distintos) · Stop · próximo objetivo
  * - `completo` — todas las líneas (comportamiento previo)
  */
 export function buildOperationalPlanChartLevels(input: {
@@ -182,12 +184,11 @@ export function buildOperationalPlanChartLevels(input: {
       advisory: false,
     });
   } else if (finite(plan.entry) && plan.phase === "prepared") {
-    // Completo: entry visible when distinct from trigger.
-    // Simple: solo Trigger (no duplicar).
-    if (
-      !simple &&
-      (!finite(trigger) || Math.abs(plan.entry - trigger) > 1e-9)
-    ) {
+    // S2 — `Entrada` (fill esperado) y `Trigger` (nivel de activación) son
+    // conceptos distintos: coexisten en Simple y Completo SOLO si el precio
+    // difiere. Si coinciden, una sola línea (`Trigger`) ya representa ambos y
+    // no se duplica (evita la ilusión de una entrada distinta).
+    if (!finite(trigger) || Math.abs(plan.entry - trigger) > 1e-9) {
       levels.push({
         id: levelId("entry"),
         kind: "entry",

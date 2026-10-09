@@ -6,16 +6,19 @@
  * @see ChartTabState.showFinalistTop1Indicators
  */
 
-import type { InstrumentStrategyTopSlotV1 } from './instrument-strategy-top.js';
-import type { IndicatorSpec, StrategyDefinitionV1 } from './research-platform.js';
+import type { InstrumentStrategyTopSlotV1 } from "./instrument-strategy-top.js";
+import type {
+  IndicatorSpec,
+  StrategyDefinitionV1,
+} from "./research-platform.js";
 import {
   isBacktestStrategyType,
   presetIndicatorSpecs,
   type BacktestStrategyType,
-} from './strategy-presets.js';
-import { findIndicatorDefinition } from './indicators-catalog.js';
+} from "./strategy-presets.js";
+import { findIndicatorDefinition } from "./indicators-catalog.js";
 
-export type StrategyTop1ChartSource = 'definition' | 'preset' | 'empty';
+export type StrategyTop1ChartSource = "definition" | "preset" | "empty";
 
 export type StrategyTop1ChartResult = {
   specs: IndicatorSpec[];
@@ -27,17 +30,23 @@ export type StrategyTop1ChartResult = {
 export type StrategyTop1ChartInput = {
   slot: InstrumentStrategyTopSlotV1 | null | undefined;
   /** Preferido cuando el slot trae strategyDefinitionId. */
-  definition?: Pick<StrategyDefinitionV1, 'indicatorSpecs' | 'presetKey'> | null;
+  definition?: Pick<
+    StrategyDefinitionV1,
+    "indicatorSpecs" | "presetKey"
+  > | null;
   /** Si true, solo specs de panel overlay (precio). Default: todos (overlay + sub). */
   overlayOnly?: boolean;
 };
 
-function filterKnownSpecs(specs: IndicatorSpec[], overlayOnly: boolean): IndicatorSpec[] {
+function filterKnownSpecs(
+  specs: IndicatorSpec[],
+  overlayOnly: boolean,
+): IndicatorSpec[] {
   const out: IndicatorSpec[] = [];
   for (const spec of specs) {
     const def = findIndicatorDefinition(spec.definitionId);
     if (!def) continue;
-    if (overlayOnly && def.panel !== 'overlay') continue;
+    if (overlayOnly && def.panel !== "overlay") continue;
     out.push({
       definitionId: spec.definitionId,
       parameters: { ...spec.parameters },
@@ -56,14 +65,15 @@ export function strategyTop1ToChartIndicators(
   const overlayOnly = Boolean(input.overlayOnly);
   const slot = input.slot;
   if (!slot || slot.rank !== 1) {
-    return { specs: [], source: 'empty' };
+    return { specs: [], source: "empty" };
   }
 
   const fromDef = input.definition?.indicatorSpecs;
   if (Array.isArray(fromDef) && fromDef.length > 0) {
     const specs = filterKnownSpecs(fromDef, overlayOnly);
     const presetKey =
-      (input.definition?.presetKey && isBacktestStrategyType(input.definition.presetKey)
+      (input.definition?.presetKey &&
+      isBacktestStrategyType(input.definition.presetKey)
         ? input.definition.presetKey
         : undefined) ??
       (slot.strategyType && isBacktestStrategyType(slot.strategyType)
@@ -71,7 +81,7 @@ export function strategyTop1ToChartIndicators(
         : undefined);
     return {
       specs,
-      source: specs.length > 0 ? 'definition' : 'empty',
+      source: specs.length > 0 ? "definition" : "empty",
       presetKey,
       label: slot.label,
     };
@@ -81,7 +91,8 @@ export function strategyTop1ToChartIndicators(
     (slot.strategyType && isBacktestStrategyType(slot.strategyType)
       ? slot.strategyType
       : null) ??
-    (input.definition?.presetKey && isBacktestStrategyType(input.definition.presetKey)
+    (input.definition?.presetKey &&
+    isBacktestStrategyType(input.definition.presetKey)
       ? input.definition.presetKey
       : null);
 
@@ -89,17 +100,78 @@ export function strategyTop1ToChartIndicators(
     const specs = filterKnownSpecs(presetIndicatorSpecs(typeKey), overlayOnly);
     return {
       specs,
-      source: specs.length > 0 ? 'preset' : 'empty',
+      source: specs.length > 0 ? "preset" : "empty",
       presetKey: typeKey,
       label: slot.label,
     };
   }
 
-  return { specs: [], source: 'empty', label: slot.label };
+  return { specs: [], source: "empty", label: slot.label };
 }
 
-export function isFinalistTop1Indicator(
-  instance: { origin?: string | null },
-): boolean {
-  return instance.origin === 'finalist-top1';
+export function isFinalistTop1Indicator(instance: {
+  origin?: string | null;
+}): boolean {
+  return instance.origin === "finalist-top1";
+}
+
+export type StrategySlotIndicatorsSource = "definition" | "preset" | "empty";
+
+export type StrategySlotIndicatorsResult = {
+  /** Nombres legibles (p. ej. `SMA`, `RSI`, `MACD`), sin duplicados. */
+  labels: string[];
+  source: StrategySlotIndicatorsSource;
+  presetKey?: BacktestStrategyType;
+};
+
+/**
+ * S3 — indicadores que **sustentan** una estrategia del TOP (cualquier rank), en
+ * nombres legibles. Fuente: `definition.indicatorSpecs` (si el caller la tiene) →
+ * `presetIndicatorSpecs(strategyType)` como fallback.
+ *
+ * NO usa el catálogo de indicadores del gráfico (eso sería deducir, no evidenciar):
+ * si no hay fuente, devuelve `[]` y la superficie declara «Sin dato todavía».
+ */
+export function strategySlotToIndicatorLabels(input: {
+  slot: InstrumentStrategyTopSlotV1 | null | undefined;
+  definition?: Pick<
+    StrategyDefinitionV1,
+    "indicatorSpecs" | "presetKey"
+  > | null;
+}): StrategySlotIndicatorsResult {
+  const slot = input.slot;
+  if (!slot) return { labels: [], source: "empty" };
+
+  const fromDef = input.definition?.indicatorSpecs;
+  const hasDef = Array.isArray(fromDef) && fromDef.length > 0;
+  const typeKey =
+    (slot.strategyType && isBacktestStrategyType(slot.strategyType)
+      ? slot.strategyType
+      : null) ??
+    (input.definition?.presetKey &&
+    isBacktestStrategyType(input.definition.presetKey)
+      ? input.definition.presetKey
+      : null);
+
+  const specs: IndicatorSpec[] = hasDef
+    ? fromDef
+    : typeKey
+      ? presetIndicatorSpecs(typeKey)
+      : [];
+
+  const labels = Array.from(
+    new Set(
+      specs
+        .map((spec) => findIndicatorDefinition(spec.definitionId)?.shortLabel)
+        .filter((label): label is string => Boolean(label && label.trim())),
+    ),
+  );
+
+  const source: StrategySlotIndicatorsSource = hasDef
+    ? "definition"
+    : labels.length > 0
+      ? "preset"
+      : "empty";
+
+  return { labels, source, presetKey: typeKey ?? undefined };
 }

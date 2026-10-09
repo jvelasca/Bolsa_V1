@@ -14,10 +14,11 @@
  * @see docs/engineering/research-radar-unification-2026-07-31.md
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InstrumentStrategyTopV1 } from "@bolsa/shared";
+import { strategySlotToIndicatorLabels } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,7 @@ import {
   formatFinalistsStabilityBadge,
   readLabEvidenceFromCoachFacts,
 } from "@/features/backtests/finalists-stability-summary";
+
 /** Deep-link hub → foco Finalistas del valor. */
 export function instrumentTopBacktestsHref(
   instrumentId: string,
@@ -71,6 +73,27 @@ export function instrumentTopBacktestsHref(
     timeframe,
   });
   return `/backtests?${params.toString()}`;
+}
+
+/**
+ * S3 — razones (texto humano) del coach para un slot, leídas del blob
+ * `coachFacts.recommendations[]` (persistido). Sin dato ⇒ `[]` (se declara).
+ */
+export function readRecommendationReasons(
+  facts: Record<string, unknown> | null | undefined,
+  rank: number,
+): string[] {
+  if (!facts || typeof facts !== "object") return [];
+  const raw = (facts as { recommendations?: unknown }).recommendations;
+  if (!Array.isArray(raw)) return [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const rec = item as { rank?: unknown; reasons?: unknown };
+    if (rec.rank !== rank) continue;
+    if (!Array.isArray(rec.reasons)) return [];
+    return rec.reasons.filter((r): r is string => typeof r === "string");
+  }
+  return [];
 }
 
 /** Acción Usar / Checklist desde un slot Finalistas. */
@@ -117,6 +140,8 @@ export function InstrumentStrategyTopBadge({
 
 function SlotRow({
   slot,
+  indicators = [],
+  reasons = [],
   onUse,
   onOpenChecklist,
   onProposeSupervised,
@@ -127,6 +152,10 @@ function SlotRow({
   diaDActive,
 }: {
   slot: InstrumentStrategyTopV1["slots"][number];
+  /** S3 — indicadores que sustentan la estrategia (definición/preset). */
+  indicators?: string[];
+  /** S3 — razones del coach (coachFacts.recommendations[].reasons). */
+  reasons?: string[];
   onUse?: (use: FinalistSlotUse) => void;
   onOpenChecklist?: (use: FinalistSlotUse) => void;
   onProposeSupervised?: (use: FinalistSlotUse) => void;
@@ -184,6 +213,23 @@ function SlotRow({
             ? ` · DD ${formatPct(slot.maxDrawdownPct)}`
             : ""}
           {slot.runId ? " · con resultado" : ""}
+        </p>
+        {/* S3 — cadena Estrategia → indicadores que la sustentan → razón. */}
+        <p
+          className="text-[11px] leading-snug text-muted-foreground"
+          data-testid="finalist-slot-indicators"
+        >
+          {indicators.length > 0
+            ? `Indicadores: ${indicators.join(" · ")}`
+            : "Indicadores: Sin dato todavía"}
+        </p>
+        <p
+          className="text-[11px] leading-snug text-muted-foreground"
+          data-testid="finalist-slot-reason"
+        >
+          {reasons.length > 0
+            ? `Razón: ${reasons[0]}${reasons.length > 1 ? ` (+${reasons.length - 1})` : ""}`
+            : "Razón: Sin dato todavía"}
         </p>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -347,6 +393,22 @@ export function InstrumentStrategyTopPanel({
     queryFn: () => api.getStrategies(),
     staleTime: 60_000,
   });
+
+  /**
+   * S3 — resumen de definición por id (solo `presetKey`; el detalle con
+   * `indicatorSpecs` no viene en el summary). La resolución de indicadores es
+   * `definition.indicatorSpecs` → `presetIndicatorSpecs(strategyType)`.
+   */
+  type SlotDefinitionRef = NonNullable<
+    Parameters<typeof strategySlotToIndicatorLabels>[0]["definition"]
+  >;
+  const definitionByStrategyId = useMemo(() => {
+    const map = new Map<string, SlotDefinitionRef>();
+    for (const s of strategiesQuery.data?.data ?? []) {
+      map.set(s.id, { indicatorSpecs: [], presetKey: s.presetKey });
+    }
+    return map;
+  }, [strategiesQuery.data?.data]);
 
   const repairedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -654,68 +716,85 @@ export function InstrumentStrategyTopPanel({
         {top.slots
           .slice()
           .sort((a, b) => a.rank - b.rank)
-          .map((slot) => (
-            <SlotRow
-              key={`${slot.rank}-${slot.label}`}
-              slot={slot}
-              onUse={
-                onUseStrategy
-                  ? (use) => onUseStrategy(use.strategyDefinitionId, use)
-                  : undefined
-              }
-              onOpenChecklist={onOpenChecklist}
-              onProposeSupervised={
-                onProposeSupervised && top.evidenceLevel === "lab_validated"
-                  ? onProposeSupervised
-                  : undefined
-              }
-              proposePending={Boolean(
-                proposePendingStrategyId &&
-                slot.strategyDefinitionId === proposePendingStrategyId,
-              )}
-              onCreateTracker={(use) => createTrackerMutation.mutate(use)}
-              trackerPending={trackerPendingRank === slot.rank}
-              diaDActive={diaDActive}
-              onSimulateDiaD={(use) => {
-                const sym = symbol?.trim() || instrumentId.slice(0, 8);
-                const fromExp = experimentTop1?.strategyDefinitionId
-                  ? {
-                      strategyDefinitionId: experimentTop1.strategyDefinitionId,
-                      strategyLabel: experimentTop1.label,
-                      rank: experimentTop1.rank,
-                    }
-                  : null;
-                enterDiaDSession({
-                  instrumentId,
-                  symbol: sym,
-                  strategyDefinitionId:
-                    fromExp?.strategyDefinitionId ?? use.strategyDefinitionId,
-                  strategyLabel: fromExp?.strategyLabel ?? use.label,
-                  rank: fromExp?.rank ?? use.rank,
-                  diaD: effectiveDiaD(diaD),
-                  endDate: todayIsoDate(),
-                  mode: "auto",
-                });
-                if (effectiveAccountId) {
-                  setAdoption({
+          .map((slot) => {
+            const definition = slot.strategyDefinitionId
+              ? (definitionByStrategyId.get(slot.strategyDefinitionId) ?? null)
+              : null;
+            const indicators = strategySlotToIndicatorLabels({
+              slot,
+              definition,
+            }).labels;
+            const reasons = readRecommendationReasons(
+              top.coachFacts as Record<string, unknown> | null | undefined,
+              slot.rank,
+            );
+            return (
+              <SlotRow
+                key={`${slot.rank}-${slot.label}`}
+                slot={slot}
+                indicators={indicators}
+                reasons={reasons}
+                onUse={
+                  onUseStrategy
+                    ? (use) => onUseStrategy(use.strategyDefinitionId, use)
+                    : undefined
+                }
+                onOpenChecklist={onOpenChecklist}
+                onProposeSupervised={
+                  onProposeSupervised && top.evidenceLevel === "lab_validated"
+                    ? onProposeSupervised
+                    : undefined
+                }
+                proposePending={Boolean(
+                  proposePendingStrategyId &&
+                  slot.strategyDefinitionId === proposePendingStrategyId,
+                )}
+                onCreateTracker={(use) => createTrackerMutation.mutate(use)}
+                trackerPending={trackerPendingRank === slot.rank}
+                diaDActive={diaDActive}
+                onSimulateDiaD={(use) => {
+                  const sym = symbol?.trim() || instrumentId.slice(0, 8);
+                  const fromExp = experimentTop1?.strategyDefinitionId
+                    ? {
+                        strategyDefinitionId:
+                          experimentTop1.strategyDefinitionId,
+                        strategyLabel: experimentTop1.label,
+                        rank: experimentTop1.rank,
+                      }
+                    : null;
+                  enterDiaDSession({
                     instrumentId,
-                    accountId: effectiveAccountId,
-                    state: "candidata",
+                    symbol: sym,
                     strategyDefinitionId:
                       fromExp?.strategyDefinitionId ?? use.strategyDefinitionId,
                     strategyLabel: fromExp?.strategyLabel ?? use.label,
-                    timeframe,
+                    rank: fromExp?.rank ?? use.rank,
+                    diaD: effectiveDiaD(diaD),
+                    endDate: todayIsoDate(),
+                    mode: "auto",
                   });
-                }
-                navigate(diaDVerifyHref(instrumentId));
-                pushToast(
-                  fromExp
-                    ? `LAB · Verificar ${effectiveDiaD(diaD)} → hoy · F-D #1 (experimento)`
-                    : `LAB · Verificar ${effectiveDiaD(diaD)} → hoy · Auto (Cartera LAB)`,
-                );
-              }}
-            />
-          ))}
+                  if (effectiveAccountId) {
+                    setAdoption({
+                      instrumentId,
+                      accountId: effectiveAccountId,
+                      state: "candidata",
+                      strategyDefinitionId:
+                        fromExp?.strategyDefinitionId ??
+                        use.strategyDefinitionId,
+                      strategyLabel: fromExp?.strategyLabel ?? use.label,
+                      timeframe,
+                    });
+                  }
+                  navigate(diaDVerifyHref(instrumentId));
+                  pushToast(
+                    fromExp
+                      ? `LAB · Verificar ${effectiveDiaD(diaD)} → hoy · F-D #1 (experimento)`
+                      : `LAB · Verificar ${effectiveDiaD(diaD)} → hoy · Auto (Cartera LAB)`,
+                  );
+                }}
+              />
+            );
+          })}
       </div>
     </div>
   );

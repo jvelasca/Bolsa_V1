@@ -67,6 +67,35 @@ describe("buildPositionExitPayload", () => {
     });
   });
 
+  it("S1 — reduce/exit lleva T1/T2 del plan vivo (backend), o null", () => {
+    const withTargets = buildPositionExitPayload({
+      position: position(),
+      accountId: "acc-1",
+      intent: "exit_hint",
+    });
+    expect(withTargets.decisionPackage).toMatchObject({
+      target1: 110,
+      target2: 120,
+    });
+
+    const withoutTargets = buildPositionExitPayload({
+      position: position({
+        operational: {
+          status: "OPEN",
+          direction: "long",
+          currentStop: 95,
+          tradePlanId: "dec-1",
+        },
+      }),
+      accountId: "acc-1",
+      intent: "exit_hint",
+    });
+    expect(withoutTargets.decisionPackage).toMatchObject({
+      target1: null,
+      target2: null,
+    });
+  });
+
   it("V1.32 — event exitSource when ExitPlan TRIGGERED", () => {
     const payload = buildPositionExitPayload({
       position: position({

@@ -112,6 +112,35 @@ describe("buildOperationalPlanChartLevels", () => {
     expect(levels.some((l) => l.kind === "entry")).toBe(false);
   });
 
+  it("S2 — prepared con Entrada ≠ Trigger: coexisten (la entrada no se pierde)", () => {
+    const levels = buildOperationalPlanChartLevels({
+      plan: plan({ phase: "prepared", phaseLabel: "Preparada", entry: 100 }),
+      showLevels: true,
+      triggerPrice: 102,
+      focusMode: "simple",
+    });
+    expect(levels.map((l) => l.kind)).toEqual([
+      "trigger",
+      "entry",
+      "stopVigente",
+      "target1",
+    ]);
+    expect(levels.find((l) => l.kind === "trigger")!.price).toBe(102);
+    expect(levels.find((l) => l.kind === "entry")!.price).toBe(100);
+    expect(levels.find((l) => l.kind === "entry")!.title).toBe("Entrada");
+  });
+
+  it("S2 — prepared con Entrada = Trigger: una sola línea (no duplica)", () => {
+    const levels = buildOperationalPlanChartLevels({
+      plan: plan({ phase: "prepared", phaseLabel: "Preparada", entry: 100 }),
+      showLevels: true,
+      triggerPrice: 100,
+      focusMode: "simple",
+    });
+    expect(levels.some((l) => l.kind === "entry")).toBe(false);
+    expect(levels.filter((l) => l.kind === "trigger")).toHaveLength(1);
+  });
+
   it("V2.14 — bootstrap stop is advisory amber, not technical red", () => {
     const levels = buildOperationalPlanChartLevels({
       plan: plan(),
