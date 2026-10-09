@@ -1167,6 +1167,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/paper-evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Paper Evidence
+         * @description Evidencia PAPER durable de la cuenta visible del principal (read-only).
+         *
+         *     ``strategyVersion`` acota el desglose por estrategia (repetible); sin él se usan las versiones
+         *     que declara el propio material. Sin cuenta visible devuelve el DTO vacío con ``no_account_scope``.
+         */
+        get: operations["get_auto_paper_evidence_api_auto_paper_evidence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/self-evaluation": {
         parameters: {
             query?: never;
@@ -4583,6 +4606,45 @@ export interface components {
             readOnly: boolean;
             /** Reservations */
             reservations?: components["schemas"]["AutoMonitorReservationDto"][];
+        };
+        /**
+         * AutoPaperEvidenceDto
+         * @description DTO canónico de la evidencia PAPER: siete criterios + conciliación + desglose.
+         */
+        AutoPaperEvidenceDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Asof */
+            asOf?: string | null;
+            /** Blockers */
+            blockers?: string[];
+            /** Contradictions */
+            contradictions?: string[];
+            /** Criteria */
+            criteria: components["schemas"]["PaperEvidenceCriterionDto"][];
+            /** Fillstotalforaccount */
+            fillsTotalForAccount?: number | null;
+            /** Fillswindowfull */
+            fillsWindowFull: boolean;
+            /** Metcriterionids */
+            metCriterionIds?: string[];
+            /** Notes */
+            notes?: string[];
+            /** Perversion */
+            perVersion?: components["schemas"]["PaperEvidencePerVersionDto"][];
+            /** Readonly */
+            readOnly: boolean;
+            reconciliation: components["schemas"]["PaperEvidenceReconciliationDto"];
+            /** Schemaversion */
+            schemaVersion: string;
+            /** Unknowncriterionids */
+            unknownCriterionIds?: string[];
+            /** Unmetcriterionids */
+            unmetCriterionIds?: string[];
+            /** Unmetorunmeasuredcriterionids */
+            unmetOrUnmeasuredCriterionIds?: string[];
+            /** Verdict */
+            verdict: string;
         };
         /**
          * AutoSelfEvaluationDto
@@ -9448,6 +9510,112 @@ export interface components {
              */
             templateId: string | null;
         };
+        /** PaperEvidenceCriterionDto */
+        PaperEvidenceCriterionDto: {
+            /** Counts */
+            counts?: {
+                [key: string]: number | null;
+            };
+            /** Id */
+            id: string;
+            /** Measurement */
+            measurement: string;
+            /** Notes */
+            notes?: string[];
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+        };
+        /** PaperEvidenceCycleDto */
+        PaperEvidenceCycleDto: {
+            /** Balanced */
+            balanced: boolean;
+            /** Bothsides */
+            bothSides: boolean;
+            /** Buyqty */
+            buyQty?: string | null;
+            /** Closed */
+            closed: boolean;
+            /** Costcomplete */
+            costComplete: boolean;
+            /** Costmeasurement */
+            costMeasurement: string;
+            /** Cycleid */
+            cycleId: string;
+            /** Fifopnl */
+            fifoPnl?: string | null;
+            /** Fills */
+            fills: number;
+            /** Notes */
+            notes?: string[];
+            /** Reconciled */
+            reconciled: boolean;
+            /** Sellqty */
+            sellQty?: string | null;
+            /** Settlementclosedqty */
+            settlementClosedQty?: string | null;
+            /** Settlementpnl */
+            settlementPnl?: string | null;
+            /** Settlementpnlmeasurement */
+            settlementPnlMeasurement: string;
+            /** Settlementpresent */
+            settlementPresent: boolean;
+            /** Strategyversion */
+            strategyVersion?: string | null;
+        };
+        /** PaperEvidencePerVersionDto */
+        PaperEvidencePerVersionDto: {
+            /** Closedoperations */
+            closedOperations: number;
+            /** Completecosts */
+            completeCosts: number;
+            /** Measuredresults */
+            measuredResults: number;
+            /** Meetsminimum */
+            meetsMinimum: boolean;
+            /** Reconciledclosures */
+            reconciledClosures: number;
+            /** Strategyversion */
+            strategyVersion: string;
+        };
+        /** PaperEvidenceReconciliationDto */
+        PaperEvidenceReconciliationDto: {
+            /** Anonymousclosedcycles */
+            anonymousClosedCycles: number;
+            /** Closedcycles */
+            closedCycles: number;
+            /** Contradictions */
+            contradictions?: string[];
+            /** Cycles */
+            cycles?: components["schemas"]["PaperEvidenceCycleDto"][];
+            /** Duplicateexecutions */
+            duplicateExecutions: number;
+            /** Fillsloaded */
+            fillsLoaded: boolean;
+            /** Fillstotal */
+            fillsTotal: number;
+            /** Fillswithcycle */
+            fillsWithCycle: number;
+            /** Notes */
+            notes?: string[];
+            /** Orphanexecutions */
+            orphanExecutions: number;
+            /** Settlementsdivergent */
+            settlementsDivergent: number;
+            /** Settlementsloaded */
+            settlementsLoaded: boolean;
+            /** Settlementsreconciled */
+            settlementsReconciled: number;
+            /** Settlementstotal */
+            settlementsTotal: number;
+            /** Settlementsunmatched */
+            settlementsUnmatched: number;
+            /** Windowdays */
+            windowDays?: number | null;
+            /** Windowepisodes */
+            windowEpisodes?: number | null;
+        };
         /** PendingOrderDto */
         PendingOrderDto: {
             /** Createdat */
@@ -13653,6 +13821,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutoOperationalMonitorDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_paper_evidence_api_auto_paper_evidence_get: {
+        parameters: {
+            query?: {
+                strategyVersion?: string[] | null;
+            };
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoPaperEvidenceDto"];
                 };
             };
             /** @description Validation Error */

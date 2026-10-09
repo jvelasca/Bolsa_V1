@@ -394,7 +394,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             universe_coverage=universe_coverage,
             probe={**probe, "windowFallback": fallback},
             meta={
-                "bump": "2.11.98-beta",
+                "bump": "2.11.99-beta",
                 "phase": "V2.91 DIA-D AUTO LONGITUDINAL",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),

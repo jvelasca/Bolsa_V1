@@ -936,6 +936,19 @@ export const api = {
       }),
     ),
 
+  /**
+   * PAPER-2 — evidencia durable PAPER (read-only): siete criterios + conciliación + desglose
+   * por versión. Nunca emite confirmación (`verdict` literal `NO_CONFIRMED`).
+   */
+  getAutoPaperEvidence: (input?: { strategyVersion?: string[] }) =>
+    call<components["schemas"]["AutoPaperEvidenceDto"]>(() =>
+      client.GET("/api/auto/paper-evidence", {
+        params: {
+          query: { strategyVersion: input?.strategyVersion },
+        },
+      }),
+    ),
+
   /** DÍA-D AUTO — días con artefacto sandbox disponible (selector de fecha del monitor). */
   getAutoDiaDReplayDays: () =>
     call<components["schemas"]["DiaDAutoReplayListDto"]>(() =>

@@ -1423,6 +1423,136 @@
         "title": "AutoOperationalMonitorDto",
         "type": "object"
       },
+      "AutoPaperEvidenceDto": {
+        "description": "DTO canónico de la evidencia PAPER: siete criterios + conciliación + desglose.",
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "asOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asof"
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "contradictions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Contradictions",
+            "type": "array"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/PaperEvidenceCriterionDto"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "fillsTotalForAccount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fillstotalforaccount"
+          },
+          "fillsWindowFull": {
+            "title": "Fillswindowfull",
+            "type": "boolean"
+          },
+          "metCriterionIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metcriterionids",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "perVersion": {
+            "items": {
+              "$ref": "#/components/schemas/PaperEvidencePerVersionDto"
+            },
+            "title": "Perversion",
+            "type": "array"
+          },
+          "readOnly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "reconciliation": {
+            "$ref": "#/components/schemas/PaperEvidenceReconciliationDto"
+          },
+          "schemaVersion": {
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "unknownCriterionIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknowncriterionids",
+            "type": "array"
+          },
+          "unmetCriterionIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmetcriterionids",
+            "type": "array"
+          },
+          "unmetOrUnmeasuredCriterionIds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmetorunmeasuredcriterionids",
+            "type": "array"
+          },
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "readOnly",
+          "verdict",
+          "criteria",
+          "fillsWindowFull",
+          "reconciliation"
+        ],
+        "title": "AutoPaperEvidenceDto",
+        "type": "object"
+      },
       "AutoSelfEvaluationDto": {
         "description": "Informe completo: roll-up + filas por versión + embudo + huecos declarados.",
         "properties": {
@@ -15959,6 +16089,335 @@
         "title": "PaperDeskCycleRequestDto",
         "type": "object"
       },
+      "PaperEvidenceCriterionDto": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "measurement": {
+            "title": "Measurement",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "measurement",
+          "source"
+        ],
+        "title": "PaperEvidenceCriterionDto",
+        "type": "object"
+      },
+      "PaperEvidenceCycleDto": {
+        "properties": {
+          "balanced": {
+            "title": "Balanced",
+            "type": "boolean"
+          },
+          "bothSides": {
+            "title": "Bothsides",
+            "type": "boolean"
+          },
+          "buyQty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyqty"
+          },
+          "closed": {
+            "title": "Closed",
+            "type": "boolean"
+          },
+          "costComplete": {
+            "title": "Costcomplete",
+            "type": "boolean"
+          },
+          "costMeasurement": {
+            "title": "Costmeasurement",
+            "type": "string"
+          },
+          "cycleId": {
+            "title": "Cycleid",
+            "type": "string"
+          },
+          "fifoPnl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fifopnl"
+          },
+          "fills": {
+            "title": "Fills",
+            "type": "integer"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "reconciled": {
+            "title": "Reconciled",
+            "type": "boolean"
+          },
+          "sellQty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sellqty"
+          },
+          "settlementClosedQty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlementclosedqty"
+          },
+          "settlementPnl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlementpnl"
+          },
+          "settlementPnlMeasurement": {
+            "title": "Settlementpnlmeasurement",
+            "type": "string"
+          },
+          "settlementPresent": {
+            "title": "Settlementpresent",
+            "type": "boolean"
+          },
+          "strategyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategyversion"
+          }
+        },
+        "required": [
+          "cycleId",
+          "fills",
+          "bothSides",
+          "balanced",
+          "closed",
+          "settlementPresent",
+          "settlementPnlMeasurement",
+          "reconciled",
+          "costMeasurement",
+          "costComplete"
+        ],
+        "title": "PaperEvidenceCycleDto",
+        "type": "object"
+      },
+      "PaperEvidencePerVersionDto": {
+        "properties": {
+          "closedOperations": {
+            "title": "Closedoperations",
+            "type": "integer"
+          },
+          "completeCosts": {
+            "title": "Completecosts",
+            "type": "integer"
+          },
+          "measuredResults": {
+            "title": "Measuredresults",
+            "type": "integer"
+          },
+          "meetsMinimum": {
+            "title": "Meetsminimum",
+            "type": "boolean"
+          },
+          "reconciledClosures": {
+            "title": "Reconciledclosures",
+            "type": "integer"
+          },
+          "strategyVersion": {
+            "title": "Strategyversion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "strategyVersion",
+          "closedOperations",
+          "reconciledClosures",
+          "measuredResults",
+          "completeCosts",
+          "meetsMinimum"
+        ],
+        "title": "PaperEvidencePerVersionDto",
+        "type": "object"
+      },
+      "PaperEvidenceReconciliationDto": {
+        "properties": {
+          "anonymousClosedCycles": {
+            "title": "Anonymousclosedcycles",
+            "type": "integer"
+          },
+          "closedCycles": {
+            "title": "Closedcycles",
+            "type": "integer"
+          },
+          "contradictions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Contradictions",
+            "type": "array"
+          },
+          "cycles": {
+            "items": {
+              "$ref": "#/components/schemas/PaperEvidenceCycleDto"
+            },
+            "title": "Cycles",
+            "type": "array"
+          },
+          "duplicateExecutions": {
+            "title": "Duplicateexecutions",
+            "type": "integer"
+          },
+          "fillsLoaded": {
+            "title": "Fillsloaded",
+            "type": "boolean"
+          },
+          "fillsTotal": {
+            "title": "Fillstotal",
+            "type": "integer"
+          },
+          "fillsWithCycle": {
+            "title": "Fillswithcycle",
+            "type": "integer"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "orphanExecutions": {
+            "title": "Orphanexecutions",
+            "type": "integer"
+          },
+          "settlementsDivergent": {
+            "title": "Settlementsdivergent",
+            "type": "integer"
+          },
+          "settlementsLoaded": {
+            "title": "Settlementsloaded",
+            "type": "boolean"
+          },
+          "settlementsReconciled": {
+            "title": "Settlementsreconciled",
+            "type": "integer"
+          },
+          "settlementsTotal": {
+            "title": "Settlementstotal",
+            "type": "integer"
+          },
+          "settlementsUnmatched": {
+            "title": "Settlementsunmatched",
+            "type": "integer"
+          },
+          "windowDays": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Windowdays"
+          },
+          "windowEpisodes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Windowepisodes"
+          }
+        },
+        "required": [
+          "fillsLoaded",
+          "settlementsLoaded",
+          "fillsTotal",
+          "fillsWithCycle",
+          "duplicateExecutions",
+          "orphanExecutions",
+          "closedCycles",
+          "anonymousClosedCycles",
+          "settlementsTotal",
+          "settlementsReconciled",
+          "settlementsDivergent",
+          "settlementsUnmatched"
+        ],
+        "title": "PaperEvidenceReconciliationDto",
+        "type": "object"
+      },
       "PendingOrderDto": {
         "properties": {
           "createdAt": {
@@ -25396,6 +25855,76 @@
           }
         },
         "summary": "Get Auto Operational Monitor",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/paper-evidence": {
+      "get": {
+        "description": "Evidencia PAPER durable de la cuenta visible del principal (read-only).\n\n``strategyVersion`` acota el desglose por estrategia (repetible); sin él se usan las versiones\nque declara el propio material. Sin cuenta visible devuelve el DTO vacío con ``no_account_scope``.",
+        "operationId": "get_auto_paper_evidence_api_auto_paper_evidence_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "strategyVersion",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 128,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Strategyversion"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoPaperEvidenceDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Paper Evidence",
         "tags": [
           "auto"
         ]

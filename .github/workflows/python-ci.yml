@@ -419,6 +419,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
+          --ignore=apps/api-python/tests/test_auto_paper_evidence_pg.py
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
           --ignore=apps/api-python/tests/test_unique_natural_keys_pg.py
           --ignore=apps/api-python/tests/test_portfolio_reservation_pg.py
@@ -732,6 +733,12 @@ jobs:
       # solo se certifican contra PG real, con otra sesión leyendo lo ya commiteado. Sin PG el
       # test skipearía en mudo y los paneles quedarían sin medir.
       AUTO_OPERATIONAL_MONITOR_PG_REQUIRED: '1'
+      # PAPER-2 (evidencia durable PAPER): el adaptador compone los siete criterios del
+      # contrato PAPER desde el material durable conciliado —fills con ``cycle_id`` y cierres
+      # ``auto_cycle_settlement`` escritos por otra sesión— y declara los cruces (duplicados,
+      # huérfanos, cierres contradictorios). Solo se certifica contra PG real: sin PG el test
+      # skipearía en mudo y la conciliación quedaría como certificación fantasma.
+      PAPER_EVIDENCE_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -809,6 +816,7 @@ jobs:
             apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py \
             apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py \
             apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py \
+            apps/api-python/tests/test_auto_paper_evidence_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 
       - name: Fail on skipped AUTO 2.0 durable PG (no skip silencioso)
