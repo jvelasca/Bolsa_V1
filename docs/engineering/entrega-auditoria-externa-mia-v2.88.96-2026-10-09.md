@@ -6,7 +6,7 @@
 > **Regla del hueco:** una regla que no se puede afirmar se declara **abierta** con su remediación, **nunca** se silencia. Un dato ausente se rotula «Sin dato todavía»; **jamás** se rellena con `0` ni con verde. `ranking ≠ decisión` y `propuesta ≠ posición materializada` se conservan.
 > **`Δ motor = 0`.** El diff vive en `apps/web/**`, `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin tocar `packages/py/**`**. **El contrato HTTP NO cambia.**
 > **Evidencia cruda:** [`docs/engineering/evidence/v2.88.96/README.md`](./evidence/v2.88.96/README.md).
-> **Cita POST-TAG:** tag anotado `v2.88.96-beta` (objeto pendiente → commit pendiente); `Release tag CI` **pendiente**.
+> **Cita POST-TAG:** tag anotado `v2.88.96-beta` (objeto `74e3fcf4` → commit `de3e5222`); `Release tag CI` [`37894478961`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37894478961) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `frontend` `281` ficheros / `1753` passed; `python` `4596 passed / 45 skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 ---
 
@@ -65,7 +65,7 @@
 | `pnpm --filter @bolsa/web exec vitest run` | **281 ficheros / 1753 passed** |
 | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **1 passed** (`2.11.96-beta`) |
 | `git diff --name-only -- packages/py` | **vacío** ⇒ **`Δ motor = 0`** |
-| `replay-repro` — CI | **pendiente** (`Release tag CI` por ejecutar) |
+| `replay-repro` — CI | **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0`** (`Release tag CI` [`37894478961`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37894478961) **VERDE**) |
 
 ---
 
@@ -74,7 +74,7 @@
 - **Producto:** `V2.88.96-beta`. **Package:** `2.11.96-beta`. **Sin migración** (Alembic head `052_top3_opportunities`). **Contrato HTTP sin cambio.** `packages/py/**` **sin mover**.
 - **Añadidos:** `docs/engineering/evidence/v2.88.96/README.md`, este documento.
 - **Modificados:** `apps/web/src/features/backtests/instrument-strategy-top-panel.tsx`, `apps/web/src/features/backtests/finalist-indicators-reason.test.ts`, `apps/web/src/features/charts/operational-plan-chart-levels.test.ts`, `package.json`, `apps/api-python/scripts/v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`.
-- **Tag anotado `v2.88.96-beta`** — objeto y commit **pendientes**; `Release tag CI` **pendiente**.
+- **Tag anotado `v2.88.96-beta`** — objeto `74e3fcf4` → commit `de3e5222`; mensaje `FASE 3 close S1-S3 observations (S2 completo coverage, S3 real indicatorSpecs via strategy detail) - Delta motor = 0`. **`Release tag CI`** [`37894478961`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37894478961) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 ---
 

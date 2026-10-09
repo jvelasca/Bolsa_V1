@@ -6,7 +6,7 @@
 > **Origen.** Cierra las dos observaciones menores del self-review del sello [`v2.88.95-beta`](../v2.88.95/README.md); no cambia la semántica de `S1`–`S3`, refuerza cobertura y fuente de datos. `S4-agregador-evidencia` **no se lanza**.
 
 **Base:** [`evidence/v2.88.95/README.md`](../v2.88.95/README.md).
-**Cita POST-TAG:** tag anotado `v2.88.96-beta` (objeto pendiente → commit pendiente); `Release tag CI` **pendiente**.
+**Cita POST-TAG:** tag anotado `v2.88.96-beta` (objeto `74e3fcf4` → commit `de3e5222`); `Release tag CI` [`37894478961`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37894478961) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `frontend` `281` ficheros / `1753` passed; `python` `4596 passed / 45 skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 ## 1. Cambios (por observación)
 

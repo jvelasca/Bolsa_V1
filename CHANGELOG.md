@@ -15,7 +15,7 @@ Cierra las dos observaciones menores del self-review del sello [`v2.88.95-beta`]
 
 **Verificación (local, cierre).** `pnpm --filter @bolsa/web exec tsc --noEmit` **OK** · `eslint src` **0 errores** (23 avisos preexistentes) · `vitest run` web **281 ficheros / 1753 passed** (+3) · `test_dia_d_bump_guard` **1 passed** (`2.11.96-beta`) · **`Δ motor = 0`** (`git diff --name-only -- packages/py` vacío; sin contrato HTTP, sin Alembic). Evidencia: [`docs/engineering/evidence/v2.88.96/README.md`](docs/engineering/evidence/v2.88.96/README.md). Entrega: [`docs/engineering/entrega-auditoria-externa-mia-v2.88.96-2026-10-09.md`](docs/engineering/entrega-auditoria-externa-mia-v2.88.96-2026-10-09.md).
 
-**Cita POST-TAG.** Tag anotado `v2.88.96-beta` (objeto pendiente → commit pendiente); `Release tag CI` **pendiente**.
+**Cita POST-TAG.** Tag anotado `v2.88.96-beta` (objeto `74e3fcf4` → commit `de3e5222`); `Release tag CI` [`37894478961`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37894478961) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `frontend` `281` ficheros / `1753` passed; `python` `4596 passed / 45 skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 ## [2.11.95-beta] — `FASE 3`: **reorden de la FASE 3 — slices `S1`–`S3` (entrada/salida literal · objetivo con precio · estrategia→indicadores→razón) (UI-only · Δ motor = 0)**
 
