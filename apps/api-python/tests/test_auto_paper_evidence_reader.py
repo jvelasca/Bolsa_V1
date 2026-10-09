@@ -20,6 +20,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+
 from bolsa_application.auto_operational_monitor import AUTO_CYCLE_SETTLEMENT_EVENT
 from bolsa_application.paper_evidence_reader import read_paper_evidence
 

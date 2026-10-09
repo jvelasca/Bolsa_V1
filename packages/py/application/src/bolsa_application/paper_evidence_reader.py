@@ -85,11 +85,10 @@ async def read_paper_evidence(
     ciclo** de esos mismos fills (nunca por ``payload->>'cycleId'``). Sin cuenta legible el
     llamante debe resolver el scope antes (fail-closed ``no_account_scope``).
     """
+    from bolsa_application.sim_durable_store import PostgresSimFillFinanceContextStore
     from bolsa_infrastructure.database.repositories.journal_repository import (
         SqlAlchemyJournalRepository,
     )
-
-    from bolsa_application.sim_durable_store import PostgresSimFillFinanceContextStore
 
     context_store = PostgresSimFillFinanceContextStore(session, autocommit=False)
     repository = SqlAlchemyJournalRepository(session)

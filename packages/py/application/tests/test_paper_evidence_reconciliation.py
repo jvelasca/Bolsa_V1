@@ -16,8 +16,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE
 
+from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE
 from bolsa_application.paper_evidence_reconciliation import (
     RECON_DUPLICATE_EXECUTION,
     RECON_DUPLICATE_SETTLEMENT,

@@ -90,8 +90,6 @@ from bolsa_analytics.cognitive.signal_identity import (
 )
 from bolsa_analytics.cognitive.trade_context import DEFAULT_MAX_AGE_DAYS, TradeContext
 from bolsa_analytics.indicators.compute import compute_atr
-from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
-
 from bolsa_application.auto_daily_journal import OpportunityRow
 from bolsa_application.auto_investment_system import trade_plan_to_decision_package
 from bolsa_application.auto_reason_codes import (
@@ -124,6 +122,7 @@ from bolsa_application.position_manager import (
     PositionManagerSkip,
     manage_position_outcome,
 )
+from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
 
 logger = logging.getLogger(__name__)
 

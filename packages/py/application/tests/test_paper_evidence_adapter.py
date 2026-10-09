@@ -19,7 +19,6 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE
-
 from bolsa_application.paper_evidence_adapter import (
     PAPER_EVIDENCE_CRITERIA_ORDER,
     PaperEvidenceInput,

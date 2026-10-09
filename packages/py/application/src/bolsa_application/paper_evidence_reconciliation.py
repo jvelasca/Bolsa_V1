@@ -44,7 +44,6 @@ from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_UNKNOWN,
     MeasurementStatus,
 )
-
 from bolsa_application.applied_cost import (
     APPLIED_COST_UNBALANCED_ROUND_TRIP,
     APPLIED_COST_WITHOUT_ROUND_TRIP,

@@ -35,7 +35,6 @@ from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_UNKNOWN,
     MeasurementStatus,
 )
-
 from bolsa_application.paper_evidence_reconciliation import PaperEvidenceReconciliation
 
 __all__ = [
