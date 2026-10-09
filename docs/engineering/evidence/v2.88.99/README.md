@@ -6,6 +6,8 @@
 
 **Origen.** Ejecuta el plan `PAPER-2` (adaptador de evidencia durable) sobre el contrato puro de `PAPER-1` ([`paper-confirmation-contract.ts`](../../../../apps/web/src/features/auto-monitor/paper-confirmation-contract.ts)): conectar los siete criterios a las **fuentes durables reales** y **conciliar** sus registros entre sí, sin emitir `CONFIRMED`.
 
+**Cita POST-TAG.** **Tag anotado `v2.88.99-beta`** (objeto `05078920` → commit `8c6d859d`). `Release tag CI` [`37941018957`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37941018957) **VERDE** (`11` jobs `success` + `playwright (integrated E2E, opt-in)` `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…929A37E7` (mismo contenido, LF, `3 340 728 B`) ⇒ **`Δ decisión = 0` confirmado por CI**). También **verdes**: `Python CI` [`37941019176`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37941019176) — `quality` + `auto-v2-durable-pg` con el test PAPER-2 nuevo y gate fail-if-skipped `PAPER_EVIDENCE_PG_REQUIRED=1`; `Frontend CI` [`37941018969`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37941018969) (typecheck/lint/test/build + `contract:check`); y las baterías `Fase 2 scientific` y `Optimize lab`.
+
 ## 1. Cambios (por tarea del plan)
 
 | # | Tarea | Qué hace | Implementación |
@@ -38,6 +40,7 @@
 - `pnpm --filter @bolsa/web run contract:check` → **OK**.
 - `uv run pytest apps/api-python/tests/test_dia_d_bump_guard.py -q` → **1 passed** (`2.11.99-beta`).
 - **`Δ decisión = 0`**: `replay-repro` **`REPRODUCIDO`** — `assert-artifact` byte a byte contra `24066225…6D9F54F0` / 3 445 622 B y mismo contenido `1E3ADAC2…929A37E7` en LF (medido sobre una BD **limpia** sembrada con el fixture congelado, como en CI).
+- **CI del tag** (`Release tag CI` [`37941018957`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37941018957)): **VERDE** — `11` jobs `success` + `playwright (integrated E2E, opt-in)` `skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…929A37E7` ⇒ `Δ decisión = 0` certificado por CI. `Python CI` [`37941019176`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37941019176) y `Frontend CI` [`37941018969`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37941018969) también **verdes**.
 
 ## 4. Qué no cambia / deuda declarada
 
