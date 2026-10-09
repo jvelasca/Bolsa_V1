@@ -6,7 +6,7 @@
 > **Regla del hueco:** una regla que no se puede afirmar se declara **abierta** con su remediación, **nunca** se silencia. Un dato ausente se rotula «Sin dato todavía»; **jamás** se rellena con `0` ni con verde. `ranking ≠ decisión` y `propuesta ≠ posición materializada` se conservan.
 > **`Δ motor = 0`.** El diff funcional vive en `apps/web/src/**` y `packages/shared/src/**`; el resto es `docs/**`, el `package.json` y el `meta.bump` de los 9 CLIs DÍA-D: **sin motor, sin worker, sin umbrales, sin Alembic, sin `contract:gen`, sin tocar `packages/py/**`**. **El contrato HTTP NO cambia.**
 > **Evidencia cruda:** [`docs/engineering/evidence/v2.88.95/README.md`](./evidence/v2.88.95/README.md).
-> **Cita POST-TAG:** tag anotado `v2.88.95-beta` (objeto pendiente → commit pendiente); `Release tag CI` **pendiente**.
+> **Cita POST-TAG:** tag anotado `v2.88.95-beta` (objeto `778c5ec9` → commit `52ba2a26`); `Release tag CI` [`37892237594`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37892237594) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `frontend` `281` ficheros / `1750` passed; `python` `4596 passed / 45 skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 **Sello dirigido (declarado).** Mandato: cerrar los hallazgos `P2-2`, `P2-3`, `P3-1`/`P3-3`/`P3-4` **solo con presentación** sobre datos ya existentes, y **no** cerrar `P4`. No se añaden funciones al motor ni se inventa ningún dato ausente.
 
@@ -72,7 +72,7 @@
 | `pnpm --filter @bolsa/web exec vitest run` | **281 ficheros / 1750 passed** |
 | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **1 passed** (`2.11.95-beta`) |
 | `git diff --name-only -- packages/py` | **vacío** ⇒ **`Δ motor = 0`** |
-| `replay-repro` — CI | **pendiente** (`Release tag CI` por ejecutar) |
+| `replay-repro` — CI | **`REPRODUCIDO`** `1E3ADAC2…` ⇒ **`Δ motor = 0`** (`Release tag CI` [`37892237594`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37892237594) **VERDE**) |
 
 ---
 
@@ -81,7 +81,7 @@
 - **Producto:** `V2.88.95-beta`. **Package:** `2.11.95-beta`. **Sin migración** (Alembic head `052_top3_opportunities`). **Contrato HTTP sin cambio.** `packages/py/**` **sin mover**.
 - **Añadidos:** `docs/engineering/evidence/v2.88.95/README.md`, este documento.
 - **Modificados:** `apps/web/src/features/trading/f3-exit-plan-block.tsx`, `apps/web/src/features/operations/propose-position-exit.ts`, `apps/web/src/features/charts/operational-plan-chart-levels.ts`, `apps/web/src/features/backtests/instrument-strategy-top-panel.tsx`, `apps/web/src/features/backtests/backtest-deep-coach.ts`, `packages/shared/src/strategy-top1-chart-indicators.ts`, `packages/shared/src/coach-facts-api.ts` (+ tests), `package.json`, `apps/api-python/scripts/v2_89`…`v2_97` (`meta.bump`), `CHANGELOG.md`, `docs/CURRENT_SYSTEM.md`, `docs/engineering/versioning.md`, `docs/engineering/entrega-auditoria-externa-mia-v2.88.94-reorden-fase-3-2026-10-08.md`, `docs/engineering/auditoria-operativa-diaria-entrada-salida-dia-d-2026-10-08.md`, `docs/engineering/arranque-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md`, `docs/engineering/respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md`.
-- **Tag anotado `v2.88.95-beta`** — objeto y commit **pendientes**; `Release tag CI` **pendiente**. Cita POST-TAG a completar en el commit de cierre.
+- **Tag anotado `v2.88.95-beta`** — objeto `778c5ec9` → commit `52ba2a26`; mensaje `FASE 3 reorder slices S1-S3 (entry/exit literal, targets with price, strategy->indicators->reason) - Delta motor = 0`. **`Release tag CI`** [`37892237594`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37892237594) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 ---
 

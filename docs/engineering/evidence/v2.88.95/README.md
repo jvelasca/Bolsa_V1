@@ -6,7 +6,7 @@
 > **Origen.** Implementa los slices que el auditor externo **aceptó** en el [reorden de la FASE 3](../../entrega-auditoria-externa-mia-v2.88.94-reorden-fase-3-2026-10-08.md); dictamen en la [respuesta del auditor](../../respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md). El cuarto slice (`S4-agregador-evidencia`) **no se lanza**.
 
 **Base:** [`evidence/v2.88.94/README.md`](../v2.88.94/README.md). Auditoría de origen: [`auditoria-operativa-diaria-entrada-salida-dia-d-2026-10-08.md`](../../auditoria-operativa-diaria-entrada-salida-dia-d-2026-10-08.md) §5.
-**Cita POST-TAG:** tag anotado `v2.88.95-beta` (objeto pendiente → commit pendiente); `Release tag CI` **pendiente**.
+**Cita POST-TAG:** tag anotado `v2.88.95-beta` (objeto `778c5ec9` → commit `52ba2a26`); `Release tag CI` [`37892237594`](https://github.com/jvelasca/Bolsa_V1/actions/runs/37892237594) **VERDE** (`11` jobs `success` + `playwright` integrado `skipped`; `certify` `success`; `frontend` `281` ficheros / `1750` passed; `python` `4596 passed / 45 skipped`; `replay-repro` **`REPRODUCIDO`** `1E3ADAC2…` ⇒ `Δ motor = 0` confirmado por CI).
 
 ## 1. Cambios (por slice)
 
