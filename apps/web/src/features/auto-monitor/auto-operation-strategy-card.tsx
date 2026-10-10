@@ -68,6 +68,9 @@ export function AutoOperationStrategyCard({
                 ? "Estrategia del valor"
                 : AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL}
             </dt>
+            {/* La nota viaja DENTRO del <dd> (contenido de flujo válido): un <div> de
+                agrupación dentro de <dl> solo puede contener grupos <dt>/<dd>, y un <p>
+                suelto ahí rompe axe `definition-list` (serious). */}
             <dd
               className="font-medium"
               data-testid="auto-operation-strategy-label"
@@ -75,16 +78,16 @@ export function AutoOperationStrategyCard({
               {view.strategyDefinitionId
                 ? `${rank != null ? `#${rank} ` : ""}${view.strategyLabel}`
                 : placeholder}
+              {notTop1 ? (
+                <span
+                  className="mt-0.5 block text-[11px] font-normal text-amber-600 dark:text-amber-400"
+                  data-testid="auto-operation-strategy-rank-note"
+                >
+                  No es la #1: el valor sitúa esta estrategia en el puesto #
+                  {rank}.
+                </span>
+              ) : null}
             </dd>
-            {notTop1 ? (
-              <p
-                className="text-[11px] text-amber-600 dark:text-amber-400"
-                data-testid="auto-operation-strategy-rank-note"
-              >
-                No es la #1: el valor sitúa esta estrategia en el puesto #{rank}
-                .
-              </p>
-            ) : null}
           </div>
           <div>
             <dt className="text-muted-foreground">Indicadores</dt>
@@ -121,13 +124,14 @@ export function AutoOperationStrategyCard({
               {view.declaredCycleStrategyVersion ??
                 AUTO_OPERATION_STRATEGY_NO_DATA}{" "}
               · {view.matchLabel}
+              {/* Nota de honestidad DENTRO del <dd> (ver nota del bloque anterior). */}
+              <span
+                className="mt-0.5 block text-[11px] text-muted-foreground"
+                data-testid="auto-operation-strategy-match-heuristic"
+              >
+                {AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC}
+              </span>
             </dd>
-            <p
-              className="text-[11px] text-muted-foreground"
-              data-testid="auto-operation-strategy-match-heuristic"
-            >
-              {AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC}
-            </p>
           </div>
         </dl>
         {loading ? (
