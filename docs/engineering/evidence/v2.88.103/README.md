@@ -58,4 +58,12 @@
 
 ## 5. Cita POST-TAG
 
-**Pendiente** en el momento de escribir esta evidencia (patrón del repo: se rellena al correr el `Release tag CI` del tag `v2.88.103-beta`). Se citará el run del `Release tag CI` (con `replay-repro`), `Python CI`, `Frontend CI`, `Fase 2 scientific`, `Optimize lab` y `Gitleaks`.
+Tag anotado **`v2.88.103-beta`** (objeto `0bd6d81d` → commit `b65fe2278072a015463f5d25146a776db5815c9e`).
+
+- `Release tag CI` [`38032301155`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38032301155) **VERDE** — `11` jobs `success` + `certify` `success`; `playwright (integrated E2E, opt-in)` **`skipped`** (un `skipped` **no** cuenta como prueba superada, por diseño).
+- `Python CI` tag [`38032301131`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38032301131) y `main` [`38032301197`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38032301197) **VERDES** (Ruff → import-linter → mypy → pytest ejecutados).
+- `Frontend CI` tag [`38032301139`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38032301139) y `main` [`38032301179`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38032301179) **VERDES**.
+- `Fase 2 scientific` tag [`38032301147`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38032301147) · `Optimize lab` tag [`38032301178`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38032301178) · `Gitleaks` [`38032301158`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38032301158) **VERDES**.
+- `replay-repro` **`REPRODUCIDO`** (`sha256` `1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`; `sello (contenido)` = mismo sha256) ⇒ **`Δ motor = 0` confirmado por CI**.
+
+Tag **unsigned** (limitación de certificación, no defecto funcional).
