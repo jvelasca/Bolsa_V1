@@ -2,6 +2,7 @@
 
 > **AsOf:** 2026-10-08 · **Base:** `v2.88.94-beta` · **Naturaleza:** auditoría **read-only** (no toca motor, contrato HTTP ni Alembic; **no** re-mide DÍA-D).
 > **Actualización (2026-10-09):** los slices `S1`–`S3` de §5 se **implementaron** en [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547) (`apps/web/**` + `packages/shared/**`, `Δ motor = 0`); `S4` sigue **no lanzado**.
+> **Actualización (2026-10-10):** **`S4` sí se entregó** después en [`d9df6de4`](https://github.com/jvelasca/Bolsa_V1/commit/d9df6de4) (`v2.88.97-beta`): el **agregador de evidencia** vive en `dia-d-evidence-aggregate-panel.tsx` (montado en `DiaDAutoPanel`) y mantiene el veredicto **`NO CONFIRMADO`** sin emitir jamás `CONFIRMED`. La afirmación «`S4` no lanzado» de la cabecera original **queda desactualizada**. Nuevo slice **`S5-puente-auto-dia-d`** (UI-only, `Δ motor = 0`) cierra el hueco restante: lleva desde la **operación de AUTO** a la **estrategia/indicadores ganadores que la sustentan** y a la **verificación DÍA-D bajo demanda** ya existente en Laboratorio.
 > **Premisas auditadas:** [`PROJECT_PREMISES.md` §6](../PROJECT_PREMISES.md) — `P2` (claridad entrada/salida), `P3` (estrategia confirmada con los mejores indicadores), `P4` (evaluación DÍA-D).
 > **Origen:** reorden de la FASE 3 — [auditoría FASE 2](./auditoria-operativa-auto-fase-2-2026-10-08.md) §8 y [plan de motor PARKED](./plan-cierre-operativa-auto-2026-10-08.md).
 > **Punto de entrada para el auditor:** [`arranque-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md`](./arranque-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md).
@@ -107,20 +108,36 @@
 
 ---
 
-## 5. Slices derivados (`S1`–`S3` **implementados** · `S4` **no lanzado**)
+## 5. Slices derivados (`S1`–`S5` **implementados** · `S4` **entregado**)
 
-> `S1`–`S3` se **implementaron** tras la auditoría (commit [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547), UI-only + `packages/shared`, **`Δ motor = 0`**). `S4` permanece **no lanzado**. Prioridad por relación coste/valor sobre `P1`–`P4`.
+> `S1`–`S3` se **implementaron** tras la auditoría (commit [`704c4547`](https://github.com/jvelasca/Bolsa_V1/commit/704c4547), UI-only + `packages/shared`, **`Δ motor = 0`**); `S4` se **entregó** en [`d9df6de4`](https://github.com/jvelasca/Bolsa_V1/commit/d9df6de4) (`v2.88.97-beta`); `S5` (puente AUTO → DÍA-D) se **implementa** UI-only. Prioridad por relación coste/valor sobre `P1`–`P4`.
 
 | Slice | Pilar | Objetivo | Alcance | Estado |
 | --- | --- | --- | --- | --- |
 | `S1-exit-precio` | P2 | Declarar T1/T2 con **precio** en el Plan de salida del ticket | UI (`f3-exit-plan-block.tsx`) + meta en `propose-position-exit.ts`; precio desde `position.operational.target*`; si falta → «Sin dato todavía» (**no** se fabrica) | **IMPLEMENTADO** `704c4547` |
 | `S2-entrada-literal` | P2 | Resolver la **semántica** de niveles en `simple` + `prepared`: `Entrada` (fill) y `Trigger` (activación) coexisten **solo** si el precio difiere; **no** se duplica la línea | UI (`operational-plan-chart-levels.ts`) | **IMPLEMENTADO** `704c4547` |
 | `S3-indicadores-razon` | P3 | Mostrar en primer nivel la cadena **Estrategia → indicadores que la sustentan → razón** | UI (`instrument-strategy-top-panel.tsx`) + helper en `strategy-top1-chart-indicators.ts`; indicadores de `definition.indicatorSpecs`→`presetIndicatorSpecs` (**nunca** el catálogo del gráfico); `reasons` persistidas en `coachFacts.recommendations[]`; hueco → «Sin dato todavía» | **IMPLEMENTADO** `704c4547` |
-| `S4-agregador-evidencia` | P4 | **Agregador de evidencia** (no un veredicto nuevo): compone los veredictos existentes (declarado↔ejecutado · OOS · PAPER) y concluye `NO CONFIRMADO` mientras no haya evidencia PAPER | Diseño read-only. **Prohibido** `OOS_SUPPORTED + MATCH → CONFIRMED`; **sin** emitir `CONFIRMED`. **No se lanza** hasta nacer con el contrato semántico correcto (§5.2 de premises) | **NO LANZADO** |
+| `S4-agregador-evidencia` | P4 | **Agregador de evidencia** (no un veredicto nuevo): compone los veredictos existentes (declarado↔ejecutado · OOS · PAPER) y concluye `NO CONFIRMADO` mientras no haya evidencia PAPER | Implementado read-only en `dia-d-evidence-aggregate-panel.tsx` (+ `dia-d-evidence-aggregate.ts`), montado en `DiaDAutoPanel`. **Prohibido** `OOS_SUPPORTED + MATCH → CONFIRMED`; **no** emite `CONFIRMED`. Nació con el contrato semántico correcto (§5.2 de premises) | **IMPLEMENTADO** `d9df6de4` |
+| `S5-puente-auto-dia-d` | P3 + P4 | **Puente operación → estrategia/indicadores → verificación DÍA-D**: desde la operación de AUTO, resolver el **UUID por ticker**, mostrar la **estrategia #1** del valor con los **indicadores que la sustentan** y la **razón**, y ofrecer el CTA **«Verificar D→hoy»** que entra la sesión DÍA-D LAB y navega al verificador | UI-only: helper puro `auto-operation-strategy.ts` + hook `use-auto-operation-strategy.ts` (`features/auto`) y bloque en `auto-operation-story-panel.tsx`. Reutiliza `strategySlotToIndicatorLabels` + `readRecommendationReasons`; **no** recalcula ranking ni score. Huecos → «Sin dato todavía» (nunca `0`); la coincidencia con el sello del ciclo es **heurística declarada**. Sin tocar motor/contrato/DB | **IMPLEMENTADO** (UI-only, `Δ motor = 0`) |
 
-**Regla:** ningún slice toca motor, contrato HTTP ni Alembic. Si un slice **exige** motor (p. ej. emitir `CONFIRMED` con evidencia PAPER), se para y se reabre el [plan PARKED](./plan-cierre-operativa-auto-2026-10-08.md) con dueño y disparador. Se cumplió: `S1`–`S3` viven en `apps/web/**` + `packages/shared/**`; `git diff --name-only -- packages/py` **vacío**.
+**Regla:** ningún slice toca motor, contrato HTTP ni Alembic. Si un slice **exige** motor (p. ej. emitir `CONFIRMED` con evidencia PAPER), se para y se reabre el [plan PARKED](./plan-cierre-operativa-auto-2026-10-08.md) con dueño y disparador. Se cumplió para `S1`–`S3` y `S5`: viven en `apps/web/**` (más `packages/shared/**` para `S3`); `git diff --name-only -- packages/py apps/api-python` **vacío**. `S4` es UI-only sobre el read-model existente.
+
+**Nota del puente (2026-10-10).** `S4` **sí se entregó** en [`d9df6de4`](https://github.com/jvelasca/Bolsa_V1/commit/d9df6de4) (`v2.88.97-beta`): el agregador compone declarado↔ejecutado · OOS · PAPER y concluye `NO CONFIRMADO` sin emitir `CONFIRMED`, mitigando el hallazgo `P4-4` (veredicto fragmentado). El hueco que quedaba **no** era el veredicto, sino el **camino**: desde la operación de AUTO no había ninguna referencia a la estrategia/indicadores ganadores que sustentan ESA señal ni al verificador DÍA-D bajo demanda del Laboratorio. Ese es exactamente **`S5`**: UI-only, con **«Sin dato todavía»** en los huecos (`UNKNOWN ≠ 0`) y **sin** fingir coincidencia entre el sello de estrategia del ciclo y el TOP #1.
 
 **Nota del auditor (2026-10-08).** `S1`–`S3` quedaron **aceptados** para diseño/implementación (con los límites de arriba) y **ya están implementados**; `S4` se **acepta como objetivo pero no como contrato actual**: queda reformulado a agregador de evidencia y **no se lanza**. Ver [respuesta del auditor](./respuesta-auditor-operativa-diaria-entrada-salida-dia-d-2026-10-08.md).
+
+**Refinamiento `S5` (2026-10-10) — UI-only, `Delta motor = 0`:**
+
+- **Refactor DRY:** nuevo hook `apps/web/src/features/trading/use-dia-d-verify-launch.ts` (`useDiaDVerifyLaunch`) unifica el lanzamiento «Verificar D-hoy» que estaba **DUPLICADO** en `auto-operation-story-panel.tsx` y `instrument-strategy-top-panel.tsx` (`enterSession` `mode:'auto'` + `setAdoption(candidata)` + `navigate(diaDVerifyHref)` + toast). Sin cambio de comportamiento.
+- **Tarjeta extraída:** `apps/web/src/features/auto-monitor/auto-operation-strategy-card.tsx` (`AutoOperationStrategyCard`) conserva los mismos `data-testid`; el story panel la consume.
+- **Heurística de coincidencia ENDURECIDA:** `resolveAutoOperationStrategyMatch` pasa de CONTENCIÓN sobre tokens normalizados (falso positivo: sello `ma` contenido en `smacrossover` se declaraba `same`) a IGUALDAD POR TOKEN COMPLETO; `same` solo con emparejamiento real, `unknown`/`differs` en el resto.
+- **Pulido de honestidad UI:** `rank != 1` se declara explícitamente (no se etiqueta como '#1' lo que no lo es); las RAZONES se listan completas (hasta 5); y 'carga != hueco': nueva bandera `loading` en la vista; durante la carga NO se declara un falso «Sin dato todavía» (se muestra «Cargando...»). Los errores de lectura siguen declarando «No disponible».
+- **Higiene E2E integrado:** `afterAll` en `gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts` limpia el `strategy-top` global sembrado (DELETE); sin cambiar aserciones.
+- **Herramienta dev:** `scripts/dev/seed_auto_cycle_for_ui.py` siembra/limpia un ciclo AUTO durable + TOP en la BD dev (idempotente, `--cleanup`), FUERA de `apps/api-python` y `packages/py`.
+
+Verificación (2026-10-10): detalle completo en [`PROJECT_STATE.md`](./PROJECT_STATE.md).
+
+**Sello (2026-10-10).** El slice **`S5`** (puente AUTO → DÍA-D) se **sella** en **`v2.88.104-beta`** (UI-only, `Δ motor = 0` / `Δ contrato = 0`, sin migración); evidencia en [`evidence/v2.88.104/README.md`](./evidence/v2.88.104/README.md).
 
 ---
 

@@ -154,11 +154,12 @@ jobs:
 
       # V1.86 tip honesty: gp-e2e + certification mocks V1.73–V1.86 (no PG · no LIVE)
       # V2.45: filtro `gp-e2e` ya incluye gp-e2e-v25/v26/v28 (cabin cert) — sin glob extra.
+      # S5: el puente AUTO → estrategia #1 → DÍA-D (mock) se cablea con token explícito.
       - name: Run mock browser E2E (gp-e2e + gp-v173..gp-v186)
         working-directory: apps/web
         env:
           E2E_RUN: '1'
-        run: pnpm e2e -- "gp-e2e|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179|gp-v181|gp-v183|gp-v184|gp-v185|gp-v186"
+        run: pnpm e2e -- "gp-e2e|gp-e2e-s5|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179|gp-v181|gp-v183|gp-v184|gp-v185|gp-v186"
 
   playwright-integrated:
     name: playwright (integrated E2E, opt-in)
@@ -312,13 +313,19 @@ jobs:
       # NO filtra en CI: pnpm reenvía el `--` y Playwright recibe `test -- <filtros>`, con lo
       # que IGNORA los filtros y corre los 135 tests (incluidos specs fuera de esta lista).
       # Se invoca el binario directamente para que los filtros lleguen verbatim.
+      #
+      # GP-V288-S5: puente AUTO operación → estrategia #1 → DÍA-D. Certifica la pantalla
+      # `/auto/operar` (declara su hueco honesto) y ejecuta el CTA «Verificar D→hoy» que monta
+      # el host DÍA-D y arranca el run real; el tramo del puente se declara SKIPPED con motivo
+      # explícito si la BD no tiene un ciclo AUTO durable (el worker del motor no corre en CI),
+      # igual que el resto de huecos declarados de este job opt-in.
       - name: Run integrated browser E2E
         working-directory: apps/web
         env:
           E2E_RUN: '1'
           E2E_INTEGRATION: '1'
           E2E_ALLOW_DEV_DB: '1'
-        run: pnpm exec playwright test gp-v164-ui gp-v167 gp-v168 gp-v170-list gp-v187
+        run: pnpm exec playwright test gp-v164-ui gp-v167 gp-v168 gp-v170-list gp-v187 gp-v288-s5
 
   python:
     name: python (ruff/imports/mypy/pytest offline)

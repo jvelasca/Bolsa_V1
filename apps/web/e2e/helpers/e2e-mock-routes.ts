@@ -174,6 +174,9 @@ const E2E_AUTO_CYCLE_A = "e2e-cycle-aaa";
 const E2E_AUTO_CYCLE_B = "e2e-cycle-bbb";
 const E2E_AUTO_SYMBOL = "AAA";
 const E2E_AUTO_WINDOW = "2026-09-29_2026-09-30";
+/** S5 — UUID determinista del valor para el puente AUTO → estrategia (UI-only, mock). */
+const E2E_AUTO_INSTRUMENT_ID = "inst-e2e-aaa";
+const E2E_AUTO_STRATEGY_ID = "def-e2e-1";
 
 function autoMonitorCycle(
   cycleId: string,
@@ -215,6 +218,58 @@ function autoMonitorCycle(
     ],
     result: { pnl: 250, closedAt: "2026-09-30T15:00:00Z" },
     notes: [],
+  };
+}
+
+/** S5 — catálogo resoluble por símbolo (`AAA` → UUID) para el puente operación → estrategia. */
+function autoStrategyInstrumentCatalog() {
+  return {
+    data: [
+      { id: E2E_AUTO_INSTRUMENT_ID, symbol: E2E_AUTO_SYMBOL, name: "AAA E2E" },
+    ],
+  };
+}
+
+/** S5 — TOP de Finalistas del valor: #1 con definición + razones del coach (sin recalcular). */
+function autoStrategyTopMock() {
+  return {
+    data: {
+      id: "top-e2e-aaa",
+      instrumentId: E2E_AUTO_INSTRUMENT_ID,
+      symbol: E2E_AUTO_SYMBOL,
+      timeframe: "1d",
+      status: "active",
+      version: 1,
+      evidenceLevel: "lab_validated",
+      slots: [
+        {
+          rank: 1,
+          label: "SMA cross",
+          stars: 3,
+          score: 70,
+          source: "coach",
+          strategyDefinitionId: E2E_AUTO_STRATEGY_ID,
+          strategyType: "sma_crossover",
+        },
+      ],
+      coachFacts: {
+        recommendations: [{ rank: 1, reasons: ["Estrellas 3/5", "DD -12%"] }],
+      },
+      createdAt: "2026-10-01T00:00:00Z",
+      updatedAt: "2026-10-01T00:00:00Z",
+    },
+  };
+}
+
+/** S5 — definición de la estrategia #1 (fuente de los indicadores que la sustentan). */
+function autoStrategyDefinitionMock() {
+  return {
+    data: {
+      definition: {
+        indicatorSpecs: [{ definitionId: "rsi", parameters: { period: 14 } }],
+        presetKey: "sma_crossover",
+      },
+    },
   };
 }
 
@@ -537,6 +592,16 @@ export function routeBody(
     }
     if (path.startsWith("/api/auto/dia-d-replay/")) {
       return { available: false, notes: ["artifact_not_found"] };
+    }
+    // S5 — puente operación → estrategia/indicadores → verificación DÍA-D (UI-only).
+    if (path === "/api/instruments") {
+      return autoStrategyInstrumentCatalog();
+    }
+    if (path.endsWith("/strategy-top")) {
+      return autoStrategyTopMock();
+    }
+    if (path.startsWith("/api/strategies/")) {
+      return autoStrategyDefinitionMock();
     }
   }
   if (path === "/api/portfolio") {

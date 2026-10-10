@@ -140,6 +140,45 @@ vi.mock("@/lib/api", () => ({
       },
       notes: [],
     })),
+    // Puente P3/P4: resolución ticker → UUID → TOP de Finalistas → definición de la estrategia #1.
+    getInstruments: vi.fn(async () => ({
+      data: [{ id: "uuid-aaa", symbol: "AAA", name: "AAA Corp" }],
+    })),
+    getInstrumentStrategyTop: vi.fn(async () => ({
+      data: {
+        id: "top-aaa",
+        instrumentId: "uuid-aaa",
+        symbol: "AAA",
+        timeframe: "1d",
+        status: "active",
+        version: 1,
+        evidenceLevel: "lab_validated",
+        slots: [
+          {
+            rank: 1,
+            label: "SMA cross",
+            stars: 3,
+            score: 70,
+            source: "coach",
+            strategyDefinitionId: "def-1",
+            strategyType: "sma_crossover",
+          },
+        ],
+        coachFacts: {
+          recommendations: [{ rank: 1, reasons: ["Estrellas 3/5", "DD -12%"] }],
+        },
+        createdAt: "2026-10-01T00:00:00Z",
+        updatedAt: "2026-10-01T00:00:00Z",
+      },
+    })),
+    getStrategy: vi.fn(async () => ({
+      data: {
+        definition: {
+          indicatorSpecs: [{ definitionId: "rsi", parameters: { period: 14 } }],
+          presetKey: "sma_crossover",
+        },
+      },
+    })),
   },
 }));
 
@@ -157,6 +196,8 @@ import {
   resolveAutoOperationSelection,
   resolveExplanationForCycle,
 } from "@/features/auto-monitor/auto-operation-story-panel";
+import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
+import { api } from "@/lib/api";
 
 function LocationProbe() {
   const location = useLocation();
@@ -192,6 +233,7 @@ function renderPanel(options?: {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  useDiaDTradingSessionStore.getState().exitSession();
 });
 
 describe("AutoOperationStoryPanel", () => {
@@ -260,6 +302,99 @@ describe("AutoOperationStoryPanel", () => {
       .find((item) => item.getAttribute("data-context-id") === "PIT_UNIVERSE");
     expect(pit?.getAttribute("data-measurement")).toBe("UNKNOWN");
     expect(pit?.textContent).toContain("NO MEDIDO");
+  });
+
+  it("muestra la estrategia #1 con sus indicadores y razones (P3)", async () => {
+    renderPanel();
+    const chain = await screen.findByTestId("auto-operation-strategy");
+    // Identidad del instrumento + estrategia #1 (no un score abstracto). La cadena se resuelve
+    // de forma asíncrona (ticker → UUID → TOP), por eso se espera al valor resuelto.
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("auto-operation-strategy-label").textContent,
+      ).toContain("#1 SMA cross"),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("auto-operation-strategy-indicators").textContent,
+      ).toContain("RSI"),
+    );
+    expect(
+      screen.getByTestId("auto-operation-strategy-reason").textContent,
+    ).toContain("Estrellas 3/5");
+    // El sello declarado por el ciclo se pinta como base del emparejamiento (honesto).
+    expect(
+      screen.getByTestId("auto-operation-strategy-match").textContent,
+    ).toContain("sv-1");
+    expect(chain.getAttribute("data-match")).toBe("differs");
+    expect(screen.queryByTestId("auto-operation-strategy-gap")).toBeNull();
+  });
+
+  it("lanza la verificación DÍA-D desde la operación (P4) con el instrumento y la #1", async () => {
+    renderPanel();
+    const button = await screen.findByTestId(
+      "auto-operation-strategy-verify-dia-d",
+    );
+    await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
+    expect(button.textContent).toContain("Verificar D→hoy");
+
+    fireEvent.click(button);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("story-location").textContent).toContain(
+        "/backtests?",
+      ),
+    );
+    const location = screen.getByTestId("story-location").textContent ?? "";
+    const params = new URLSearchParams(location.split("?")[1] ?? "");
+    expect(params.get("instrumentId")).toBe("uuid-aaa");
+    expect(params.get("focus")).toBe("detail");
+    expect(params.get("verify")).toBe("1");
+
+    // La sesión DÍA-D LAB queda precargada con la estrategia #1 (sandbox, no producción).
+    const session = useDiaDTradingSessionStore.getState().session;
+    expect(session?.instrumentId).toBe("uuid-aaa");
+    expect(session?.strategyDefinitionId).toBe("def-1");
+    expect(session?.mode).toBe("auto");
+  });
+
+  it("declara el hueco y no ofrece verificación cuando no hay TOP (fail-closed)", async () => {
+    vi.mocked(api.getInstrumentStrategyTop).mockResolvedValueOnce({
+      data: null,
+    });
+
+    renderPanel();
+    // Primero se resuelve el instrumento (hueco transitorio); luego el TOP nulo declara el hueco.
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("auto-operation-strategy-gap").textContent,
+      ).toContain("no hay Finalistas"),
+    );
+    const button = screen.getByTestId("auto-operation-strategy-verify-dia-d");
+    expect(button.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("un ciclo seleccionado sin instrumentId declara el hueco y no oculta la tarjeta (fail-closed)", async () => {
+    // El monitor puede exponer un ciclo cuyo `instrumentId` (ticker) sea `null`: la tarjeta
+    // del puente debe seguir visible y declarar el hueco, nunca desaparecer en silencio.
+    const monitor = await vi.mocked(api.getAutoOperationalMonitor)();
+    vi.mocked(api.getAutoOperationalMonitor).mockResolvedValueOnce({
+      ...monitor,
+      cycles: (monitor.cycles ?? []).map((cycle, index) =>
+        index === 0 ? { ...cycle, instrumentId: null } : cycle,
+      ),
+    });
+
+    renderPanel();
+    const card = await screen.findByTestId("auto-operation-strategy");
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("auto-operation-strategy-gap").textContent,
+      ).toContain("no se pudo resolver el instrumento"),
+    );
+    expect(card).toBeTruthy();
+    const button = screen.getByTestId("auto-operation-strategy-verify-dia-d");
+    expect(button.hasAttribute("disabled")).toBe(true);
   });
 
   it("resuelve la explicación por cycleId (índice `cycles[]`) y la lleva a «Qué aprendemos»", async () => {

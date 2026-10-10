@@ -38,6 +38,7 @@ import {
 } from "@bolsa/shared";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 import { useAutoDiaDFeedbackList } from "@/features/auto-monitor/use-auto-dia-d-feedback";
+import { AutoOperationStrategyCard } from "@/features/auto-monitor/auto-operation-strategy-card";
 import { buildOperationIdentity } from "@/features/auto/auto-operation-identity";
 import {
   plainStageLabel,
@@ -47,6 +48,8 @@ import {
   autoDiaDHref,
   autoTechnicalDetailHref,
 } from "@/features/auto/auto-nav";
+import { useAutoOperationStrategy } from "@/features/auto/use-auto-operation-strategy";
+import { useDiaDVerifyLaunch } from "@/features/trading/use-dia-d-verify-launch";
 
 type DiaDFeedbackValueDto = components["schemas"]["DiaDFeedbackValueDto"];
 type DiaDFeedbackCycleDto = components["schemas"]["DiaDFeedbackCycleDto"];
@@ -269,6 +272,39 @@ export function AutoOperationStoryPanel({
     });
   }, [feedbackList.data, selected]);
 
+  // Puente P3/P4: estrategia #1 del valor (la que sustenta la señal) + destino de verificación
+  // DÍA-D del ciclo seleccionado. Se pasa la FORMA del ciclo tal cual: si existe pero su
+  // `instrumentId` es `null`, la tarjeta sigue declarando el hueco (no se oculta).
+  const strategy = useAutoOperationStrategy({
+    cycle: selected
+      ? {
+          instrumentId: selected.instrumentId ?? null,
+          strategyVersion: selected.strategyVersion ?? null,
+        }
+      : null,
+  });
+  // Fail-closed: el único destino verificable es el del helper (ya exige instrumento + #1 y
+  // descarta los fallos de lectura del TOP/definición).
+  const canVerifyDiaD = Boolean(strategy.view?.verifyHref);
+
+  // Lanza la verificación DÍA-D LAB del valor con la estrategia #1 precargada (sandbox, no escribe
+  // producción): la misma sesión que abre Finalistas, pero disparada desde ESTA operación.
+  const launchDiaDVerify = useDiaDVerifyLaunch();
+  const startDiaDVerification = () => {
+    const view = strategy.view;
+    // Guard completo: el destino canónico (`verifyHref`) ya es `null` si falta instrumento/#1
+    // o si la lectura del TOP/definición falló (fail-closed), pero se comprueba explícitamente.
+    if (!view?.verifyHref || !view.instrumentId || !view.strategyDefinitionId)
+      return;
+    launchDiaDVerify({
+      instrumentId: view.instrumentId,
+      symbol: view.symbol,
+      strategyDefinitionId: view.strategyDefinitionId,
+      strategyLabel: view.strategyLabel,
+      rank: view.rank ?? 1,
+    });
+  };
+
   const story = useMemo(
     () => buildAutoOperationStory({ cycle: selected, explanation }),
     [selected, explanation],
@@ -412,6 +448,15 @@ export function AutoOperationStoryPanel({
           ) : null}
         </CardContent>
       </Card>
+
+      {selected && strategy.view ? (
+        <AutoOperationStrategyCard
+          view={strategy.view}
+          onVerify={startDiaDVerification}
+          disabled={!canVerifyDiaD}
+          loading={strategy.view.loading}
+        />
+      ) : null}
 
       {selected ? (
         <Card

@@ -53,16 +53,10 @@ import { useAlertsStore } from "@/stores/alerts-store";
 import {
   effectiveDiaD,
   isDiaDInPast,
-  todayIsoDate,
 } from "@/features/backtests/backtest-period";
 import { loadBacktestRunContext } from "@/features/backtests/backtest-run-context";
-import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
-import {
-  diaDVerifyHref,
-  VERIFY_DIA_D_CTA,
-} from "@/features/platform/product-universe";
-import { setAdoption } from "@/features/platform/strategy-adoption";
-import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { VERIFY_DIA_D_CTA } from "@/features/platform/product-universe";
+import { useDiaDVerifyLaunch } from "@/features/trading/use-dia-d-verify-launch";
 import {
   getDiaDExperimentTop,
   getDiaDExperimentTop1,
@@ -420,8 +414,7 @@ export function InstrumentStrategyTopPanel({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const pushToast = useAlertsStore((s) => s.pushToast);
-  const enterDiaDSession = useDiaDTradingSessionStore((s) => s.enterSession);
-  const { effectiveAccountId } = useActiveAccount();
+  const launchDiaDVerify = useDiaDVerifyLaunch();
   const diaD = asOfDiaD ?? loadBacktestRunContext().diaD;
   const diaDActive = isDiaDInPast(diaD);
   const [deleting, setDeleting] = useState(false);
@@ -828,6 +821,8 @@ export function InstrumentStrategyTopPanel({
                 diaDActive={diaDActive}
                 onSimulateDiaD={(use) => {
                   const sym = symbol?.trim() || instrumentId.slice(0, 8);
+                  // El experimento F-D (si existe) manda sobre el slot operativo: la verificación
+                  // usa su #1 y lo declara; en su defecto, la estrategia del slot (Cartera LAB).
                   const fromExp = experimentTop1?.strategyDefinitionId
                     ? {
                         strategyDefinitionId:
@@ -836,35 +831,19 @@ export function InstrumentStrategyTopPanel({
                         rank: experimentTop1.rank,
                       }
                     : null;
-                  enterDiaDSession({
+                  launchDiaDVerify({
                     instrumentId,
                     symbol: sym,
                     strategyDefinitionId:
                       fromExp?.strategyDefinitionId ?? use.strategyDefinitionId,
                     strategyLabel: fromExp?.strategyLabel ?? use.label,
                     rank: fromExp?.rank ?? use.rank,
-                    diaD: effectiveDiaD(diaD),
-                    endDate: todayIsoDate(),
-                    mode: "auto",
-                  });
-                  if (effectiveAccountId) {
-                    setAdoption({
-                      instrumentId,
-                      accountId: effectiveAccountId,
-                      state: "candidata",
-                      strategyDefinitionId:
-                        fromExp?.strategyDefinitionId ??
-                        use.strategyDefinitionId,
-                      strategyLabel: fromExp?.strategyLabel ?? use.label,
-                      timeframe,
-                    });
-                  }
-                  navigate(diaDVerifyHref(instrumentId));
-                  pushToast(
-                    fromExp
+                    timeframe,
+                    diaD,
+                    toast: fromExp
                       ? `LAB · Verificar ${effectiveDiaD(diaD)} → hoy · F-D #1 (experimento)`
                       : `LAB · Verificar ${effectiveDiaD(diaD)} → hoy · Auto (Cartera LAB)`,
-                  );
+                  });
                 }}
               />
             );
