@@ -105,8 +105,9 @@ export function useAutoOperationStrategy(
             }
           : null,
         instrumentId: resolvedInstrumentId,
-        top,
         // Un FALLO de lectura no es una ausencia: se propaga como error declarado.
+        instrumentError: instrumentsQuery.isError,
+        top,
         topError: topQuery.isError,
         definition,
         definitionError: definitionQuery.isError,
@@ -117,6 +118,7 @@ export function useAutoOperationStrategy(
       ticker,
       cycleStrategyVersion,
       resolvedInstrumentId,
+      instrumentsQuery.isError,
       top,
       topQuery.isError,
       definition,

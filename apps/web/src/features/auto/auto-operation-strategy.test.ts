@@ -12,6 +12,9 @@ import type {
   InstrumentStrategyTopV1,
 } from "@bolsa/shared";
 import {
+  AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL,
+  AUTO_OPERATION_STRATEGY_DECLARED_LABEL,
+  AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC,
   AUTO_OPERATION_STRATEGY_NO_DATA,
   buildAutoOperationStrategyView,
   resolveAutoOperationStrategyMatch,
@@ -203,6 +206,50 @@ describe("buildAutoOperationStrategyView", () => {
     expect(view?.gapReason).not.toContain(ABSENT_DATA_NOT_AVAILABLE);
   });
 
+  it("un FALLO del catálogo de instrumentos declara «No disponible» (no una ausencia) y cierra el CTA", () => {
+    const view = buildAutoOperationStrategyView({
+      cycle: { instrumentId: "AAPL" },
+      instrumentId: null,
+      top: null,
+      instrumentError: true,
+      definition: null,
+    });
+    expect(view?.gapReason).toContain(ABSENT_DATA_NOT_AVAILABLE);
+    expect(view?.gapReason).toContain("no se pudo leer el catálogo");
+    // No se describe como ausencia ni se colapsa a un hueco de instrumento.
+    expect(view?.gapReason).not.toContain(AUTO_OPERATION_STRATEGY_NO_DATA);
+    expect(view?.verifyHref).toBeNull();
+  });
+
+  it("un FALLO del catálogo manda aunque el UUID esté resuelto: «No disponible», sin verificación", () => {
+    const view = buildAutoOperationStrategyView({
+      cycle: { instrumentId: "AAPL", strategyVersion: "sma_crossover" },
+      instrumentId: "uuid-1",
+      top: top(),
+      instrumentError: true,
+      definition,
+    });
+    expect(view?.gapReason).toContain(ABSENT_DATA_NOT_AVAILABLE);
+    expect(view?.gapReason).toContain("no se pudo leer el catálogo");
+    expect(view?.gapReason).not.toContain(AUTO_OPERATION_STRATEGY_NO_DATA);
+    expect(view?.verifyHref).toBeNull();
+  });
+
+  it("un FALLO del catálogo manda sobre la carga (sigue «No disponible», no carga)", () => {
+    const view = buildAutoOperationStrategyView({
+      cycle: { instrumentId: "AAPL" },
+      instrumentId: null,
+      top: null,
+      instrumentError: true,
+      definition: null,
+      loading: true,
+    });
+    expect(view?.gapReason).not.toBeNull();
+    expect(view?.gapReason).toContain(ABSENT_DATA_NOT_AVAILABLE);
+    expect(view?.gapReason).not.toContain(AUTO_OPERATION_STRATEGY_NO_DATA);
+    expect(view?.verifyHref).toBeNull();
+  });
+
   it("un ciclo SELECCIONADO sin instrumentId declara el hueco y no oculta la tarjeta", () => {
     const view = buildAutoOperationStrategyView({
       cycle: { instrumentId: null, strategyVersion: "sv-1" },
@@ -258,5 +305,37 @@ describe("resolveAutoOperationStrategyMatch", () => {
     expect(resolveAutoOperationStrategyMatch(null, slot())).toBe("unknown");
     expect(resolveAutoOperationStrategyMatch("1", slot())).toBe("unknown");
     expect(resolveAutoOperationStrategyMatch("sv-1", null)).toBe("unknown");
+  });
+});
+
+describe("copy de identidad (separación mejor-disponible vs ejecutada)", () => {
+  it("nombra los dos bloques de forma INEQUÍVOCA", () => {
+    // (a) Mejor DISPONIBLE del valor = TOP #1 de Finalistas.
+    expect(AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL).toContain(
+      "Mejor estrategia del valor",
+    );
+    expect(AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL).toContain(
+      "Finalistas",
+    );
+    // (b) EJECUTADA declarada por el ciclo (identidad publicada por el motor).
+    expect(AUTO_OPERATION_STRATEGY_DECLARED_LABEL).toContain("ejecutada");
+    expect(AUTO_OPERATION_STRATEGY_DECLARED_LABEL).toContain("ciclo");
+    // Son rótulos DISTINTOS: no se pueden confundir en la superficie.
+    expect(AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL).not.toBe(
+      AUTO_OPERATION_STRATEGY_DECLARED_LABEL,
+    );
+  });
+
+  it("declara la heurística y NO afirma una identidad exacta", () => {
+    expect(AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC).toContain(
+      "aproximación textual",
+    );
+    expect(AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC).toContain(
+      "no lo materializa",
+    );
+    // No se declara «coincide»/identidad exacta en la nota honesta.
+    expect(AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC).not.toContain(
+      "Coincide",
+    );
   });
 });

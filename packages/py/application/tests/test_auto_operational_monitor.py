@@ -130,6 +130,78 @@ def test_journal_entry_turns_signal_reached() -> None:
     assert _fact(_step(steps, "TOP_N"), "rank")["value"] == 1
 
 
+def test_top_n_exposes_durable_ranking_motive() -> None:
+    """F5 — el paso ``TOP_N`` publica el MOTIVO de selección durable (desglose del score).
+
+    El productor sella el desglose del score de ranking (``opportunityComponents``) en la
+    entrada durable de la decisión; el read-model lo publica como el hecho ``components``
+    (medido), junto al score y el régimen. ``ranking ≠ decisión``: son los factores del
+    ranking, no la cartera.
+    """
+    entry = SimpleNamespace(
+        decision_id="dec-1",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        created_at="2026-01-01T12:00:00Z",
+        session_id="sess-a",
+        payload={
+            "cycleId": "cyc-1",
+            "instrumentId": "AAPL",
+            "strategyVersion": "sv-1",
+            "rank": 2,
+            "opportunityScore": 0.71,
+            "regime": "trend_up",
+            "opportunityComponents": {
+                "edge": 0.9,
+                "robustness": 0.6,
+                "regime_fit": 0.0,
+            },
+        },
+    )
+    dto = build_operational_monitor(
+        account_id="acc-1", reservations=[_reservation()], journal=[entry]
+    )
+    step = _step(dto["cycles"][0]["steps"], "TOP_N")
+    assert step["state"] == STEP_REACHED
+    assert _fact(step, "rank")["value"] == 2
+    assert _fact(step, "score")["value"] == 0.71
+    assert _fact(step, "regime")["value"] == "trend_up"
+    components = _fact(step, "components")
+    assert components["value"] == {
+        "edge": 0.9,
+        "robustness": 0.6,
+        "regime_fit": 0.0,
+    }
+    assert components["measurement"] == "COMPLETE"
+
+
+def test_top_n_without_durable_motive_does_not_fabricate_one() -> None:
+    """Sin desglose durable, ``TOP_N`` NO inventa un ``components``: el hueco se declara.
+
+    El paso sigue ``reached`` por su ``rank``, pero el MOTIVO (``components``) no consta; la
+    superficie lo declara «Sin dato todavía» (``UNKNOWN``), nunca un ``0`` ni un relleno.
+    """
+    entry = SimpleNamespace(
+        decision_id="dec-1",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        created_at="2026-01-01T12:00:00Z",
+        session_id="sess-a",
+        payload={
+            "cycleId": "cyc-1",
+            "instrumentId": "AAPL",
+            "strategyVersion": "sv-1",
+            "rank": 1,
+            "opportunityScore": 0.9,
+        },
+    )
+    dto = build_operational_monitor(
+        account_id="acc-1", reservations=[_reservation()], journal=[entry]
+    )
+    step = _step(dto["cycles"][0]["steps"], "TOP_N")
+    assert step["state"] == STEP_REACHED
+    # El motivo NO se fabrica: no hay hecho ``components`` cuando el desglose no es durable.
+    assert all(fact["key"] != "components" for fact in step["facts"])
+
+
 def test_reservation_step_reaches_and_carries_durable_risk() -> None:
     dto = build_operational_monitor(account_id="acc-1", reservations=[_reservation()])
     step = _step(dto["cycles"][0]["steps"], "RESERVATION")

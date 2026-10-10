@@ -11,6 +11,7 @@ describe("buildAutoAccountFigures", () => {
     expect(missing.map((item) => item.id)).toEqual([
       "position",
       "pnl",
+      "realized",
       "cash",
       "risk",
     ]);
@@ -21,6 +22,9 @@ describe("buildAutoAccountFigures", () => {
       AUTO_HOME_NO_DATA_LABEL,
     );
     expect(missing.find((item) => item.id === "pnl")?.value).toBe(
+      AUTO_HOME_NO_DATA_LABEL,
+    );
+    expect(missing.find((item) => item.id === "realized")?.value).toBe(
       AUTO_HOME_NO_DATA_LABEL,
     );
     expect(missing.find((item) => item.id === "risk")?.value).toBe("Normal");
@@ -43,5 +47,50 @@ describe("buildAutoAccountFigures", () => {
     );
     expect(JSON.stringify(figures)).not.toContain("DINERO REAL");
     expect(JSON.stringify(figures)).not.toContain("Posición abierta");
+  });
+
+  it("pinta el P&L realizado agregado cuando está medido", () => {
+    const figures = buildAutoAccountFigures({
+      summary: {
+        positionsCount: 1,
+        cash: 10000,
+        totalUnrealizedPnl: 12.5,
+        totalRealizedPnl: 94.5,
+      },
+      riskLabel: "Normal",
+    });
+    const realized = figures.find((item) => item.id === "realized");
+    expect(realized?.label).toBe("Resultado realizado");
+    expect(realized?.value).toBe("94.50 € en la cuenta simulada");
+    // La separación SIM/dinero real se mantiene explícita.
+    expect(realized?.value).toContain("cuenta simulada");
+  });
+
+  it("declara el hueco del P&L realizado (null) sin fabricar un 0", () => {
+    const figures = buildAutoAccountFigures({
+      summary: {
+        positionsCount: 0,
+        cash: 10000,
+        totalUnrealizedPnl: 0,
+        totalRealizedPnl: null,
+      },
+      riskLabel: "Normal",
+    });
+    expect(figures.find((item) => item.id === "realized")?.value).toBe(
+      AUTO_HOME_NO_DATA_LABEL,
+    );
+    expect(figures.find((item) => item.id === "realized")?.value).not.toBe(
+      "0.00 € en la cuenta simulada",
+    );
+  });
+
+  it("un P&L realizado ausente también es un hueco declarado", () => {
+    const figures = buildAutoAccountFigures({
+      summary: { positionsCount: 0, cash: 10000, totalUnrealizedPnl: 0 },
+      riskLabel: "Normal",
+    });
+    expect(figures.find((item) => item.id === "realized")?.value).toBe(
+      AUTO_HOME_NO_DATA_LABEL,
+    );
   });
 });

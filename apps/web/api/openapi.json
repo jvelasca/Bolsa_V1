@@ -159,6 +159,17 @@
             "title": "Totalmarketvalue",
             "type": "number"
           },
+          "totalRealizedPnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totalrealizedpnl"
+          },
           "totalUnrealizedPnl": {
             "title": "Totalunrealizedpnl",
             "type": "number"
@@ -6665,6 +6676,11 @@
             ],
             "title": "Schemaversion"
           },
+          "serving": {
+            "default": "PRECOMPUTED_ARTIFACT",
+            "title": "Serving",
+            "type": "string"
+          },
           "summary": {
             "anyOf": [
               {
@@ -6791,6 +6807,11 @@
             "default": true,
             "title": "Readonly",
             "type": "boolean"
+          },
+          "serving": {
+            "default": "PRECOMPUTED_ARTIFACT",
+            "title": "Serving",
+            "type": "string"
           },
           "windows": {
             "items": {

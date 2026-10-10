@@ -236,6 +236,33 @@ def test_plan_v2_tick_excluded_keeps_real_score_and_rank() -> None:
     assert excluded["BBB"]["rank"] == 2
 
 
+def test_plan_v2_tick_approved_entry_seals_ranking_motive() -> None:
+    """F5 — el MOTIVO de selección (desglose del score) viaja durable con la decisión aprobada.
+
+    El desglose del score de ranking se sella en el payload del ``auto_entry_decision``
+    (``opportunityComponents``), junto al ``rank`` y el ``opportunityScore``. Es ADITIVO y NO
+    toca la decisión (``Δ decisión = 0``): sin él, "por qué entró en el TOP-N" no era
+    reconstruible desde el journal de la operación.
+    """
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=0.9)],
+        regime="BULL_TREND",
+        evidence={"AAA": {"robustness": 0.8, "regime_fit": 1.0}},
+    )
+    assert plan.approved_symbols == ("AAA",)
+    approved = next(
+        e
+        for e in plan.journal_entries
+        if e.instrument_id == "AAA" and e.payload.get("approved")
+    )
+    components = approved.payload["opportunityComponents"]
+    # El desglose sellado coincide con el score rankeado (mismos factores, mismo valor).
+    assert components == dict(plan.ranked[0].components)
+    assert components["robustness"] == 0.8
+    assert components["regime_fit"] == 1.0
+
+
 def test_plan_v2_tick_evidence_components_reorder_ranking() -> None:
     """V2.88 — la evidencia LAB (robustness/regime_fit) reordena el ranking del TOP.
 

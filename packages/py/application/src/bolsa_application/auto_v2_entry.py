@@ -2356,6 +2356,17 @@ def _journal_entry(
         payload["opportunityScore"] = decision.opportunity_score
     if score is not None and score.rank is not None:
         payload["rank"] = score.rank
+    # F5 — el MOTIVO DE SELECCIÓN por ciclo: el desglose del score de ranking (los factores
+    # que situaron la oportunidad en el TOP-N, ``OpportunityScore.components``). El ``rank`` y
+    # el ``opportunityScore`` ya viajaban, pero sin los COMPONENTES el "por qué entró en el
+    # TOP-N" no era reconstruible desde el journal de la operación: vivían sólo en la foto TOP3
+    # (``top3_opportunities``, clave ``runId``), no ligados al ``cycleId``. ADITIVO (JSONB, sin
+    # migración) y NO toca la decisión: la clave se OMITE si no hay componentes (la ausencia es
+    # información, jamás un relleno). El read-model lo publica como la etapa ``TOP_N``.
+    if score is not None and score.components:
+        payload["opportunityComponents"] = {
+            str(name): float(value) for name, value in score.components.items()
+        }
     # V2.48/AUTO-8 — la asignación Adaptive que estrechó (o dejó intacto) el techo de
     # riesgo de esta estrategia. Solo se publica cuando Adaptive está activo Y hay algo
     # que declarar (multiplicador < 1): con el flag OFF o sin estrechamiento, el payload

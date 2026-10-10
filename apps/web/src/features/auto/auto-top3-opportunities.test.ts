@@ -77,6 +77,22 @@ describe("auto-top3-opportunities", () => {
     expect(buildAutoTop3View(null).isEmpty).toBe(true);
   });
 
+  it("un activo repetido en el espejo durable se pinta una sola vez (mejor rank)", () => {
+    // El espejo `top3_opportunities` no tiene clave natural única por `(runId, activo)`: un run
+    // reescrito puede traer el mismo activo dos veces. La UI no debe pintarlo repetido.
+    const view = buildAutoTop3View({
+      runId: "r",
+      items: [
+        { ...DTO.items[0]!, rank: 1, assetId: "MSFT" },
+        { ...DTO.items[0]!, rank: 2, assetId: "MSFT" },
+        { ...DTO.items[1]!, rank: 3, assetId: "ITX" },
+      ],
+    });
+    expect(view.slots.map((s) => s.assetId)).toEqual(["MSFT", "ITX"]);
+    expect(view.slots.filter((s) => s.assetId === "MSFT")).toHaveLength(1);
+    expect(view.slots.find((s) => s.assetId === "MSFT")?.rank).toBe(1);
+  });
+
   it("ordena por rank y no expone vocabulario de primer nivel prohibido", () => {
     const view = buildAutoTop3View({
       runId: "r",

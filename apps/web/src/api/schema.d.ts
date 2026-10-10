@@ -4225,6 +4225,8 @@ export interface components {
             totalEquity: number;
             /** Totalmarketvalue */
             totalMarketValue: number;
+            /** Totalrealizedpnl */
+            totalRealizedPnl?: number | null;
             /** Totalunrealizedpnl */
             totalUnrealizedPnl: number;
         };
@@ -6435,6 +6437,11 @@ export interface components {
             readOnly: boolean;
             /** Schemaversion */
             schemaVersion?: string | null;
+            /**
+             * Serving
+             * @default PRECOMPUTED_ARTIFACT
+             */
+            serving: string;
             summary?: components["schemas"]["DiaDFeedbackSummaryDto"] | null;
             /** Values */
             values?: components["schemas"]["DiaDFeedbackValueDto"][];
@@ -6494,6 +6501,11 @@ export interface components {
              * @default true
              */
             readOnly: boolean;
+            /**
+             * Serving
+             * @default PRECOMPUTED_ARTIFACT
+             */
+            serving: string;
             /** Windows */
             windows?: string[];
         };

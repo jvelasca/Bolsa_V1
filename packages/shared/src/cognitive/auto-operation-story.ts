@@ -19,6 +19,7 @@ import {
   type AutoMonitorCycleV1,
   type AutoMonitorStepV1,
 } from "./auto-operational-monitor.js";
+import { autoRankingMotiveLabel } from "./auto-ranking-motive.js";
 
 export const AUTO_OPERATION_STORY_ORDER = [
   "OPPORTUNITY",
@@ -324,6 +325,35 @@ function mapStepState(
   }
 }
 
+/**
+ * Copia los hechos durables de un paso. El desglose de ranking (`components`) se HUMANIZA: sus
+ * códigos de componente nunca se pintan crudos — se presenta como el «motivo» de selección, y si
+ * no hay componentes medibles el hecho se declara `UNKNOWN` (nunca un valor de relleno).
+ */
+function copyStepFacts(
+  step: AutoMonitorStepV1 | undefined,
+): AutoOperationStoryFact[] {
+  return (step?.facts ?? []).map((fact) => {
+    if (fact.key !== "components") {
+      return {
+        label: fact.key,
+        value: fact.value,
+        measurement: fact.measurement,
+      };
+    }
+    const motive = autoRankingMotiveLabel(
+      fact.value != null && typeof fact.value === "object"
+        ? (fact.value as Record<string, unknown>)
+        : null,
+    );
+    return {
+      label: "motivo",
+      value: motive,
+      measurement: motive ? fact.measurement : "UNKNOWN",
+    };
+  });
+}
+
 function joinNote(
   derived: string | undefined,
   step: AutoMonitorStepV1 | undefined,
@@ -456,9 +486,29 @@ function buildExplanationStage(
 }
 
 /**
+ * Desglose durable del score de ranking del ciclo (el «motivo de selección»), o `null`.
+ *
+ * Se lee del hecho durable del paso `TOP_N` (el desglose viaja sellado en el journal de la
+ * decisión y el read-model lo publica como un hecho `components`). Sin ese hecho → `null` (la
+ * superficie declara `NO MEDIDO`, nunca un motivo de relleno) y `ranking ≠ decisión`.
+ */
+function cycleRankingComponents(
+  cycle: AutoMonitorCycleV1 | null,
+): Record<string, unknown> | null {
+  const selection = (cycle?.steps ?? []).find((step) => step.id === "TOP_N");
+  const fact = selection?.facts.find((item) => item.key === "components");
+  const value = fact?.value;
+  return value != null && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/**
  * Contexto que ORIGINÓ la operación. Instrumento/estrategia/dirección se copian del ciclo (o se
- * declaran `NO MEDIDO`); universo PIT / régimen / ranking NO se materializan por ciclo, así que
- * se declaran `NO MEDIDO` — nunca un valor de relleno.
+ * declaran `NO MEDIDO`); universo PIT / régimen NO se materializan por ciclo, así que se
+ * declaran `NO MEDIDO` — nunca un valor de relleno. El «Motivo de selección» (`RANKING`) SÍ se
+ * materializa cuando el ciclo declara el desglose del score: se humaniza; sin él se declara
+ * `NO MEDIDO` (nunca un código crudo), y `ranking ≠ decisión`.
  */
 function buildContext(
   cycle: AutoMonitorCycleV1 | null,
@@ -478,6 +528,16 @@ function buildContext(
       note,
     };
   };
+  const rankingMotive = autoRankingMotiveLabel(cycleRankingComponents(cycle));
+  const ranking: AutoOperationStoryContextItem = {
+    id: "RANKING",
+    label: "Motivo de selección",
+    value: rankingMotive ?? NO_MEASUREMENT_LABEL,
+    measurement: rankingMotive ? "COMPLETE" : "UNKNOWN",
+    note: rankingMotive
+      ? "por qué entró en el TOP-N: los factores de su score de ranking (ranking ≠ decisión)"
+      : "sin motivo de selección durable por ciclo: el desglose del score no consta",
+  };
   return [
     item("INSTRUMENT", "Instrumento", cycle?.instrumentId ?? null),
     item("STRATEGY", "Estrategia", cycle?.strategyVersion ?? null),
@@ -489,12 +549,7 @@ function buildContext(
       "el watch PIT no se materializa por ciclo",
     ),
     item("REGIME", "Régimen", null, "sin régimen durable por ciclo"),
-    item(
-      "RANKING",
-      "Motivo de selección",
-      null,
-      "no hay motivo de selección durable por ciclo (ver Selección · TOP-N)",
-    ),
+    ranking,
   ];
 }
 
@@ -580,11 +635,7 @@ export function buildAutoOperationStory(input: {
       ...baseStage(spec, index, state),
       at: step?.at ?? null,
       measurement: step?.measurement ?? "UNKNOWN",
-      facts: (step?.facts ?? []).map((fact) => ({
-        label: fact.key,
-        value: fact.value,
-        measurement: fact.measurement,
-      })),
+      facts: copyStepFacts(step),
       note: joinNote(spec.derivedNote, step),
     };
   });

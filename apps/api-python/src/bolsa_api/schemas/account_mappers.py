@@ -137,6 +137,7 @@ def to_account_summary_dto(summary: AccountSummary) -> AccountSummaryDto:
         free_margin=summary.free_margin,
         margin_level_pct=summary.margin_level_pct,
         positions_count=summary.positions_count,
+        total_realized_pnl=summary.total_realized_pnl,
     )
 
 

@@ -23,10 +23,7 @@ import {
 import { ModeBadge } from "@/components/mode-badge";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 import { buildOperationIdentity } from "@/features/auto/auto-operation-identity";
-import {
-  OPERATION_LADDER_NOTES,
-  operationLadderRungFromCycle,
-} from "@/features/auto/auto-operation-ladder";
+import { operationLadderRungFromCycle } from "@/features/auto/auto-operation-ladder";
 import {
   autoOperacionHref,
   AUTO_ACTIVIDAD_PATH,
@@ -78,10 +75,8 @@ export function AutoOperarPage() {
           </Link>
           .
         </p>
-        <p className="text-xs text-amber-600 dark:text-amber-400">
-          {OPERATION_LADDER_NOTES.rankingIsNotDecision}: estar arriba en la
-          lista no equivale a comprar ya.
-        </p>
+        {/* `ranking ≠ decisión` ya lo declara el propio panel del TOP3 (`AUTO_TOP3_RANK_NOTE`):
+            aquí no se repite (evita afirmar el mismo hecho dos veces en el primer nivel). */}
         <p className="text-sm text-muted-foreground">
           <Link
             to={AUTO_ACTIVIDAD_PATH}

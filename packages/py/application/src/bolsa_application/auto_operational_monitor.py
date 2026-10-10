@@ -401,8 +401,21 @@ def _entry_decision_step(
         if payload.get("opportunityScore") is not None:
             facts.append(_fact("score", payload.get("opportunityScore")))
     elif step_id == "TOP_N":
+        # F5 — la SELECCIÓN/ranking del ciclo. Además del ``rank`` posicional se publica el
+        # score combinado, el régimen y el DESGLOSE del score de ranking (los factores que
+        # situaron la oportunidad en el TOP-N): ese desglose es el MOTIVO DE SELECCIÓN, y sin
+        # él "por qué entró en el TOP-N" no era reconstruible desde el journal de la operación.
+        # Cada hecho viaja con su medición (``_fact``): un valor ausente es ``UNKNOWN``, jamás un
+        # ``0`` fabricado, y ``ranking ≠ decisión`` (la decisión de cartera vive en ``RISK``).
         if payload.get("rank") is not None:
             facts.append(_fact("rank", payload.get("rank")))
+        if payload.get("opportunityScore") is not None:
+            facts.append(_fact("score", payload.get("opportunityScore")))
+        if payload.get("regime") is not None:
+            facts.append(_fact("regime", payload.get("regime")))
+        components = payload.get("opportunityComponents")
+        if isinstance(components, Mapping) and components:
+            facts.append(_fact("components", dict(components)))
     elif step_id == "RISK":
         # El envoltorio de riesgo de la decisión vive DURABLE y ANIDADO en la propia
         # entrada: la asignación del sizing en ``payload.risk`` (``quantity``/

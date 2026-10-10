@@ -13,7 +13,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL,
+  AUTO_OPERATION_STRATEGY_DECLARED_LABEL,
   AUTO_OPERATION_STRATEGY_DESCRIPTION,
+  AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC,
   AUTO_OPERATION_STRATEGY_NO_DATA,
   AUTO_OPERATION_STRATEGY_TITLE,
   type AutoOperationStrategyViewV1,
@@ -61,7 +64,9 @@ export function AutoOperationStrategyCard({
         >
           <div>
             <dt className="text-muted-foreground">
-              {notTop1 ? "Estrategia del valor" : "Estrategia #1"}
+              {notTop1
+                ? "Estrategia del valor"
+                : AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL}
             </dt>
             <dd
               className="font-medium"
@@ -107,7 +112,7 @@ export function AutoOperationStrategyCard({
           </div>
           <div className="sm:col-span-2">
             <dt className="text-muted-foreground">
-              Estrategia declarada por el ciclo
+              {AUTO_OPERATION_STRATEGY_DECLARED_LABEL}
             </dt>
             <dd
               data-testid="auto-operation-strategy-match"
@@ -117,6 +122,12 @@ export function AutoOperationStrategyCard({
                 AUTO_OPERATION_STRATEGY_NO_DATA}{" "}
               · {view.matchLabel}
             </dd>
+            <p
+              className="text-[11px] text-muted-foreground"
+              data-testid="auto-operation-strategy-match-heuristic"
+            >
+              {AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC}
+            </p>
           </div>
         </dl>
         {loading ? (

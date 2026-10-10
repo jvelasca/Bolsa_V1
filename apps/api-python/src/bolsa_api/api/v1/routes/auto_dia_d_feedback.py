@@ -8,6 +8,13 @@ catálogo de errores (``SOFTWARE``/``OPERATIONAL``/``DATA``) y el gate de ventan
 Read-only: este router NO ejecuta el motor (eso vive en el CLI) y NO escribe nada. Sin cuenta
 visible del principal devuelve vacío con ``no_account_scope`` (fail-closed). Una ventana sin
 artefacto se declara ``available = false``; nunca se rellena con ceros.
+
+Modo de servicio (honesto, hallazgo ``P4-3``): el artefacto canónico lo produce el job **offline**
+``v2_90_dia_d_feedback.py`` — un *replay durable PESADO* (barras históricas + motor SIM + DB +
+``ensure_migrated``). Ese cómputo **no** es viable dentro del ciclo de una petición HTTP ni como job
+ligero: exige migraciones de esquema y un replay de minutos. Por eso esta superficie se declara
+``serving = PRECOMPUTED_ARTIFACT`` (**artefacto precalculado; NO se recalcula en vivo**) y NO ofrece
+recompute on-demand. Declararlo es deliberado: nunca se fuerza una falsa sensación de «en vivo».
 """
 
 from __future__ import annotations
@@ -27,6 +34,13 @@ from bolsa_api.api.dependencies import (
 )
 
 router = APIRouter()
+
+#: Modo de servicio REAL de esta superficie (``P4-3``). El artefacto lo produce el job offline
+#: ``v2_90_dia_d_feedback.py`` (replay durable PESADO + ``ensure_migrated``); esta ruta solo lo
+#: **lee**. NO hay recompute on-demand: el cómputo canónico no cabe en una petición HTTP. Se
+#: declara explícitamente para no simular «en vivo»; los otros valores posibles (``LIVE``,
+#: ``RECOMPUTABLE_ON_DEMAND``) NO se emiten hoy porque no son ciertos.
+SERVING_PRECOMPUTED_ARTIFACT = "PRECOMPUTED_ARTIFACT"
 
 #: Directorio por defecto de artefactos (relativo a la raíz del repo). `DIA_D_AUTO_DIR` lo
 #: sobreescribe para despliegues donde la API corre fuera del árbol de trabajo.
@@ -185,6 +199,9 @@ class DiaDFeedbackDto(BaseModel):
 
     available: bool
     readOnly: bool = True
+    #: Modo de servicio real (``P4-3``): artefacto PRECALCULADO por el job offline; esta ruta no
+    #: lo recalcula en vivo. La UI lo declara en primer nivel. ``CONFIRMED`` no es un veredicto.
+    serving: str = SERVING_PRECOMPUTED_ARTIFACT
     schemaVersion: str | None = None
     kind: str | None = None
     matrixBasis: str = "entryDay"
@@ -204,6 +221,8 @@ class DiaDFeedbackListDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     readOnly: bool = True
+    #: Mismo modo de servicio que el detalle (``P4-3``): artefacto precalculado, no en vivo.
+    serving: str = SERVING_PRECOMPUTED_ARTIFACT
     windows: list[str] = Field(default_factory=list)
     latest: str | None = None
     artifact: DiaDFeedbackDto | None = None

@@ -131,10 +131,13 @@ async def test_list_returns_windows_descending_and_latest_artifact(
     assert response.status_code == 200
     body = response.json()
     assert body["readOnly"] is True
+    # P4-3: la superficie declara que el artefacto es PRECALCULADO (no se recalcula en vivo).
+    assert body["serving"] == "PRECOMPUTED_ARTIFACT"
     assert body["windows"] == ["2026-09-25_2026-09-30", "2026-09-25_2026-09-29"]
     assert body["latest"] == "2026-09-25_2026-09-30"
     # El artefacto más reciente viaja embebido (misma proyección que el detalle).
     assert body["artifact"]["available"] is True
+    assert body["artifact"]["serving"] == "PRECOMPUTED_ARTIFACT"
     assert body["artifact"]["window"]["from"] == "2026-09-25"
     assert body["artifact"]["window"]["to"] == "2026-09-30"
 
@@ -153,6 +156,7 @@ async def test_get_returns_the_artifact_projection(app, tmp_path, monkeypatch) -
     assert response.status_code == 200
     body = response.json()
     assert body["available"] is True
+    assert body["serving"] == "PRECOMPUTED_ARTIFACT"
     assert body["kind"] == "DIA_D_AUTO_FEEDBACK"
     assert body["matrixBasis"] == "entryDay"
     assert body["summary"]["refuted"] == 1
@@ -165,6 +169,8 @@ async def test_get_returns_the_artifact_projection(app, tmp_path, monkeypatch) -
     assert body["cycles"][0]["realizedR"] == 0.5
     assert body["matrix"][0]["cells"][1]["outcome"] == "NOT_MEASURED"
     assert body["errors"][0]["kind"] == "SOFTWARE"
+    # Ningún veredicto emitido es CONFIRMED (reservado a evidencia PAPER).
+    assert all(value["verdict"] != "CONFIRMED" for value in body["values"])
     assert body["notes"] == []
 
 
@@ -203,6 +209,12 @@ async def test_get_missing_artifact_is_fail_closed(app, tmp_path, monkeypatch) -
     body = response.json()
     assert body["available"] is False
     assert body["notes"] == ["artifact_not_found"]
+    # El hueco se declara: sin medición NO hay valores (nunca un 0 de relleno) y el modo de
+    # servicio sigue declarado (artefacto precalculado, no en vivo).
+    assert body["serving"] == "PRECOMPUTED_ARTIFACT"
+    assert body["values"] == []
+    assert body["matrix"] == []
+    assert body["summary"] is None
 
 
 @pytest.mark.asyncio

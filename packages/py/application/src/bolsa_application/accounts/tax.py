@@ -1,6 +1,7 @@
 """Use-case de informe fiscal."""
 
 from dataclasses import replace
+from datetime import datetime
 
 from bolsa_domain.account_settings import settings_from_dict
 from bolsa_domain.entities.portfolio import Transaction
@@ -19,6 +20,58 @@ from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlch
 from bolsa_infrastructure.database.repositories.portfolio_repository import (
     SqlAlchemyPortfolioRepository,
 )
+
+
+async def collect_report_inputs(
+    *,
+    account_repo: SqlAlchemyAccountRepository,
+    portfolio_repo: SqlAlchemyPortfolioRepository,
+    ledger_repo: SqlAlchemyLedgerRepository,
+    account_id: str,
+    executed_before: datetime | None = None,
+    fee_executed_from: datetime | None = None,
+    fee_executed_to: datetime | None = None,
+) -> tuple[list[Transaction], dict[str, float]]:
+    """Recoge las transacciones de TODAS las carteras de la cuenta + fracciona las fees
+    del ledger por transacción — patrón canónico del tax report, COMPARTIDO.
+
+    Es la ÚNICA vía de recogida de la cara realizada, de modo que cualquier read-model que
+    reuse el realizado agregado (p. ej. el resumen de cuenta F4) concilie con
+    ``net_realized_gain`` del tax report: mismo método FIFO/avg, misma semántica de fees y
+    mismo ``fees_by_transaction_id``.
+
+    ``executed_before`` acota las transacciones (los carry-in de compras previas se
+    incluyen SIN techo truncante: ``limit=None``); ``fee_executed_from`` /
+    ``fee_executed_to`` acotan las entradas de fee mapeadas. Devuelve las transacciones
+    crudas (sin fee aplicada: cada cara decide si la incorpora, igual que ``GetTaxReport``)
+    y el mapa ``reference_id -> fee``.
+    """
+    portfolios = await account_repo.list_portfolios(account_id)
+    transactions: list[Transaction] = []
+    seen_ids: set[str] = set()
+    for portfolio in portfolios:
+        if not portfolio.legacy_portfolio_id:
+            continue
+        batch = await portfolio_repo.list_transactions(
+            legacy_portfolio_id=portfolio.legacy_portfolio_id,
+            limit=None,
+            executed_before=executed_before,
+        )
+        for tx in batch:
+            if tx.id not in seen_ids:
+                seen_ids.add(tx.id)
+                transactions.append(tx)
+    transactions.sort(key=lambda tx: tx.executed_at)
+
+    ledger_entries = await ledger_repo.list_for_account(
+        account_id,
+        limit=None,
+        offset=0,
+        executed_from=fee_executed_from,
+        executed_to=fee_executed_to,
+    )
+    fees_by_tx = map_ledger_fees_to_transactions(ledger_entries)
+    return transactions, fees_by_tx
 
 
 class GetTaxReport:
@@ -40,40 +93,21 @@ class GetTaxReport:
         settings = scope.account.settings or settings_from_dict(None)
         tax = settings.tax
 
-        portfolios = await self._account_repo.list_portfolios(account_id)
         # F-FIN-2: ejercicio fiscal [inicio, fin) — canonical en dominio (fiscal_year_range).
         # Las transacciones se cargan SOLO hasta el fin del ejercicio (incluye carry-in
         # de compras previas para FIFO/avg, excluye años futuros) SIN techo truncante
         # (antes limit=10000 cortaba las compras antiguas y rompía el cost basis).
-        fiscal_start, fiscal_end = fiscal_year_range(year, tax.fiscal_year_start_month)
-        transactions: list[Transaction] = []
-        seen_ids: set[str] = set()
-        for portfolio in portfolios:
-            if not portfolio.legacy_portfolio_id:
-                continue
-            batch = await self._portfolio_repo.list_transactions(
-                legacy_portfolio_id=portfolio.legacy_portfolio_id,
-                limit=None,
-                executed_before=fiscal_end,
-            )
-            for tx in batch:
-                if tx.id not in seen_ids:
-                    seen_ids.add(tx.id)
-                    transactions.append(tx)
-        transactions.sort(key=lambda tx: tx.executed_at)
-
         # F-AUD2/P2.1: el ledger del ejercicio fiscal se carga SIN techo físico.
-        # Antes limit=10_000 podía cortar entradas de fees de un ejercicio grande
-        # (rompiendo el mapeo fee->transacción). El filtro [fiscal_start, fiscal_end)
-        # ya lo acota a ese ejercicio; total_fees_for_account por separado sin límite.
-        ledger_entries = await self._ledger_repo.list_for_account(
-            scope.account.id,
-            limit=None,
-            offset=0,
-            executed_from=fiscal_start,
-            executed_to=fiscal_end,
+        fiscal_start, fiscal_end = fiscal_year_range(year, tax.fiscal_year_start_month)
+        transactions, fees_by_tx = await collect_report_inputs(
+            account_repo=self._account_repo,
+            portfolio_repo=self._portfolio_repo,
+            ledger_repo=self._ledger_repo,
+            account_id=scope.account.id,
+            executed_before=fiscal_end,
+            fee_executed_from=fiscal_start,
+            fee_executed_to=fiscal_end,
         )
-        fees_by_tx = map_ledger_fees_to_transactions(ledger_entries)
         total_ledger_fees = await self._ledger_repo.total_fees_for_account(
             scope.account.id,
             executed_from=fiscal_start,
@@ -100,6 +134,9 @@ class GetTaxReport:
         # posición NO cambia; este "puente" con fee solo alimenta la cara fiscal del report.
         prices: dict[str, float] = {}
         live_quantities: dict[str, float] = {}
+        # Portfolios de nuevo para resolver precios/live quantities de la cara unrealized
+        # (el report es on-demand; el helper de recogida es self-contained).
+        portfolios = await self._account_repo.list_portfolios(scope.account.id)
         for portfolio in portfolios:
             if not portfolio.legacy_portfolio_id:
                 continue

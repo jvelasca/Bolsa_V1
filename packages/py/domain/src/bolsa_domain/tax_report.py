@@ -208,6 +208,27 @@ def _compute_realized_gains(
     return lines
 
 
+def compute_all_time_realized_pnl(
+    *,
+    transactions: list[TaxReportTransaction],
+    method: str,
+) -> float:
+    """P&L realizado AGREGADO de TODO el historial (sin filtro de ejercicio fiscal).
+
+    Reutiliza la MISMA máquina canónica de realized del tax report
+    (``_compute_realized_gains`` → FIFO/``average``) y la MISMA semántica de fees: la fee
+    de compra se capitaliza en el cost-basis y la de venta se descuenta de los proceeds.
+    Es, por tanto, la suma de ``RealizedGainLine.realized_gain`` de TODAS las líneas, sin
+    el filtro ``_is_in_fiscal_year`` que aplica ``build_tax_report``. Para un ejercicio en el
+    que caigan todas las ventas coincide exactamente con su ``net_realized_gain``; por
+    construcción concilia con el tax report (mismo método y misma base).
+
+    Un historial SIN transacciones devuelve ``0.0``: el realizado de una cuenta sin
+    operaciones es genuinamente cero, no un dato ausente (aquí ``0`` SÍ es conocido).
+    """
+    return sum(line.realized_gain for line in _compute_realized_gains(transactions, method))
+
+
 def _compute_residual_open(
     transactions: list[TaxReportTransaction],
     method: str,

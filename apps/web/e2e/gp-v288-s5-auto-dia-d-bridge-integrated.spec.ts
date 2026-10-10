@@ -9,18 +9,29 @@
  *
  * Precondición DURA (declarada, no fingida): para que exista una operación que verificar, el
  * monitor AUTO de la cuenta debe declarar ≥1 ciclo **durable** (reserva/fill con `cycleId`). El
- * ciclo lo produce el MOTOR AUTO (worker de simulación), que el harness E2E no arranca: con una
- * BD recién migrada/sembrada no hay ninguno y el journey del puente se declara `skipped` con
- * motivo explícito. La pantalla `/auto/operar` sí se certifica siempre (declara su hueco honesto:
- * «Sin operaciones en la ventana»), así que este spec NO es un skip total.
+ * ciclo lo produce el MOTOR AUTO (worker de simulación), que el harness E2E no arranca. Para
+ * que este journey sea REPRODUCIBLE, el propio `beforeAll` **siembra** un ciclo durable en la
+ * cuenta efímera **reutilizando** el CLI dev `scripts/dev/seed_auto_cycle_for_ui.py` como
+ * subproceso (ver `e2e/helpers/auto-cycle-seed.ts`); NO reimplementa lógica de backend.
  *
- * Run (API :8000 + PG + Vite proxy):
+ * Run (API :8000 + PG + Vite proxy; el harness siembra y limpia el ciclo):
  *   E2E_INTEGRATION=1 E2E_RUN=1 E2E_ALLOW_DEV_DB=1 \
  *     pnpm --filter @bolsa/web exec playwright test gp-v288-s5
  * Against an existing dev server (PLAYWRIGHT_BASE_URL):
  *   E2E_INTEGRATION=1 E2E_ALLOW_DEV_DB=1 pnpm --filter @bolsa/web e2e -- gp-v288-s5
  *
- * Default (no env): skipped.
+ * Reproducción manual de lo que hace el harness (mismos pasos, mismo CLI):
+ *   uv run --no-sync python scripts/dev/seed_auto_cycle_for_ui.py \
+ *     --account-id e2e-v288-s5-xxxxxxxx --symbol <símbolo del catálogo> \
+ *     --api-base http://localhost:5173
+ *   # … abrir /auto/operar/operacion/<cycleId> y ejercitar el CTA «Verificar D→hoy»
+ *   uv run --no-sync python scripts/dev/seed_auto_cycle_for_ui.py --cleanup \
+ *     --account-id e2e-v288-s5-xxxxxxxx --api-base http://localhost:5173
+ *
+ * `skipped` SIGUE siendo un skip declarado (no certifica): el journey se declara `skipped` con
+ * motivo explícito si (a) `uv`/python no están disponibles (el seed devuelve el motivo), (b) el
+ * monitor no declara ciclo tras el seed, o (c) el símbolo del ciclo no está en el catálogo.
+ * Default (sin env): skipped.
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -34,16 +45,26 @@ import {
   gateIntegratedE2eEnvironment,
   seedHoyBrowserState,
 } from "./integration";
+import {
+  autoCycleSeedEnabled,
+  cleanupAutoCycleForAccount,
+  seedAutoCycleForAccount,
+  AUTO_CYCLE_SEED_DISABLED_REASON,
+} from "./helpers/auto-cycle-seed";
 
 /** Ciclo AUTO durable ausente: el motor (worker) no corre en el harness ⇒ hueco declarado. */
 const NO_CYCLE_REASON =
   "Sin ciclo AUTO durable en la cuenta (el worker del motor AUTO no corre en el harness E2E). " +
-  "Seedea ≥1 reserva/fill con cycleId para ejecutar el journey del puente.";
+  "El harness intenta sembrarlo con scripts/dev/seed_auto_cycle_for_ui.py.";
 
 /** El ciclo existe pero su símbolo no está en el catálogo: no hay cadena de estrategia que probar. */
 const NO_CHAIN_REASON =
   "El símbolo del ciclo AUTO no está en el catálogo /api/instruments: no se puede resolver la " +
   "estrategia #1 ni el UUID del instrumento para el deep-link DÍA-D.";
+
+/** El catálogo de instrumentos está vacío: no hay símbolo con el que sembrar el ciclo. */
+const NO_CATALOG_REASON =
+  "El catálogo /api/instruments está vacío: no hay símbolo con el que sembrar el ciclo AUTO.";
 
 const MONITOR_PATH = "/api/auto/operational-monitor";
 const RUN_PATH = "/api/backtests/run";
@@ -66,6 +87,8 @@ type AutoBridgeFixture = {
   instrumentId: string | null;
   strategyDefinitionId: string | null;
   strategyLabel: string;
+  /** El harness lanzó el seed (aunque fallara): el `afterAll` debe limpiar/verificar. */
+  seedAttempted: boolean;
   /** Motivo del hueco (ciclo ausente), o `null` si hay ciclo. */
   noCycleReason: string | null;
   /** Motivo del hueco (símbolo del ciclo fuera del catálogo), o `null`. */
@@ -77,8 +100,9 @@ async function body<T>(res: { json(): Promise<unknown> }): Promise<T> {
 }
 
 /**
- * Cuenta efímera + (si el monitor trae ciclo) estrategia #1 y su TOP de Finalistas REAL, para
- * que la cadena `operación → estrategia/indicadores → DÍA-D` sea verificable sin mocks.
+ * Cuenta efímera + ciclo AUTO durable sembrado (subproceso del CLI dev) + estrategia #1 y su
+ * TOP de Finalistas REAL, para que la cadena `operación → estrategia/indicadores → DÍA-D` sea
+ * verificable sin mocks.
  */
 async function ensureAutoBridgeFixture(
   request: APIRequestContext,
@@ -102,6 +126,42 @@ async function ensureAutoBridgeFixture(
   }
   const accountId = (await body<{ data: { id: string } }>(accountRes)).data.id;
 
+  // Catálogo PRIMERO: necesitamos un símbolo real con el que sembrar el ciclo durable.
+  const instrumentsRes = await request.get(
+    new URL("/api/instruments", baseURL).toString(),
+  );
+  if (!instrumentsRes.ok()) {
+    throw new Error(
+      `GET /api/instruments failed (${instrumentsRes.status()}).`,
+    );
+  }
+  const catalog = await body<{
+    data: Array<{ id: string; symbol: string }>;
+  }>(instrumentsRes);
+  const seedTarget = (catalog.data ?? [])[0] ?? null;
+
+  // Siembra del ciclo AUTO durable reutilizando el CLI dev (subproceso `uv run … python …`).
+  // No lanza: un fallo del seed se DECLARA (motivo) y el journey queda `skipped`, no verde.
+  let seedAttempted = false;
+  let seedOk = true;
+  let seedReason = "";
+  if (!seedTarget) {
+    seedOk = false;
+    seedReason = NO_CATALOG_REASON;
+  } else if (autoCycleSeedEnabled()) {
+    seedAttempted = true;
+    const seeded = await seedAutoCycleForAccount({
+      accountId,
+      symbol: seedTarget.symbol,
+      apiBase: baseURL,
+    });
+    seedOk = seeded.ok;
+    if (!seeded.ok) seedReason = seeded.reason;
+  } else {
+    seedOk = false;
+    seedReason = AUTO_CYCLE_SEED_DISABLED_REASON;
+  }
+
   const monitorRes = await request.get(
     new URL(`${MONITOR_PATH}?limit=20`, baseURL).toString(),
     { headers: { "X-Account-Id": accountId } },
@@ -123,22 +183,14 @@ async function ensureAutoBridgeFixture(
       instrumentId: null,
       strategyDefinitionId: null,
       strategyLabel: "",
-      noCycleReason: NO_CYCLE_REASON,
+      seedAttempted,
+      noCycleReason: seedOk
+        ? NO_CYCLE_REASON
+        : `${NO_CYCLE_REASON} Seed: ${seedReason}`,
       noChainReason: null,
     };
   }
 
-  const instrumentsRes = await request.get(
-    new URL("/api/instruments", baseURL).toString(),
-  );
-  if (!instrumentsRes.ok()) {
-    throw new Error(
-      `GET /api/instruments failed (${instrumentsRes.status()}).`,
-    );
-  }
-  const catalog = await body<{
-    data: Array<{ id: string; symbol: string }>;
-  }>(instrumentsRes);
   const upper = cycleSymbol.toUpperCase();
   const instrument = (catalog.data ?? []).find(
     (row) => row.symbol?.toUpperCase() === upper,
@@ -151,6 +203,7 @@ async function ensureAutoBridgeFixture(
       instrumentId: null,
       strategyDefinitionId: null,
       strategyLabel: "",
+      seedAttempted,
       noCycleReason: null,
       noChainReason: NO_CHAIN_REASON,
     };
@@ -175,6 +228,8 @@ async function ensureAutoBridgeFixture(
     await body<{ data: { id: string } }>(strategyRes)
   ).data.id;
 
+  // El TOP de Finalistas es GLOBAL por instrumento: este PUT SOBRESCRIBE el TOP que el seed
+  // hubiera dejado, para que la UI muestre EXACTAMENTE la etiqueta/razón que el spec asserta.
   const topRes = await request.put(
     new URL(
       `/api/instruments/${encodeURIComponent(instrument.id)}/strategy-top`,
@@ -218,6 +273,7 @@ async function ensureAutoBridgeFixture(
     instrumentId: instrument.id,
     strategyDefinitionId,
     strategyLabel: STRATEGY_LABEL,
+    seedAttempted,
     noCycleReason: null,
     noChainReason: null,
   };
@@ -239,7 +295,7 @@ async function openFirstOperation(page: Page, fixture: AutoBridgeFixture) {
 }
 
 test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)", () => {
-  test.describe.configure({ mode: "serial" });
+  test.describe.configure({ mode: "serial", timeout: 240_000 });
 
   let environmentSkip: string | null = null;
   let fixture: AutoBridgeFixture | null = null;
@@ -265,20 +321,55 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
   });
 
   test.afterAll(async ({ request, baseURL }) => {
-    // Higiene determinista: el TOP de Finalistas es una tabla GLOBAL (NO acotada por cuenta), así
-    // que el PUT de este journey dejaría un residuo que contaminaría runs futuros. Se retira el
-    // instrumento usado. NO es una aserción: la limpieza es best-effort (su fallo no cambia el
-    // resultado del run; el gate de entorno ya declaró la disponibilidad del stack). Sin stack
-    // live (o sin cadena resuelta) `fixture.instrumentId` es `null` y no hay nada que limpiar.
-    if (!fixture?.instrumentId || !baseURL) return;
-    const cleanupUrl = new URL(
-      `/api/instruments/${encodeURIComponent(fixture.instrumentId)}/strategy-top?timeframe=1d`,
-      baseURL,
-    ).toString();
-    try {
-      await request.delete(cleanupUrl);
-    } catch {
-      // best-effort: se declara implícitamente por ausencia de ruido en el run.
+    if (!fixture || !baseURL) return;
+
+    // 1) Limpieza del seed durable: borra las filas del ciclo `cyc-ui-*` de la cuenta
+    //    (reserva/fills/journal) + el `DELETE` del TOP que hace el propio CLI. NO es una
+    //    aserción: si no puede correr, la verificación de residuo de abajo lo declara.
+    let seedCleanupOk = true;
+    let seedCleanupReason = "";
+    if (fixture.seedAttempted) {
+      const cleaned = await cleanupAutoCycleForAccount({
+        accountId: fixture.accountId,
+        apiBase: baseURL,
+      });
+      seedCleanupOk = cleaned.ok;
+      if (!cleaned.ok) seedCleanupReason = cleaned.reason;
+    }
+
+    // 2) Higiene determinista (pre-existente): el TOP de Finalistas es una tabla GLOBAL (NO
+    //    acotada por cuenta), así que el PUT de este journey dejaría un residuo que
+    //    contaminaría runs futuros. Se retira el instrumento usado. La limpieza es
+    //    best-effort (su fallo no cambia el resultado del run; el gate de entorno ya declaró
+    //    la disponibilidad del stack). Sin cadena resuelta `fixture.instrumentId` es `null`.
+    if (fixture.instrumentId) {
+      const cleanupUrl = new URL(
+        `/api/instruments/${encodeURIComponent(fixture.instrumentId)}/strategy-top?timeframe=1d`,
+        baseURL,
+      ).toString();
+      try {
+        await request.delete(cleanupUrl);
+      } catch {
+        // best-effort: se declara implícitamente por ausencia de ruido en el run.
+      }
+    }
+
+    // 3) Aserción de NO-residuo: tras el teardown la cuenta efímera no puede declarar ciclo.
+    //    Si el seed no llegó a lanzarse (sin opt-in / sin símbolo) no hay nada que verificar.
+    if (fixture.seedAttempted) {
+      const monitorRes = await request.get(
+        new URL(`${MONITOR_PATH}?limit=20`, baseURL).toString(),
+        { headers: { "X-Account-Id": fixture.accountId } },
+      );
+      if (monitorRes.ok()) {
+        const monitor = await body<{ cycles?: MonitorCycle[] }>(monitorRes);
+        expect(
+          monitor.cycles ?? [],
+          seedCleanupOk
+            ? "El teardown dejó un ciclo AUTO residual en la cuenta efímera."
+            : `La limpieza del seed no pudo correr: ${seedCleanupReason}`,
+        ).toHaveLength(0);
+      }
     }
   });
 

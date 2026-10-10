@@ -55,6 +55,15 @@ const EVIDENCE_LABEL: Record<string, string> = {
   NOT_MEASURED: "NO MEDIDO",
 };
 
+// Modo de servicio REAL de la superficie (hallazgo P4-3). El artefacto lo produce el job
+// offline; esta vista solo lo lee. Nunca se rotula «en vivo» si no lo es.
+const SERVING_LABEL: Record<string, string> = {
+  PRECOMPUTED_ARTIFACT:
+    "Artefacto precalculado por job offline · no se recalcula en vivo",
+  RECOMPUTABLE_ON_DEMAND: "Recalculable a demanda",
+  LIVE: "En vivo",
+};
+
 /** Un valor no medido se rotula `NO MEDIDO`; nunca un `0` de relleno. */
 export function formatFeedbackR(value: number | null | undefined): string {
   if (value === null || value === undefined) return "NO MEDIDO";
@@ -156,7 +165,7 @@ function NotAvailable({ detail }: { detail: DiaDFeedbackDto }) {
   const reason = detail.notes?.[0] ?? "artifact_not_found";
   const messages: Record<string, string> = {
     artifact_not_found:
-      "No hay artefacto de feedback para esta ventana. Ejecuta el barrido por CLI para generarlo.",
+      "Sin dato todavía: no hay artefacto de feedback para esta ventana. El feedback se precalcula con el job offline; no se recalcula en vivo.",
     no_account_scope: "Sin cuenta activa: no se puede resolver el artefacto.",
     invalid_window: "Ventana inválida.",
   };
@@ -168,7 +177,8 @@ function NotAvailable({ detail }: { detail: DiaDFeedbackDto }) {
     >
       <CardContent className="py-6">
         <p className="text-xs text-muted-foreground">
-          {messages[reason] ?? reason}
+          {/* Nada de códigos crudos: un motivo no catalogado degrada a «Sin dato todavía». */}
+          {messages[reason] ?? absentDataLabel()}
         </p>
         <p className="mt-2 font-mono text-[10px] text-muted-foreground">
           uv run --no-sync python
@@ -221,6 +231,10 @@ export function DiaDAutoFeedbackPanel() {
       ? (listQuery.data?.artifact ?? null)
       : null);
 
+  // Modo de servicio real declarado por el backend (P4-3); por defecto, artefacto precalculado.
+  const serving =
+    artifact?.serving ?? listQuery.data?.serving ?? "PRECOMPUTED_ARTIFACT";
+
   const days = artifact?.window?.days ?? [];
 
   return (
@@ -234,6 +248,14 @@ export function DiaDAutoFeedbackPanel() {
             Evalúa la evidencia OOS de cada instrumento sobre una ventana y
             clasifica las incidencias de software, operativa y datos. Advisory
             read-only: no cambia el motor.
+          </p>
+          {/* Honestidad de superficie: se declara el modo REAL, nunca se simula «en vivo». */}
+          <p
+            className="mt-1 text-[10px] text-muted-foreground"
+            data-testid="dia-d-auto-feedback-serving"
+            data-serving={serving}
+          >
+            Modo: {SERVING_LABEL[serving] ?? "Origen no declarado"}
           </p>
         </CardHeader>
         <CardContent className="space-y-3">

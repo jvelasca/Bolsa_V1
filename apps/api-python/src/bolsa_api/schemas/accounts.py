@@ -124,6 +124,9 @@ class AccountSummaryDto(BaseModel):
     free_margin: float = Field(alias="freeMargin")
     margin_level_pct: float | None = Field(alias="marginLevelPct")
     positions_count: int = Field(alias="positionsCount")
+    # F4: P&L realizado AGREGADO de todo el historial (base canónica tax report).
+    # Opcional/nullable: ``None`` = fuente no disponible → «Sin dato todavía», NUNCA 0.
+    total_realized_pnl: float | None = Field(default=None, alias="totalRealizedPnl")
 
 
 class LedgerEntryDto(BaseModel):

@@ -16,6 +16,9 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AutoOperationStrategyCard } from "@/features/auto-monitor/auto-operation-strategy-card";
 import {
+  AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL,
+  AUTO_OPERATION_STRATEGY_DECLARED_LABEL,
+  AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC,
   AUTO_OPERATION_STRATEGY_MATCH_LABELS,
   AUTO_OPERATION_STRATEGY_NO_DATA,
   type AutoOperationStrategyViewV1,
@@ -81,6 +84,29 @@ describe("AutoOperationStrategyCard", () => {
     ).toContain("sma_crossover");
     // Sin hueco real no se pinta el rótulo de ausencia.
     expect(screen.queryByTestId("auto-operation-strategy-gap")).toBeNull();
+  });
+
+  it("distingue la MEJOR del valor (Finalistas) de la EJECUTADA declarada por el ciclo y declara la heurística", () => {
+    renderCard();
+
+    const chain = screen.getByTestId("auto-operation-strategy-chain");
+    // Bloque (a): mejor estrategia DISPONIBLE del valor (TOP #1 de Finalistas).
+    expect(chain.textContent).toContain(
+      AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL,
+    );
+    // Bloque (b): estrategia EJECUTADA que declara el ciclo (sello `strategyVersion`).
+    expect(chain.textContent).toContain(AUTO_OPERATION_STRATEGY_DECLARED_LABEL);
+    // Se conserva el sello declarado y su emparejamiento en el testid estable.
+    expect(
+      screen.getByTestId("auto-operation-strategy-match").textContent,
+    ).toContain("sma_crossover");
+    // Declaración de honestidad en superficie: aproximación textual, no identidad exacta.
+    expect(
+      screen.getByTestId("auto-operation-strategy-match-heuristic").textContent,
+    ).toBe(AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC);
+    expect(
+      screen.getByTestId("auto-operation-strategy-match-heuristic").textContent,
+    ).toContain("aproximación textual");
   });
 
   it("con rank != 1 declara el puesto real y que NO es la #1", () => {

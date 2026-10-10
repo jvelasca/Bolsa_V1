@@ -1,11 +1,17 @@
 """Use-cases de resumen de cuentas (margen y hub listing)."""
 
+from bolsa_application.accounts.tax import collect_report_inputs
+from bolsa_domain.account_settings import settings_from_dict
 from bolsa_domain.entities.account import (
     AccountSummary,
     InvestmentAccount,
     InvestmentPortfolio,
 )
 from bolsa_domain.entities.portfolio import PortfolioSummary
+from bolsa_domain.tax_report import (
+    TaxReportTransaction,
+    compute_all_time_realized_pnl,
+)
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -15,11 +21,61 @@ from bolsa_infrastructure.database.repositories.portfolio_repository import (
 )
 
 
+async def _all_time_realized_pnl(
+    *,
+    account_id: str,
+    account_repo: SqlAlchemyAccountRepository,
+    portfolio_repo: SqlAlchemyPortfolioRepository,
+    ledger_repo: SqlAlchemyLedgerRepository | None,
+) -> float | None:
+    """P&L realizado AGREGADO de todo el historial, o ``None`` si no es medible.
+
+    Reutiliza la MISMA vía de recogida/fees/método que ``GetTaxReport``
+    (``collect_report_inputs`` + ``compute_all_time_realized_pnl``), de modo que el valor
+    concilie con ``net_realized_gain`` del report para un ejercicio que contenga todas las
+    ventas.
+
+    Fail-closed (UNKNOWN ≠ 0): sin ``ledger_repo`` no se pueden mapear las fees del ledger
+    y el realizado NO conciliaría con el tax report → ``None`` («Sin dato todavía»), nunca un
+    valor parcial fabricado. Con historial vacío el dominio devuelve ``0.0`` (hecho conocido:
+    una cuenta sin operaciones cerradas tiene 0 de realizado, no un dato ausente).
+    """
+    if ledger_repo is None:
+        return None
+    scope = await account_repo.resolve_scope(account_id)
+    settings = scope.account.settings or settings_from_dict(None)
+    method = settings.tax.cost_basis_method
+    transactions, fees_by_tx = await collect_report_inputs(
+        account_repo=account_repo,
+        portfolio_repo=portfolio_repo,
+        ledger_repo=ledger_repo,
+        account_id=scope.account.id,
+    )
+    # Fees aplicadas como en la cara realized del tax report (fee de compra capitalizada
+    # en el cost-basis, fee de venta descontada de los proceeds).
+    report_tx = [
+        TaxReportTransaction(
+            id=tx.id,
+            type=tx.type,
+            instrument_id=tx.instrument_id,
+            symbol=tx.symbol,
+            quantity=tx.quantity,
+            price=tx.price,
+            total=tx.total,
+            executed_at=tx.executed_at,
+            fee_amount=fees_by_tx.get(tx.id, 0.0),
+        )
+        for tx in transactions
+    ]
+    return compute_all_time_realized_pnl(transactions=report_tx, method=method)
+
+
 def _account_summary_from_portfolio(
     *,
     account: InvestmentAccount,
     default_portfolio: InvestmentPortfolio,
     portfolio_summary: PortfolioSummary,
+    total_realized_pnl: float | None = None,
 ) -> AccountSummary:
     cash = portfolio_summary.portfolio.cash
     # M-6: margen canónico (inversión bajo apalancamiento). Definición:
@@ -51,6 +107,7 @@ def _account_summary_from_portfolio(
         free_margin=free_margin,
         margin_level_pct=margin_level_pct,
         positions_count=len(portfolio_summary.positions),
+        total_realized_pnl=total_realized_pnl,
     )
 
 
@@ -75,10 +132,18 @@ class GetAccountSummary:
         # (RunCustodyJob), nunca muta el estado por side-effect en lectura.
         scope = await self._account_repo.resolve_scope(account_id, portfolio_id)
         summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
+        # F4: P&L realizado agregado de todo el historial (base canónica tax report).
+        total_realized_pnl = await _all_time_realized_pnl(
+            account_id=scope.account.id,
+            account_repo=self._account_repo,
+            portfolio_repo=self._portfolio_repo,
+            ledger_repo=self._ledger_repo,
+        )
         return _account_summary_from_portfolio(
             account=scope.account,
             default_portfolio=scope.portfolio,
             portfolio_summary=summary,
+            total_realized_pnl=total_realized_pnl,
         )
 
 

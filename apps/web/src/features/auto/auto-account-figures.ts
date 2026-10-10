@@ -14,9 +14,19 @@ export type AutoAccountSummaryFacts = {
   positionsCount: number;
   cash: number;
   totalUnrealizedPnl: number;
+  /**
+   * F4 — P&L realizado AGREGADO de todo el historial (base canónica tax report).
+   * `null`/ausente = no medido → «Sin dato todavía», NUNCA 0 fabricado.
+   */
+  totalRealizedPnl?: number | null;
 };
 
-export type AutoAccountFigureId = "position" | "pnl" | "cash" | "risk";
+export type AutoAccountFigureId =
+  | "position"
+  | "pnl"
+  | "realized"
+  | "cash"
+  | "risk";
 
 export type AutoAccountFigure = {
   id: AutoAccountFigureId;
@@ -42,6 +52,11 @@ export function buildAutoAccountFigures(input: {
     summary == null
       ? AUTO_HOME_NO_DATA_LABEL
       : `Resultado de la cuenta ${formatPrice(summary.totalUnrealizedPnl, "EUR")}`;
+  // F4: realizado agregado. `null`/ausente es un hueco declarado, nunca 0.
+  const realized =
+    summary == null || summary.totalRealizedPnl == null
+      ? AUTO_HOME_NO_DATA_LABEL
+      : `${formatPrice(summary.totalRealizedPnl, "EUR")} en la cuenta simulada`;
   const cash =
     summary == null
       ? AUTO_HOME_NO_DATA_LABEL
@@ -50,6 +65,7 @@ export function buildAutoAccountFigures(input: {
   return [
     { id: "position", label: "Posición", value: position },
     { id: "pnl", label: "Resultado", value: pnl },
+    { id: "realized", label: "Resultado realizado", value: realized },
     { id: "cash", label: "Efectivo simulado", value: cash },
     { id: "risk", label: "Riesgo", value: input.riskLabel },
   ];

@@ -32,6 +32,7 @@ export * from "./daily-desk.js";
 export * from "./daily-desk-auto-projection.js";
 export * from "./auto-operational-monitor.js";
 export * from "./auto-operation-story.js";
+export * from "./auto-ranking-motive.js";
 export * from "./paper-daily-report.js";
 export * from "./operational-context.js";
 export * from "./position-operational-view.js";

@@ -85,6 +85,11 @@ export interface AccountSummaryDto {
   totalMarketValue: number;
   totalCost: number;
   totalUnrealizedPnl: number;
+  /**
+   * F4 — P&L realizado AGREGADO de todo el historial (base canónica tax report).
+   * `null`/ausente = no medido («Sin dato todavía»), nunca 0 fabricado.
+   */
+  totalRealizedPnl?: number | null;
   totalEquity: number;
   marginUsed: number;
   freeMargin: number;

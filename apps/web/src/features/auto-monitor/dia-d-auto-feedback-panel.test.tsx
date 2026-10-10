@@ -26,6 +26,7 @@ vi.mock("lightweight-charts", () => ({
 const FEEDBACK = {
   available: true,
   readOnly: true,
+  serving: "PRECOMPUTED_ARTIFACT",
   schemaVersion: "dia-d-feedback-v2",
   kind: "DIA_D_AUTO_FEEDBACK",
   window: {
@@ -186,6 +187,7 @@ vi.mock("@/lib/api", () => ({
   api: {
     getAutoDiaDFeedbackList: vi.fn(async () => ({
       readOnly: true,
+      serving: "PRECOMPUTED_ARTIFACT",
       windows: ["2026-09-29_2026-09-30"],
       latest: "2026-09-29_2026-09-30",
       artifact: FEEDBACK,
@@ -332,6 +334,12 @@ describe("DiaDAutoFeedbackPanel", () => {
     const panel = screen.getByTestId("dia-d-auto-feedback-panel");
     expect(panel.textContent).toContain("Evalúa");
     expect(panel.textContent).not.toContain("Confirma");
+
+    // P4-3: el modo real se declara (artefacto precalculado, no en vivo); nunca un código crudo.
+    const serving = screen.getByTestId("dia-d-auto-feedback-serving");
+    expect(serving.getAttribute("data-serving")).toBe("PRECOMPUTED_ARTIFACT");
+    expect(serving.textContent).toContain("precalculado");
+    expect(serving.textContent).toContain("no se recalcula en vivo");
   });
 
   it("preselecciona el símbolo de la URL (enlace de EXPLICACIÓN)", async () => {
@@ -348,6 +356,32 @@ describe("DiaDAutoFeedbackPanel", () => {
     expect(focused.map((row) => row.getAttribute("data-symbol"))).toEqual([
       "BBB",
     ]);
+  });
+
+  it("declara la ausencia honesta (Sin dato todavía) sin códigos crudos", async () => {
+    vi.mocked(api.getAutoDiaDFeedbackList).mockResolvedValueOnce({
+      readOnly: true,
+      serving: "PRECOMPUTED_ARTIFACT",
+      windows: ["2026-09-29_2026-09-30"],
+      latest: "2026-09-29_2026-09-30",
+      artifact: null,
+      notes: [],
+    });
+    vi.mocked(api.getAutoDiaDFeedback).mockResolvedValueOnce({
+      available: false,
+      window: { from: "2026-09-29", to: "2026-09-30", days: [] },
+      notes: ["unmotivo_no_catalogado"],
+    });
+
+    renderWithClient(
+      <DiaDAutoFeedbackPanel />,
+      "/auto-monitor?mode=dia-d&view=feedback&window=2026-09-29_2026-09-30",
+    );
+
+    const card = await screen.findByTestId("dia-d-auto-feedback-not-available");
+    // Un hueco se declara con el vocabulario oficial, nunca con un código crudo.
+    expect(card.textContent).toContain("Sin dato todavía");
+    expect(card.textContent).not.toContain("unmotivo_no_catalogado");
   });
 });
 

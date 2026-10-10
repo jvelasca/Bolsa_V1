@@ -40,6 +40,28 @@ export const AUTO_OPERATION_STRATEGY_DESCRIPTION =
   "La mejor estrategia del valor en Finalistas, con los indicadores que la sustentan. Puedes verificar por tu cuenta que la operativa diaria usa esa estrategia con DÍA-D." as const;
 
 /**
+ * Rótulo del bloque de la MEJOR estrategia DISPONIBLE del valor (Finalistas TOP #1), la que
+ * `getInstrumentStrategyTop` devuelve. Es lo mejor disponible, NO necesariamente lo ejecutado.
+ */
+export const AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL =
+  "Mejor estrategia del valor (Finalistas)" as const;
+
+/**
+ * Rótulo del bloque de la estrategia EJECUTADA que declara el ciclo (`cycle.strategyVersion`,
+ * un sello opaco del motor; p. ej. `ActiveStrategy.version_id`). Es OTRA cosa que el TOP #1.
+ */
+export const AUTO_OPERATION_STRATEGY_DECLARED_LABEL =
+  "Estrategia ejecutada declarada por el ciclo" as const;
+
+/**
+ * Declaración de HONESTIDAD en superficie: la coincidencia entre la estrategia EJECUTADA
+ * (sello `cycle.strategyVersion`) y la MEJOR del valor (TOP #1) es una aproximación textual;
+ * el enlace EXACTO no lo materializa todavía el motor del ciclo, así que no se afirma.
+ */
+export const AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC =
+  "La coincidencia es una aproximación textual (igualdad por token), no una identidad exacta: el enlace entre la estrategia ejecutada y la mejor del valor todavía no lo materializa el motor del ciclo." as const;
+
+/**
  * Tri-estado de coincidencia (`coincide` / `no coincide` / `sin dato`). Nunca se afirma
  * «coincide» sin un emparejamiento textual real; un hueco se declara.
  */
@@ -93,6 +115,12 @@ export type AutoOperationStrategyInput = {
   } | null;
   /** UUID resuelto del instrumento (distinto del ticker del ciclo). */
   instrumentId: string | null;
+  /**
+   * La lectura del CATÁLOGO DE INSTRUMENTOS FALLÓ (HTTP/red). Distinto de «instrumento sin
+   * resolver»: el UUID sí podría existir y no pudimos leerlo ⇒ se declara `No disponible`,
+   * nunca «Sin dato todavía».
+   */
+  instrumentError?: boolean;
   top: InstrumentStrategyTopV1 | null;
   /**
    * La lectura del TOP FALLÓ (HTTP/red). Distinto de «no hay TOP»: aquí SÍ podría existir un
@@ -191,8 +219,12 @@ export function buildAutoOperationStrategyView(
   // Prioridad DECLARADA del hueco: un FALLO de lectura nunca se describe como ausencia
   // (`No disponible` ≠ `Sin dato todavía`); una lectura EN VUELO deja el hueco en `null` (la UI
   // muestra carga y no un falso «sin dato»); solo el hueco real usa el rótulo de ausencia.
+  // El fallo del catálogo de instrumentos va PRIMERO: sin catálogo el UUID no puede resolverse
+  // (y TOP/definición ni se piden), así que manda sobre `loading` y sobre el hueco de instrumento.
   let gapReason: string | null = null;
-  if (input.topError === true) {
+  if (input.instrumentError === true) {
+    gapReason = `${ABSENT_DATA_NOT_AVAILABLE}: no se pudo leer el catálogo de instrumentos.`;
+  } else if (input.topError === true) {
     gapReason = `${ABSENT_DATA_NOT_AVAILABLE}: no se pudo leer el TOP de Finalistas.`;
   } else if (input.definitionError === true) {
     gapReason = `${ABSENT_DATA_NOT_AVAILABLE}: no se pudo leer la definición de la estrategia #1.`;
@@ -208,10 +240,12 @@ export function buildAutoOperationStrategyView(
       "Sin dato todavía: la estrategia #1 no tiene definición guardada.";
   }
 
-  // Fail-closed ante un error de lectura: sin TOP/definición fiables no se ofrece verificación.
+  // Fail-closed ante un error de lectura: sin catálogo/TOP/definición fiables no se ofrece
+  // verificación.
   const verifyHref =
     resolvedInstrumentId &&
     strategyDefinitionId &&
+    input.instrumentError !== true &&
     input.topError !== true &&
     input.definitionError !== true
       ? diaDVerifyHref(resolvedInstrumentId)

@@ -149,59 +149,31 @@ export function AutoRiesgoPage() {
             </dl>
           ) : null}
 
-          {risk.positionRiskAvailable ? (
-            <dl className="grid gap-2 sm:grid-cols-2">
-              <div className="flex justify-between gap-4 text-sm">
-                <dt className="text-muted-foreground">Riesgo abierto</dt>
-                <dd data-testid="auto-riesgo-open-risk">
-                  {risk.positionRiskLabel}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4 text-sm">
-                <dt className="text-muted-foreground">Máxima pérdida</dt>
-                <dd data-testid="auto-riesgo-max-loss">
-                  {risk.positionRiskLabel}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4 text-sm">
-                <dt className="text-muted-foreground">Posiciones con riesgo</dt>
-                <dd data-testid="auto-riesgo-position-risk">
-                  {risk.positionRiskLabel}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4 text-sm">
-                <dt className="text-muted-foreground">Límite diario</dt>
-                <dd data-testid="auto-riesgo-daily-limit">
-                  {risk.positionRiskLabel}
-                </dd>
-              </div>
-            </dl>
-          ) : (
-            // Los límites detallados no viven en el read-model de AUTO. Si el veredicto ya declaró
-            // el hueco (`Sin dato todavía`), aquí sólo se enlaza la superficie canónica para no
-            // repetir el rótulo; si el veredicto trae una lectura real, éste es el único mensaje de
-            // hueco del primer nivel. Nunca se rellena con `0`.
-            <p
-              className="text-sm text-muted-foreground"
-              data-testid="auto-riesgo-limits"
+          {/* Los límites detallados no viven en el read-model de AUTO: las cuatro filas que
+              mostraban el MISMO hueco (`positionRiskLabel`) se retiraron del primer nivel. Si el
+              veredicto ya declaró el hueco (`Sin dato todavía`), aquí sólo se enlaza la superficie
+              canónica para no repetir el rótulo; si el veredicto trae una lectura real, éste es el
+              único mensaje de hueco del primer nivel. Nunca se rellena con `0`. */}
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="auto-riesgo-limits"
+          >
+            {risk.verdictTone === "unknown" ? (
+              <>El riesgo por posición y los límites se calculan en </>
+            ) : (
+              <>
+                Riesgo por posición y límites: {absentDataLabel()}. El detalle
+                se calcula en{" "}
+              </>
+            )}
+            <Link
+              to={CARTERA_RIESGO_PATH}
+              className="underline hover:text-primary"
             >
-              {risk.verdictTone === "unknown" ? (
-                <>El riesgo por posición y los límites se calculan en </>
-              ) : (
-                <>
-                  Riesgo por posición y límites: {absentDataLabel()}. El detalle
-                  se calcula en{" "}
-                </>
-              )}
-              <Link
-                to={CARTERA_RIESGO_PATH}
-                className="underline hover:text-primary"
-              >
-                Cartera → Riesgo
-              </Link>
-              .
-            </p>
-          )}
+              Cartera → Riesgo
+            </Link>
+            .
+          </p>
         </section>
       </div>
 

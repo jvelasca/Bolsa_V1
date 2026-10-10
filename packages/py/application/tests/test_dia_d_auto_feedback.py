@@ -78,6 +78,30 @@ def test_oos_supported_needs_positive_edge_hit_rate_and_supported_sample() -> No
     assert VALUE_CONFIRMED not in VALUE_VERDICTS
 
 
+def test_confirmed_is_never_emitted_even_with_strong_positive_evidence() -> None:
+    # P4-2/P4-3: el techo real es OOS_SUPPORTED (replay). CONFIRMED queda RESERVADO a evidencia
+    # PAPER y NO se emite, ni con muestra fuerte (>=32) y edge positivo.
+    card = build_value_scorecard(
+        "AAA",
+        round_trips=_trips(*([1.0] * EVIDENCE_STRONG_MIN_CYCLES)),
+        days=["2026-09-30"],
+    )
+    artifact = build_dia_d_feedback_artifact(
+        window_from="2026-09-30",
+        window_to="2026-09-30",
+        days=["2026-09-30"],
+        values=[card],
+    )
+    verdicts = {value["verdict"] for value in artifact["values"]}
+    assert VALUE_OOS_SUPPORTED in verdicts
+    assert VALUE_CONFIRMED not in verdicts
+    # Todo veredicto emitido pertenece a la taxonomía declarada (CONFIRMED no está en ella).
+    assert verdicts <= set(VALUE_VERDICTS)
+    assert artifact["summary"]["oosSupported"] == 1
+    # `CONFIRMED` solo puede aparecer en la prosa de `limits` (reservado), nunca como veredicto.
+    assert all(value["verdict"] != VALUE_CONFIRMED for value in artifact["values"])
+
+
 def test_positive_edge_with_preliminary_sample_is_mixed_not_supported() -> None:
     # 5..19 ciclos: se MIDE, pero no se declara SOPORTADO (D34-04).
     card = build_value_scorecard(

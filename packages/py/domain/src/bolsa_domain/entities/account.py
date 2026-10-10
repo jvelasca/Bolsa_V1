@@ -63,6 +63,10 @@ class AccountSummary:
     free_margin: float
     margin_level_pct: float | None
     positions_count: int
+    # F4: P&L realizado AGREGADO de todo el historial (misma base canónica que el tax
+    # report). ``None`` = no medido / fuente no disponible → «Sin dato todavía», NUNCA 0.
+    # Default ``None`` para no romper constructores existentes.
+    total_realized_pnl: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

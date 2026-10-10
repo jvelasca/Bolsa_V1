@@ -52,7 +52,13 @@ export function AutoTop3Panel({
         </h3>
         <p className={cn("text-muted-foreground", AUTO_USER_TEXT)}>
           Las 3 oportunidades que AUTO ha situado en los primeros puestos de su
-          último análisis. {view?.rankNote ?? ""}
+          último análisis.
+          {/*
+           * `ranking ≠ decisión` (`UI5-12`) se declara una sola vez en cada superficie: el
+           * resumen compacto (HOME) lo deja a la sección «Decisión de cartera», que ya lo dice;
+           * la vista completa (Operar) lo lleva aquí, en su propio panel.
+           */}
+          {!compact && view?.rankNote ? ` ${view.rankNote}` : null}
         </p>
       </div>
 
@@ -131,7 +137,10 @@ export function AutoTop3Panel({
               <dd className="font-mono">{view.runId}</dd>
             </div>
             {view.slots.map((slot) => (
-              <div key={`tech-${slot.rank}`} className="flex gap-2">
+              <div
+                key={`tech-${slot.rank}-${slot.assetId}`}
+                className="flex gap-2"
+              >
                 <dt className="text-muted-foreground">#{slot.rank}</dt>
                 <dd className="font-mono">
                   {slot.assetId} · {slot.scoreLabel}

@@ -225,12 +225,53 @@ describe("buildAutoOperationStory", () => {
     expect(context.get("STRATEGY")?.value).toBe("strat-3");
     expect(context.get("DIRECTION")?.value).toBe("long");
 
-    // El universo PIT / régimen / ranking NO se materializan por ciclo ⇒ NO MEDIDO.
+    // El universo PIT / régimen NO se materializan por ciclo ⇒ NO MEDIDO.
     expect(context.get("PIT_UNIVERSE")?.measurement).toBe("UNKNOWN");
     expect(context.get("PIT_UNIVERSE")?.value).toBe("NO MEDIDO");
     expect(context.get("PIT_UNIVERSE")?.note).toContain("watch PIT");
     expect(context.get("REGIME")?.measurement).toBe("UNKNOWN");
+    // El ranking SÍ se materializa cuando el desglose consta; sin él queda NO MEDIDO.
     expect(context.get("RANKING")?.measurement).toBe("UNKNOWN");
+    expect(context.get("RANKING")?.value).toBe("NO MEDIDO");
+  });
+
+  it("puebla el «Motivo de selección» cuando el ciclo declara el desglose del score", () => {
+    const withRanking = cycle();
+    withRanking.steps = withRanking.steps.map((step) =>
+      step.id === "TOP_N"
+        ? {
+            ...step,
+            facts: [
+              { key: "rank", value: 2, measurement: "COMPLETE" },
+              {
+                key: "components",
+                value: { edge: 0.9, regime_fit: 0.7, momentum: 0 },
+                measurement: "COMPLETE",
+              },
+            ],
+          }
+        : step,
+    );
+    const story = buildAutoOperationStory({ cycle: withRanking });
+    const ranking = story.context.find((item) => item.id === "RANKING");
+    expect(ranking?.measurement).toBe("COMPLETE");
+    expect(ranking?.value).toBe("Ventaja esperada · Encaje con el régimen");
+    expect(ranking?.note).toContain("ranking ≠ decisión");
+
+    // El hecho humanizado se refleja en el paso Selección · TOP-N: nunca el código crudo.
+    const selection = story.stages.find((stage) => stage.id === "SELECTION");
+    const motive = selection?.facts.find((fact) => fact.label === "motivo");
+    expect(motive?.value).toBe("Ventaja esperada · Encaje con el régimen");
+    expect(motive?.measurement).toBe("COMPLETE");
+    expect(JSON.stringify(selection?.facts)).not.toContain("edge");
+  });
+
+  it("sin desglose durable, el «Motivo de selección» queda NO MEDIDO (no 0, no relleno)", () => {
+    const story = buildAutoOperationStory({ cycle: cycle() });
+    const ranking = story.context.find((item) => item.id === "RANKING");
+    expect(ranking?.measurement).toBe("UNKNOWN");
+    expect(ranking?.value).toBe("NO MEDIDO");
+    expect(ranking?.note).toContain("sin motivo de selección");
   });
 
   it("una etapa sin traza es NOT_MEASURED y nunca un 0", () => {

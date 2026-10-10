@@ -106,8 +106,18 @@ export function buildAutoTop3View(
     };
   }
 
+  // Un activo = un slot: el espejo durable (`top3_opportunities`) no tiene clave natural
+  // única por `(runId, activo)`, de modo que un run reescrito (p. ej. reinicio del worker en
+  // la misma barra) puede traer el mismo activo dos veces. Se conserva el mejor rank (la lista
+  // ya viene ordenada) y así la UI nunca pinta el mismo activo repetido en el TOP3.
+  const seenAssetIds = new Set<string>();
   const slots = [...items]
     .sort((a, b) => a.rank - b.rank)
+    .filter((item) => {
+      if (seenAssetIds.has(item.assetId)) return false;
+      seenAssetIds.add(item.assetId);
+      return true;
+    })
     .map((item) => {
       const { strength, label } = opportunityStrengthLabel(item.score);
       return {

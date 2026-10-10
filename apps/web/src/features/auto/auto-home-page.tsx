@@ -92,6 +92,7 @@ export function AutoHomePage() {
           positionsCount: summaryQuery.data.positionsCount,
           cash: summaryQuery.data.cash,
           totalUnrealizedPnl: summaryQuery.data.totalUnrealizedPnl,
+          totalRealizedPnl: summaryQuery.data.totalRealizedPnl ?? null,
         }
       : null,
     riskLabel: summary.riskLabel,
