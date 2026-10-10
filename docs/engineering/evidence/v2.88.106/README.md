@@ -44,9 +44,10 @@
 ## 3.b Verificación del sello en CI (tag `v2.88.106-beta`)
 
 - `Release tag CI` del tag `v2.88.106-beta` → **GREEN**: 12 jobs verdes, incluido el nuevo `playwright (integrated AUTO S5)` (3 tests corridos, **guardia anti-skip OK**) y `certify` con `"status": "GREEN"` y `"playwright-integrated-auto-s5": "success"`. Artefacto `release-tag-ci-summary`.
-- **Hallazgo del primer sello (honesto).** En esa corrida el job del `S5` necesitó **1 reintento**: el `afterAll` del primer intento falló con `DELETE /api/accounts/… falló (400)` — y el teardown original **se tragaba el cuerpo** de la respuesta, así que el motivo exacto del `400` no quedó en el log. Es una **carrera** en un gate que ahora **bloquea el tag**, no un fallo de producto: los 3 tests pasaron y el reintento dejó el job verde.
+- **Primer sello** ([`38077184522`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38077184522), 13m26s): **GREEN pero con 1 reintento** (honesto). El `afterAll` del primer intento falló con `DELETE /api/accounts/… falló (400)` y el teardown original **se tragaba el cuerpo** de la respuesta, así que el motivo exacto del `400` no quedó en el log. Es una **carrera** en un gate que ahora **bloquea el tag**, no un fallo de producto: los 3 tests pasaron y el reintento dejó el job verde.
 - **Corrección (mismo tag, re-anclado).** El teardown dejó de ser «ciego»: sondea el estado real (`GET /accounts/{id}`), verifica el cierre **antes** de borrar (con reintento), reintenta el borrado, adjunta **cuerpo + `status`/`type`** si falla, acepta el `400`/`404` cuando el sondeo confirma que la cuenta ya no existe y **asserta** el no-residuo al final. Re-verificado localmente con la versión endurecida: **3/3 passed** con `E2E_S5_REQUIRED=1` y **0 reintentos**, **0 cuentas `e2e-*` residuales**.
-- **Tag `unsigned`.** El tag se re-ancló al commit de la corrección (misma versión).
+- **Sello final (tag re-anclado `37d4b6a8` → commit `2070dd47`).** `Release tag CI` [`38087677244`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38087677244) **GREEN**: 12 jobs verdes, `playwright (integrated AUTO S5)` **3 passed (24.7s, sin reintento)** con la guardia anti-skip **OK**, y `certify` **GREEN** con `"playwright-integrated-auto-s5": "success"`.
+- **Tag `unsigned`.** Si el `400` reapareciera, el teardown ahora deja **cuerpo + estado de la cuenta** en el log.
 
 ## 4. Qué no cambia / deuda declarada
 
