@@ -6,7 +6,7 @@
 > **Origen.** Auditoría 1 (honestidad de lectura del puente `S5`, identidad de la estrategia ejecutada, E2E integrado reproducible) + deuda PARKED FASE 2 (`F2-3`/`F2-4`) + `P4-3` + simplificación de la UI AUTO.
 
 **Base:** [`evidence/v2.88.104/README.md`](../v2.88.104/README.md) (puente AUTO → DÍA-D `S5`).
-**Cita POST-TAG.** **Tag anotado `v2.88.105-beta`:** **PENDIENTE de completar** (objeto → commit + `Release tag CI` `VERDE`/`ROJO` + `replay-repro`) tras el run de CI del tag.
+**Cita POST-TAG.** **Tag anotado `v2.88.105-beta`:** objeto **`0ba42c1a`** → commit **`c28b49f1`** (**re-anclado una vez**: el primer intento, objeto `6c56b951` → commit `3e37d6b9`, tuvo `Release tag CI` **ROJO** por una violación axe `definition-list` —ver §5—, corregida en `c28b49f1`). **`Release tag CI` [`38074199301`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38074199301) VERDE** (11m45s): `python` ✓ · `frontend` ✓ · `shared` ✓ · `replay-repro` ✓ **`REPRODUCIDO`** `1E3ADAC2…929A37E7` ⇒ **`Δ motor ≠ 0` aditivo confirmado por CI** · `playwright (mock E2E)` ✓ **111 passed** / 29 skipped · `lifecycle-pg` ✓ · `dr-verify` ✓ · `decision-spine` ✓ · `a7-gate` ✓ · `security` ✓. `Python CI` [`38074199290`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38074199290) · `Frontend CI` [`38074199306`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38074199306) · `Fase 2 scientific` [`38074199323`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38074199323) · `Optimize lab` [`38074199341`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38074199341) **VERDES**. `main` `c28b49f1`: `Gitleaks` [`38074195763`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38074195763) · `Frontend CI` [`38074195757`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38074195757) **VERDES** (Python CI no se dispara: el commit solo toca `apps/web`). Tag **unsigned**.
 
 ## 1. Cambios (por fase)
 
@@ -43,7 +43,7 @@
 - `uv run mypy … --follow-imports=silent` → **Success: no issues found in 544 source files** (exit 0).
 - `uv run pytest packages/py/domain/tests packages/py/application/tests -q` → **2706 passed** (exit 0).
 - `uv run pytest test_dia_d_bump_guard + api-python tocados -q` → **46 passed** (exit 0).
-- **E2E integrado `S5`** (`gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts`, opt-in) → **3/3 verdes** contra stack real (FastAPI + PostgreSQL), con **teardown sin residuo** (0 reservas/fills/ciclos); hermano **mock** → **2/2**.
+- **E2E `S5`:** **integrado** (`gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts`, opt-in) → **3/3** contra stack real (FastAPI + PostgreSQL) con **teardown sin residuo**; **mock** (`gp-e2e-s5-…-mock`) → **2/2**; **axe AUTO** (`gp-e2e-v28865-auto-axe-mock.spec.ts`) → **14/14** (0 violaciones `critical`/`serious` en las 8 rutas AUTO). En CI, el job `playwright (mock E2E)` → **111 passed / 29 skipped**.
 - **Web shared** (`auto-ranking-motive` + `auto-operation-story`) → **27 passed** (F5).
 
 ## 4. Fiabilidad y `replay-repro` (**`Δ motor ≠ 0`**)
@@ -56,10 +56,13 @@ Este sello **sí** toca `packages/py/**`, así que `replay-repro` debe **regener
 
 ⇒ **Los bytes del artefacto congelado no cambian.** La **autoridad** es el job CI `replay-repro` del tag (regenera desde el fixture y ASSERTA el SHA-256); se declara aquí para que el sello no quede a ciegas.
 
+**Veredicto CI (tag `v2.88.105-beta`, job [`114277631043`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38074199301)):** `replay-repro` **`REPRODUCIDO`** (mismo CONTENIDO: `1E3ADAC2…929A37E7`, 3 340 728 B) y runner determinista consigo mismo ⇒ el `Δ motor ≠ 0` es **invisible al artefacto congelado**, como predecía este análisis.
+
 ## 5. Qué no cambia / deuda declarada
 
 - **Motor de decisión/ejecución**, umbrales, Alembic (head `052_top3_opportunities`). Sin `contract:gen` **fuera** de lo declarado.
 - **`P4-3`** se **declara** (modo `PRECOMPUTED_ARTIFACT`), **no** se resuelve como «en vivo»: el feedback DÍA-D **sigue** siendo artefacto precalculado por CLI.
 - **E2E integrado `opt-in`** (un `skipped` **no** certifica); la ejecución del job CI `playwright-integrated` **no** se corrió en local (sí el journey, contra stack real).
+- **`playwright (mock E2E)` destapó un defecto real (y se corrigió).** El primer intento del sello tenía una violación axe **`definition-list`** (serious, `wcag131`) en `/auto/operar/operacion/e2e-cycle-aaa`: la nota de heurística de `F3` (y la de `rank != 1`) viajaban como `<p>` dentro de un `<div>` de agrupación del `<dl>` de la tarjeta `S5`, y un `<div>` de `<dl>` solo admite grupos `<dt>`/`<dd>`. Corregido en `c28b49f1` moviendo ambas notas **dentro de su `<dd>`** (contenido de flujo válido); re-verificado en local (axe `14/14`, `S5` mock `2/2`, `vitest 294/2074`) y en CI (mock E2E `111 passed`). Tag **re-anclado** a `c28b49f1`.
 - **`23` warnings `react-hooks/exhaustive-deps`** (`eslint`, **0 errores**): preexistentes, ajenos a este sello.
 - **Tag `unsigned`.**
