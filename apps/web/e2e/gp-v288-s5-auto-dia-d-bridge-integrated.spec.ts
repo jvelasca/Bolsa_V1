@@ -274,6 +274,127 @@ function sameTop(before: TopSnapshot, after: TopSnapshot): boolean {
 }
 
 /**
+ * Estado observable de la cuenta efímera. `gone` (404) es el estado DESEADO al final del run: la
+ * cuenta ya no existe y no hay nada más que limpiar (no es un error). Se usa el mismo guard de
+ * visibilidad que `DELETE`, así que «gone» siempre significa «fuera del alcance de este principal».
+ */
+type AccountProbe =
+  | { kind: "gone" }
+  | { kind: "present"; status: string | null; type: string | null };
+
+/** Lee el estado de la cuenta efímera sin tragárse el diagnóstico de un fallo inesperado. */
+async function probeAccount(
+  request: APIRequestContext,
+  baseURL: string,
+  accountId: string,
+): Promise<AccountProbe> {
+  const res = await request.get(
+    new URL(`/api/accounts/${accountId}`, baseURL).toString(),
+  );
+  if (res.status() === 404) return { kind: "gone" };
+  if (!res.ok()) {
+    throw new Error(
+      `GET /api/accounts/${accountId} falló (${res.status()}): ${await res.text()}`,
+    );
+  }
+  const data = (
+    await body<{ data?: { status?: string | null; type?: string | null } }>(res)
+  ).data;
+  return {
+    kind: "present",
+    status: data?.status ?? null,
+    type: data?.type ?? null,
+  };
+}
+
+function describeProbe(probe: AccountProbe): string {
+  return probe.kind === "gone"
+    ? "gone"
+    : `status=${String(probe.status)}, type=${String(probe.type)}`;
+}
+
+/**
+ * Cierra la cuenta efímera y la BORRA, verificando cada paso. El `DELETE` exige la cuenta
+ * `closed` (conservación contable) y el `400` no distingue motivos, de modo que el teardown:
+ * 1. sondea el estado real antes de actuar (una cuenta ya borrada es el estado deseado, no un rojo);
+ * 2. cierra y RE-VERIFICA (con un reintento) que quedó `closed` antes de borrar;
+ * 3. borra con un reintento y, si falla, adjunta el cuerpo de la respuesta + el estado observado;
+ * 4. comprueba al final que la cuenta NO sobrevive (residuo = rojo).
+ * Nunca lanza: acumula los motivos en `failures` para que el `afterAll` decida.
+ */
+async function disposeEphemeralAccount(
+  request: APIRequestContext,
+  baseURL: string,
+  accountId: string,
+  failures: string[],
+): Promise<void> {
+  const accountUrl = new URL(`/api/accounts/${accountId}`, baseURL).toString();
+
+  const closeOnce = async (): Promise<string | null> => {
+    const res = await request.post(`${accountUrl}/close`);
+    if (res.ok() || res.status() === 404) return null;
+    return `POST /api/accounts/${accountId}/close falló (${res.status()}): ${await res.text()}`;
+  };
+
+  try {
+    let probe = await probeAccount(request, baseURL, accountId);
+    if (probe.kind === "gone") return;
+
+    const closeError = await closeOnce();
+    if (closeError) failures.push(closeError);
+
+    // El cierre es un requisito DURO del borrado: no se insiste en borrar sin confirmarlo.
+    probe = await probeAccount(request, baseURL, accountId);
+    if (probe.kind === "present" && probe.status !== "closed") {
+      const retryError = await closeOnce();
+      if (retryError) failures.push(retryError);
+      probe = await probeAccount(request, baseURL, accountId);
+    }
+    if (probe.kind === "gone") return;
+    if (probe.status !== "closed") {
+      failures.push(
+        `la cuenta ${accountId} no quedó cerrada antes del borrado (${describeProbe(probe)}).`,
+      );
+      return;
+    }
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const delRes = await request.delete(accountUrl);
+      if (delRes.ok() || delRes.status() === 404) break;
+      const detail = await delRes.text();
+      const after = await probeAccount(request, baseURL, accountId);
+      // El `400` puede llegar con el borrado YA efectivo: el sondeo manda, no el código.
+      if (after.kind === "gone") break;
+      if (attempt === 2) {
+        failures.push(
+          `DELETE /api/accounts/${accountId} falló (${delRes.status()}): ${detail} [tras el intento: ${describeProbe(after)}]`,
+        );
+        break;
+      }
+    }
+  } catch (err) {
+    failures.push(
+      `el cierre/borrado de la cuenta ${accountId} lanzó: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return;
+  }
+
+  // Residuo = rojo: la cuenta efímera no puede sobrevivir al teardown.
+  try {
+    const finalProbe = await probeAccount(request, baseURL, accountId);
+    if (finalProbe.kind !== "gone") {
+      failures.push(
+        `la cuenta efímera ${accountId} sigue existiendo tras el teardown (${describeProbe(finalProbe)}).`,
+      );
+    }
+  } catch (err) {
+    failures.push(
+      `no se pudo verificar el borrado de ${accountId}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+/**
  * Siembra la cadena completa registrando CADA recurso en cuanto existe:
  * cuenta efímera → catálogo → (snapshot del TOP) → ciclo AUTO durable → TOP real de Finalistas.
  *
@@ -548,29 +669,9 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
 
     // 4) Cierre + borrado de la cuenta efímera (cierre del ciclo de vida del fixture). El
     //    borrado exige la cuenta CERRADA (conservación contable): sin el `close` sería un
-    //    400 permanente y el teardown no cerraría el ciclo.
-    const accountUrl = new URL(
-      `/api/accounts/${state.accountId}`,
-      baseURL,
-    ).toString();
-    try {
-      const closeRes = await request.post(`${accountUrl}/close`);
-      if (!closeRes.ok() && closeRes.status() !== 404) {
-        failures.push(
-          `POST /api/accounts/${state.accountId}/close falló (${closeRes.status()}).`,
-        );
-      }
-      const delRes = await request.delete(accountUrl);
-      if (!delRes.ok() && delRes.status() !== 404) {
-        failures.push(
-          `DELETE /api/accounts/${state.accountId} falló (${delRes.status()}).`,
-        );
-      }
-    } catch (err) {
-      failures.push(
-        `cierre/borrado de la cuenta efímera lanzó: ${String(err)}`,
-      );
-    }
+    //    400 permanente. El helper sondea/verifica cada paso y adjunta el cuerpo del fallo,
+    //    para que un `400` no quede sin diagnóstico (un 400 con la cuenta ya borrada es OK).
+    await disposeEphemeralAccount(request, baseURL, state.accountId, failures);
 
     if (failures.length > 0) {
       throw new Error(
