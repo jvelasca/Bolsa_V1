@@ -46,7 +46,7 @@ function slot(card: ReturnType<typeof buildAutoOperationCard>, id: string) {
 const ACCOUNT = {
   positionLabel: "2 posiciones en la cuenta simulada",
   cashLabel: "10000.00 €",
-  pnlLabel: "Resultado de la cuenta 12.50 €",
+  pnlLabel: "12.50 € en la cuenta simulada",
 };
 
 describe("buildAutoOperationCard", () => {
@@ -110,7 +110,9 @@ describe("buildAutoOperationCard", () => {
     expect(slot(card, "position").state).not.toBe(AUTO_CARD_SLOT_DONE);
     expect(slot(card, "money").state).toBe(AUTO_CARD_ACCOUNT_SCOPE);
     expect(slot(card, "money").detail).toContain("Efectivo simulado");
-    expect(slot(card, "money").detail).toContain("Resultado de la cuenta");
+    expect(slot(card, "money").detail).toContain(
+      "Resultado de posiciones abiertas",
+    );
   });
 
   it("una cantidad aplicada menor es Ejecución parcial", () => {

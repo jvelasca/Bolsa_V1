@@ -9,6 +9,10 @@
  */
 
 import {
+  AUTO_ACCOUNT_CASH_LABEL,
+  AUTO_ACCOUNT_OPEN_PNL_LABEL,
+} from "@/features/auto/auto-account-figures";
+import {
   type AutoBasicCycle,
   operationHappenedLabel,
   readEntryQuantities,
@@ -169,9 +173,11 @@ function moneySlot(
   if (!cashKnown && !pnlKnown) {
     return { state: AUTO_HOME_NO_DATA_LABEL, detail: null };
   }
+  // H4: el P&L de la tarjeta se prefija con QUÉ es (abierto), no con la frase-completa
+  // antigua, para que rótulo y valor no se pisen.
   const parts = [
-    cashKnown ? `Efectivo simulado ${account.cashLabel}` : null,
-    pnlKnown ? account.pnlLabel : null,
+    cashKnown ? `${AUTO_ACCOUNT_CASH_LABEL} ${account.cashLabel}` : null,
+    pnlKnown ? `${AUTO_ACCOUNT_OPEN_PNL_LABEL} ${account.pnlLabel}` : null,
   ].filter((part): part is string => part != null);
   return { state: AUTO_CARD_ACCOUNT_SCOPE, detail: parts.join(" · ") };
 }

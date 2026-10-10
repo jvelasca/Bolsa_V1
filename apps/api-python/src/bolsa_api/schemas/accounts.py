@@ -126,6 +126,8 @@ class AccountSummaryDto(BaseModel):
     positions_count: int = Field(alias="positionsCount")
     # F4: P&L realizado AGREGADO de todo el historial (base canónica tax report).
     # Opcional/nullable: ``None`` = fuente no disponible → «Sin dato todavía», NUNCA 0.
+    # Política (H3, v2.88.106): SOLO la vista de detalle (``GetAccountSummary``) lo
+    # rellena; la LISTA (``ListAccountSummaries``) lo deja en ``None`` a propósito.
     total_realized_pnl: float | None = Field(default=None, alias="totalRealizedPnl")
 
 

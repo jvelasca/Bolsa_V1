@@ -148,7 +148,16 @@ class GetAccountSummary:
 
 
 class ListAccountSummaries:
-    """Hub listing: one pass, no custody side-effects (use GetAccountSummary for that)."""
+    """Hub listing: one pass, no custody side-effects (use GetAccountSummary for that).
+
+    Política del P&L realizado (H3, v2.88.106): esta vía deja ``total_realized_pnl``
+    en ``None`` DE FORMA DELIBERADA. El realizado agregado exige recorrer TODO el
+    historial de cada cuenta (``collect_report_inputs`` + máquina FIFO/avg), y esta
+    lista no lo consume (solo alimenta equity/posiciones): calcularlo aquí sería una
+    regresión O(N) sin beneficio. El campo sigue viajando como ``None`` («Sin dato
+    todavía», nunca 0) y la cifra realizada solo se publica en el detalle
+    (``GetAccountSummary`` → ``GET /accounts/{id}/summary``).
+    """
 
     def __init__(
         self,
@@ -176,6 +185,8 @@ class ListAccountSummaries:
                     account=scope.account,
                     default_portfolio=scope.portfolio,
                     portfolio_summary=summary,
+                    # H3: sin ``total_realized_pnl`` a propósito (ver docstring de la
+                    # clase): el realizado solo se materializa en el detalle.
                 )
             )
         return items

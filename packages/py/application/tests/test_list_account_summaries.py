@@ -59,6 +59,23 @@ class _FakePortfolioRepo:
         )
 
 
+def test_list_account_summaries_declara_el_realizado_ausente() -> None:
+    """H3: la lista NO calcula el realizado (política detail-only) → ``None`` honesto.
+
+    El detalle ``GetAccountSummary`` sí lo calcula; la lista lo deja declarado para no
+    pagar el coste O(N) de agregar el historial por cuenta (ver docstring de la clase).
+    """
+    accounts = [_Account(id="a1"), _Account(id="a2")]
+    account_repo = _FakeAccountRepo(accounts=accounts, resolve_calls=[])
+    portfolio_repo = _FakePortfolioRepo(summary_calls=[])
+    use_case = ListAccountSummaries(account_repo, portfolio_repo)  # type: ignore[arg-type]
+
+    items = asyncio.run(use_case.execute())
+
+    # Ni 0 fabricado ni valor parcial: el hueco se DECLARA (`None`), no se rellena.
+    assert all(item.total_realized_pnl is None for item in items)
+
+
 def test_list_account_summaries_one_summary_per_account() -> None:
     accounts = [_Account(id="a1"), _Account(id="a2")]
     account_repo = _FakeAccountRepo(accounts=accounts, resolve_calls=[])

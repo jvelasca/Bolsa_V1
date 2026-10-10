@@ -14,11 +14,26 @@
  * cuenta efímera **reutilizando** el CLI dev `scripts/dev/seed_auto_cycle_for_ui.py` como
  * subproceso (ver `e2e/helpers/auto-cycle-seed.ts`); NO reimplementa lógica de backend.
  *
+ * Ciclo de vida del fixture (H2, v2.88.106 — HONESTIDAD y NO-RESIDUO):
+ * - Cada recurso se **registra en cuanto existe** (la cuenta justo tras su `POST`), no al final:
+ *   si una petición intermedia falla, el `afterAll` todavía conoce lo creado y lo limpia.
+ * - El TOP de Finalistas es una tabla **GLOBAL por instrumento**: el journey **guarda** el TOP
+ *   previo antes de tocarlo y lo **restaura** al terminar, y **verifica** que quedó como estaba
+ *   (no «best-effort»: si no cuadra, el run es ROJO).
+ * - La limpieza se ejecuta SIEMPRE (equivale a `finally`), y termina borrando la cuenta efímera.
+ *
+ * `E2E_S5_REQUIRED=1` (CI del tag): una precondición ausente (entorno/ciclo/catálogo) se
+ * convierte en **FALLO**, no en `skipped`, para que un skip no pueda dar verde en CI. Sin ese
+ * modo, `skipped` SIGUE siendo un skip declarado con motivo.
+ *
  * Run (API :8000 + PG + Vite proxy; el harness siembra y limpia el ciclo):
  *   E2E_INTEGRATION=1 E2E_RUN=1 E2E_ALLOW_DEV_DB=1 \
  *     pnpm --filter @bolsa/web exec playwright test gp-v288-s5
  * Against an existing dev server (PLAYWRIGHT_BASE_URL):
  *   E2E_INTEGRATION=1 E2E_ALLOW_DEV_DB=1 pnpm --filter @bolsa/web e2e -- gp-v288-s5
+ * Modo CI del tag (precondición = fallo, no skip):
+ *   E2E_S5_REQUIRED=1 E2E_INTEGRATION=1 E2E_ALLOW_DEV_DB=1 \
+ *     pnpm --filter @bolsa/web exec playwright test gp-v288-s5
  *
  * Reproducción manual de lo que hace el harness (mismos pasos, mismo CLI):
  *   uv run --no-sync python scripts/dev/seed_auto_cycle_for_ui.py \
@@ -27,11 +42,6 @@
  *   # … abrir /auto/operar/operacion/<cycleId> y ejercitar el CTA «Verificar D→hoy»
  *   uv run --no-sync python scripts/dev/seed_auto_cycle_for_ui.py --cleanup \
  *     --account-id e2e-v288-s5-xxxxxxxx --api-base http://localhost:5173
- *
- * `skipped` SIGUE siendo un skip declarado (no certifica): el journey se declara `skipped` con
- * motivo explícito si (a) `uv`/python no están disponibles (el seed devuelve el motivo), (b) el
- * monitor no declara ciclo tras el seed, o (c) el símbolo del ciclo no está en el catálogo.
- * Default (sin env): skipped.
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -62,53 +72,224 @@ const NO_CHAIN_REASON =
   "El símbolo del ciclo AUTO no está en el catálogo /api/instruments: no se puede resolver la " +
   "estrategia #1 ni el UUID del instrumento para el deep-link DÍA-D.";
 
-/** El catálogo de instrumentos está vacío: no hay símbolo con el que sembrar el ciclo. */
+/** El catálogo de instrumentos está vacío: no hay símbolo con el que sembrar el ciclo AUTO. */
 const NO_CATALOG_REASON =
   "El catálogo /api/instruments está vacío: no hay símbolo con el que sembrar el ciclo AUTO.";
 
 const MONITOR_PATH = "/api/auto/operational-monitor";
 const RUN_PATH = "/api/backtests/run";
+const TOP_TIMEFRAME = "1d";
 const PRESET_KEY = "sma_crossover";
 const STRATEGY_LABEL = "E2E S5 · Cruce SMA 20/50";
 const STRATEGY_REASON = "E2E S5 · razones del coach";
+
+/** `E2E_S5_REQUIRED=1` (CI del tag) convierte cualquier precondición ausente en FALLO. */
+function s5Required(): boolean {
+  return process.env.E2E_S5_REQUIRED === "1";
+}
 
 type MonitorCycle = {
   cycleId: string;
   instrumentId?: string | null;
 };
 
-type AutoBridgeFixture = {
-  accountId: string;
-  /** Ciclo durable que la UI debe mostrar como primera operación (o `null` = hueco). */
+/** Estado del TOP global ANTES de tocarlo (para restaurarlo y verificarlo). */
+type TopSnapshot = { status: "absent" } | { status: "present"; body: unknown };
+
+/**
+ * Registro MUTABLE del harness: se rellena recurso a recurso en cuanto existe, de modo que el
+ * teardown puede limpiar aunque una petición intermedia falle (H2).
+ */
+type S5State = {
+  /** Cuenta efímera: se registra justo tras su `POST` (primer recurso). */
+  accountId: string | null;
+  /** Fallo de seed/fixture (producto): se propaga como FAIL, nunca como skip. */
+  seedError: Error | null;
+  /** El harness lanzó el seed (aunque fallara): hay residuo durable que verificar. */
+  seedAttempted: boolean;
   cycleId: string | null;
-  /** Símbolo (ticker) del ciclo — la identidad humana que resuelve el UUID. */
   cycleSymbol: string | null;
-  /** UUID resuelto del instrumento; `null` si la cadena no se puede cerrar. */
   instrumentId: string | null;
   strategyDefinitionId: string | null;
   strategyLabel: string;
-  /** El harness lanzó el seed (aunque fallara): el `afterAll` debe limpiar/verificar. */
-  seedAttempted: boolean;
   /** Motivo del hueco (ciclo ausente), o `null` si hay ciclo. */
   noCycleReason: string | null;
   /** Motivo del hueco (símbolo del ciclo fuera del catálogo), o `null`. */
   noChainReason: string | null;
+  /** TOP(s) global(es) que el journey tocó, con su estado previo. */
+  topBackups: Array<{ instrumentId: string; snapshot: TopSnapshot }>;
 };
+
+function emptyState(): S5State {
+  return {
+    accountId: null,
+    seedError: null,
+    seedAttempted: false,
+    cycleId: null,
+    cycleSymbol: null,
+    instrumentId: null,
+    strategyDefinitionId: null,
+    strategyLabel: "",
+    noCycleReason: null,
+    noChainReason: null,
+    topBackups: [],
+  };
+}
 
 async function body<T>(res: { json(): Promise<unknown> }): Promise<T> {
   return (await res.json()) as T;
 }
 
+function strategyTopUrl(baseURL: string, instrumentId: string): string {
+  return new URL(
+    `/api/instruments/${encodeURIComponent(instrumentId)}/strategy-top`,
+    baseURL,
+  ).toString();
+}
+
 /**
- * Cuenta efímera + ciclo AUTO durable sembrado (subproceso del CLI dev) + estrategia #1 y su
- * TOP de Finalistas REAL, para que la cadena `operación → estrategia/indicadores → DÍA-D` sea
- * verificable sin mocks.
+ * Lee el TOP de Finalistas (tabla GLOBAL por instrumento). El endpoint NO usa 404: devuelve
+ * `{ data: null }` cuando no hay TOP, así que la ausencia es un estado DECLARADO.
  */
-async function ensureAutoBridgeFixture(
+async function readStrategyTop(
   request: APIRequestContext,
   baseURL: string,
-): Promise<AutoBridgeFixture> {
+  instrumentId: string,
+): Promise<TopSnapshot> {
+  const res = await request.get(strategyTopUrl(baseURL, instrumentId));
+  if (!res.ok()) {
+    throw new Error(
+      `GET strategy-top de ${instrumentId} falló (${res.status()}): ${await res.text()}`,
+    );
+  }
+  const json = await body<{ data: unknown }>(res);
+  return json?.data == null
+    ? { status: "absent" }
+    : { status: "present", body: json.data };
+}
+
+/**
+ * Guarda el TOP previo ANTES de tocarlo (una sola vez por instrumento). El CLI de seed también
+ * hace `PUT .../strategy-top`, así que la captura debe ocurrir antes de lanzarlo.
+ */
+async function backupStrategyTop(
+  request: APIRequestContext,
+  baseURL: string,
+  state: S5State,
+  instrumentId: string,
+): Promise<void> {
+  if (state.topBackups.some((b) => b.instrumentId === instrumentId)) return;
+  const snapshot = await readStrategyTop(request, baseURL, instrumentId);
+  state.topBackups.push({ instrumentId, snapshot });
+}
+
+/** Restaura el TOP previo (o asegura su ausencia) para no contaminar runs futuros. */
+async function restoreStrategyTop(
+  request: APIRequestContext,
+  baseURL: string,
+  backup: { instrumentId: string; snapshot: TopSnapshot },
+): Promise<void> {
+  const url = strategyTopUrl(baseURL, backup.instrumentId);
+  if (backup.snapshot.status === "present") {
+    const raw = (backup.snapshot.body ?? {}) as Record<string, unknown>;
+    const putRes = await request.put(url, {
+      data: {
+        ...raw,
+        instrumentId: backup.instrumentId,
+        timeframe: raw.timeframe ?? TOP_TIMEFRAME,
+      },
+    });
+    if (!putRes.ok()) {
+      throw new Error(
+        `PUT de restauración del TOP ${backup.instrumentId} falló (${putRes.status()}): ${await putRes.text()}`,
+      );
+    }
+    return;
+  }
+  const delRes = await request.delete(
+    `${url}?timeframe=${encodeURIComponent(TOP_TIMEFRAME)}`,
+  );
+  if (!delRes.ok() && delRes.status() !== 404) {
+    throw new Error(
+      `DELETE de restauración del TOP ${backup.instrumentId} falló (${delRes.status()}).`,
+    );
+  }
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "null";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  const obj = value as Record<string, unknown>;
+  const keys = Object.keys(obj).sort();
+  return `{${keys
+    .map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`)
+    .join(",")}}`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+/**
+ * Proyección semántica del TOP (ignora `id`/`version`/`updatedAt`, que cambian al reescribirlo)
+ * para comparar el ANTES con el DESPUÉS de la restauración.
+ */
+function normalizeTop(snapshot: TopSnapshot): unknown {
+  if (snapshot.status === "absent") return { absent: true };
+  const raw = asRecord(snapshot.body);
+  const slots = (Array.isArray(raw.slots) ? raw.slots : [])
+    .map((slot) => asRecord(slot))
+    .sort((a, b) => Number(a.rank ?? 0) - Number(b.rank ?? 0))
+    .map((s) => ({
+      rank: s.rank ?? null,
+      label: s.label ?? null,
+      strategyType: s.strategyType ?? null,
+      strategyDefinitionId: s.strategyDefinitionId ?? null,
+      stars: s.stars ?? null,
+      score: s.score ?? null,
+      source: s.source ?? null,
+      runId: s.runId ?? null,
+    }));
+  return {
+    status: raw.status ?? null,
+    evidenceLevel: raw.evidenceLevel ?? null,
+    symbol: raw.symbol ?? null,
+    timeframe: raw.timeframe ?? null,
+    slots,
+    coachFacts: raw.coachFacts ?? null,
+  };
+}
+
+function sameTop(before: TopSnapshot, after: TopSnapshot): boolean {
+  return (
+    stableStringify(normalizeTop(before)) ===
+    stableStringify(normalizeTop(after))
+  );
+}
+
+/**
+ * Siembra la cadena completa registrando CADA recurso en cuanto existe:
+ * cuenta efímera → catálogo → (snapshot del TOP) → ciclo AUTO durable → TOP real de Finalistas.
+ *
+ * NO lanza en huecos DECLARADOS (catálogo vacío / seed no opt-in / símbolo fuera del catálogo):
+ * esos son `skipped` con motivo. Los fallos de producto (HTTP) SÍ lanzan y el `beforeAll` los
+ * captura para fallar sin perder el registro de limpieza.
+ */
+async function seedAutoBridge(
+  request: APIRequestContext,
+  baseURL: string,
+  state: S5State,
+): Promise<void> {
   const suffix = randomUUID().slice(0, 8);
+
+  // 1) Cuenta efímera PRIMERO — se registra de inmediato, antes de cualquier petición que pueda
+  //    fallar, para que el teardown pueda borrarla aun con un fallo aguas abajo.
   const accountRes = await request.post(
     new URL("/api/accounts", baseURL).toString(),
     {
@@ -124,9 +305,9 @@ async function ensureAutoBridgeFixture(
       `POST /api/accounts failed (${accountRes.status()}): ${await accountRes.text()}`,
     );
   }
-  const accountId = (await body<{ data: { id: string } }>(accountRes)).data.id;
+  state.accountId = (await body<{ data: { id: string } }>(accountRes)).data.id;
 
-  // Catálogo PRIMERO: necesitamos un símbolo real con el que sembrar el ciclo durable.
+  // 2) Catálogo: necesitamos un símbolo real con el que sembrar el ciclo durable.
   const instrumentsRes = await request.get(
     new URL("/api/instruments", baseURL).toString(),
   );
@@ -140,31 +321,28 @@ async function ensureAutoBridgeFixture(
   }>(instrumentsRes);
   const seedTarget = (catalog.data ?? [])[0] ?? null;
 
-  // Siembra del ciclo AUTO durable reutilizando el CLI dev (subproceso `uv run … python …`).
-  // No lanza: un fallo del seed se DECLARA (motivo) y el journey queda `skipped`, no verde.
-  let seedAttempted = false;
-  let seedOk = true;
+  // 3) Siembra del ciclo AUTO durable reutilizando el CLI dev (subproceso `uv run … python …`).
+  //    El CLI también hace PUT del TOP: capturamos el TOP previo ANTES de lanzarlo.
   let seedReason = "";
   if (!seedTarget) {
-    seedOk = false;
     seedReason = NO_CATALOG_REASON;
   } else if (autoCycleSeedEnabled()) {
-    seedAttempted = true;
+    await backupStrategyTop(request, baseURL, state, seedTarget.id);
+    state.seedAttempted = true;
     const seeded = await seedAutoCycleForAccount({
-      accountId,
+      accountId: state.accountId,
       symbol: seedTarget.symbol,
       apiBase: baseURL,
     });
-    seedOk = seeded.ok;
     if (!seeded.ok) seedReason = seeded.reason;
   } else {
-    seedOk = false;
     seedReason = AUTO_CYCLE_SEED_DISABLED_REASON;
   }
+  const seedOk = seedReason === "";
 
   const monitorRes = await request.get(
     new URL(`${MONITOR_PATH}?limit=20`, baseURL).toString(),
-    { headers: { "X-Account-Id": accountId } },
+    { headers: { "X-Account-Id": state.accountId } },
   );
   if (!monitorRes.ok()) {
     throw new Error(
@@ -173,41 +351,25 @@ async function ensureAutoBridgeFixture(
   }
   const monitor = await body<{ cycles?: MonitorCycle[] }>(monitorRes);
   const cycle = (monitor.cycles ?? [])[0] ?? null;
-  const cycleSymbol = cycle?.instrumentId?.trim() || null;
+  state.cycleId = cycle?.cycleId ?? null;
+  state.cycleSymbol = cycle?.instrumentId?.trim() || null;
 
-  if (!cycle || !cycleSymbol) {
-    return {
-      accountId,
-      cycleId: null,
-      cycleSymbol: null,
-      instrumentId: null,
-      strategyDefinitionId: null,
-      strategyLabel: "",
-      seedAttempted,
-      noCycleReason: seedOk
-        ? NO_CYCLE_REASON
-        : `${NO_CYCLE_REASON} Seed: ${seedReason}`,
-      noChainReason: null,
-    };
+  if (!cycle || !state.cycleSymbol) {
+    state.noCycleReason = seedOk
+      ? NO_CYCLE_REASON
+      : `${NO_CYCLE_REASON} Seed: ${seedReason}`;
+    return;
   }
 
-  const upper = cycleSymbol.toUpperCase();
+  const upper = state.cycleSymbol.toUpperCase();
   const instrument = (catalog.data ?? []).find(
     (row) => row.symbol?.toUpperCase() === upper,
   );
   if (!instrument) {
-    return {
-      accountId,
-      cycleId: cycle.cycleId,
-      cycleSymbol,
-      instrumentId: null,
-      strategyDefinitionId: null,
-      strategyLabel: "",
-      seedAttempted,
-      noCycleReason: null,
-      noChainReason: NO_CHAIN_REASON,
-    };
+    state.noChainReason = NO_CHAIN_REASON;
+    return;
   }
+  state.instrumentId = instrument.id;
 
   const strategyRes = await request.post(
     new URL("/api/strategies/from-preset", baseURL).toString(),
@@ -224,12 +386,13 @@ async function ensureAutoBridgeFixture(
       `POST /api/strategies/from-preset failed (${strategyRes.status()}): ${await strategyRes.text()}`,
     );
   }
-  const strategyDefinitionId = (
+  state.strategyDefinitionId = (
     await body<{ data: { id: string } }>(strategyRes)
   ).data.id;
 
-  // El TOP de Finalistas es GLOBAL por instrumento: este PUT SOBRESCRIBE el TOP que el seed
-  // hubiera dejado, para que la UI muestre EXACTAMENTE la etiqueta/razón que el spec asserta.
+  // El TOP de Finalistas es GLOBAL por instrumento: guardamos el previo (si no se capturó ya) y
+  // SOBRESCRIBIMOS para que la UI muestre EXACTAMENTE la etiqueta/razón que el spec asserta.
+  await backupStrategyTop(request, baseURL, state, instrument.id);
   const topRes = await request.put(
     new URL(
       `/api/instruments/${encodeURIComponent(instrument.id)}/strategy-top`,
@@ -248,7 +411,7 @@ async function ensureAutoBridgeFixture(
             rank: 1,
             label: STRATEGY_LABEL,
             strategyType: PRESET_KEY,
-            strategyDefinitionId,
+            strategyDefinitionId: state.strategyDefinitionId,
             stars: 3,
             score: 70,
             source: "coach",
@@ -265,23 +428,12 @@ async function ensureAutoBridgeFixture(
       `PUT /api/instruments/${instrument.id}/strategy-top failed (${topRes.status()}): ${await topRes.text()}`,
     );
   }
-
-  return {
-    accountId,
-    cycleId: cycle.cycleId,
-    cycleSymbol,
-    instrumentId: instrument.id,
-    strategyDefinitionId,
-    strategyLabel: STRATEGY_LABEL,
-    seedAttempted,
-    noCycleReason: null,
-    noChainReason: null,
-  };
+  state.strategyLabel = STRATEGY_LABEL;
 }
 
 /** Abre la PRIMERA operación AUTO canónica de la cuenta (ruta `/auto/operar/operacion/:id`). */
-async function openFirstOperation(page: Page, fixture: AutoBridgeFixture) {
-  await seedHoyBrowserState(page, { accountId: fixture.accountId });
+async function openFirstOperation(page: Page, accountId: string) {
+  await seedHoyBrowserState(page, { accountId });
   await page.goto("/auto/operar");
   await expect(page.getByTestId("auto-operar-page")).toBeVisible({
     timeout: 20_000,
@@ -298,7 +450,7 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
   test.describe.configure({ mode: "serial", timeout: 240_000 });
 
   let environmentSkip: string | null = null;
-  let fixture: AutoBridgeFixture | null = null;
+  const state: S5State = emptyState();
 
   test.beforeAll(async ({ request, baseURL }) => {
     environmentSkip = await gateIntegratedE2eEnvironment(request, baseURL, {
@@ -306,85 +458,140 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
       e2eSkipReason: E2E_SKIP_REASON,
     });
     if (environmentSkip || !baseURL) return;
-    fixture = await ensureAutoBridgeFixture(request, baseURL);
+    try {
+      await seedAutoBridge(request, baseURL, state);
+    } catch (err) {
+      // Fallo de producto: se DECLARA y propaga como FAIL, pero NO se pierde el registro de
+      // recursos (la cuenta ya creada queda en `state` para que el `afterAll` la limpie).
+      state.seedError = err instanceof Error ? err : new Error(String(err));
+    }
   });
 
   test.beforeEach(() => {
     if (environmentSkip) {
+      // En modo requerido (CI del tag) un entorno no disponible es FAIL, no skip.
+      if (s5Required()) {
+        throw new Error(
+          `E2E_S5_REQUIRED=1 pero el entorno integrado no está disponible: ${environmentSkip}`,
+        );
+      }
       test.skip(true, environmentSkip);
     }
-    if (!fixture) {
-      throw new Error(
-        "AUTO DÍA-D bridge fixture missing after environment gates (fixture/product failure).",
-      );
+    if (state.seedError) {
+      throw state.seedError;
     }
   });
 
   test.afterAll(async ({ request, baseURL }) => {
-    if (!fixture || !baseURL) return;
+    if (!baseURL || !state.accountId) return;
+    const failures: string[] = [];
 
-    // 1) Limpieza del seed durable: borra las filas del ciclo `cyc-ui-*` de la cuenta
-    //    (reserva/fills/journal) + el `DELETE` del TOP que hace el propio CLI. NO es una
-    //    aserción: si no puede correr, la verificación de residuo de abajo lo declara.
-    let seedCleanupOk = true;
-    let seedCleanupReason = "";
-    if (fixture.seedAttempted) {
-      const cleaned = await cleanupAutoCycleForAccount({
-        accountId: fixture.accountId,
-        apiBase: baseURL,
-      });
-      seedCleanupOk = cleaned.ok;
-      if (!cleaned.ok) seedCleanupReason = cleaned.reason;
+    // 1) Limpieza del seed durable (filas ciclos `cyc-ui-*` + DELETE del TOP del símbolo).
+    //    No es una aserción por sí sola: si no puede correr, la verificación de residuo lo declara.
+    if (state.seedAttempted) {
+      try {
+        const cleaned = await cleanupAutoCycleForAccount({
+          accountId: state.accountId,
+          apiBase: baseURL,
+        });
+        if (!cleaned.ok) {
+          failures.push(
+            `la limpieza del seed no pudo correr: ${cleaned.reason}`,
+          );
+        }
+      } catch (err) {
+        failures.push(`la limpieza del seed lanzó: ${String(err)}`);
+      }
     }
 
-    // 2) Higiene determinista (pre-existente): el TOP de Finalistas es una tabla GLOBAL (NO
-    //    acotada por cuenta), así que el PUT de este journey dejaría un residuo que
-    //    contaminaría runs futuros. Se retira el instrumento usado. La limpieza es
-    //    best-effort (su fallo no cambia el resultado del run; el gate de entorno ya declaró
-    //    la disponibilidad del stack). Sin cadena resuelta `fixture.instrumentId` es `null`.
-    if (fixture.instrumentId) {
-      const cleanupUrl = new URL(
-        `/api/instruments/${encodeURIComponent(fixture.instrumentId)}/strategy-top?timeframe=1d`,
-        baseURL,
-      ).toString();
+    // 2) Restauración del TOP global: el PUT del journey dejaría un residuo que contaminaría
+    //    runs futuros. Se restaura el valor previo y se VERIFICA que quedó como estaba.
+    for (const backup of state.topBackups) {
       try {
-        await request.delete(cleanupUrl);
-      } catch {
-        // best-effort: se declara implícitamente por ausencia de ruido en el run.
+        await restoreStrategyTop(request, baseURL, backup);
+        const after = await readStrategyTop(
+          request,
+          baseURL,
+          backup.instrumentId,
+        );
+        if (!sameTop(backup.snapshot, after)) {
+          failures.push(
+            `el TOP de ${backup.instrumentId} no quedó restaurado tras el teardown.`,
+          );
+        }
+      } catch (err) {
+        failures.push(
+          `no se pudo restaurar el TOP de ${backup.instrumentId}: ${String(err)}`,
+        );
       }
     }
 
     // 3) Aserción de NO-residuo: tras el teardown la cuenta efímera no puede declarar ciclo.
-    //    Si el seed no llegó a lanzarse (sin opt-in / sin símbolo) no hay nada que verificar.
-    if (fixture.seedAttempted) {
+    if (state.seedAttempted) {
       const monitorRes = await request.get(
         new URL(`${MONITOR_PATH}?limit=20`, baseURL).toString(),
-        { headers: { "X-Account-Id": fixture.accountId } },
+        { headers: { "X-Account-Id": state.accountId } },
       );
       if (monitorRes.ok()) {
         const monitor = await body<{ cycles?: MonitorCycle[] }>(monitorRes);
-        expect(
-          monitor.cycles ?? [],
-          seedCleanupOk
-            ? "El teardown dejó un ciclo AUTO residual en la cuenta efímera."
-            : `La limpieza del seed no pudo correr: ${seedCleanupReason}`,
-        ).toHaveLength(0);
+        if ((monitor.cycles ?? []).length > 0) {
+          failures.push(
+            "el teardown dejó un ciclo AUTO residual en la cuenta efímera.",
+          );
+        }
+      } else {
+        failures.push(
+          `no se pudo verificar el residuo de ciclos (${monitorRes.status()}).`,
+        );
       }
+    }
+
+    // 4) Cierre + borrado de la cuenta efímera (cierre del ciclo de vida del fixture). El
+    //    borrado exige la cuenta CERRADA (conservación contable): sin el `close` sería un
+    //    400 permanente y el teardown no cerraría el ciclo.
+    const accountUrl = new URL(
+      `/api/accounts/${state.accountId}`,
+      baseURL,
+    ).toString();
+    try {
+      const closeRes = await request.post(`${accountUrl}/close`);
+      if (!closeRes.ok() && closeRes.status() !== 404) {
+        failures.push(
+          `POST /api/accounts/${state.accountId}/close falló (${closeRes.status()}).`,
+        );
+      }
+      const delRes = await request.delete(accountUrl);
+      if (!delRes.ok() && delRes.status() !== 404) {
+        failures.push(
+          `DELETE /api/accounts/${state.accountId} falló (${delRes.status()}).`,
+        );
+      }
+    } catch (err) {
+      failures.push(
+        `cierre/borrado de la cuenta efímera lanzó: ${String(err)}`,
+      );
+    }
+
+    if (failures.length > 0) {
+      throw new Error(
+        `Teardown del S5 no completó la limpieza:\n- ${failures.join("\n- ")}`,
+      );
     }
   });
 
   test("GP-V288-S5-01: /auto/operar monta y declara su estado sin fabricar la operación", async ({
     page,
   }) => {
-    if (!fixture) throw new Error("fixture required");
-    await seedHoyBrowserState(page, { accountId: fixture.accountId });
+    const accountId = state.accountId;
+    if (!accountId) throw new Error("fixture required");
+    await seedHoyBrowserState(page, { accountId });
     await page.goto("/auto/operar");
     await expect(page.getByTestId("auto-operar-page")).toBeVisible({
       timeout: 20_000,
     });
 
     // La UI NO inventa una operación: o lista el ciclo durable, o declara el hueco.
-    if (fixture.cycleId) {
+    if (state.cycleId) {
       await expect(
         page.getByTestId("auto-operar-operation-link").first(),
       ).toBeVisible({ timeout: 20_000 });
@@ -402,20 +609,24 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
   test("GP-V288-S5-02: la operación AUTO muestra la estrategia #1 con sus indicadores (P3)", async ({
     page,
   }) => {
-    if (!fixture) throw new Error("fixture required");
-    if (!fixture.cycleId) test.skip(true, fixture.noCycleReason!);
-    if (!fixture.instrumentId || !fixture.strategyDefinitionId) {
-      test.skip(true, fixture.noChainReason ?? NO_CHAIN_REASON);
+    if (!state.cycleId) {
+      declareGap(state.noCycleReason ?? NO_CYCLE_REASON);
+      return;
     }
+    if (!state.instrumentId || !state.strategyDefinitionId) {
+      declareGap(state.noChainReason ?? NO_CHAIN_REASON);
+      return;
+    }
+    if (!state.accountId) throw new Error("fixture required");
 
-    await openFirstOperation(page, fixture);
+    await openFirstOperation(page, state.accountId);
 
     await expect(page.getByTestId("auto-operation-strategy")).toBeVisible({
       timeout: 20_000,
     });
     await expect(
       page.getByTestId("auto-operation-strategy-label"),
-    ).toContainText(`#1 ${fixture.strategyLabel}`);
+    ).toContainText(`#1 ${state.strategyLabel}`);
     // Los indicadores salen de la DEFINICIÓN real (preset SMA 20/50) — no vacíos, no «Sin dato».
     await expect(
       page.getByTestId("auto-operation-strategy-indicators"),
@@ -434,13 +645,17 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
   test("GP-V288-S5-03: «Verificar D→hoy» monta el host DÍA-D y arranca el run real (P4)", async ({
     page,
   }) => {
-    if (!fixture) throw new Error("fixture required");
-    if (!fixture.cycleId) test.skip(true, fixture.noCycleReason!);
-    if (!fixture.instrumentId || !fixture.strategyDefinitionId) {
-      test.skip(true, fixture.noChainReason ?? NO_CHAIN_REASON);
+    if (!state.cycleId) {
+      declareGap(state.noCycleReason ?? NO_CYCLE_REASON);
+      return;
     }
+    if (!state.instrumentId || !state.strategyDefinitionId) {
+      declareGap(state.noChainReason ?? NO_CHAIN_REASON);
+      return;
+    }
+    if (!state.accountId) throw new Error("fixture required");
 
-    await openFirstOperation(page, fixture);
+    await openFirstOperation(page, state.accountId);
 
     const cta = page.getByTestId("auto-operation-strategy-verify-dia-d");
     await expect(cta).toBeVisible({ timeout: 20_000 });
@@ -465,7 +680,7 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
     const url = new URL(page.url());
     expect(url.pathname).toBe("/backtests");
     expect(url.searchParams.get("tab")).toBe("run");
-    expect(url.searchParams.get("instrumentId")).toBe(fixture.instrumentId);
+    expect(url.searchParams.get("instrumentId")).toBe(state.instrumentId);
     expect(url.searchParams.get("focus")).toBe("detail");
     expect(url.searchParams.get("verify")).toBe("1");
 
@@ -478,3 +693,16 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
     await runRequest;
   });
 });
+
+/**
+ * Declara un hueco de precondición: `skipped` con motivo por defecto, o **FALLO** si el run
+ * exige el journey (`E2E_S5_REQUIRED=1`, CI del tag) — así un skip no puede dar verde.
+ */
+function declareGap(reason: string): void {
+  if (s5Required()) {
+    throw new Error(
+      `E2E_S5_REQUIRED=1: precondición del S5 ausente — ${reason}`,
+    );
+  }
+  test.skip(true, reason);
+}

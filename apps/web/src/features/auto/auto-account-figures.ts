@@ -34,9 +34,20 @@ export type AutoAccountFigure = {
   value: string;
 };
 
+// H4 (v2.88.106): el RÓTULO dice QUÉ es el resultado (abierto vs cerrado) y el VALOR
+// lleva la cifra con el calificador de cuenta simulada, para no mezclar SIM/dinero real.
+export const AUTO_ACCOUNT_OPEN_PNL_LABEL = "Resultado de posiciones abiertas";
+export const AUTO_ACCOUNT_CLOSED_PNL_LABEL =
+  "Resultado de operaciones cerradas";
+export const AUTO_ACCOUNT_CASH_LABEL = "Efectivo simulado";
+
 function positionLabel(count: number): string {
   const noun = count === 1 ? "posición" : "posiciones";
   return `${count} ${noun} en la cuenta simulada`;
+}
+
+function accountScopeAmount(amount: number): string {
+  return `${formatPrice(amount, "EUR")} en la cuenta simulada`;
 }
 
 export function buildAutoAccountFigures(input: {
@@ -51,12 +62,12 @@ export function buildAutoAccountFigures(input: {
   const pnl =
     summary == null
       ? AUTO_HOME_NO_DATA_LABEL
-      : `Resultado de la cuenta ${formatPrice(summary.totalUnrealizedPnl, "EUR")}`;
+      : accountScopeAmount(summary.totalUnrealizedPnl);
   // F4: realizado agregado. `null`/ausente es un hueco declarado, nunca 0.
   const realized =
     summary == null || summary.totalRealizedPnl == null
       ? AUTO_HOME_NO_DATA_LABEL
-      : `${formatPrice(summary.totalRealizedPnl, "EUR")} en la cuenta simulada`;
+      : accountScopeAmount(summary.totalRealizedPnl);
   const cash =
     summary == null
       ? AUTO_HOME_NO_DATA_LABEL
@@ -64,9 +75,9 @@ export function buildAutoAccountFigures(input: {
 
   return [
     { id: "position", label: "Posición", value: position },
-    { id: "pnl", label: "Resultado", value: pnl },
-    { id: "realized", label: "Resultado realizado", value: realized },
-    { id: "cash", label: "Efectivo simulado", value: cash },
+    { id: "pnl", label: AUTO_ACCOUNT_OPEN_PNL_LABEL, value: pnl },
+    { id: "realized", label: AUTO_ACCOUNT_CLOSED_PNL_LABEL, value: realized },
+    { id: "cash", label: AUTO_ACCOUNT_CASH_LABEL, value: cash },
     { id: "risk", label: "Riesgo", value: input.riskLabel },
   ];
 }
