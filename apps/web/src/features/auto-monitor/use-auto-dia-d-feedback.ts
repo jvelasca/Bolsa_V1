@@ -61,3 +61,19 @@ export function useDiaDCycleVerifications(
     retry: false,
   });
 }
+
+/**
+ * P2 (sello 2) — auditoría por VALOR de ESTUDIO (estrategia + porqué + señal + R + dinero).
+ * Read-only: compone piezas YA calculadas (feedback DÍA-D + reporte financiero OOS opt-in);
+ * no recalcula el motor. La ventana más reciente con artefacto, fail-closed por cuenta.
+ */
+export function useAutoEstudioAudit(input?: { enabled?: boolean }) {
+  const { effectiveAccountId } = useActiveAccount();
+  return useQuery({
+    queryKey: ["auto-estudio-audit", effectiveAccountId],
+    queryFn: () => api.getAutoEstudioAudit(),
+    enabled: (input?.enabled ?? true) && Boolean(effectiveAccountId),
+    staleTime: 30_000,
+    retry: false,
+  });
+}

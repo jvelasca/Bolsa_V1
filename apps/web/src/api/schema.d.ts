@@ -1171,6 +1171,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/estudio-audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Estudio Audit
+         * @description Auditoría por valor de la ventana más reciente con artefacto (fail-closed por cuenta).
+         */
+        get: operations["get_auto_estudio_audit_api_auto_estudio_audit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/estudio-audit/{window}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Estudio Audit Window
+         * @description Auditoría por valor de una ventana concreta (``D0_D1``), read-only y fail-closed.
+         */
+        get: operations["get_auto_estudio_audit_window_api_auto_estudio_audit__window__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/operational-monitor": {
         parameters: {
             query?: never;
@@ -6505,6 +6545,8 @@ export interface components {
             exitDay?: string | null;
             /** Realizedr */
             realizedR?: number | null;
+            /** Strategypresetkey */
+            strategyPresetKey?: string | null;
             /** Strategyversion */
             strategyVersion?: string | null;
             /** Symbol */
@@ -6963,6 +7005,197 @@ export interface components {
             data: {
                 [key: string]: number;
             };
+        };
+        /**
+         * EstudioAuditDto
+         * @description Auditoría por valor de ESTUDIO. ``available = false`` cuando no hay artefacto.
+         */
+        EstudioAuditDto: {
+            audit?: components["schemas"]["EstudioAuditReportDto"] | null;
+            /** Available */
+            available: boolean;
+            /** Notes */
+            notes?: string[];
+            /**
+             * Readonly
+             * @default true
+             */
+            readOnly: boolean;
+            /**
+             * Serving
+             * @default PRECOMPUTED_ARTIFACT
+             */
+            serving: string;
+            /** Window */
+            window?: string | null;
+        };
+        /** EstudioAuditMoneyDto */
+        EstudioAuditMoneyDto: {
+            /** Committedcapital */
+            committedCapital?: number | null;
+            /** Hitrate */
+            hitRate?: number | null;
+            /** Maxdrawdownpct */
+            maxDrawdownPct?: number | null;
+            /**
+             * Measured
+             * @default false
+             */
+            measured: boolean;
+            /** Netreturnpct */
+            netReturnPct?: number | null;
+            /** Netreturnpctatstress */
+            netReturnPctAtStress?: number | null;
+            /**
+             * Samplefloor
+             * @default 0
+             */
+            sampleFloor: number;
+            /**
+             * Trades
+             * @default 0
+             */
+            trades: number;
+        };
+        /** EstudioAuditReportDto */
+        EstudioAuditReportDto: {
+            /** Kind */
+            kind: string;
+            /** Notes */
+            notes: string[];
+            /**
+             * Pointcitable
+             * @default false
+             */
+            pointCitable: boolean;
+            /** Pointcitablereason */
+            pointCitableReason: string;
+            /**
+             * Readonly
+             * @default true
+             */
+            readOnly: boolean;
+            summary: components["schemas"]["EstudioAuditSummaryDto"];
+            /** Values */
+            values: components["schemas"]["EstudioAuditValueDto"][];
+        };
+        /** EstudioAuditResultRDto */
+        EstudioAuditResultRDto: {
+            /**
+             * Dayscovered
+             * @default 0
+             */
+            daysCovered: number;
+            /**
+             * Evidencequality
+             * @default NOT_MEASURED
+             */
+            evidenceQuality: string;
+            /** Expectancyr */
+            expectancyR?: number | null;
+            /** Hitrate */
+            hitRate?: number | null;
+            /**
+             * Measured
+             * @default false
+             */
+            measured: boolean;
+            /**
+             * Measuredcycles
+             * @default 0
+             */
+            measuredCycles: number;
+            /** Realizedrtotal */
+            realizedRTotal?: number | null;
+            /**
+             * Samplefloor
+             * @default 0
+             */
+            sampleFloor: number;
+            /**
+             * Verdict
+             * @default NOT_MEASURED
+             */
+            verdict: string;
+            /** Verdictreason */
+            verdictReason?: string | null;
+        };
+        /** EstudioAuditSignalDto */
+        EstudioAuditSignalDto: {
+            /**
+             * Cycles
+             * @default 0
+             */
+            cycles: number;
+            /**
+             * Dayscovered
+             * @default 0
+             */
+            daysCovered: number;
+            /**
+             * Measuredcycles
+             * @default 0
+             */
+            measuredCycles: number;
+        };
+        /** EstudioAuditStrategyDto */
+        EstudioAuditStrategyDto: {
+            /** Presetkey */
+            presetKey?: string | null;
+            /** Version */
+            version?: string | null;
+        };
+        /** EstudioAuditSummaryDto */
+        EstudioAuditSummaryDto: {
+            /**
+             * Measured
+             * @default 0
+             */
+            measured: number;
+            /**
+             * Unmeasured
+             * @default 0
+             */
+            unmeasured: number;
+            /**
+             * Values
+             * @default 0
+             */
+            values: number;
+            /**
+             * Withpresetkey
+             * @default 0
+             */
+            withPresetKey: number;
+            /**
+             * Withoutpresetkey
+             * @default 0
+             */
+            withoutPresetKey: number;
+        };
+        /** EstudioAuditValueDto */
+        EstudioAuditValueDto: {
+            /**
+             * Measured
+             * @default false
+             */
+            measured: boolean;
+            money: components["schemas"]["EstudioAuditMoneyDto"];
+            resultR: components["schemas"]["EstudioAuditResultRDto"];
+            signal: components["schemas"]["EstudioAuditSignalDto"];
+            strategy: components["schemas"]["EstudioAuditStrategyDto"];
+            /** Symbol */
+            symbol: string;
+            /** Unmeasured */
+            unmeasured: string[];
+            why: components["schemas"]["EstudioAuditWhyDto"];
+        };
+        /** EstudioAuditWhyDto */
+        EstudioAuditWhyDto: {
+            /** Indicatorspecs */
+            indicatorSpecs?: unknown[] | null;
+            /** Recommendations */
+            recommendations?: unknown[] | null;
         };
         /**
          * EstudioAutoProposeDto
@@ -14149,6 +14382,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiaDCycleVerificationResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_estudio_audit_api_auto_estudio_audit_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstudioAuditDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_estudio_audit_window_api_auto_estudio_audit__window__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path: {
+                window: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstudioAuditDto"];
                 };
             };
             /** @description Validation Error */

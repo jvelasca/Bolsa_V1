@@ -13,6 +13,7 @@ import {
   AutoSectionHeading,
 } from "@/components/layout/auto-workspace-layout";
 import { DiaDAutoPanel } from "@/features/auto-monitor/dia-d-auto-panel";
+import { EstudioAuditPanel } from "@/features/auto-monitor/estudio-audit-panel";
 import { OpsAutoEvidenceSection } from "@/features/operational-console/auto-evidence-section";
 import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
 import { AutoTechnicalDetail } from "@/features/auto/auto-technical-detail";
@@ -131,6 +132,18 @@ export function AutoAnalisisPage() {
             </p>
           </AutoTechnicalDetail>
           <DiaDAutoPanel />
+          <AutoSectionBlockHeading id="auto-analisis-estudio">
+            Auditoría por valor: estrategia, porqué, señal y resultado
+          </AutoSectionBlockHeading>
+          <AutoTechnicalDetail testId="auto-analisis-estudio-technical">
+            <p>
+              «ESTUDIO»: reúne por valor la estrategia elegida (identidad
+              exacta), la señal, el resultado en R (feedback) y en dinero
+              (reporte financiero OOS). Un valor solo se declara «medido» si R y
+              dinero alcanzan su suelo de muestra; nunca un 0.
+            </p>
+          </AutoTechnicalDetail>
+          <EstudioAuditPanel />
         </section>
       ) : null}
 

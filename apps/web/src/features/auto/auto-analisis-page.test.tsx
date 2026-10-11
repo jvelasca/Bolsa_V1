@@ -14,6 +14,10 @@ vi.mock("@/features/auto-monitor/dia-d-auto-panel", () => ({
   DiaDAutoPanel: () => <div data-testid="dia-d-stub" />,
 }));
 
+vi.mock("@/features/auto-monitor/estudio-audit-panel", () => ({
+  EstudioAuditPanel: () => <div data-testid="estudio-audit-stub" />,
+}));
+
 vi.mock("@/features/operational-console/auto-evidence-section", () => ({
   OpsAutoEvidenceSection: () => <div data-testid="evidence-stub" />,
 }));

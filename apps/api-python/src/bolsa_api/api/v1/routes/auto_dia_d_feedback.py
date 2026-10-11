@@ -189,6 +189,8 @@ class DiaDFeedbackCycleDto(BaseModel):
     entryDay: str | None = None
     exitDay: str | None = None
     strategyVersion: str | None = None
+    #: H1 — identidad EXACTA (``presetKey``) del ciclo; ``None`` = hueco declarado.
+    strategyPresetKey: str | None = None
     realizedR: float | None = None
 
 

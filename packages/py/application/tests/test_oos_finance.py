@@ -194,3 +194,44 @@ def test_intraday_sell_without_open_is_ignored() -> None:
     # Venta sin compra previa: no se fabrica un round-trip en corto.
     report = build_oos_finance_report([_fill("ACS", "sell", 10, 110)], min_trades=1)
     assert report.aggregate.trades == 0
+
+
+def test_group_exposes_exact_preset_key_when_declared() -> None:
+    # H1 — la identidad EXACTA (presetKey) viaja al grupo; el grupo sin clave queda en None.
+    fills = [
+        OosFill("ACS", "ex-a", "buy", 10, 100, strategy_preset_key="sma_crossover"),
+        OosFill("ACS", "ex-a", "sell", 10, 110, strategy_preset_key="sma_crossover"),
+        OosFill("ITX", "ex-a", "buy", 10, 50),
+        OosFill("ITX", "ex-a", "sell", 10, 55),
+    ]
+    report = build_oos_finance_report(fills, min_trades=1)
+    by_key = dict(report.groups)
+    assert by_key[("ex-a", "ACS")].strategy_preset_key == "sma_crossover"
+    assert by_key[("ex-a", "ITX")].strategy_preset_key is None
+    groups_dict = {row["symbol"]: row for row in report.to_dict()["groups"]}
+    assert groups_dict["ACS"]["strategyPresetKey"] == "sma_crossover"
+    assert groups_dict["ITX"]["strategyPresetKey"] is None
+
+
+def test_fills_from_replay_carries_preset_key_and_declares_gap() -> None:
+    rows = [
+        {
+            "symbol": "ACS",
+            "side": "buy",
+            "quantity": 10,
+            "price": 100,
+            "strategyVersion": "v1",
+            "strategyPresetKey": "sma_crossover",
+        },
+        {
+            "symbol": "ACS",
+            "side": "sell",
+            "quantity": 10,
+            "price": 110,
+            "strategyVersion": "v1",
+            "strategyPresetKey": "",
+        },
+    ]
+    fills = fills_from_replay(rows)
+    assert fills[0].strategy_preset_key == "sma_crossover"
+    assert fills[1].strategy_preset_key is None  # cadena vacía ⇒ hueco declarado, nunca ""

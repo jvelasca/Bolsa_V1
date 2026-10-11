@@ -978,6 +978,24 @@ export const api = {
     ),
 
   /**
+   * AUTO · ESTUDIO — auditoría por VALOR (estrategia + porqué + señal + R + dinero) de la
+   * ventana más reciente con artefacto. Read-only: compone piezas YA calculadas (feedback
+   * DÍA-D + reporte financiero OOS opt-in); no recalcula el motor. Fail-closed por cuenta.
+   */
+  getAutoEstudioAudit: () =>
+    call<components["schemas"]["EstudioAuditDto"]>(() =>
+      client.GET("/api/auto/estudio-audit", {}),
+    ),
+
+  /** AUTO · ESTUDIO — auditoría por valor de una ventana concreta (``D0_D1``), read-only. */
+  getAutoEstudioAuditWindow: (window: string) =>
+    call<components["schemas"]["EstudioAuditDto"]>(() =>
+      client.GET("/api/auto/estudio-audit/{window}", {
+        params: { path: { window } },
+      }),
+    ),
+
+  /**
    * T1 — TOP3 de oportunidades (cross-asset) del tick más reciente. Read-only: la UI
    * copia el DTO tal cual (no re-deriva el score). El TOP3 describe oportunidades
    * rankeadas, nunca una decisión de cartera.

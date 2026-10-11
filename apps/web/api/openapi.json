@@ -6853,6 +6853,17 @@
             ],
             "title": "Realizedr"
           },
+          "strategyPresetKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategypresetkey"
+          },
           "strategyVersion": {
             "anyOf": [
               {
@@ -7839,6 +7850,418 @@
           "data"
         ],
         "title": "EnqueueStaleResponseDto",
+        "type": "object"
+      },
+      "EstudioAuditDto": {
+        "description": "Auditoría por valor de ESTUDIO. ``available = false`` cuando no hay artefacto.",
+        "properties": {
+          "audit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EstudioAuditReportDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "readOnly": {
+            "default": true,
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "serving": {
+            "default": "PRECOMPUTED_ARTIFACT",
+            "title": "Serving",
+            "type": "string"
+          },
+          "window": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "EstudioAuditDto",
+        "type": "object"
+      },
+      "EstudioAuditMoneyDto": {
+        "properties": {
+          "committedCapital": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committedcapital"
+          },
+          "hitRate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hitrate"
+          },
+          "maxDrawdownPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxdrawdownpct"
+          },
+          "measured": {
+            "default": false,
+            "title": "Measured",
+            "type": "boolean"
+          },
+          "netReturnPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Netreturnpct"
+          },
+          "netReturnPctAtStress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Netreturnpctatstress"
+          },
+          "sampleFloor": {
+            "default": 0,
+            "title": "Samplefloor",
+            "type": "integer"
+          },
+          "trades": {
+            "default": 0,
+            "title": "Trades",
+            "type": "integer"
+          }
+        },
+        "title": "EstudioAuditMoneyDto",
+        "type": "object"
+      },
+      "EstudioAuditReportDto": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "pointCitable": {
+            "default": false,
+            "title": "Pointcitable",
+            "type": "boolean"
+          },
+          "pointCitableReason": {
+            "title": "Pointcitablereason",
+            "type": "string"
+          },
+          "readOnly": {
+            "default": true,
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/EstudioAuditSummaryDto"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/EstudioAuditValueDto"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "pointCitableReason",
+          "summary",
+          "values",
+          "notes"
+        ],
+        "title": "EstudioAuditReportDto",
+        "type": "object"
+      },
+      "EstudioAuditResultRDto": {
+        "properties": {
+          "daysCovered": {
+            "default": 0,
+            "title": "Dayscovered",
+            "type": "integer"
+          },
+          "evidenceQuality": {
+            "default": "NOT_MEASURED",
+            "title": "Evidencequality",
+            "type": "string"
+          },
+          "expectancyR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectancyr"
+          },
+          "hitRate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hitrate"
+          },
+          "measured": {
+            "default": false,
+            "title": "Measured",
+            "type": "boolean"
+          },
+          "measuredCycles": {
+            "default": 0,
+            "title": "Measuredcycles",
+            "type": "integer"
+          },
+          "realizedRTotal": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realizedrtotal"
+          },
+          "sampleFloor": {
+            "default": 0,
+            "title": "Samplefloor",
+            "type": "integer"
+          },
+          "verdict": {
+            "default": "NOT_MEASURED",
+            "title": "Verdict",
+            "type": "string"
+          },
+          "verdictReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdictreason"
+          }
+        },
+        "title": "EstudioAuditResultRDto",
+        "type": "object"
+      },
+      "EstudioAuditSignalDto": {
+        "properties": {
+          "cycles": {
+            "default": 0,
+            "title": "Cycles",
+            "type": "integer"
+          },
+          "daysCovered": {
+            "default": 0,
+            "title": "Dayscovered",
+            "type": "integer"
+          },
+          "measuredCycles": {
+            "default": 0,
+            "title": "Measuredcycles",
+            "type": "integer"
+          }
+        },
+        "title": "EstudioAuditSignalDto",
+        "type": "object"
+      },
+      "EstudioAuditStrategyDto": {
+        "properties": {
+          "presetKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presetkey"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "title": "EstudioAuditStrategyDto",
+        "type": "object"
+      },
+      "EstudioAuditSummaryDto": {
+        "properties": {
+          "measured": {
+            "default": 0,
+            "title": "Measured",
+            "type": "integer"
+          },
+          "unmeasured": {
+            "default": 0,
+            "title": "Unmeasured",
+            "type": "integer"
+          },
+          "values": {
+            "default": 0,
+            "title": "Values",
+            "type": "integer"
+          },
+          "withPresetKey": {
+            "default": 0,
+            "title": "Withpresetkey",
+            "type": "integer"
+          },
+          "withoutPresetKey": {
+            "default": 0,
+            "title": "Withoutpresetkey",
+            "type": "integer"
+          }
+        },
+        "title": "EstudioAuditSummaryDto",
+        "type": "object"
+      },
+      "EstudioAuditValueDto": {
+        "properties": {
+          "measured": {
+            "default": false,
+            "title": "Measured",
+            "type": "boolean"
+          },
+          "money": {
+            "$ref": "#/components/schemas/EstudioAuditMoneyDto"
+          },
+          "resultR": {
+            "$ref": "#/components/schemas/EstudioAuditResultRDto"
+          },
+          "signal": {
+            "$ref": "#/components/schemas/EstudioAuditSignalDto"
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/EstudioAuditStrategyDto"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "unmeasured": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmeasured",
+            "type": "array"
+          },
+          "why": {
+            "$ref": "#/components/schemas/EstudioAuditWhyDto"
+          }
+        },
+        "required": [
+          "symbol",
+          "strategy",
+          "why",
+          "signal",
+          "resultR",
+          "money",
+          "unmeasured"
+        ],
+        "title": "EstudioAuditValueDto",
+        "type": "object"
+      },
+      "EstudioAuditWhyDto": {
+        "properties": {
+          "indicatorSpecs": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indicatorspecs"
+          },
+          "recommendations": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendations"
+          }
+        },
+        "title": "EstudioAuditWhyDto",
         "type": "object"
       },
       "EstudioAutoProposeDto": {
@@ -26552,6 +26975,115 @@
           }
         },
         "summary": "Persist Auto Dia D Verification",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/estudio-audit": {
+      "get": {
+        "description": "Auditoría por valor de la ventana más reciente con artefacto (fail-closed por cuenta).",
+        "operationId": "get_auto_estudio_audit_api_auto_estudio_audit_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstudioAuditDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Estudio Audit",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/estudio-audit/{window}": {
+      "get": {
+        "description": "Auditoría por valor de una ventana concreta (``D0_D1``), read-only y fail-closed.",
+        "operationId": "get_auto_estudio_audit_window_api_auto_estudio_audit__window__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "window",
+            "required": true,
+            "schema": {
+              "title": "Window",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstudioAuditDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Estudio Audit Window",
         "tags": [
           "auto"
         ]

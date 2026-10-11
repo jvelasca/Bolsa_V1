@@ -8,6 +8,7 @@ from bolsa_api.api.v1.routes import (
     auto_dia_d,
     auto_dia_d_feedback,
     auto_dia_d_verification,
+    auto_estudio_audit,
     auto_operational_monitor,
     auto_paper_evidence,
     auto_self_evaluation,
@@ -80,6 +81,7 @@ api_v1_router.include_router(auto_paper_evidence.router, tags=["auto"])
 api_v1_router.include_router(auto_dia_d.router, tags=["auto"])
 api_v1_router.include_router(auto_dia_d_feedback.router, tags=["auto"])
 api_v1_router.include_router(auto_dia_d_verification.router, tags=["auto"])
+api_v1_router.include_router(auto_estudio_audit.router, tags=["auto"])
 api_v1_router.include_router(top3_opportunities.router, tags=["auto"])
 api_v1_router.include_router(mandates.router, tags=["mandates"])
 api_v1_router.include_router(core_r.router, tags=["core-r"])

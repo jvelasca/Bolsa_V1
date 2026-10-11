@@ -528,16 +528,23 @@ def _normalize_cycle_row(row: Mapping[str, Any]) -> dict[str, Any]:
 
     No re-deriva: copia lo que el replay ya midió (``cycleId``/``symbol``/``entryDay``/
     ``exitDay``/``strategyVersion``/``realizedR``) y declara ``None`` cuando falta. Un
-    ``realizedR`` ilegible es un hueco (no un ``0``).
+    ``realizedR`` ilegible es un hueco (no un ``0``). H1 (P2): la identidad EXACTA de la
+    estrategia (``strategyPresetKey``/``presetKey``) se copia si el hecho la declara; ausente
+    ⇒ ``None`` (hueco declarado, nunca ``""``) para poder unir el dinero por esa clave.
     """
     cycle_id = str(row.get("cycleId") or "").strip()
     version = row.get("strategyVersion")
+    preset = row.get("strategyPresetKey")
+    if preset is None:
+        preset = row.get("presetKey")
+    preset_text = None if preset is None else str(preset).strip() or None
     return {
         "cycleId": cycle_id,
         "symbol": str(row.get("symbol") or "").strip(),
         "entryDay": normalize_day(row.get("entryDay")) or None,
         "exitDay": normalize_day(row.get("exitDay")) or None,
         "strategyVersion": str(version) if version is not None else None,
+        "strategyPresetKey": preset_text,
         "realizedR": finite_number(row.get("realizedR")),
     }
 

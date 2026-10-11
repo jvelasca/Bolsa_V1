@@ -114,6 +114,9 @@ class OosFill:
     quantity: float
     price: float
     direction: str = "long"
+    #: H1 — identidad EXACTA de la estrategia (``preset_key``). Clave ADITIVA de la unión con
+    #: el TOP/feedback; ``None`` = hueco declarado (el fill no la declara), **nunca** ``""``.
+    strategy_preset_key: str | None = None
 
     def key(self) -> tuple[str | None, str]:
         return (self.strategy_version, self.symbol)
@@ -134,6 +137,9 @@ class GroupMetrics:
     sharpe: float | None
     commission_paid: float
     slippage_paid: float
+    #: H1 — identidad EXACTA de la estrategia del grupo (``preset_key``); ``None`` en el
+    #: agregado o cuando los filles no la declaran (hueco declarado, nunca fabricado).
+    strategy_preset_key: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -148,6 +154,7 @@ class GroupMetrics:
             "sharpe": _rounded(self.sharpe),
             "commissionPaid": round(self.commission_paid, 6),
             "slippagePaid": round(self.slippage_paid, 6),
+            "strategyPresetKey": self.strategy_preset_key,
         }
 
 
@@ -287,6 +294,7 @@ def _metrics_from_trips(
     overlay: CostOverlay,
     stress_overlay: CostOverlay,
     min_trades: int,
+    strategy_preset_key: str | None = None,
 ) -> GroupMetrics:
     trades = len(gross_pnls)
     costs, commission_paid, slippage_paid = _costs_for(entry_values, overlay)
@@ -308,6 +316,7 @@ def _metrics_from_trips(
             sharpe=None,
             commission_paid=commission_paid,
             slippage_paid=slippage_paid,
+            strategy_preset_key=strategy_preset_key,
         )
 
     gross_total = sum(gross_pnls)
@@ -326,6 +335,7 @@ def _metrics_from_trips(
         sharpe=_sharpe(net_pnls, entry_values, min_trades),
         commission_paid=commission_paid,
         slippage_paid=slippage_paid,
+        strategy_preset_key=strategy_preset_key,
     )
 
 
@@ -362,6 +372,7 @@ def build_oos_finance_report(
             quantity=fill.quantity,
             price=fill.price,
             direction=fill.direction,
+            strategy_preset_key=fill.strategy_preset_key,
         )
         buckets.setdefault(normalized.key(), []).append(normalized)
 
@@ -370,8 +381,26 @@ def build_oos_finance_report(
     trip_map = {
         key: _round_trips(buckets[key]) for key in sorted(buckets, key=lambda k: (k[0] or "", k[1]))
     }
+    # H1 — identidad EXACTA por grupo: el PRIMER ``preset_key`` NO vacío de sus filles (un
+    # grupo sin identidad queda en ``None`` = hueco declarado, nunca fabricado).
+    preset_by_key: dict[tuple[str | None, str], str | None] = {}
+    for key, group_fills in buckets.items():
+        preset = next(
+            (
+                str(fill.strategy_preset_key).strip()
+                for fill in group_fills
+                if fill.strategy_preset_key and str(fill.strategy_preset_key).strip()
+            ),
+            None,
+        )
+        preset_by_key[key] = preset
     groups = tuple(
-        (key, _metrics_from_trips(*trip_map[key], overlay, stress_overlay, min_trades))
+        (
+            key,
+            _metrics_from_trips(
+                *trip_map[key], overlay, stress_overlay, min_trades, preset_by_key.get(key)
+            ),
+        )
         for key in trip_map
     )
     agg_gross = [pnl for key in trip_map for pnl in trip_map[key][0]]
@@ -418,12 +447,15 @@ def fills_from_replay(
     *,
     symbol_key: str = "symbol",
     version_key: str = "strategyVersion",
+    preset_key_key: str = "strategyPresetKey",
 ) -> list[OosFill]:
     """Adapta las filas de fill del replay (``ReplayFill.to_dict``) a ``OosFill``.
 
     Acepta diccionarios con las claves del replay (``symbol``/``side``/``quantity``/
     ``price``/``strategyVersion``/``direction``) o ``OosFill`` ya construidos. Los filles
-    ilegibles se descartan (no deben romper el reporte).
+    ilegibles se descartan (no deben romper el reporte). La identidad EXACTA
+    (``strategyPresetKey``/``strategy_preset_key``, H1) se propaga si la fila la declara;
+    ausente ⇒ ``None`` (hueco declarado, nunca ``""``).
     """
     out: list[OosFill] = []
     for row in fill_rows:
@@ -438,6 +470,10 @@ def fills_from_replay(
         except (KeyError, TypeError, ValueError):
             continue
         version = row.get(version_key)
+        preset = row.get(preset_key_key)
+        if preset is None:
+            preset = row.get("strategy_preset_key")
+        preset_text = None if preset is None else str(preset).strip() or None
         out.append(
             OosFill(
                 symbol=symbol,
@@ -446,6 +482,7 @@ def fills_from_replay(
                 quantity=quantity,
                 price=price,
                 direction=str(row.get("direction", "long")),
+                strategy_preset_key=preset_text,
             )
         )
     return out

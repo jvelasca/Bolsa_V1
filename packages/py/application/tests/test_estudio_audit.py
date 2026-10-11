@@ -1,0 +1,185 @@
+"""`P2` (sello 2) — pruebas de la auditoría por valor de ESTUDIO.
+
+Muerden: la composición estrategia+porqué+señal+R+dinero; la unión por la clave EXACTA
+`presetKey` (H1) y su declaración de AMBIGÜEDAD; que un valor solo se declara «medido» con
+las dos mitades sobre su suelo de muestra; que nada se rellena con `0`; y el determinismo.
+"""
+
+from __future__ import annotations
+
+from bolsa_application.estudio_audit import (
+    ESTUDIO_AUDIT_KIND,
+    build_estudio_audit_report,
+)
+
+
+def _value(
+    symbol: str,
+    *,
+    measured_cycles: int = 8,
+    expectancy_r: float | None = 0.4,
+    verdict: str = "MIXED",
+) -> dict:
+    return {
+        "symbol": symbol,
+        "verdict": verdict,
+        "verdictReason": "preliminary_sample",
+        "evidenceQuality": "SUPPORTED",
+        "expectancyR": expectancy_r,
+        "hitRate": 0.55,
+        "measuredCycles": measured_cycles,
+        "daysCovered": 3,
+        "realizedRTotal": 3.2,
+    }
+
+
+def _cycle(symbol: str, *, preset: str | None, version: str | None = "ver-1", r: float = 0.5) -> dict:
+    return {
+        "cycleId": f"cyc-{symbol}-{preset}-{version}",
+        "symbol": symbol,
+        "entryDay": "2026-04-01",
+        "exitDay": "2026-04-02",
+        "strategyVersion": version,
+        "strategyPresetKey": preset,
+        "realizedR": r,
+    }
+
+
+def _group(symbol: str, *, preset: str | None, trades: int = 12, net: float | None = 2.5) -> dict:
+    return {
+        "symbol": symbol,
+        "strategyVersion": "ver-1",
+        "strategyPresetKey": preset,
+        "trades": trades,
+        "committedCapital": 1000.0,
+        "netReturnPct": net,
+        "netReturnPctAtStress": 1.8,
+        "maxDrawdownPct": 3.0,
+        "hitRate": 0.6,
+    }
+
+
+def test_both_halves_measured_and_joined_by_exact_preset_key() -> None:
+    report = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[_cycle("ACS", preset="sma_crossover")],
+        finance_groups=[_group("ACS", preset="sma_crossover")],
+        why_by_symbol={"ACS": {"indicatorSpecs": [{"kind": "SMA"}], "recommendations": ["r1"]}},
+    )
+    entry = report.values[0]
+    assert entry["symbol"] == "ACS"
+    assert entry["strategy"]["presetKey"] == "sma_crossover"
+    assert entry["strategy"]["version"] == "ver-1"
+    assert entry["resultR"]["measured"] is True
+    assert entry["money"]["measured"] is True
+    assert entry["money"]["netReturnPct"] == 2.5
+    assert entry["measured"] is True
+    assert entry["why"]["indicatorSpecs"] == [{"kind": "SMA"}]
+    assert entry["why"]["recommendations"] == ["r1"]
+    assert entry["unmeasured"] == []
+    assert report.summary == {
+        "values": 1,
+        "measured": 1,
+        "unmeasured": 0,
+        "withPresetKey": 1,
+        "withoutPresetKey": 0,
+    }
+    assert report.point_citable is False
+    assert report.to_dict()["kind"] == ESTUDIO_AUDIT_KIND
+
+
+def test_missing_money_is_declared_never_zero() -> None:
+    report = build_estudio_audit_report(
+        values=[_value("ACS")], cycles=[_cycle("ACS", preset="sma_crossover")]
+    )
+    entry = report.values[0]
+    assert entry["resultR"]["measured"] is True
+    assert entry["money"]["measured"] is False
+    assert entry["money"]["netReturnPct"] is None
+    assert entry["money"]["trades"] == 0
+    assert entry["measured"] is False
+    assert any("sin grupo financiero" in gap for gap in entry["unmeasured"])
+
+
+def test_money_below_floor_is_none_never_zero() -> None:
+    report = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[_cycle("ACS", preset="sma_crossover")],
+        finance_groups=[_group("ACS", preset="sma_crossover", trades=3, net=0.0)],
+        min_trades=10,
+    )
+    entry = report.values[0]
+    assert entry["money"]["trades"] == 3
+    assert entry["money"]["netReturnPct"] == 0.0  # el dato bruto llega, pero…
+    assert entry["money"]["measured"] is False  # …bajo el suelo NO se declara medido
+    assert any("round-trips < suelo" in gap for gap in entry["unmeasured"])
+
+
+def test_ambiguous_preset_key_is_declared_not_chosen() -> None:
+    report = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[
+            _cycle("ACS", preset="sma_crossover", version="a"),
+            _cycle("ACS", preset="rsi_mean_reversion", version="b"),
+        ],
+    )
+    entry = report.values[0]
+    assert entry["strategy"]["presetKey"] is None
+    assert any("ambigua" in gap for gap in entry["unmeasured"])
+    assert report.summary["withPresetKey"] == 0
+    assert report.summary["withoutPresetKey"] == 1
+
+
+def test_missing_preset_key_is_a_declared_gap() -> None:
+    report = build_estudio_audit_report(
+        values=[_value("ACS")], cycles=[_cycle("ACS", preset=None)]
+    )
+    entry = report.values[0]
+    assert entry["strategy"]["presetKey"] is None
+    assert any("no declara presetKey" in gap for gap in entry["unmeasured"])
+
+
+def test_money_group_selected_by_exact_preset_key_when_several_share_symbol() -> None:
+    report = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[_cycle("ACS", preset="rsi_mean_reversion")],
+        finance_groups=[
+            _group("ACS", preset="sma_crossover", net=9.9),
+            _group("ACS", preset="rsi_mean_reversion", net=1.1),
+        ],
+    )
+    entry = report.values[0]
+    # Se atribuye a la estrategia EXACTA, no al primero del símbolo.
+    assert entry["money"]["netReturnPct"] == 1.1
+
+
+def test_result_r_below_floor_is_declared() -> None:
+    report = build_estudio_audit_report(
+        values=[_value("ACS", measured_cycles=2, expectancy_r=0.3)],
+        cycles=[_cycle("ACS", preset="sma_crossover")],
+        finance_groups=[_group("ACS", preset="sma_crossover")],
+        min_cycles=5,
+    )
+    entry = report.values[0]
+    assert entry["resultR"]["measured"] is False
+    assert entry["resultR"]["expectancyR"] == 0.3  # el dato bruto llega…
+    assert entry["measured"] is False  # …pero bajo el suelo no se declara medido
+    assert any("ciclos medidos < suelo" in gap for gap in entry["unmeasured"])
+
+
+def test_missing_why_is_a_declared_gap() -> None:
+    report = build_estudio_audit_report(
+        values=[_value("ACS")], cycles=[_cycle("ACS", preset="sma_crossover")]
+    )
+    entry = report.values[0]
+    assert entry["why"]["indicatorSpecs"] is None
+    assert any("porqué" in gap for gap in entry["unmeasured"])
+
+
+def test_deterministic_and_ordered_by_symbol() -> None:
+    values = [_value("ITX"), _value("ACS")]
+    cycles = [_cycle("ACS", preset="p"), _cycle("ITX", preset="q")]
+    first = build_estudio_audit_report(values=values, cycles=cycles).to_dict()
+    second = build_estudio_audit_report(values=list(reversed(values)), cycles=cycles).to_dict()
+    assert first == second
+    assert [row["symbol"] for row in first["values"]] == ["ACS", "ITX"]
