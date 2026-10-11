@@ -193,6 +193,32 @@ def test_adaptive_emission_is_deterministic() -> None:
     assert run() == run()
 
 
+def test_adaptive_emission_preset_key_is_exact_identity() -> None:
+    """H1: la identidad adaptativa es el ``presetKey`` declarado, no el nombre de familia."""
+    from bolsa_application.discovery_grammar import GrammarBudget
+
+    snapshot = _snapshot({f.name: 20 for f in DISCOVERY_FAMILIES})
+    allocator = DiscoveryBudgetAllocator(adaptive_weight=0.5, adaptive_min=2)
+    budget = _budget()
+    adaptive_cap = allocator.allocate(budget)["adaptive"].candidates
+    policy = build_search_policy(
+        snapshot, adaptive_cap=adaptive_cap, available_families=[f.name for f in DISCOVERY_FAMILIES]
+    )
+    candidates, _ = discover_for_instrument_with_summary(
+        instrument_id="AAA",
+        budget=budget,
+        grammar_budget=GrammarBudget(base=budget),
+        allocator=allocator,
+        search_policy=policy,
+    )
+    adaptive = [c for c in candidates if c.strategy_family.startswith(ADAPTIVE_FAMILY_PREFIX)]
+    assert adaptive
+    for candidate in adaptive:
+        # Identidad EXACTA: el ``presetKey`` declarado por la definición materializada;
+        # nunca el nombre de familia como sustituto (doctrina H1, ``UNKNOWN ≠ 0``).
+        assert candidate.preset_key == candidate.params["definition"]["presetKey"]
+
+
 # ── V2.38 (incremento 3) — emisión adaptativa por región ────────────────────────
 
 

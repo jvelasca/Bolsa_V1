@@ -328,8 +328,13 @@ async def test_v2_journal_seals_strategy_preset_key_from_the_worker(v2_env: None
     Prueba INTEGRADA (motor real): la operación la genera
     ``AutoSimulationWorker.auto_turn`` desde el ``DecisionPackage`` de un decider, NO un ciclo
     sembrado a mano. El ``presetKey`` que viaja en ``source`` (``active-strategy:<v>::<preset>``)
-    aterriza en el payload durable de la decisión aprobada, y la versión queda RECORTADA del
-    sufijo (``<v>``, sin arrastrar el ``::<preset>``).
+    aterriza en el payload de la decisión aprobada, y la versión queda RECORTADA del sufijo
+    (``<v>``, sin arrastrar el ``::<preset>``).
+
+    ALCANCE: se afirma sobre ``worker._v2_journal``, que es el journal EN MEMORIA del turno
+    (misma forma que el registro durable ``auto_entry_decision``). La DURABILIDAD real
+    (escritura + lectura en PostgreSQL) la certifica
+    ``test_auto_v2_durable_pg.py::test_auto_entry_decision_strategy_preset_key_is_durable_in_pg``.
     """
 
     def _decider(symbol: str) -> DecisionPackage:
@@ -365,7 +370,9 @@ async def test_v2_journal_omits_strategy_preset_key_when_source_has_none(
     """H1 — sin ``::<preset>`` en ``source`` la clave se OMITE (la ausencia no se rellena).
 
     Control negativo del test anterior: una fuente ``active-strategy:<v>`` (identidad histórica
-    intacta) o de otro prefijo NO inventa un ``presetKey``.
+    intacta) o de otro prefijo NO inventa un ``presetKey``. Se afirma sobre el journal EN
+    MEMORIA del turno; la durabilidad real la cubre
+    ``test_auto_v2_durable_pg.py::test_auto_entry_decision_strategy_preset_key_is_durable_in_pg``.
     """
 
     def _decider(symbol: str) -> DecisionPackage:

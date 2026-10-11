@@ -235,6 +235,32 @@ class _BuyOnce:
         return DecisionPackage(action="BUY", instrument_id=self._symbol, quantity=self._lot)
 
 
+class _PresetBuyOnce:
+    """Spine determinista con FUENTE versionada (``source`` H1) para la identidad.
+
+    Devuelve BUY declarando ``active-strategy:<v>::<preset>`` (o su forma histórica sin
+    sufijo), de modo que el worker REAL selle ``strategyPresetKey`` desde el camino de
+    producción, no desde un ciclo sembrado a mano.
+    """
+
+    def __init__(self, symbol: str, source: str, lot: float = 100.0) -> None:
+        self._symbol = symbol
+        self._source = source
+        self._lot = lot
+
+    def __call__(self, symbol: str):
+        from bolsa_application.decision_contract import DecisionPackage
+
+        if symbol != self._symbol:
+            return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0)
+        return DecisionPackage(
+            action="BUY",
+            instrument_id=self._symbol,
+            quantity=self._lot,
+            source=self._source,
+        )
+
+
 async def _durable_rows(
     factory: async_sessionmaker[AsyncSession], account_id: str, engine_id: str
 ) -> tuple[str | None, int]:
@@ -617,3 +643,118 @@ async def test_auto_cycle_regime_trace_is_durable_and_readable_from_another_sess
                         delete(EdgeReportRow).where(EdgeReportRow.id == edge_report_id)
                     )
                 await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_auto_entry_decision_strategy_preset_key_is_durable_in_pg(
+    v2_pg_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """H1 — el ``strategyPresetKey`` sellado por el worker REAL sobrevive en PostgreSQL.
+
+    El worker corre el camino de producción (``AutoSimRuntime.run_tick`` → ``auto_turn``)
+    con el sumidero M2 encendido (``AUTO_OPERATIONAL_AUDIT=1``) y la identidad viaja en la
+    FUENTE del ``DecisionPackage`` (``active-strategy:<v>::<preset>``). La prueba lee el
+    ``auto_entry_decision`` desde una sesión NUEVA: certifica DURABILIDAD (JSONB en
+    ``decision_journal_entries``), no la RAM del proceso. Control negativo: sin sufijo
+    ``::<preset>`` la clave se OMITE (la ausencia no se rellena con un valor ficticio).
+    """
+    from bolsa_api.background.auto_simulation_worker import (
+        AutoSimRuntime,
+        AutoSimulationWorker,
+    )
+    from bolsa_application.auto_operational_monitor import AUTO_ENTRY_DECISION_EVENT
+    from bolsa_infrastructure.database.models.tables import (
+        DecisionJournalEntryRow,
+        EdgeReportRow,
+        SimAutoPositionRow,
+        SimConsumedSignalRow,
+    )
+
+    monkeypatch.setenv("AUTO_ENGINE_SIMULATED_VENUE", "simulated")
+    monkeypatch.setenv("AUTO_SIMULATION_WORKER_ENABLED", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_REGIME", "BULL_TREND")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_EQUITY", "100000")
+    monkeypatch.setenv("AUTO_OPERATIONAL_AUDIT", "1")
+
+    accounts: list[str] = []
+
+    async def _run(source: str, strategy_ref: str, prefix: str) -> str:
+        instrument_id = _filling_instrument_id(prefix, side="buy")
+        engine_id = f"auto-v2p-{uuid.uuid4().hex[:10]}"
+        monkeypatch.setenv("AUTO_ENGINE_SIMULATED_WATCH", instrument_id)
+        async with v2_pg_factory() as session:
+            account_id = await _seed_account(session)
+            await _seed_instrument(session, instrument_id)
+            await _seed_edge_report(session, account_id=account_id, strategy_ref=strategy_ref)
+        accounts.append(account_id)
+
+        worker = AutoSimulationWorker(
+            decider=_PresetBuyOnce(instrument_id, source),
+            engine_id=engine_id,
+            account_id=account_id,
+        )
+        runtime = AutoSimRuntime(
+            v2_pg_factory, worker=worker, engine_id=engine_id, account_id=account_id
+        )
+        for _ in range(8):
+            await runtime.run_tick()
+            if worker._open.get(instrument_id, Decimal("0")) > 0:
+                break
+        assert worker._open.get(instrument_id, Decimal("0")) > 0, "abre en el camino real"
+        return account_id
+
+    async def _durable_approved(account_id: str) -> dict[str, object]:
+        async with v2_pg_factory() as session:  # sesión NUEVA: lee lo DURABLE, no la RAM.
+            payloads = (
+                (
+                    await session.execute(
+                        select(DecisionJournalEntryRow.payload)
+                        .where(DecisionJournalEntryRow.account_id == account_id)
+                        .where(DecisionJournalEntryRow.event_type == AUTO_ENTRY_DECISION_EVENT)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        approved = [p for p in payloads if isinstance(p, dict) and p.get("approved")]
+        assert approved, "el turno real dejó una decisión aprobada en el journal durable"
+        return approved[0]
+
+    try:
+        # Positivo: la identidad EXACTA viaja al payload durable, versión recortada.
+        positive = await _run(
+            "active-strategy:ver-abc::sma_crossover", "ver-abc", "inst-v2p-"
+        )
+        payload = await _durable_approved(positive)
+        assert payload["strategyPresetKey"] == "sma_crossover"
+        assert payload["strategyVersion"] == "ver-abc"
+
+        # Negativo: fuente histórica sin ``::<preset>`` ⇒ la clave NO se fabrica.
+        negative = await _run("active-strategy:ver-xyz", "ver-xyz", "inst-v2pn-")
+        payload_neg = await _durable_approved(negative)
+        assert "strategyPresetKey" not in payload_neg
+        assert payload_neg["strategyVersion"] == "ver-xyz"
+    finally:
+        from sqlalchemy import delete
+
+        async with v2_pg_factory() as session:
+            for account_id in accounts:
+                await session.execute(
+                    delete(DecisionJournalEntryRow).where(
+                        DecisionJournalEntryRow.account_id == account_id
+                    )
+                )
+                await session.execute(
+                    delete(SimAutoPositionRow).where(SimAutoPositionRow.account_id == account_id)
+                )
+                await session.execute(
+                    delete(SimConsumedSignalRow).where(
+                        SimConsumedSignalRow.account_id == account_id
+                    )
+                )
+                await session.execute(
+                    delete(EdgeReportRow).where(EdgeReportRow.account_id == account_id)
+                )
+            await session.commit()

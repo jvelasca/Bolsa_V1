@@ -28,7 +28,7 @@ La candidata lleva en ``params`` dos claves que consume el runner genérico del 
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -123,6 +123,22 @@ class DiscoveryEmissionSummary:
 
 def _default_candidate_id(instrument_id: str, family_name: str, index: int) -> str:
     return f"disc-{instrument_id}-{family_name}-{index}"
+
+
+def _preset_key_of(definition: Mapping[str, Any] | None) -> str | None:
+    """Identidad EXACTA (``presetKey``) declarada por la definición materializada.
+
+    Doctrina H1 (``UNKNOWN ≠ 0``): la identidad **nunca se inventa**. Si la definición
+    no declara ``presetKey`` (o lo declara vacío), se devuelve ``None`` para que el
+    hueco viaje declarado hasta la UI («Sin dato todavía»), en vez de fabricar una
+    identidad a partir del nombre de familia (que es una etiqueta de familia, no un
+    preset). Con el catálogo curado el ``presetKey`` siempre está presente e igual a
+    ``family.name``, así que el valor de producción no cambia.
+    """
+    if not definition:
+        return None
+    key = definition.get("presetKey")
+    return str(key) if key else None
 
 
 def _points_for_region(family: DiscoveryFamily, param_region: str) -> list[dict[str, Any]]:
@@ -259,7 +275,7 @@ def discover_for_instrument_with_summary(
                     params=catalog_params,
                     origin="discovery",
                     data_snapshot_id=data_snapshot_id,
-                    preset_key=str(executable.get("presetKey") or family.name),
+                    preset_key=_preset_key_of(executable),
                 )
             )
             emitted_for_family += 1
@@ -406,7 +422,7 @@ def discover_for_instrument_with_summary(
                         },
                         origin="discovery",
                         data_snapshot_id=data_snapshot_id,
-                        preset_key=str(executable.get("presetKey") or adaptive_family.name),
+                        preset_key=_preset_key_of(executable),
                     )
                 )
                 emitted_for_family += 1

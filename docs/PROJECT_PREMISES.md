@@ -95,6 +95,7 @@ R-12 entregó Track A–C, R12-409, EXEC-B-CONC, R12-SCHED, R12-ACCOUNTS, R12-AU
 | **Prioridades de producto (operativa diaria · entrada/salida · estrategia/indicadores · DÍA-D)** | §6 de este archivo · [auditoría operativa diaria](./engineering/auditoria-operativa-auto-fase-2-2026-10-08.md)                                           |
 | **Auditoría profundizada AUTO (H1 identidad de estrategia · blindaje SIM · DÍA-D · bucle diario)** | [auditoría profundizada AUTO](./engineering/auditoria-profundizada-auto-h1-sim-dia-d-2026-10-11.md)                                                     |
 | **Plan/ejecución `v2.88.107-beta` (H1 identidad EXACTA de la estrategia ejecutada = `presetKey`)** | [plan + pivote](./engineering/plan-v2-88-107-h1-identidad-estrategia-2026-10-11.md) · [evidencia](./engineering/evidence/v2.88.107/README.md) |
+| **Remediación `v2.88.108-beta` (H1: no se fabrica identidad en discovery + durabilidad real del sello en PG)** | [evidencia](./engineering/evidence/v2.88.108/README.md) |
 
 Entrada auditoría: [audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md).  
 Índice ingeniería (docs): [engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md).  

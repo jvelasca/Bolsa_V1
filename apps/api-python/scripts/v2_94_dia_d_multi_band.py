@@ -430,7 +430,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         cross_check=cross_check,
         meta={
-                "bump": "2.11.107-beta",
+                "bump": "2.11.108-beta",
             "phase": "V2.94 DIA-D AUTO MULTI BAND",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),

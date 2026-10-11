@@ -106,3 +106,57 @@ def test_engine_does_not_emit_unbuildable_points() -> None:
         template=_never,
     )
     assert discover_for_instrument(instrument_id="AAA", families=(dead,)) == ()
+
+
+def test_catalog_preset_key_equals_declared_preset_key() -> None:
+    """H1: la identidad es EXACTA — nunca se fabrica con el nombre de familia.
+
+    Para el catálogo curado, ``presetKey`` está siempre declarado, así que
+    ``candidate.preset_key`` debe ser idéntico al ``presetKey`` de la definición
+    materializada (no al ``family.name``).
+    """
+    candidates = discover_for_instrument(instrument_id="AAA")
+    assert candidates
+    for candidate in candidates:
+        assert candidate.params["discovery_family"] == candidate.strategy_family
+        assert candidate.preset_key == candidate.params["definition"]["presetKey"]
+
+
+def test_template_without_preset_key_declares_gap_not_family_name() -> None:
+    """Una definición sin ``presetKey`` ⇒ ``None`` (hueco declarado), no el nombre de familia."""
+
+    def _no_preset(_point):  # type: ignore[no-untyped-def]
+        return {"indicatorSpecs": [], "entries": {"operator": "all", "rules": []}}
+
+    family = DiscoveryFamily(
+        name="custom_no_preset",
+        parent=PARENT_TREND,
+        description="definición sin presetKey",
+        indicator_ids=("sma",),
+        param_space={"period": (10,)},
+        template=_no_preset,
+    )
+    candidates = discover_for_instrument(instrument_id="AAA", families=(family,))
+    assert len(candidates) == 1
+    assert candidates[0].strategy_family == "custom_no_preset"
+    # La etiqueta de familia NO se usa como identidad: el hueco viaja declarado.
+    assert candidates[0].preset_key is None
+
+
+def test_template_with_preset_key_preserves_exact_identity() -> None:
+    """Una definición con ``presetKey`` conserva la identidad EXACTA declarada."""
+
+    def _with_preset(_point):  # type: ignore[no-untyped-def]
+        return {"presetKey": "custom_preset", "indicatorSpecs": []}
+
+    family = DiscoveryFamily(
+        name="custom_with_preset",
+        parent=PARENT_TREND,
+        description="definición con presetKey",
+        indicator_ids=("sma",),
+        param_space={"period": (10,)},
+        template=_with_preset,
+    )
+    candidates = discover_for_instrument(instrument_id="AAA", families=(family,))
+    assert len(candidates) == 1
+    assert candidates[0].preset_key == "custom_preset"
