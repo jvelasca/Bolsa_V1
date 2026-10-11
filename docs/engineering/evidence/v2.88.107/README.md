@@ -51,6 +51,7 @@ Cada ciclo del motor AUTO publica ahora la **identidad exacta** de la estrategia
 - **Integración «motor real» (criterio 5):** `test_auto_v2_worker_integration.py` gana 2 pruebas que corren **el worker** (`auto_turn`) desde un `DecisionPackage` real (no un ciclo sembrado) y afirman que el `presetKey` de `source` aterriza en el payload durable de la decisión aprobada (`strategyPresetKey`) y que la versión queda recortada (`ver-abc`, sin `::<preset>`); control negativo: sin sufijo la clave se **omite**. **41 passed** (archivo completo).
 - **Guardián de bump:** `test_dia_d_bump_guard.py` **1 passed** (`package.json` y los 9 CLIs DÍA-D sellan `2.11.107-beta`).
 - **Web:** `contract:gen` + `contract:check` **OK** · `typecheck`/`lint`/`build` **OK** · `vitest` **2 080 passed**.
+- **CI del tag (cita POST-TAG):** `Release tag CI` [38124869217](https://github.com/jvelasca/Bolsa_V1/actions/runs/38124869217) **VERDE** — 12 jobs `success` + `certify` `success` (`playwright (integrated E2E, opt-in)` `skipped`, esperado), sin reintentos en los obligatorios. `replay-repro` **REPRODUCIDO** `1E3ADAC2…` (idéntico al sello previo ⇒ **`Δ decisión = 0`** confirmado en CI). Tag anotado `v2.88.107-beta` (objeto `6a484ccc` → commit `756d4e44`).
 
 ## 5. Límites declarados (sin fabricar)
 
