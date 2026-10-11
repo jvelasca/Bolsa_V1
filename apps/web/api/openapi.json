@@ -976,6 +976,17 @@
             "title": "Steps",
             "type": "array"
           },
+          "strategyPresetKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategypresetkey"
+          },
           "strategyVersion": {
             "anyOf": [
               {

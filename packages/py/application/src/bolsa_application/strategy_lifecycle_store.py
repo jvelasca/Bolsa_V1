@@ -683,12 +683,19 @@ class PostgresStrategyLifecycleStore:
         ).scalar_one_or_none()
         if version is None:
             return None
+        # H1: la identidad exacta que el motor AUTO conoce (``preset_key``) vive de forma
+        # DURABLE en la candidata de origen (``strategy_candidates.preset_key``), no en la
+        # versión. Se resuelve aquí para que la ACTIVE la declare — sin migración y sin
+        # tocar ``definition`` (el hash inmutable no se altera). Sin candidato o sin preset
+        # queda ``None``: la ausencia se declara, jamás se rellena.
+        candidate = await self.get_candidate(version.candidate_id)
         active = ActiveStrategy(
             version_id=version.id,
             candidate_id=version.candidate_id,
             instrument_id=version.instrument_id,
             name=version.name,
             definition=dict(version.definition or {}),
+            preset_key=candidate.preset_key if candidate is not None else None,
             shadow_validated=bool(row.shadow_validated),
             shadow_validation_id=(
                 str(row.shadow_validation_id) if row.shadow_validation_id else None

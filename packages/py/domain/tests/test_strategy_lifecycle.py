@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from bolsa_domain.entities.strategy_lifecycle import (
     PROMOTION_GATES,
+    ActiveStrategy,
     CoachAssessment,
     GateResult,
     GateStatus,
@@ -339,6 +340,48 @@ def test_candidate_carries_data_snapshot_for_reproducibility() -> None:
         data_snapshot_id="snap-2026-09-10",
     )
     assert cand.data_snapshot_id == "snap-2026-09-10"
+
+
+# ── H1: identidad exacta (preset_key) en finalista/activa ───────────────────────
+
+
+def test_finalist_carries_preset_key_when_present() -> None:
+    finalist = StrategyFinalist(
+        candidate_id="cand-1",
+        version_id="ver-1",
+        name="SMA",
+        definition_hash="hash-1",
+        definition={"family": "sma"},
+        preset_key="sma_crossover",
+    )
+    assert finalist.preset_key == "sma_crossover"
+
+
+def test_finalist_preset_key_defaults_to_none() -> None:
+    assert _finalist().preset_key is None
+
+
+def test_active_carries_preset_key_when_present() -> None:
+    active = ActiveStrategy(
+        version_id="ver-1",
+        candidate_id="cand-1",
+        instrument_id="AAA",
+        name="SMA",
+        definition={"family": "sma"},
+        preset_key="sma_crossover",
+    )
+    assert active.preset_key == "sma_crossover"
+
+
+def test_active_preset_key_defaults_to_none() -> None:
+    active = ActiveStrategy(
+        version_id="ver-1",
+        candidate_id="cand-1",
+        instrument_id="AAA",
+        name="SMA",
+        definition={"family": "sma"},
+    )
+    assert active.preset_key is None
 
 
 # ── V2.32/A12: Promotion Gate por EVIDENCIA shadow (no por flag) ─────────────────

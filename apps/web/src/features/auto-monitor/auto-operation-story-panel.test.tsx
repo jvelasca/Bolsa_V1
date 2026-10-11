@@ -44,6 +44,7 @@ vi.mock("@/lib/api", () => ({
         {
           cycleId: "cyc-1",
           instrumentId: "AAA",
+          strategyPresetKey: "sma_crossover",
           strategyVersion: "sv-1",
           direction: "long",
           closed: true,
@@ -322,11 +323,15 @@ describe("AutoOperationStoryPanel", () => {
     expect(
       screen.getByTestId("auto-operation-strategy-reason").textContent,
     ).toContain("Estrellas 3/5");
-    // El sello declarado por el ciclo se pinta como base del emparejamiento (honesto).
+    // La clave EXACTA declarada por el ciclo (que empareja con el #1) y su sello opaco se
+    // pintan por separado (honesto: la identidad no se confunde con el sello).
+    expect(
+      screen.getByTestId("auto-operation-strategy-preset-key").textContent,
+    ).toContain("sma_crossover");
     expect(
       screen.getByTestId("auto-operation-strategy-match").textContent,
     ).toContain("sv-1");
-    expect(chain.getAttribute("data-match")).toBe("differs");
+    expect(chain.getAttribute("data-match")).toBe("same");
     expect(screen.queryByTestId("auto-operation-strategy-gap")).toBeNull();
   });
 

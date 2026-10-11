@@ -106,6 +106,27 @@ def test_signal_evaluator_emits_entry_on_bullish_cross() -> None:
     assert proposal.source == "active-strategy:ver-1"
 
 
+def test_signal_evaluator_source_carries_preset_key() -> None:
+    """H1: con identidad exacta la fuente añade ``::<preset_key>`` (sin preset: histórica)."""
+    base = _active_with_executable()
+    with_preset = ActiveStrategy(
+        version_id=base.version_id,
+        candidate_id=base.candidate_id,
+        instrument_id=base.instrument_id,
+        name=base.name,
+        definition=base.definition,
+        preset_key="sma_crossover",
+    )
+    decider = make_active_strategy_decider(
+        active=with_preset,
+        watch=("AAA",),
+        bars_by_symbol=lambda symbol: _closes([10.0] * 7 + [20.0]),
+    )
+    proposal = decider("AAA")
+    assert proposal.action == "BUY"
+    assert proposal.source == "active-strategy:ver-1::sma_crossover"
+
+
 def test_signal_evaluator_holds_without_bars() -> None:
     decider = make_active_strategy_decider(
         active=_active_with_executable(),

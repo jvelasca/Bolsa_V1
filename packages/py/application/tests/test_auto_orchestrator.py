@@ -259,6 +259,27 @@ def test_active_strategy_decider_holds_outside_watch() -> None:
     assert decider("BBB").action == "HOLD"
 
 
+def test_active_strategy_decider_source_carries_preset_key() -> None:
+    """H1: con identidad exacta la fuente añade ``::<preset_key>`` (sin preset, histórica)."""
+    from bolsa_application.decision_contract import DecisionPackage
+
+    def fallback(symbol: str) -> DecisionPackage:
+        return DecisionPackage(action="BUY", instrument_id=symbol, quantity=50)
+
+    active = ActiveStrategy(
+        version_id="ver-1",
+        candidate_id="cand-1",
+        instrument_id="AAA",
+        name="SMA",
+        definition={"lot_qty": 100.0, "watch": ["AAA"]},
+        preset_key="sma_crossover",
+    )
+    decider = active_strategy_decider(active=active, fallback=fallback, watch=("AAA",))
+    prop = decider("AAA")
+    assert prop.action == "BUY"
+    assert prop.source == "active-strategy:ver-1::sma_crossover"
+
+
 def test_promotion_gate_names_are_the_seven() -> None:
     assert set(PROMOTION_GATES) == {
         "backtest",
@@ -293,6 +314,34 @@ async def test_promoted_version_carries_champion_params_and_executable() -> None
         {"definitionId": "sma", "parameters": {"period": 10}},
         {"definitionId": "sma", "parameters": {"period": 30}},
     ]
+
+
+@pytest.mark.asyncio
+async def test_promoted_active_carries_candidate_preset_key() -> None:
+    """H1: el ``preset_key`` de la candidata viaja finalista→ACTIVE en la promoción."""
+    from bolsa_domain.entities.strategy_lifecycle import StrategyCandidate
+
+    store = InMemoryStrategyLifecycleStore()
+    deps = OrchestratorDeps(
+        store=store,
+        run_optimize=(lambda candidate: _runner(_good_result())),
+        discovery=lambda instrument_id: (
+            StrategyCandidate(
+                id="cand-h1",
+                instrument_id=instrument_id,
+                strategy_family="sma_crossover",
+                params={},
+                preset_key="sma_crossover",
+            ),
+        ),
+    )
+    _with_shadow_evidence(deps)
+    orchestrator = AutoOrchestrator(deps)
+    result = await orchestrator.run_cycle(instrument_id="AAA")
+    assert result.promoted, result.reasons
+    active = await store.get_active(instrument_id="AAA")
+    assert active is not None
+    assert active.active.preset_key == "sma_crossover"
 
 
 @pytest.mark.asyncio

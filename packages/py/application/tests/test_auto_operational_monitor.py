@@ -130,6 +130,50 @@ def test_journal_entry_turns_signal_reached() -> None:
     assert _fact(_step(steps, "TOP_N"), "rank")["value"] == 1
 
 
+def test_cycle_exposes_strategy_preset_key_when_the_journal_declares_it() -> None:
+    """H1 — la identidad EXACTA (``strategyPresetKey``) sale del hecho durable del ciclo.
+
+    Presente cuando el productor la selló en el ``auto_entry_decision`` (se publica también
+    como hecho aditivo del paso ``SIGNAL``); ``None`` cuando el hecho no la declara.
+    """
+    entry = SimpleNamespace(
+        decision_id="dec-1",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        created_at="2026-01-01T12:00:00Z",
+        session_id="sess-a",
+        payload={
+            "cycleId": "cyc-1",
+            "instrumentId": "AAPL",
+            "strategyVersion": "sv-1",
+            "strategyPresetKey": "trend",
+        },
+    )
+    dto = build_operational_monitor(
+        account_id="acc-1", reservations=[_reservation()], journal=[entry]
+    )
+    cycle = dto["cycles"][0]
+    assert cycle["strategyPresetKey"] == "trend"
+    signal_fact = _fact(_step(cycle["steps"], "SIGNAL"), "strategyPresetKey")
+    assert signal_fact["value"] == "trend"
+
+
+def test_cycle_strategy_preset_key_is_absent_when_not_declared() -> None:
+    """H1 — sin ``strategyPresetKey`` en el hecho, el ciclo lo declara ``None`` (no lo inventa)."""
+    entry = SimpleNamespace(
+        decision_id="dec-1",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        created_at="2026-01-01T12:00:00Z",
+        session_id="sess-a",
+        payload={"cycleId": "cyc-1", "instrumentId": "AAPL", "strategyVersion": "sv-1"},
+    )
+    dto = build_operational_monitor(
+        account_id="acc-1", reservations=[_reservation()], journal=[entry]
+    )
+    cycle = dto["cycles"][0]
+    assert cycle["strategyPresetKey"] is None
+    assert all(fact["key"] != "strategyPresetKey" for fact in _step(cycle["steps"], "SIGNAL")["facts"])
+
+
 def test_top_n_exposes_durable_ranking_motive() -> None:
     """F5 — el paso ``TOP_N`` publica el MOTIVO de selección durable (desglose del score).
 

@@ -31,7 +31,10 @@ import logging
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 
-from bolsa_application.decision_contract import DecisionPackage
+from bolsa_application.decision_contract import (
+    DecisionPackage,
+    format_active_strategy_source,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +128,8 @@ def make_active_strategy_decider(
     definition = dict(getattr(active, "definition", None) or {})
     executable = definition.get("executable")
     version_id = str(getattr(active, "version_id", "") or "")
-    source = f"active-strategy:{version_id}"
+    # H1: la fuente transporta la identidad exacta (preset_key) si la ACTIVE la tiene.
+    source = format_active_strategy_source(version_id, getattr(active, "preset_key", None))
     effective_lot = float(definition.get("lot_qty", lot_qty) or lot_qty)
     effective_watch = tuple(str(s) for s in (definition.get("watch") or watch))
 

@@ -447,6 +447,8 @@ class AutoOrchestrator:
                     # V2.32/A12: la evidencia real que autorizó la promoción.
                     shadow_validated=decision.promotion.shadow_validated,
                     shadow_validation_id=decision.promotion.shadow_validation_id,
+                    # H1: la identidad exacta (preset_key) viaja finalista→ACTIVE.
+                    preset_key=finalist.preset_key,
                 ),
                 promoted_at=finalist.definition.get("promoted_at") or "",
             )
@@ -757,12 +759,16 @@ def active_strategy_decider(
     ``kind == "deterministic_sma"`` (o sin ``kind``) usa la lógica del spine; el
     ``definition`` puede aportar ``lot_qty``/``watch`` sin cambiar la seguridad.
     """
-    from bolsa_application.decision_contract import DecisionPackage
+    from bolsa_application.decision_contract import (
+        DecisionPackage,
+        format_active_strategy_source,
+    )
 
     definition = dict(active.definition or {})
     effective_lot = float(definition.get("lot_qty", lot_qty) or lot_qty)
     effective_watch = tuple(str(s) for s in (definition.get("watch") or watch))
-    source = f"active-strategy:{active.version_id}"
+    # H1: fuente canónica compartida; incluye ``::<preset_key>`` si la ACTIVE lo tiene.
+    source = format_active_strategy_source(active.version_id, active.preset_key)
 
     def _decide(symbol: str) -> DecisionPackage:
         if symbol not in effective_watch:

@@ -188,6 +188,9 @@ class StrategyFinalist:
     definition_hash: str
     definition: dict[str, Any]
     created_at: str | None = None
+    # H1: identidad exacta de la estrategia ejecutada (``preset_key`` del motor AUTO).
+    # Se propaga desde la candidata; ``None`` cuando no hay preset (no se inventa).
+    preset_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -493,6 +496,9 @@ class ActiveStrategy:
     shadow_validated: bool = False
     shadow_validation_id: str | None = None
     promoted_at: str | None = None
+    # H1: identidad exacta de la estrategia ejecutada (``preset_key`` del motor AUTO).
+    # ``None`` cuando la candidata de origen no tenía preset (no se inventa).
+    preset_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

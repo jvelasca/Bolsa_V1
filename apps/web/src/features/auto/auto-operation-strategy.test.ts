@@ -2,8 +2,9 @@
  * Puente operación → estrategia ganadora (P3/P4): composición pura y fail-closed.
  *
  * Se comprueba que la cadena estrategia → indicadores → razón se copia del TOP sin recalcular,
- * que el emparejamiento con el sello del ciclo es honesto (nunca «coincide» sin match real) y que
- * un hueco se declara («Sin dato todavía») en vez de fabricar una estrategia.
+ * que el emparejamiento con la clave EXACTA del ciclo (`presetKey`) es una igualdad honesta
+ * (nunca «coincide» sin igualdad exacta) y que un hueco se declara («Sin dato todavía») en vez de
+ * fabricar una estrategia.
  */
 
 import { describe, expect, it } from "vitest";
@@ -14,7 +15,7 @@ import type {
 import {
   AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL,
   AUTO_OPERATION_STRATEGY_DECLARED_LABEL,
-  AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC,
+  AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT,
   AUTO_OPERATION_STRATEGY_NO_DATA,
   buildAutoOperationStrategyView,
   resolveAutoOperationStrategyMatch,
@@ -64,7 +65,11 @@ const definition = {
 describe("buildAutoOperationStrategyView", () => {
   it("compone la cadena estrategia → indicadores → razón desde el TOP ya producido", () => {
     const view = buildAutoOperationStrategyView({
-      cycle: { instrumentId: "AAPL", strategyVersion: "sma_crossover" },
+      cycle: {
+        instrumentId: "AAPL",
+        strategyPresetKey: "sma_crossover",
+        strategyVersion: "sv-1",
+      },
       instrumentId: "uuid-1",
       top: top(),
       definition,
@@ -78,6 +83,9 @@ describe("buildAutoOperationStrategyView", () => {
     expect(view?.indicators).toEqual(["RSI"]);
     expect(view?.reasons).toEqual(["Estrellas 3/5", "DD -12%"]);
     expect(view?.match).toBe("same");
+    // La clave EXACTA y el sello opaco se copian por separado, tal cual los declara el ciclo.
+    expect(view?.declaredCyclePresetKey).toBe("sma_crossover");
+    expect(view?.declaredCycleStrategyVersion).toBe("sv-1");
     expect(view?.gapReason).toBeNull();
     expect(view?.verifyHref).toContain("/backtests?");
     expect(view?.verifyHref).toContain("instrumentId=uuid-1");
@@ -277,34 +285,80 @@ describe("buildAutoOperationStrategyView", () => {
 });
 
 describe("resolveAutoOperationStrategyMatch", () => {
-  it("coincide por id, etiqueta o tipo (normalizado)", () => {
-    expect(resolveAutoOperationStrategyMatch("def-1", slot())).toBe("same");
-    expect(resolveAutoOperationStrategyMatch("SMA cross", slot())).toBe("same");
-    expect(resolveAutoOperationStrategyMatch("sma_crossover", slot())).toBe(
-      "same",
-    );
+  it("declara coincidencia SOLO con igualdad EXACTA de la clave declarada", () => {
+    expect(
+      resolveAutoOperationStrategyMatch("sma_crossover", slot(), definition),
+    ).toBe("same");
   });
 
-  it("declara divergencia cuando el sello no empareja con la identidad del #1", () => {
-    expect(resolveAutoOperationStrategyMatch("trend-v3", slot())).toBe(
+  it("empareja por el `strategyType` que declara el #1", () => {
+    expect(
+      resolveAutoOperationStrategyMatch("sma_crossover", slot(), null),
+    ).toBe("same");
+  });
+
+  it("empareja por el `presetKey` que declara la definición del #1", () => {
+    const sinTipo = slot({ strategyType: null });
+    expect(
+      resolveAutoOperationStrategyMatch("sma_crossover", sinTipo, definition),
+    ).toBe("same");
+  });
+
+  it("declara divergencia cuando la clave declarada no es igual (contenido distinto)", () => {
+    expect(
+      resolveAutoOperationStrategyMatch("trend_v3", slot(), definition),
+    ).toBe("differs");
+  });
+
+  it("NO empareja por contención ni por etiqueta: solo identidad EXACTA", () => {
+    // Antes «SMA cross» (etiqueta) emparejaba por token; ahora NO: solo la clave exacta.
+    expect(
+      resolveAutoOperationStrategyMatch("SMA cross", slot(), definition),
+    ).toBe("differs");
+    // «sma» ⊂ «sma_crossover»: sin contención, no coincide.
+    expect(resolveAutoOperationStrategyMatch("sma", slot(), definition)).toBe(
       "differs",
     );
   });
 
-  it("no confunde por contención: «ma» NO coincide con «smacrossover»", () => {
-    const smac = slot({
-      strategyDefinitionId: "smacrossover",
-      label: "smacrossover",
-      strategyType: "smacrossover",
-    });
-    // Token completo: «ma» ≠ «smacrossover» (antes habría dado un falso «same»).
-    expect(resolveAutoOperationStrategyMatch("ma", smac)).toBe("differs");
+  it("sin clave declarada, clave en blanco o sin #1 ⇒ «sin dato» (no se inventa)", () => {
+    expect(resolveAutoOperationStrategyMatch(null, slot(), definition)).toBe(
+      "unknown",
+    );
+    expect(
+      resolveAutoOperationStrategyMatch(undefined, slot(), definition),
+    ).toBe("unknown");
+    expect(resolveAutoOperationStrategyMatch("   ", slot(), definition)).toBe(
+      "unknown",
+    );
+    expect(
+      resolveAutoOperationStrategyMatch("sma_crossover", null, definition),
+    ).toBe("unknown");
   });
 
-  it("sin sello, sin #1 o sello trivial ⇒ «sin dato» (no se inventa)", () => {
-    expect(resolveAutoOperationStrategyMatch(null, slot())).toBe("unknown");
-    expect(resolveAutoOperationStrategyMatch("1", slot())).toBe("unknown");
-    expect(resolveAutoOperationStrategyMatch("sv-1", null)).toBe("unknown");
+  it("#1 SIN identidad declarada ⇒ «sin dato», NUNCA «difiere» (no se afirma sin término)", () => {
+    // `strategyType` y `presetKey` son opcionales: el #1 puede no declarar NINGUNA identidad.
+    const sinIdentidad = slot({ strategyType: null });
+    expect(
+      resolveAutoOperationStrategyMatch("sma_crossover", sinIdentidad, null),
+    ).toBe("unknown");
+    expect(
+      resolveAutoOperationStrategyMatch("sma_crossover", sinIdentidad),
+    ).toBe("unknown");
+    // Una definición sin `presetKey` tampoco aporta identidad: sigue siendo hueco, no divergencia.
+    expect(
+      resolveAutoOperationStrategyMatch("sma_crossover", sinIdentidad, {}),
+    ).toBe("unknown");
+  });
+
+  it("recorta los espacios de la clave declarada y de las identidades antes de comparar", () => {
+    expect(
+      resolveAutoOperationStrategyMatch(
+        "  sma_crossover  ",
+        slot(),
+        definition,
+      ),
+    ).toBe("same");
   });
 });
 
@@ -326,16 +380,15 @@ describe("copy de identidad (separación mejor-disponible vs ejecutada)", () => 
     );
   });
 
-  it("declara la heurística y NO afirma una identidad exacta", () => {
-    expect(AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC).toContain(
-      "aproximación textual",
+  it("declara la identidad EXACTA (`presetKey`) y la ausencia honesta del dato", () => {
+    expect(AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT).toContain(
+      "identidad EXACTA",
     );
-    expect(AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC).toContain(
-      "no lo materializa",
+    expect(AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT).toContain("presetKey");
+    // Cuando el ciclo no declara su clave, se rotula la ausencia y no se afirma coincidencia.
+    expect(AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT).toContain(
+      "Sin dato todavía",
     );
-    // No se declara «coincide»/identidad exacta en la nota honesta.
-    expect(AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC).not.toContain(
-      "Coincide",
-    );
+    expect(AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT).not.toContain("Coincide");
   });
 });

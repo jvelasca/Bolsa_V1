@@ -279,6 +279,7 @@ export function AutoOperationStoryPanel({
     cycle: selected
       ? {
           instrumentId: selected.instrumentId ?? null,
+          strategyPresetKey: selected.strategyPresetKey ?? null,
           strategyVersion: selected.strategyVersion ?? null,
         }
       : null,

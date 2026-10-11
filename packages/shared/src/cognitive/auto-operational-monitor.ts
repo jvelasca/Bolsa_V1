@@ -151,6 +151,10 @@ export type AutoMonitorCycleV1 = {
   position?: AutoMonitorCyclePositionV1 | null;
   instrumentId?: string | null;
   strategyVersion?: string | null;
+  // H1 — identidad EXACTA de la estrategia que declara el motor (`presetKey`, el mismo espacio de
+  // claves del TOP de Finalistas): la clave de la join exacta. `null` = el hecho durable no la
+  // declaró (ausencia: se rotula, no se finge).
+  strategyPresetKey?: string | null;
   direction?: string;
   // `closed` es nullable: `null` = la evidencia (ventana de fills) está truncada y NO se puede
   // afirmar el cierre. `closedMeasurement` acompaña (PARTIAL/UNKNOWN); la UI no adivina.

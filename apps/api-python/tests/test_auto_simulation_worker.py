@@ -331,6 +331,37 @@ def test_strategy_version_from_source_reads_v2_entry_proposal() -> None:
     assert _strategy_version_from_source("auto-2.0-position:time_exit") is None
 
 
+def test_strategy_version_from_source_strips_preset_suffix() -> None:
+    """H1: el sufijo ADITIVO ``::<preset>`` se recorta y NO contamina la versión.
+
+    La identidad exacta viaja como ``active-strategy:<v>::<preset>``. La versión es lo
+    anterior al separador ``::``; un sufijo vacío no cambia la salida histórica.
+    """
+    from bolsa_api.background.auto_simulation_worker import _strategy_version_from_source
+
+    assert _strategy_version_from_source("active-strategy:ver-1::trend") == "ver-1"
+    assert _strategy_version_from_source("active-strategy:ver-1::") == "ver-1"
+    # Sin ``::`` la salida es exactamente la de hoy (retrocompatibilidad).
+    assert _strategy_version_from_source("active-strategy:ver-1") == "ver-1"
+
+
+def test_strategy_preset_from_source_reads_only_active_strategy_suffix() -> None:
+    """H1: el preset sólo existe en una ``active-strategy:`` CON sufijo ``::`` no vacío."""
+    from bolsa_api.background.auto_simulation_worker import _strategy_preset_from_source
+
+    assert _strategy_preset_from_source("active-strategy:ver-1::trend") == "trend"
+    # Sufijo vacío / de sólo espacios ⇒ ``None`` (la ausencia no se disfraza).
+    assert _strategy_preset_from_source("active-strategy:ver-1::") is None
+    assert _strategy_preset_from_source("active-strategy:ver-1::   ") is None
+    # Fuentes sin ``::`` o de otro prefijo (``auto-2.0:<v>``) NO declaran preset.
+    assert _strategy_preset_from_source("active-strategy:ver-1") is None
+    assert _strategy_preset_from_source("auto-2.0:orb-1") is None
+    assert _strategy_preset_from_source("auto-2.0:orb-1::trend") is None
+    assert _strategy_preset_from_source("protection:x") is None
+    assert _strategy_preset_from_source("") is None
+    assert _strategy_preset_from_source(None) is None
+
+
 @pytest.mark.asyncio
 async def test_open_fills_carry_active_strategy_version(auto_env: None) -> None:
     """La apertura atribuye sus fills a la versión del ``DecisionPackage.source``."""

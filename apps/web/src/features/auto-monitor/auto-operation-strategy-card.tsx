@@ -16,7 +16,7 @@ import {
   AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL,
   AUTO_OPERATION_STRATEGY_DECLARED_LABEL,
   AUTO_OPERATION_STRATEGY_DESCRIPTION,
-  AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC,
+  AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT,
   AUTO_OPERATION_STRATEGY_NO_DATA,
   AUTO_OPERATION_STRATEGY_TITLE,
   type AutoOperationStrategyViewV1,
@@ -121,15 +121,29 @@ export function AutoOperationStrategyCard({
               data-testid="auto-operation-strategy-match"
               data-match={view.match}
             >
-              {view.declaredCycleStrategyVersion ??
-                AUTO_OPERATION_STRATEGY_NO_DATA}{" "}
-              · {view.matchLabel}
+              {/* Identidad EXACTA declarada por el ciclo (`presetKey`): la clave de la igualdad.
+                  Ausente ⇒ «Sin dato todavía» (no se finge una identidad inexistente). */}
+              <span
+                className="block font-medium"
+                data-testid="auto-operation-strategy-preset-key"
+              >
+                {view.declaredCyclePresetKey ?? AUTO_OPERATION_STRATEGY_NO_DATA}
+              </span>
+              {/* Sello OPACO del motor (`strategyVersion`) + veredicto del emparejamiento. */}
+              <span
+                className="block"
+                data-testid="auto-operation-strategy-declared-version"
+              >
+                {view.declaredCycleStrategyVersion ??
+                  AUTO_OPERATION_STRATEGY_NO_DATA}{" "}
+                · {view.matchLabel}
+              </span>
               {/* Nota de honestidad DENTRO del <dd> (ver nota del bloque anterior). */}
               <span
                 className="mt-0.5 block text-[11px] text-muted-foreground"
-                data-testid="auto-operation-strategy-match-heuristic"
+                data-testid="auto-operation-strategy-match-exact"
               >
-                {AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC}
+                {AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT}
               </span>
             </dd>
           </div>

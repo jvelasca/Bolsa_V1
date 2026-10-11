@@ -94,6 +94,9 @@ class AutoMonitorCycleDto(BaseModel):
     position: AutoMonitorCyclePositionDto | None = None
     instrumentId: str | None = None
     strategyVersion: str | None = None
+    # H1 — identidad EXACTA de la estrategia (``preset_key``): la clave de la join exacta,
+    # aditiva al read-model (``strategyPresetKey``), ``None`` cuando la fuente no la declara.
+    strategyPresetKey: str | None = None
     direction: str = "long"
     # ``closed`` es nullable: con la ventana de fills truncada no se puede AFIRMAR el cierre.
     # ``None`` + ``closedMeasurement`` (PARTIAL/UNKNOWN) declara el hueco; la UI lo rotula.

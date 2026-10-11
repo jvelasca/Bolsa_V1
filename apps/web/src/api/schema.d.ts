@@ -4473,6 +4473,8 @@ export interface components {
             result?: components["schemas"]["AutoMonitorCycleResultDto"] | null;
             /** Steps */
             steps?: components["schemas"]["AutoMonitorStepDto"][];
+            /** Strategypresetkey */
+            strategyPresetKey?: string | null;
             /** Strategyversion */
             strategyVersion?: string | null;
         };

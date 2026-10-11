@@ -531,13 +531,37 @@ def _strategy_version_from_source(source: Any) -> str | None:
     pipeline V2, V2.45/AUTO-5). Devuelve ``None`` cuando la propuesta no proviene de una
     estrategia con versión (spine determinista, protección, ``auto-2.0`` sin versión): la
     ausencia de atribución es información, nunca se inventa una versión.
+
+    H1 — la identidad EXACTA viaja con un sufijo ADITIVO ``::<presetKey>``
+    (``active-strategy:<v>::<preset>``). La versión es lo anterior al separador ``::``: se
+    recorta PRIMERO, antes de quitar el prefijo, para no arrastrar el preset dentro de la
+    versión y para no cambiar NINGUNA salida de las fuentes SIN ``::`` (que son las de hoy).
     """
     text = str(source or "").strip()
+    # H1 — ``::`` (dos caracteres) separa versión de preset; sin él ``text`` queda igual.
+    text = text.split("::", 1)[0].strip()
     for prefix in (_ACTIVE_STRATEGY_SOURCE_PREFIX, _V2_ENTRY_SOURCE_PREFIX):
         if text.startswith(prefix):
             version_id = text[len(prefix) :].strip()
             return version_id or None
     return None
+
+
+def _strategy_preset_from_source(source: Any) -> str | None:
+    """H1 — extrae el ``preset_key`` ADITIVO de ``DecisionPackage.source``.
+
+    El decider marca la identidad EXACTA de la estrategia como
+    ``active-strategy:<version>::<preset_key>`` (separador de DOS caracteres ``::``). Sólo
+    esa fuente ``active-strategy:`` CON sufijo lleva preset: cualquier otra (``auto-2.0:<v>``,
+    una fuente sin ``::``, la propia ``active-strategy:<v>`` de hoy) NO declara preset y
+    devuelve ``None``. Un sufijo vacío o de sólo espacios también es ``None``: la ausencia de
+    preset es información, jamás un relleno.
+    """
+    text = str(source or "").strip()
+    if not text.startswith(_ACTIVE_STRATEGY_SOURCE_PREFIX) or "::" not in text:
+        return None
+    preset = text.split("::", 1)[1].strip()
+    return preset or None
 
 
 def _dec_or_none(value: Any) -> Decimal | None:
@@ -2400,6 +2424,9 @@ class AutoSimulationWorker:
             price = Decimal(str(raw_price))
             action = str(getattr(pkg, "action", "HOLD")).upper()
             version = _strategy_version_from_source(getattr(pkg, "source", None))
+            # H1 — la identidad EXACTA de la estrategia (preset) viaja con la señal para
+            # aterrizar en el journal de decisión sin migración; ausente ⇒ ``None``.
+            preset = _strategy_preset_from_source(getattr(pkg, "source", None))
             identity = signal_identity_for_bar(
                 instrument_id=symbol,
                 action=action,
@@ -2459,6 +2486,7 @@ class AutoSimulationWorker:
                     liquidity_notional=context.liquidity_notional,
                     trade_context=context,
                     strategy_version=version,
+                    strategy_preset_key=preset,
                     signal_id=signal_id,
                     bar_timestamp=identity.bar_timestamp if identity is not None else "",
                     valid_until=identity.valid_until if identity is not None else "",

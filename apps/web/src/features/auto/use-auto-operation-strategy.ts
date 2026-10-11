@@ -22,11 +22,13 @@ import {
 
 export type UseAutoOperationStrategyInput = {
   /**
-   * Ciclo seleccionado del monitor (tal cual): el `instrumentId` es el TICKER (puede faltar)
-   * y el `strategyVersion` es el sello declarado por el motor. `null` = sin operación.
+   * Ciclo seleccionado del monitor (tal cual): el `instrumentId` es el TICKER (puede faltar),
+   * el `strategyPresetKey` es la identidad EXACTA declarada por el motor y el `strategyVersion`
+   * es su sello opaco. `null` = sin operación.
    */
   cycle: {
     instrumentId?: string | null;
+    strategyPresetKey?: string | null;
     strategyVersion?: string | null;
   } | null;
   timeframe?: string;
@@ -40,6 +42,7 @@ export function useAutoOperationStrategy(
   const timeframe = input.timeframe ?? "1d";
   const hasCycle = input.cycle != null;
   const ticker = input.cycle?.instrumentId?.trim() || null;
+  const cycleStrategyPresetKey = input.cycle?.strategyPresetKey?.trim() || null;
   const cycleStrategyVersion = input.cycle?.strategyVersion?.trim() || null;
 
   const instrumentsQuery = useQuery({
@@ -101,6 +104,7 @@ export function useAutoOperationStrategy(
         cycle: hasCycle
           ? {
               instrumentId: ticker,
+              strategyPresetKey: cycleStrategyPresetKey,
               strategyVersion: cycleStrategyVersion,
             }
           : null,
@@ -116,6 +120,7 @@ export function useAutoOperationStrategy(
     [
       hasCycle,
       ticker,
+      cycleStrategyPresetKey,
       cycleStrategyVersion,
       resolvedInstrumentId,
       instrumentsQuery.isError,

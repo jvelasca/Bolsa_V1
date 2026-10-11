@@ -202,6 +202,7 @@ async def test_strategy_lifecycle_roundtrip_pg(
                     strategy_family="sma",
                     params={"fast": 20, "slow": 50},
                     data_snapshot_id="snap-2026-09-10",
+                    preset_key="sma_crossover",
                 )
             )
             loaded = await store.get_candidate(candidate_id)
@@ -275,6 +276,10 @@ async def test_strategy_lifecycle_roundtrip_pg(
             assert active is not None
             assert active.active.version_id == version_id
             assert active.active.definition["family"] == "sma"
+            # H1 — la identidad exacta (``preset_key``) vive de forma durable en la
+            # candidata de origen, no en la versión: ``get_active`` la resuelve y el
+            # round-trip la conserva.
+            assert active.active.preset_key == "sma_crossover"
 
             # 6) Vigilancia: snapshot de salud y detección de degradación.
             await store.save_health(

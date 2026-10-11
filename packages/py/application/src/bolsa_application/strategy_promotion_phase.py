@@ -74,6 +74,8 @@ def build_strategy_version(
         name=name,
         definition_hash=definition_hash(effective),
         definition=effective,
+        # H1: la identidad exacta del motor AUTO viaja con el finalista (candidata→finalista).
+        preset_key=candidate.preset_key,
     )
 
 

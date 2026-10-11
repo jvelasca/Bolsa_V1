@@ -33,6 +33,33 @@ VenueAllowed = Literal["paper", "simulated"]
 # nunca LIVE real. M0 bloquea además el camino XTB con doble barrera.
 ALLOWED_AUTO_VENUES: frozenset[VenueAllowed] = frozenset({"paper", "simulated"})
 
+# H1: prefijo canónico de la fuente de una propuesta de la estrategia ACTIVE.
+_ACTIVE_STRATEGY_SOURCE_PREFIX = "active-strategy:"
+
+
+def format_active_strategy_source(version_id: str, preset_key: str | None) -> str:
+    """H1 — Fuente canónica de una propuesta de la estrategia ACTIVE.
+
+    Formato fijado (lo parsea el worker AUTO; NO cambiar sin coordinar):
+
+    * sin ``preset_key`` (``None``, cadena vacía o solo espacios) ⇒
+      ``active-strategy:<version_id>`` (identidad histórica, sin cambios).
+    * con ``preset_key`` no vacío ⇒ ``active-strategy:<version_id>::<preset_key>``
+      (separador literal de dos caracteres ``::``).
+
+    El ``preset_key`` es la identidad exacta que el motor AUTO realmente conoce. Un
+    ``version_id`` vacío se conserva tal cual (``active-strategy:``), igual que hoy:
+    la ausencia de preset nunca cambia la forma previa.
+
+    Única fuente de verdad: ambos decisores (``auto_orchestrator`` y
+    ``active_strategy_signal_evaluator``) la importan para no poder divergir.
+    """
+    key = (preset_key or "").strip()
+    if key:
+        return f"{_ACTIVE_STRATEGY_SOURCE_PREFIX}{version_id}::{key}"
+    return f"{_ACTIVE_STRATEGY_SOURCE_PREFIX}{version_id}"
+
+
 
 class RiskGateReason(StrEnum):
     AUTO_OK_SIMULATED = "auto_simulated_only"

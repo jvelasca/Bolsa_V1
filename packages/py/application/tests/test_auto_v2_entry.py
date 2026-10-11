@@ -263,6 +263,38 @@ def test_plan_v2_tick_approved_entry_seals_ranking_motive() -> None:
     assert components["regime_fit"] == 1.0
 
 
+def test_plan_v2_tick_seals_strategy_preset_key_when_present() -> None:
+    """H1 — el ``preset_key`` de la señal viaja ADITIVO al payload (presente u omitido).
+
+    Con la señal declarando un preset, la decisión aprobada lo sella en
+    ``payload.strategyPresetKey`` (clave JSONB, sin migración). Sin preset la clave se OMITE:
+    la ausencia es información, jamás un relleno.
+    """
+    with_preset = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=0.9, strategy_preset_key="trend")],
+        regime="BULL_TREND",
+    )
+    approved = next(
+        e
+        for e in with_preset.journal_entries
+        if e.instrument_id == "AAA" and e.payload.get("approved")
+    )
+    assert approved.payload["strategyPresetKey"] == "trend"
+
+    without_preset = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=0.9)],
+        regime="BULL_TREND",
+    )
+    approved = next(
+        e
+        for e in without_preset.journal_entries
+        if e.instrument_id == "AAA" and e.payload.get("approved")
+    )
+    assert "strategyPresetKey" not in approved.payload
+
+
 def test_plan_v2_tick_evidence_components_reorder_ranking() -> None:
     """V2.88 — la evidencia LAB (robustness/regime_fit) reordena el ranking del TOP.
 

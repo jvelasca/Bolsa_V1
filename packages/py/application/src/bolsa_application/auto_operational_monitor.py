@@ -216,6 +216,23 @@ def _cycle_opportunity_id(entries: Sequence[Any]) -> str | None:
     return None
 
 
+def _cycle_strategy_preset(entries: Sequence[Any]) -> str | None:
+    """H1 — identidad EXACTA de la estrategia (``preset_key``) del ciclo, o ``None``.
+
+    Es el ``strategyPresetKey`` ADITIVO que el productor sella en el mismo hecho durable de
+    la decisión (``AUTO_ENTRY_DECISION_EVENT``, ``payload.strategyPresetKey``) cuando la
+    fuente traía preset. Espeja ``_cycle_decision``/``_cycle_opportunity_id``: un valor
+    ausente o en blanco se declara ``None`` (la ausencia es información, nunca un relleno).
+    """
+    for entry in entries:
+        if _get(entry, "event_type", "eventType") == AUTO_ENTRY_DECISION_EVENT:
+            value = _entry_payload(entry).get("strategyPresetKey")
+            text = str(value).strip() if value is not None else ""
+            if text:
+                return text
+    return None
+
+
 def _cycle_decision(entries: Sequence[Any]) -> dict[str, Any] | None:
     """F2-2 — DECISIÓN de cartera DURABLE del ciclo, o ``None`` si no hay hecho que la registre.
 
@@ -394,6 +411,9 @@ def _entry_decision_step(
             facts.append(_fact("instrumentId", payload.get("instrumentId")))
         if payload.get("strategyVersion"):
             facts.append(_fact("strategyVersion", payload.get("strategyVersion")))
+        # H1 — la identidad EXACTA (preset) se publica ADITIVA y sólo si el hecho la declara.
+        if payload.get("strategyPresetKey"):
+            facts.append(_fact("strategyPresetKey", payload.get("strategyPresetKey")))
         # Frente A — la identidad de la OPORTUNIDAD (estable, no el ``rank``): permite
         # demostrar ``oportunidad → decisión`` sin depender del ranking de la corrida.
         if payload.get("opportunityId"):
@@ -873,6 +893,9 @@ def _build_cycle(
         "position": _cycle_position(cycle_journal, positions_by_cycle.get(cycle_id)),
         "instrumentId": _get(reservation, "instrument_id", "instrumentId"),
         "strategyVersion": _get(reservation, "strategy_version_id", "strategyVersionId"),
+        # H1 — identidad EXACTA de la estrategia (preset), leída del hecho durable de la
+        # decisión del ciclo (o ``None``): habilita la join exacta sin migración.
+        "strategyPresetKey": _cycle_strategy_preset(cycle_journal),
         "direction": "short" if side == "sell" else "long",
         "closed": closed_value,
         "closedMeasurement": closed_measurement,

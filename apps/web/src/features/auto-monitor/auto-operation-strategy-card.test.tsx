@@ -18,7 +18,7 @@ import { AutoOperationStrategyCard } from "@/features/auto-monitor/auto-operatio
 import {
   AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL,
   AUTO_OPERATION_STRATEGY_DECLARED_LABEL,
-  AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC,
+  AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT,
   AUTO_OPERATION_STRATEGY_MATCH_LABELS,
   AUTO_OPERATION_STRATEGY_NO_DATA,
   type AutoOperationStrategyViewV1,
@@ -37,7 +37,8 @@ function view(
     reasons: ["Estrellas 3/5", "DD -12%"],
     match: "same",
     matchLabel: AUTO_OPERATION_STRATEGY_MATCH_LABELS.same,
-    declaredCycleStrategyVersion: "sma_crossover",
+    declaredCyclePresetKey: "sma_crossover",
+    declaredCycleStrategyVersion: "sv-1",
     verifyHref:
       "/backtests?tab=run&instrumentId=uuid-aaa&focus=detail&verify=1",
     gapReason: null,
@@ -82,11 +83,19 @@ describe("AutoOperationStrategyCard", () => {
     expect(
       screen.getByTestId("auto-operation-strategy-match").textContent,
     ).toContain("sma_crossover");
+    // La identidad EXACTA declarada se pinta aparte del sello opaco del motor.
+    expect(
+      screen.getByTestId("auto-operation-strategy-preset-key").textContent,
+    ).toBe("sma_crossover");
+    expect(
+      screen.getByTestId("auto-operation-strategy-declared-version")
+        .textContent,
+    ).toContain("sv-1");
     // Sin hueco real no se pinta el rótulo de ausencia.
     expect(screen.queryByTestId("auto-operation-strategy-gap")).toBeNull();
   });
 
-  it("distingue la MEJOR del valor (Finalistas) de la EJECUTADA declarada por el ciclo y declara la heurística", () => {
+  it("distingue la MEJOR del valor (Finalistas) de la EJECUTADA declarada por el ciclo y declara la identidad EXACTA", () => {
     renderCard();
 
     const chain = screen.getByTestId("auto-operation-strategy-chain");
@@ -94,19 +103,38 @@ describe("AutoOperationStrategyCard", () => {
     expect(chain.textContent).toContain(
       AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL,
     );
-    // Bloque (b): estrategia EJECUTADA que declara el ciclo (sello `strategyVersion`).
+    // Bloque (b): estrategia EJECUTADA que declara el ciclo (clave exacta + sello opaco).
     expect(chain.textContent).toContain(AUTO_OPERATION_STRATEGY_DECLARED_LABEL);
-    // Se conserva el sello declarado y su emparejamiento en el testid estable.
+    // Se conserva la clave EXACTA declarada y su emparejamiento en el testid estable.
     expect(
       screen.getByTestId("auto-operation-strategy-match").textContent,
     ).toContain("sma_crossover");
-    // Declaración de honestidad en superficie: aproximación textual, no identidad exacta.
+    // Declaración de honestidad en superficie: identidad EXACTA (`presetKey`), no heurística.
     expect(
-      screen.getByTestId("auto-operation-strategy-match-heuristic").textContent,
-    ).toBe(AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC);
+      screen.getByTestId("auto-operation-strategy-match-exact").textContent,
+    ).toBe(AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT);
     expect(
-      screen.getByTestId("auto-operation-strategy-match-heuristic").textContent,
-    ).toContain("aproximación textual");
+      screen.getByTestId("auto-operation-strategy-match-exact").textContent,
+    ).toContain("identidad EXACTA");
+  });
+
+  it("sin clave exacta declarada muestra «Sin dato todavía» (no finge la identidad)", () => {
+    renderCard({
+      view: view({
+        match: "unknown",
+        matchLabel: AUTO_OPERATION_STRATEGY_MATCH_LABELS.unknown,
+        declaredCyclePresetKey: null,
+      }),
+    });
+
+    expect(
+      screen.getByTestId("auto-operation-strategy-preset-key").textContent,
+    ).toBe(AUTO_OPERATION_STRATEGY_NO_DATA);
+    // El sello opaco se sigue pintando (no se oculta el dato que SÍ existe).
+    expect(
+      screen.getByTestId("auto-operation-strategy-declared-version")
+        .textContent,
+    ).toContain("sv-1");
   });
 
   it("con rank != 1 declara el puesto real y que NO es la #1", () => {
@@ -163,6 +191,7 @@ describe("AutoOperationStrategyCard", () => {
         reasons: [],
         match: "unknown",
         matchLabel: AUTO_OPERATION_STRATEGY_MATCH_LABELS.unknown,
+        declaredCyclePresetKey: null,
         declaredCycleStrategyVersion: null,
         verifyHref: null,
         gapReason: null,

@@ -10,11 +10,11 @@
  * (`InstrumentStrategyTopV1`) y su definición. Un dato ausente se declara
  * «Sin dato todavía», nunca un valor de relleno (`UNKNOWN ≠ 0`, §5.1.4).
  *
- * Nota de honestidad: la **coincidencia** entre la versión de estrategia DECLARADA por el ciclo
- * (`cycle.strategyVersion`, un sello opaco del motor) y la identidad del #1 resuelto solo puede
- * afirmarse cuando hay un emparejamiento textual fiable. Se marca como heurística y siempre se
- * pinta el sello declarado para que el usuario juzgue; si no es comparable, se declara
- * «Sin dato todavía».
+ * Nota de honestidad: la **coincidencia** entre la identidad EXACTA que DECLARA el ciclo
+ * (`cycle.strategyPresetKey`, la misma clave `presetKey` del TOP de Finalistas) y la identidad
+ * del #1 resuelto es una IGUALDAD EXACTA de cadenas (sin tokenizar ni buscar contención). El
+ * sello `cycle.strategyVersion` (opaco) se pinta aparte para que el usuario juzgue. Cuando el
+ * ciclo no declara la clave exacta, se declara «Sin dato todavía» y NUNCA se afirma coincidencia.
  *
  * @see docs/PROJECT_PREMISES.md §6 (P3 estrategia/indicadores · P4 DÍA-D)
  * @see packages/shared/src/instrument-strategy-top.ts
@@ -47,23 +47,25 @@ export const AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL =
   "Mejor estrategia del valor (Finalistas)" as const;
 
 /**
- * Rótulo del bloque de la estrategia EJECUTADA que declara el ciclo (`cycle.strategyVersion`,
- * un sello opaco del motor; p. ej. `ActiveStrategy.version_id`). Es OTRA cosa que el TOP #1.
+ * Rótulo del bloque de la estrategia EJECUTADA que declara el ciclo: la clave EXACTA
+ * (`cycle.strategyPresetKey`, el mismo `presetKey` del TOP #1) y el sello opaco del motor
+ * (`cycle.strategyVersion`, p. ej. `ActiveStrategy.version_id`). Es OTRA cosa que el TOP #1.
  */
 export const AUTO_OPERATION_STRATEGY_DECLARED_LABEL =
   "Estrategia ejecutada declarada por el ciclo" as const;
 
 /**
- * Declaración de HONESTIDAD en superficie: la coincidencia entre la estrategia EJECUTADA
- * (sello `cycle.strategyVersion`) y la MEJOR del valor (TOP #1) es una aproximación textual;
- * el enlace EXACTO no lo materializa todavía el motor del ciclo, así que no se afirma.
+ * Declaración de HONESTIDAD en superficie: la coincidencia entre la estrategia EJECUTADA que
+ * declara el ciclo (clave EXACTA `cycle.strategyPresetKey`) y la MEJOR del valor (TOP #1) es
+ * una IGUALDAD EXACTA (`presetKey`). Cuando el ciclo no declara esa clave, la UI dice «Sin dato
+ * todavía» y NUNCA afirma una coincidencia.
  */
-export const AUTO_OPERATION_STRATEGY_MATCH_IS_HEURISTIC =
-  "La coincidencia es una aproximación textual (igualdad por token), no una identidad exacta: el enlace entre la estrategia ejecutada y la mejor del valor todavía no lo materializa el motor del ciclo." as const;
+export const AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT =
+  "La coincidencia es una identidad EXACTA (`presetKey`): el mismo espacio de claves que el TOP de Finalistas. Cuando el ciclo no declara su clave, se muestra «Sin dato todavía» y no se afirma ninguna coincidencia." as const;
 
 /**
  * Tri-estado de coincidencia (`coincide` / `no coincide` / `sin dato`). Nunca se afirma
- * «coincide» sin un emparejamiento textual real; un hueco se declara.
+ * «coincide» sin una igualdad EXACTA de la clave declarada; un hueco se declara.
  */
 export type AutoOperationStrategyMatch = "same" | "differs" | "unknown";
 
@@ -91,10 +93,12 @@ export type AutoOperationStrategyViewV1 = {
   indicators: string[];
   /** Razones del coach para el slot #1 (texto humano). */
   reasons: string[];
-  /** Coincidencia (heurística declarada) con el sello de estrategia del ciclo. */
+  /** Coincidencia EXACTA (`presetKey`) con la identidad declarada por el ciclo. */
   match: AutoOperationStrategyMatch;
   matchLabel: string;
-  /** Sello `strategyVersion` que el ciclo declara (o `null`). */
+  /** Clave EXACTA `strategyPresetKey` que declara el ciclo (o `null` si no la declara). */
+  declaredCyclePresetKey: string | null;
+  /** Sello opaco `strategyVersion` que declara el ciclo (o `null`), aparte de la clave exacta. */
   declaredCycleStrategyVersion: string | null;
   /** Destino canónico de verificación DÍA-D (o `null` si falta instrumento/estrategia). */
   verifyHref: string | null;
@@ -108,9 +112,10 @@ export type AutoOperationStrategyViewV1 = {
 };
 
 export type AutoOperationStrategyInput = {
-  /** Ciclo del monitor (ticker en `instrumentId` + versión declarada). */
+  /** Ciclo del monitor (ticker en `instrumentId` + clave EXACTA y versión declaradas). */
   cycle: {
     instrumentId?: string | null;
+    strategyPresetKey?: string | null;
     strategyVersion?: string | null;
   } | null;
   /** UUID resuelto del instrumento (distinto del ticker del ciclo). */
@@ -142,39 +147,35 @@ export type AutoOperationStrategyInput = {
 };
 
 /**
- * Parte una cadena en TOKENS completos (lowercased) por separadores no alfanuméricos y descarta
- * los de longitud < 2. Se compara por token entero, nunca por contención: así un sello corto
- * (p. ej. «ma») no coincide con un token distinto que lo contiene (p. ej. «smacrossover»).
- */
-function tokenizeStrategy(value: string | null | undefined): string[] {
-  return (value ?? "")
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length >= 2);
-}
-
-/**
- * Empareja el sello de estrategia del ciclo con la identidad del #1 (heurística declarada).
+ * Empareja la clave EXACTA de estrategia declarada por el ciclo (`presetKey`) con la identidad
+ * del #1 (TOP de Finalistas).
  *
- * Solo declara `same` cuando algún token del sello IGUALA EXACTAMENTE a un token de la identidad
- * del #1 (`strategyDefinitionId`/`label`/`strategyType`); `unknown` si no hay sello válido, no hay
- * #1 o no hay tokens comparables; `differs` si hay tokens comparables y ninguno coincide.
+ * IGUALDAD EXACTA de cadenas: ni tokenización ni contención. Solo declara `same` cuando la clave
+ * (recortada) IGUALA EXACTAMENTE a alguna de las identidades que el #1 DECLARA
+ * (`slot.strategyType` o `definition.presetKey`, recortadas). Declara `unknown` si el ciclo no
+ * declara la clave (vacía o solo espacios), no hay #1, o el #1 NO declara ninguna identidad
+ * (`strategyType`/`presetKey` ambos ausentes): sin identidad del #1 no hay nada que comparar, así
+ * que NUNCA se afirma `differs` (`UNKNOWN ≠ 0`, §5.1.4). `differs` solo con identidad comparable.
  */
 export function resolveAutoOperationStrategyMatch(
-  cycleStrategyVersion: string | null | undefined,
+  cyclePresetKey: string | null | undefined,
   slot: InstrumentStrategyTopSlotV1 | null | undefined,
+  definition?: Pick<StrategyDefinitionV1, "presetKey"> | null,
 ): AutoOperationStrategyMatch {
-  const versionTokens = tokenizeStrategy(cycleStrategyVersion);
-  if (versionTokens.length === 0) return "unknown";
+  const key = cyclePresetKey?.trim() || null;
+  if (!key) return "unknown";
   if (!slot) return "unknown";
-  const identityTokens = new Set<string>([
-    ...tokenizeStrategy(slot.strategyDefinitionId),
-    ...tokenizeStrategy(slot.label),
-    ...tokenizeStrategy(slot.strategyType),
-  ]);
+  // Identidades DECLARADAS por el #1: tipo del slot y `presetKey` de su definición (si se conoce).
+  // Se comparan como cadenas EXACTAS, ya recortadas (sin normalizar a minúsculas ni tokenizar).
+  const identityTokens = new Set<string>();
+  const slotType = slot.strategyType?.trim() || null;
+  if (slotType) identityTokens.add(slotType);
+  const presetKey = definition?.presetKey?.trim() || null;
+  if (presetKey) identityTokens.add(presetKey);
+  // Sin identidad DECLARADA por el #1 no hay término de comparación: se declara el hueco
+  // («Sin dato todavía»), jamás una divergencia que no se puede probar.
   if (identityTokens.size === 0) return "unknown";
-  const matched = versionTokens.some((token) => identityTokens.has(token));
-  return matched ? "same" : "differs";
+  return identityTokens.has(key) ? "same" : "differs";
 }
 
 /**
@@ -193,6 +194,9 @@ export function buildAutoOperationStrategyView(
 
   const symbol = cycle.instrumentId?.trim() || AUTO_OPERATION_STRATEGY_NO_DATA;
   const declaredCycleStrategyVersion = cycle.strategyVersion?.trim() || null;
+  // Clave EXACTA declarada por el ciclo (`presetKey`): la base de la igualdad; `null` = no la
+  // declara ⇒ el emparejamiento queda `unknown` («Sin dato todavía», no se finge una identidad).
+  const declaredCyclePresetKey = cycle.strategyPresetKey?.trim() || null;
   const resolvedInstrumentId = input.instrumentId?.trim() || null;
 
   const slot = input.top
@@ -212,8 +216,9 @@ export function buildAutoOperationStrategyView(
   const rank = slot?.rank ?? null;
 
   const match = resolveAutoOperationStrategyMatch(
-    declaredCycleStrategyVersion,
+    declaredCyclePresetKey,
     slot,
+    input.definition,
   );
 
   // Prioridad DECLARADA del hueco: un FALLO de lectura nunca se describe como ausencia
@@ -261,6 +266,7 @@ export function buildAutoOperationStrategyView(
     reasons,
     match,
     matchLabel: AUTO_OPERATION_STRATEGY_MATCH_LABELS[match],
+    declaredCyclePresetKey,
     declaredCycleStrategyVersion,
     verifyHref,
     gapReason,

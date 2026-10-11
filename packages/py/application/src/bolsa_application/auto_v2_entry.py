@@ -632,6 +632,11 @@ class V2Signal:
     sector: str | None = None
     liquidity_notional: float | None = None
     strategy_version: str | None = None
+    # H1 — identidad EXACTA de la estrategia (``preset_key``): la clave de la JOIN exacta
+    # que viaja aditiva con la señal (``active-strategy:<v>::<preset>``) y aterriza en el
+    # journal de decisión (``strategyPresetKey``). ``None`` cuando la fuente no la declara:
+    # la ausencia es información, jamás un relleno.
+    strategy_preset_key: str | None = None
     # Identidad/frescura de la señal (``signal_identity``): evita que la MISMA señal
     # sobre la MISMA barra se re-emita en cada turno (worker 60s vs señal D1).
     signal_id: str = ""
@@ -1478,6 +1483,8 @@ def plan_v2_tick(
                 actor=actor,
                 as_of=as_of,
                 strategy_version=signal.strategy_version,
+                # H1 — la identidad EXACTA de la estrategia aterriza en el payload durable.
+                strategy_preset_key=signal.strategy_preset_key,
                 cycle_id=cycle_id,
                 # V2.88.99 — identidad de la oportunidad: la señal que la originó y el
                 # ranking que la situó, para que ``SIGNAL``/``TOP_N`` sean demostrables
@@ -2307,6 +2314,7 @@ def _journal_entry(
     actor: str,
     as_of: str,
     strategy_version: str | None = None,
+    strategy_preset_key: str | None = None,
     cycle_id: str | None = None,
     signal_id: str | None = None,
     opportunity_id: str | None = None,
@@ -2333,6 +2341,12 @@ def _journal_entry(
     # clave se omite si no hay versión). Permite atribuir la decisión del día sin migración.
     if str(strategy_version or "").strip():
         payload["strategyVersion"] = str(strategy_version)
+    # H1 — identidad EXACTA de la estrategia (``preset_key``): clave ADITIVA del payload
+    # (JSONB, sin migración ni columna). Es la que permite la join exacta contra la
+    # estrategia que originó la decisión. Se OMITE si no hay preset: la ausencia es
+    # información, jamás un relleno (misma doctrina que ``strategyVersion``).
+    if str(strategy_preset_key or "").strip():
+        payload["strategyPresetKey"] = str(strategy_preset_key)
     # V2.47 — el ciclo financiero viaja en el payload (JSONB, sin migración): es el hilo
     # que une esta decisión con su reserva, su orden, su fill, su posición y su PnL.
     if str(cycle_id or "").strip():

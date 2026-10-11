@@ -1,10 +1,36 @@
-# Plan — `v2.88.107-beta` / **AUTO·H1**: identidad exacta de la estrategia ejecutada por ciclo (`strategyDefinitionId`)
+# Plan — `v2.88.107-beta` / **AUTO·H1**: identidad exacta de la estrategia ejecutada por ciclo (`strategyDefinitionId` → **clave final ratificada `preset_key`**)
 
-> **Estado:** **PROPUESTO** (2026-10-11) — no ejecutado. Requiere aprobación del propietario antes de tocar código (premisa E1).
+> **Estado:** **EJECUTADO** (2026-10-11) — implementado, verificado y sellado. Ver el **PIVOTE DE EJECUCIÓN** justo abajo y la evidencia en [`evidence/v2.88.107/README.md`](./evidence/v2.88.107/README.md).
+> **Estado original:** redactado como **PROPUESTO**; el propietario aprobó la ejecución el 2026-10-11 (premisa E1) y la ejecución **cambió la clave de unión** (pivote declarado abajo y en `PROJECT_STATE`).
 > **Base funcional:** `v2.88.106-beta` (tag anotado `v2.88.106-beta`, commit `2070dd47`). HEAD del árbol al redactar: `65d45404`.
 > **Naturaleza prevista:** `Δ motor ≠ 0` **aditivo** · `Δ decisión = 0` · **Migración Alembic `053`** · **Contrato ampliado** (`contract:gen`).
 > **Origen:** hallazgo `H1` (identidad exacta de estrategia) de la auditoría externa, profundizado en [`auditoria-profundizada-auto-h1-sim-dia-d-2026-10-11.md`](./auditoria-profundizada-auto-h1-sim-dia-d-2026-10-11.md) §3.1/§5, y en el gate [`gate-f0-identidad-estrategia-y-pnl-realizado-2026-10-10.md`](./gate-f0-identidad-estrategia-y-pnl-realizado-2026-10-10.md).
 > **Decisión de diseño ratificada:** la clave de unión canónica es el **`strategyDefinitionId`** (identidad de definición de estrategia), hilvanada `candidata → versión → activa → ciclo` y comparada por **igualdad exacta** con el slot #1 del TOP de Finalistas. Se elimina la heurística por token.
+
+---
+
+## ⚠️ PIVOTE DE EJECUCIÓN (2026-10-11) — el id ratificado NO existe en el origen; la clave final es `preset_key`
+
+Este plan se **ejecutó** el 2026-10-11 con una **desviación de diseño material**, declarada aquí y en `PROJECT_STATE`.
+
+Durante la Fase 1 se verificó **empíricamente** el hallazgo de §1.1: **ninguna** ruta de producción de candidatas del lifecycle conoce un `strategyDefinitionId`. Lo que el motor **sí** conoce es el **`preset_key`**:
+
+- Los productores siguen creando candidatas desde `strategy_family`+`params`+`preset_key`; el `executable` de discovery es un `StrategyDefinitionV1` **en memoria** que solo expone `presetKey` (sin `id`) — `strategy_discovery_engine.py:229-262, 378-415, 551-585`.
+- El `strategyDefinitionId` que publica el TOP de Finalistas **no lo produce el motor**: lo **deriva la UI** desde el `presetKey` del slot (`coach-top-save.ts:64-84` → `createFromPreset`). El espacio de claves que **ambos lados comparten** es el `presetKey`, no el id de definición.
+
+**Consecuencia (E3 — no fabricar):** poblar `strategy_definition_id` en el origen habría exigido **inventar** un id o un mapeo por I/O asumiendo unicidad. Se ratificó con el propietario cambiar la clave de unión a **`preset_key`** (que además el TOP ya lleva en `strategyType`).
+
+**Desviaciones respecto del plan de abajo (que se conserva como *plan original*, auditable):**
+
+1. **Sin migración.** La Fase 0 (Alembic `053` sobre `strategy_versions`) se **retiró**. La identidad no viaja por columna nueva: el `preset_key` ya es **durable** en `strategy_candidates.preset_key` y se sella por ciclo como clave **aditiva** del payload JSONB del journal (precedente V2.45). Head de Alembic sigue `052_top3_opportunities`.
+2. **Fase 1 reescrita.** El dominio propaga **`preset_key`** (no `strategyDefinitionId`); los **productores de origen NO se tocan** (no tienen el dato ⇒ hueco declarado, nunca inventado).
+3. **Fase 3 (transporte).** El `preset_key` viaja en la fuente del `DecisionPackage` con formato **fijado** `active-strategy:<version_id>::<preset_key>` (sin sufijo si no hay preset ⇒ formato histórico **intacto**) y se sella en `payload.strategyPresetKey` (clave **omitida** si no hay dato).
+4. **Fase 2 (store).** `get_active` resuelve el `preset_key` desde la **candidata de origen** (`strategy_candidates.preset_key`), sin tocar `definition` ni el hash inmutable.
+5. **Fase 6 (UI).** Comparación por **igualdad exacta** de `presetKey` contra `{slot.strategyType, definition.presetKey}`; el rótulo de **heurística se retira** (pasa a exacto).
+
+**Lo que NO cambia:** el objetivo (§0), la independencia de la decisión (`Δ decisión = 0`) y la doctrina de huecos («Sin dato todavía», nunca relleno). Las Fases 4 y 5 (monitor DTO + contrato) se ejecutan tal cual con el campo `strategyPresetKey`.
+
+El **estado de ejecución** con los `file:line` reales vive en [`evidence/v2.88.107/README.md`](./evidence/v2.88.107/README.md).
 
 ---
 

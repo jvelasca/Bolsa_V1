@@ -322,6 +322,78 @@ async def test_v2_journal_records_reason_codes(v2_env: None) -> None:
 
 
 @pytest.mark.asyncio
+async def test_v2_journal_seals_strategy_preset_key_from_the_worker(v2_env: None) -> None:
+    """H1 — el worker sella la identidad EXACTA de la estrategia que originó la operación.
+
+    Prueba INTEGRADA (motor real): la operación la genera
+    ``AutoSimulationWorker.auto_turn`` desde el ``DecisionPackage`` de un decider, NO un ciclo
+    sembrado a mano. El ``presetKey`` que viaja en ``source`` (``active-strategy:<v>::<preset>``)
+    aterriza en el payload durable de la decisión aprobada, y la versión queda RECORTADA del
+    sufijo (``<v>``, sin arrastrar el ``::<preset>``).
+    """
+
+    def _decider(symbol: str) -> DecisionPackage:
+        return DecisionPackage(
+            action="BUY",
+            instrument_id=symbol,
+            quantity=250.0,
+            source="active-strategy:ver-abc::sma_crossover",
+        )
+
+    worker = _worker()
+    worker._decider = _decider
+    await worker.auto_turn()
+    assert worker._open.get("AAA", Decimal("0")) > 0, "el pipeline V2 debe abrir"
+
+    approved = [
+        entry
+        for entry in worker._v2_journal
+        if entry.payload is not None and entry.payload.get("approved")
+    ]
+    assert approved, "el turno debe dejar una decisión aprobada en el journal"
+    payload = approved[0].payload
+    assert payload is not None
+    assert payload["strategyPresetKey"] == "sma_crossover"
+    # El sufijo ``::<preset>`` NO contamina la versión: se recorta antes de parsear.
+    assert payload["strategyVersion"] == "ver-abc"
+
+
+@pytest.mark.asyncio
+async def test_v2_journal_omits_strategy_preset_key_when_source_has_none(
+    v2_env: None,
+) -> None:
+    """H1 — sin ``::<preset>`` en ``source`` la clave se OMITE (la ausencia no se rellena).
+
+    Control negativo del test anterior: una fuente ``active-strategy:<v>`` (identidad histórica
+    intacta) o de otro prefijo NO inventa un ``presetKey``.
+    """
+
+    def _decider(symbol: str) -> DecisionPackage:
+        return DecisionPackage(
+            action="BUY",
+            instrument_id=symbol,
+            quantity=250.0,
+            source="active-strategy:ver-xyz",
+        )
+
+    worker = _worker()
+    worker._decider = _decider
+    await worker.auto_turn()
+    assert worker._open.get("AAA", Decimal("0")) > 0
+
+    approved = [
+        entry
+        for entry in worker._v2_journal
+        if entry.payload is not None and entry.payload.get("approved")
+    ]
+    assert approved
+    payload = approved[0].payload
+    assert payload is not None
+    assert "strategyPresetKey" not in payload
+    assert payload["strategyVersion"] == "ver-xyz"
+
+
+@pytest.mark.asyncio
 async def test_v2_adopts_readopted_position_after_restart(v2_env: None) -> None:
     """Tras crash+restart la posición readoptada sigue gestionada por AUTO 2.0.
 

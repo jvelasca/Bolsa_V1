@@ -239,3 +239,25 @@ def test_coach_veto_blocks_against_active_swap() -> None:
     )
     assert not decision.promoted
     assert "coach_veto" in decision.reasons
+
+
+# ── H1: propagación de preset_key candidata → finalista ─────────────────────────
+
+
+def test_finalist_carries_candidate_preset_key() -> None:
+    """La identidad exacta (``preset_key``) de la candidata viaja al finalista."""
+    candidate = StrategyCandidate(
+        id="cand-1",
+        instrument_id="AAA",
+        strategy_family="sma_crossover",
+        params={"fast": 20, "slow": 50},
+        preset_key="sma_crossover",
+    )
+    finalist = build_strategy_version(candidate=candidate, name="SMA-20/50")
+    assert finalist.preset_key == "sma_crossover"
+
+
+def test_finalist_without_preset_key_stays_none() -> None:
+    """Sin preset en la candidata, el finalista NO inventa identidad (``None``)."""
+    finalist = build_strategy_version(candidate=_candidate(), name="SMA-20/50")
+    assert finalist.preset_key is None
