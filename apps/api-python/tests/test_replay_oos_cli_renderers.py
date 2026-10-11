@@ -20,7 +20,9 @@ volver a leer atributos de un ``dict``.
 from __future__ import annotations
 
 import importlib.util
+import inspect
 import pathlib
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -137,3 +139,68 @@ def test_both_renderers_agree_on_the_same_payload(
     from_v87 = capsys.readouterr().out
 
     assert from_v86 == from_v87
+
+
+class _Row:
+    """Fill del replay mínimo (lo que ``_finance_report_from_ticks`` lee por atributo)."""
+
+    def __init__(
+        self,
+        symbol: str,
+        side: str,
+        quantity: float,
+        price: float,
+        strategy_version: str | None = "ex-a",
+        direction: str = "long",
+    ) -> None:
+        self.symbol = symbol
+        self.side = side
+        self.quantity = quantity
+        self.price = price
+        self.strategy_version = strategy_version
+        self.direction = direction
+
+
+def test_finance_report_seam_builds_by_strategy_and_instrument(v87: Any) -> None:
+    """`§8` — la costura reúne los filles del replay y agrupa por `(versión, símbolo)`."""
+    ticks = [
+        SimpleNamespace(
+            fill_rows=(
+                _Row("ACS", "buy", 10, 100, "ex-a"),
+                _Row("ACS", "sell", 10, 110, "ex-a"),
+                _Row("ITX", "buy", 10, 50, "ex-a"),
+                _Row("ITX", "sell", 10, 45, "ex-a"),
+            )
+        ),
+        SimpleNamespace(fill_rows=()),  # un tick sin fills NO rompe el reporte.
+    ]
+
+    report = v87._finance_report_from_ticks(ticks, min_trades=1)  # noqa: SLF001
+
+    assert report["pointCitable"] is False
+    assert report["aggregate"]["trades"] == 2
+    keys = [(group["strategyVersion"], group["symbol"]) for group in report["groups"]]
+    assert keys == [("ex-a", "ACS"), ("ex-a", "ITX")]
+
+
+def test_finance_report_seam_skips_garbage(v87: Any) -> None:
+    """Filles ilegibles (cantidad 0, lado inválido) se descartan sin romper ni fabricar."""
+    ticks = [
+        SimpleNamespace(
+            fill_rows=(
+                _Row("ACS", "sell", 0, 110, "ex-a"),
+                _Row("ACS", "hold", 10, 110, "ex-a"),
+            )
+        )
+    ]
+
+    report = v87._finance_report_from_ticks(ticks, min_trades=1)  # noqa: SLF001
+
+    assert report["aggregate"]["trades"] == 0
+    assert report["aggregate"]["netReturnPct"] is None
+
+
+def test_finance_report_seam_is_optin_inert(v87: Any) -> None:
+    """La costura es INERTE por defecto: sin la ruta pedida el payload no cambia (sello intacto)."""
+    signature = inspect.signature(v87._run_durable_replay)  # noqa: SLF001
+    assert signature.parameters["finance_report_path"].default is None

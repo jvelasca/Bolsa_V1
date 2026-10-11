@@ -317,6 +317,7 @@ async def _run_durable_replay(
     operable_days: Sequence[bool] = (),
     durable_cycle: bool = True,
     capture_cycle_detail: bool = False,
+    finance_report_path: str | None = None,
 ) -> dict[str, Any]:
     """Replay hermético con el ciclo durable de reservas CERRADO en cada tick.
 
@@ -781,6 +782,22 @@ async def _run_durable_replay(
         # Costura INERTE (Δ motor = 0): con `capture_cycle_detail` apagado —el default— la clave
         # NO se añade, de modo que el artefacto congelado de `replay-repro` sale byte a byte igual.
         payload["cycleDetail"] = cycle_detail
+    if finance_report_path:
+        # §8 — reporte financiero OOS. Costura INERTE respecto del sello: escribe en un
+        # fichero APARTE y no toca el payload, así el artefacto por defecto queda intacto.
+        report_path = pathlib.Path(finance_report_path)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps(
+                _finance_report_from_ticks(ticks),
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+                default=str,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     return payload
 
 
@@ -834,6 +851,52 @@ async def _final_book_detail(worker: Any) -> dict[str, Any]:
         "pendingTraceCount": len(traces),
         "ownedReservationIds": sorted(str(x) for x in owned) if owned is not None else None,
     }
+
+
+def _finance_report_from_ticks(
+    ticks: Sequence[Any],
+    *,
+    min_trades: int = 10,
+    commission_bps: float = 10.0,
+    slippage_bps: float = 5.0,
+    stress_multiplier: float = 2.0,
+) -> dict[str, Any]:
+    """`§8` — reporte financiero OOS por `(estrategia × instrumento)` desde los filles del replay.
+
+    Reúne los ``fill_rows`` ya materializados por el motor (``ReplayFill``) y delega en el
+    módulo **puro** ``oos_finance``. Es una costura **INERTE** respecto del sello congelado:
+    el reporte se escribe en un fichero **aparte** y **nunca** entra en el payload por
+    defecto, de modo que el `SHA-256` del artefacto de `replay-repro` no puede moverse.
+    """
+    from bolsa_application.oos_finance import OosFill, build_oos_finance_report
+
+    fills: list[OosFill] = []
+    for tick in ticks:
+        for row in getattr(tick, "fill_rows", ()) or ():
+            side = str(getattr(row, "side", "") or "").strip().lower()
+            if side not in {"buy", "sell"}:
+                continue
+            quantity = float(getattr(row, "quantity", 0) or 0)
+            price = float(getattr(row, "price", 0) or 0)
+            if quantity <= 0 or price <= 0:
+                continue
+            fills.append(
+                OosFill(
+                    symbol=str(getattr(row, "symbol", "")),
+                    strategy_version=getattr(row, "strategy_version", None),
+                    side=side,
+                    quantity=quantity,
+                    price=price,
+                    direction=str(getattr(row, "direction", "long") or "long"),
+                )
+            )
+    return build_oos_finance_report(
+        fills,
+        commission_bps=commission_bps,
+        slippage_bps=slippage_bps,
+        min_trades=min_trades,
+        stress_multiplier=stress_multiplier,
+    ).to_dict()
 
 
 def _print_census(census: dict[str, Any]) -> None:
@@ -992,6 +1055,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 engine_id=f"replay-oos-durable-{os.urandom(3).hex()}",
                 operable_days=tuple(bool(row.entries_allowed_long) for row in census.days),
                 durable_cycle=bool(args.durable_cycle),
+                finance_report_path=getattr(args, "finance_report", None),
             )
         elif not args.no_replay:
             evidence["replaySkipped"] = "census_gate: 0 dias operables (el paso 2 no aporta)"
@@ -1054,6 +1118,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--venue", default="paper", choices=("paper", "simulated"))
     parser.add_argument("--json", action="store_true", help="emite el payload como JSON")
     parser.add_argument("--out", default=None, help="ruta del JSON de evidencia")
+    parser.add_argument(
+        "--finance-report",
+        default=None,
+        metavar="PATH",
+        help=(
+            "§8 — escribe el reporte financiero OOS por (estrategia × instrumento) en PATH. "
+            "Opt-in e INERTE: no toca el payload por defecto (sello replay-repro intacto)."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if int(args.watch_size) <= 0 or int(args.min_bars) <= 0:
