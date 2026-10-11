@@ -44,6 +44,17 @@ def _preset_key_of(definition: Mapping[str, Any] | None) -> str | None:
 
 Ninguno alimenta la identidad del ciclo AUTO ⇒ no se tocan.
 
+## 2.1. Registro de residuos (auditoría independiente de `v2.88.108-beta`)
+
+La auditoría de esta versión (desde el tag `5fbb0e4f`) **cerró** los dos hallazgos, pero dejó constancia de **residuos que no afectan a la identidad del ciclo AUTO** y que no se declaran como fabricación. Se registran aquí para no perderlos:
+
+1. **`optimization_runs.py:328` — acoplamiento de evidencia (no identidad).** El *shape* `preset_key=family` persiste, y **este código se ejecuta dentro de la fase LAB del orquestador AUTO** (`auto_orchestrator_worker.py` construye `RunSmaGridOptimizeAndSave`), no solo en el laboratorio aislado. Escribe `research_trials` con la **clave de evidencia por familia** que consume el carril adaptativo (`discovery_evidence.py`), por lo que puede influir en **pesos** de búsqueda — nunca en la **identidad** del ciclo. La declaración del release («capa lab») es correcta para identidad; queda **no declarado** el acoplamiento de evidencia.
+2. **`research_trial_repository.py:358` — default de presentación.** `"presetKey": row.preset or "unknown"` inventa el literal `"unknown"` en el payload de observabilidad del laboratorio (endpoint read-only). Es *display*, no identidad del ciclo; el release no lo menciona.
+3. **`backtests.py:299` — patrón familia/tipo-como-preset.** `preset_key=strategy_type` en la ruta manual/lab de backtest (research trial). No declarado.
+4. **Invariante de catálogo no forzado.** La identidad exacta en producción se sostiene porque el catálogo curado (14 familias) declara `presetKey == family.name`; lo prueba un test (`test_catalog_preset_key_equals_declared_preset_key`), pero **no** se valida en la construcción del catálogo. Si una familia lo omitiera, el candidato degrada a `None` (hueco declarado, comportamiento correcto) ⇒ **reduce cobertura en vez de fallar**.
+
+Ninguno de los cuatro alimenta la identidad del ciclo AUTO; el veredicto «remediación cerrada» se mantiene.
+
 ## 3. `H1-b` — durabilidad REAL del sello (PostgreSQL)
 
 Nueva prueba en [`test_auto_v2_durable_pg.py`](../../../../apps/api-python/tests/test_auto_v2_durable_pg.py):
