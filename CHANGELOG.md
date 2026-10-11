@@ -14,7 +14,7 @@ All notable releases of Bolsa V1.
 
 **Verificación (local).** Batería hermética EXACTA del job `quality` → **4789 passed, 1 skipped** · ficheros `§7` nuevos → **49 passed** (40+7+2) · finanzas AUTO contra **PG REAL** (`test_simulated_finance_pg.py`, `AUTO_M5_FIN_PG_REQUIRED=1`) → **2 passed** · guardián de censo de tests → **5 passed** · guardián `bump` → **1 passed** · `ruff` **All checks passed** · `lint-imports` **4 kept, 0 broken** · `mypy` **544 source files, no issues**. CI: sin cambio de workflow (los 3 ficheros nuevos entran por el pase de directorio de `packages/py/application/tests`). Evidencia: [`docs/engineering/evidence/v2.88.110/README.md`](docs/engineering/evidence/v2.88.110/README.md).
 
-**Cita POST-TAG.** PENDIENTE — se completará con el objeto del tag, el commit y el run de `Release tag CI` tras publicar.
+**Cita POST-TAG.** Tag anotado `v2.88.110-beta` (objeto `b08bbff2` → commit `d868ea40`) sellado y publicado; `Release tag CI` [38136552355](https://github.com/jvelasca/Bolsa_V1/actions/runs/38136552355) **VERDE** — **11 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado), **sin reintentos** en los obligatorios; `python` (ruff/imports/mypy/pytest offline) **`success`** y `lifecycle-pg` **`success`**. `replay-repro` **`REPRODUCIDO`** (`1E3ADAC2…929A37E7`, idéntico a sellos previos) ⇒ **`Δ decisión = 0` confirmado por CI**. Tag **unsigned**.
 
 ## [2.11.109-beta] — **`§6`: bucle diario con el MOTOR REAL — las NUEVE etapas canónicas desde hechos durables** (**`Δ motor = 0` · `Δ decisión = 0` · contrato sin cambio · sin migración**)
 

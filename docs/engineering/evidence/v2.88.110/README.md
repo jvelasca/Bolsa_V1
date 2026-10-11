@@ -67,4 +67,9 @@ Este sello cierra los tres.
 
 ## 7. Cita POST-TAG
 
-_Pendiente de sellar: se completará con el objeto del tag, el commit y el run de `Release tag CI` tras publicar._
+Tag anotado **`v2.88.110-beta`** (objeto `b08bbff2` → commit `d868ea40`) sellado y publicado.
+
+- `Release tag CI` [**38136552355**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38136552355) → **`success`**: **11 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado), **sin reintentos** en los obligatorios.
+- **`python`** (ruff/imports/mypy/pytest offline) → **`success`**: el permiso positivo, el invariante **derivado** y el negativo E2E quedan **certificados en CI**, no solo en local. **`lifecycle-pg`** (Alembic + auth + golden restart) → **`success`**.
+- `replay-repro` → **VEREDICTO `REPRODUCIDO`**: `sha256` `1E3ADAC2…929A37E7` **idéntico** a los sellos previos ⇒ **`Δ decisión = 0`** confirmado por CI.
+- Tag **unsigned** (limitación de certificación, no defecto).
