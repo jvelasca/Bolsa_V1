@@ -43,3 +43,12 @@ H1 se certifica en las **dos mitades** del camino real:
 - **Validación OOS por valor (`§8`, P3) sigue FUERA de alcance:** sin retorno neto/drawdown/Sharpe reproducibles no se afirma rentabilidad.
 - **El Golden Day no cubre identidad H1** (su spine es `unversioned`): las nueve etapas y la identidad se certifican en arneses **distintos** y complementarios.
 - **Tag `unsigned`** (limitación de certificación, no defecto).
+
+## 6. Cita POST-TAG
+
+Tag anotado **`v2.88.109-beta`** (objeto `89ecd71b` → commit `a98adbed`) sellado y publicado.
+
+- `Release tag CI` [**38134357849**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38134357849) → **`success`**: **11 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado), **sin reintentos** en los obligatorios.
+- **`lifecycle-pg`** (el job que ejecuta los tres ficheros con sus gates `AUTO_*_PG_REQUIRED=1`) → **`success`**: las nueve etapas y la identidad exacta quedan **certificadas en CI**, no solo en local.
+- `replay-repro` → **REPRODUCIDO** (coherente con `Δ motor = 0`: solo pruebas).
+
