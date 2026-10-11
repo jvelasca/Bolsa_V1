@@ -63,4 +63,9 @@ Restricción DURA respetada: `replay-repro` regenera el artefacto del sello y **
 
 ## 7. Cita POST-TAG
 
-_Pendiente de sellar: se completará con el objeto del tag, el commit y el run de `Release tag CI` tras publicar._
+Tag anotado **`v2.88.111-beta`** (objeto `ab02f934` → commit `a530dc93`) sellado y publicado.
+
+- `Release tag CI` [**38141710304**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38141710304) → **`success`**: **12 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado), **sin reintentos** en los obligatorios.
+- **`python`** (ruff/imports/mypy/pytest offline) → **`success`**: el módulo puro y la costura opt-in quedan **certificados en CI**, no solo en local. **`lifecycle-pg`** → **`success`**.
+- **`replay-repro`** → **`REPRODUCIDO`**: `sha256` `1E3ADAC2…929A37E7` **idéntico** a los sellos previos ⇒ **prueba directa** de que la costura opt-in **no** movió el artefacto congelado (`Δ decisión = 0` confirmado por CI).
+- Tag **unsigned** (limitación de certificación, no defecto).

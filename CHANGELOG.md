@@ -13,7 +13,7 @@ All notable releases of Bolsa V1.
 
 **Verificación (local).** `ruff` **All checks passed** · `lint-imports` **4 kept, 0 broken** · `mypy` **545 source files, no issues** · `pytest packages/py/application/tests` → **2656 passed** · `§8` (`test_oos_finance.py` **12 passed** + costura en `test_replay_oos_cli_renderers.py` **6 passed**) · guardián `bump` → **1 passed** · censo de tests CI → **5 passed**. Evidencia: [`docs/engineering/evidence/v2.88.111/README.md`](docs/engineering/evidence/v2.88.111/README.md). Plan: [`plan-v2-88-111-oos-validacion-financiera-2026-10-11.md`](docs/engineering/plan-v2-88-111-oos-validacion-financiera-2026-10-11.md).
 
-**Cita POST-TAG.** PENDIENTE — se completará con el objeto del tag, el commit y el run de `Release tag CI` tras publicar.
+**Cita POST-TAG.** Tag anotado `v2.88.111-beta` (objeto `ab02f934` → commit `a530dc93`) sellado y publicado; `Release tag CI` [38141710304](https://github.com/jvelasca/Bolsa_V1/actions/runs/38141710304) **VERDE** — **12 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado), **sin reintentos** en los obligatorios; `python` **`success`** e `lifecycle-pg` **`success`**. **`replay-repro` `REPRODUCIDO`** (`1E3ADAC2…929A37E7`, idéntico a sellos previos) ⇒ **prueba directa** de que la costura opt-in **no** movió el artefacto congelado: `Δ decisión = 0` confirmado por CI. Tag **unsigned**.
 
 ## [2.11.110-beta] — **`§7`: endurecimiento RUNTIME de la barrera SIM — permiso POSITIVO + invariante DERIVADO + negativo E2E** (**`Δ motor ≠ 0` defensivo · `Δ decisión = 0` · contrato sin cambio · sin migración**)
 
