@@ -63,7 +63,7 @@ Nueva prueba en [`test_auto_v2_durable_pg.py`](../../../../apps/api-python/tests
 - **Pytest:** `packages/py/application/tests` + `packages/py/domain/tests` → **2 729 passed**.
 - **Durabilidad real (PostgreSQL):** `test_auto_v2_durable_pg.py` + `test_auto_v2_worker_integration.py` → **45 passed** (incluye la nueva prueba PG y su control negativo).
 - **Contrato:** `contract:gen`/`contract:check` → **OK** (sin cambio de contrato).
-- **CI del tag:** pendiente de la cita POST-TAG.
+- **CI del tag:** `Release tag CI` [38127345052](https://github.com/jvelasca/Bolsa_V1/actions/runs/38127345052) **VERDE** — **11 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado). `replay-repro` **REPRODUCIDO** `1E3ADAC2…929A37E7` (byte a byte idéntico al sello previo ⇒ **`Δ decisión = 0`** confirmado en CI: el `Δ motor ≠ 0` es aditivo). Tag `v2.88.108-beta` = objeto `1c97c633` → commit `5fbb0e4f` (**unsigned**).
 
 ## 6. Límites declarados (sin fabricar)
 

@@ -14,7 +14,7 @@ All notable releases of Bolsa V1.
 
 **Verificación (local).** `ruff` **All checks passed** · `lint-imports` **4 kept, 0 broken** · `mypy` **544 source files, no issues** · `pytest` `packages/py/{application,domain}/tests` **2 729 passed** · durabilidad **PG real** (`test_auto_v2_durable_pg.py` + `test_auto_v2_worker_integration.py`) **45 passed** · `contract:check` **OK**. Evidencia: [`docs/engineering/evidence/v2.88.108/README.md`](docs/engineering/evidence/v2.88.108/README.md).
 
-**Cita POST-TAG.** (se completa al publicar el tag `v2.88.108-beta`.)
+**Cita POST-TAG.** Tag anotado `v2.88.108-beta` (objeto `1c97c633` → commit `5fbb0e4f`) sellado y publicado; `Release tag CI` [38127345052](https://github.com/jvelasca/Bolsa_V1/actions/runs/38127345052) **VERDE** — **11 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado), sin reintentos en los obligatorios. `replay-repro` **REPRODUCIDO** `1E3ADAC2…929A37E7` (idéntico al sello previo ⇒ **`Δ decisión = 0`** confirmado en CI: la remediación H1 es **aditiva**). Tag **unsigned**.
 
 ## [2.11.107-beta] — **AUTO·H1: identidad EXACTA de la estrategia ejecutada por ciclo (clave `presetKey`)** (**`Δ motor ≠ 0` aditivo · `Δ decisión = 0` · contrato ampliado · sin migración**)
 
