@@ -437,14 +437,23 @@ async def _durable_fact_health(
 
 
 async def _read_monitor_cycles(
-    factory: async_sessionmaker[AsyncSession], *, account_id: str, engine_id: str
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    account_id: str,
+    engine_id: str,
+    cycle_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Ciclos que el monitor reconstruye del material DURABLE (read-only, sin RAM)."""
+    """Ciclos que el monitor reconstruye del material DURABLE (read-only, sin RAM).
+
+    Con ``cycle_id`` (drill-down) el read-model queda acotado a ESE ciclo: es la misma
+    consulta que usa la superficie de detalle, y permite probar que una asociación
+    INCORRECTA (un id ajeno al día) no hereda los hechos de otro ciclo.
+    """
     from bolsa_application.auto_operational_monitor import read_operational_monitor
 
     async with factory() as session:
         dto = await read_operational_monitor(
-            session, account_id, engine_id=engine_id, grace_seconds=61.0
+            session, account_id, engine_id=engine_id, grace_seconds=61.0, cycle_id=cycle_id
         )
     return list(dto.get("cycles") or [])
 
@@ -477,6 +486,22 @@ async def _fill_price_sources(
 
 def _monitor_steps(cycle: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {str(step.get("id")): step for step in (cycle.get("steps") or [])}
+
+
+#: §6 — las NUEVE etapas canónicas del ciclo AUTO (``auto_operational_monitor``). El
+#: certificado §6 exige que un ciclo PRODUCIDO POR EL WORKER (no sembrado) las encienda
+#: TODAS desde hechos durables; un ``unknown``/``absent`` aquí es un hueco real del motor.
+_CANONICAL_STEPS = (
+    "SIGNAL",
+    "TOP_N",
+    "RISK",
+    "RESERVATION",
+    "ORDER",
+    "FILL",
+    "PROTECTION",
+    "SETTLEMENT",
+    "CYCLE_CLOSED",
+)
 
 
 async def _count_watch_bars(
@@ -1002,6 +1027,52 @@ async def test_golden_day_v2_real_process_opens_and_closes_the_book_pg(
             reached_settlement = reached_settlement or settlement.get("state") == "reached"
         assert reached_protection, "algún ciclo debe encender PROTECTION desde el hecho durable"
         assert reached_settlement, "algún ciclo debe encender SETTLEMENT desde el hecho durable"
+
+        # ── §6 — las NUEVE etapas canónicas del ciclo PRODUCIDO POR EL WORKER ──────
+        #
+        # El ciclo NO se siembra (no hay ``seed_auto_cycle_for_ui.py``): lo conduce el
+        # PROCESO scheduler real sobre PostgreSQL. §6 exige recorrer y asertar la cadena
+        # canónica completa (``SIGNAL → TOP_N → RISK → RESERVATION → ORDER → FILL →
+        # PROTECTION → SETTLEMENT → CYCLE_CLOSED``) leyendo HECHOS DURABLES, no la
+        # proyección. Un ``unknown``/``absent`` significa que ese eslabón no tiene hecho
+        # durable ⇒ es un hueco del motor, no un artefacto del test.
+        #
+        # RÉGIMEN DECLARADO (premisa §5.2): este certificado corre el sandbox ``DÍA-D AUTO``
+        # con PRECIO INYECTADO (``flat_price_script``); el régimen de PRECIO REAL es otro
+        # test (``..._real_price_process_...``, ``AUTO_ENGINE_SIM_REAL_PRICE=1`` con
+        # ``price_source == MARKET_CLOSE``).
+        closed_cycle = next((c for c in cycles if c.get("closed") is True), None)
+        assert closed_cycle is not None, (
+            "el monitor debe reconstruir un ciclo CERRADO (BUY→SELL) del día del worker; "
+            f"ciclos presentes={[c.get('cycleId') for c in cycles]}"
+        )
+        cycle_steps = _monitor_steps(closed_cycle)
+        not_reached = {
+            step_id: (cycle_steps.get(step_id) or {}).get("state")
+            for step_id in _CANONICAL_STEPS
+            if (cycle_steps.get(step_id) or {}).get("state") != "reached"
+        }
+        assert not not_reached, (
+            "el ciclo producido por el WORKER debe encender las NUEVE etapas canónicas "
+            "desde hechos durables; sin encender="
+            f"{not_reached} (cycleId={closed_cycle.get('cycleId')!r})"
+        )
+
+        # Control NEGATIVO (§6: «debe rechazar una asociación incorrecta»): el drill-down
+        # por un ``cycle_id`` AJENO al día NO hereda los hechos de otro ciclo. El read-model
+        # devuelve ese ciclo —porque se lo pidieron— pero con las etapas SIN encender.
+        foreign_id = "cyc-foreign-does-not-exist-000000"
+        foreign = await _read_monitor_cycles(
+            golden_pg_factory, account_id=account_id, engine_id=engine_id, cycle_id=foreign_id
+        )
+        assert [c.get("cycleId") for c in foreign] == [foreign_id], (
+            "el drill-down por ciclo debe devolver EL ciclo pedido, no otro"
+        )
+        foreign_steps = _monitor_steps(foreign[0])
+        assert (foreign_steps.get("SIGNAL") or {}).get("state") != "reached", (
+            "un ``cycle_id`` ajeno NO puede heredar el SIGNAL de otro ciclo (asociación "
+            f"rechazada); cycleId={foreign_id!r} heredó={foreign_steps.get('SIGNAL')}"
+        )
 
         # Zero human / zero LIVE: ninguna traza de ESTA cuenta con venue live.
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow

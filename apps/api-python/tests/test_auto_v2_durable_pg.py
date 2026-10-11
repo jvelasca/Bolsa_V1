@@ -680,7 +680,7 @@ async def test_auto_entry_decision_strategy_preset_key_is_durable_in_pg(
 
     accounts: list[str] = []
 
-    async def _run(source: str, strategy_ref: str, prefix: str) -> str:
+    async def _run(source: str, strategy_ref: str, prefix: str) -> tuple[str, str]:
         instrument_id = _filling_instrument_id(prefix, side="buy")
         engine_id = f"auto-v2p-{uuid.uuid4().hex[:10]}"
         monkeypatch.setenv("AUTO_ENGINE_SIMULATED_WATCH", instrument_id)
@@ -703,7 +703,7 @@ async def test_auto_entry_decision_strategy_preset_key_is_durable_in_pg(
             if worker._open.get(instrument_id, Decimal("0")) > 0:
                 break
         assert worker._open.get(instrument_id, Decimal("0")) > 0, "abre en el camino real"
-        return account_id
+        return account_id, engine_id
 
     async def _durable_approved(account_id: str) -> dict[str, object]:
         async with v2_pg_factory() as session:  # sesión NUEVA: lee lo DURABLE, no la RAM.
@@ -727,13 +727,38 @@ async def test_auto_entry_decision_strategy_preset_key_is_durable_in_pg(
         positive = await _run(
             "active-strategy:ver-abc::sma_crossover", "ver-abc", "inst-v2p-"
         )
-        payload = await _durable_approved(positive)
+        positive_account, positive_engine = positive
+        payload = await _durable_approved(positive_account)
         assert payload["strategyPresetKey"] == "sma_crossover"
         assert payload["strategyVersion"] == "ver-abc"
 
+        # §6/H1 — el MONITOR reconstruye la MISMA identidad EXACTA desde PostgreSQL
+        # (read-only, sin la RAM del worker): el paso ``SIGNAL`` del ciclo producido por el
+        # WORKER debe exponer el ``presetKey`` declarado por el sello. Cierra el eslabón
+        # «identidad sellada → identidad presentada» sobre el camino V2 real.
+        from bolsa_application.auto_operational_monitor import read_operational_monitor
+
+        async with v2_pg_factory() as session:
+            dto = await read_operational_monitor(
+                session, positive_account, engine_id=positive_engine
+            )
+        signal_presets = {
+            fact.get("value")
+            for cycle in (dto.get("cycles") or [])
+            for step in (cycle.get("steps") or [])
+            if step.get("id") == "SIGNAL"
+            for fact in (step.get("facts") or [])
+            if fact.get("key") == "strategyPresetKey"
+        }
+        assert signal_presets == {"sma_crossover"}, (
+            "el paso SIGNAL del monitor debe exponer el ``presetKey`` EXACTO del sello "
+            f"(real={signal_presets!r})"
+        )
+
         # Negativo: fuente histórica sin ``::<preset>`` ⇒ la clave NO se fabrica.
         negative = await _run("active-strategy:ver-xyz", "ver-xyz", "inst-v2pn-")
-        payload_neg = await _durable_approved(negative)
+        negative_account, _negative_engine = negative
+        payload_neg = await _durable_approved(negative_account)
         assert "strategyPresetKey" not in payload_neg
         assert payload_neg["strategyVersion"] == "ver-xyz"
     finally:

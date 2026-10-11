@@ -94,6 +94,13 @@ _A11_INSTRUMENT_PREFIX = "inst-a11-"
 _A11_FILL_CHUNKS = 4  # = ``_FILL_CHUNKS`` del worker (mismo schedule de parciales).
 _A11_LOT_QTY = Decimal("100")
 _A11_FILL_DRAWS = 64
+#: H1 — ``preset_key`` que declaran las candidatas de DISCOVERY de este certifier.
+#:
+#: Es DISTINTO del nombre de familia (``sma_crossover``) A PROPÓSITO: así la aserción del
+#: sello durable demuestra que el motor propaga la identidad EXACTA declarada y NO la
+#: sustituye por el nombre de familia (la fabricación que ``v2.88.108`` eliminó). Espeja el
+#: contrato real de discovery, que sella ``preset_key`` desde el ``presetKey`` de la definición.
+_A11_CERT_PRESET = "a11_cert_preset"
 
 
 def _bar_ticks() -> tuple[int, ...]:
@@ -300,6 +307,9 @@ def _make_discovery_runner():
                 id=f"disc-{instrument_id}-sma-{index}",
                 instrument_id=instrument_id,
                 strategy_family="sma_crossover",
+                # H1: identidad EXACTA declarada por la candidata (distinta del nombre de
+                # familia): es la que el lifecycle debe propagar hasta la ACTIVA y el ciclo.
+                preset_key=_A11_CERT_PRESET,
                 params={**structural, **grid, "seed": index},
             )
             for index in range(3)
@@ -474,6 +484,19 @@ async def test_a11_discovery_to_auto_sim_pg(
             ctx_store = PostgresSimFillFinanceContextStore(session)
             fills = await ctx_store.list_for_strategy_version(version_id)
             assert fills, "el fill SIM debe atribuirse a la versión ACTIVE"
+
+        # ── H1 — identidad EXACTA propagada por el lifecycle REAL (§6) ─────────────
+        #
+        # La identidad declarada por DISCOVERY (``a11_cert_preset``, DISTINTA del nombre de
+        # familia ``sma_crossover``) debe propagarse candidata→versión→ACTIVA sin sustituirse
+        # por el nombre de familia (la fabricación que ``v2.88.108`` eliminó). Es la mitad de
+        # H1 que este E2E prueba sobre el ciclo REAL DISCOVERY→PROMOTION→ACTIVE; el SELLO
+        # durable del ``preset_key`` en el spine/monitor lo certifica el camino V2 real en
+        # ``test_auto_v2_durable_pg.py``.
+        assert record.active.preset_key == _A11_CERT_PRESET, (
+            "el lifecycle debe propagar el ``preset_key`` EXACTO de la candidata hasta la "
+            f"ACTIVA (esperado={_A11_CERT_PRESET!r}, real={record.active.preset_key!r})"
+        )
 
         # --- Crash/restart: readopción conserva la atribución de la versión ---------
         worker2 = AutoSimulationWorker(
