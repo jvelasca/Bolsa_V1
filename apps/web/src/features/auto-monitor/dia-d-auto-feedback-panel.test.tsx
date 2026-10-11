@@ -171,6 +171,24 @@ const FEEDBACK = {
   errors: [
     { day: "2026-09-29", symbol: "CCC", kind: "SOFTWARE", code: "FILL" },
   ],
+  cycles: [
+    {
+      cycleId: "cyc-1",
+      symbol: "AAA",
+      entryDay: "2026-09-29",
+      exitDay: "2026-09-30",
+      strategyVersion: "sv-1",
+      realizedR: 0.5,
+    },
+    {
+      cycleId: "cyc-2",
+      symbol: "BBB",
+      entryDay: "2026-09-29",
+      exitDay: "2026-09-30",
+      strategyVersion: null,
+      realizedR: null,
+    },
+  ],
   gate: {
     verdict: "INCONCLUSIVE",
     days: 2,
@@ -194,6 +212,29 @@ vi.mock("@/lib/api", () => ({
       notes: [],
     })),
     getAutoDiaDFeedback: vi.fn(async () => FEEDBACK),
+    listDiaDCycleVerifications: vi.fn(async () => ({
+      data: [
+        {
+          id: "v-1",
+          cycleId: "cyc-1",
+          accountId: "acc-1",
+          instrumentId: "inst-1",
+          symbol: "AAA",
+          diaD: "2026-09-29",
+          endDate: "2026-09-30",
+          mode: "auto",
+          createdAt: "2026-09-30T00:00:00+00:00",
+          strategyPresetKey: null,
+          strategyVersion: "sv-1",
+          strategyDefinitionId: null,
+          band: "favorable",
+          result: null,
+          researchEvidenceId: null,
+        },
+      ],
+      total: 1,
+      notes: [],
+    })),
     getAutoDiaDReplayDays: vi.fn(async () => ({
       readOnly: true,
       days: ["2026-09-30"],
@@ -340,6 +381,41 @@ describe("DiaDAutoFeedbackPanel", () => {
     expect(serving.getAttribute("data-serving")).toBe("PRECOMPUTED_ARTIFACT");
     expect(serving.textContent).toContain("precalculado");
     expect(serving.textContent).toContain("no se recalcula en vivo");
+  });
+
+  it("pinta los ciclos de la ventana con el tri-estado de verificación DÍA-D", async () => {
+    renderWithClient(<DiaDAutoFeedbackPanel />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("dia-d-auto-feedback-cycles")).toBeTruthy(),
+    );
+
+    await waitFor(() => {
+      const linkedRow = screen
+        .getAllByTestId("dia-d-auto-feedback-cycle")
+        .find((row) => row.getAttribute("data-cycle-id") === "cyc-1");
+      expect(linkedRow?.getAttribute("data-verification-state")).toBe("linked");
+    });
+
+    const rows = screen.getAllByTestId("dia-d-auto-feedback-cycle");
+    const linked = rows.find(
+      (row) => row.getAttribute("data-cycle-id") === "cyc-1",
+    );
+    const notVerified = rows.find(
+      (row) => row.getAttribute("data-cycle-id") === "cyc-2",
+    );
+    const badgeOf = (row?: HTMLElement) =>
+      row?.querySelector(
+        '[data-testid="dia-d-auto-feedback-cycle-verification"]',
+      );
+    expect(linked?.getAttribute("data-verification-state")).toBe("linked");
+    expect(badgeOf(linked)?.textContent).toContain("Verificación vinculada");
+    expect(notVerified?.getAttribute("data-verification-state")).toBe(
+      "not-verified",
+    );
+    expect(badgeOf(notVerified)?.textContent).toContain("Sin verificación");
+    // Un ciclo sin identidad de estrategia declara el hueco, nunca un 0 de relleno.
+    expect(notVerified?.textContent).toContain("Sin dato todavía");
   });
 
   it("preselecciona el símbolo de la URL (enlace de EXPLICACIÓN)", async () => {

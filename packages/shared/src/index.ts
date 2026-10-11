@@ -58,6 +58,7 @@ export * from "./core-r-api.js";
 export * from "./core-r-judgment.js";
 export * from "./supervised-f3-api.js";
 export * from "./dia-d-evidence-api.js";
+export * from "./dia-d-verification-api.js";
 export * from "./coach-facts-api.js";
 export * from "./paper-bridge-api.js";
 export * from "./signal-events.js";

@@ -2172,6 +2172,22 @@ export const api = {
       }),
     ),
 
+  /** P2 — enlace durable de la verificación DÍA-D a su ciclo AUTO. */
+  persistDiaDCycleVerification: (
+    body: import("@bolsa/shared").DiaDCycleVerificationPersistDto,
+  ) =>
+    call<{ data: import("@bolsa/shared").DiaDCycleVerificationV1Dto }>(() =>
+      client.POST("/api/auto/dia-d-verifications", { body: apiBody(body) }),
+    ),
+
+  /** P2 — verificaciones DÍA-D del principal (opcionalmente acotadas a un ciclo). */
+  listDiaDCycleVerifications: (cycleId?: string) =>
+    call<import("@bolsa/shared").DiaDCycleVerificationListV1Dto>(() =>
+      client.GET("/api/auto/dia-d-verifications", {
+        params: { query: cycleId ? { cycleId } : {} },
+      }),
+    ),
+
   optimizeBacktest: (body: import("@bolsa/shared").OptimizeSmaGridRequestDto) =>
     call<import("@bolsa/shared").OptimizeSmaGridResponseDto>(() =>
       client.POST("/api/backtests/optimize", { body: apiBody(body) }),

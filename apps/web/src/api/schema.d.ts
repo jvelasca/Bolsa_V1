@@ -1144,6 +1144,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/dia-d-verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Auto Dia D Verifications
+         * @description Verificaciones del principal; con ``cycleId`` acota a un ciclo.
+         *
+         *     Fail-closed por cuenta: sin cuenta del principal se devuelve vacío (`no_account_scope`),
+         *     nunca datos globales.
+         */
+        get: operations["list_auto_dia_d_verifications_api_auto_dia_d_verifications_get"];
+        put?: never;
+        /**
+         * Persist Auto Dia D Verification
+         * @description Registra (idempotente) la verificación DÍA-D enlazada al ciclo del principal.
+         */
+        post: operations["persist_auto_dia_d_verification_api_auto_dia_d_verifications_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/operational-monitor": {
         parameters: {
             query?: never;
@@ -6347,6 +6374,89 @@ export interface components {
             steps: number;
             /** Verdict */
             verdict: string;
+        };
+        /**
+         * DiaDCycleVerificationDto
+         * @description Verificación durable enlazada a un ciclo (una fila por ciclo + ventana + modo).
+         */
+        DiaDCycleVerificationDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Band */
+            band?: string | null;
+            /** Createdat */
+            createdAt: string;
+            /** Cycleid */
+            cycleId: string;
+            /** Diad */
+            diaD: string;
+            /** Enddate */
+            endDate: string;
+            /** Id */
+            id: string;
+            /** Instrumentid */
+            instrumentId: string;
+            /** Mode */
+            mode: string;
+            /** Researchevidenceid */
+            researchEvidenceId?: string | null;
+            /** Result */
+            result?: {
+                [key: string]: unknown;
+            } | null;
+            /** Strategydefinitionid */
+            strategyDefinitionId?: string | null;
+            /** Strategypresetkey */
+            strategyPresetKey?: string | null;
+            /** Strategyversion */
+            strategyVersion?: string | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** DiaDCycleVerificationListResponseDto */
+        DiaDCycleVerificationListResponseDto: {
+            /** Data */
+            data: components["schemas"]["DiaDCycleVerificationDto"][];
+            /** Notes */
+            notes?: string[];
+            /** Total */
+            total: number;
+        };
+        /**
+         * DiaDCycleVerificationPersistRequestDto
+         * @description Payload de la verificación D→hoy lanzada desde un ciclo. Huecos ⇒ campo ausente.
+         */
+        DiaDCycleVerificationPersistRequestDto: {
+            /** Band */
+            band?: string | null;
+            /** Cycleid */
+            cycleId: string;
+            /** Diad */
+            diaD: string;
+            /** Enddate */
+            endDate: string;
+            /** Instrumentid */
+            instrumentId: string;
+            /** Mode */
+            mode: string;
+            /** Researchevidenceid */
+            researchEvidenceId?: string | null;
+            /** Result */
+            result?: {
+                [key: string]: unknown;
+            } | null;
+            /** Strategydefinitionid */
+            strategyDefinitionId?: string | null;
+            /** Strategypresetkey */
+            strategyPresetKey?: string | null;
+            /** Strategyversion */
+            strategyVersion?: string | null;
+            /** Symbol */
+            symbol: string;
+        };
+        /** DiaDCycleVerificationResponseDto */
+        DiaDCycleVerificationResponseDto: {
+            data: components["schemas"]["DiaDCycleVerificationDto"];
         };
         /** DiaDFeedbackByDayDto */
         DiaDFeedbackByDayDto: {
@@ -13971,6 +14081,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiaDAutoReplayDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_auto_dia_d_verifications_api_auto_dia_d_verifications_get: {
+        parameters: {
+            query?: {
+                cycleId?: string | null;
+            };
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDCycleVerificationListResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    persist_auto_dia_d_verification_api_auto_dia_d_verifications_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiaDCycleVerificationPersistRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDCycleVerificationResponseDto"];
                 };
             };
             /** @description Validation Error */

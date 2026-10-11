@@ -37,6 +37,14 @@ export type DiaDTradingSession = {
   /** Fin del replay (habitualmente hoy real al crear la sesión). */
   endDate: string;
   mode: DiaDTradingMode;
+  /**
+   * P2 — ciclo AUTO desde el que se lanzó la verificación (si se lanzó desde uno).
+   * `null`/ausente = verificación no enlazada a un ciclo. Identidad EXACTA declarada
+   * por el ciclo (`presetKey`/`version`); un hueco NUNCA se rellena.
+   */
+  cycleId?: string | null;
+  strategyPresetKey?: string | null;
+  strategyVersion?: string | null;
   /** Run Auto cacheado (D→hoy) para no re-lanzar al remontar. */
   autoRunId?: string | null;
   /** Log Semi/Manual: aceptaciones/rechazos. Reescriben fills/equity en v0.4. */
@@ -81,6 +89,9 @@ export const useDiaDTradingSessionStore = create<DiaDTradingSessionState>()(
             diaD: input.diaD,
             endDate: input.endDate,
             mode: input.mode ?? "auto",
+            cycleId: input.cycleId ?? null,
+            strategyPresetKey: input.strategyPresetKey ?? null,
+            strategyVersion: input.strategyVersion ?? null,
             autoRunId: null,
             gateDecisions: [],
             fullBleedMovie: input.fullBleedMovie ?? false,

@@ -88,3 +88,45 @@ describe("dia-d fullBleedMovie", () => {
     );
   });
 });
+
+describe("dia-d cycle linkage (P2)", () => {
+  beforeEach(() => {
+    localStorage.removeItem("bolsa-dia-d-trading-session-v1");
+    useDiaDTradingSessionStore.setState({ session: null });
+  });
+
+  it("persists the cycle link and its exact strategy identity", () => {
+    useDiaDTradingSessionStore.getState().enterSession({
+      instrumentId: "i1",
+      symbol: "ACS",
+      strategyDefinitionId: "s1",
+      strategyLabel: "SMA",
+      rank: 1,
+      diaD: "2024-01-01",
+      endDate: "2024-12-31",
+      cycleId: "cyc-1",
+      strategyPresetKey: "sma_crossover",
+      strategyVersion: "ver-1",
+    });
+    const session = useDiaDTradingSessionStore.getState().session;
+    expect(session?.cycleId).toBe("cyc-1");
+    expect(session?.strategyPresetKey).toBe("sma_crossover");
+    expect(session?.strategyVersion).toBe("ver-1");
+  });
+
+  it("declares the gap (null) when launched without a cycle", () => {
+    useDiaDTradingSessionStore.getState().enterSession({
+      instrumentId: "i1",
+      symbol: "ACS",
+      strategyDefinitionId: "s1",
+      strategyLabel: "SMA",
+      rank: 1,
+      diaD: "2024-01-01",
+      endDate: "2024-12-31",
+    });
+    const session = useDiaDTradingSessionStore.getState().session;
+    expect(session?.cycleId).toBeNull();
+    expect(session?.strategyPresetKey).toBeNull();
+    expect(session?.strategyVersion).toBeNull();
+  });
+});

@@ -39,3 +39,25 @@ export function useAutoDiaDFeedback(
     retry: false,
   });
 }
+
+/**
+ * P2 — verificación DÍA-D ENLAZADA a un ciclo (durable). Sin `cycleId` lista las del
+ * principal; con él acota al ciclo. Read-only sobre el registro durable.
+ */
+export function useDiaDCycleVerifications(
+  cycleId?: string | null,
+  input?: { enabled?: boolean },
+) {
+  const { effectiveAccountId } = useActiveAccount();
+  return useQuery({
+    queryKey: [
+      "dia-d-cycle-verifications",
+      effectiveAccountId,
+      cycleId ?? null,
+    ],
+    queryFn: () => api.listDiaDCycleVerifications(cycleId ?? undefined),
+    enabled: (input?.enabled ?? true) && Boolean(effectiveAccountId),
+    staleTime: 30_000,
+    retry: false,
+  });
+}

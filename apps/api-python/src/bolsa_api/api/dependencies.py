@@ -179,6 +179,9 @@ from bolsa_infrastructure.database.repositories.core_r_repository import SqlAlch
 from bolsa_infrastructure.database.repositories.custody_obligation_repository import (
     CustodyObligationRepository,
 )
+from bolsa_infrastructure.database.repositories.dia_d_cycle_verification_repository import (
+    SqlAlchemyDiaDCycleVerificationRepository,
+)
 from bolsa_infrastructure.database.repositories.execution_policy_repository import (
     SqlAlchemyExecutionPolicyRepository,
 )
@@ -877,6 +880,12 @@ def get_research_evidence_repository(
     session: AsyncSession,
 ) -> SqlAlchemyResearchEvidenceRepository:
     return SqlAlchemyResearchEvidenceRepository(session)
+
+
+def get_dia_d_cycle_verification_repository(
+    session: AsyncSession,
+) -> SqlAlchemyDiaDCycleVerificationRepository:
+    return SqlAlchemyDiaDCycleVerificationRepository(session)
 
 
 def get_hypothesis_repository(session: AsyncSession) -> SqlAlchemyHypothesisRepository:

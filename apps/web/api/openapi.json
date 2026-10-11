@@ -6474,6 +6474,279 @@
         "title": "DiaDAutoSummaryDto",
         "type": "object"
       },
+      "DiaDCycleVerificationDto": {
+        "description": "Verificación durable enlazada a un ciclo (una fila por ciclo + ventana + modo).",
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "band": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "cycleId": {
+            "title": "Cycleid",
+            "type": "string"
+          },
+          "diaD": {
+            "title": "Diad",
+            "type": "string"
+          },
+          "endDate": {
+            "title": "Enddate",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "instrumentId": {
+            "title": "Instrumentid",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "researchEvidenceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Researchevidenceid"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "strategyDefinitionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategydefinitionid"
+          },
+          "strategyPresetKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategypresetkey"
+          },
+          "strategyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategyversion"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "cycleId",
+          "instrumentId",
+          "symbol",
+          "diaD",
+          "endDate",
+          "mode",
+          "createdAt"
+        ],
+        "title": "DiaDCycleVerificationDto",
+        "type": "object"
+      },
+      "DiaDCycleVerificationListResponseDto": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DiaDCycleVerificationDto"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data",
+          "total"
+        ],
+        "title": "DiaDCycleVerificationListResponseDto",
+        "type": "object"
+      },
+      "DiaDCycleVerificationPersistRequestDto": {
+        "description": "Payload de la verificación D→hoy lanzada desde un ciclo. Huecos ⇒ campo ausente.",
+        "properties": {
+          "band": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band"
+          },
+          "cycleId": {
+            "title": "Cycleid",
+            "type": "string"
+          },
+          "diaD": {
+            "title": "Diad",
+            "type": "string"
+          },
+          "endDate": {
+            "title": "Enddate",
+            "type": "string"
+          },
+          "instrumentId": {
+            "title": "Instrumentid",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "researchEvidenceId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Researchevidenceid"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "strategyDefinitionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategydefinitionid"
+          },
+          "strategyPresetKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategypresetkey"
+          },
+          "strategyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategyversion"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cycleId",
+          "instrumentId",
+          "symbol",
+          "diaD",
+          "endDate",
+          "mode"
+        ],
+        "title": "DiaDCycleVerificationPersistRequestDto",
+        "type": "object"
+      },
+      "DiaDCycleVerificationResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DiaDCycleVerificationDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "DiaDCycleVerificationResponseDto",
+        "type": "object"
+      },
       "DiaDFeedbackByDayDto": {
         "properties": {
           "cycles": {
@@ -26155,6 +26428,130 @@
           }
         },
         "summary": "Get Auto Dia D Replay",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/dia-d-verifications": {
+      "get": {
+        "description": "Verificaciones del principal; con ``cycleId`` acota a un ciclo.\n\nFail-closed por cuenta: sin cuenta del principal se devuelve vacío (`no_account_scope`),\nnunca datos globales.",
+        "operationId": "list_auto_dia_d_verifications_api_auto_dia_d_verifications_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cycleId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cycleid"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDCycleVerificationListResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Auto Dia D Verifications",
+        "tags": [
+          "auto"
+        ]
+      },
+      "post": {
+        "description": "Registra (idempotente) la verificación DÍA-D enlazada al ciclo del principal.",
+        "operationId": "persist_auto_dia_d_verification_api_auto_dia_d_verifications_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiaDCycleVerificationPersistRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDCycleVerificationResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Persist Auto Dia D Verification",
         "tags": [
           "auto"
         ]

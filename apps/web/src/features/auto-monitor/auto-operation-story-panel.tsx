@@ -303,6 +303,10 @@ export function AutoOperationStoryPanel({
       strategyDefinitionId: view.strategyDefinitionId,
       strategyLabel: view.strategyLabel,
       rank: view.rank ?? 1,
+      // P2 — enlaza la verificación con ESTE ciclo y su identidad EXACTA declarada.
+      cycleId: selected?.cycleId ?? null,
+      strategyPresetKey: selected?.strategyPresetKey ?? null,
+      strategyVersion: selected?.strategyVersion ?? null,
     });
   };
 

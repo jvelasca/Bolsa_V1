@@ -1073,6 +1073,52 @@ class ResearchEvidenceRow(Base):
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
+class DiaDCycleVerificationRow(Base):
+    """P2 — verificación DÍA-D ENLAZADA a un ciclo AUTO (durable, aditiva).
+
+    Una fila por ``(cycle_id, dia_d, end_date, mode)``: registra que la verificación
+    D→hoy se lanzó DESDE un ciclo y con qué identidad EXACTA de estrategia. Las claves
+    de estrategia son ``nullable`` a propósito (un ciclo histórico no las declara ⇒
+    «Sin dato todavía»; jamás se fabrica).
+    """
+
+    __tablename__ = "dia_d_cycle_verifications"
+    __table_args__ = (
+        UniqueConstraint(
+            "cycle_id",
+            "dia_d",
+            "end_date",
+            "mode",
+            name="dia_d_cycle_verifications_cycle_key",
+        ),
+        Index("dia_d_cycle_verifications_cycle_id_idx", "cycle_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    cycle_id: Mapped[str] = mapped_column("cycle_id", String)
+    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
+    instrument_id: Mapped[str] = mapped_column("instrument_id", String)
+    symbol: Mapped[str] = mapped_column("symbol", String)
+    strategy_preset_key: Mapped[str | None] = mapped_column(
+        "strategy_preset_key", String, nullable=True
+    )
+    strategy_version: Mapped[str | None] = mapped_column(
+        "strategy_version", String, nullable=True
+    )
+    strategy_definition_id: Mapped[str | None] = mapped_column(
+        "strategy_definition_id", String, nullable=True
+    )
+    dia_d: Mapped[str] = mapped_column("dia_d", String)
+    end_date: Mapped[str] = mapped_column("end_date", String)
+    mode: Mapped[str] = mapped_column("mode", String)
+    band: Mapped[str | None] = mapped_column("band", String, nullable=True)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    research_evidence_id: Mapped[str | None] = mapped_column(
+        "research_evidence_id", String, nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+
+
 class ResearchTrialRow(Base):
     """QROS scientific ledger (K) — ADR-016. Distinct from trial_records (RFC-008)."""
 

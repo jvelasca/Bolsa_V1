@@ -815,6 +815,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py
           --ignore=apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
           --ignore=apps/api-python/tests/test_auto_operational_monitor_pg.py
+          --ignore=apps/api-python/tests/test_dia_d_cycle_verification_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
@@ -955,6 +956,11 @@ jobs:
       # certifican contra PG real, con otra sesión leyendo lo ya commiteado. Un skip mudo
       # dejaría los paneles sin medir en el tag.
       AUTO_OPERATIONAL_MONITOR_PG_REQUIRED: '1'
+      # P2 (DÍA-D enlazado al ciclo): la tabla ``dia_d_cycle_verifications`` (migración 053)
+      # y su repositorio (idempotencia por clave natural, aislamiento por cuenta, huecos
+      # ``NULL``) solo se certifican contra PG real. Un skip mudo dejaría el enlace durable
+      # sin medir en el tag.
+      DIA_D_CYCLE_VERIFICATION_PG_REQUIRED: '1'
       # V2.25/A10: persistencia del Strategy Lifecycle (migración 030) en PG real.
       STRATEGY_LIFECYCLE_PG_REQUIRED: '1'
       # V2.26/A10: ciclo completo del Auto Orchestrator sobre PG real (promoción solo
@@ -1153,6 +1159,7 @@ jobs:
           apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
           apps/api-python/tests/test_auto_v70_auto23_evidence_validation.py
           apps/api-python/tests/test_auto_operational_monitor_pg.py
+          apps/api-python/tests/test_dia_d_cycle_verification_pg.py
           apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
           apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py

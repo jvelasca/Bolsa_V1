@@ -36,6 +36,14 @@ export type DiaDVerifyLaunchArgs = {
   timeframe?: string;
   /** D efectiva (ISO). Por defecto, la del contexto de Backtests (o hoy). */
   diaD?: string | null;
+  /**
+   * P2 — ciclo AUTO desde el que se lanza (si aplica) + identidad EXACTA declarada por
+   * el ciclo (`presetKey`/`version`). Se transporta a la sesión para enlazar la
+   * verificación con su ciclo; un hueco (`undefined`/`null`) NO se rellena.
+   */
+  cycleId?: string | null;
+  strategyPresetKey?: string | null;
+  strategyVersion?: string | null;
   /** Toast explícito; por defecto, la forma canónica de la verificación desde AUTO. */
   toast?: string;
 };
@@ -73,6 +81,9 @@ export function useDiaDVerifyLaunch(): (args: DiaDVerifyLaunchArgs) => void {
         diaD,
         endDate: todayIsoDate(),
         mode: "auto",
+        cycleId: args.cycleId ?? null,
+        strategyPresetKey: args.strategyPresetKey ?? null,
+        strategyVersion: args.strategyVersion ?? null,
       });
 
       // La adopción solo se escribe con cuenta activa (como en los dos llamantes originales).

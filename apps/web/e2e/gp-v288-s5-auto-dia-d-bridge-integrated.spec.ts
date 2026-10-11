@@ -793,6 +793,65 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
     await expect(page.getByTestId("dia-d-replay-embedded")).toBeVisible();
     await runRequest;
   });
+
+  test("GP-V288-S5-04: guardar registra el enlace durable verificación ↔ cicloId (P2)", async ({
+    page,
+    request,
+    baseURL,
+  }) => {
+    if (!state.cycleId) {
+      declareGap(state.noCycleReason ?? NO_CYCLE_REASON);
+      return;
+    }
+    if (!state.instrumentId || !state.strategyDefinitionId) {
+      declareGap(state.noChainReason ?? NO_CHAIN_REASON);
+      return;
+    }
+    if (!state.accountId) throw new Error("fixture required");
+    if (!baseURL) throw new Error("baseURL required");
+
+    // Precondición de no-residuo: el ciclo aún no tiene verificación durable registrada.
+    const listUrl = new URL(
+      `/api/auto/dia-d-verifications?cycleId=${encodeURIComponent(state.cycleId)}`,
+      baseURL,
+    ).toString();
+    const headers = { "X-Account-Id": state.accountId };
+    const before = await request.get(listUrl, { headers });
+    expect(before.ok()).toBe(true);
+    expect((await body<{ total: number }>(before)).total).toBe(0);
+
+    await openFirstOperation(page, state.accountId);
+    const cta = page.getByTestId("auto-operation-strategy-verify-dia-d");
+    await expect(cta).toBeVisible({ timeout: 20_000 });
+    await expect(cta).toBeEnabled();
+    await cta.click();
+
+    // La sesión LAB arranca el run; cuando la evidencia de sesión está lista aparece el guardado.
+    const save = page.getByRole("button", { name: "Guardar Evidence" });
+    await expect(save).toBeVisible({ timeout: 60_000 });
+    await expect(save).toBeEnabled({ timeout: 60_000 });
+    await save.click();
+    await expect(
+      page.getByText("Guardado", { exact: false }).first(),
+    ).toBeVisible({
+      timeout: 30_000,
+    });
+
+    // El registro durable queda ENLAZADO al ciclo desde el que se lanzó (no basta con el laboratorio).
+    await expect
+      .poll(
+        async () => {
+          const res = await request.get(listUrl, { headers });
+          if (!res.ok()) return -1;
+          const json = await body<{
+            data: Array<{ cycleId: string; instrumentId: string }>;
+          }>(res);
+          return json.data.filter((v) => v.cycleId === state.cycleId).length;
+        },
+        { timeout: 30_000 },
+      )
+      .toBeGreaterThan(0);
+  });
 });
 
 /**

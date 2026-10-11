@@ -21,6 +21,7 @@ import {
 import { DiaDAutoFeedbackHeatmap } from "@/features/auto-monitor/dia-d-auto-feedback-heatmap";
 import { DiaDAutoFeedbackChart } from "@/features/auto-monitor/dia-d-auto-feedback-chart";
 import { DiaDAutoErrorList } from "@/features/auto-monitor/dia-d-auto-error-list";
+import { DiaDAutoFeedbackCycles } from "@/features/auto-monitor/dia-d-auto-feedback-cycles";
 
 type DiaDFeedbackDto = components["schemas"]["DiaDFeedbackDto"];
 type DiaDFeedbackValueDto = components["schemas"]["DiaDFeedbackValueDto"];
@@ -384,6 +385,8 @@ export function DiaDAutoFeedbackPanel() {
               </table>
             </CardContent>
           </Card>
+
+          <DiaDAutoFeedbackCycles cycles={artifact.cycles ?? []} />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card className="rounded-xl border border-border bg-card">

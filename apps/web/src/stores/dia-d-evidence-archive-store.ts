@@ -24,6 +24,8 @@ export type DiaDEvidenceArchiveItem = {
   savedAt: string;
   /** Id en research_evidence si se persistió en Fase 2. */
   researchEvidenceId: string | null;
+  /** P2 — ciclo AUTO desde el que se lanzó la verificación (o `null`). */
+  cycleId?: string | null;
   engine: string;
   evidence: DiaDSessionEvidenceV1;
   /** Párrafos narrados (IA) si distintos de la heurística. */
@@ -73,6 +75,7 @@ export const useDiaDEvidenceArchiveStore = create<DiaDEvidenceArchiveState>()(
           endDate: input.endDate,
           savedAt,
           researchEvidenceId: input.researchEvidenceId ?? null,
+          cycleId: input.cycleId ?? null,
           engine: input.engine,
           evidence: input.evidence,
           narrativeParagraphs: input.narrativeParagraphs ?? null,

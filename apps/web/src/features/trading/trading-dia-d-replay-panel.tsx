@@ -640,6 +640,32 @@ export function TradingDiaDReplayPanel() {
       } catch {
         // Archivo local siempre; Fase 2 opcional si API no tiene la ruta.
       }
+      // P2 — enlaza la verificación con su ciclo AUTO (solo si se lanzó desde uno; un
+      // ciclo ausente NO se fabrica). Best-effort como la persistencia de Fase 2.
+      if (session.cycleId) {
+        try {
+          await api.persistDiaDCycleVerification({
+            cycleId: session.cycleId,
+            instrumentId: session.instrumentId,
+            symbol: session.symbol,
+            diaD: session.diaD,
+            endDate: session.endDate,
+            mode: session.mode,
+            strategyPresetKey: session.strategyPresetKey ?? null,
+            strategyVersion: session.strategyVersion ?? null,
+            strategyDefinitionId: session.strategyDefinitionId,
+            band: evidencePayload.band,
+            result: {
+              band: evidencePayload.band,
+              confidence: evidencePayload.confidence,
+              metrics: evidencePayload.metrics,
+            },
+            researchEvidenceId,
+          });
+        } catch {
+          // El enlace durable es best-effort; el archivo local ya conserva el cicloId.
+        }
+      }
       const archived = useDiaDEvidenceArchiveStore.getState().save({
         instrumentId: session.instrumentId,
         symbol: session.symbol,
@@ -648,6 +674,7 @@ export function TradingDiaDReplayPanel() {
         diaD: session.diaD,
         endDate: session.endDate,
         researchEvidenceId,
+        cycleId: session.cycleId ?? null,
         engine,
         evidence: evidencePayload,
         narrativeParagraphs: iaNarrative,
