@@ -6811,6 +6811,7 @@ def _compose_real_stores(
     )
     from bolsa_application.simulated_finance import (  # noqa: PLC0415
         build_simulated_execute_trade_applier,
+        require_sim_only_scope,
     )
     from bolsa_infrastructure.database.repositories.account_repository import (  # noqa: PLC0415
         SqlAlchemyAccountRepository,
@@ -6836,8 +6837,14 @@ def _compose_real_stores(
         SqlAlchemyLedgerRepository(session),
     )
     # ``build_..._applier(execute_trade, resolver)`` deduce la vía por duck-typing y
-    # acepta resolver síncrono o asíncrono (durable).
-    applier = build_simulated_execute_trade_applier(trade, resolver)
+    # acepta resolver síncrono o asíncrono (durable). El worker AUTO acuña explícitamente
+    # su permiso positivo SIM-only (A8·M0 §7): sin él, el applier que mueve dinero no se
+    # construye. El worker NUNCA posee capacidad LIVE.
+    applier = build_simulated_execute_trade_applier(
+        trade,
+        resolver,
+        scope=require_sim_only_scope(source="auto_simulation_worker"),
+    )
     return exec_store, auto_store, applier, context_store
 
 

@@ -38,6 +38,7 @@ from bolsa_application.simulated_finance import (
     SimulatedFillFinance,
     build_simulated_execute_trade_applier,
     guard_sim_only_venue,
+    require_sim_only_scope,
     resolve_execution_finance,
     sim_fill_finances,
     sim_roundtrip_accounting,
@@ -176,7 +177,9 @@ def _applier_for(result, *, fake: object):
             account_id="acc-1",
         )
 
-    return build_simulated_execute_trade_applier(fake, _resolver)
+    return build_simulated_execute_trade_applier(
+        fake, _resolver, scope=require_sim_only_scope(source="test_simulated_finance")
+    )
 
 
 def test_applier_fail_closed_on_foreign_event_and_live_venue() -> None:
@@ -190,7 +193,9 @@ def test_applier_fail_closed_on_foreign_event_and_live_venue() -> None:
             result, execution=execution, instrument_id="AAA", side="buy", account_id="acc-1"
         )
 
-    applier = build_simulated_execute_trade_applier(fake, _resolver)
+    applier = build_simulated_execute_trade_applier(
+        fake, _resolver, scope=require_sim_only_scope(source="test_simulated_finance")
+    )
 
     async def _go() -> None:
         # Evento ajeno (otro result / no-match) → applier devuelve False (no APPLY).

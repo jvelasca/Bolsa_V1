@@ -133,6 +133,7 @@ def _finance_applier_for(
     from bolsa_application.simulated_broker import simulated_fill_schedule
     from bolsa_application.simulated_finance import (
         build_simulated_execute_trade_applier,
+        require_sim_only_scope,
         resolve_execution_finance,
     )
     from bolsa_infrastructure.database.repositories.account_repository import (
@@ -171,7 +172,9 @@ def _finance_applier_for(
         SqlAlchemyPortfolioRepository(session),
         SqlAlchemyLedgerRepository(session),
     )
-    return build_simulated_execute_trade_applier(trade, _resolver)
+    return build_simulated_execute_trade_applier(
+        trade, _resolver, scope=require_sim_only_scope(source="test_simulated_finance_pg")
+    )
 
 
 async def _drive_buy_sell(
@@ -608,6 +611,7 @@ async def test_finance_auto_day_materializes_executetrade_exactly_once(
         )
         from bolsa_application.simulated_finance import (  # noqa: PLC0415
             build_simulated_execute_trade_applier,
+            require_sim_only_scope,
         )
         from bolsa_infrastructure.database.repositories.account_repository import (  # noqa: PLC0415
             SqlAlchemyAccountRepository,
@@ -638,7 +642,11 @@ async def test_finance_auto_day_materializes_executetrade_exactly_once(
                 second = await apply_execution_financial_once(
                     store,
                     execution=row,
-                    apply_finance=build_simulated_execute_trade_applier(trade, lambda _e: None),  # noqa: PLC0415
+                    apply_finance=build_simulated_execute_trade_applier(
+                        trade,
+                        lambda _e: None,
+                        scope=require_sim_only_scope(source="test_simulated_finance_pg"),
+                    ),  # noqa: PLC0415
                     owner="fin-pg-gate-replay",
                 )
                 assert second == "already_applied", second

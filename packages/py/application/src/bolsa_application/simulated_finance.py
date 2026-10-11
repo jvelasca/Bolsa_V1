@@ -37,6 +37,10 @@ Diseño (dos mitades, recosen costuras sin ciclos):
   la MISMA sesión, igual que el recovery/a7 con ``SqlAlchemyAccountRepository`` +
   ``SqlAlchemyPortfolioRepository`` + ``SqlAlchemyLedgerRepository``), materializa cada
   fill con los argumentos derivados por el mapper.
+* permiso POSITIVO (A8 · M0 · §7): el applier EXIGE un ``SimOnlyScope`` acuñado por
+  ``require_sim_only_scope`` — no se construye sin declarar afirmativamente la vía
+  simulada. La lista de venues y las envs LIVE siguen ahí, pero dejan de ser la única
+  defensa: el movimiento de dinero pide una capacidad, no solo la ausencia de una.
 """
 
 from __future__ import annotations
@@ -60,9 +64,11 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "SIM_FINANCE_VENUES",
+    "SimOnlyScope",
     "SimulatedFillFinance",
     "build_simulated_execute_trade_applier",
     "guard_sim_only_venue",
+    "require_sim_only_scope",
     "resolve_execution_finance",
     "sim_fill_finances",
     "sim_roundtrip_accounting",
@@ -134,6 +140,74 @@ def guard_sim_only_venue(venue: str) -> None:
             f"simulated finance refused non-AUTO venue {venue!r} "
             f"(allowed={sorted(SIM_FINANCE_VENUES)})"
         )
+
+
+# ── Permiso POSITIVO SIM-only (A8 · M0 · §7 endurecimiento runtime) ───────────────
+# El barricada no es solo una lista de denegación: el punto de movimiento de dinero
+# EXIGE una capacidad afirmativa («este llamante opera SIM-ONLY»). El token NO es un
+# booleano ni una env var: solo lo acuña ``require_sim_only_scope`` (sello de identidad
+# sobre una clave privada del módulo), y un intento de forja no pasa el sello.
+_SIM_ONLY_SCOPE_KEY = object()
+
+
+class SimOnlyScope:
+    """Capacidad positiva e intransferible que acredita «este llamante opera SIM-ONLY».
+
+    No es un booleano ni una env var: es un token que SOLO puede acuñar
+    ``require_sim_only_scope``. El punto de movimiento de dinero
+    (``build_simulated_execute_trade_applier``) lo EXIGE para construirse, de modo que
+    ninguna ruta pueda mover cash/posiciones sin haber declarado, de forma afirmativa,
+    que pertenece a la vía simulada. Un ``_key`` ajeno (p.ej. intento de forja) no pasa
+    el sello de identidad y la construcción falla ruidosamente.
+
+    Este permiso NO habilita nada LIVE: ``allows`` solo cubre los venues AUTO de
+    liquidación simulada {paper, simulated}. La vía real sigue cerrada por sus dos
+    barreras humanas (``live_execution_runtime``) y por el invariante estructural M0.
+    """
+
+    __slots__ = ("_key", "_source")
+
+    def __init__(self, *, _key: object, source: str) -> None:
+        if _key is not _SIM_ONLY_SCOPE_KEY:
+            raise TypeError(
+                "SimOnlyScope no es construible directamente; usa require_sim_only_scope()"
+            )
+        self._key = _key
+        self._source = source
+
+    @property
+    def source(self) -> str:
+        """Módulo/punto que acuñó la capacidad (trazabilidad del permiso)."""
+        return self._source
+
+    def allows(self, venue: str) -> bool:
+        """La capacidad cubre SOLO los venues AUTO de liquidación simulada."""
+        return str(venue or "").strip().lower() in SIM_FINANCE_VENUES
+
+    def __repr__(self) -> str:
+        return f"SimOnlyScope(source={self._source!r})"
+
+
+def require_sim_only_scope(*, source: str) -> SimOnlyScope:
+    """Acuña la capacidad SIM-only. Único constructor válido (permiso positivo).
+
+    ``source`` documenta quién la pide y falla si viene vacío: un permiso sin
+    procedencia declarada no debe existir (trazabilidad del movimiento de dinero).
+    """
+    tag = str(source or "").strip()
+    if not tag:
+        raise ValueError("require_sim_only_scope requires a non-empty source")
+    return SimOnlyScope(_key=_SIM_ONLY_SCOPE_KEY, source=tag)
+
+
+def _sealed_sim_only_scope(scope: Any) -> SimOnlyScope:
+    """Valida el sello de la capacidad; cualquier cosa forjada ⇒ ``TypeError``."""
+    if not isinstance(scope, SimOnlyScope) or scope._key is not _SIM_ONLY_SCOPE_KEY:
+        raise TypeError(
+            "build_simulated_execute_trade_applier exige un SimOnlyScope acuñado por "
+            "require_sim_only_scope() (permiso positivo SIM-only · A8·M0 §7)"
+        )
+    return scope
 
 
 def _fill_for_execution(result: SimulatedOrderResult, execution_id: str) -> SimulatedFill | None:
@@ -224,8 +298,15 @@ FinanceResolver = Callable[[ExecutionEvent], Any]
 def build_simulated_execute_trade_applier(
     execute_trade: Any,
     resolver: FinanceResolver,
+    *,
+    scope: SimOnlyScope,
 ) -> Any:
     """Fabrica un ``ApplyFinanceCallable`` que materializa un fill simulado en PG real.
+
+    ``scope`` es el PERMISO POSITIVO SIM-only (A8·M0 §7): debe venir acuñado por
+    ``require_sim_only_scope``; el applier no se construye sin él (``TypeError`` si falta
+    o si está forjado). Así el movimiento de dinero exige una declaración afirmativa de
+    vía simulada, en vez de depender solo de una lista de denegación de venues.
 
     ``execute_trade`` es la instancia de ``ExecuteTrade`` (construida por el caller en su
     sesión, igual que el recovery/a7: ``SqlAlchemyAccountRepository``+``Portfolio``+
@@ -245,6 +326,8 @@ def build_simulated_execute_trade_applier(
     executor = getattr(execute_trade, "execute", None)
     if executor is None:
         raise TypeError("execute_trade must expose an async .execute(**kwargs)")
+    # Permiso positivo: sin capacidad sellada SIM-only no hay applier de dinero.
+    _sealed_sim_only_scope(scope)
 
     async def _apply(execution: ExecutionEvent) -> bool:
         resolved = resolver(execution)
@@ -255,7 +338,7 @@ def build_simulated_execute_trade_applier(
         if finance is None:
             # Sin contexto viable (no-match / venue no-AUTO / sin price) → nada que aplicar.
             return False
-        if not finance.venue_is_sim_only:
+        if not finance.venue_is_sim_only or not scope.allows(finance.venue):
             return False
         try:
             await executor(
