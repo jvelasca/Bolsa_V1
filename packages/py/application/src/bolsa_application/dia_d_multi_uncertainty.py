@@ -11,10 +11,12 @@ producción), y publica por cada cubo
 * ``bands`` — ``min``/``median``/``max``/``mean``/``stdev`` de cada métrica (``expectancyR``,
   ``realizedRTotal``, ``hitRate``, ``meanMaeR``, ``meanMfeR``, ``captureMean``, ``reversedCount``,
   ``cycles``); ``None`` sin muestra, **nunca** ``0``;
-* ``validity`` — ``crossesZeroR`` y ``pointCitable`` evaluados con el criterio YA sellado por
-  ``W3.3`` (``point_citable`` sólo si la banda de R **no** cruza cero **y** ``|media| > 1.96·SE``),
-  más ``se``/``ci95HalfWidth``. Con menos de ``MIN_DRAWS_FOR_BAND`` sorteos **no** hay banda que
-  cite un punto: se declara (``insufficient_draws``).
+* ``validity`` — bloque con **DOS etiquetas separadas** (H1): ``sensitivityBand`` (lo que los ``K``
+  re-sorteos del venue SÍ miden: ``crossesZeroR`` y ``pointCitable`` acotado por
+  ``pointCitableScope``) y ``statisticalConfidence`` (``NOT_MEASURED`` por defecto: re-sorteos del
+  mismo dato **no** son observaciones independientes ⇒ jamás se infiere de ellas). Con menos de
+  ``MIN_DRAWS_FOR_BAND`` sorteos **no** hay banda que cite un punto: se declara
+  (``insufficient_draws``).
 
 Por qué existe
 --------------
@@ -45,7 +47,7 @@ from typing import Any
 from bolsa_application.dia_d_auto import finite_number
 
 #: Versión del esquema del artefacto de banda. Un cambio de forma la sube.
-SCHEMA_VERSION = "dia-d-multi-band-v1"
+SCHEMA_VERSION = "dia-d-multi-band-v2"
 
 #: Tipo del artefacto (una banda de la atribución, no una atribución).
 KIND = "DIA_D_AUTO_MULTI_BAND"
@@ -56,6 +58,29 @@ MIN_DRAWS_FOR_BAND = 2
 
 #: Z del IC95 del criterio de citabilidad (el MISMO de ``W3.3``).
 CI95_Z = 1.96
+
+#: Diseño de la muestra: de dónde vienen los ``K`` sorteos. Se DECLARA; no se adivina (H1).
+#: ``venue_draw`` = re-sorteos del MISMO dato (solo mide sensibilidad al azar del venue);
+#: ``independent_sample`` = observaciones INDEPENDIENTES declaradas por el llamante.
+DESIGN_VENUE_DRAW = "venue_draw"
+DESIGN_INDEPENDENT = "independent_sample"
+
+#: Alcance de ``pointCitable``: citabilidad DE LA BANDA DE SENSIBILIDAD, NUNCA una afirmación
+#: de confianza estadística ni de rentabilidad demostrada (H1).
+POINT_CITABLE_SCOPE = "sensitivity_band_only_not_statistical_confidence"
+
+#: Motivo declarado por el que la confianza estadística NO se mide con re-sorteos del venue.
+STATISTICAL_CONFIDENCE_NOT_MEASURED_REASON = (
+    "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: "
+    "no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo "
+    "del venue, no la incertidumbre estadistica de la estrategia."
+)
+
+#: Lo que exigiría medir la confianza estadística (nunca se infiere de re-sorteos).
+STATISTICAL_CONFIDENCE_REQUIRES = (
+    "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un "
+    "procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato."
+)
 
 #: Dimensiones declaradas de un cubo (nunca se adivina la etiqueta).
 DIM_GLOBAL = "GLOBAL"
@@ -92,6 +117,11 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "incertidumbre de muestreo del ciclo ni el futuro.",
     "Un punto solo es citable si la banda de R NO cruza cero Y |media| > 1.96*SE, con K >= 2; con "
     "menos sorteos se declara insufficient_draws y pointCitable=False.",
+    "H1: las etiquetas sensitivityBand y statisticalConfidence NO se confunden. La banda de K "
+    "re-sorteos del MISMO dato mide SOLO sensibilidad al sorteo del venue; la confianza estadistica "
+    "queda NOT_MEASURED salvo que el llamante declare observaciones independientes.",
+    "pointCitable esta acotado por pointCitableScope: es citabilidad de la banda de sensibilidad, "
+    "NUNCA una afirmacion de rentabilidad demostrada.",
     "La banda se cita ENTERA o no se cita: el determinismo (reproducibilidad byte a byte) NO es "
     "validez.",
     "Un hueco es None/NOT_MEASURED; nunca se rellena con 0. Un cubo ausente en un sorteo baja "
@@ -158,39 +188,97 @@ def _stats(values: Sequence[float]) -> dict[str, Any] | None:
     }
 
 
-def _validity(realized_stats: Mapping[str, Any] | None, draws_with_cell: int) -> dict[str, Any]:
-    """Criterio de citabilidad del MISMO sello de ``W3.3`` (evaluado, no narrado).
+def band_validity(
+    *,
+    crosses_key: str,
+    stats: Mapping[str, Any] | None,
+    draws_with_cell: int,
+    design: str = DESIGN_VENUE_DRAW,
+) -> dict[str, Any]:
+    """Bloque ``validity`` con DOS etiquetas SEPARADAS (H1): sensibilidad vs confianza estadística.
 
-    ``crossesZeroR`` = la banda de R total abarca el cero. ``pointCitable`` = la banda **no**
-    cruza el cero **y** ``|media| > 1.96·SE`` (SE = ``stdev / sqrt(n)``), con al menos
-    ``MIN_DRAWS_FOR_BAND`` sorteos. Sin banda ⇒ ``crossesZeroR = None`` y ``pointCitable = False``.
+    ``sensitivityBand`` — lo que los ``K`` sorteos del venue SÍ miden: ``crosses_key`` (¿la banda
+    abarca el cero?) y ``pointCitable`` (= banda estable **y** ``|media| > 1.96·SE``), SIEMPRE
+    acotado por ``pointCitableScope``. Es una lectura del **ruido del sorteo**, no de la estrategia.
+
+    ``statisticalConfidence`` — lo que re-sorteos del MISMO dato **no** pueden afirmar: con
+    ``design = venue_draw`` (por defecto) queda ``status = NOT_MEASURED``, ``established = False``
+    y el motivo. Solo con ``design = independent_sample`` (declarado por el llamante) se computa
+    con el mismo criterio.
+
+    Un hueco es ``None`` (``sin_muestra`` / ``insufficient_draws``); jamás se rellena con ``0``.
     """
-    if realized_stats is None:
-        return {
-            "crossesZeroR": None,
-            "pointCitable": False,
-            "se": None,
-            "ci95HalfWidth": None,
-            "note": "sin_muestra",
-        }
-    crosses = bool(realized_stats["min"] < 0.0 < realized_stats["max"])
-    if draws_with_cell < MIN_DRAWS_FOR_BAND:
-        return {
-            "crossesZeroR": crosses,
-            "pointCitable": False,
-            "se": None,
-            "ci95HalfWidth": None,
-            "note": "insufficient_draws",
-        }
-    se = float(realized_stats["stdev"]) / math.sqrt(draws_with_cell)
-    point_citable = (not crosses) and abs(float(realized_stats["mean"])) > CI95_Z * se
-    return {
-        "crossesZeroR": crosses,
+    measured = stats is not None
+    crosses: bool | None = None
+    se: float | None = None
+    half_width: float | None = None
+    note: str | None = None
+    point_citable = False
+    if stats is None:
+        note = "sin_muestra"
+    else:
+        crosses = bool(stats["min"] < 0.0 < stats["max"])
+        if draws_with_cell < MIN_DRAWS_FOR_BAND:
+            note = "insufficient_draws"
+        else:
+            se = float(stats["stdev"]) / math.sqrt(draws_with_cell)
+            half_width = CI95_Z * se
+            point_citable = (not crosses) and abs(float(stats["mean"])) > half_width
+    sensitivity = {
+        "label": "sensitivityBand",
+        "scope": "venue_draw_sensitivity",
+        "measured": measured,
+        "drawsWithCell": draws_with_cell,
+        crosses_key: crosses,
         "pointCitable": bool(point_citable),
+        "pointCitableScope": POINT_CITABLE_SCOPE,
         "se": se,
-        "ci95HalfWidth": CI95_Z * se,
-        "note": None,
+        "ci95HalfWidth": half_width,
+        "note": note,
     }
+    if design == DESIGN_INDEPENDENT:
+        statistical: dict[str, Any] = {
+            "label": "statisticalConfidence",
+            "design": design,
+            "status": "MEASURED",
+            "established": bool(point_citable),
+            "se": se,
+            "ci95HalfWidth": half_width,
+            "reason": None,
+            "requires": STATISTICAL_CONFIDENCE_REQUIRES,
+        }
+    else:
+        statistical = {
+            "label": "statisticalConfidence",
+            "design": design,
+            "status": "NOT_MEASURED",
+            "established": False,
+            "se": None,
+            "ci95HalfWidth": None,
+            "reason": STATISTICAL_CONFIDENCE_NOT_MEASURED_REASON,
+            "requires": STATISTICAL_CONFIDENCE_REQUIRES,
+        }
+    return {
+        "design": design,
+        "crossesKey": crosses_key,
+        "sensitivityBand": sensitivity,
+        "statisticalConfidence": statistical,
+    }
+
+
+def _validity(
+    realized_stats: Mapping[str, Any] | None,
+    draws_with_cell: int,
+    *,
+    design: str = DESIGN_VENUE_DRAW,
+) -> dict[str, Any]:
+    """`validity` de la banda DÍA-D: delega en `band_validity` (H1) con su clave de cruce."""
+    return band_validity(
+        crosses_key="crossesZeroR",
+        stats=realized_stats,
+        draws_with_cell=draws_with_cell,
+        design=design,
+    )
 
 
 def _label(value: Any, fallback: str = "") -> str:
@@ -296,6 +384,7 @@ def _render_cell(
     *,
     draws_with_cell: int,
     draws_total: int,
+    design: str = DESIGN_VENUE_DRAW,
 ) -> dict[str, Any]:
     """Cubo con su banda por métrica y su ``validity`` (las etiquetas del cubo, según dimensión)."""
     dimension, year, regime = key
@@ -304,7 +393,7 @@ def _render_cell(
         "drawsWithCell": draws_with_cell,
         "drawsTotal": draws_total,
         "bands": bands,
-        "validity": _validity(bands.get("realizedRTotal"), draws_with_cell),
+        "validity": _validity(bands.get("realizedRTotal"), draws_with_cell, design=design),
     }
     if dimension == DIM_YEAR:
         cell["year"] = year
@@ -396,19 +485,25 @@ def build_band_artifact(
     cross_check: Mapping[str, Any] | None = None,
     meta: Mapping[str, Any] | None = None,
     limits: Sequence[str] | None = None,
+    design: str = DESIGN_VENUE_DRAW,
 ) -> dict[str, Any]:
     """Payload canónico de la banda multirregimen (puro y determinista: sin reloj ni azar).
 
     ``draws`` son los ``K`` artefactos ``dia-d-multi-v1`` (uno por sorteo del venue). Pliega cada
-    cubo con ``bands`` (min/median/max/mean/stdev) y ``validity`` (``crossesZeroR``/``pointCitable``).
-    Un cubo sin muestra no aparece en su dimensión; un hueco queda ``None``, nunca ``0``.
+    cubo con ``bands`` (min/median/max/mean/stdev) y ``validity`` (bloque H1 con ``sensitivityBand``
+    y ``statisticalConfidence`` separados). Un cubo sin muestra no aparece en su dimensión; un hueco
+    queda ``None``, nunca ``0``. ``design`` declara la procedencia de los ``K`` sorteos.
     """
     ordered = list(draws or ())
     draws_total = len(ordered)
     values, presence = _fold(ordered)
     cells = {
         key: _render_cell(
-            key, values[key], draws_with_cell=presence.get(key, 0), draws_total=draws_total
+            key,
+            values[key],
+            draws_with_cell=presence.get(key, 0),
+            draws_total=draws_total,
+            design=design,
         )
         for key in sorted(values, key=_sort_key)
     }
@@ -420,7 +515,7 @@ def build_band_artifact(
         "drawsWithCell": 0,
         "drawsTotal": draws_total,
         "bands": {metric: None for metric in METRICS},
-        "validity": _validity(None, 0),
+        "validity": _validity(None, 0, design=design),
     })
 
     return {
@@ -428,6 +523,7 @@ def build_band_artifact(
         "kind": KIND,
         "readOnly": True,
         "basis": "entryDay",
+        "design": design,
         "draws": draws_total,
         "seedShift": {str(key): value for key, value in (seed_shift or {}).items()},
         "coverage": _coverage(ordered),
@@ -449,6 +545,8 @@ def build_band_artifact(
 __all__ = [
     "CI95_Z",
     "DEFAULT_LIMITS",
+    "DESIGN_INDEPENDENT",
+    "DESIGN_VENUE_DRAW",
     "DIM_GLOBAL",
     "DIM_OPERATIONAL",
     "DIM_REGIME",
@@ -457,6 +555,10 @@ __all__ = [
     "KIND",
     "METRICS",
     "MIN_DRAWS_FOR_BAND",
+    "POINT_CITABLE_SCOPE",
     "SCHEMA_VERSION",
+    "STATISTICAL_CONFIDENCE_NOT_MEASURED_REASON",
+    "STATISTICAL_CONFIDENCE_REQUIRES",
+    "band_validity",
     "build_band_artifact",
 ]

@@ -264,7 +264,8 @@ def test_finance_band_seam_folds_replay_reports(v87: Any) -> None:
     cell = next(cell for cell in band["groups"] if cell["symbol"] == "ACS")
     assert cell["drawsWithCell"] == 2
     assert cell["bands"]["netReturnPct"]["n"] == 2
-    assert cell["validity"]["note"] is None
+    assert cell["validity"]["sensitivityBand"]["note"] is None
+    assert cell["validity"]["statisticalConfidence"]["status"] == "NOT_MEASURED"
 
 
 def test_purge_draw_artifacts_removes_only_draw_outputs(v87: Any, tmp_path: pathlib.Path) -> None:

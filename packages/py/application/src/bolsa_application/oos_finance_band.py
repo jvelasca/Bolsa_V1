@@ -15,9 +15,10 @@ Por cada cubo publica:
   (``netReturnPct``, ``grossReturnPct``, ``netReturnPctAtStress``, ``maxDrawdownPct``,
   ``hitRate``, ``profitFactor``, ``sharpe``, ``trades``, ``committedCapital``); ``None``
   sin muestra, **nunca** ``0``.
-* ``validity`` — ``crossesZeroNetReturn`` y ``pointCitable`` evaluados con el MISMO
-  criterio que el resto del repositorio (``pointCitable`` sólo si la banda de retorno neto
-  **no** cruza cero **y** ``|media| > 1.96·SE``), más ``se``/``ci95HalfWidth``. Con menos de
+* ``validity`` — bloque con **DOS etiquetas separadas** (H1): ``sensitivityBand`` (lo que los ``K``
+  re-sorteos del venue SÍ miden: ``crossesZeroNetReturn`` y ``pointCitable`` acotado por
+  ``pointCitableScope``) y ``statisticalConfidence`` (``NOT_MEASURED`` por defecto: re-sorteos del
+  mismo dato **no** son observaciones independientes ⇒ jamás se infiere de ellas). Con menos de
   ``MIN_DRAWS_FOR_BAND`` sorteos **no** hay banda que cite un punto: se declara
   (``insufficient_draws``).
 * ``strategyPresetKey`` — identidad EXACTA (H1/H2) del cubo: la clave única si TODOS los
@@ -46,11 +47,18 @@ from typing import Any
 from bolsa_application.dia_d_auto import finite_number
 
 #: Fuente ÚNICA de verdad del criterio de banda: el sello ya existente no se re-declara.
-#: Importarlos aquí garantiza que la banda financiera y la banda DÍA-D usan el mismo umbral.
-from bolsa_application.dia_d_multi_uncertainty import CI95_Z, MIN_DRAWS_FOR_BAND
+#: Importarlos aquí garantiza que la banda financiera y la banda DÍA-D usan el mismo umbral
+#: y la MISMA separación H1 entre sensibilidad del sorteo y confianza estadística.
+from bolsa_application.dia_d_multi_uncertainty import (
+    CI95_Z,
+    DESIGN_VENUE_DRAW,
+    MIN_DRAWS_FOR_BAND,
+    POINT_CITABLE_SCOPE,
+    band_validity,
+)
 
 #: Versión del esquema del artefacto de banda. Un cambio de forma la sube.
-SCHEMA_VERSION = "oos-finance-band-v2"
+SCHEMA_VERSION = "oos-finance-band-v3"
 
 #: Tipo del artefacto.
 KIND = "OOS_FINANCE_BAND"
@@ -82,6 +90,11 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "no la incertidumbre de muestreo del ciclo ni el futuro.",
     "Un punto solo es citable si la banda de retorno neto NO cruza cero Y |media| > 1.96*SE, "
     "con K >= 2; con menos sorteos se declara insufficient_draws y pointCitable=False.",
+    "H1: las etiquetas sensitivityBand y statisticalConfidence NO se confunden. La banda de K "
+    "re-sorteos del MISMO dato mide SOLO sensibilidad al sorteo del venue; la confianza estadistica "
+    "queda NOT_MEASURED salvo que el llamante declare observaciones independientes.",
+    "pointCitable esta acotado por pointCitableScope: es citabilidad de la banda de sensibilidad, "
+    "NUNCA una afirmacion de rentabilidad demostrada.",
     "La banda se cita ENTERA o no se cita: el determinismo (reproducibilidad byte a byte) NO es "
     "validez.",
     "Un hueco es None/NOT_MEASURED; nunca se rellena con 0. Un cubo ausente en un sorteo baja "
@@ -152,40 +165,25 @@ def _stats(values: Sequence[float]) -> dict[str, Any] | None:
     }
 
 
-def _validity(net_return_stats: Mapping[str, Any] | None, draws_with_cell: int) -> dict[str, Any]:
-    """Criterio de citabilidad evaluado (no narrado).
+def _validity(
+    net_return_stats: Mapping[str, Any] | None,
+    draws_with_cell: int,
+    *,
+    design: str = DESIGN_VENUE_DRAW,
+) -> dict[str, Any]:
+    """`validity` de la banda financiera: delega en `band_validity` (H1) con su clave de cruce.
 
-    ``crossesZeroNetReturn`` = la banda de retorno neto abarca el cero. ``pointCitable`` = la
-    banda **no** cruza el cero **y** ``|media| > 1.96·SE`` (SE = ``stdev / sqrt(n)``), con al
-    menos ``MIN_DRAWS_FOR_BAND`` sorteos. Sin banda ⇒ ``crossesZeroNetReturn = None`` y
-    ``pointCitable = False``.
+    ``sensitivityBand.crossesZeroNetReturn`` = la banda de retorno neto abarca el cero.
+    ``sensitivityBand.pointCitable`` = la banda **no** cruza el cero **y** ``|media| > 1.96·SE``
+    (SE = ``stdev / sqrt(n)``), con al menos ``MIN_DRAWS_FOR_BAND`` sorteos, SIEMPRE acotado por
+    ``pointCitableScope``. ``statisticalConfidence`` NO se infiere de re-sorteos del venue.
     """
-    if net_return_stats is None:
-        return {
-            "crossesZeroNetReturn": None,
-            "pointCitable": False,
-            "se": None,
-            "ci95HalfWidth": None,
-            "note": "sin_muestra",
-        }
-    crosses = bool(net_return_stats["min"] < 0.0 < net_return_stats["max"])
-    if draws_with_cell < MIN_DRAWS_FOR_BAND:
-        return {
-            "crossesZeroNetReturn": crosses,
-            "pointCitable": False,
-            "se": None,
-            "ci95HalfWidth": None,
-            "note": "insufficient_draws",
-        }
-    se = float(net_return_stats["stdev"]) / math.sqrt(draws_with_cell)
-    point_citable = (not crosses) and abs(float(net_return_stats["mean"])) > CI95_Z * se
-    return {
-        "crossesZeroNetReturn": crosses,
-        "pointCitable": bool(point_citable),
-        "se": se,
-        "ci95HalfWidth": CI95_Z * se,
-        "note": None,
-    }
+    return band_validity(
+        crosses_key="crossesZeroNetReturn",
+        stats=net_return_stats,
+        draws_with_cell=draws_with_cell,
+        design=design,
+    )
 
 
 # ── Extracción de métricas de UN reporte `oos_finance` ───────────────────────────
@@ -306,6 +304,7 @@ def _render_cell(
     draws_with_cell: int,
     draws_total: int,
     identity: _PresetIdentity,
+    design: str = DESIGN_VENUE_DRAW,
 ) -> dict[str, Any]:
     """Cubo con su banda por métrica, su ``validity`` medida y su identidad declarada (H2)."""
     bands = {metric: _stats(metric_values.get(metric, [])) for metric in METRICS}
@@ -318,7 +317,7 @@ def _render_cell(
         "drawsWithCell": draws_with_cell,
         "drawsTotal": draws_total,
         "bands": bands,
-        "validity": _validity(bands.get(VALIDITY_METRIC), draws_with_cell),
+        "validity": _validity(bands.get(VALIDITY_METRIC), draws_with_cell, design=design),
     }
 
 
@@ -359,13 +358,14 @@ def build_finance_band(
     seed_shift: Mapping[str, Any] | None = None,
     meta: Mapping[str, Any] | None = None,
     limits: Sequence[str] | None = None,
+    design: str = DESIGN_VENUE_DRAW,
 ) -> dict[str, Any]:
     """Payload canónico de la banda financiera OOS (puro y determinista: sin reloj ni azar).
 
     ``draws`` son los ``K`` reportes ``oos_finance`` (``OosFinanceReport.to_dict()``), uno por
     sorteo del venue. Pliega cada cubo con ``bands`` (min/median/max/mean/stdev/n) y ``validity``
-    (``crossesZeroNetReturn``/``pointCitable``). Un cubo sin muestra no aparece; un hueco queda
-    ``None``, nunca ``0``.
+    (bloque H1: ``sensitivityBand`` + ``statisticalConfidence`` separados). Un cubo sin muestra no
+    aparece; un hueco queda ``None``, nunca ``0``. ``design`` declara la procedencia de los sorteos.
     """
     ordered = [report for report in (draws or ()) if isinstance(report, Mapping)]
     draws_total = len(ordered)
@@ -377,6 +377,7 @@ def build_finance_band(
             draws_with_cell=presence.get(key, 0),
             draws_total=draws_total,
             identity=identities.get(key, _NO_IDENTITY),
+            design=design,
         )
         for key in values
     }
@@ -389,7 +390,7 @@ def build_finance_band(
         "drawsWithCell": 0,
         "drawsTotal": draws_total,
         "bands": {metric: None for metric in METRICS},
-        "validity": _validity(None, 0),
+        "validity": _validity(None, 0, design=design),
     })
     group_cells = [
         cells[key] for key in sorted(cells, key=_sort_key) if key != AGGREGATE_KEY
@@ -398,6 +399,7 @@ def build_finance_band(
         "schemaVersion": SCHEMA_VERSION,
         "kind": KIND,
         "readOnly": True,
+        "design": design,
         "draws": draws_total,
         "minTrades": _declared_scalar(ordered, "minTrades"),
         "stressMultiplier": _declared_scalar(ordered, "stressMultiplier"),
@@ -414,9 +416,11 @@ __all__ = [
     "AGGREGATE_KEY",
     "CI95_Z",
     "DEFAULT_LIMITS",
+    "DESIGN_VENUE_DRAW",
     "KIND",
     "METRICS",
     "MIN_DRAWS_FOR_BAND",
+    "POINT_CITABLE_SCOPE",
     "SCHEMA_VERSION",
     "VALIDITY_METRIC",
     "build_finance_band",

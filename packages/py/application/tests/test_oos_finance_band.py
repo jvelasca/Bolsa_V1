@@ -4,7 +4,8 @@ Contrato de honestidad, verificado aquí:
 
 * Un hueco es ``None``/``NOT_MEASURED``; **nunca** se rellena con ``0``.
 * Un cubo ausente en un sorteo baja ``drawsWithCell`` (no se inventa un valor).
-* ``validity`` se **evalúa** (``crossesZeroNetReturn``/``pointCitable``), no se narra.
+* ``validity`` se **evalúa** (bloque H1 con ``sensitivityBand`` y ``statisticalConfidence``
+  SEPARADOS), no se narra.
 * El payload es **determinista** (no depende del orden de los sorteos ni de los grupos).
 """
 
@@ -12,10 +13,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from bolsa_application.dia_d_multi_uncertainty import (
+    DESIGN_INDEPENDENT,
+    DESIGN_VENUE_DRAW,
+)
 from bolsa_application.oos_finance_band import (
     AGGREGATE_KEY,
     METRICS,
     MIN_DRAWS_FOR_BAND,
+    POINT_CITABLE_SCOPE,
     build_finance_band,
 )
 
@@ -88,10 +94,10 @@ def test_insufficient_draws_with_k_one() -> None:
 
     band = build_finance_band(draws=draws)
 
-    validity = band["groups"][0]["validity"]
-    assert validity["pointCitable"] is False
-    assert validity["note"] == "insufficient_draws"
-    assert validity["se"] is None
+    sensitivity = band["groups"][0]["validity"]["sensitivityBand"]
+    assert sensitivity["pointCitable"] is False
+    assert sensitivity["note"] == "insufficient_draws"
+    assert sensitivity["se"] is None
 
 
 def test_crosses_zero_blocks_citation_and_all_positive_allows_it() -> None:
@@ -103,8 +109,9 @@ def test_crosses_zero_blocks_citation_and_all_positive_allows_it() -> None:
         ]
     )
     band = [cell for cell in crossing["groups"] if cell["symbol"] == "ACS"][0]
-    assert band["validity"]["crossesZeroNetReturn"] is True
-    assert band["validity"]["pointCitable"] is False
+    sensitivity = band["validity"]["sensitivityBand"]
+    assert sensitivity["crossesZeroNetReturn"] is True
+    assert sensitivity["pointCitable"] is False
 
     citable = build_finance_band(
         draws=[
@@ -113,9 +120,10 @@ def test_crosses_zero_blocks_citation_and_all_positive_allows_it() -> None:
         ]
     )
     ok = [cell for cell in citable["groups"] if cell["symbol"] == "ITX"][0]
-    assert ok["validity"]["crossesZeroNetReturn"] is False
-    assert ok["validity"]["pointCitable"] is True
-    assert ok["validity"]["se"] is not None
+    ok_sensitivity = ok["validity"]["sensitivityBand"]
+    assert ok_sensitivity["crossesZeroNetReturn"] is False
+    assert ok_sensitivity["pointCitable"] is True
+    assert ok_sensitivity["se"] is not None
 
 
 def test_absent_group_has_no_sample_but_is_declared() -> None:
@@ -124,10 +132,59 @@ def test_absent_group_has_no_sample_but_is_declared() -> None:
 
     band = build_finance_band(draws=draws)
 
+    sensitivity = band["groups"][0]["validity"]["sensitivityBand"]
+    assert sensitivity["crossesZeroNetReturn"] is None
+    assert sensitivity["pointCitable"] is False
+    assert sensitivity["note"] == "sin_muestra"
+
+
+def test_h1_sensitivity_band_is_not_statistical_confidence() -> None:
+    """H1 — la banda financiera separa sensibilidad del sorteo de confianza estadística."""
+    band = build_finance_band(
+        draws=[
+            _report([_group("ITX", netReturnPct=value)])
+            for value in (10.0, 12.0, 14.0, 16.0)
+        ]
+    )
     validity = band["groups"][0]["validity"]
-    assert validity["crossesZeroNetReturn"] is None
-    assert validity["pointCitable"] is False
-    assert validity["note"] == "sin_muestra"
+
+    assert band["design"] == DESIGN_VENUE_DRAW
+    assert validity["design"] == DESIGN_VENUE_DRAW
+    assert validity["crossesKey"] == "crossesZeroNetReturn"
+    sensitivity = validity["sensitivityBand"]
+    assert sensitivity["label"] == "sensitivityBand"
+    assert sensitivity["scope"] == "venue_draw_sensitivity"
+    assert sensitivity["pointCitable"] is True
+    assert sensitivity["pointCitableScope"] == POINT_CITABLE_SCOPE
+    statistical = validity["statisticalConfidence"]
+    assert statistical["label"] == "statisticalConfidence"
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["established"] is False
+    assert statistical["reason"] and statistical["requires"]
+
+
+def test_h1_independent_sample_establishes_statistical_confidence() -> None:
+    """H1 — con ``design=independent_sample`` declarado, la confianza estadística sí se computa."""
+    band = build_finance_band(
+        draws=[
+            _report([_group("ITX", netReturnPct=value)])
+            for value in (10.0, 12.0, 14.0, 16.0)
+        ],
+        design=DESIGN_INDEPENDENT,
+    )
+    statistical = band["groups"][0]["validity"]["statisticalConfidence"]
+    assert band["design"] == DESIGN_INDEPENDENT
+    assert statistical["status"] == "MEASURED"
+    assert statistical["established"] is True
+
+
+def test_h1_aggregate_declares_both_labels_without_sample() -> None:
+    """H1 — el cubo agregado sin muestra declara ambas etiquetas como hueco, nunca un cero."""
+    validity = build_finance_band(draws=[])["aggregate"]["validity"]
+    assert validity["sensitivityBand"]["pointCitable"] is False
+    assert validity["sensitivityBand"]["note"] == "sin_muestra"
+    assert validity["statisticalConfidence"]["status"] == "NOT_MEASURED"
+    assert validity["statisticalConfidence"]["established"] is False
 
 
 def test_payload_is_deterministic_under_permutation() -> None:

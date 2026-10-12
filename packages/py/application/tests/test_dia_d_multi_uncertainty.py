@@ -5,8 +5,10 @@ Invariantes que se fijan aquí:
 * La banda publica ``min``/``median``/``max``/``mean``/``stdev`` por cubo; sin muestra es ``None``
   (**nunca** ``0``).
 * Un cubo ausente en un sorteo baja ``drawsWithCell`` (no se inventa un valor).
-* ``pointCitable`` sólo es ``True`` si la banda de R total **no** cruza cero, ``|media| > 1.96·SE``
-  y hay al menos ``MIN_DRAWS_FOR_BAND`` sorteos; con menos, se declara (``insufficient_draws``).
+* ``validity`` publica DOS etiquetas SEPARADAS (H1): ``sensitivityBand`` (``pointCitable`` sólo es
+  ``True`` si la banda de R total **no** cruza cero, ``|media| > 1.96·SE`` y hay al menos
+  ``MIN_DRAWS_FOR_BAND`` sorteos; con menos, se declara ``insufficient_draws``) y
+  ``statisticalConfidence`` (``NOT_MEASURED`` con re-sorteos del venue; nunca se infiere de ellos).
 * La cobertura cuenta por año y por sorteo (medido / vacío / no medido), sin rellenar huecos.
 * El artefacto es determinista (sin reloj ni aleatorios).
 """
@@ -18,7 +20,10 @@ from typing import Any
 
 from bolsa_application.dia_d_multi import build_dia_d_multi_artifact
 from bolsa_application.dia_d_multi_uncertainty import (
+    DESIGN_INDEPENDENT,
+    DESIGN_VENUE_DRAW,
     KIND,
+    POINT_CITABLE_SCOPE,
     SCHEMA_VERSION,
     build_band_artifact,
 )
@@ -116,35 +121,93 @@ def test_cell_absent_in_a_draw_lowers_draws_with_cell():
 
 def test_point_citable_is_false_when_the_band_crosses_zero():
     artifact = build_band_artifact(draws=[_draw(realized_r=-1.0), _draw(realized_r=1.0)])
-    validity = artifact["global"]["validity"]
-    assert validity["crossesZeroR"] is True
-    assert validity["pointCitable"] is False
+    sensitivity = artifact["global"]["validity"]["sensitivityBand"]
+    assert sensitivity["crossesZeroR"] is True
+    assert sensitivity["pointCitable"] is False
 
 
 def test_point_citable_is_true_when_the_band_is_away_from_zero_and_narrow():
     artifact = build_band_artifact(
         draws=[_draw(realized_r=-5.0), _draw(realized_r=-5.1), _draw(realized_r=-4.9)]
     )
-    validity = artifact["global"]["validity"]
-    assert validity["crossesZeroR"] is False
-    assert validity["pointCitable"] is True
-    assert validity["ci95HalfWidth"] is not None and validity["ci95HalfWidth"] > 0.0
+    sensitivity = artifact["global"]["validity"]["sensitivityBand"]
+    assert sensitivity["crossesZeroR"] is False
+    assert sensitivity["pointCitable"] is True
+    assert sensitivity["ci95HalfWidth"] is not None and sensitivity["ci95HalfWidth"] > 0.0
 
 
 def test_insufficient_draws_blocks_citability():
     artifact = build_band_artifact(draws=[_draw(realized_r=-5.0)])
-    validity = artifact["global"]["validity"]
-    assert validity["pointCitable"] is False
-    assert validity["note"] == "insufficient_draws"
+    sensitivity = artifact["global"]["validity"]["sensitivityBand"]
+    assert sensitivity["pointCitable"] is False
+    assert sensitivity["note"] == "insufficient_draws"
 
 
 def test_no_draws_declares_none_not_zero():
     artifact = build_band_artifact(draws=[])
     assert artifact["draws"] == 0
     assert artifact["global"]["bands"]["realizedRTotal"] is None
-    assert artifact["global"]["validity"]["pointCitable"] is False
-    assert artifact["global"]["validity"]["note"] == "sin_muestra"
+    sensitivity = artifact["global"]["validity"]["sensitivityBand"]
+    assert sensitivity["pointCitable"] is False
+    assert sensitivity["note"] == "sin_muestra"
     assert artifact["byYear"] == []
+
+
+# ── H1: sensibilidad del sorteo vs confianza estadística (etiquetas SEPARADAS) ───
+
+
+def test_h1_sensitivity_and_statistical_confidence_are_separate_labels():
+    """H1 — con re-sorteos del venue, ``pointCitable`` NO implica confianza estadística."""
+    artifact = build_band_artifact(
+        draws=[_draw(realized_r=-5.0), _draw(realized_r=-5.1), _draw(realized_r=-4.9)]
+    )
+    validity = artifact["global"]["validity"]
+
+    assert validity["design"] == DESIGN_VENUE_DRAW
+    assert artifact["design"] == DESIGN_VENUE_DRAW
+    sensitivity = validity["sensitivityBand"]
+    assert sensitivity["pointCitableScope"] == POINT_CITABLE_SCOPE
+    # La banda es citable COMO SENSIBILIDAD...
+    assert sensitivity["pointCitable"] is True
+    # ... pero la confianza estadística NO se mide con re-sorteos del mismo dato.
+    statistical = validity["statisticalConfidence"]
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["established"] is False
+    assert statistical["se"] is None
+    assert statistical["reason"]
+    assert statistical["requires"]
+
+
+def test_h1_permutation_does_not_change_the_two_labels():
+    """H1 — el veredicto de ambas etiquetas es determinista bajo permutación de los sorteos."""
+    draws = [_draw(realized_r=-5.0), _draw(realized_r=-5.1), _draw(realized_r=-4.9)]
+    forward = build_band_artifact(draws=draws)["global"]["validity"]
+    reversed_order = build_band_artifact(draws=list(reversed(draws)))["global"]["validity"]
+    assert forward == reversed_order
+
+
+def test_h1_independent_sample_measures_statistical_confidence():
+    """H1 — solo si el llamante DECLARA observaciones independientes se computa la confianza."""
+    artifact = build_band_artifact(
+        draws=[_draw(realized_r=-5.0), _draw(realized_r=-5.1), _draw(realized_r=-4.9)],
+        design=DESIGN_INDEPENDENT,
+    )
+    validity = artifact["global"]["validity"]
+    assert validity["design"] == DESIGN_INDEPENDENT
+    statistical = validity["statisticalConfidence"]
+    assert statistical["status"] == "MEASURED"
+    assert statistical["established"] is True
+    assert statistical["se"] is not None
+    assert statistical["reason"] is None
+
+
+def test_h1_gap_still_marks_statistical_confidence_not_measured():
+    """H1 — sin muestra, ambas etiquetas declaran el hueco (nunca un ``0``), incluso con diseño."""
+    artifact = build_band_artifact(draws=[], design=DESIGN_INDEPENDENT)
+    validity = artifact["global"]["validity"]
+    assert validity["sensitivityBand"]["pointCitable"] is False
+    assert validity["statisticalConfidence"]["status"] == "MEASURED"
+    assert validity["statisticalConfidence"]["established"] is False
 
 
 # ── Cobertura por año ────────────────────────────────────────────────────────────
@@ -176,8 +239,9 @@ def test_artifact_is_deterministic_and_declares_its_contract():
     first = build_band_artifact(draws=draws, seed_shift={"K": 3}, meta={"phase": "test"})
     again = build_band_artifact(draws=draws, seed_shift={"K": 3}, meta={"phase": "test"})
     assert json.dumps(first, sort_keys=True) == json.dumps(again, sort_keys=True)
-    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-multi-band-v1"
+    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-multi-band-v2"
     assert first["kind"] == KIND == "DIA_D_AUTO_MULTI_BAND"
     assert first["readOnly"] is True
     assert first["basis"] == "entryDay"
+    assert first["design"] == DESIGN_VENUE_DRAW
     assert first["limits"]

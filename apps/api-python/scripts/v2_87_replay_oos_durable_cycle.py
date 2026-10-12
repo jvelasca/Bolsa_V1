@@ -1188,7 +1188,7 @@ def _run_finance_band(args: argparse.Namespace) -> int:
             "k0Sha256Lf": k0_sha,
         },
         meta={
-            "bump": "2.11.115-beta",
+            "bump": "2.11.116-beta",
             "phase": "V2.88.114 OOS FINANCE BAND (§8-c)",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),
@@ -1205,14 +1205,20 @@ def _run_finance_band(args: argparse.Namespace) -> int:
     )
 
     aggregate_band = artifact["aggregate"]["bands"].get("netReturnPct")
-    validity = artifact["aggregate"]["validity"]
+    sensitivity = artifact["aggregate"]["validity"]["sensitivityBand"]
+    statistical = artifact["aggregate"]["validity"]["statisticalConfidence"]
     print()
     print(f"BANDA OOS FINANCIERA · K = {draws_total} sorteos")
     print("=" * 78)
     print(f"agregado netReturnPct     {aggregate_band}")
     print(
-        f"crossesZeroNetReturn      {validity['crossesZeroNetReturn']} · "
-        f"pointCitable {validity['pointCitable']} ({validity['note']})"
+        f"sensitivityBand           crossesZeroNetReturn "
+        f"{sensitivity['crossesZeroNetReturn']} · "
+        f"pointCitable {sensitivity['pointCitable']} ({sensitivity['note']})"
+    )
+    print(
+        f"statisticalConfidence     {statistical['status']} "
+        f"(established {statistical['established']})"
     )
     print(f"artefacto                 {out_path}")
     return 0

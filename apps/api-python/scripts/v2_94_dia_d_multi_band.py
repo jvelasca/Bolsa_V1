@@ -9,8 +9,10 @@ en ``v2_88_16_3``), restaura el árbol **byte a byte** tras cada sorteo y pliega
 artefactos en una **banda**:
 
 * ``min``/``median``/``max``/``mean``/``stdev`` por cubo (año / régimen / año × régimen / global);
-* ``validity``: ``crossesZeroR`` y ``pointCitable`` con el criterio de ``W3.3``
-  (``point_citable`` sólo si la banda de R NO cruza cero y ``|media| > 1.96·SE``).
+* ``validity``: bloque con DOS etiquetas separadas (H1) — ``sensitivityBand``
+  (``crossesZeroR``/``pointCitable`` con el criterio de ``W3.3``: sólo si la banda de R NO cruza
+  cero y ``|media| > 1.96·SE``) y ``statisticalConfidence`` (``NOT_MEASURED`` por defecto: los
+  ``K`` re-sorteos del MISMO dato NO son observaciones independientes).
 
 ``k = 0`` es la realización de PRODUCCIÓN (sin parchear): el autochequeo del instrumento. La sonda
 lo cruza contra el artefacto sellado que se le pase con ``--check-against`` (tolerante, de ``v2_92``).
@@ -281,7 +283,7 @@ def _print_text(artifact: dict[str, Any]) -> None:
     def _row(title: str, label: str, cell: dict[str, Any]) -> None:
         expectancy = cell["bands"]["expectancyR"]
         total = cell["bands"]["realizedRTotal"]
-        validity = cell["validity"]
+        validity = cell["validity"]["sensitivityBand"]
         band_text = (
             "n/d"
             if total is None
@@ -430,7 +432,7 @@ def main(argv: list[str] | None = None) -> int:
         },
         cross_check=cross_check,
         meta={
-                "bump": "2.11.115-beta",
+                "bump": "2.11.116-beta",
             "phase": "V2.94 DIA-D AUTO MULTI BAND",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),

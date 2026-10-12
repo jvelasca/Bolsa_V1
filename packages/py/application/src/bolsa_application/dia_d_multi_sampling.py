@@ -2,7 +2,7 @@
 
 Qué es
 ------
-La banda del sorteo del venue (``dia_d_multi_uncertainty``, ``dia-d-multi-band-v1``) mide
+La banda del sorteo del venue (``dia_d_multi_uncertainty``, ``dia-d-multi-band-v2``) mide
 cuánto mueve el resultado la realización del venue simulador: ``K`` corridas del MISMO harness
 con el ancla temporal del ``fill_seed`` desplazada. Faltaba la OTRA mitad de la incertidumbre
 del instrumento: cuánto puede variar el resultado según **qué operaciones entran en la muestra**
@@ -1518,16 +1518,23 @@ def _venue_band_cross_check(
         return {"available": False, "note": "no se cruzó contra una banda del venue sellada"}
     reference = venue_band.get("global") or {}
     reference_validity = reference.get("validity") or {}
+    # H1: la banda publica el bloque `validity` con la sensibilidad anidada en `sensitivityBand`.
+    # Un artefacto sellado anterior (plano) se sigue leyendo por respaldo, sin fingir otra cosa.
+    reference_sensitivity = reference_validity.get("sensitivityBand") or reference_validity
     metric = (global_cell.get("metrics") or {}).get("realizedRTotal") or {}
     venue = metric.get("venue") or {}
     drifted = [
         name
         for name, left, right in (
-            ("crossesZeroR", venue.get("crossesZeroR"), reference_validity.get("crossesZeroR")),
+            (
+                "crossesZeroR",
+                venue.get("crossesZeroR"),
+                reference_sensitivity.get("crossesZeroR"),
+            ),
             (
                 "pointCitable",
                 (global_cell.get("validity") or {}).get("venuePointCitable"),
-                reference_validity.get("pointCitable"),
+                reference_sensitivity.get("pointCitable"),
             ),
         )
         if left != right
