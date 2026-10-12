@@ -99,7 +99,7 @@ flowchart TD
 ## 6. Deudas y residuos declarados
 
 - **R-1 (publicación asimétrica):** se publicó **solo** el tag `v2.88.113-beta` (decisión del propietario). El tag `v2.88.112-beta` **no** se publicó ⇒ **no hay `Release tag CI` propio del sello 1**; su migración `053` y su ruta sí quedan certificadas **dentro** del CI de `113` (`lifecycle-pg` con el gate nuevo). Si se quiere el run propio del sello 1, publicar `v2.88.112-beta`.
-- **R-2 (`origin/main` sin avanzar):** al empujar solo el tag, los 2 commits (`d955da59`, `3dd15193`) son alcanzables por el tag pero **no** por `main` ⇒ **no corrió el CI de rama** sobre ellos (solo el CI de tag). El `main` remoto sigue en `3d8e74ad` (POST-TAG de `111`).
+- **R-2 (`origin/main` sin avanzar):** al empujar solo el tag, los 2 commits (`d955da59`, `3dd15193`) son alcanzables por el tag pero **no** por `main` ⇒ **no corrió el CI de rama** sobre ellos (solo el CI de tag). El `main` remoto sigue en `3d8e74ad` (POST-TAG de `111`). **→ RESUELTO en `v2.88.114-beta` (2026-10-12):** `main` empujado a `origin` (`3d8e74ad..1c33e7c1`); CI de rama `success`.
 - **R-3 (tag unsigned):** `verification.verified = false` (`reason: unsigned`). Limitación de certificación, no defecto funcional.
 - **R-4 (`§8-c` pendiente):** la banda `K` **medida** del OOS (re-ejecutar el replay `K` veces, no reproducible sin PG) queda como sello propio.
 - **R-5 (documentación):** reinyectar la cita POST-TAG en las evidencias `112`/`113`.

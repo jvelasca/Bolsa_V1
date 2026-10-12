@@ -134,7 +134,7 @@ harness de robustez de semilla `v2.88.16.3` (`CD59FEB8…`), lo que **cruza** do
 | --- | --- | --- |
 | `R-4`/`§8-c` | banda `K` medida del reporte financiero OOS | **✅ CERRADO por este sello** |
 | `R-5` | cita POST-TAG de `113` en las evidencias | **✅ actualizada** ([`v2.88.113/README.md` §10](../v2.88.113/README.md)) |
-| `R-2` | `origin/main` en `3d8e74ad`: los commits del tag `113` no corren `main` CI | **abierto (fuera de alcance)** |
+| `R-2` | `origin/main` estaba en `3d8e74ad`: los commits de los sellos `112`/`113`/`114` no corrían `main` CI | **✅ CERRADO (2026-10-12)**: `main` empujado a `origin` (`3d8e74ad..1c33e7c1`); CI de rama `success` (`Python CI` [38219867949](https://github.com/jvelasca/Bolsa_V1/actions/runs/38219867949), `Frontend CI` [38219867988](https://github.com/jvelasca/Bolsa_V1/actions/runs/38219867988), `Fase 2 scientific` [38219867946](https://github.com/jvelasca/Bolsa_V1/actions/runs/38219867946), `Optimize lab` [38219867934](https://github.com/jvelasca/Bolsa_V1/actions/runs/38219867934), `Gitleaks` [38219868031](https://github.com/jvelasca/Bolsa_V1/actions/runs/38219868031)) |
 
 ---
 
