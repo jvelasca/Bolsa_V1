@@ -80,7 +80,7 @@
 | `pytest` focales (bandas + render CLI) | **48 passed** |
 | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **1 passed** |
 | `alembic heads` | `053_dia_d_cycle_verifications (head)` — **sin migración** |
-| `Release tag CI` (autoridad externa) | **PENDIENTE** (tag por publicar) |
+| `Release tag CI` (autoridad externa) | [`38302937561`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302937561) **VERDE** (`replay-repro` **`success`**) |
 
 ---
 
@@ -89,7 +89,7 @@
 - **Producto:** `V2.88.117-beta`. **Package:** `2.11.117-beta`. **Sin migración** (head `053`). **Contrato sin cambio.** **`Δ motor ≠ 0` aditivo · `Δ decisión = 0`.**
 - **Añadidos:** `docs/engineering/evidence/v2.88.117/README.md`, `docs/engineering/plan-v2-88-117-h1-1-procedencia-estadistica-2026-10-12.md`, este documento.
 - **Modificados:** `packages/py/application/src/bolsa_application/{dia_d_multi_uncertainty.py,oos_finance_band.py,dia_d_multi_sampling.py}`; tests de aplicación; `package.json` + `apps/api-python/scripts/v2_87` y `v2_89`…`v2_97` (`meta.bump`); `CHANGELOG.md`; `docs/engineering/PROJECT_STATE.md`.
-- **Tag anotado `v2.88.117-beta`:** PENDIENTE de publicar. **Tag unsigned** (declarado).
+- **Tag anotado `v2.88.117-beta`** (objeto `277d33ca` → commit `2195ad7f`): `Release tag CI` [`38302937561`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302937561) **VERDE** (`11m39s`; 12 jobs + `certify`; `replay-repro` **`success`**); resto de workflows del tag y CI de rama (`main`, `2195ad7f`) **VERDES**. `origin/main` == `HEAD` == `2195ad7f`. **Tag unsigned** (declarado).
 
 ---
 

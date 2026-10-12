@@ -104,5 +104,12 @@ válidos y sin contradicción de venue: `status = MEASURED`, `established = poin
 
 ## 5. Cita POST-TAG
 
-PENDIENTE (tag `v2.88.117-beta` por publicar). Al publicarse se completará con objeto + `^{}` del tag
-anotado, el commit de destino y los runs de `Release tag CI` y de `main` (incluido `replay-repro`).
+Tag anotado **`v2.88.117-beta`** (objeto `277d33ca` → commit `2195ad7f`) sellado y publicado en `origin`
+(`git ls-remote origin refs/tags/v2.88.117-beta*` resuelve objeto + `^{}`); `origin/main` == `HEAD` == `2195ad7f`.
+Tag **anotado sin firmar** (`unsigned`) — declarado, no disimulado.
+
+- `Release tag CI` [**38302937561**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302937561) → **`success`** (`11m39s`): **12 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado). **`replay-repro`** → **`success`**: regenera el artefacto del sello desde el fixture **sin** mover el payload ⇒ el cambio de forma de las **bandas** (ficheros) **no** tocó el artefacto congelado.
+- `Python CI` [**38302937501**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302937501) `success` (`3m47s`) · `Frontend CI` [**38302937492**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302937492) `success` (`4m18s`) · `Fase 2 scientific` [**38302937508**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302937508) `success` (`1m24s`) · `Optimize lab` [**38302937490**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302937490) `success` (`1m31s`).
+- CI de **rama** (`main`, `2195ad7f`): `Python CI` [**38302935816**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302935816) · `Frontend CI` [**38302935701**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302935701) · `Fase 2 scientific` [**38302935715**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302935715) · `Optimize lab` [**38302935705**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302935705) · `Gitleaks` [**38302935774**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38302935774) — todos `success`.
+- **Anotaciones del run:** solo avisos **preexistentes** y ajenos al diff (deprecación de Node 20 en `actions/*`, migración `ubuntu-latest`→26). **Ninguna** referida a `dia_d_multi_uncertainty`/`oos_finance_band`.
+- **Distinción:** *estado comunicado* (implementado y verificado localmente) vs *verificación externa* (tag/commit/run resueltos en GitHub) — aquí **ambos** confirmados. El sello **no** demuestra rentabilidad.
