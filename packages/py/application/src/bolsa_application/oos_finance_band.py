@@ -20,7 +20,8 @@ Por cada cubo publica:
   ``pointCitableScope``) y ``statisticalConfidence`` (``NOT_MEASURED`` por defecto: re-sorteos del
   mismo dato **no** son observaciones independientes ⇒ jamás se infiere de ellas). Con menos de
   ``MIN_DRAWS_FOR_BAND`` sorteos **no** hay banda que cite un punto: se declara
-  (``insufficient_draws``).
+  (``insufficient_draws``). ``statisticalConfidence`` solo pasa a ``MEASURED`` con
+  ``design = "independent_sample"`` **y** procedencia verificable (H1.1).
 * ``strategyPresetKey`` — identidad EXACTA (H1/H2) del cubo: la clave única si TODOS los
   sorteos coinciden; si declaran claves DISTINTAS, ``None`` + ``strategyPresetKeyAmbiguous``
   (``True``) y ``strategyPresetKeys`` con todas (nunca se elige una «ganadora»).
@@ -58,7 +59,7 @@ from bolsa_application.dia_d_multi_uncertainty import (
 )
 
 #: Versión del esquema del artefacto de banda. Un cambio de forma la sube.
-SCHEMA_VERSION = "oos-finance-band-v3"
+SCHEMA_VERSION = "oos-finance-band-v4"
 
 #: Tipo del artefacto.
 KIND = "OOS_FINANCE_BAND"
@@ -92,7 +93,11 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "con K >= 2; con menos sorteos se declara insufficient_draws y pointCitable=False.",
     "H1: las etiquetas sensitivityBand y statisticalConfidence NO se confunden. La banda de K "
     "re-sorteos del MISMO dato mide SOLO sensibilidad al sorteo del venue; la confianza estadistica "
-    "queda NOT_MEASURED salvo que el llamante declare observaciones independientes.",
+    "queda NOT_MEASURED salvo que el llamante declare observaciones independientes CON procedencia "
+    "verificable (H1.1).",
+    "H1.1: declarar design='independent_sample' NO basta. Sin evidencia de ventanas de evaluacion "
+    "independientes, metodo de muestreo, tamano de muestra, unidad de observacion y tratamiento de "
+    "la dependencia temporal, statisticalConfidence sigue NOT_MEASURED con missingProvenance.",
     "pointCitable esta acotado por pointCitableScope: es citabilidad de la banda de sensibilidad, "
     "NUNCA una afirmacion de rentabilidad demostrada.",
     "La banda se cita ENTERA o no se cita: el determinismo (reproducibilidad byte a byte) NO es "
@@ -170,19 +175,24 @@ def _validity(
     draws_with_cell: int,
     *,
     design: str = DESIGN_VENUE_DRAW,
+    provenance: Mapping[str, Any] | None = None,
+    venue_seeded: bool = False,
 ) -> dict[str, Any]:
-    """`validity` de la banda financiera: delega en `band_validity` (H1) con su clave de cruce.
+    """`validity` de la banda financiera: delega en `band_validity` (H1/H1.1) con su clave de cruce.
 
     ``sensitivityBand.crossesZeroNetReturn`` = la banda de retorno neto abarca el cero.
     ``sensitivityBand.pointCitable`` = la banda **no** cruza el cero **y** ``|media| > 1.96·SE``
     (SE = ``stdev / sqrt(n)``), con al menos ``MIN_DRAWS_FOR_BAND`` sorteos, SIEMPRE acotado por
-    ``pointCitableScope``. ``statisticalConfidence`` NO se infiere de re-sorteos del venue.
+    ``pointCitableScope``. ``statisticalConfidence`` NO se infiere de re-sorteos del venue: solo pasa
+    a ``MEASURED`` con ``design=independent_sample`` **y** procedencia verificable (H1.1).
     """
     return band_validity(
         crosses_key="crossesZeroNetReturn",
         stats=net_return_stats,
         draws_with_cell=draws_with_cell,
         design=design,
+        provenance=provenance,
+        venue_seeded=venue_seeded,
     )
 
 
@@ -305,6 +315,8 @@ def _render_cell(
     draws_total: int,
     identity: _PresetIdentity,
     design: str = DESIGN_VENUE_DRAW,
+    provenance: Mapping[str, Any] | None = None,
+    venue_seeded: bool = False,
 ) -> dict[str, Any]:
     """Cubo con su banda por métrica, su ``validity`` medida y su identidad declarada (H2)."""
     bands = {metric: _stats(metric_values.get(metric, [])) for metric in METRICS}
@@ -317,7 +329,13 @@ def _render_cell(
         "drawsWithCell": draws_with_cell,
         "drawsTotal": draws_total,
         "bands": bands,
-        "validity": _validity(bands.get(VALIDITY_METRIC), draws_with_cell, design=design),
+        "validity": _validity(
+            bands.get(VALIDITY_METRIC),
+            draws_with_cell,
+            design=design,
+            provenance=provenance,
+            venue_seeded=venue_seeded,
+        ),
     }
 
 
@@ -359,16 +377,20 @@ def build_finance_band(
     meta: Mapping[str, Any] | None = None,
     limits: Sequence[str] | None = None,
     design: str = DESIGN_VENUE_DRAW,
+    provenance: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Payload canónico de la banda financiera OOS (puro y determinista: sin reloj ni azar).
 
     ``draws`` son los ``K`` reportes ``oos_finance`` (``OosFinanceReport.to_dict()``), uno por
     sorteo del venue. Pliega cada cubo con ``bands`` (min/median/max/mean/stdev/n) y ``validity``
     (bloque H1: ``sensitivityBand`` + ``statisticalConfidence`` separados). Un cubo sin muestra no
-    aparece; un hueco queda ``None``, nunca ``0``. ``design`` declara la procedencia de los sorteos.
+    aparece; un hueco queda ``None``, nunca ``0``. ``design`` declara la procedencia de los sorteos;
+    ``provenance`` es la evidencia exigida para computar la confianza estadística (H1.1) y un
+    ``seed_shift`` no vacío revela un re-sorteo del venue (contradice la independencia declarada).
     """
     ordered = [report for report in (draws or ()) if isinstance(report, Mapping)]
     draws_total = len(ordered)
+    venue_seeded = bool(seed_shift)
     values, presence, identities = _fold(ordered)
     cells = {
         key: _render_cell(
@@ -378,6 +400,8 @@ def build_finance_band(
             draws_total=draws_total,
             identity=identities.get(key, _NO_IDENTITY),
             design=design,
+            provenance=provenance,
+            venue_seeded=venue_seeded,
         )
         for key in values
     }
@@ -390,7 +414,9 @@ def build_finance_band(
         "drawsWithCell": 0,
         "drawsTotal": draws_total,
         "bands": {metric: None for metric in METRICS},
-        "validity": _validity(None, 0, design=design),
+        "validity": _validity(
+            None, 0, design=design, provenance=provenance, venue_seeded=venue_seeded
+        ),
     })
     group_cells = [
         cells[key] for key in sorted(cells, key=_sort_key) if key != AGGREGATE_KEY

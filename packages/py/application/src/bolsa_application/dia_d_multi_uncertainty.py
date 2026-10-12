@@ -16,7 +16,9 @@ producción), y publica por cada cubo
   ``pointCitableScope``) y ``statisticalConfidence`` (``NOT_MEASURED`` por defecto: re-sorteos del
   mismo dato **no** son observaciones independientes ⇒ jamás se infiere de ellas). Con menos de
   ``MIN_DRAWS_FOR_BAND`` sorteos **no** hay banda que cite un punto: se declara
-  (``insufficient_draws``).
+  (``insufficient_draws``). ``statisticalConfidence`` solo pasa a ``MEASURED`` si el llamante
+  declara ``design = "independent_sample"`` **y** aporta procedencia verificable (H1.1): sin
+  evidencia queda ``NOT_MEASURED`` con ``missingProvenance``.
 
 Por qué existe
 --------------
@@ -47,7 +49,7 @@ from typing import Any
 from bolsa_application.dia_d_auto import finite_number
 
 #: Versión del esquema del artefacto de banda. Un cambio de forma la sube.
-SCHEMA_VERSION = "dia-d-multi-band-v2"
+SCHEMA_VERSION = "dia-d-multi-band-v3"
 
 #: Tipo del artefacto (una banda de la atribución, no una atribución).
 KIND = "DIA_D_AUTO_MULTI_BAND"
@@ -81,6 +83,27 @@ STATISTICAL_CONFIDENCE_REQUIRES = (
     "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un "
     "procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato."
 )
+
+#: Campos de PROCEDENCIA exigidos para acreditar `statisticalConfidence = MEASURED` (H1.1): una
+#: mera declaración `independent_sample` NO basta. Sin evidencia verificable de ventanas de
+#: evaluación independientes, método de muestreo, tamaño de muestra, unidad de observación y
+#: tratamiento de dependencia temporal, la etiqueta queda NOT_MEASURED con el hueco declarado.
+PROVENANCE_REQUIRED_FIELDS: tuple[str, ...] = (
+    "evaluationWindows",
+    "samplingMethod",
+    "sampleSize",
+    "observationUnit",
+    "temporalDependence",
+)
+
+#: Motivo: el llamante pidió `independent_sample` sin declarar NINGUNA procedencia (H1.1).
+STATISTICAL_CONFIDENCE_PROVENANCE_MISSING_REASON = "provenance_missing"
+
+#: Motivo: la procedencia declarada está INCOMPLETA; `missingProvenance` lista los campos.
+STATISTICAL_CONFIDENCE_PROVENANCE_INCOMPLETE_REASON = "provenance_incomplete"
+
+#: Motivo: los datos declaran un re-sorteo del venue (semilla desplazada) ⇒ NO son independientes.
+STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON = "venue_draw_declared_independent"
 
 #: Dimensiones declaradas de un cubo (nunca se adivina la etiqueta).
 DIM_GLOBAL = "GLOBAL"
@@ -119,7 +142,11 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "menos sorteos se declara insufficient_draws y pointCitable=False.",
     "H1: las etiquetas sensitivityBand y statisticalConfidence NO se confunden. La banda de K "
     "re-sorteos del MISMO dato mide SOLO sensibilidad al sorteo del venue; la confianza estadistica "
-    "queda NOT_MEASURED salvo que el llamante declare observaciones independientes.",
+    "queda NOT_MEASURED salvo que el llamante declare observaciones independientes CON procedencia "
+    "verificable (H1.1).",
+    "H1.1: declarar design='independent_sample' NO basta. Sin evidencia de ventanas de evaluacion "
+    "independientes, metodo de muestreo, tamano de muestra, unidad de observacion y tratamiento de "
+    "la dependencia temporal, statisticalConfidence sigue NOT_MEASURED con missingProvenance.",
     "pointCitable esta acotado por pointCitableScope: es citabilidad de la banda de sensibilidad, "
     "NUNCA una afirmacion de rentabilidad demostrada.",
     "La banda se cita ENTERA o no se cita: el determinismo (reproducibilidad byte a byte) NO es "
@@ -188,12 +215,51 @@ def _stats(values: Sequence[float]) -> dict[str, Any] | None:
     }
 
 
+def _provenance_gaps(provenance: Mapping[str, Any] | None) -> tuple[str, ...]:
+    """Campos de procedencia que FALTAN o son inválidos para acreditar independencia (H1.1).
+
+    Función pura y tolerante: un ``provenance`` ausente o malformado NO levanta; devuelve TODOS
+    los campos exigidos como huecos. No se adivina: si no hay evidencia verificable de ventanas
+    independientes, método de muestreo, tamaño, unidad de observación y tratamiento de dependencia
+    temporal, la confianza estadística NO se mide. El orden es el de ``PROVENANCE_REQUIRED_FIELDS``
+    (determinista).
+    """
+    source: Mapping[str, Any] = provenance if isinstance(provenance, Mapping) else {}
+    gaps: list[str] = []
+
+    windows = source.get("evaluationWindows")
+    if isinstance(windows, (str, bytes)) or not isinstance(windows, Sequence):
+        gaps.append("evaluationWindows")
+    elif not windows or not all(isinstance(item, str) and item.strip() for item in windows):
+        gaps.append("evaluationWindows")
+
+    method = source.get("samplingMethod")
+    if not isinstance(method, str) or not method.strip():
+        gaps.append("samplingMethod")
+
+    size = source.get("sampleSize")
+    if isinstance(size, bool) or not isinstance(size, int) or size < MIN_DRAWS_FOR_BAND:
+        gaps.append("sampleSize")
+
+    unit = source.get("observationUnit")
+    if not isinstance(unit, str) or not unit.strip():
+        gaps.append("observationUnit")
+
+    dependence = source.get("temporalDependence")
+    if not isinstance(dependence, str) or not dependence.strip():
+        gaps.append("temporalDependence")
+
+    return tuple(gaps)
+
+
 def band_validity(
     *,
     crosses_key: str,
     stats: Mapping[str, Any] | None,
     draws_with_cell: int,
     design: str = DESIGN_VENUE_DRAW,
+    provenance: Mapping[str, Any] | None = None,
+    venue_seeded: bool = False,
 ) -> dict[str, Any]:
     """Bloque ``validity`` con DOS etiquetas SEPARADAS (H1): sensibilidad vs confianza estadística.
 
@@ -203,8 +269,10 @@ def band_validity(
 
     ``statisticalConfidence`` — lo que re-sorteos del MISMO dato **no** pueden afirmar: con
     ``design = venue_draw`` (por defecto) queda ``status = NOT_MEASURED``, ``established = False``
-    y el motivo. Solo con ``design = independent_sample`` (declarado por el llamante) se computa
-    con el mismo criterio.
+    y el motivo. Solo con ``design = independent_sample`` **y** procedencia verificable
+    (``provenance`` con los ``PROVENANCE_REQUIRED_FIELDS``) se computa con el mismo criterio; una
+    mera declaración NO basta (H1.1): sin evidencia (o si los datos revelan un ``venue_seeded``)
+    vuelve a ``NOT_MEASURED`` con el motivo y ``missingProvenance`` declarados.
 
     Un hueco es ``None`` (``sin_muestra`` / ``insufficient_draws``); jamás se rellena con ``0``.
     """
@@ -236,16 +304,37 @@ def band_validity(
         "ci95HalfWidth": half_width,
         "note": note,
     }
+    echoed_provenance = dict(provenance) if isinstance(provenance, Mapping) else {}
     if design == DESIGN_INDEPENDENT:
+        gaps = _provenance_gaps(provenance)
+        if venue_seeded:
+            status = "NOT_MEASURED"
+            reason: str | None = STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON
+            missing = list(gaps)
+        elif not provenance:
+            status = "NOT_MEASURED"
+            reason = STATISTICAL_CONFIDENCE_PROVENANCE_MISSING_REASON
+            missing = list(PROVENANCE_REQUIRED_FIELDS)
+        elif gaps:
+            status = "NOT_MEASURED"
+            reason = STATISTICAL_CONFIDENCE_PROVENANCE_INCOMPLETE_REASON
+            missing = list(gaps)
+        else:
+            status = "MEASURED"
+            reason = None
+            missing = []
+        measured_statistical = status == "MEASURED"
         statistical: dict[str, Any] = {
             "label": "statisticalConfidence",
             "design": design,
-            "status": "MEASURED",
-            "established": bool(point_citable),
-            "se": se,
-            "ci95HalfWidth": half_width,
-            "reason": None,
+            "status": status,
+            "established": measured_statistical and bool(point_citable),
+            "se": se if measured_statistical else None,
+            "ci95HalfWidth": half_width if measured_statistical else None,
+            "reason": reason,
             "requires": STATISTICAL_CONFIDENCE_REQUIRES,
+            "provenance": echoed_provenance,
+            "missingProvenance": missing,
         }
     else:
         statistical = {
@@ -257,6 +346,8 @@ def band_validity(
             "ci95HalfWidth": None,
             "reason": STATISTICAL_CONFIDENCE_NOT_MEASURED_REASON,
             "requires": STATISTICAL_CONFIDENCE_REQUIRES,
+            "provenance": echoed_provenance,
+            "missingProvenance": [],
         }
     return {
         "design": design,
@@ -271,13 +362,17 @@ def _validity(
     draws_with_cell: int,
     *,
     design: str = DESIGN_VENUE_DRAW,
+    provenance: Mapping[str, Any] | None = None,
+    venue_seeded: bool = False,
 ) -> dict[str, Any]:
-    """`validity` de la banda DÍA-D: delega en `band_validity` (H1) con su clave de cruce."""
+    """`validity` de la banda DÍA-D: delega en `band_validity` (H1/H1.1) con su clave de cruce."""
     return band_validity(
         crosses_key="crossesZeroR",
         stats=realized_stats,
         draws_with_cell=draws_with_cell,
         design=design,
+        provenance=provenance,
+        venue_seeded=venue_seeded,
     )
 
 
@@ -385,6 +480,8 @@ def _render_cell(
     draws_with_cell: int,
     draws_total: int,
     design: str = DESIGN_VENUE_DRAW,
+    provenance: Mapping[str, Any] | None = None,
+    venue_seeded: bool = False,
 ) -> dict[str, Any]:
     """Cubo con su banda por métrica y su ``validity`` (las etiquetas del cubo, según dimensión)."""
     dimension, year, regime = key
@@ -393,7 +490,13 @@ def _render_cell(
         "drawsWithCell": draws_with_cell,
         "drawsTotal": draws_total,
         "bands": bands,
-        "validity": _validity(bands.get("realizedRTotal"), draws_with_cell, design=design),
+        "validity": _validity(
+            bands.get("realizedRTotal"),
+            draws_with_cell,
+            design=design,
+            provenance=provenance,
+            venue_seeded=venue_seeded,
+        ),
     }
     if dimension == DIM_YEAR:
         cell["year"] = year
@@ -486,16 +589,20 @@ def build_band_artifact(
     meta: Mapping[str, Any] | None = None,
     limits: Sequence[str] | None = None,
     design: str = DESIGN_VENUE_DRAW,
+    provenance: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Payload canónico de la banda multirregimen (puro y determinista: sin reloj ni azar).
 
     ``draws`` son los ``K`` artefactos ``dia-d-multi-v1`` (uno por sorteo del venue). Pliega cada
     cubo con ``bands`` (min/median/max/mean/stdev) y ``validity`` (bloque H1 con ``sensitivityBand``
     y ``statisticalConfidence`` separados). Un cubo sin muestra no aparece en su dimensión; un hueco
-    queda ``None``, nunca ``0``. ``design`` declara la procedencia de los ``K`` sorteos.
+    queda ``None``, nunca ``0``. ``design`` declara la procedencia de los ``K`` sorteos; ``provenance``
+    es la evidencia requerida para computar la confianza estadística (H1.1) y un ``seed_shift`` no
+    vacío revela un re-sorteo del venue (contradice una declaración de independencia).
     """
     ordered = list(draws or ())
     draws_total = len(ordered)
+    venue_seeded = bool(seed_shift)
     values, presence = _fold(ordered)
     cells = {
         key: _render_cell(
@@ -504,6 +611,8 @@ def build_band_artifact(
             draws_with_cell=presence.get(key, 0),
             draws_total=draws_total,
             design=design,
+            provenance=provenance,
+            venue_seeded=venue_seeded,
         )
         for key in sorted(values, key=_sort_key)
     }
@@ -515,7 +624,9 @@ def build_band_artifact(
         "drawsWithCell": 0,
         "drawsTotal": draws_total,
         "bands": {metric: None for metric in METRICS},
-        "validity": _validity(None, 0, design=design),
+        "validity": _validity(
+            None, 0, design=design, provenance=provenance, venue_seeded=venue_seeded
+        ),
     })
 
     return {
@@ -556,9 +667,13 @@ __all__ = [
     "METRICS",
     "MIN_DRAWS_FOR_BAND",
     "POINT_CITABLE_SCOPE",
+    "PROVENANCE_REQUIRED_FIELDS",
     "SCHEMA_VERSION",
     "STATISTICAL_CONFIDENCE_NOT_MEASURED_REASON",
+    "STATISTICAL_CONFIDENCE_PROVENANCE_INCOMPLETE_REASON",
+    "STATISTICAL_CONFIDENCE_PROVENANCE_MISSING_REASON",
     "STATISTICAL_CONFIDENCE_REQUIRES",
+    "STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON",
     "band_validity",
     "build_band_artifact",
 ]

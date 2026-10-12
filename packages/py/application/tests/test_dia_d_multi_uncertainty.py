@@ -9,6 +9,8 @@ Invariantes que se fijan aquí:
   ``True`` si la banda de R total **no** cruza cero, ``|media| > 1.96·SE`` y hay al menos
   ``MIN_DRAWS_FOR_BAND`` sorteos; con menos, se declara ``insufficient_draws``) y
   ``statisticalConfidence`` (``NOT_MEASURED`` con re-sorteos del venue; nunca se infiere de ellos).
+* ``statisticalConfidence`` solo pasa a ``MEASURED`` con ``design = independent_sample`` **y**
+  procedencia verificable (H1.1); sin evidencia queda ``NOT_MEASURED`` con ``missingProvenance``.
 * La cobertura cuenta por año y por sorteo (medido / vacío / no medido), sin rellenar huecos.
 * El artefacto es determinista (sin reloj ni aleatorios).
 """
@@ -24,9 +26,26 @@ from bolsa_application.dia_d_multi_uncertainty import (
     DESIGN_VENUE_DRAW,
     KIND,
     POINT_CITABLE_SCOPE,
+    PROVENANCE_REQUIRED_FIELDS,
     SCHEMA_VERSION,
+    STATISTICAL_CONFIDENCE_PROVENANCE_INCOMPLETE_REASON,
+    STATISTICAL_CONFIDENCE_PROVENANCE_MISSING_REASON,
+    STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON,
     build_band_artifact,
 )
+
+
+def _provenance(**overrides: Any) -> dict[str, Any]:
+    """Procedencia verificable mínima para acreditar ``independent_sample`` (H1.1)."""
+    base: dict[str, Any] = {
+        "evaluationWindows": ["2019", "2021"],
+        "samplingMethod": "blocked_cross_year",
+        "sampleSize": 12,
+        "observationUnit": "cycle",
+        "temporalDependence": "year_blocked",
+    }
+    base.update(overrides)
+    return base
 
 
 def _trip(
@@ -181,16 +200,21 @@ def test_h1_sensitivity_and_statistical_confidence_are_separate_labels():
 def test_h1_permutation_does_not_change_the_two_labels():
     """H1 — el veredicto de ambas etiquetas es determinista bajo permutación de los sorteos."""
     draws = [_draw(realized_r=-5.0), _draw(realized_r=-5.1), _draw(realized_r=-4.9)]
-    forward = build_band_artifact(draws=draws)["global"]["validity"]
-    reversed_order = build_band_artifact(draws=list(reversed(draws)))["global"]["validity"]
+    forward = build_band_artifact(
+        draws=draws, design=DESIGN_INDEPENDENT, provenance=_provenance()
+    )["global"]["validity"]
+    reversed_order = build_band_artifact(
+        draws=list(reversed(draws)), design=DESIGN_INDEPENDENT, provenance=_provenance()
+    )["global"]["validity"]
     assert forward == reversed_order
 
 
 def test_h1_independent_sample_measures_statistical_confidence():
-    """H1 — solo si el llamante DECLARA observaciones independientes se computa la confianza."""
+    """H1.1 — con ``independent_sample`` Y procedencia verificable, la confianza sí se computa."""
     artifact = build_band_artifact(
         draws=[_draw(realized_r=-5.0), _draw(realized_r=-5.1), _draw(realized_r=-4.9)],
         design=DESIGN_INDEPENDENT,
+        provenance=_provenance(),
     )
     validity = artifact["global"]["validity"]
     assert validity["design"] == DESIGN_INDEPENDENT
@@ -199,15 +223,62 @@ def test_h1_independent_sample_measures_statistical_confidence():
     assert statistical["established"] is True
     assert statistical["se"] is not None
     assert statistical["reason"] is None
+    assert statistical["missingProvenance"] == []
 
 
 def test_h1_gap_still_marks_statistical_confidence_not_measured():
     """H1 — sin muestra, ambas etiquetas declaran el hueco (nunca un ``0``), incluso con diseño."""
-    artifact = build_band_artifact(draws=[], design=DESIGN_INDEPENDENT)
+    artifact = build_band_artifact(draws=[], design=DESIGN_INDEPENDENT, provenance=_provenance())
     validity = artifact["global"]["validity"]
     assert validity["sensitivityBand"]["pointCitable"] is False
     assert validity["statisticalConfidence"]["status"] == "MEASURED"
     assert validity["statisticalConfidence"]["established"] is False
+
+
+# ── H1.1: la declaración de independencia NO basta sin procedencia verificable ──
+
+
+def test_h1_1_independent_sample_without_provenance_is_not_measured():
+    """H1.1 — declarar ``independent_sample`` sin procedencia deja la confianza NOT_MEASURED."""
+    artifact = build_band_artifact(
+        draws=[_draw(realized_r=-5.0), _draw(realized_r=-5.1), _draw(realized_r=-4.9)],
+        design=DESIGN_INDEPENDENT,
+    )
+    statistical = artifact["global"]["validity"]["statisticalConfidence"]
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["established"] is False
+    assert statistical["reason"] == STATISTICAL_CONFIDENCE_PROVENANCE_MISSING_REASON
+    assert statistical["missingProvenance"] == list(PROVENANCE_REQUIRED_FIELDS)
+    assert statistical["se"] is None
+
+
+def test_h1_1_incomplete_provenance_declares_the_missing_field():
+    """H1.1 — procedencia incompleta ⇒ NOT_MEASURED con ``missingProvenance`` declarado."""
+    provenance = _provenance()
+    del provenance["temporalDependence"]
+    artifact = build_band_artifact(
+        draws=[_draw(realized_r=-5.0), _draw(realized_r=-5.1), _draw(realized_r=-4.9)],
+        design=DESIGN_INDEPENDENT,
+        provenance=provenance,
+    )
+    statistical = artifact["global"]["validity"]["statisticalConfidence"]
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["reason"] == STATISTICAL_CONFIDENCE_PROVENANCE_INCOMPLETE_REASON
+    assert statistical["missingProvenance"] == ["temporalDependence"]
+
+
+def test_h1_1_venue_seeded_data_cannot_claim_independence():
+    """H1.1 — un re-sorteo del venue (semilla desplazada) NO es independiente aunque se declare."""
+    artifact = build_band_artifact(
+        draws=[_draw(realized_r=-5.0), _draw(realized_r=-5.1), _draw(realized_r=-4.9)],
+        seed_shift={"K": 12},
+        design=DESIGN_INDEPENDENT,
+        provenance=_provenance(),
+    )
+    statistical = artifact["global"]["validity"]["statisticalConfidence"]
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["reason"] == STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON
+    assert statistical["established"] is False
 
 
 # ── Cobertura por año ────────────────────────────────────────────────────────────
@@ -239,7 +310,7 @@ def test_artifact_is_deterministic_and_declares_its_contract():
     first = build_band_artifact(draws=draws, seed_shift={"K": 3}, meta={"phase": "test"})
     again = build_band_artifact(draws=draws, seed_shift={"K": 3}, meta={"phase": "test"})
     assert json.dumps(first, sort_keys=True) == json.dumps(again, sort_keys=True)
-    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-multi-band-v2"
+    assert first["schemaVersion"] == SCHEMA_VERSION == "dia-d-multi-band-v3"
     assert first["kind"] == KIND == "DIA_D_AUTO_MULTI_BAND"
     assert first["readOnly"] is True
     assert first["basis"] == "entryDay"

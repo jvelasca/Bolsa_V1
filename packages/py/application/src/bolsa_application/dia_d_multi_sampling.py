@@ -2,7 +2,7 @@
 
 Qué es
 ------
-La banda del sorteo del venue (``dia_d_multi_uncertainty``, ``dia-d-multi-band-v2``) mide
+La banda del sorteo del venue (``dia_d_multi_uncertainty``, ``dia-d-multi-band-v3``) mide
 cuánto mueve el resultado la realización del venue simulador: ``K`` corridas del MISMO harness
 con el ancla temporal del ``fill_seed`` desplazada. Faltaba la OTRA mitad de la incertidumbre
 del instrumento: cuánto puede variar el resultado según **qué operaciones entran en la muestra**

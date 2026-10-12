@@ -16,6 +16,10 @@ from typing import Any
 from bolsa_application.dia_d_multi_uncertainty import (
     DESIGN_INDEPENDENT,
     DESIGN_VENUE_DRAW,
+    PROVENANCE_REQUIRED_FIELDS,
+    STATISTICAL_CONFIDENCE_PROVENANCE_INCOMPLETE_REASON,
+    STATISTICAL_CONFIDENCE_PROVENANCE_MISSING_REASON,
+    STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON,
 )
 from bolsa_application.oos_finance_band import (
     AGGREGATE_KEY,
@@ -24,6 +28,19 @@ from bolsa_application.oos_finance_band import (
     POINT_CITABLE_SCOPE,
     build_finance_band,
 )
+
+
+def _provenance(**overrides: Any) -> dict[str, Any]:
+    """Procedencia verificable mínima para acreditar ``independent_sample`` (H1.1)."""
+    base: dict[str, Any] = {
+        "evaluationWindows": ["2019", "2021"],
+        "samplingMethod": "blocked_cross_year",
+        "sampleSize": 12,
+        "observationUnit": "cycle",
+        "temporalDependence": "year_blocked",
+    }
+    base.update(overrides)
+    return base
 
 
 def _group(
@@ -164,7 +181,24 @@ def test_h1_sensitivity_band_is_not_statistical_confidence() -> None:
 
 
 def test_h1_independent_sample_establishes_statistical_confidence() -> None:
-    """H1 — con ``design=independent_sample`` declarado, la confianza estadística sí se computa."""
+    """H1.1 — con ``independent_sample`` Y procedencia verificable, la confianza sí se computa."""
+    band = build_finance_band(
+        draws=[
+            _report([_group("ITX", netReturnPct=value)])
+            for value in (10.0, 12.0, 14.0, 16.0)
+        ],
+        design=DESIGN_INDEPENDENT,
+        provenance=_provenance(),
+    )
+    statistical = band["groups"][0]["validity"]["statisticalConfidence"]
+    assert band["design"] == DESIGN_INDEPENDENT
+    assert statistical["status"] == "MEASURED"
+    assert statistical["established"] is True
+    assert statistical["missingProvenance"] == []
+
+
+def test_h1_1_independent_sample_without_provenance_is_not_measured() -> None:
+    """H1.1 — declarar ``independent_sample`` sin procedencia deja la confianza NOT_MEASURED."""
     band = build_finance_band(
         draws=[
             _report([_group("ITX", netReturnPct=value)])
@@ -173,9 +207,44 @@ def test_h1_independent_sample_establishes_statistical_confidence() -> None:
         design=DESIGN_INDEPENDENT,
     )
     statistical = band["groups"][0]["validity"]["statisticalConfidence"]
-    assert band["design"] == DESIGN_INDEPENDENT
-    assert statistical["status"] == "MEASURED"
-    assert statistical["established"] is True
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["reason"] == STATISTICAL_CONFIDENCE_PROVENANCE_MISSING_REASON
+    assert statistical["missingProvenance"] == list(PROVENANCE_REQUIRED_FIELDS)
+
+
+def test_h1_1_incomplete_provenance_is_declared_not_measured() -> None:
+    """H1.1 — procedencia incompleta ⇒ NOT_MEASURED con el campo ausente declarado."""
+    provenance = _provenance()
+    del provenance["sampleSize"]
+    band = build_finance_band(
+        draws=[
+            _report([_group("ITX", netReturnPct=value)])
+            for value in (10.0, 12.0, 14.0, 16.0)
+        ],
+        design=DESIGN_INDEPENDENT,
+        provenance=provenance,
+    )
+    statistical = band["groups"][0]["validity"]["statisticalConfidence"]
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["reason"] == STATISTICAL_CONFIDENCE_PROVENANCE_INCOMPLETE_REASON
+    assert statistical["missingProvenance"] == ["sampleSize"]
+
+
+def test_h1_1_venue_seeded_data_cannot_claim_independence() -> None:
+    """H1.1 — un re-sorteo del venue declarado independiente se declara, no se acepta."""
+    band = build_finance_band(
+        draws=[
+            _report([_group("ITX", netReturnPct=value)])
+            for value in (10.0, 12.0, 14.0, 16.0)
+        ],
+        seed_shift={"K": 12},
+        design=DESIGN_INDEPENDENT,
+        provenance=_provenance(),
+    )
+    statistical = band["groups"][0]["validity"]["statisticalConfidence"]
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["reason"] == STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON
+    assert statistical["established"] is False
 
 
 def test_h1_aggregate_declares_both_labels_without_sample() -> None:
