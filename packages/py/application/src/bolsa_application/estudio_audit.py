@@ -146,15 +146,19 @@ def _pick_finance_group(
     """Elige el grupo financiero del valor por la clave EXACTA ``presetKey``.
 
     Precedencia: (1) grupo con ``strategyPresetKey`` == ``preset_key``; (2) si el valor no
-    declara identidad (o ningún grupo la declara), el grupo ÚNICO del valor; (3) si hay varios
-    candidatos sin clave, es **ambiguo** ⇒ ``None`` (hueco declarado, no se elige uno).
+    declara identidad **o** el único grupo tampoco la declara, ese grupo ÚNICO; (3) si hay
+    varios candidatos sin clave, es **ambiguo** ⇒ ``None`` (hueco declarado, no se elige uno).
+    Un grupo que declara OTRA identidad nunca se atribuye a este valor (sería dinero de otra
+    estrategia, justo el hueco que H1 cierra).
     """
     if preset_key:
         for group in groups:
             if _text(group.get("strategyPresetKey")) == preset_key:
                 return group
     without_key = [group for group in groups if _text(group.get("strategyPresetKey")) is None]
-    if len(groups) == 1:
+    # Fallback "grupo único" sólo si el valor NO declara identidad, o el único grupo tampoco
+    # la declara. Con identidad declarada y sin coincidencia, un grupo con OTRA clave no se usa.
+    if len(groups) == 1 and (preset_key is None or len(without_key) == 1):
         return groups[0]
     if len(without_key) == 1:
         return without_key[0]
@@ -277,10 +281,17 @@ def build_estudio_audit_report(
         strategy = _strategy_for_symbol(symbol_cycles)
         signal = _signal_for_symbol(symbol_cycles)
         r_bucket, r_reasons = _r_bucket(value, min_cycles=min_cycles)
-        group = _pick_finance_group(
-            groups_by_symbol.get(symbol, []), preset_key=strategy["presetKey"]
-        )
+        symbol_groups = groups_by_symbol.get(symbol, [])
+        group = _pick_finance_group(symbol_groups, preset_key=strategy["presetKey"])
         money_bucket, money_reasons = _money_bucket(group, min_trades=min_trades)
+        # Si existían grupos del símbolo pero ninguno declara la identidad del valor, el hueco
+        # NO es "sin grupo" (mensaje genérico engañoso) sino "sin grupo con ESA identidad": se
+        # declara tal cual para no sugerir que el dinero simplemente no viajó.
+        if group is None and symbol_groups and strategy["presetKey"]:
+            money_reasons = [
+                f"dinero: los grupos del símbolo no declaran la identidad "
+                f"'{strategy['presetKey']}' (Sin dato todavía)"
+            ]
 
         why_row = why.get(symbol) or {}
         indicator_specs = why_row.get("indicatorSpecs")

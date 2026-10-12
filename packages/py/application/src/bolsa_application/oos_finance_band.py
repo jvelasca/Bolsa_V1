@@ -20,6 +20,9 @@ Por cada cubo publica:
   **no** cruza cero **y** ``|media| > 1.96·SE``), más ``se``/``ci95HalfWidth``. Con menos de
   ``MIN_DRAWS_FOR_BAND`` sorteos **no** hay banda que cite un punto: se declara
   (``insufficient_draws``).
+* ``strategyPresetKey`` — identidad EXACTA (H1/H2) del cubo: la clave única si TODOS los
+  sorteos coinciden; si declaran claves DISTINTAS, ``None`` + ``strategyPresetKeyAmbiguous``
+  (``True``) y ``strategyPresetKeys`` con todas (nunca se elige una «ganadora»).
 
 Reglas duras (heredadas, no se relajan)
 ---------------------------------------
@@ -37,6 +40,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from bolsa_application.dia_d_auto import finite_number
@@ -46,7 +50,7 @@ from bolsa_application.dia_d_auto import finite_number
 from bolsa_application.dia_d_multi_uncertainty import CI95_Z, MIN_DRAWS_FOR_BAND
 
 #: Versión del esquema del artefacto de banda. Un cambio de forma la sube.
-SCHEMA_VERSION = "oos-finance-band-v1"
+SCHEMA_VERSION = "oos-finance-band-v2"
 
 #: Tipo del artefacto.
 KIND = "OOS_FINANCE_BAND"
@@ -82,6 +86,9 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "validez.",
     "Un hueco es None/NOT_MEASURED; nunca se rellena con 0. Un cubo ausente en un sorteo baja "
     "drawsWithCell, no se inventa.",
+    "La identidad EXACTA (presetKey) de un cubo se declara solo si los K sorteos coinciden; "
+    "claves distintas en el mismo cubo ⇒ strategyPresetKey=None + strategyPresetKeyAmbiguous=True "
+    "(nunca se elige una).",
     "Compone reportes financieros ya calculados (oos_finance): NO recalcula el motor ni proclama "
     "una estrategia ganadora.",
     "Costes MODELADOS (overlay de comision/deslizamiento): la friccion medida del SIM se "
@@ -220,21 +227,52 @@ def _draw_cells(report: Mapping[str, Any]) -> dict[tuple[str | None, str], dict[
 # ── Plegado de los K sorteos ─────────────────────────────────────────────────────
 
 
+@dataclass(frozen=True, slots=True)
+class _PresetIdentity:
+    """Identidad EXACTA (H1/H2) de un cubo entre los ``K`` sorteos.
+
+    ``key`` es la clave única si TODOS los sorteos que la declaran coinciden; ``None`` cuando
+    no hay ninguna (hueco) o cuando hay MÁS DE UNA distinta (ambigua). ``keys`` publica todas
+    las identidades declaradas, ordenadas: nunca se elige una «ganadora».
+    """
+
+    key: str | None
+    ambiguous: bool
+    keys: tuple[str, ...]
+
+
+#: Identidad ausente (cubo sin ``presetKey`` declarado): hueco, NI ambiguo NI fabricado.
+_NO_IDENTITY = _PresetIdentity(key=None, ambiguous=False, keys=())
+
+
+def _identity_from_keys(keys: set[str]) -> _PresetIdentity:
+    """Resuelve la identidad de un cubo: una sola clave, hueco (∅) o ambigüedad declarada."""
+    ordered = tuple(sorted(keys))
+    if len(ordered) == 1:
+        return _PresetIdentity(key=ordered[0], ambiguous=False, keys=ordered)
+    if not ordered:
+        return _NO_IDENTITY
+    return _PresetIdentity(key=None, ambiguous=True, keys=ordered)
+
+
 def _fold(
     draws: Sequence[Mapping[str, Any]],
 ) -> tuple[
     dict[tuple[str | None, str], dict[str, list[float]]],
     dict[tuple[str | None, str], int],
-    dict[tuple[str | None, str], str | None],
+    dict[tuple[str | None, str], _PresetIdentity],
 ]:
     """Pliega los sorteos: valores por métrica, presencia de cada cubo y su identidad exacta.
 
     Sólo se acumulan valores finitos: un hueco no vota (no se rellena con ``0``). La presencia
     de un cubo se cuenta por sorteo, para que ``drawsWithCell`` distinga "no medido" de "medido".
+    La identidad recoge TODAS las claves distintas declaradas en el cubo: si hay más de una, la
+    identidad es AMBIGUA (``key = None``) y NO se elige una ganadora (H2). Determinista bajo
+    permutación de los sorteos.
     """
     values: dict[tuple[str | None, str], dict[str, list[float]]] = {}
     presence: dict[tuple[str | None, str], int] = {}
-    presets: dict[tuple[str | None, str], str | None] = {}
+    preset_keys: dict[tuple[str | None, str], set[str]] = {}
     for report in draws:
         if not isinstance(report, Mapping):
             continue
@@ -246,16 +284,14 @@ def _fold(
                 value = metrics.get(metric)
                 if value is not None:
                     bucket[metric].append(value)
-    for report in draws:
-        if not isinstance(report, Mapping):
-            continue
         for group in report.get("groups") or ():
             if not isinstance(group, Mapping):
                 continue
-            key = _group_key(group)
-            if presets.get(key) is None:
-                presets[key] = _preset_key(group)
-    return values, presence, presets
+            preset = _preset_key(group)
+            if preset:
+                preset_keys.setdefault(_group_key(group), set()).add(preset)
+    identities = {key: _identity_from_keys(keys) for key, keys in preset_keys.items()}
+    return values, presence, identities
 
 
 def _sort_key(key: tuple[str | None, str]) -> tuple[int, str, str]:
@@ -269,13 +305,15 @@ def _render_cell(
     *,
     draws_with_cell: int,
     draws_total: int,
-    preset_key: str | None,
+    identity: _PresetIdentity,
 ) -> dict[str, Any]:
-    """Cubo con su banda por métrica y su ``validity`` medida."""
+    """Cubo con su banda por métrica, su ``validity`` medida y su identidad declarada (H2)."""
     bands = {metric: _stats(metric_values.get(metric, [])) for metric in METRICS}
     return {
         "strategyVersion": key[0],
-        "strategyPresetKey": preset_key,
+        "strategyPresetKey": identity.key,
+        "strategyPresetKeyAmbiguous": identity.ambiguous,
+        "strategyPresetKeys": list(identity.keys),
         "symbol": key[1],
         "drawsWithCell": draws_with_cell,
         "drawsTotal": draws_total,
@@ -331,20 +369,22 @@ def build_finance_band(
     """
     ordered = [report for report in (draws or ()) if isinstance(report, Mapping)]
     draws_total = len(ordered)
-    values, presence, presets = _fold(ordered)
+    values, presence, identities = _fold(ordered)
     cells = {
         key: _render_cell(
             key,
             values.get(key, {metric: [] for metric in METRICS}),
             draws_with_cell=presence.get(key, 0),
             draws_total=draws_total,
-            preset_key=presets.get(key),
+            identity=identities.get(key, _NO_IDENTITY),
         )
         for key in values
     }
     aggregate_cell = cells.get(AGGREGATE_KEY, {
         "strategyVersion": AGGREGATE_KEY[0],
         "strategyPresetKey": None,
+        "strategyPresetKeyAmbiguous": False,
+        "strategyPresetKeys": [],
         "symbol": AGGREGATE_KEY[1],
         "drawsWithCell": 0,
         "drawsTotal": draws_total,

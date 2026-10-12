@@ -153,6 +153,33 @@ def test_money_group_selected_by_exact_preset_key_when_several_share_symbol() ->
     assert entry["money"]["netReturnPct"] == 1.1
 
 
+def test_single_group_with_other_preset_is_not_attributed() -> None:
+    """Un solo grupo con OTRA identidad NO se atribuye: hueco declarado, nunca dinero cruzado."""
+    report = build_estudio_audit_report(
+        values=[_value("TEF")],
+        cycles=[_cycle("TEF", preset="breakout_v3", version="ver-breakout")],
+        finance_groups=[_group("TEF", preset="mean_reversion_v1", net=2.5)],
+    )
+    entry = report.values[0]
+    assert entry["strategy"]["presetKey"] == "breakout_v3"
+    assert entry["money"]["measured"] is False
+    assert entry["money"]["netReturnPct"] is None
+    assert entry["measured"] is False
+    assert any("no declaran la identidad" in gap for gap in entry["unmeasured"])
+
+
+def test_single_keyless_group_still_used_when_value_declares_preset() -> None:
+    """Fallback documentado: si el único grupo NO declara clave, sí se usa (las identidades no chocan)."""
+    report = build_estudio_audit_report(
+        values=[_value("TEF")],
+        cycles=[_cycle("TEF", preset="breakout_v3")],
+        finance_groups=[_group("TEF", preset=None, net=2.5)],
+    )
+    entry = report.values[0]
+    assert entry["money"]["measured"] is True
+    assert entry["money"]["netReturnPct"] == 2.5
+
+
 def test_result_r_below_floor_is_declared() -> None:
     report = build_estudio_audit_report(
         values=[_value("ACS", measured_cycles=2, expectancy_r=0.3)],

@@ -73,6 +73,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import time
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
@@ -981,6 +982,79 @@ def _finance_band_child_argv(
     return child
 
 
+#: Patrones de las salidas crudas por sorteo (reporte financiero + payload del replay).
+_FINANCE_BAND_DRAW_GLOBS = ("draw-*.finance.json", "draw-*.payload.json")
+
+
+def _purge_draw_artifacts(records_dir: pathlib.Path) -> int:
+    """Borra restos de sorteos previos para que NINGUNA salida vieja pueda leerse como nueva."""
+    removed = 0
+    for pattern in _FINANCE_BAND_DRAW_GLOBS:
+        for path in sorted(records_dir.glob(pattern)):
+            try:
+                path.unlink()
+            except FileNotFoundError:  # pragma: no cover — carrera improbable.
+                continue
+            removed += 1
+    return removed
+
+
+def _reset_draw_outputs(paths: Sequence[pathlib.Path]) -> None:
+    """Deja cada salida AUSENTE antes de lanzar el sorteo (borra y verifica); si no, ABORTA."""
+    for path in paths:
+        path.unlink(missing_ok=True)
+    present = [str(path) for path in paths if path.exists()]
+    if present:
+        raise RuntimeError(
+            f"salidas de una corrida previa siguen presentes: {', '.join(present)}; ABORTO"
+        )
+
+
+def _read_fresh_draw_report(path: pathlib.Path, *, launched_ns: int) -> dict[str, Any]:
+    """Lee el reporte financiero SOLO si es de ESTE sorteo y está bien formado; si no, ABORTA.
+
+    La frescura (``mtime`` posterior al lanzamiento) impide leer un informe anterior dejado por
+    una corrida previa: el sorteo debe haberlo regenerado (robustez del proceso de evidencias).
+    """
+    if not path.is_file():
+        raise RuntimeError(f"sin reporte financiero en {path.name}; ABORTO")
+    if path.stat().st_mtime_ns < launched_ns:
+        raise RuntimeError(f"{path.name} es anterior a este sorteo (reutilizado); ABORTO")
+    report = json.loads(path.read_text(encoding="utf-8"))
+    if (
+        not isinstance(report, dict)
+        or not isinstance(report.get("groups"), list)
+        or not isinstance(report.get("aggregate"), Mapping)
+    ):
+        raise RuntimeError(f"{path.name} no es un reporte financiero OOS válido; ABORTO")
+    return report
+
+
+def _validate_draw_payload(
+    path: pathlib.Path, *, account: str, version_a: str
+) -> dict[str, Any]:
+    """Verifica los metadatos del sorteo (identidad de entrada + ventana) antes de plegarlo."""
+    if not path.is_file():
+        raise RuntimeError(f"sin payload del sorteo en {path.name}; ABORTO")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping):
+        raise RuntimeError(f"{path.name} no es un payload de replay válido; ABORTO")
+    if str(payload.get("account")) != account:
+        raise RuntimeError(f"{path.name}: cuenta {payload.get('account')!r} ≠ {account!r}; ABORTO")
+    if str(payload.get("versionA")) != version_a:
+        raise RuntimeError(
+            f"{path.name}: versión A {payload.get('versionA')!r} ≠ {version_a!r}; ABORTO"
+        )
+    replay = payload.get("replay")
+    if (
+        not isinstance(replay, Mapping)
+        or replay.get("startDay") is None
+        or replay.get("endDay") is None
+    ):
+        raise RuntimeError(f"{path.name}: la ventana del replay no está declarada; ABORTO")
+    return dict(payload)
+
+
 def _run_finance_band(args: argparse.Namespace) -> int:
     """`§8-c` — orquesta los `K` sorteos del venue y pliega la BANDA financiera medida.
 
@@ -1006,6 +1080,9 @@ def _run_finance_band(args: argparse.Namespace) -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     records_dir = out_path.parent / f"{out_path.stem}-draws"
     records_dir.mkdir(parents=True, exist_ok=True)
+    purged = _purge_draw_artifacts(records_dir)
+    if purged:
+        print(f"    limpieza: {purged} salida(s) de corridas previas borrada(s)")
 
     mutations = _load_mutations()
     worker = _REPO_ROOT / _WORKER_REL
@@ -1017,6 +1094,10 @@ def _run_finance_band(args: argparse.Namespace) -> int:
     for k in range(draws_total):
         report_path = records_dir / f"draw-{k:02d}.finance.json"
         payload_path = records_dir / f"draw-{k:02d}.payload.json"
+        # H3 — ninguna salida puede sobrevivir de una corrida previa: se borra y se verifica su
+        # ausencia ANTES de lanzar. La frescura posterior impide leer un informe reutilizado.
+        launched_ns = time.time_ns()
+        _reset_draw_outputs([report_path, payload_path])
         original = ""
         restored = True
         try:
@@ -1051,9 +1132,9 @@ def _run_finance_band(args: argparse.Namespace) -> int:
                 timeout=7200,
                 env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             )
-            if result.returncode != 0 or not report_path.is_file():
+            if result.returncode != 0:
                 raise RuntimeError(
-                    f"draw {k:02d}: el replay no produjo reporte (exit {result.returncode}):\n"
+                    f"draw {k:02d}: el replay falló (exit {result.returncode}):\n"
                     f"{(result.stdout or '')[-1500:]}\n{(result.stderr or '')[-1500:]}"
                 )
         finally:
@@ -1065,7 +1146,12 @@ def _run_finance_band(args: argparse.Namespace) -> int:
         if not restored:
             raise RuntimeError(f"{_WORKER_REL} NO se restauró byte a byte; ABORTO (árbol en riesgo)")
 
-        report = json.loads(report_path.read_text(encoding="utf-8"))
+        # H3 — solo se incorpora el reporte REGENERADO en este sorteo (frescura + forma), y
+        # se verifican los metadatos del payload (identidad de entrada + ventana) antes de plegar.
+        report = _read_fresh_draw_report(report_path, launched_ns=launched_ns)
+        _validate_draw_payload(
+            payload_path, account=str(args.account_id), version_a=str(args.version_a)
+        )
         reports.append(report)
         sha = _sha256_lf(payload_path) if payload_path.is_file() else None
         if k == 0:
@@ -1102,7 +1188,7 @@ def _run_finance_band(args: argparse.Namespace) -> int:
             "k0Sha256Lf": k0_sha,
         },
         meta={
-            "bump": "2.11.114-beta",
+            "bump": "2.11.115-beta",
             "phase": "V2.88.114 OOS FINANCE BAND (§8-c)",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),

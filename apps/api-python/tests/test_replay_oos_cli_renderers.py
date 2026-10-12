@@ -21,7 +21,10 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
+import json
+import os
 import pathlib
+import time
 from types import SimpleNamespace
 from typing import Any
 
@@ -262,4 +265,93 @@ def test_finance_band_seam_folds_replay_reports(v87: Any) -> None:
     assert cell["drawsWithCell"] == 2
     assert cell["bands"]["netReturnPct"]["n"] == 2
     assert cell["validity"]["note"] is None
+
+
+def test_purge_draw_artifacts_removes_only_draw_outputs(v87: Any, tmp_path: pathlib.Path) -> None:
+    """H3 — los restos de sorteos previos se borran; los ficheros ajenos se conservan."""
+    (tmp_path / "draw-00.finance.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "draw-01.payload.json").write_text("{}", encoding="utf-8")
+    keep = tmp_path / "finance-band.json"
+    keep.write_text("{}", encoding="utf-8")
+
+    removed = v87._purge_draw_artifacts(tmp_path)  # noqa: SLF001
+
+    assert removed == 2
+    assert not (tmp_path / "draw-00.finance.json").exists()
+    assert not (tmp_path / "draw-01.payload.json").exists()
+    assert keep.exists()
+
+
+def test_reset_draw_outputs_verifies_absence(v87: Any, tmp_path: pathlib.Path) -> None:
+    """H3 — antes de lanzar el sorteo sus salidas quedan AUSENTES (borrar y verificar)."""
+    report = tmp_path / "draw-00.finance.json"
+    payload = tmp_path / "draw-00.payload.json"
+    report.write_text("viejo", encoding="utf-8")
+    payload.write_text("viejo", encoding="utf-8")
+
+    v87._reset_draw_outputs([report, payload])  # noqa: SLF001
+
+    assert not report.exists() and not payload.exists()
+
+
+def test_read_fresh_draw_report_rejects_a_reused_artifact(v87: Any, tmp_path: pathlib.Path) -> None:
+    """H3 — un reporte anterior al lanzamiento se RECHAZA: no se lee el informe viejo."""
+    path = tmp_path / "draw-00.finance.json"
+    path.write_text(json.dumps({"groups": [], "aggregate": {}, "minTrades": 10}), encoding="utf-8")
+    old = time.time_ns() - 10_000_000_000
+    os.utime(path, ns=(old, old))
+
+    with pytest.raises(RuntimeError):
+        v87._read_fresh_draw_report(path, launched_ns=time.time_ns())  # noqa: SLF001
+
+
+def test_read_fresh_draw_report_accepts_a_new_wellformed_artifact(
+    v87: Any, tmp_path: pathlib.Path
+) -> None:
+    """H3 — un reporte NUEVO y bien formado se acepta."""
+    path = tmp_path / "draw-00.finance.json"
+    path.write_text(json.dumps({"groups": [], "aggregate": {"trades": 0}}), encoding="utf-8")
+
+    report = v87._read_fresh_draw_report(  # noqa: SLF001
+        path, launched_ns=time.time_ns() - 1_000_000_000
+    )
+
+    assert report["aggregate"] == {"trades": 0}
+
+
+def test_validate_draw_payload_checks_window_and_identity(v87: Any, tmp_path: pathlib.Path) -> None:
+    """H3 — cuenta/versión/ventana del sorteo se verifican antes de plegarlo."""
+    path = tmp_path / "draw-00.payload.json"
+    path.write_text(
+        json.dumps(
+            {
+                "account": "acc-1",
+                "versionA": "vA",
+                "replay": {"startDay": "2022-01-03", "endDay": "2022-06-30"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    ok = v87._validate_draw_payload(path, account="acc-1", version_a="vA")  # noqa: SLF001
+    assert ok["account"] == "acc-1"
+
+    with pytest.raises(RuntimeError):
+        v87._validate_draw_payload(path, account="other", version_a="vA")  # noqa: SLF001
+    with pytest.raises(RuntimeError):
+        v87._validate_draw_payload(path, account="acc-1", version_a="other")  # noqa: SLF001
+
+
+def test_validate_draw_payload_rejects_an_undeclared_window(
+    v87: Any, tmp_path: pathlib.Path
+) -> None:
+    """H3 — un payload sin ventana declarada (replay nulo) NO se pliega."""
+    path = tmp_path / "draw-01.payload.json"
+    path.write_text(
+        json.dumps({"account": "acc-1", "versionA": "vA", "replay": None}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError):
+        v87._validate_draw_payload(path, account="acc-1", version_a="vA")  # noqa: SLF001
 

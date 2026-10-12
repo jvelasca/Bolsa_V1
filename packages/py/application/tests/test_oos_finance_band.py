@@ -156,4 +156,55 @@ def test_declared_scalars_and_identity_are_propagated() -> None:
     assert band["minTrades"] == 7
     assert band["stressMultiplier"] == 3.0
     assert band["groups"][0]["strategyPresetKey"] == "preset-x"
+    assert band["groups"][0]["strategyPresetKeyAmbiguous"] is False
+    assert band["groups"][0]["strategyPresetKeys"] == ["preset-x"]
     assert set(band["groups"][0]["bands"]) == set(METRICS)
+
+
+def test_preset_identity_consistent_across_draws_is_kept() -> None:
+    """H2 — si TODOS los sorteos del cubo declaran la MISMA clave, la identidad se conserva."""
+    draws = [
+        _report([_group("ACS", preset="breakout_v3", netReturnPct=float(value))])
+        for value in (1.0, 3.0)
+    ]
+
+    cell = build_finance_band(draws=draws)["groups"][0]
+
+    assert cell["strategyPresetKey"] == "breakout_v3"
+    assert cell["strategyPresetKeyAmbiguous"] is False
+    assert cell["strategyPresetKeys"] == ["breakout_v3"]
+
+
+def test_preset_identity_ambiguous_across_draws_is_declared_not_chosen() -> None:
+    """H2 — claves DISTINTAS en el mismo cubo ⇒ identidad ambigua (None), ninguna «ganadora»."""
+    draw_a = _report([_group("ACS", preset="breakout_v3", netReturnPct=1.0)])
+    draw_b = _report([_group("ACS", preset="mean_reversion_v1", netReturnPct=2.0)])
+
+    band = build_finance_band(draws=[draw_a, draw_b])
+
+    cell = band["groups"][0]
+    assert cell["strategyPresetKey"] is None
+    assert cell["strategyPresetKeyAmbiguous"] is True
+    assert cell["strategyPresetKeys"] == ["breakout_v3", "mean_reversion_v1"]
+    # Permutar los sorteos NO cambia el veredicto ni elige una clave por orden de llegada.
+    assert build_finance_band(draws=[draw_b, draw_a]) == band
+
+
+def test_preset_identity_absent_is_a_gap_never_ambiguous() -> None:
+    """H2 — sin ``presetKey`` no hay identidad ni ambigüedad: hueco declarado, nunca fabricado."""
+    cell = build_finance_band(draws=[_report([_group("ACS", netReturnPct=1.0)])])["groups"][0]
+
+    assert cell["strategyPresetKey"] is None
+    assert cell["strategyPresetKeyAmbiguous"] is False
+    assert cell["strategyPresetKeys"] == []
+
+
+def test_aggregate_declares_no_identity() -> None:
+    """H2 — el cubo agregado no tiene identidad de estrategia: ``None`` y sin ambigüedad."""
+    band = build_finance_band(draws=[_report([_group("ACS", preset="preset-x", netReturnPct=1.0)])])
+
+    aggregate = band["aggregate"]
+    assert aggregate["strategyPresetKey"] is None
+    assert aggregate["strategyPresetKeyAmbiguous"] is False
+    assert aggregate["strategyPresetKeys"] == []
+
