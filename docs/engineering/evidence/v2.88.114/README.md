@@ -135,3 +135,14 @@ harness de robustez de semilla `v2.88.16.3` (`CD59FEB8…`), lo que **cruza** do
 | `R-4`/`§8-c` | banda `K` medida del reporte financiero OOS | **✅ CERRADO por este sello** |
 | `R-5` | cita POST-TAG de `113` en las evidencias | **✅ actualizada** ([`v2.88.113/README.md` §10](../v2.88.113/README.md)) |
 | `R-2` | `origin/main` en `3d8e74ad`: los commits del tag `113` no corren `main` CI | **abierto (fuera de alcance)** |
+
+---
+
+## 7. Cita POST-TAG
+
+Tag anotado **`v2.88.114-beta`** (objeto `bcb19cd40c4d8739519ed579575f10712a3884bc` → commit `743bb8df71cb8ef617bdf94a52eb08312086efce`) sellado y publicado en `origin`.
+
+- `Release tag CI` [**38218516439**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38218516439) → **`success`** (`12m6s`): **12 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado).
+- **`replay-repro`** → **`success`**: regenera el artefacto del sello desde el fixture **sin** mover el payload ⇒ la costura opt-in de la banda **no** tocó el sello congelado.
+- Resto de workflows del tag: `Python CI` [**38218516436**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38218516436) `success` · `Frontend CI` [**38218516453**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38218516453) `success` · `Fase 2 scientific` [**38218516438**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38218516438) `success` · `Optimize lab` [**38218516459**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38218516459) `success`.
+- **Distinción:** *estado comunicado* (implementado y verificado localmente) vs *verificación externa* (tag/commit/run resueltos en GitHub) — aquí **ambos** confirmados. El sello **no** demuestra rentabilidad ni bloquea por sí solo rutas reales de `XTB`.
