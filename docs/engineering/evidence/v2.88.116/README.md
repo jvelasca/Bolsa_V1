@@ -87,4 +87,12 @@ la semilla del simulador sobre el **MISMO** dato histórico ⇒ **no** son obser
 
 ## 5. Cita POST-TAG
 
-**PENDIENTE** (tag `v2.88.116-beta` por publicar desde esta sesión). La cita se completa con el `Release tag CI` resuelto en GitHub.
+Tag anotado **`v2.88.116-beta`** (objeto `cfed89bbe3855e426b150cd8d231200a3978dc71` → commit `932cbdcffc5cfda0e73d350755b1d4a5b3422b07`) sellado y publicado en `origin` (`git ls-remote origin refs/tags/v2.88.116-beta*` resuelve objeto + `^{}`). `origin/main` == `HEAD` == `932cbdcf`. Tag **anotado sin firmar** (`unsigned`) — declarado, no disimulado.
+
+- `Release tag CI` [**38290903444**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38290903444) → **`success`** (`12m26s`): **12 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado).
+- **`replay-repro`** → **`success`** (`4m6s`): regenera el artefacto del sello desde el fixture **sin** mover el payload ⇒ el cambio de forma de las **bandas** (ficheros, no el sello) **no** tocó el artefacto congelado.
+- **`playwright (mock E2E)`** → **`success`** (`11m39s`) y **`playwright (integrated AUTO S5)`** → **`success`** (`3m29s`).
+- Resto de workflows del tag: `Python CI` [**38290903411**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38290903411) `success` · `Frontend CI` [**38290903443**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38290903443) `success` · `Fase 2 scientific` [**38290903616**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38290903616) `success` · `Optimize lab` [**38290903497**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38290903497) `success`.
+- CI de **rama** (`main`, commit `932cbdcf`): `Python CI` [**38290899631**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38290899631) · `Frontend CI` [**38290899719**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38290899719) · `Fase 2 scientific` [**38290899555**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38290899555) · `Optimize lab` [**38290899571**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38290899571) · `Gitleaks` [**38290899569**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38290899569) — todos `success`.
+- **Anotaciones del run:** solo avisos **preexistentes** y ajenos al diff (deprecación de Node 20 en `actions/*`, aviso de migración `ubuntu-latest`→26). **Ninguna** referida a `dia_d_multi_uncertainty`/`oos_finance_band`/`dia_d_multi_sampling`/`v2_87`/`v2_94`.
+- **Distinción:** *estado comunicado* (implementado y verificado localmente) vs *verificación externa* (tag/commit/run resueltos en GitHub) — aquí **ambos** confirmados. El sello **no** demuestra rentabilidad ni bloquea por sí solo rutas reales de `XTB`.

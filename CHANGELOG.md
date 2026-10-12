@@ -17,7 +17,7 @@ All notable releases of Bolsa V1.
 
 **Verificación (local).** `ruff` **All checks passed** · `mypy` **263 source files, no issues** · `pytest packages/py/application/tests` → **2699 passed** (+8 de la cobertura `H1`) · focales (bandas + CLI + guardas) **77 passed**. Evidencia: [`docs/engineering/evidence/v2.88.116/README.md`](docs/engineering/evidence/v2.88.116/README.md). Plan: [`plan-v2-88-116-h1-sensibilidad-vs-confianza-2026-10-12.md`](docs/engineering/plan-v2-88-116-h1-sensibilidad-vs-confianza-2026-10-12.md).
 
-**Cita POST-TAG.** PENDIENTE (tag `v2.88.116-beta` por publicar).
+**Cita POST-TAG.** Tag anotado **`v2.88.116-beta`** (objeto `cfed89bb` → commit `932cbdcf`) publicado en `origin`; `Release tag CI` [`38290903444`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38290903444) **VERDE** (`12m26s`; **12 jobs `success` + `certify`**, `playwright (integrated E2E, opt-in)` `skipped`) con `replay-repro` **REPRODUCIDO** ⇒ el cambio de forma de las bandas **no** movió el sello; `Python CI`/`Frontend CI`/`Fase 2 scientific`/`Optimize lab` del tag y de `main` (`932cbdcf`) **VERDES**. Tag **unsigned**.
 
 ## [2.11.113-beta] — **`P2` (sello 2): auditoría por VALOR de ESTUDIO — estrategia + porqué + señal + resultado** (**`Δ motor ≠ 0` aditivo · `Δ decisión = 0` · contrato ampliado · sin migración**)
 
