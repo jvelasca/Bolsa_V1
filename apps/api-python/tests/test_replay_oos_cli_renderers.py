@@ -204,3 +204,62 @@ def test_finance_report_seam_is_optin_inert(v87: Any) -> None:
     """La costura es INERTE por defecto: sin la ruta pedida el payload no cambia (sello intacto)."""
     signature = inspect.signature(v87._run_durable_replay)  # noqa: SLF001
     assert signature.parameters["finance_report_path"].default is None
+
+
+def test_finance_band_flags_are_inert_by_default(v87: Any) -> None:
+    """`§8-c` — la banda es OPT-IN: por defecto OFF (no puede mover el sello por accidente)."""
+    args = v87._build_parser().parse_args([])  # noqa: SLF001
+
+    assert args.finance_band == 0
+    assert args.finance_band_out is None
+    assert args.finance_band_seal is None
+    assert args.finance_report is None
+
+
+def test_finance_band_child_argv_never_recurses(v87: Any) -> None:
+    """El argv del sorteo NO arrastra los flags de banda (no hay recursión) y pide el reporte."""
+    args = v87._build_parser().parse_args(  # noqa: SLF001
+        ["--finance-band", "3", "--watch", "ACS,ITX"]
+    )
+
+    child = v87._finance_band_child_argv(  # noqa: SLF001
+        args,
+        report_path=pathlib.Path("r.json"),
+        payload_path=pathlib.Path("p.json"),
+    )
+
+    assert "--finance-band" not in child
+    assert "--finance-band-out" not in child
+    assert "--finance-band-seal" not in child
+    assert "--finance-report" in child
+    assert "r.json" in child
+    assert "--watch" in child and "ACS,ITX" in child
+
+
+def test_finance_band_seam_folds_replay_reports(v87: Any) -> None:
+    """`§8-c` — la costura une `ticks -> reporte financiero -> banda` sin PG (plegado real)."""
+    from bolsa_application.oos_finance_band import build_finance_band
+
+    def ticks_with(symbol: str, buy: float, sell: float) -> list[Any]:
+        return [
+            SimpleNamespace(
+                fill_rows=(
+                    _Row(symbol, "buy", 10, buy, "ex-a"),
+                    _Row(symbol, "sell", 10, sell, "ex-a"),
+                )
+            )
+        ]
+
+    reports = [
+        v87._finance_report_from_ticks(ticks_with("ACS", 100.0, 110.0), min_trades=1),  # noqa: SLF001
+        v87._finance_report_from_ticks(ticks_with("ACS", 100.0, 105.0), min_trades=1),  # noqa: SLF001
+    ]
+
+    band = build_finance_band(draws=reports)
+
+    assert band["draws"] == 2
+    cell = next(cell for cell in band["groups"] if cell["symbol"] == "ACS")
+    assert cell["drawsWithCell"] == 2
+    assert cell["bands"]["netReturnPct"]["n"] == 2
+    assert cell["validity"]["note"] is None
+

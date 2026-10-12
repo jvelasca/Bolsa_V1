@@ -65,11 +65,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import importlib.util
 import json
 import logging
 import os
 import pathlib
+import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
@@ -899,6 +901,237 @@ def _finance_report_from_ticks(
     ).to_dict()
 
 
+# ── §8-c · BANDA `K` MEDIDA del reporte financiero OOS (orquestador de re-sorteo) ─
+#
+# La costura `--finance-report` produce UN reporte de dinero para UNA realización del venue.
+# `§8-c` exige la BANDA: correr el MISMO replay `K` veces, cada sorteo con el ancla temporal
+# del seed del fill desplazada (`fill_seed(bar_tick_now + k, symbol)`), y plegar los `K`
+# reportes. Todo esto es INERTE respecto del sello congelado: el payload por defecto de cada
+# sorteo (y del tag) NO cambia; la banda vive en su propio fichero.
+
+#: Sorteo del venue, en su ÚNICA fuente (`auto_simulation_worker.py`): el ancla temporal del
+#: `seed` del book SIM. El orquestador la desplaza por sorteo y la restaura byte a byte.
+_WORKER_REL = "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py"
+_SEED_LINE = "                seed=fill_seed(bar_tick_now, symbol),\n"
+
+#: Matriz de mutaciones (presta `_apply`/`_restore`/`_drop_bytecode`: restauración byte a byte).
+_MUTATIONS = _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_44_mutation_audit.py"
+
+#: Carpeta por defecto del artefacto de banda (no versionada; mismos criterios que otras sondas).
+_FINANCE_BAND_SUBDIR = pathlib.Path("operability_runs") / "oos-finance-band"
+
+
+def _load_mutations() -> Any:
+    """Carga la matriz de mutaciones por ruta (presta `_apply`/`_restore`/`_drop_bytecode`)."""
+    spec = importlib.util.spec_from_file_location("v2_44_mutation_audit", _MUTATIONS)
+    if spec is None or spec.loader is None:  # pragma: no cover — el fichero vive al lado.
+        raise RuntimeError(f"no se pudo cargar {_MUTATIONS}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _sha256_lf(path: pathlib.Path) -> str:
+    """`sha256` del artefacto con saltos normalizados a LF (MISMA convención que el sello)."""
+    raw = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(raw).hexdigest().upper()
+
+
+def _finance_band_child_argv(
+    args: argparse.Namespace,
+    *,
+    report_path: pathlib.Path,
+    payload_path: pathlib.Path,
+) -> list[str]:
+    """Argv de UN sorteo: el MISMO script sin los flags de banda, pidiendo el reporte de dinero.
+
+    Se reconstruye el argv desde los argumentos YA parseados (no desde `sys.argv`): así no hay
+    riesgo de recursión (los flags de banda no viajan) ni de arrastrar un flag ajeno.
+    """
+    child = [sys.executable, str(pathlib.Path(__file__).resolve())]
+    if args.watch:
+        child += ["--watch", str(args.watch)]
+    child += [
+        "--watch-size",
+        str(args.watch_size),
+        "--min-bars",
+        str(args.min_bars),
+        "--history-days",
+        str(args.history_days),
+        "--start-index",
+        str(args.start_index),
+        "--max-ticks",
+        str(args.max_ticks),
+        "--edge",
+        str(args.edge),
+        "--account-id",
+        str(args.account_id),
+        "--version-a",
+        str(args.version_a),
+        "--venue",
+        str(args.venue),
+        "--finance-report",
+        str(report_path),
+        "--out",
+        str(payload_path),
+    ]
+    if not args.durable_cycle:
+        child += ["--no-durable-cycle"]
+    return child
+
+
+def _run_finance_band(args: argparse.Namespace) -> int:
+    """`§8-c` — orquesta los `K` sorteos del venue y pliega la BANDA financiera medida.
+
+    Por cada sorteo: parchea el ancla del seed (si `k > 0`), lanza un subproceso del MISMO
+    script pidiendo el reporte financiero, restaura el árbol byte a byte (ABORTA si no) y
+    acumula el reporte. Al final pliega con el módulo puro `oos_finance_band`. El payload por
+    defecto de cada sorteo NO se toca; si se pide `--finance-band-seal`, el sorteo `k = 0`
+    (realización de producción, sin parchear) tiene que reproducirlo.
+    """
+    from bolsa_application.oos_finance_band import DEFAULT_LIMITS, build_finance_band
+
+    draws_total = int(getattr(args, "finance_band", 0) or 0)
+    if draws_total < 1:
+        print("# uso incorrecto: --finance-band debe ser >= 1", file=sys.stderr)
+        return 1
+
+    if getattr(args, "finance_band_out", None):
+        out_path = pathlib.Path(args.finance_band_out)
+        if not out_path.is_absolute():
+            out_path = _REPO_ROOT / out_path
+    else:
+        out_path = _REPO_ROOT / _FINANCE_BAND_SUBDIR / "finance-band.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    records_dir = out_path.parent / f"{out_path.stem}-draws"
+    records_dir.mkdir(parents=True, exist_ok=True)
+
+    mutations = _load_mutations()
+    worker = _REPO_ROOT / _WORKER_REL
+    reports: list[dict[str, Any]] = []
+    draw_records: list[dict[str, Any]] = []
+    seal = getattr(args, "finance_band_seal", None)
+    k0_sha: str | None = None
+
+    for k in range(draws_total):
+        report_path = records_dir / f"draw-{k:02d}.finance.json"
+        payload_path = records_dir / f"draw-{k:02d}.payload.json"
+        original = ""
+        restored = True
+        try:
+            if k > 0:
+                original = worker.read_text(encoding="utf-8")
+                hits = original.count(_SEED_LINE)
+                if hits != 1:
+                    raise RuntimeError(
+                        f"el ancla del seed aparece {hits} veces en {_WORKER_REL}; ABORTO"
+                    )
+                patched = original.replace(
+                    _SEED_LINE,
+                    f"                seed=fill_seed(bar_tick_now + {k}, symbol),\n",
+                    1,
+                ).encode("utf-8")
+                if not mutations._apply(worker, patched):  # noqa: SLF001 — sonda
+                    raise RuntimeError(f"draw {k:02d}: no se pudo escribir el sorteo; ABORTO")
+                mutations._drop_bytecode((_WORKER_REL,))  # noqa: SLF001
+                live = worker.read_text(encoding="utf-8")
+                if f"fill_seed(bar_tick_now + {k}, symbol)" not in live:  # vivacidad del EDIT
+                    raise RuntimeError(f"draw {k:02d}: el desplazamiento no está en el fichero; ABORTO")
+                print(f"### sorteo {k:02d}  (re-sorteo: seed=fill_seed(bar_tick_now + {k}, …))")
+            else:
+                print("### sorteo 00  (realización de PRODUCCIÓN, sin tocar el árbol)")
+            result = subprocess.run(  # noqa: S603 — argv construido, no hay shell.
+                _finance_band_child_argv(args, report_path=report_path, payload_path=payload_path),
+                cwd=_REPO_ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=7200,
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            )
+            if result.returncode != 0 or not report_path.is_file():
+                raise RuntimeError(
+                    f"draw {k:02d}: el replay no produjo reporte (exit {result.returncode}):\n"
+                    f"{(result.stdout or '')[-1500:]}\n{(result.stderr or '')[-1500:]}"
+                )
+        finally:
+            if k > 0:
+                restored = mutations._restore(worker, _WORKER_REL, original)  # noqa: SLF001
+                mutations._drop_bytecode((_WORKER_REL,))  # noqa: SLF001
+                if restored and worker.read_text(encoding="utf-8") != original:
+                    restored = False
+        if not restored:
+            raise RuntimeError(f"{_WORKER_REL} NO se restauró byte a byte; ABORTO (árbol en riesgo)")
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        reports.append(report)
+        sha = _sha256_lf(payload_path) if payload_path.is_file() else None
+        if k == 0:
+            k0_sha = sha
+        draw_records.append(
+            {
+                "k": k,
+                "report": report_path.name,
+                "payload": payload_path.name,
+                "sha256Lf": sha,
+                "groups": len(report.get("groups") or []),
+            }
+        )
+        print(
+            f"    reporte {report_path.name} · grupos {len(report.get('groups') or [])} · "
+            f"LF {(sha or 'n/d')[:12].lower()}"
+        )
+
+    if seal is not None and k0_sha is not None and k0_sha != str(seal).upper():
+        print(
+            f"# el sorteo 0 NO reproduce el sello declarado:\n"
+            f"  esperado {str(seal).upper()}\n  medido   {k0_sha}",
+            file=sys.stderr,
+        )
+        return 2
+
+    artifact = build_finance_band(
+        draws=reports,
+        seed_shift={
+            "k0": "produccion (sin parchear)",
+            "kGreaterThanZero": "fill_seed(bar_tick_now + k, symbol)",
+            "source": f"{_WORKER_REL}:seed",
+            "K": draws_total,
+            "k0Sha256Lf": k0_sha,
+        },
+        meta={
+            "bump": "2.11.114-beta",
+            "phase": "V2.88.114 OOS FINANCE BAND (§8-c)",
+            "nature": "INVESTIGACION",
+            "account": str(args.account_id),
+            "versionA": str(args.version_a),
+            "venue": str(args.venue),
+            "watch": str(args.watch) if args.watch else None,
+            "draws": draw_records,
+        },
+        limits=list(DEFAULT_LIMITS),
+    )
+    out_path.write_text(
+        json.dumps(artifact, indent=2, sort_keys=True, ensure_ascii=False, default=str) + "\n",
+        encoding="utf-8",
+    )
+
+    aggregate_band = artifact["aggregate"]["bands"].get("netReturnPct")
+    validity = artifact["aggregate"]["validity"]
+    print()
+    print(f"BANDA OOS FINANCIERA · K = {draws_total} sorteos")
+    print("=" * 78)
+    print(f"agregado netReturnPct     {aggregate_band}")
+    print(
+        f"crossesZeroNetReturn      {validity['crossesZeroNetReturn']} · "
+        f"pointCitable {validity['pointCitable']} ({validity['note']})"
+    )
+    print(f"artefacto                 {out_path}")
+    return 0
+
+
 def _print_census(census: dict[str, Any]) -> None:
     """Censo desde el DICT del payload.
 
@@ -1081,8 +1314,13 @@ def _use_utf8_console() -> None:
             continue
 
 
-def main(argv: list[str] | None = None) -> int:
-    _use_utf8_console()
+def _build_parser() -> argparse.ArgumentParser:
+    """Parser del CLI.
+
+    Se extrae a una función para poder **guardar sus DEFAULTs** en test: la costura de banda
+    (`§8-c`) tiene que ser INERTE por defecto, y eso se asserta sobre este parser, no sobre la
+    narración del `--help`.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--watch", default=None, help="instrumentos separados por coma (si falta, catálogo)"
@@ -1127,7 +1365,37 @@ def main(argv: list[str] | None = None) -> int:
             "Opt-in e INERTE: no toca el payload por defecto (sello replay-repro intacto)."
         ),
     )
-    args = parser.parse_args(argv)
+    parser.add_argument(
+        "--finance-band",
+        type=int,
+        default=0,
+        metavar="K",
+        help=(
+            "§8-c — BANDA K MEDIDA: corre el replay K veces (re-sorteo del venue) y pliega los "
+            "reportes financieros en una banda. 0 = OFF (inerte)."
+        ),
+    )
+    parser.add_argument(
+        "--finance-band-out",
+        default=None,
+        metavar="PATH",
+        help="§8-c — ruta del JSON de la banda (por defecto operability_runs/oos-finance-band/).",
+    )
+    parser.add_argument(
+        "--finance-band-seal",
+        default=None,
+        metavar="SHA256",
+        help=(
+            "§8-c — sha256 (LF) que el sorteo 0 (sin parchear) debe reproducir; si no cuadra, "
+            "la sonda sale con código 2 (autochequeo del instrumento)."
+        ),
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    _use_utf8_console()
+    args = _build_parser().parse_args(argv)
 
     if int(args.watch_size) <= 0 or int(args.min_bars) <= 0:
         print("# uso incorrecto: --watch-size y --min-bars deben ser > 0", file=sys.stderr)
@@ -1137,6 +1405,11 @@ def main(argv: list[str] | None = None) -> int:
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s %(message)s")
+
+    if int(getattr(args, "finance_band", 0) or 0) >= 1:
+        # §8-c — modo BANDA: el script actúa de orquestador de los K sorteos del venue.
+        return _run_finance_band(args)
+
     try:
         evidence = asyncio.run(_run(args))
     except Exception as error:  # noqa: BLE001 — sin PG/mercado no hay evidencia: se DECLARA.

@@ -77,4 +77,16 @@ El veredicto DÍA-D quedaba **fragmentado** en cuatro capas que no se podían le
 
 ## 10. Cita POST-TAG
 
-Pendiente de publicar el tag anotado **`v2.88.113-beta`** (unsigned, limitación de certificación).
+Tag anotado **`v2.88.113-beta`** (objeto `7713925b4fa73f2ed7705705624cac06c2a5a857` → commit `3dd15193881895a5bfa7a55937aca7e14963b500`) sellado y publicado en `origin`.
+
+- `Release tag CI` [**38177610756**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38177610756) → **`success`**: **12 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado).
+- **`replay-repro`** → **`REPRODUCIDO`**: `sha256` `1E3ADAC2…929A37E7` **idéntico** a los sellos previos ⇒ **prueba directa** de que el sello **no** movió el artefacto congelado (`Δ decisión = 0` confirmado por CI).
+- Tag **unsigned** (`verification.verified = false`, `reason: unsigned`): limitación de certificación, no defecto funcional.
+
+### 10.1 Verificación externa (comunicado vs verificado)
+
+- **Estado comunicado (antes de publicar):** el tag y la comparación devolvían `404` porque `v2.88.112-beta`/`v2.88.113-beta` **solo existían en el clon local**; no había `ref` remoto.
+- **Verificación externa (confirmada 2026-10-11):** tras publicar el tag, `gh api repos/jvelasca/Bolsa_V1/git/ref/tags/v2.88.113-beta` **resuelve** al objeto `7713925b…` → commit `3dd15193`, y el run `38177610756` (`headBranch=v2.88.113-beta`, `headSha=3dd15193`) figura **`success`**. La verificación ya **no** es pendiente.
+- **Residuo `R-2` (no cerrado por este sello):** al empujar **solo** el tag, los 2 commits (`d955da59`, `3dd15193`) son alcanzables por el tag pero **no** por `main` ⇒ no corrió el CI de rama sobre ellos; `origin/main` sigue en `3d8e74ad`.
+- **Alcance de la aprobación:** la aprobación del sello **no** demuestra la rentabilidad de las estrategias ni certifica por sí sola el bloqueo de **todas** las rutas de órdenes reales de `XTB`. Es un sello **aditivo** (`Δ decisión = 0`), no una afirmación de rendimiento.
+
