@@ -97,7 +97,9 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "verificable (H1.1).",
     "H1.1: declarar design='independent_sample' NO basta. Sin evidencia de ventanas de evaluacion "
     "independientes, metodo de muestreo, tamano de muestra, unidad de observacion y tratamiento de "
-    "la dependencia temporal, statisticalConfidence sigue NOT_MEASURED con missingProvenance.",
+    "la dependencia temporal, statisticalConfidence sigue NOT_MEASURED con missingProvenance. Sin "
+    "muestra efectiva (banda ausente o con menos de MIN_DRAWS_FOR_BAND sorteos) queda NOT_MEASURED "
+    "con reason=no_effective_sample, aunque la procedencia sea completa.",
     "pointCitable esta acotado por pointCitableScope: es citabilidad de la banda de sensibilidad, "
     "NUNCA una afirmacion de rentabilidad demostrada.",
     "La banda se cita ENTERA o no se cita: el determinismo (reproducibilidad byte a byte) NO es "

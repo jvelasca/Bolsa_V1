@@ -17,6 +17,7 @@ from bolsa_application.dia_d_multi_uncertainty import (
     DESIGN_INDEPENDENT,
     DESIGN_VENUE_DRAW,
     PROVENANCE_REQUIRED_FIELDS,
+    STATISTICAL_CONFIDENCE_NO_SAMPLE_REASON,
     STATISTICAL_CONFIDENCE_PROVENANCE_INCOMPLETE_REASON,
     STATISTICAL_CONFIDENCE_PROVENANCE_MISSING_REASON,
     STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON,
@@ -254,6 +255,22 @@ def test_h1_aggregate_declares_both_labels_without_sample() -> None:
     assert validity["sensitivityBand"]["note"] == "sin_muestra"
     assert validity["statisticalConfidence"]["status"] == "NOT_MEASURED"
     assert validity["statisticalConfidence"]["established"] is False
+
+
+def test_h1_1_no_effective_sample_blocks_measured_even_with_provenance() -> None:
+    """H1.1 — sin muestra, la confianza queda NOT_MEASURED aunque la procedencia sea completa."""
+    validity = build_finance_band(
+        draws=[],
+        design=DESIGN_INDEPENDENT,
+        provenance=_provenance(),
+    )["aggregate"]["validity"]
+    statistical = validity["statisticalConfidence"]
+    assert validity["design"] == DESIGN_INDEPENDENT
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["reason"] == STATISTICAL_CONFIDENCE_NO_SAMPLE_REASON
+    assert statistical["established"] is False
+    assert statistical["se"] is None
+    assert statistical["ci95HalfWidth"] is None
 
 
 def test_payload_is_deterministic_under_permutation() -> None:

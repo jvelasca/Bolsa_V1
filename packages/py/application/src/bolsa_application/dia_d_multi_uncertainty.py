@@ -18,7 +18,8 @@ producción), y publica por cada cubo
   ``MIN_DRAWS_FOR_BAND`` sorteos **no** hay banda que cite un punto: se declara
   (``insufficient_draws``). ``statisticalConfidence`` solo pasa a ``MEASURED`` si el llamante
   declara ``design = "independent_sample"`` **y** aporta procedencia verificable (H1.1): sin
-  evidencia queda ``NOT_MEASURED`` con ``missingProvenance``.
+  evidencia queda ``NOT_MEASURED`` con ``missingProvenance``, y sin muestra efectiva queda
+  ``NOT_MEASURED`` con reason ``no_effective_sample`` (la procedencia no crea la medición).
 
 Por qué existe
 --------------
@@ -105,6 +106,10 @@ STATISTICAL_CONFIDENCE_PROVENANCE_INCOMPLETE_REASON = "provenance_incomplete"
 #: Motivo: los datos declaran un re-sorteo del venue (semilla desplazada) ⇒ NO son independientes.
 STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON = "venue_draw_declared_independent"
 
+#: Motivo: NO hay muestra efectiva (banda ausente o con menos de ``MIN_DRAWS_FOR_BAND`` sorteos):
+#: sin datos que resumir no se computa ninguna estadística, por completa que sea la procedencia.
+STATISTICAL_CONFIDENCE_NO_SAMPLE_REASON = "no_effective_sample"
+
 #: Dimensiones declaradas de un cubo (nunca se adivina la etiqueta).
 DIM_GLOBAL = "GLOBAL"
 DIM_YEAR = "YEAR"
@@ -146,7 +151,9 @@ DEFAULT_LIMITS: tuple[str, ...] = (
     "verificable (H1.1).",
     "H1.1: declarar design='independent_sample' NO basta. Sin evidencia de ventanas de evaluacion "
     "independientes, metodo de muestreo, tamano de muestra, unidad de observacion y tratamiento de "
-    "la dependencia temporal, statisticalConfidence sigue NOT_MEASURED con missingProvenance.",
+    "la dependencia temporal, statisticalConfidence sigue NOT_MEASURED con missingProvenance. Sin "
+    "muestra efectiva (banda ausente o con menos de MIN_DRAWS_FOR_BAND sorteos) queda NOT_MEASURED "
+    "con reason=no_effective_sample, aunque la procedencia sea completa.",
     "pointCitable esta acotado por pointCitableScope: es citabilidad de la banda de sensibilidad, "
     "NUNCA una afirmacion de rentabilidad demostrada.",
     "La banda se cita ENTERA o no se cita: el determinismo (reproducibilidad byte a byte) NO es "
@@ -272,7 +279,9 @@ def band_validity(
     y el motivo. Solo con ``design = independent_sample`` **y** procedencia verificable
     (``provenance`` con los ``PROVENANCE_REQUIRED_FIELDS``) se computa con el mismo criterio; una
     mera declaración NO basta (H1.1): sin evidencia (o si los datos revelan un ``venue_seeded``)
-    vuelve a ``NOT_MEASURED`` con el motivo y ``missingProvenance`` declarados.
+    vuelve a ``NOT_MEASURED`` con el motivo y ``missingProvenance`` declarados. Y sin muestra
+    efectiva (``stats is None``) queda SIEMPRE ``NOT_MEASURED`` (``no_effective_sample``): declarar
+    independencia no crea la medición que no existe.
 
     Un hueco es ``None`` (``sin_muestra`` / ``insufficient_draws``); jamás se rellena con ``0``.
     """
@@ -307,9 +316,13 @@ def band_validity(
     echoed_provenance = dict(provenance) if isinstance(provenance, Mapping) else {}
     if design == DESIGN_INDEPENDENT:
         gaps = _provenance_gaps(provenance)
-        if venue_seeded:
+        if not measured:
             status = "NOT_MEASURED"
-            reason: str | None = STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON
+            reason: str | None = STATISTICAL_CONFIDENCE_NO_SAMPLE_REASON
+            missing = list(gaps)
+        elif venue_seeded:
+            status = "NOT_MEASURED"
+            reason = STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON
             missing = list(gaps)
         elif not provenance:
             status = "NOT_MEASURED"
@@ -670,6 +683,7 @@ __all__ = [
     "PROVENANCE_REQUIRED_FIELDS",
     "SCHEMA_VERSION",
     "STATISTICAL_CONFIDENCE_NOT_MEASURED_REASON",
+    "STATISTICAL_CONFIDENCE_NO_SAMPLE_REASON",
     "STATISTICAL_CONFIDENCE_PROVENANCE_INCOMPLETE_REASON",
     "STATISTICAL_CONFIDENCE_PROVENANCE_MISSING_REASON",
     "STATISTICAL_CONFIDENCE_REQUIRES",

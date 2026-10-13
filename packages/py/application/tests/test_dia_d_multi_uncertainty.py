@@ -28,6 +28,7 @@ from bolsa_application.dia_d_multi_uncertainty import (
     POINT_CITABLE_SCOPE,
     PROVENANCE_REQUIRED_FIELDS,
     SCHEMA_VERSION,
+    STATISTICAL_CONFIDENCE_NO_SAMPLE_REASON,
     STATISTICAL_CONFIDENCE_PROVENANCE_INCOMPLETE_REASON,
     STATISTICAL_CONFIDENCE_PROVENANCE_MISSING_REASON,
     STATISTICAL_CONFIDENCE_VENUE_DRAW_CONTRADICTION_REASON,
@@ -227,12 +228,16 @@ def test_h1_independent_sample_measures_statistical_confidence():
 
 
 def test_h1_gap_still_marks_statistical_confidence_not_measured():
-    """H1 — sin muestra, ambas etiquetas declaran el hueco (nunca un ``0``), incluso con diseño."""
+    """H1/H1.1 — sin muestra, la confianza queda NOT_MEASURED aunque la procedencia sea completa."""
     artifact = build_band_artifact(draws=[], design=DESIGN_INDEPENDENT, provenance=_provenance())
     validity = artifact["global"]["validity"]
     assert validity["sensitivityBand"]["pointCitable"] is False
-    assert validity["statisticalConfidence"]["status"] == "MEASURED"
-    assert validity["statisticalConfidence"]["established"] is False
+    statistical = validity["statisticalConfidence"]
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["reason"] == STATISTICAL_CONFIDENCE_NO_SAMPLE_REASON
+    assert statistical["established"] is False
+    assert statistical["se"] is None
+    assert statistical["ci95HalfWidth"] is None
 
 
 # ── H1.1: la declaración de independencia NO basta sin procedencia verificable ──

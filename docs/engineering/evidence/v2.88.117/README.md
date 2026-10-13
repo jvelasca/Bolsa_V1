@@ -90,6 +90,9 @@ válidos y sin contradicción de venue: `status = MEASURED`, `established = poin
 - **La puerta verifica la procedencia declarada, NO la valida científicamente.** Sigue sin existir un
   procedimiento estadístico real: la etiqueta `MEASURED` acredita que el llamante **declaró** una
   procedencia completa y coherente, no que el muestreo sea correcto. No se finge lo contrario.
+- **`MEASURED` también exige muestra efectiva.** Aun con procedencia completa, sin banda (o con menos
+  de `MIN_DRAWS_FOR_BAND` sorteos) la confianza queda `NOT_MEASURED` con `reason=no_effective_sample`:
+  declarar independencia no crea la medición que no existe.
 - **Los artefactos de evidencia sellados siguen en su esquema antiguo** (`v2.88.114/finance-band-w32-k12.json`):
   regenerarlos exige PostgreSQL con la entrada sembrada ⇒ **no reproducible sin PG**.
 - **`R-ev`** (regenerar el artefacto `K=12` en el esquema nuevo) sigue **pendiente**.
