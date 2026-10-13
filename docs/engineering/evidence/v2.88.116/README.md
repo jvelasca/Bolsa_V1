@@ -79,7 +79,7 @@ la semilla del simulador sobre el **MISMO** dato histórico ⇒ **no** son obser
 
 - **No** se implementa una confianza estadística real: exige observaciones **independientes** y un procedimiento adecuado ⇒ queda `NOT_MEASURED` con su requisito **declarado**, no simulado.
 - **Los artefactos de evidencia sellados siguen en su esquema antiguo** (`v2.88.114/finance-band-w32-k12.json` es `oos-finance-band-v1`): regenerarlos exige PostgreSQL con la entrada sembrada ⇒ **no reproducible sin PG** y **no** se finge. La forma nueva está fijada por tests puros.
-- **`H3`/`H2`/`P1`** (sellos anteriores) siguen cerrados; **`R-ev`** (regenerar el artefacto `K=12` en el esquema nuevo) sigue **pendiente** por la misma dependencia de PostgreSQL.
+- **`H3`/`H2`/`P1`** (sellos anteriores) siguen cerrados; **`R-ev`** (regenerar el artefacto `K=12` en el esquema nuevo) → **✅ CERRADO en [`v2.88.119-beta`](../v2.88.119/README.md)** (era `⏳ PENDIENTE` aquí; reproducible con PostgreSQL sembrado).
 - **Hueco declarado en `CHANGELOG.md`:** las entradas `2.11.114-beta` y `2.11.115-beta` **no** se añadieron (los dos sellos no tocaron el `CHANGELOG`); esta entrada documenta el salto `113 → 116`. Se declara, no se disimula.
 - **Tag `unsigned`:** el tag anotado no está firmado.
 

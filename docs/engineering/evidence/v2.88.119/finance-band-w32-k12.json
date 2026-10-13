@@ -1,0 +1,1405 @@
+{
+  "aggregate": {
+    "bands": {
+      "committedCapital": {
+        "max": 1695800.911402,
+        "mean": 1201006.2090124167,
+        "median": 1231358.713517,
+        "min": 686979.813954,
+        "n": 12,
+        "stdev": 282582.0028684115
+      },
+      "grossReturnPct": {
+        "max": 0.665323,
+        "mean": -0.7113163333333333,
+        "median": -0.5528965,
+        "min": -3.248126,
+        "n": 12,
+        "stdev": 1.0195997560849823
+      },
+      "hitRate": {
+        "max": 0.679372,
+        "mean": 0.59616625,
+        "median": 0.6099030000000001,
+        "min": 0.491184,
+        "n": 12,
+        "stdev": 0.047632125715608147
+      },
+      "maxDrawdownPct": {
+        "max": 3.623252,
+        "mean": 1.41566125,
+        "median": 1.2559835000000001,
+        "min": 0.461874,
+        "n": 12,
+        "stdev": 0.8559779833924006
+      },
+      "netReturnPct": {
+        "max": 0.515323,
+        "mean": -0.8613163333333334,
+        "median": -0.7028965,
+        "min": -3.398126,
+        "n": 12,
+        "stdev": 1.0195997560849823
+      },
+      "netReturnPctAtStress": {
+        "max": 0.365323,
+        "mean": -1.0113163333333333,
+        "median": -0.8528965,
+        "min": -3.548126,
+        "n": 12,
+        "stdev": 1.0195997560849823
+      },
+      "profitFactor": {
+        "max": 1.19296,
+        "mean": 0.8070729166666667,
+        "median": 0.810082,
+        "min": 0.383374,
+        "n": 12,
+        "stdev": 0.21171242362438186
+      },
+      "sharpe": {
+        "max": 0.435189,
+        "mean": 0.2652265833333333,
+        "median": 0.2630325,
+        "min": 0.066817,
+        "n": 12,
+        "stdev": 0.08644846105383477
+      },
+      "trades": {
+        "max": 1095.0,
+        "mean": 715.0,
+        "median": 726.5,
+        "min": 397.0,
+        "n": 12,
+        "stdev": 180.65713381984116
+      }
+    },
+    "drawsTotal": 12,
+    "drawsWithCell": 12,
+    "strategyPresetKey": null,
+    "strategyPresetKeyAmbiguous": false,
+    "strategyPresetKeys": [],
+    "strategyVersion": "__ALL__",
+    "symbol": "__ALL__",
+    "validity": {
+      "crossesKey": "crossesZeroNetReturn",
+      "design": "venue_draw",
+      "sensitivityBand": {
+        "ci95HalfWidth": 0.5768928697685145,
+        "crossesZeroNetReturn": true,
+        "drawsWithCell": 12,
+        "label": "sensitivityBand",
+        "measured": true,
+        "note": null,
+        "pointCitable": false,
+        "pointCitableScope": "sensitivity_band_only_not_statistical_confidence",
+        "scope": "venue_draw_sensitivity",
+        "se": 0.29433309682067066
+      },
+      "statisticalConfidence": {
+        "ci95HalfWidth": null,
+        "design": "venue_draw",
+        "established": false,
+        "label": "statisticalConfidence",
+        "missingProvenance": [],
+        "provenance": {},
+        "reason": "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo del venue, no la incertidumbre estadistica de la estrategia.",
+        "requires": "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato.",
+        "se": null,
+        "status": "NOT_MEASURED"
+      }
+    }
+  },
+  "coverage": {
+    "drawsTotal": 12,
+    "groups": [
+      {
+        "drawsWithCell": 12,
+        "strategyVersion": "v283-window-a",
+        "symbol": "0a5dc12fd5a24f0a89a91d36a"
+      },
+      {
+        "drawsWithCell": 12,
+        "strategyVersion": "v283-window-a",
+        "symbol": "0cf0907837fc422db221b0149"
+      },
+      {
+        "drawsWithCell": 12,
+        "strategyVersion": "v283-window-a",
+        "symbol": "240a4ae01a944d3bba1cf1b24"
+      },
+      {
+        "drawsWithCell": 12,
+        "strategyVersion": "v283-window-a",
+        "symbol": "31f9a597d03249319ea0c9345"
+      },
+      {
+        "drawsWithCell": 12,
+        "strategyVersion": "v283-window-a",
+        "symbol": "381dd3b0699a44e8b9d13ac13"
+      },
+      {
+        "drawsWithCell": 12,
+        "strategyVersion": "v283-window-a",
+        "symbol": "49596ff25acb4294b265f321b"
+      },
+      {
+        "drawsWithCell": 12,
+        "strategyVersion": "v283-window-a",
+        "symbol": "4d24ea029283461cb9304421a"
+      },
+      {
+        "drawsWithCell": 12,
+        "strategyVersion": "v283-window-a",
+        "symbol": "54283bcb54674ec1b70b4db72"
+      },
+      {
+        "drawsWithCell": 12,
+        "strategyVersion": "v283-window-a",
+        "symbol": "5a130eea1ad54dcaaa50b67b9"
+      },
+      {
+        "drawsWithCell": 12,
+        "strategyVersion": "v283-window-a",
+        "symbol": "5c34aaec1448406ebec94b20f"
+      }
+    ]
+  },
+  "design": "venue_draw",
+  "draws": 12,
+  "groups": [
+    {
+      "bands": {
+        "committedCapital": {
+          "max": 432167.7321,
+          "mean": 159503.85916633334,
+          "median": 144866.3151445,
+          "min": 9691.156034,
+          "n": 12,
+          "stdev": 126337.09754481606
+        },
+        "grossReturnPct": {
+          "max": 1.731119,
+          "mean": -0.6787391,
+          "median": 0.2659885,
+          "min": -4.170984,
+          "n": 10,
+          "stdev": 1.994913391822635
+        },
+        "hitRate": {
+          "max": 0.740741,
+          "mean": 0.5991392,
+          "median": 0.6613249999999999,
+          "min": 0.2,
+          "n": 10,
+          "stdev": 0.16181635604833028
+        },
+        "maxDrawdownPct": {
+          "max": 4.658085,
+          "mean": 2.6062815,
+          "median": 2.114205,
+          "min": 1.112407,
+          "n": 10,
+          "stdev": 1.3234264596640986
+        },
+        "netReturnPct": {
+          "max": 1.581119,
+          "mean": -0.8287391,
+          "median": 0.1159885,
+          "min": -4.320984,
+          "n": 10,
+          "stdev": 1.994913391822635
+        },
+        "netReturnPctAtStress": {
+          "max": 1.431119,
+          "mean": -0.9787391,
+          "median": -0.0340115,
+          "min": -4.470984,
+          "n": 10,
+          "stdev": 1.994913391822635
+        },
+        "profitFactor": {
+          "max": 1.614605,
+          "mean": 0.8921706,
+          "median": 1.050335,
+          "min": 0.072772,
+          "n": 10,
+          "stdev": 0.5227931731595584
+        },
+        "sharpe": {
+          "max": 0.714882,
+          "mean": 0.2778844,
+          "median": 0.394459,
+          "min": -0.904928,
+          "n": 10,
+          "stdev": 0.47289702246518744
+        },
+        "trades": {
+          "max": 234.0,
+          "mean": 89.58333333333333,
+          "median": 71.0,
+          "min": 4.0,
+          "n": 12,
+          "stdev": 74.67870996624288
+        }
+      },
+      "drawsTotal": 12,
+      "drawsWithCell": 12,
+      "strategyPresetKey": null,
+      "strategyPresetKeyAmbiguous": false,
+      "strategyPresetKeys": [],
+      "strategyVersion": "v283-window-a",
+      "symbol": "0a5dc12fd5a24f0a89a91d36a",
+      "validity": {
+        "crossesKey": "crossesZeroNetReturn",
+        "design": "venue_draw",
+        "sensitivityBand": {
+          "ci95HalfWidth": 1.128728508103212,
+          "crossesZeroNetReturn": true,
+          "drawsWithCell": 12,
+          "label": "sensitivityBand",
+          "measured": true,
+          "note": null,
+          "pointCitable": false,
+          "pointCitableScope": "sensitivity_band_only_not_statistical_confidence",
+          "scope": "venue_draw_sensitivity",
+          "se": 0.5758818918893939
+        },
+        "statisticalConfidence": {
+          "ci95HalfWidth": null,
+          "design": "venue_draw",
+          "established": false,
+          "label": "statisticalConfidence",
+          "missingProvenance": [],
+          "provenance": {},
+          "reason": "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo del venue, no la incertidumbre estadistica de la estrategia.",
+          "requires": "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato.",
+          "se": null,
+          "status": "NOT_MEASURED"
+        }
+      }
+    },
+    {
+      "bands": {
+        "committedCapital": {
+          "max": 389476.896788,
+          "mean": 211808.67717458334,
+          "median": 213162.893125,
+          "min": 68086.693461,
+          "n": 12,
+          "stdev": 101911.15645026272
+        },
+        "grossReturnPct": {
+          "max": 0.469616,
+          "mean": -1.2096449166666667,
+          "median": -0.5954269999999999,
+          "min": -4.361769,
+          "n": 12,
+          "stdev": 1.5928641486154982
+        },
+        "hitRate": {
+          "max": 0.764706,
+          "mean": 0.5515438333333333,
+          "median": 0.6666805,
+          "min": 0.08,
+          "n": 12,
+          "stdev": 0.21445954044171647
+        },
+        "maxDrawdownPct": {
+          "max": 4.511769,
+          "mean": 2.1897360833333335,
+          "median": 1.9299985,
+          "min": 0.910513,
+          "n": 12,
+          "stdev": 1.1741382331656027
+        },
+        "netReturnPct": {
+          "max": 0.319616,
+          "mean": -1.3596449166666666,
+          "median": -0.7454270000000001,
+          "min": -4.511769,
+          "n": 12,
+          "stdev": 1.5928641486154984
+        },
+        "netReturnPctAtStress": {
+          "max": 0.169616,
+          "mean": -1.5096449166666666,
+          "median": -0.895427,
+          "min": -4.661769,
+          "n": 12,
+          "stdev": 1.5928641486154982
+        },
+        "profitFactor": {
+          "max": 1.153992,
+          "mean": 0.66470475,
+          "median": 0.739763,
+          "min": 0.04794,
+          "n": 12,
+          "stdev": 0.3692084380064837
+        },
+        "sharpe": {
+          "max": 0.499298,
+          "mean": 0.06279525,
+          "median": 0.25376699999999996,
+          "min": -1.08268,
+          "n": 12,
+          "stdev": 0.4909250832831022
+        },
+        "trades": {
+          "max": 220.0,
+          "mean": 104.75,
+          "median": 109.5,
+          "min": 21.0,
+          "n": 12,
+          "stdev": 65.41167709209114
+        }
+      },
+      "drawsTotal": 12,
+      "drawsWithCell": 12,
+      "strategyPresetKey": null,
+      "strategyPresetKeyAmbiguous": false,
+      "strategyPresetKeys": [],
+      "strategyVersion": "v283-window-a",
+      "symbol": "0cf0907837fc422db221b0149",
+      "validity": {
+        "crossesKey": "crossesZeroNetReturn",
+        "design": "venue_draw",
+        "sensitivityBand": {
+          "ci95HalfWidth": 0.9012477340859489,
+          "crossesZeroNetReturn": true,
+          "drawsWithCell": 12,
+          "label": "sensitivityBand",
+          "measured": true,
+          "note": null,
+          "pointCitable": false,
+          "pointCitableScope": "sensitivity_band_only_not_statistical_confidence",
+          "scope": "venue_draw_sensitivity",
+          "se": 0.4598202724928311
+        },
+        "statisticalConfidence": {
+          "ci95HalfWidth": null,
+          "design": "venue_draw",
+          "established": false,
+          "label": "statisticalConfidence",
+          "missingProvenance": [],
+          "provenance": {},
+          "reason": "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo del venue, no la incertidumbre estadistica de la estrategia.",
+          "requires": "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato.",
+          "se": null,
+          "status": "NOT_MEASURED"
+        }
+      }
+    },
+    {
+      "bands": {
+        "committedCapital": {
+          "max": 169959.894989,
+          "mean": 90804.34890599998,
+          "median": 89536.45778150001,
+          "min": 10635.293785,
+          "n": 12,
+          "stdev": 40815.65354395303
+        },
+        "grossReturnPct": {
+          "max": 2.482555,
+          "mean": -4.288858181818181,
+          "median": -4.417978,
+          "min": -8.615627,
+          "n": 11,
+          "stdev": 3.199573257067227
+        },
+        "hitRate": {
+          "max": 0.729412,
+          "mean": 0.4934786363636363,
+          "median": 0.480769,
+          "min": 0.229167,
+          "n": 11,
+          "stdev": 0.13757835471750945
+        },
+        "maxDrawdownPct": {
+          "max": 8.765627,
+          "mean": 6.088663727272728,
+          "median": 6.969264,
+          "min": 1.194574,
+          "n": 11,
+          "stdev": 2.1932637246417244
+        },
+        "netReturnPct": {
+          "max": 2.332555,
+          "mean": -4.4388581818181825,
+          "median": -4.567978,
+          "min": -8.765627,
+          "n": 11,
+          "stdev": 3.199573257067227
+        },
+        "netReturnPctAtStress": {
+          "max": 2.182555,
+          "mean": -4.588858181818182,
+          "median": -4.717978,
+          "min": -8.915627,
+          "n": 11,
+          "stdev": 3.199573257067227
+        },
+        "profitFactor": {
+          "max": 1.606113,
+          "mean": 0.4930932727272727,
+          "median": 0.356616,
+          "min": 0.058819,
+          "n": 11,
+          "stdev": 0.44133841626169384
+        },
+        "sharpe": {
+          "max": 0.550314,
+          "mean": 0.03102827272727272,
+          "median": 0.150106,
+          "min": -0.712589,
+          "n": 11,
+          "stdev": 0.3387680687263219
+        },
+        "trades": {
+          "max": 124.0,
+          "mean": 66.16666666666667,
+          "median": 56.5,
+          "min": 5.0,
+          "n": 12,
+          "stdev": 33.65965273472414
+        }
+      },
+      "drawsTotal": 12,
+      "drawsWithCell": 12,
+      "strategyPresetKey": null,
+      "strategyPresetKeyAmbiguous": false,
+      "strategyPresetKeys": [],
+      "strategyVersion": "v283-window-a",
+      "symbol": "240a4ae01a944d3bba1cf1b24",
+      "validity": {
+        "crossesKey": "crossesZeroNetReturn",
+        "design": "venue_draw",
+        "sensitivityBand": {
+          "ci95HalfWidth": 1.8103289916344973,
+          "crossesZeroNetReturn": true,
+          "drawsWithCell": 12,
+          "label": "sensitivityBand",
+          "measured": true,
+          "note": null,
+          "pointCitable": false,
+          "pointCitableScope": "sensitivity_band_only_not_statistical_confidence",
+          "scope": "venue_draw_sensitivity",
+          "se": 0.9236372406298456
+        },
+        "statisticalConfidence": {
+          "ci95HalfWidth": null,
+          "design": "venue_draw",
+          "established": false,
+          "label": "statisticalConfidence",
+          "missingProvenance": [],
+          "provenance": {},
+          "reason": "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo del venue, no la incertidumbre estadistica de la estrategia.",
+          "requires": "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato.",
+          "se": null,
+          "status": "NOT_MEASURED"
+        }
+      }
+    },
+    {
+      "bands": {
+        "committedCapital": {
+          "max": 414700.002739,
+          "mean": 170409.29054775,
+          "median": 153099.378226,
+          "min": 67107.688556,
+          "n": 12,
+          "stdev": 91263.9999785249
+        },
+        "grossReturnPct": {
+          "max": 3.664723,
+          "mean": -0.36422899999999997,
+          "median": -0.951393,
+          "min": -2.209419,
+          "n": 12,
+          "stdev": 1.5784166219344098
+        },
+        "hitRate": {
+          "max": 0.850746,
+          "mean": 0.5582353333333333,
+          "median": 0.5282469999999999,
+          "min": 0.382353,
+          "n": 12,
+          "stdev": 0.12672746135068313
+        },
+        "maxDrawdownPct": {
+          "max": 3.560226,
+          "mean": 2.4634915833333335,
+          "median": 2.5208995,
+          "min": 1.09016,
+          "n": 12,
+          "stdev": 0.7261756259791725
+        },
+        "netReturnPct": {
+          "max": 3.514723,
+          "mean": -0.5142289999999999,
+          "median": -1.1013929999999998,
+          "min": -2.359419,
+          "n": 12,
+          "stdev": 1.5784166219344098
+        },
+        "netReturnPctAtStress": {
+          "max": 3.364723,
+          "mean": -0.664229,
+          "median": -1.251393,
+          "min": -2.509419,
+          "n": 12,
+          "stdev": 1.5784166219344098
+        },
+        "profitFactor": {
+          "max": 2.927389,
+          "mean": 0.9858093333333334,
+          "median": 0.7309005,
+          "min": 0.488565,
+          "n": 12,
+          "stdev": 0.6464819155177934
+        },
+        "sharpe": {
+          "max": 0.994944,
+          "mean": 0.3354143333333333,
+          "median": 0.290798,
+          "min": 0.149134,
+          "n": 12,
+          "stdev": 0.21861345594196369
+        },
+        "trades": {
+          "max": 240.0,
+          "mean": 84.41666666666667,
+          "median": 70.5,
+          "min": 27.0,
+          "n": 12,
+          "stdev": 57.64179376883485
+        }
+      },
+      "drawsTotal": 12,
+      "drawsWithCell": 12,
+      "strategyPresetKey": null,
+      "strategyPresetKeyAmbiguous": false,
+      "strategyPresetKeys": [],
+      "strategyVersion": "v283-window-a",
+      "symbol": "31f9a597d03249319ea0c9345",
+      "validity": {
+        "crossesKey": "crossesZeroNetReturn",
+        "design": "venue_draw",
+        "sensitivityBand": {
+          "ci95HalfWidth": 0.8930732763358671,
+          "crossesZeroNetReturn": true,
+          "drawsWithCell": 12,
+          "label": "sensitivityBand",
+          "measured": true,
+          "note": null,
+          "pointCitable": false,
+          "pointCitableScope": "sensitivity_band_only_not_statistical_confidence",
+          "scope": "venue_draw_sensitivity",
+          "se": 0.45564963078360565
+        },
+        "statisticalConfidence": {
+          "ci95HalfWidth": null,
+          "design": "venue_draw",
+          "established": false,
+          "label": "statisticalConfidence",
+          "missingProvenance": [],
+          "provenance": {},
+          "reason": "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo del venue, no la incertidumbre estadistica de la estrategia.",
+          "requires": "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato.",
+          "se": null,
+          "status": "NOT_MEASURED"
+        }
+      }
+    },
+    {
+      "bands": {
+        "committedCapital": {
+          "max": 292091.002124,
+          "mean": 88278.77077141666,
+          "median": 33422.3917975,
+          "min": 8897.442365,
+          "n": 12,
+          "stdev": 98298.40782914312
+        },
+        "grossReturnPct": {
+          "max": 1.369365,
+          "mean": -2.1107152,
+          "median": -1.352821,
+          "min": -9.262112,
+          "n": 10,
+          "stdev": 3.1908921344322128
+        },
+        "hitRate": {
+          "max": 0.783784,
+          "mean": 0.6733652,
+          "median": 0.676103,
+          "min": 0.55,
+          "n": 10,
+          "stdev": 0.0662236271942273
+        },
+        "maxDrawdownPct": {
+          "max": 10.839933,
+          "mean": 4.7359773,
+          "median": 4.398443,
+          "min": 0.875574,
+          "n": 10,
+          "stdev": 2.8195397018574875
+        },
+        "netReturnPct": {
+          "max": 1.219365,
+          "mean": -2.2607152,
+          "median": -1.502821,
+          "min": -9.412112,
+          "n": 10,
+          "stdev": 3.1908921344322128
+        },
+        "netReturnPctAtStress": {
+          "max": 1.069365,
+          "mean": -2.4107152000000003,
+          "median": -1.652821,
+          "min": -9.562112,
+          "n": 10,
+          "stdev": 3.1908921344322128
+        },
+        "profitFactor": {
+          "max": 1.459436,
+          "mean": 0.7492270999999999,
+          "median": 0.699732,
+          "min": 0.131719,
+          "n": 10,
+          "stdev": 0.4151046314792091
+        },
+        "sharpe": {
+          "max": 0.499888,
+          "mean": 0.24927329999999998,
+          "median": 0.28655600000000003,
+          "min": -0.084435,
+          "n": 10,
+          "stdev": 0.1831346571176794
+        },
+        "trades": {
+          "max": 197.0,
+          "mean": 59.833333333333336,
+          "median": 28.5,
+          "min": 7.0,
+          "n": 12,
+          "stdev": 63.08570008770256
+        }
+      },
+      "drawsTotal": 12,
+      "drawsWithCell": 12,
+      "strategyPresetKey": null,
+      "strategyPresetKeyAmbiguous": false,
+      "strategyPresetKeys": [],
+      "strategyVersion": "v283-window-a",
+      "symbol": "381dd3b0699a44e8b9d13ac13",
+      "validity": {
+        "crossesKey": "crossesZeroNetReturn",
+        "design": "venue_draw",
+        "sensitivityBand": {
+          "ci95HalfWidth": 1.8054171841141076,
+          "crossesZeroNetReturn": true,
+          "drawsWithCell": 12,
+          "label": "sensitivityBand",
+          "measured": true,
+          "note": null,
+          "pointCitable": false,
+          "pointCitableScope": "sensitivity_band_only_not_statistical_confidence",
+          "scope": "venue_draw_sensitivity",
+          "se": 0.9211312163847488
+        },
+        "statisticalConfidence": {
+          "ci95HalfWidth": null,
+          "design": "venue_draw",
+          "established": false,
+          "label": "statisticalConfidence",
+          "missingProvenance": [],
+          "provenance": {},
+          "reason": "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo del venue, no la incertidumbre estadistica de la estrategia.",
+          "requires": "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato.",
+          "se": null,
+          "status": "NOT_MEASURED"
+        }
+      }
+    },
+    {
+      "bands": {
+        "committedCapital": {
+          "max": 320601.47167,
+          "mean": 123362.15003808333,
+          "median": 117101.5053325,
+          "min": 7107.977988,
+          "n": 12,
+          "stdev": 99605.18149996662
+        },
+        "grossReturnPct": {
+          "max": 0.669654,
+          "mean": -2.4238365454545456,
+          "median": -2.652297,
+          "min": -5.091864,
+          "n": 11,
+          "stdev": 1.4995322807769922
+        },
+        "hitRate": {
+          "max": 0.608108,
+          "mean": 0.5055887272727273,
+          "median": 0.517241,
+          "min": 0.363636,
+          "n": 11,
+          "stdev": 0.08059320211022865
+        },
+        "maxDrawdownPct": {
+          "max": 5.86397,
+          "mean": 3.3615104545454546,
+          "median": 3.195192,
+          "min": 0.918272,
+          "n": 11,
+          "stdev": 1.293023744061279
+        },
+        "netReturnPct": {
+          "max": 0.519654,
+          "mean": -2.5738365454545455,
+          "median": -2.802297,
+          "min": -5.241864,
+          "n": 11,
+          "stdev": 1.499532280776992
+        },
+        "netReturnPctAtStress": {
+          "max": 0.369654,
+          "mean": -2.7238365454545455,
+          "median": -2.952297,
+          "min": -5.391864,
+          "n": 11,
+          "stdev": 1.4995322807769922
+        },
+        "profitFactor": {
+          "max": 1.303017,
+          "mean": 0.5220274545454545,
+          "median": 0.476632,
+          "min": 0.158376,
+          "n": 11,
+          "stdev": 0.2858592946542896
+        },
+        "sharpe": {
+          "max": 0.490831,
+          "mean": 0.17183227272727272,
+          "median": 0.182767,
+          "min": -0.195965,
+          "n": 11,
+          "stdev": 0.18937998109289114
+        },
+        "trades": {
+          "max": 163.0,
+          "mean": 74.58333333333333,
+          "median": 71.5,
+          "min": 5.0,
+          "n": 12,
+          "stdev": 49.52012778210044
+        }
+      },
+      "drawsTotal": 12,
+      "drawsWithCell": 12,
+      "strategyPresetKey": null,
+      "strategyPresetKeyAmbiguous": false,
+      "strategyPresetKeys": [],
+      "strategyVersion": "v283-window-a",
+      "symbol": "49596ff25acb4294b265f321b",
+      "validity": {
+        "crossesKey": "crossesZeroNetReturn",
+        "design": "venue_draw",
+        "sensitivityBand": {
+          "ci95HalfWidth": 0.8484402586458272,
+          "crossesZeroNetReturn": true,
+          "drawsWithCell": 12,
+          "label": "sensitivityBand",
+          "measured": true,
+          "note": null,
+          "pointCitable": false,
+          "pointCitableScope": "sensitivity_band_only_not_statistical_confidence",
+          "scope": "venue_draw_sensitivity",
+          "se": 0.4328776829825649
+        },
+        "statisticalConfidence": {
+          "ci95HalfWidth": null,
+          "design": "venue_draw",
+          "established": false,
+          "label": "statisticalConfidence",
+          "missingProvenance": [],
+          "provenance": {},
+          "reason": "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo del venue, no la incertidumbre estadistica de la estrategia.",
+          "requires": "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato.",
+          "se": null,
+          "status": "NOT_MEASURED"
+        }
+      }
+    },
+    {
+      "bands": {
+        "committedCapital": {
+          "max": 349571.417589,
+          "mean": 108170.46703641668,
+          "median": 62665.048548,
+          "min": 18809.241445,
+          "n": 12,
+          "stdev": 102405.65184976776
+        },
+        "grossReturnPct": {
+          "max": 2.451394,
+          "mean": -0.32694533333333337,
+          "median": 0.488512,
+          "min": -6.72785,
+          "n": 9,
+          "stdev": 2.8331582461807923
+        },
+        "hitRate": {
+          "max": 0.807692,
+          "mean": 0.6932725555555556,
+          "median": 0.715909,
+          "min": 0.573529,
+          "n": 9,
+          "stdev": 0.07350074106521515
+        },
+        "maxDrawdownPct": {
+          "max": 6.87785,
+          "mean": 2.7696424444444445,
+          "median": 1.761618,
+          "min": 0.454131,
+          "n": 9,
+          "stdev": 2.3067313756101395
+        },
+        "netReturnPct": {
+          "max": 2.301394,
+          "mean": -0.47694533333333333,
+          "median": 0.338512,
+          "min": -6.87785,
+          "n": 9,
+          "stdev": 2.8331582461807923
+        },
+        "netReturnPctAtStress": {
+          "max": 2.151394,
+          "mean": -0.6269453333333332,
+          "median": 0.188512,
+          "min": -7.02785,
+          "n": 9,
+          "stdev": 2.8331582461807923
+        },
+        "profitFactor": {
+          "max": 2.171696,
+          "mean": 1.154114222222222,
+          "median": 1.074042,
+          "min": 0.02709,
+          "n": 9,
+          "stdev": 0.676361013317227
+        },
+        "sharpe": {
+          "max": 0.788844,
+          "mean": 0.5959125555555556,
+          "median": 0.666018,
+          "min": 0.364825,
+          "n": 9,
+          "stdev": 0.1426404811312624
+        },
+        "trades": {
+          "max": 208.0,
+          "mean": 55.75,
+          "median": 30.5,
+          "min": 7.0,
+          "n": 12,
+          "stdev": 56.9606955130758
+        }
+      },
+      "drawsTotal": 12,
+      "drawsWithCell": 12,
+      "strategyPresetKey": null,
+      "strategyPresetKeyAmbiguous": false,
+      "strategyPresetKeys": [],
+      "strategyVersion": "v283-window-a",
+      "symbol": "4d24ea029283461cb9304421a",
+      "validity": {
+        "crossesKey": "crossesZeroNetReturn",
+        "design": "venue_draw",
+        "sensitivityBand": {
+          "ci95HalfWidth": 1.6030101825675027,
+          "crossesZeroNetReturn": true,
+          "drawsWithCell": 12,
+          "label": "sensitivityBand",
+          "measured": true,
+          "note": null,
+          "pointCitable": false,
+          "pointCitableScope": "sensitivity_band_only_not_statistical_confidence",
+          "scope": "venue_draw_sensitivity",
+          "se": 0.8178623380446443
+        },
+        "statisticalConfidence": {
+          "ci95HalfWidth": null,
+          "design": "venue_draw",
+          "established": false,
+          "label": "statisticalConfidence",
+          "missingProvenance": [],
+          "provenance": {},
+          "reason": "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo del venue, no la incertidumbre estadistica de la estrategia.",
+          "requires": "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato.",
+          "se": null,
+          "status": "NOT_MEASURED"
+        }
+      }
+    },
+    {
+      "bands": {
+        "committedCapital": {
+          "max": 243399.125741,
+          "mean": 73088.75506291667,
+          "median": 40691.648315,
+          "min": 6673.396674,
+          "n": 12,
+          "stdev": 68423.41642767758
+        },
+        "grossReturnPct": {
+          "max": 3.378356,
+          "mean": -0.30293227272727274,
+          "median": 0.590423,
+          "min": -4.68609,
+          "n": 11,
+          "stdev": 2.557842237606608
+        },
+        "hitRate": {
+          "max": 0.716981,
+          "mean": 0.581156,
+          "median": 0.603175,
+          "min": 0.341463,
+          "n": 11,
+          "stdev": 0.09915683297960587
+        },
+        "maxDrawdownPct": {
+          "max": 7.291641,
+          "mean": 3.223603363636364,
+          "median": 2.35828,
+          "min": 0.522542,
+          "n": 11,
+          "stdev": 2.423711953595419
+        },
+        "netReturnPct": {
+          "max": 3.228356,
+          "mean": -0.45293227272727277,
+          "median": 0.440423,
+          "min": -4.83609,
+          "n": 11,
+          "stdev": 2.557842237606608
+        },
+        "netReturnPctAtStress": {
+          "max": 3.078356,
+          "mean": -0.6029322727272727,
+          "median": 0.290423,
+          "min": -4.98609,
+          "n": 11,
+          "stdev": 2.557842237606608
+        },
+        "profitFactor": {
+          "max": 3.413737,
+          "mean": 1.2889187272727272,
+          "median": 1.147421,
+          "min": 0.229577,
+          "n": 11,
+          "stdev": 0.9051227200752282
+        },
+        "sharpe": {
+          "max": 0.581984,
+          "mean": 0.2688270909090909,
+          "median": 0.315724,
+          "min": -0.308182,
+          "n": 11,
+          "stdev": 0.2838111980497709
+        },
+        "trades": {
+          "max": 212.0,
+          "mean": 65.0,
+          "median": 49.0,
+          "min": 9.0,
+          "n": 12,
+          "stdev": 51.713956852413965
+        }
+      },
+      "drawsTotal": 12,
+      "drawsWithCell": 12,
+      "strategyPresetKey": null,
+      "strategyPresetKeyAmbiguous": false,
+      "strategyPresetKeys": [],
+      "strategyVersion": "v283-window-a",
+      "symbol": "54283bcb54674ec1b70b4db72",
+      "validity": {
+        "crossesKey": "crossesZeroNetReturn",
+        "design": "venue_draw",
+        "sensitivityBand": {
+          "ci95HalfWidth": 1.4472354863382346,
+          "crossesZeroNetReturn": true,
+          "drawsWithCell": 12,
+          "label": "sensitivityBand",
+          "measured": true,
+          "note": null,
+          "pointCitable": false,
+          "pointCitableScope": "sensitivity_band_only_not_statistical_confidence",
+          "scope": "venue_draw_sensitivity",
+          "se": 0.738385452213385
+        },
+        "statisticalConfidence": {
+          "ci95HalfWidth": null,
+          "design": "venue_draw",
+          "established": false,
+          "label": "statisticalConfidence",
+          "missingProvenance": [],
+          "provenance": {},
+          "reason": "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo del venue, no la incertidumbre estadistica de la estrategia.",
+          "requires": "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato.",
+          "se": null,
+          "status": "NOT_MEASURED"
+        }
+      }
+    },
+    {
+      "bands": {
+        "committedCapital": {
+          "max": 176348.606681,
+          "mean": 65970.10211425,
+          "median": 31529.6046245,
+          "min": 885.293049,
+          "n": 12,
+          "stdev": 68761.45504816769
+        },
+        "grossReturnPct": {
+          "max": 8.050417,
+          "mean": -1.8827192727272726,
+          "median": -1.667078,
+          "min": -12.17276,
+          "n": 11,
+          "stdev": 4.825106872077477
+        },
+        "hitRate": {
+          "max": 0.783784,
+          "mean": 0.5125325454545454,
+          "median": 0.55,
+          "min": 0.25,
+          "n": 11,
+          "stdev": 0.16727514032350396
+        },
+        "maxDrawdownPct": {
+          "max": 12.336557,
+          "mean": 3.60087,
+          "median": 2.606728,
+          "min": 1.121109,
+          "n": 11,
+          "stdev": 3.1937249843644393
+        },
+        "netReturnPct": {
+          "max": 7.900417,
+          "mean": -2.032719272727273,
+          "median": -1.817078,
+          "min": -12.32276,
+          "n": 11,
+          "stdev": 4.825106872077477
+        },
+        "netReturnPctAtStress": {
+          "max": 7.750417,
+          "mean": -2.182719272727273,
+          "median": -1.967078,
+          "min": -12.47276,
+          "n": 11,
+          "stdev": 4.825106872077476
+        },
+        "profitFactor": {
+          "max": 4.185761,
+          "mean": 0.899139,
+          "median": 0.52279,
+          "min": 0.001118,
+          "n": 11,
+          "stdev": 1.1570526969163741
+        },
+        "sharpe": {
+          "max": 0.614986,
+          "mean": 0.13108454545454545,
+          "median": 0.088025,
+          "min": -0.375719,
+          "n": 11,
+          "stdev": 0.32051713685808203
+        },
+        "trades": {
+          "max": 118.0,
+          "mean": 53.666666666666664,
+          "median": 34.5,
+          "min": 9.0,
+          "n": 12,
+          "stdev": 42.22229532157415
+        }
+      },
+      "drawsTotal": 12,
+      "drawsWithCell": 12,
+      "strategyPresetKey": null,
+      "strategyPresetKeyAmbiguous": false,
+      "strategyPresetKeys": [],
+      "strategyVersion": "v283-window-a",
+      "symbol": "5a130eea1ad54dcaaa50b67b9",
+      "validity": {
+        "crossesKey": "crossesZeroNetReturn",
+        "design": "venue_draw",
+        "sensitivityBand": {
+          "ci95HalfWidth": 2.7300612164333913,
+          "crossesZeroNetReturn": true,
+          "drawsWithCell": 12,
+          "label": "sensitivityBand",
+          "measured": true,
+          "note": null,
+          "pointCitable": false,
+          "pointCitableScope": "sensitivity_band_only_not_statistical_confidence",
+          "scope": "venue_draw_sensitivity",
+          "se": 1.3928883757313222
+        },
+        "statisticalConfidence": {
+          "ci95HalfWidth": null,
+          "design": "venue_draw",
+          "established": false,
+          "label": "statisticalConfidence",
+          "missingProvenance": [],
+          "provenance": {},
+          "reason": "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo del venue, no la incertidumbre estadistica de la estrategia.",
+          "requires": "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato.",
+          "se": null,
+          "status": "NOT_MEASURED"
+        }
+      }
+    },
+    {
+      "bands": {
+        "committedCapital": {
+          "max": 377639.538315,
+          "mean": 109609.78819458334,
+          "median": 75457.123396,
+          "min": 96.009216,
+          "n": 12,
+          "stdev": 108352.95420986353
+        },
+        "grossReturnPct": {
+          "max": 8.623712,
+          "mean": 0.19575479999999995,
+          "median": -0.018303999999999987,
+          "min": -5.558002,
+          "n": 10,
+          "stdev": 3.701235307211953
+        },
+        "hitRate": {
+          "max": 0.752577,
+          "mean": 0.4828006,
+          "median": 0.47857150000000004,
+          "min": 0.148148,
+          "n": 10,
+          "stdev": 0.1791019492346189
+        },
+        "maxDrawdownPct": {
+          "max": 6.075191,
+          "mean": 3.9615166000000004,
+          "median": 4.386229999999999,
+          "min": 1.103126,
+          "n": 10,
+          "stdev": 1.5724582124450366
+        },
+        "netReturnPct": {
+          "max": 8.473712,
+          "mean": 0.04575480000000016,
+          "median": -0.16830399999999998,
+          "min": -5.708002,
+          "n": 10,
+          "stdev": 3.701235307211953
+        },
+        "netReturnPctAtStress": {
+          "max": 8.323712,
+          "mean": -0.10424519999999995,
+          "median": -0.31830400000000003,
+          "min": -5.858002,
+          "n": 10,
+          "stdev": 3.701235307211953
+        },
+        "profitFactor": {
+          "max": 2.869307,
+          "mean": 1.1369843,
+          "median": 0.9563765,
+          "min": 0.109705,
+          "n": 10,
+          "stdev": 0.8385254597118742
+        },
+        "sharpe": {
+          "max": 0.499147,
+          "mean": 0.1779744,
+          "median": 0.2612525,
+          "min": -0.560267,
+          "n": 10,
+          "stdev": 0.33429024609288255
+        },
+        "trades": {
+          "max": 202.0,
+          "mean": 61.25,
+          "median": 41.5,
+          "min": 5.0,
+          "n": 12,
+          "stdev": 57.58345393137395
+        }
+      },
+      "drawsTotal": 12,
+      "drawsWithCell": 12,
+      "strategyPresetKey": null,
+      "strategyPresetKeyAmbiguous": false,
+      "strategyPresetKeys": [],
+      "strategyVersion": "v283-window-a",
+      "symbol": "5c34aaec1448406ebec94b20f",
+      "validity": {
+        "crossesKey": "crossesZeroNetReturn",
+        "design": "venue_draw",
+        "sensitivityBand": {
+          "ci95HalfWidth": 2.0941710169339087,
+          "crossesZeroNetReturn": true,
+          "drawsWithCell": 12,
+          "label": "sensitivityBand",
+          "measured": true,
+          "note": null,
+          "pointCitable": false,
+          "pointCitableScope": "sensitivity_band_only_not_statistical_confidence",
+          "scope": "venue_draw_sensitivity",
+          "se": 1.068454600476484
+        },
+        "statisticalConfidence": {
+          "ci95HalfWidth": null,
+          "design": "venue_draw",
+          "established": false,
+          "label": "statisticalConfidence",
+          "missingProvenance": [],
+          "provenance": {},
+          "reason": "Los K sorteos desplazan el ancla de la semilla del simulador sobre el MISMO dato historico: no son observaciones independientes de una poblacion. La banda mide sensibilidad al sorteo del venue, no la incertidumbre estadistica de la estrategia.",
+          "requires": "Observaciones INDEPENDIENTES declaradas por el llamante (design='independent_sample') y un procedimiento estadistico adecuado; jamas se infiere de re-sorteos del mismo dato.",
+          "se": null,
+          "status": "NOT_MEASURED"
+        }
+      }
+    }
+  ],
+  "kind": "OOS_FINANCE_BAND",
+  "limits": [
+    "Advisory read-only: no cambia el motor, los umbrales, TOP_N ni la allocation.",
+    "La banda mide el RUIDO DEL SORTEO DEL VENUE (K re-sorteos del MISMO dato y estrategia), no la incertidumbre de muestreo del ciclo ni el futuro.",
+    "Un punto solo es citable si la banda de retorno neto NO cruza cero Y |media| > 1.96*SE, con K >= 2; con menos sorteos se declara insufficient_draws y pointCitable=False.",
+    "H1: las etiquetas sensitivityBand y statisticalConfidence NO se confunden. La banda de K re-sorteos del MISMO dato mide SOLO sensibilidad al sorteo del venue; la confianza estadistica queda NOT_MEASURED salvo que el llamante declare observaciones independientes CON procedencia verificable (H1.1).",
+    "H1.1: declarar design='independent_sample' NO basta. Sin evidencia de ventanas de evaluacion independientes, metodo de muestreo, tamano de muestra, unidad de observacion y tratamiento de la dependencia temporal, statisticalConfidence sigue NOT_MEASURED con missingProvenance. Sin muestra efectiva (banda ausente o con menos de MIN_DRAWS_FOR_BAND sorteos) queda NOT_MEASURED con reason=no_effective_sample, aunque la procedencia sea completa.",
+    "pointCitable esta acotado por pointCitableScope: es citabilidad de la banda de sensibilidad, NUNCA una afirmacion de rentabilidad demostrada.",
+    "La banda se cita ENTERA o no se cita: el determinismo (reproducibilidad byte a byte) NO es validez.",
+    "Un hueco es None/NOT_MEASURED; nunca se rellena con 0. Un cubo ausente en un sorteo baja drawsWithCell, no se inventa.",
+    "La identidad EXACTA (presetKey) de un cubo se declara solo si los K sorteos coinciden; claves distintas en el mismo cubo ⇒ strategyPresetKey=None + strategyPresetKeyAmbiguous=True (nunca se elige una).",
+    "Compone reportes financieros ya calculados (oos_finance): NO recalcula el motor ni proclama una estrategia ganadora.",
+    "Costes MODELADOS (overlay de comision/deslizamiento): la friccion medida del SIM se reportaria aparte, sin doble contabilizacion.",
+    "Evidencia de REPLAY/OOS: NO sustituye la ventana PAPER real (P3-2/P3-3 siguen abiertas). CONFIRMED sigue reservado a evidencia PAPER.",
+    "La banda medida NO es reproducible sin PostgreSQL (el replay lee barras reales): se cita como medicion, no como gate de CI.",
+    "Determinismo: mismas K semillas => payload identico (sin reloj, ULID ni azar global)."
+  ],
+  "meta": {
+    "account": "1484e253d2d54645945a6b1d7",
+    "bump": "2.11.119-beta",
+    "draws": [
+      {
+        "groups": 10,
+        "k": 0,
+        "payload": "draw-00.payload.json",
+        "report": "draw-00.finance.json",
+        "sha256Lf": "1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7"
+      },
+      {
+        "groups": 10,
+        "k": 1,
+        "payload": "draw-01.payload.json",
+        "report": "draw-01.finance.json",
+        "sha256Lf": "CD59FEB83D64BDDF499CBF69DF58A9C44383CB3ED6CACEFA38E2789F41537D6A"
+      },
+      {
+        "groups": 10,
+        "k": 2,
+        "payload": "draw-02.payload.json",
+        "report": "draw-02.finance.json",
+        "sha256Lf": "7891A0327F9DD93C205172C44854BEF7C456FAF39A72279C2879ECD3E1D595AF"
+      },
+      {
+        "groups": 10,
+        "k": 3,
+        "payload": "draw-03.payload.json",
+        "report": "draw-03.finance.json",
+        "sha256Lf": "1001E0D1D0DA84A4AF03F974964CAEFD5A7AE7A898EF2D889E346B7231715751"
+      },
+      {
+        "groups": 10,
+        "k": 4,
+        "payload": "draw-04.payload.json",
+        "report": "draw-04.finance.json",
+        "sha256Lf": "F6F65AFC8A43C7D88C32F8317A339DBBEF57B4262D2E5E5EBDDCBE5BEC1EC2D8"
+      },
+      {
+        "groups": 10,
+        "k": 5,
+        "payload": "draw-05.payload.json",
+        "report": "draw-05.finance.json",
+        "sha256Lf": "C034436454884824238E9A2C41C9E07466DABC67E047D0D37F874752FE3B460D"
+      },
+      {
+        "groups": 10,
+        "k": 6,
+        "payload": "draw-06.payload.json",
+        "report": "draw-06.finance.json",
+        "sha256Lf": "5B4C7A29FE9CF5409F5E1AAC6F1A9F4EBDC08E39849A252727E43842F22942D8"
+      },
+      {
+        "groups": 10,
+        "k": 7,
+        "payload": "draw-07.payload.json",
+        "report": "draw-07.finance.json",
+        "sha256Lf": "E44D86B63B1A4C845F08D0EA12FD57462E8F5344E56004FBA967316FE1D2DF59"
+      },
+      {
+        "groups": 10,
+        "k": 8,
+        "payload": "draw-08.payload.json",
+        "report": "draw-08.finance.json",
+        "sha256Lf": "314980A17C936E4A11D9F71363D423DD4D1237D2D369C9FD8DF2EFF560D7C5B9"
+      },
+      {
+        "groups": 10,
+        "k": 9,
+        "payload": "draw-09.payload.json",
+        "report": "draw-09.finance.json",
+        "sha256Lf": "DC7B128CF264CFD8573A8D34B5F865BACC7D4AC0CC57D02135E22F80207A5529"
+      },
+      {
+        "groups": 10,
+        "k": 10,
+        "payload": "draw-10.payload.json",
+        "report": "draw-10.finance.json",
+        "sha256Lf": "522EE3DDF7686D70EEC3A56E6FEB411FEA68E5C5D331658DB27E06E4A41F7CA6"
+      },
+      {
+        "groups": 10,
+        "k": 11,
+        "payload": "draw-11.payload.json",
+        "report": "draw-11.finance.json",
+        "sha256Lf": "D9C97343717BF0467B38C1B22791A1BA369FDDB209B765B50966235173E49C9A"
+      }
+    ],
+    "nature": "INVESTIGACION",
+    "phase": "V2.88.114 OOS FINANCE BAND (§8-c)",
+    "venue": "paper",
+    "versionA": "v283-window-a",
+    "watch": "0a5dc12fd5a24f0a89a91d36a,0cf0907837fc422db221b0149,240a4ae01a944d3bba1cf1b24,31f9a597d03249319ea0c9345,381dd3b0699a44e8b9d13ac13,49596ff25acb4294b265f321b,4d24ea029283461cb9304421a,54283bcb54674ec1b70b4db72,5a130eea1ad54dcaaa50b67b9,5c34aaec1448406ebec94b20f,615d243eb830473ab009c8997,6655c5faff8a458186dcd8adc,67c117a7d88f4c75a7174e998,6db46176cc2d4845845b6ee6e,6f6215d935c04e0f9ac7bfef7,74c66a856dde4cbaad4888908,7721cde9af0c49d29576786d5,840a307d2b074e2db4dfc3373,856510e40dda4c758f4d4df89,8601a0c3f8d248b0b8052b963"
+  },
+  "minTrades": 10,
+  "readOnly": true,
+  "schemaVersion": "oos-finance-band-v4",
+  "seedShift": {
+    "K": 12,
+    "k0": "produccion (sin parchear)",
+    "k0Sha256Lf": "1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7",
+    "kGreaterThanZero": "fill_seed(bar_tick_now + k, symbol)",
+    "source": "apps/api-python/src/bolsa_api/background/auto_simulation_worker.py:seed"
+  },
+  "stressMultiplier": 2.0
+}

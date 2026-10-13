@@ -60,7 +60,7 @@
 | `H2` (AUDITORIA 1) | identidad de estrategia «elegida por orden de llegada» en el plegado de la banda | **✅ CERRADO** |
 | `H3` (AUDITORIA 1) | posible reutilización de informes de sorteos previos en `_run_finance_band` | **✅ CERRADO** |
 | `H1` (AUDITORIA 1) | sensibilidad del simulador vs inferencia estadística (`pointCitable`) | **⏳ ABIERTO** (sello propio) |
-| `R-ev` | regenerar `finance-band-w32-k12.json` con esquema `v2` | **⏳ PENDIENTE** (requiere PostgreSQL) |
+| `R-ev` | regenerar `finance-band-w32-k12.json` con esquema `v2` | **✅ CERRADO** en `v2.88.119-beta` (`oos-finance-band-v4`; era `⏳ PENDIENTE` aquí; reproducible con PostgreSQL sembrado) |
 
 - **Fallos ambientales declarados, no disimulados:** el `ImportError` de DLL de `numpy`/`numba` es de entorno (política de Control de Aplicaciones de Windows), no del diff.
 - **Avisos de CI:** solo preexistentes y ajenos al diff (`react-hooks/exhaustive-deps` en el front de backtests, deprecación de Node 20 en `actions/*`, aviso de migración `ubuntu-latest`→26). **Ninguno** sobre `estudio_audit`/`oos_finance_band`/`v2_87`.

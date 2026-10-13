@@ -89,7 +89,7 @@ La banda sigue viviendo en fichero **aparte** y con el flag **apagado por defect
 | `H2` (AUDITORIA 1) | identidad de estrategia «elegida por orden de llegada» en el plegado de la banda | **✅ CERRADO por este sello** |
 | `H3` (AUDITORIA 1) | posible reutilización de informes de sorteos previos en `_run_finance_band` | **✅ CERRADO por este sello** |
 | `H1` (AUDITORIA 1) | sensibilidad del simulador vs inferencia estadística (`pointCitable`) | **⏳ ABIERTO** (sello propio) |
-| `R-ev` | regenerar `finance-band-w32-k12.json` con el esquema `v2` | **⏳ PENDIENTE** (requiere PostgreSQL) |
+| `R-ev` | regenerar `finance-band-w32-k12.json` con el esquema `v2` | **✅ CERRADO** en `v2.88.119-beta` (`oos-finance-band-v4`; era `⏳ PENDIENTE` aquí; reproducible con PostgreSQL sembrado) |
 
 ---
 

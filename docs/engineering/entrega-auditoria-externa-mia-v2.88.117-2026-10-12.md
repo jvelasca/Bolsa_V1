@@ -27,7 +27,7 @@
 - **NO** hay migración (head `053`).
 - **NO** cambia el **contrato HTTP**.
 - **NO** se regenera el artefacto de evidencia `finance-band-w32-k12.json`: sigue en su esquema antiguo; regenerarlo exige **PostgreSQL** ⇒ **no reproducible sin PG**, y **no se finge**.
-- **NO** se cierran **`R-ev`**, **`P3-2`/`P3-3`** (PAPER longitudinal) ni la **auditoría de UI**.
+- **NO** se cierran **`R-ev`**, **`P3-2`/`P3-3`** (PAPER longitudinal) ni la **auditoría de UI**. *(Nota posterior: `R-ev` se cerró en `v2.88.119-beta`.)*
 
 ---
 
@@ -63,7 +63,7 @@
 | `H2` (AUDITORIA 1) | identidad de estrategia ambigua en el plegado de la banda | **✅ CERRADO** en `v2.88.115-beta` |
 | `H3` (AUDITORIA 1) | reutilización de informes de sorteos previos | **✅ CERRADO** en `v2.88.115-beta` |
 | `P1` (AUDITORIA 2) | atribución cruzada de dinero entre estrategias en `estudio_audit` | **✅ CERRADO** en `v2.88.115-beta` |
-| `R-ev` | regenerar `finance-band-w32-k12.json` con el esquema nuevo | **⏳ PENDIENTE** (requiere PostgreSQL) |
+| `R-ev` | regenerar `finance-band-w32-k12.json` con el esquema nuevo | **✅ CERRADO** en `v2.88.119-beta` (`oos-finance-band-v4`; era `⏳ PENDIENTE` aquí; reproducible con PostgreSQL sembrado) |
 | `P3-2`/`P3-3` | validación longitudinal PAPER por activo | **⏳ ABIERTO** (evidencia de replay **no** sustituye ventana PAPER) |
 
 - **Revisión independiente:** la revisión Bugbot solicitada **no pudo completarse** (el validador de hallazgos descartó sus resultados en dos intentos). Se declara y se sustituye por la comprobación empírica de bordes de §3.

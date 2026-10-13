@@ -95,7 +95,7 @@ válidos y sin contradicción de venue: `status = MEASURED`, `established = poin
   declarar independencia no crea la medición que no existe.
 - **Los artefactos de evidencia sellados siguen en su esquema antiguo** (`v2.88.114/finance-band-w32-k12.json`):
   regenerarlos exige PostgreSQL con la entrada sembrada ⇒ **no reproducible sin PG**.
-- **`R-ev`** (regenerar el artefacto `K=12` en el esquema nuevo) sigue **pendiente**.
+- **`R-ev`** (regenerar el artefacto `K=12` en el esquema nuevo) → **✅ CERRADO en [`v2.88.119-beta`](../v2.88.119/README.md)** (re-medido en `oos-finance-band-v4`; reproducible con PostgreSQL sembrado).
 - **`P3-2`/`P3-3`** (validación longitudinal PAPER) y la **auditoría de UI** siguen **abiertos**; la
   evidencia de replay OOS **no** sustituye una ventana PAPER.
 - **Tag `unsigned`:** el tag anotado no está firmado.
