@@ -400,6 +400,79 @@ describe("AutoOperationStoryPanel", () => {
     expect(session?.mode).toBe("auto");
   });
 
+  it("verifica la estrategia EJECUTADA del ciclo (no el #1) cuando divergen", async () => {
+    const monoTop = await vi.mocked(api.getInstrumentStrategyTop)();
+    vi.mocked(api.getInstrumentStrategyTop).mockResolvedValueOnce({
+      ...monoTop,
+      data: {
+        ...monoTop.data!,
+        slots: [
+          {
+            rank: 1,
+            label: "SMA cross",
+            stars: 3,
+            score: 70,
+            source: "coach",
+            strategyDefinitionId: "def-1",
+            strategyType: "sma_crossover",
+          },
+          {
+            rank: 2,
+            label: "RSI rev",
+            stars: 3,
+            score: 65,
+            source: "coach",
+            strategyDefinitionId: "def-2",
+            strategyType: "rsi_reversion",
+          },
+          {
+            rank: 3,
+            label: "F-D exp",
+            stars: 2,
+            score: 60,
+            source: "coach",
+            strategyDefinitionId: "def-3",
+            strategyType: "fib_extension",
+          },
+        ],
+      },
+    });
+    // El ciclo declara como EJECUTADA la estrategia #3 (`fib_extension`), distinta del #1.
+    const monitor = await vi.mocked(api.getAutoOperationalMonitor)();
+    vi.mocked(api.getAutoOperationalMonitor).mockResolvedValueOnce({
+      ...monitor,
+      cycles: (monitor.cycles ?? []).map((cycle) => ({
+        ...cycle,
+        strategyPresetKey: "fib_extension",
+      })),
+    });
+
+    renderPanel();
+    const button = await screen.findByTestId(
+      "auto-operation-strategy-verify-dia-d",
+    );
+    await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
+    // La tarjeta declara que se verifica la EJECUTADA, en su puesto REAL (#3).
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("auto-operation-strategy-executed").textContent,
+      ).toContain("#3 F-D exp"),
+    );
+
+    fireEvent.click(button);
+
+    await waitFor(() =>
+      expect(useDiaDTradingSessionStore.getState().session).not.toBeNull(),
+    );
+    const session = useDiaDTradingSessionStore.getState().session;
+    // La sesión LAB queda precargada con la EJECUTADA, no con el #1 de Finalistas.
+    expect(session?.strategyDefinitionId).toBe("def-3");
+    expect(session?.rank).toBe(3);
+    expect(session?.cycleId).toBe("cyc-1");
+    expect(session?.strategyPresetKey).toBe("fib_extension");
+    expect(session?.mode).toBe("auto");
+  });
+
   it("declara el hueco y no ofrece verificación cuando no hay TOP (fail-closed)", async () => {
     vi.mocked(api.getInstrumentStrategyTop).mockResolvedValueOnce({
       data: null,

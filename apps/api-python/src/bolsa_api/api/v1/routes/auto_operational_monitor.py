@@ -217,6 +217,10 @@ class AutoOperationalMonitorDto(BaseModel):
     cycles: list[AutoMonitorCycleDto] = Field(default_factory=list)
     reservations: list[AutoMonitorReservationDto] = Field(default_factory=list)
     concurrency: AutoMonitorConcurrencyDto
+    # H5 — filtro por instrumento APLICADO en la lectura (eco honesto del `instrumentId`
+    # solicitado); `None` = ventana global de la cuenta. Con el filtro activo y sin ciclos, el
+    # DTO declara la nota `filter_instrument_empty`.
+    filterInstrumentId: str | None = None
     notes: list[str] = Field(default_factory=list)
 
 
@@ -244,16 +248,23 @@ async def get_auto_operational_monitor(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     limit: Annotated[int, Query(ge=1, le=200)] = 20,
     cycle_id: Annotated[str | None, Query(alias="cycleId", max_length=128)] = None,
+    instrument_id: Annotated[
+        str | None, Query(alias="instrumentId", max_length=128)
+    ] = None,
     account_id: Annotated[str | None, Depends(get_account_id_header)] = None,
 ) -> AutoOperationalMonitorDto:
     """Proyección read-only de la cadena AUTO de una cuenta visible del principal.
 
     Sin cuenta operativa visible la respuesta es un DTO vacío con ``no_account_scope``
-    (fail-closed, nunca global). ``cycleId`` acota a un solo ciclo para el drill-down.
+    (fail-closed, nunca global). ``cycleId`` acota a un solo ciclo para el drill-down; si se pasa
+    junto con ``instrumentId``, ``cycleId`` manda. ``instrumentId`` (H5) acota a los ciclos DE ESE
+    valor: un ``instrumentId`` desconocido NO cae a una lectura global (``cycles == []``).
     """
     scope = await resolve_account_scope_or_default(request, account_id)
     if scope is None:
-        payload = build_operational_monitor(account_id="", cycle_id=cycle_id)
+        payload = build_operational_monitor(
+            account_id="", cycle_id=cycle_id, instrument_id=instrument_id
+        )
         payload["notes"] = ["no_account_scope", *payload["notes"]]
         return AutoOperationalMonitorDto(**payload)
     interval_seconds, grace_seconds = _timing_context()
@@ -262,6 +273,7 @@ async def get_auto_operational_monitor(
         scope,
         limit=limit,
         cycle_id=cycle_id,
+        instrument_id=instrument_id,
         interval_seconds=interval_seconds,
         grace_seconds=grace_seconds,
     )

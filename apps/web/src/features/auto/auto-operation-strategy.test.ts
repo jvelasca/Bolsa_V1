@@ -17,8 +17,10 @@ import {
   AUTO_OPERATION_STRATEGY_DECLARED_LABEL,
   AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT,
   AUTO_OPERATION_STRATEGY_NO_DATA,
+  AUTO_OPERATION_STRATEGY_VERIFY_EXECUTED_LABEL,
   buildAutoOperationStrategyView,
   resolveAutoOperationStrategyMatch,
+  resolveExecutedStrategySlot,
 } from "@/features/auto/auto-operation-strategy";
 import { ABSENT_DATA_NOT_AVAILABLE } from "@/components/absent-data";
 
@@ -390,5 +392,223 @@ describe("copy de identidad (separación mejor-disponible vs ejecutada)", () => 
       "Sin dato todavía",
     );
     expect(AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT).not.toContain("Coincide");
+  });
+});
+
+describe("resolveExecutedStrategySlot", () => {
+  const topTres = top({
+    slots: [
+      slot({
+        rank: 1,
+        label: "SMA cross",
+        strategyType: "sma_crossover",
+        strategyDefinitionId: "def-1",
+      }),
+      slot({
+        rank: 2,
+        label: "RSI rev",
+        strategyType: "rsi_reversion",
+        strategyDefinitionId: "def-2",
+      }),
+      slot({
+        rank: 3,
+        label: "F-D exp",
+        strategyType: "fib_extension",
+        strategyDefinitionId: "def-3",
+      }),
+    ],
+  });
+
+  it("resuelve el slot cuya identidad IGUALA EXACTAMENTE la clave ejecutada (no el #1)", () => {
+    const resolved = resolveExecutedStrategySlot(
+      "fib_extension",
+      topTres,
+      definition,
+    );
+    expect(resolved?.strategyDefinitionId).toBe("def-3");
+    expect(resolved?.rank).toBe(3);
+  });
+
+  it("sin clave declarada, sin TOP o sin coincidencia ⇒ null (nunca cae al #1)", () => {
+    expect(resolveExecutedStrategySlot(null, topTres, definition)).toBeNull();
+    expect(resolveExecutedStrategySlot("   ", topTres, definition)).toBeNull();
+    expect(
+      resolveExecutedStrategySlot("fib_extension", null, definition),
+    ).toBeNull();
+    expect(
+      resolveExecutedStrategySlot("desconocida", topTres, definition),
+    ).toBeNull();
+  });
+
+  it("casa el #1 por el `presetKey` de su definición cuando su `strategyType` falta", () => {
+    const sinTipo = top({ slots: [slot({ strategyType: null })] });
+    const resolved = resolveExecutedStrategySlot(
+      "sma_crossover",
+      sinTipo,
+      definition,
+    );
+    expect(resolved?.strategyDefinitionId).toBe("def-1");
+  });
+
+  it("no empareja por contención: solo identidad EXACTA", () => {
+    expect(resolveExecutedStrategySlot("fib", topTres, definition)).toBeNull();
+  });
+});
+
+describe("vista: el CTA verifica la estrategia EJECUTADA del ciclo", () => {
+  const topTres = top({
+    slots: [
+      slot({
+        rank: 1,
+        label: "SMA cross",
+        strategyType: "sma_crossover",
+        strategyDefinitionId: "def-1",
+      }),
+      slot({
+        rank: 2,
+        label: "RSI rev",
+        strategyType: "rsi_reversion",
+        strategyDefinitionId: "def-2",
+      }),
+      slot({
+        rank: 3,
+        label: "F-D exp",
+        strategyType: "fib_extension",
+        strategyDefinitionId: "def-3",
+      }),
+    ],
+  });
+
+  it("con `differs`, verifica la EJECUTADA (rank 3) y conserva la referencia #1", () => {
+    const view = buildAutoOperationStrategyView({
+      cycle: {
+        instrumentId: "AAPL",
+        strategyPresetKey: "fib_extension",
+        strategyVersion: "sv-3",
+      },
+      instrumentId: "uuid-1",
+      top: topTres,
+      definition,
+    });
+    // Lo que se VERIFICA es la ejecutada, no la mejor disponible.
+    expect(view?.executedStrategyDefinitionId).toBe("def-3");
+    expect(view?.executedStrategyLabel).toBe("F-D exp");
+    expect(view?.executedStrategyRank).toBe(3);
+    expect(view?.verifyTarget).toBe("executed");
+    expect(view?.verifyGapReason).toBeNull();
+    expect(view?.verifyHref).toContain("/backtests?");
+    expect(view?.verifyHref).toContain("instrumentId=uuid-1");
+    // La referencia (mejor disponible, TOP #1) NO cambia.
+    expect(view?.strategyDefinitionId).toBe("def-1");
+    expect(view?.rank).toBe(1);
+    expect(view?.match).toBe("differs");
+  });
+
+  it("con `same` (ejecutada == #1) el comportamiento no cambia", () => {
+    const view = buildAutoOperationStrategyView({
+      cycle: {
+        instrumentId: "AAPL",
+        strategyPresetKey: "sma_crossover",
+        strategyVersion: "sv-1",
+      },
+      instrumentId: "uuid-1",
+      top: topTres,
+      definition,
+    });
+    expect(view?.executedStrategyDefinitionId).toBe("def-1");
+    expect(view?.executedStrategyRank).toBe(1);
+    expect(view?.verifyTarget).toBe("executed");
+    expect(view?.match).toBe("same");
+    expect(view?.verifyHref).toContain("instrumentId=uuid-1");
+  });
+
+  it("sin `strategyPresetKey` no ofrece verificación y declara el hueco (no cae al #1)", () => {
+    const view = buildAutoOperationStrategyView({
+      cycle: { instrumentId: "AAPL", strategyVersion: "sv-1" },
+      instrumentId: "uuid-1",
+      top: topTres,
+      definition,
+    });
+    expect(view?.executedStrategyDefinitionId).toBeNull();
+    expect(view?.verifyTarget).toBeNull();
+    expect(view?.verifyHref).toBeNull();
+    expect(view?.verifyGapReason).toContain(
+      "no declara su estrategia ejecutada",
+    );
+    // La referencia #1 sigue disponible, pero NO se verifica.
+    expect(view?.strategyDefinitionId).toBe("def-1");
+  });
+
+  it("con clave declarada ausente del TOP no ofrece verificación (hueco declarado)", () => {
+    const view = buildAutoOperationStrategyView({
+      cycle: { instrumentId: "AAPL", strategyPresetKey: "no_existe" },
+      instrumentId: "uuid-1",
+      top: topTres,
+      definition,
+    });
+    expect(view?.verifyTarget).toBeNull();
+    expect(view?.verifyHref).toBeNull();
+    expect(view?.verifyGapReason).toContain(
+      "no está entre las estrategias del valor",
+    );
+  });
+
+  it("ejecutada resuelta SIN definición guardada ⇒ CTA cerrado y hueco declarado", () => {
+    const topSinDef = top({
+      slots: [
+        slot({
+          rank: 1,
+          label: "F-D exp",
+          strategyType: "fib_extension",
+          strategyDefinitionId: null,
+        }),
+      ],
+    });
+    const view = buildAutoOperationStrategyView({
+      cycle: { instrumentId: "AAPL", strategyPresetKey: "fib_extension" },
+      instrumentId: "uuid-1",
+      top: topSinDef,
+      definition: { indicatorSpecs: [], presetKey: "fib_extension" },
+    });
+    expect(view?.verifyTarget).toBeNull();
+    expect(view?.verifyHref).toBeNull();
+    expect(view?.verifyGapReason).toContain("no tiene definición guardada");
+  });
+
+  it("un fallo de la definición del #1 NO bloquea si la ejecutada se resuelve por `strategyType`", () => {
+    const view = buildAutoOperationStrategyView({
+      cycle: { instrumentId: "AAPL", strategyPresetKey: "sma_crossover" },
+      instrumentId: "uuid-1",
+      top: top(),
+      definitionError: true,
+      definition: null,
+    });
+    // La identidad ejecutada sale del TOP, no de la definición del #1: sigue verificable.
+    expect(view?.verifyTarget).toBe("executed");
+    expect(view?.verifyHref).not.toBeNull();
+    // El hueco de la REFERENCIA (#1 sin definición fiable) se sigue declarando.
+    expect(view?.gapReason).toContain(ABSENT_DATA_NOT_AVAILABLE);
+  });
+
+  it("un FALLO del TOP cierra el CTA de la ejecutada (fail-closed)", () => {
+    const view = buildAutoOperationStrategyView({
+      cycle: { instrumentId: "AAPL", strategyPresetKey: "sma_crossover" },
+      instrumentId: "uuid-1",
+      top: null,
+      topError: true,
+      definition: null,
+    });
+    expect(view?.verifyTarget).toBeNull();
+    expect(view?.verifyHref).toBeNull();
+    expect(view?.verifyGapReason).toContain(ABSENT_DATA_NOT_AVAILABLE);
+  });
+
+  it("expone un rótulo inequívoco de que la ejecutada es lo que se verifica", () => {
+    expect(AUTO_OPERATION_STRATEGY_VERIFY_EXECUTED_LABEL).toContain(
+      "Estrategia ejecutada",
+    );
+    expect(AUTO_OPERATION_STRATEGY_VERIFY_EXECUTED_LABEL).toContain(
+      "se verifica",
+    );
   });
 });

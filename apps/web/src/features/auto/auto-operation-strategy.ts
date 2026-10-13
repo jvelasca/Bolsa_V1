@@ -55,6 +55,21 @@ export const AUTO_OPERATION_STRATEGY_DECLARED_LABEL =
   "Estrategia ejecutada declarada por el ciclo" as const;
 
 /**
+ * Rótulo de la estrategia EJECUTADA **resuelta** en el TOP del valor: la identidad que el CTA
+ * «Verificar D→hoy» precarga en la sesión LAB (`verifyTarget === "executed"`). Es lo que se
+ * VERIFICA, no la mejor disponible (TOP #1) que se pinta como referencia.
+ */
+export const AUTO_OPERATION_STRATEGY_VERIFY_EXECUTED_LABEL =
+  "Estrategia ejecutada (lo que se verifica)" as const;
+
+/**
+ * Objetivo del CTA «Verificar D→hoy». Hoy solo existe `"executed"`: el CTA verifica SIEMPRE la
+ * estrategia EJECUTADA del ciclo, resuelta en el TOP del valor. `null` = no se pudo resolver
+ * (el CTA se deshabilita y `verifyGapReason` declara el hueco); NUNCA se cae en silencio al #1.
+ */
+export type AutoOperationStrategyVerifyTarget = "executed";
+
+/**
  * Declaración de HONESTIDAD en superficie: la coincidencia entre la estrategia EJECUTADA que
  * declara el ciclo (clave EXACTA `cycle.strategyPresetKey`) y la MEJOR del valor (TOP #1) es
  * una IGUALDAD EXACTA (`presetKey`). Cuando el ciclo no declara esa clave, la UI dice «Sin dato
@@ -100,9 +115,26 @@ export type AutoOperationStrategyViewV1 = {
   declaredCyclePresetKey: string | null;
   /** Sello opaco `strategyVersion` que declara el ciclo (o `null`), aparte de la clave exacta. */
   declaredCycleStrategyVersion: string | null;
-  /** Destino canónico de verificación DÍA-D (o `null` si falta instrumento/estrategia). */
+  /**
+   * Estrategia EJECUTADA del ciclo **resuelta** en el TOP del valor (emparejada por la clave
+   * EXACTA `presetKey` contra la identidad de algún slot). `null` = no se pudo resolver: el CTA
+   * NO cae al #1, se deshabilita y declara el hueco en `verifyGapReason`.
+   */
+  executedStrategyDefinitionId: string | null;
+  /** Etiqueta legible de la estrategia ejecutada resuelta (o `null`). */
+  executedStrategyLabel: string | null;
+  /** Puesto de la estrategia ejecutada en el TOP del valor (o `null`). */
+  executedStrategyRank: number | null;
+  /** Objetivo del CTA (`"executed"`) o `null` cuando no se puede verificar la ejecutada. */
+  verifyTarget: AutoOperationStrategyVerifyTarget | null;
+  /** Motivo del hueco del CTA de verificación (o `null` si la ejecutada es verificable). */
+  verifyGapReason: string | null;
+  /**
+   * Destino canónico de verificación DÍA-D de la estrategia EJECUTADA (o `null` si falta
+   * instrumento/ejecutada resuelta o la lectura del TOP falló: fail-closed).
+   */
   verifyHref: string | null;
-  /** Motivo del hueco cuando la cadena está incompleta (o `null`). */
+  /** Motivo del hueco cuando la cadena de REFERENCIA (TOP #1) está incompleta (o `null`). */
   gapReason: string | null;
   /**
    * Lecturas en vuelo (`instruments`/`TOP`/`definition`). Mientras es `true`, un hueco es
@@ -179,6 +211,34 @@ export function resolveAutoOperationStrategyMatch(
 }
 
 /**
+ * Resuelve la estrategia EJECUTADA del ciclo **dentro del TOP del valor**: devuelve el slot cuya
+ * identidad DECLARADA (`strategyType`, o el `presetKey` de la definición del #1) IGUALA
+ * EXACTAMENTE la clave `presetKey` que declara el ciclo. Es la estrategia que el CTA
+ * «Verificar D→hoy» debe precargar, NO la mejor disponible (TOP #1).
+ *
+ * IGUALDAD EXACTA de cadenas, recortadas: ni tokenización ni contención. Sin clave declarada,
+ * sin TOP o sin identidad coincidente ⇒ `null` (el llamante declara el hueco; NUNCA cae al #1).
+ */
+export function resolveExecutedStrategySlot(
+  cyclePresetKey: string | null | undefined,
+  top: InstrumentStrategyTopV1 | null | undefined,
+  definition?: Pick<StrategyDefinitionV1, "presetKey"> | null,
+): InstrumentStrategyTopSlotV1 | null {
+  const key = cyclePresetKey?.trim() || null;
+  if (!key) return null;
+  const slots = top?.slots ?? [];
+  if (slots.length === 0) return null;
+  // Solo la DEFINICIÓN del #1 está disponible: su `presetKey` es una identidad más del #1.
+  const presetKey = definition?.presetKey?.trim() || null;
+  for (const slot of slots) {
+    const slotType = slot.strategyType?.trim() || null;
+    if (slotType && slotType === key) return slot;
+    if (slot.rank === 1 && presetKey && presetKey === key) return slot;
+  }
+  return null;
+}
+
+/**
  * Compone la vista de la cadena estrategia → indicadores → razón para UN ciclo de AUTO.
  *
  * Devuelve `null` solo si no hay ciclo. Con ciclo, siempre devuelve una vista: los huecos
@@ -221,6 +281,18 @@ export function buildAutoOperationStrategyView(
     input.definition,
   );
 
+  // Estrategia EJECUTADA del ciclo resuelta en el TOP del valor (por la clave EXACTA). Es lo
+  // que el CTA «Verificar D→hoy» precarga: NUNCA se cae al #1 cuando no se puede resolver.
+  const executedSlot = resolveExecutedStrategySlot(
+    declaredCyclePresetKey,
+    input.top,
+    input.definition,
+  );
+  const executedStrategyDefinitionId =
+    executedSlot?.strategyDefinitionId?.trim() || null;
+  const executedStrategyLabel = executedSlot?.label?.trim() || null;
+  const executedStrategyRank = executedSlot?.rank ?? null;
+
   // Prioridad DECLARADA del hueco: un FALLO de lectura nunca se describe como ausencia
   // (`No disponible` ≠ `Sin dato todavía`); una lectura EN VUELO deja el hueco en `null` (la UI
   // muestra carga y no un falso «sin dato»); solo el hueco real usa el rótulo de ausencia.
@@ -245,14 +317,42 @@ export function buildAutoOperationStrategyView(
       "Sin dato todavía: la estrategia #1 no tiene definición guardada.";
   }
 
-  // Fail-closed ante un error de lectura: sin catálogo/TOP/definición fiables no se ofrece
-  // verificación.
-  const verifyHref =
-    resolvedInstrumentId &&
-    strategyDefinitionId &&
+  // Motivo del hueco del CTA de verificación (reproducir la EJECUTADA). Prioridad: un fallo de
+  // lectura de lo que la resolución necesita (catálogo/TOP) nunca se describe como ausencia;
+  // `loading` deja el hueco en `null` (transitorio); un fallo de la definición del #1 se declara
+  // porque pudo impedir resolver la ejecutada cuando el #1 no declara `strategyType`.
+  let verifyGapReason: string | null = null;
+  if (executedStrategyDefinitionId) {
+    verifyGapReason = null;
+  } else if (input.instrumentError === true) {
+    verifyGapReason = `${ABSENT_DATA_NOT_AVAILABLE}: no se pudo leer el catálogo de instrumentos.`;
+  } else if (input.topError === true) {
+    verifyGapReason = `${ABSENT_DATA_NOT_AVAILABLE}: no se pudo leer el TOP de Finalistas.`;
+  } else if (input.loading === true) {
+    verifyGapReason = null;
+  } else if (!declaredCyclePresetKey) {
+    verifyGapReason =
+      "Sin dato todavía: el ciclo no declara su estrategia ejecutada (`presetKey`).";
+  } else if (!executedSlot && input.definitionError === true) {
+    verifyGapReason = `${ABSENT_DATA_NOT_AVAILABLE}: no se pudo leer la definición de la estrategia #1.`;
+  } else if (!executedSlot) {
+    verifyGapReason =
+      "Sin dato todavía: la estrategia ejecutada del ciclo no está entre las estrategias del valor (Finalistas).";
+  } else {
+    verifyGapReason =
+      "Sin dato todavía: la estrategia ejecutada del ciclo no tiene definición guardada.";
+  }
+
+  const verifyTarget: AutoOperationStrategyVerifyTarget | null =
+    executedStrategyDefinitionId &&
     input.instrumentError !== true &&
-    input.topError !== true &&
-    input.definitionError !== true
+    input.topError !== true
+      ? "executed"
+      : null;
+
+  // Fail-closed: el destino solo existe con instrumento resuelto y la ejecutada verificable.
+  const verifyHref =
+    resolvedInstrumentId && verifyTarget === "executed"
       ? diaDVerifyHref(resolvedInstrumentId)
       : null;
 
@@ -268,6 +368,11 @@ export function buildAutoOperationStrategyView(
     matchLabel: AUTO_OPERATION_STRATEGY_MATCH_LABELS[match],
     declaredCyclePresetKey,
     declaredCycleStrategyVersion,
+    executedStrategyDefinitionId,
+    executedStrategyLabel,
+    executedStrategyRank,
+    verifyTarget,
+    verifyGapReason,
     verifyHref,
     gapReason,
     loading: input.loading === true,

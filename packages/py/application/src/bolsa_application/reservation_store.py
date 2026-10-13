@@ -185,8 +185,13 @@ class ReservationStore(Protocol):
         account_id: str | None,
         *,
         limit: int = 500,
+        instrument_id: str | None = None,
     ) -> list[PortfolioReservation]:
         """AUTO-11 — las reservas **con ciclo** más recientes, de nueva a vieja.
+
+        ``instrument_id`` (opcional, H5) acota a las reservas de ESE valor: el monitor puede
+        pedir «los ciclos DE ESTE instrumento» sin conocer su ``cycle_id``. ``None`` (default)
+        conserva el comportamiento previo byte a byte (ventana global de la cuenta).
 
         Es la ventana que alimenta la reconciliación del rastro de ciclo
         (``auto_cycle_reconciliation``): qué ciclos tienen capital comprometido. Se pide por la
@@ -505,16 +510,22 @@ class InMemoryReservationStore:
         account_id: str | None,
         *,
         limit: int = 500,
+        instrument_id: str | None = None,
     ) -> list[PortfolioReservation]:
-        """Espeja la ventana DESC del PG: solo filas con ciclo, de la más nueva a la más vieja."""
+        """Espeja la ventana DESC del PG: solo filas con ciclo, de la más nueva a la más vieja.
+
+        ``instrument_id`` (H5) acota a ese valor; ``None`` conserva la ventana global previa.
+        """
         if limit <= 0:
             return []
+        wanted = str(instrument_id).strip() if instrument_id is not None else None
         rows = [
             row
             for row in self._rows.values()
             if row.cycle_id
             and str(row.cycle_id).strip()
             and (account_id is None or row.account_id == account_id)
+            and (wanted is None or str(row.instrument_id or "").strip() == wanted)
         ]
         rows.sort(key=_order_key, reverse=True)
         return rows[:limit]
@@ -757,6 +768,7 @@ class PostgresReservationStore:
         account_id: str | None,
         *,
         limit: int = 500,
+        instrument_id: str | None = None,
     ) -> list[PortfolioReservation]:
         """AUTO-11 — ventana de reservas con ciclo, DESC (ver ``ReservationStore``).
 
@@ -764,6 +776,9 @@ class PostgresReservationStore:
         ciclo inventado. Se ordena DESC por ``created_at`` (los ``NULL`` al final) para que el
         límite corte por lo VIEJO: un ciclo antiguo fuera de la ventana queda declarado por el
         llamante (``unrequested``), nunca disfrazado de "journal sin traza".
+
+        ``instrument_id`` (H5) añade ``instrument_id = :id`` (aditivo): ``None`` NO toca la
+        consulta previa.
         """
         import sqlalchemy as sa
 
@@ -782,6 +797,9 @@ class PostgresReservationStore:
         )
         if account_id is not None:
             query = query.where(PortfolioReservationRow.account_id == account_id)
+        wanted = str(instrument_id).strip() if instrument_id is not None else None
+        if wanted:
+            query = query.where(PortfolioReservationRow.instrument_id == wanted)
         rows = (await self._session.execute(query)).scalars().all()
         return [_row_to_reservation(row) for row in rows]
 

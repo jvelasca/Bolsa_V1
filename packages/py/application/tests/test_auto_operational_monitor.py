@@ -1513,3 +1513,32 @@ def test_cycle_closed_without_durable_reason_declares_a_gap_not_flat() -> None:
     reason = _fact(_step(without_reason["cycles"][0]["steps"], "CYCLE_CLOSED"), "reason")
     assert reason["value"] is None
     assert reason["measurement"] == "UNKNOWN"
+
+
+def test_filter_instrument_is_declared_and_empty_is_flagged() -> None:
+    """H5 — el DTO declara el filtro APLICADO y, si no deja ciclos, el vacío es POR FILTRO."""
+    # Sin filtro: eco nulo (ventana global de la cuenta).
+    dto_global = build_operational_monitor(
+        account_id="acc-1", reservations=[_reservation()]
+    )
+    assert dto_global["filterInstrumentId"] is None
+    assert "filter_instrument_empty" not in dto_global["notes"]
+
+    # Con filtro y ciclos presentes: se declara, sin nota de vacío.
+    dto_filtered = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation(instrument_id="AAPL")],
+        instrument_id="AAPL",
+    )
+    assert dto_filtered["filterInstrumentId"] == "AAPL"
+    assert "filter_instrument_empty" not in dto_filtered["notes"]
+
+    # Con filtro y SIN ciclos: vacío HONESTO por filtro, declarado (no una ausencia global).
+    dto_empty = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[],
+        instrument_id="ZZZ",
+    )
+    assert dto_empty["cycles"] == []
+    assert dto_empty["filterInstrumentId"] == "ZZZ"
+    assert "filter_instrument_empty" in dto_empty["notes"]

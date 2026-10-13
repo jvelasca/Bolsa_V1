@@ -1223,7 +1223,9 @@ export interface paths {
          * @description Proyección read-only de la cadena AUTO de una cuenta visible del principal.
          *
          *     Sin cuenta operativa visible la respuesta es un DTO vacío con ``no_account_scope``
-         *     (fail-closed, nunca global). ``cycleId`` acota a un solo ciclo para el drill-down.
+         *     (fail-closed, nunca global). ``cycleId`` acota a un solo ciclo para el drill-down; si se pasa
+         *     junto con ``instrumentId``, ``cycleId`` manda. ``instrumentId`` (H5) acota a los ciclos DE ESE
+         *     valor: un ``instrumentId`` desconocido NO cae a una lectura global (``cycles == []``).
          */
         get: operations["get_auto_operational_monitor_api_auto_operational_monitor_get"];
         put?: never;
@@ -4759,6 +4761,8 @@ export interface components {
             concurrency: components["schemas"]["AutoMonitorConcurrencyDto"];
             /** Cycles */
             cycles?: components["schemas"]["AutoMonitorCycleDto"][];
+            /** Filterinstrumentid */
+            filterInstrumentId?: string | null;
             header: components["schemas"]["AutoMonitorHeaderDto"];
             /** Key */
             key: string;
@@ -14499,6 +14503,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 cycleId?: string | null;
+                instrumentId?: string | null;
             };
             header?: {
                 "X-Account-Id"?: string | null;

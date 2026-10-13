@@ -1368,12 +1368,17 @@ def build_operational_monitor(
     header_decision_entries: Sequence[Any] | None = None,
     fills_window_full: bool = False,
     fills_total_by_cycle: Mapping[str, int] | None = None,
+    instrument_id: str | None = None,
 ) -> dict[str, Any]:
     """(PURA) construye el DTO del monitor desde el estado durable ya leído. Sin I/O.
 
     No sintetiza pasos: cada etapa viene de un hecho durable concreto y lo que no existe se
     declara ``unknown``/``absent`` con su nota. Un ``cycle_id`` filtra a un único ciclo (para el
     drill-down); sin él se devuelven los ciclos de la ventana (``limit``).
+
+    ``instrument_id`` (H5) es el filtro YA APLICADO en la lectura (las reservas cargadas son solo
+    de ese valor): aquí solo se DECLARA en ``filterInstrumentId`` y, si el filtro deja el DTO sin
+    ciclos, se añade la nota ``filter_instrument_empty`` (vacío POR FILTRO, no global).
 
     ``header_decision_entries`` es la lectura GLOBAL del último ``auto_entry_decision`` durable
     (independiente de los ciclos/reservas visibles): sin ella, el header cae al ``journal`` del
@@ -1530,6 +1535,10 @@ def build_operational_monitor(
     if reservation_views and not any(view["ownerSession"] for view in reservation_views):
         # Hay reservas pero ningún claim ganado en el spine: el dueño no se puede afirmar.
         notes.append("owner_session_not_durable")
+    if instrument_id and not cycles:
+        # El filtro por instrumento está activo y NO hay ciclos: el vacío es POR FILTRO (no una
+        # ausencia global). Se declara para que el consumidor no lo confunda con "sin operación".
+        notes.append("filter_instrument_empty")
     return {
         "key": "auto_operational_monitor_v1",
         "readOnly": True,
@@ -1539,6 +1548,7 @@ def build_operational_monitor(
         "cycles": cycles,
         "reservations": reservation_views,
         "concurrency": concurrency,
+        "filterInstrumentId": instrument_id,
         "notes": notes,
     }
 
@@ -1550,6 +1560,7 @@ async def read_operational_monitor(
     engine_id: str = "auto-sim",
     limit: int = 20,
     cycle_id: str | None = None,
+    instrument_id: str | None = None,
     interval_seconds: float | None = None,
     grace_seconds: float | None = None,
 ) -> dict[str, Any]:
@@ -1557,6 +1568,10 @@ async def read_operational_monitor(
 
     Read-only: solo hay ``SELECT``. Un fallo de lectura de un bloque opcional se declara (el
     ``notes`` del DTO) y NO tumba el resto — un hueco declarado, nunca un ``0`` fingido.
+
+    ``cycle_id`` acota a UN ciclo (drill-down) y MANDA: si también llega ``instrument_id``, se
+    ignora el filtro por instrumento. Sin ``cycle_id``, ``instrument_id`` acota la ventana de
+    reservas a ESE valor (los ciclos derivan de ellas); ``None`` conserva la ventana global.
     """
     from bolsa_application.auto_engine_state_store import PostgresAutoEngineStore
     from bolsa_application.exit_order_store import PostgresExitOrderStore
@@ -1577,11 +1592,15 @@ async def read_operational_monitor(
     repository = SqlAlchemyJournalRepository(session)
 
     if cycle_id:
+        # ``cycleId`` MANDA: el drill-down a un ciclo ignora el filtro por instrumento (así un
+        # ciclo ajeno no hereda hechos por un ``instrumentId`` que no le corresponde).
         reservations = await reservation_store.list_by_cycle_ids(
             account_id, [cycle_id], limit=limit
         )
     else:
-        reservations = await reservation_store.list_recent_with_cycle(account_id, limit=limit)
+        reservations = await reservation_store.list_recent_with_cycle(
+            account_id, limit=limit, instrument_id=instrument_id
+        )
 
     cycle_ids: list[str] = []
     seen: set[str] = set()
@@ -1761,6 +1780,7 @@ async def read_operational_monitor(
         header_decision_entries=header_decision_entries,
         fills_window_full=fills_window_full,
         fills_total_by_cycle=fills_total_by_cycle,
+        instrument_id=instrument_id,
     )
 
 

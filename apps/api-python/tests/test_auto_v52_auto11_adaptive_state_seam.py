@@ -408,7 +408,13 @@ class _Reservations:
         ]
         self.calls: list[tuple[str | None, int]] = []
 
-    async def list_recent_with_cycle(self, account_id: str | None, *, limit: int = 500):
+    async def list_recent_with_cycle(
+        self,
+        account_id: str | None,
+        *,
+        limit: int = 500,
+        instrument_id: str | None = None,
+    ):
         self.calls.append((account_id, limit))
         return list(self._rows)
 
@@ -484,7 +490,13 @@ async def test_a_broken_reservation_read_is_declared_not_treated_as_clean(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     class _Broken:
-        async def list_recent_with_cycle(self, _account_id, *, limit: int = 500):
+        async def list_recent_with_cycle(
+            self,
+            _account_id,
+            *,
+            limit: int = 500,
+            instrument_id: str | None = None,
+        ):
             raise RuntimeError("PG caído")
 
     regime = _RegimeReader(CycleRegimeReading())

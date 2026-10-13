@@ -1562,6 +1562,17 @@
             "title": "Cycles",
             "type": "array"
           },
+          "filterInstrumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filterinstrumentid"
+          },
           "header": {
             "$ref": "#/components/schemas/AutoMonitorHeaderDto"
           },
@@ -27182,7 +27193,7 @@
     },
     "/api/auto/operational-monitor": {
       "get": {
-        "description": "Proyección read-only de la cadena AUTO de una cuenta visible del principal.\n\nSin cuenta operativa visible la respuesta es un DTO vacío con ``no_account_scope``\n(fail-closed, nunca global). ``cycleId`` acota a un solo ciclo para el drill-down.",
+        "description": "Proyección read-only de la cadena AUTO de una cuenta visible del principal.\n\nSin cuenta operativa visible la respuesta es un DTO vacío con ``no_account_scope``\n(fail-closed, nunca global). ``cycleId`` acota a un solo ciclo para el drill-down; si se pasa\njunto con ``instrumentId``, ``cycleId`` manda. ``instrumentId`` (H5) acota a los ciclos DE ESE\nvalor: un ``instrumentId`` desconocido NO cae a una lectura global (``cycles == []``).",
         "operationId": "get_auto_operational_monitor_api_auto_operational_monitor_get",
         "parameters": [
           {
@@ -27212,6 +27223,23 @@
                 }
               ],
               "title": "Cycleid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instrumentId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instrumentid"
             }
           },
           {

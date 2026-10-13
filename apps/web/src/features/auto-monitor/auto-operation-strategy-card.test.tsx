@@ -21,6 +21,7 @@ import {
   AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT,
   AUTO_OPERATION_STRATEGY_MATCH_LABELS,
   AUTO_OPERATION_STRATEGY_NO_DATA,
+  AUTO_OPERATION_STRATEGY_VERIFY_EXECUTED_LABEL,
   type AutoOperationStrategyViewV1,
 } from "@/features/auto/auto-operation-strategy";
 
@@ -39,6 +40,11 @@ function view(
     matchLabel: AUTO_OPERATION_STRATEGY_MATCH_LABELS.same,
     declaredCyclePresetKey: "sma_crossover",
     declaredCycleStrategyVersion: "sv-1",
+    executedStrategyDefinitionId: "def-1",
+    executedStrategyLabel: "SMA cross",
+    executedStrategyRank: 1,
+    verifyTarget: "executed",
+    verifyGapReason: null,
     verifyHref:
       "/backtests?tab=run&instrumentId=uuid-aaa&focus=detail&verify=1",
     gapReason: null,
@@ -193,6 +199,11 @@ describe("AutoOperationStrategyCard", () => {
         matchLabel: AUTO_OPERATION_STRATEGY_MATCH_LABELS.unknown,
         declaredCyclePresetKey: null,
         declaredCycleStrategyVersion: null,
+        executedStrategyDefinitionId: null,
+        executedStrategyLabel: null,
+        executedStrategyRank: null,
+        verifyTarget: null,
+        verifyGapReason: null,
         verifyHref: null,
         gapReason: null,
         loading: true,
@@ -208,6 +219,60 @@ describe("AutoOperationStrategyCard", () => {
     expect(
       screen.getByTestId("auto-operation-strategy-label").textContent,
     ).toContain("Cargando");
+  });
+
+  it("pinta la estrategia EJECUTADA resuelta y el rótulo de que es lo que se verifica", () => {
+    renderCard();
+
+    expect(
+      screen.getByTestId("auto-operation-strategy-executed-label").textContent,
+    ).toBe(AUTO_OPERATION_STRATEGY_VERIFY_EXECUTED_LABEL);
+    const executed = screen.getByTestId("auto-operation-strategy-executed");
+    expect(executed.textContent).toContain("#1 SMA cross");
+    expect(executed.getAttribute("data-verify-target")).toBe("executed");
+    expect(
+      screen
+        .getByTestId("auto-operation-strategy-verify-dia-d")
+        .getAttribute("data-verify-target"),
+    ).toBe("executed");
+  });
+
+  it("declara un ranking real distinto del #1 cuando la ejecutada no es la mejor del valor", () => {
+    renderCard({
+      view: view({
+        match: "differs",
+        matchLabel: AUTO_OPERATION_STRATEGY_MATCH_LABELS.differs,
+        executedStrategyDefinitionId: "def-3",
+        executedStrategyLabel: "F-D exp",
+        executedStrategyRank: 3,
+      }),
+    });
+
+    const executed = screen.getByTestId("auto-operation-strategy-executed");
+    expect(executed.textContent).toContain("#3 F-D exp");
+    expect(executed.getAttribute("data-verify-target")).toBe("executed");
+  });
+
+  it("deshabilita el CTA y declara el hueco cuando no se resuelve la ejecutada (fail-closed)", () => {
+    renderCard({
+      view: view({
+        executedStrategyDefinitionId: null,
+        executedStrategyLabel: null,
+        executedStrategyRank: null,
+        verifyTarget: null,
+        verifyGapReason:
+          "Sin dato todavía: el ciclo no declara su estrategia ejecutada (`presetKey`).",
+        verifyHref: null,
+      }),
+    });
+
+    const button = screen.getByTestId("auto-operation-strategy-verify-dia-d");
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("data-verify-target")).toBe("none");
+    // El hueco de la EJECUTADA se declara en su propio testid (no se cae al #1 en silencio).
+    expect(
+      screen.getByTestId("auto-operation-strategy-executed").textContent,
+    ).toContain("no declara su estrategia ejecutada");
   });
 
   it("llama a onVerify al pulsar y respeta el estado deshabilitado", () => {

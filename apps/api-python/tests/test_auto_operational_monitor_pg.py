@@ -1016,3 +1016,82 @@ async def test_migration_047_price_source_upgrade_downgrade_is_idempotent(
         # Se revierte todo: el esquema de la base compartida queda intacto.
         await session.rollback()
 
+
+@pytest.mark.asyncio
+async def test_monitor_filters_by_instrument_and_declares_the_filter(
+    monitor_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """H5 — ``instrumentId`` acota a los ciclos DE ESE valor; un id desconocido NO cae a global.
+
+    Además: con ``cycleId`` e ``instrumentId`` a la vez, ``cycleId`` MANDA (un ciclo ajeno no
+    hereda hechos por el filtro).
+    """
+    from bolsa_application.auto_operational_monitor import read_operational_monitor
+    from bolsa_application.reservation_store import PostgresReservationStore
+
+    account_id = f"acc-monitor-{uuid.uuid4().hex[:10]}"
+    suffix = uuid.uuid4().hex[:10]
+    cycle_aaa = f"cyc-aaa-{suffix}"
+    cycle_bbb = f"cyc-bbb-{suffix}"
+    await _wipe(monitor_pg_factory, account_id)
+    try:
+        async with monitor_pg_factory() as session:
+            reservations = PostgresReservationStore(session, autocommit=True)
+            for cycle_id, instrument in ((cycle_aaa, "AAA"), (cycle_bbb, "BBB")):
+                assert await reservations.save_claim(
+                    _reservation(
+                        reservation_id=f"RES-{instrument}-{suffix}",
+                        cycle_id=cycle_id,
+                        account_id=account_id,
+                        instrument=instrument,
+                    )
+                )
+                for side, price, reference in (("buy", 100.0, 99.9), ("sell", 110.0, 110.1)):
+                    await _seed_fill(
+                        session,
+                        account_id=account_id,
+                        cycle_id=cycle_id,
+                        instrument=instrument,
+                        side=side,
+                        price=price,
+                        reference_mid=reference,
+                        execution_id=f"EX-{instrument}-{suffix}-{side}",
+                    )
+
+        async with monitor_pg_factory() as session:
+            only_aaa = await read_operational_monitor(
+                session,
+                account_id,
+                engine_id=_ENGINE_ID,
+                instrument_id="AAA",
+                grace_seconds=61.0,
+            )
+            unknown = await read_operational_monitor(
+                session,
+                account_id,
+                engine_id=_ENGINE_ID,
+                instrument_id="ZZZ",
+                grace_seconds=61.0,
+            )
+            # ``cycleId`` MANDA sobre el filtro: el ciclo BBB se devuelve aunque se pida AAA.
+            by_cycle = await read_operational_monitor(
+                session,
+                account_id,
+                engine_id=_ENGINE_ID,
+                cycle_id=cycle_bbb,
+                instrument_id="AAA",
+                grace_seconds=61.0,
+            )
+
+        # Solo el ciclo de AAA: el filtro por instrumento acota la ventana.
+        assert [c["cycleId"] for c in only_aaa["cycles"]] == [cycle_aaa]
+        assert only_aaa["filterInstrumentId"] == "AAA"
+        # Un instrumento sin ciclos ⇒ lista vacía HONESTA (no global) + nota declarada.
+        assert unknown["cycles"] == []
+        assert unknown["filterInstrumentId"] == "ZZZ"
+        assert "filter_instrument_empty" in unknown["notes"]
+        # ``cycleId`` manda: el ciclo ajeno (BBB) se devuelve pese a ``instrumentId="AAA"``.
+        assert [c["cycleId"] for c in by_cycle["cycles"]] == [cycle_bbb]
+    finally:
+        await _wipe(monitor_pg_factory, account_id)
+

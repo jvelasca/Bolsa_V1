@@ -49,6 +49,7 @@ import {
   autoTechnicalDetailHref,
 } from "@/features/auto/auto-nav";
 import { useAutoOperationStrategy } from "@/features/auto/use-auto-operation-strategy";
+import { AUTO_OPERATION_STRATEGY_NO_DATA } from "@/features/auto/auto-operation-strategy";
 import { useDiaDVerifyLaunch } from "@/features/trading/use-dia-d-verify-launch";
 
 type DiaDFeedbackValueDto = components["schemas"]["DiaDFeedbackValueDto"];
@@ -293,16 +294,23 @@ export function AutoOperationStoryPanel({
   const launchDiaDVerify = useDiaDVerifyLaunch();
   const startDiaDVerification = () => {
     const view = strategy.view;
-    // Guard completo: el destino canónico (`verifyHref`) ya es `null` si falta instrumento/#1
-    // o si la lectura del TOP/definición falló (fail-closed), pero se comprueba explícitamente.
-    if (!view?.verifyHref || !view.instrumentId || !view.strategyDefinitionId)
+    // Guard completo: el destino canónico (`verifyHref`) ya es `null` si falta instrumento o la
+    // estrategia EJECUTADA del ciclo (fail-closed), pero se comprueba explícitamente.
+    if (
+      !view?.verifyHref ||
+      !view.instrumentId ||
+      !view.executedStrategyDefinitionId
+    )
       return;
     launchDiaDVerify({
       instrumentId: view.instrumentId,
       symbol: view.symbol,
-      strategyDefinitionId: view.strategyDefinitionId,
-      strategyLabel: view.strategyLabel,
-      rank: view.rank ?? 1,
+      // Se verifica la estrategia EJECUTADA del ciclo, no el #1 de Finalistas. `rank` es su
+      // puesto REAL en el TOP del valor (puede no ser 1).
+      strategyDefinitionId: view.executedStrategyDefinitionId,
+      strategyLabel:
+        view.executedStrategyLabel ?? AUTO_OPERATION_STRATEGY_NO_DATA,
+      rank: view.executedStrategyRank ?? 1,
       // P2 — enlaza la verificación con ESTE ciclo y su identidad EXACTA declarada.
       cycleId: selected?.cycleId ?? null,
       strategyPresetKey: selected?.strategyPresetKey ?? null,

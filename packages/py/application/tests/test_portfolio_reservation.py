@@ -361,3 +361,42 @@ def test_store_release_reconstructs_the_committed_risk_across_partial_fills() ->
         assert persisted.reserved_risk == pytest.approx(1000.0)
 
     asyncio.run(_run())
+
+
+# ── H5: la ventana de reservas con ciclo admite filtro POR INSTRUMENTO ──────────────
+
+
+def test_store_recent_with_cycle_filters_by_instrument() -> None:
+    """H5 — ``instrument_id`` acota la ventana a ese valor; ``None`` conserva la global."""
+    store = InMemoryReservationStore()
+    aaa = _store_reservation()
+    bbb = build_reservation(
+        reservation_id="RES-cyc-2",
+        account_id="acc-1",
+        instrument_id="BBB",
+        side="buy",
+        quantity=100.0,
+        entry=50.0,
+        stop=48.0,
+        reserved_risk=500.0,
+        cycle_id="cyc-2",
+        created_at="2026-09-27T08:00:00+00:00",
+    )
+
+    async def _run() -> None:
+        await store.save(aaa)
+        await store.save(bbb)
+
+        # Sin filtro: las dos (comportamiento previo intacto).
+        todas = await store.list_recent_with_cycle("acc-1")
+        assert {row.cycle_id for row in todas} == {"cyc-1", "cyc-2"}
+
+        # Con filtro: SOLO el valor pedido.
+        solo_aaa = await store.list_recent_with_cycle("acc-1", instrument_id="AAA")
+        assert [row.cycle_id for row in solo_aaa] == ["cyc-1"]
+        assert all(row.instrument_id == "AAA" for row in solo_aaa)
+
+        # Un instrumento sin reservas con ciclo ⇒ [] (nunca la ventana global).
+        assert await store.list_recent_with_cycle("acc-1", instrument_id="ZZZ") == []
+
+    asyncio.run(_run())

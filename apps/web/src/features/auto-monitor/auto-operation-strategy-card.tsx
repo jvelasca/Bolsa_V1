@@ -19,6 +19,7 @@ import {
   AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT,
   AUTO_OPERATION_STRATEGY_NO_DATA,
   AUTO_OPERATION_STRATEGY_TITLE,
+  AUTO_OPERATION_STRATEGY_VERIFY_EXECUTED_LABEL,
   type AutoOperationStrategyViewV1,
 } from "@/features/auto/auto-operation-strategy";
 import { VERIFY_DIA_D_CTA } from "@/features/platform/product-universe";
@@ -42,6 +43,9 @@ export function AutoOperationStrategyCard({
   const notTop1 = rank != null && rank !== 1;
   // En carga, un valor ausente se declara como carga, nunca como ausencia de dato.
   const placeholder = loading ? "Cargando…" : AUTO_OPERATION_STRATEGY_NO_DATA;
+  // Fail-closed: el CTA SOLO se habilita si hay una estrategia EJECUTADA verificable
+  // (`verifyTarget === "executed"`). Un hueco se declara; nunca se cae al #1 en silencio.
+  const verifyDisabled = disabled || view.verifyTarget === null;
 
   return (
     <Card
@@ -138,6 +142,25 @@ export function AutoOperationStrategyCard({
                   AUTO_OPERATION_STRATEGY_NO_DATA}{" "}
                 · {view.matchLabel}
               </span>
+              {/* Estrategia EJECUTADA del ciclo RESUELTA en el TOP del valor: es lo que el CTA
+                  verifica. Un hueco se declara y NO se cae al #1 en silencio. */}
+              <span
+                className="mt-0.5 block text-[11px] text-muted-foreground"
+                data-testid="auto-operation-strategy-executed-label"
+              >
+                {AUTO_OPERATION_STRATEGY_VERIFY_EXECUTED_LABEL}
+              </span>
+              <span
+                className="block font-medium"
+                data-testid="auto-operation-strategy-executed"
+                data-verify-target={view.verifyTarget ?? "none"}
+              >
+                {view.executedStrategyLabel
+                  ? `${view.executedStrategyRank != null ? `#${view.executedStrategyRank} ` : ""}${view.executedStrategyLabel}`
+                  : loading
+                    ? "Cargando…"
+                    : (view.verifyGapReason ?? placeholder)}
+              </span>
               {/* Nota de honestidad DENTRO del <dd> (ver nota del bloque anterior). */}
               <span
                 className="mt-0.5 block text-[11px] text-muted-foreground"
@@ -168,12 +191,14 @@ export function AutoOperationStrategyCard({
           size="sm"
           variant="default"
           data-testid="auto-operation-strategy-verify-dia-d"
+          data-verify-target={view.verifyTarget ?? "none"}
           className="h-7 rounded px-2 text-xs"
-          disabled={disabled}
+          disabled={verifyDisabled}
           title={
-            disabled
-              ? "Sin dato todavía: falta el instrumento o la estrategia #1"
-              : "Verificar D→hoy en LAB (Análisis técnico · Cartera LAB · Auto)"
+            verifyDisabled
+              ? (view.verifyGapReason ??
+                "Sin dato todavía: no se puede verificar la estrategia ejecutada del ciclo")
+              : "Verificar D→hoy la estrategia EJECUTADA del ciclo en LAB (Análisis técnico · Cartera LAB · Auto)"
           }
           onClick={onVerify}
         >
