@@ -134,5 +134,12 @@ uv run --no-sync python apps/api-python/scripts/v2_87_replay_oos_durable_cycle.p
 
 ## 7. Cita POST-TAG
 
-_Pendiente de empujar el tag `v2.88.119-beta` y de que `Release tag CI` cierre en verde (`replay-repro`
-debe **REPRODUCIR** el artefacto congelado: este sello no toca el payload del replay ⇒ `Δ decisión = 0`)._
+Tag anotado **`v2.88.119-beta`** (objeto `b9e62316` → commit `3b069ce4`) sellado y publicado en `origin`
+(`git ls-remote origin refs/tags/v2.88.119-beta*` resuelve objeto + `^{}`); `origin/main` == `HEAD` == `3b069ce4`.
+Tag **anotado sin firmar** (`unsigned`) — declarado, no disimulado.
+
+- `Release tag CI` [**38364511593**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38364511593) → **`success`** (`12m28s`): **12 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado). **`replay-repro`** → **`success`** (`3m9s`): regenera el artefacto congelado del sello desde el fixture ⇒ este sello (bump + documentación + artefacto de banda) **no** toca el payload del replay (`Δ decisión = 0`).
+- `Python CI` [**38364511626**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38364511626) `success` (`2m0s`) · `Frontend CI` [**38364511628**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38364511628) `success` (`3m26s`) · `Fase 2 scientific` [**38364511673**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38364511673) `success` (`1m25s`) · `Optimize lab` [**38364511669**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38364511669) `success` (`1m31s`).
+- CI de **rama** (`main`, `3b069ce4`): `Python CI` [**38364509509**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38364509509) `success` (`3m7s`) · `Frontend CI` [**38364509505**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38364509505) `success` (`4m12s`) · `Optimize lab` [**38364509474**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38364509474) `success` (`1m33s`) · `Gitleaks` [**38364509494**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38364509494) `success` (`17s`).
+- **Anotaciones del run:** solo avisos **preexistentes** y ajenos al diff (deprecación de Node 20 en `actions/*`, migración `ubuntu-latest`→26, `react-hooks/exhaustive-deps` en `apps/web`). **Ninguna** referida a la banda OOS.
+- **Distinción:** *estado comunicado* (artefacto regenerado y verificado localmente, autochequeo `exit 0`) vs *verificación externa* (tag/commit/run resueltos en GitHub) — aquí **ambos** confirmados. El sello **no** demuestra rentabilidad.
