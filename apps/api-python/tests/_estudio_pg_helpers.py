@@ -14,6 +14,7 @@ NUNCA abre el bridge LIVE.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import math
 import os
@@ -28,8 +29,6 @@ from typing import Any
 import pytest
 
 if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
-    import asyncio
-
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 _DOTENV = Path(__file__).resolve().parents[3] / ".env"
