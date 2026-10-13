@@ -240,6 +240,27 @@ def test_h1_gap_still_marks_statistical_confidence_not_measured():
     assert statistical["ci95HalfWidth"] is None
 
 
+def test_h1_1_single_draw_does_not_establish_statistical_confidence():
+    """H1.1 — con UN sorteo (``n = 1``) no se mide la confianza, ni con procedencia completa.
+
+    Cierra el borde ``n = 1``: ``stats`` no es ``None`` pero no hay dispersión que medir; la guarda
+    ``no_effective_sample`` (``n < MIN_DRAWS_FOR_BAND``) lo declara antes que la procedencia.
+    """
+    artifact = build_band_artifact(
+        draws=[_draw(realized_r=-5.0)],
+        design=DESIGN_INDEPENDENT,
+        provenance=_provenance(),
+    )
+    validity = artifact["global"]["validity"]
+    assert validity["sensitivityBand"]["note"] == "insufficient_draws"
+    statistical = validity["statisticalConfidence"]
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["reason"] == STATISTICAL_CONFIDENCE_NO_SAMPLE_REASON
+    assert statistical["established"] is False
+    assert statistical["se"] is None
+    assert statistical["ci95HalfWidth"] is None
+
+
 # ── H1.1: la declaración de independencia NO basta sin procedencia verificable ──
 
 

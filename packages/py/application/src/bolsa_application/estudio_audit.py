@@ -28,6 +28,7 @@ Diseño (alineado con el proyecto):
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -114,9 +115,25 @@ class EstudioAuditReport:
         }
 
 
-def _signal_for_symbol(cycles: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def _signal_for_symbol(
+    cycles: Sequence[Mapping[str, Any]],
+    *,
+    linked_cycles: int,
+    unlinked_cycles: int,
+    duplicate_cycles: int,
+) -> dict[str, Any]:
+    """Recuento de la señal de un valor, con el desglose **enlazables / sin enlazar / repetidos**.
+
+    ``cycles`` es el total de ciclos; ``linkedCycles`` los que traen ``cycleId`` y por tanto
+    ``len(cycles[])`` (el invariante que se sostiene por construcción); ``unlinkedCycles`` los
+    que no declaran ``cycleId`` (no enlazables); ``duplicateCycles`` los que repetían una clave
+    ya listada (deduplicados). ``linkedCycles + unlinkedCycles + duplicateCycles == cycles``.
+    """
     return {
         "cycles": len(cycles),
+        "linkedCycles": linked_cycles,
+        "unlinkedCycles": unlinked_cycles,
+        "duplicateCycles": duplicate_cycles,
         "measuredCycles": sum(1 for cycle in cycles if _finite(cycle.get("realizedR")) is not None),
         "daysCovered": len(
             {
@@ -128,36 +145,76 @@ def _signal_for_symbol(cycles: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+_DIGITS_RE = re.compile(r"(\d+)")
+
+
+def _natural_sort_key(text: str) -> tuple[tuple[int, object], ...]:
+    """Clave de orden NATURAL: los tramos numéricos se comparan como números.
+
+    ``cyc-2`` < ``cyc-10`` (el orden lexicográfico los pondría al revés). Determinista y estable;
+    un ``cycleId`` sin dígitos se ordena por texto. Evita que el listado quede fuera de orden.
+    """
+    return tuple(
+        (0, int(part)) if part.isdigit() else (1, part)
+        for part in _DIGITS_RE.split(text)
+        if part != ""
+    )
+
+
+def _cycle_row_signature(row: Mapping[str, Any]) -> str:
+    """Firma textual determinista de una fila de ciclo (desempate estable en el dedup)."""
+    return "|".join(
+        "" if row.get(key) is None else str(row.get(key))
+        for key in ("entryDay", "exitDay", "strategyPresetKey", "strategyVersion", "realizedR")
+    )
+
+
 def _cycles_for_symbol(
     cycles: Sequence[Mapping[str, Any]],
-) -> tuple[list[dict[str, Any]], int]:
+) -> tuple[list[dict[str, Any]], int, int]:
     """Ciclos del valor con la clave canónica para **enlazar** con la operación (PURA).
 
-    Lista ordenada por ``cycleId`` con los campos que el ciclo ya sella (día de entrada/salida,
-    identidad de estrategia y ``realizedR``). Solo se listan ciclos con ``cycleId`` legible: sin
-    esa clave no hay enlace canónico a la operación; los que no la declaran se **cuentan** aparte
-    (``unlinked``) para declarar el hueco — nunca se descartan en silencio. Un campo ausente es
-    ``None`` (hueco declarado, jamás ``""``/``0``).
+    Lista ordenada de forma NATURAL por ``cycleId`` (``cyc-2`` antes que ``cyc-10``) y **deduplicada**
+    por ``cycleId``, con los campos que el ciclo ya sella (día de entrada/salida, identidad de
+    estrategia y ``realizedR``). Solo se listan ciclos con ``cycleId`` legible: sin esa clave no hay
+    enlace canónico a la operación. Los que no la declaran se **cuentan** aparte (``unlinked``) y las
+    claves repetidas también (``duplicates``) para declarar el hueco — nunca se descartan en silencio.
+    Un campo ausente es ``None`` (hueco declarado, jamás ``""``/``0``).
+
+    El orden de llegada NO decide: se ordena por ``(cycleId natural, firma de la fila)`` ANTES de
+    deduplicar, así que dos ciclos con el MISMO ``cycleId`` no eligen «ganadora» por permutación.
     """
-    rows: list[dict[str, Any]] = []
+    candidates: list[tuple[str, dict[str, Any]]] = []
     unlinked = 0
     for cycle in cycles:
         cycle_id = _text(cycle.get("cycleId"))
         if not cycle_id:
             unlinked += 1
             continue
-        rows.append(
-            {
-                "cycleId": cycle_id,
-                "entryDay": _text(cycle.get("entryDay")),
-                "exitDay": _text(cycle.get("exitDay")),
-                "strategyPresetKey": _text(cycle.get("strategyPresetKey")),
-                "strategyVersion": _text(cycle.get("strategyVersion")),
-                "realizedR": _finite(cycle.get("realizedR")),
-            }
+        candidates.append(
+            (
+                cycle_id,
+                {
+                    "cycleId": cycle_id,
+                    "entryDay": _text(cycle.get("entryDay")),
+                    "exitDay": _text(cycle.get("exitDay")),
+                    "strategyPresetKey": _text(cycle.get("strategyPresetKey")),
+                    "strategyVersion": _text(cycle.get("strategyVersion")),
+                    "realizedR": _finite(cycle.get("realizedR")),
+                },
+            )
         )
-    rows.sort(key=lambda row: row["cycleId"])
-    return rows, unlinked
+    candidates.sort(key=lambda item: (_natural_sort_key(item[0]), _cycle_row_signature(item[1])))
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    duplicates = 0
+    for cycle_id, row in candidates:
+        if cycle_id in seen:
+            duplicates += 1
+            continue
+        seen.add(cycle_id)
+        rows.append(row)
+    return rows, unlinked, duplicates
 
 
 def _strategy_for_symbol(cycles: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -313,9 +370,14 @@ def build_estudio_audit_report(
             (row for row in values or () if _text(row.get("symbol")) == symbol), {}
         )
         symbol_cycles = cycles_by_symbol.get(symbol, [])
-        symbol_cycle_rows, unlinked_cycles = _cycles_for_symbol(symbol_cycles)
+        symbol_cycle_rows, unlinked_cycles, duplicate_cycles = _cycles_for_symbol(symbol_cycles)
         strategy = _strategy_for_symbol(symbol_cycles)
-        signal = _signal_for_symbol(symbol_cycles)
+        signal = _signal_for_symbol(
+            symbol_cycles,
+            linked_cycles=len(symbol_cycle_rows),
+            unlinked_cycles=unlinked_cycles,
+            duplicate_cycles=duplicate_cycles,
+        )
         r_bucket, r_reasons = _r_bucket(value, min_cycles=min_cycles)
         symbol_groups = groups_by_symbol.get(symbol, [])
         group = _pick_finance_group(symbol_groups, preset_key=strategy["presetKey"])
@@ -346,6 +408,11 @@ def build_estudio_audit_report(
             unmeasured.append(
                 f"señal: {unlinked_cycles} ciclo(s) sin cycleId "
                 "(no enlazables a la operación)"
+            )
+        if duplicate_cycles:
+            unmeasured.append(
+                f"señal: {duplicate_cycles} ciclo(s) con cycleId repetido "
+                "(deduplicados por su clave canónica)"
             )
 
         measured = bool(r_bucket["measured"] and money_bucket["measured"])
@@ -388,7 +455,8 @@ def build_estudio_audit_report(
         "caso los ratios son None (nunca 0).",
         "La unión del dinero a la estrategia usa la clave EXACTA presetKey (H1); ambigua ⇒ hueco.",
         "Cada valor lista sus ciclos por cycleId (entrada/salida/identidad/realizedR) para enlazar "
-        "con la operación; un ciclo sin cycleId se declara, no se descarta en silencio.",
+        "con la operación; el recuento signal.linkedCycles == len(cycles[]) y los ciclos sin "
+        "cycleId o con clave repetida se declaran, no se descartan en silencio.",
     ]
     return EstudioAuditReport(
         values=tuple(entries), summary=summary, notes=tuple(notes)

@@ -33,7 +33,14 @@ const AUDIT = {
         symbol: "AAA",
         strategy: { presetKey: "sma_crossover", version: "ver-1" },
         why: { indicatorSpecs: null, recommendations: null },
-        signal: { cycles: 3, measuredCycles: 3, daysCovered: 2 },
+        signal: {
+          cycles: 3,
+          linkedCycles: 1,
+          unlinkedCycles: 2,
+          duplicateCycles: 0,
+          measuredCycles: 3,
+          daysCovered: 2,
+        },
         cycles: [
           {
             cycleId: "cyc-aaa-1",
@@ -73,7 +80,14 @@ const AUDIT = {
         symbol: "BBB",
         strategy: { presetKey: null, version: null },
         why: { indicatorSpecs: null, recommendations: null },
-        signal: { cycles: 1, measuredCycles: 1, daysCovered: 1 },
+        signal: {
+          cycles: 1,
+          linkedCycles: 0,
+          unlinkedCycles: 1,
+          duplicateCycles: 0,
+          measuredCycles: 1,
+          daysCovered: 1,
+        },
         cycles: [],
         resultR: {
           verdict: "NOT_MEASURED",
@@ -162,6 +176,11 @@ describe("EstudioAuditPanel", () => {
     expect(measured?.textContent).toContain("sma_crossover · ver-1");
     expect(measured?.textContent).toContain("+0.40R");
     expect(measured?.textContent).toContain("+2.50%");
+    // La señal cuadra con la lista: los ciclos ENLAZABLES declarados == los que se listan.
+    expect(
+      measured?.querySelector('[data-testid="estudio-audit-value-signal"]')
+        ?.textContent,
+    ).toContain("1 de 3 ciclos enlazables");
 
     // El informe por valor enlaza con la operación canónica por `cycleId`.
     expect(
@@ -176,6 +195,10 @@ describe("EstudioAuditPanel", () => {
 
     expect(gap?.getAttribute("data-measure-state")).toBe("unmeasured");
     // Un valor sin ciclos enlazables declara el hueco (nunca se inventa un enlace).
+    expect(
+      gap?.querySelector('[data-testid="estudio-audit-value-signal"]')
+        ?.textContent,
+    ).toContain("0 de 1 ciclos enlazables");
     expect(
       gap?.querySelector('[data-testid="estudio-audit-value-cycles-gap"]'),
     ).toBeTruthy();

@@ -14,6 +14,7 @@ import { useAutoEstudioAudit } from "@/features/auto-monitor/use-auto-dia-d-feed
 import {
   ESTUDIO_VALUE_LABELS,
   describeCycle,
+  describeSignal,
   describeStrategy,
   describeVerdict,
   estudioValueState,
@@ -140,9 +141,11 @@ export function EstudioAuditPanel() {
                     </div>
                     <div>
                       <div className="text-muted-foreground">Señal</div>
-                      <div className="font-mono">
-                        {value.signal.cycles} ciclos ·{" "}
-                        {value.signal.measuredCycles} medidos
+                      <div
+                        className="font-mono"
+                        data-testid="estudio-audit-value-signal"
+                      >
+                        {describeSignal(value.signal, cycles.length)}
                       </div>
                     </div>
                     <div>
@@ -181,9 +184,9 @@ export function EstudioAuditPanel() {
                       className="mt-1 space-y-0.5 text-[10px]"
                       data-testid="estudio-audit-value-cycles"
                     >
-                      {cycles.map((cycle) => (
+                      {cycles.map((cycle, index) => (
                         <li
-                          key={cycle.cycleId}
+                          key={`${cycle.cycleId}#${index}`}
                           className="flex flex-wrap items-center gap-2"
                           data-testid="estudio-audit-value-cycle"
                           data-cycle-id={cycle.cycleId}

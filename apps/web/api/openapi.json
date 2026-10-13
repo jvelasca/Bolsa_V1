@@ -8189,9 +8189,24 @@
             "title": "Dayscovered",
             "type": "integer"
           },
+          "duplicateCycles": {
+            "default": 0,
+            "title": "Duplicatecycles",
+            "type": "integer"
+          },
+          "linkedCycles": {
+            "default": 0,
+            "title": "Linkedcycles",
+            "type": "integer"
+          },
           "measuredCycles": {
             "default": 0,
             "title": "Measuredcycles",
+            "type": "integer"
+          },
+          "unlinkedCycles": {
+            "default": 0,
+            "title": "Unlinkedcycles",
             "type": "integer"
           }
         },

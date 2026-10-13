@@ -23,9 +23,10 @@ la regeneración se publica como artefacto **nuevo** bajo este sello, para que l
 
 ## 2. El residuo `R-ev` y su cierre (corrección de una premisa ambiental)
 
-**Qué era `R-ev`.** Los sellos `115`, `116`, `117` y `118` endurecieron la banda OOS
-(`oos-finance-band-v1` → `v2` → `v3` → `v4`), pero el **artefacto de evidencia sellado** de `v2.88.114`
-seguía en `v1`. `R-ev` es «**regenerar** `finance-band-w32-k12.json` con el esquema nuevo».
+**Qué era `R-ev`.** Los sellos `115`, `116` y `117` endurecieron la banda OOS subiendo su esquema
+(`oos-finance-band-v1` → `v2` → `v3` → `v4`); `118` la endureció **sin** subir esquema (guarda
+`no_effective_sample`). El **artefacto de evidencia sellado** de `v2.88.114` seguía en `v1`.
+`R-ev` es «**regenerar** `finance-band-w32-k12.json` con el esquema nuevo».
 
 **La premisa que se corrige.** Las evidencias `115`/`116`/`117`/`118` declaraban que regenerarlo
 «exige PostgreSQL sembrado ⇒ **no reproducible sin PG**». Esa afirmación era cierta **sólo como

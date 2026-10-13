@@ -5,6 +5,8 @@
 > **Naturaleza:** sello **aditivo** · **`Δ motor ≠ 0`** (dominio puro de banda) · **`Δ decisión = 0`** (no toca decisión/ejecución, umbrales, `TOP_N`, régimen ni reparto) · **SIN migración** (head `053_dia_d_cycle_verifications`) · **contrato HTTP SIN cambio** (las bandas son **ficheros**, no endpoints) · **SIN cambio de forma de artefacto** (`SCHEMA_VERSION` NO sube: se mantienen `dia-d-multi-band-v3` y `oos-finance-band-v4`).
 > **Cierra:** caso límite (P1) de **`H1.1`** detectado por la **AUDITORIA 1** al auditar `v2.88.117-beta` y no cubierto por la **AUDITORIA 2**: una banda **sin muestra** con procedencia completa quedaba en `MEASURED`.
 > **Fecha:** 2026-10-13.
+>
+> **⚠️ ERRATA (`v2.88.121-beta`, 2026-10-13) — alcance real de la guarda en `118`.** En `v2.88.118` la guarda `if not measured:` cubría **sólo** `stats is None` (**cero** sorteos). La afirmación de §4 de que «con menos de `MIN_DRAWS_FOR_BAND` sorteos» también quedaba `NOT_MEASURED` era **aspiracional, no implementada**: con **1 sorteo** + `independent_sample` + procedencia completa, `118` seguía emitiendo `MEASURED`/`established=False`. El borde `n = 1` lo detectó la re-auditoría [`auditoria-externa-v2.88.118-120-2026-10-13.md`](../../auditoria-externa-v2.88.118-120-2026-10-13.md) (**H1**) y se remedió en [`v2.88.121-beta`](../v2.88.121/README.md): la guarda pasa a medir la **muestra efectiva** (`effective_draws < MIN_DRAWS_FOR_BAND`). Este documento se conserva como evidencia histórica; el texto de §4 se lee ahora **con esta errata**.
 
 ---
 

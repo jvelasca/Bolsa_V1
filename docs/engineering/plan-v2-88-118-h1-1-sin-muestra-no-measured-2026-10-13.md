@@ -5,6 +5,13 @@
 > **Naturaleza prevista:** `Δ motor ≠ 0` **aditivo** (dominio puro de banda) · **`Δ decisión = 0`** · **SIN migración** (head `053_dia_d_cycle_verifications`) · **contrato HTTP sin cambio** (los artefactos de banda son ficheros, no endpoints).
 > **Origen:** `H1.1` de la AUDITORIA 1 sobre `v2.88.117-beta`. El test `test_h1_gap_still_marks_statistical_confidence_not_measured` construía una banda **sin sorteos** (`draws=[]`) con procedencia completa y afirmaba `statisticalConfidence.status == "MEASURED"` (con `established == False`). Esa combinación es incoherente: un consumidor lee `MEASURED` como «hay una medición estadística» cuando **no existe muestra**.
 
+> **Errata (remediación `v2.88.118–120`):** la guarda `no_effective_sample` de este sello se acotó a
+> `stats is None`, dejando abierto el borde `stats["n"] = 1 < MIN_DRAWS_FOR_BAND`: **una sola lectura**
+> con procedencia completa seguía emitiendo `MEASURED` / `established = False` (el mismo medio-estado
+> que este sello quiso eliminar, alcanzado por el borde `insufficient_draws`). El sello de remediación
+> amplía la guarda a `stats["n"] < MIN_DRAWS_FOR_BAND` (muestra **efectiva**), cubriendo ambos bordes
+> con el MISMO motivo `no_effective_sample`. Sin cambio de forma de artefacto (`SCHEMA_VERSION` no sube).
+
 ---
 
 ## 0. Objetivo y criterio de aceptación (falsable)

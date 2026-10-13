@@ -280,12 +280,19 @@ def band_validity(
     (``provenance`` con los ``PROVENANCE_REQUIRED_FIELDS``) se computa con el mismo criterio; una
     mera declaración NO basta (H1.1): sin evidencia (o si los datos revelan un ``venue_seeded``)
     vuelve a ``NOT_MEASURED`` con el motivo y ``missingProvenance`` declarados. Y sin muestra
-    efectiva (``stats is None``) queda SIEMPRE ``NOT_MEASURED`` (``no_effective_sample``): declarar
-    independencia no crea la medición que no existe.
+    efectiva (banda ausente ``stats is None`` **o** con menos de ``MIN_DRAWS_FOR_BAND``
+    observaciones, ``stats["n"] < MIN_DRAWS_FOR_BAND``) queda SIEMPRE ``NOT_MEASURED``
+    (``no_effective_sample``): declarar independencia no crea la medición que no existe, y una
+    sola observación no es una muestra de la que inferir confianza estadística.
 
     Un hueco es ``None`` (``sin_muestra`` / ``insufficient_draws``); jamás se rellena con ``0``.
     """
     measured = stats is not None
+    # Muestra EFECTIVA: nº de observaciones finitas que resumen la banda (``stats["n"]``). Una
+    # banda con una sola lectura no tiene dispersión medible: con ella NO se acredita confianza
+    # estadística, aunque la procedencia declarada sea completa (H1.1, borde ``n = 1``).
+    effective_draws = int(stats["n"]) if stats is not None else 0
+    no_effective_sample = effective_draws < MIN_DRAWS_FOR_BAND
     crosses: bool | None = None
     se: float | None = None
     half_width: float | None = None
@@ -316,7 +323,7 @@ def band_validity(
     echoed_provenance = dict(provenance) if isinstance(provenance, Mapping) else {}
     if design == DESIGN_INDEPENDENT:
         gaps = _provenance_gaps(provenance)
-        if not measured:
+        if no_effective_sample:
             status = "NOT_MEASURED"
             reason: str | None = STATISTICAL_CONFIDENCE_NO_SAMPLE_REASON
             missing = list(gaps)

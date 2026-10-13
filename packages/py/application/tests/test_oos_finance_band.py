@@ -273,6 +273,29 @@ def test_h1_1_no_effective_sample_blocks_measured_even_with_provenance() -> None
     assert statistical["ci95HalfWidth"] is None
 
 
+def test_h1_1_single_draw_blocks_measured_even_with_provenance() -> None:
+    """H1.1 — ``n = 1 < MIN_DRAWS_FOR_BAND`` NO acredita confianza, ni con procedencia completa.
+
+    Cierra el borde ``n = 1``: ``stats`` NO es ``None`` pero una sola lectura no tiene dispersión
+    que medir, así que ``MEASURED`` sería de nuevo el medio-estado «hay medición sin muestra» que
+    H1.1 prohíbe (misma guarda ``no_effective_sample`` que el caso ``draws = []``).
+    """
+    assert MIN_DRAWS_FOR_BAND == 2
+    band = build_finance_band(
+        draws=[_report([_group("ITX", netReturnPct=5.0)])],
+        design=DESIGN_INDEPENDENT,
+        provenance=_provenance(),
+    )
+    validity = band["groups"][0]["validity"]
+    assert validity["sensitivityBand"]["note"] == "insufficient_draws"
+    statistical = validity["statisticalConfidence"]
+    assert statistical["status"] == "NOT_MEASURED"
+    assert statistical["reason"] == STATISTICAL_CONFIDENCE_NO_SAMPLE_REASON
+    assert statistical["established"] is False
+    assert statistical["se"] is None
+    assert statistical["ci95HalfWidth"] is None
+
+
 def test_payload_is_deterministic_under_permutation() -> None:
     """Mismo estado ⇒ mismo payload: el orden de sorteos y grupos no puede cambiar la banda."""
     draw_a = _report([_group("ITX", netReturnPct=2.0), _group("ACS", netReturnPct=1.0)])

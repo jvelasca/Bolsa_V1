@@ -7151,10 +7151,25 @@ export interface components {
              */
             daysCovered: number;
             /**
+             * Duplicatecycles
+             * @default 0
+             */
+            duplicateCycles: number;
+            /**
+             * Linkedcycles
+             * @default 0
+             */
+            linkedCycles: number;
+            /**
              * Measuredcycles
              * @default 0
              */
             measuredCycles: number;
+            /**
+             * Unlinkedcycles
+             * @default 0
+             */
+            unlinkedCycles: number;
         };
         /** EstudioAuditStrategyDto */
         EstudioAuditStrategyDto: {

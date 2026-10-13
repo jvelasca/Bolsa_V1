@@ -75,6 +75,9 @@ class EstudioAuditSignalDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     cycles: int = 0
+    linkedCycles: int = 0
+    unlinkedCycles: int = 0
+    duplicateCycles: int = 0
     measuredCycles: int = 0
     daysCovered: int = 0
 

@@ -20,7 +20,7 @@ import { AutoOperationSheetView } from "@/features/auto/auto-operation-sheet-vie
 export function AutoOperacionPage() {
   const { cycleId } = useParams<{ cycleId: string }>();
   const navigate = useNavigate();
-  const { view } = useAutoOperationalMonitor();
+  const { view, isLoading } = useAutoOperationalMonitor();
   const cycle = view?.cycles.find((item) => item.cycleId === cycleId) ?? null;
   const title = cycle?.instrumentId ?? cycleId ?? "Operación";
 
@@ -48,12 +48,21 @@ export function AutoOperacionPage() {
         </AutoSectionBlockHeading>
         {cycle ? (
           <AutoOperationSheetView sheet={buildAutoOperationSheet(cycle)} />
+        ) : isLoading ? (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="auto-operacion-loading"
+          >
+            Cargando la operación…
+          </p>
         ) : (
           <p
             className="text-sm text-muted-foreground"
             data-testid="auto-operacion-sheet-hole"
           >
-            Sin dato todavía: no hay una operación con ese identificador.
+            Sin dato todavía: no hay una operación con el identificador «
+            {cycleId}» en la ventana actual del monitor (puede estar fuera de la
+            ventana).
           </p>
         )}
       </section>

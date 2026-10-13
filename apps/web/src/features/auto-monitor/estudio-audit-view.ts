@@ -60,6 +60,36 @@ export function formatDay(value: string | null | undefined): string {
   return day ? day : "sin día";
 }
 
+/**
+ * Recuento de la señal del valor, con los ciclos ENLAZABLES explícitos para cuadrar con la
+ * lista: `linkedCycles` debe ser igual a `len(cycles[])`. Los ciclos sin `cycleId` (no
+ * enlazables) y los `cycleId` repetidos (deduplicados) se declaran aparte, nunca se ocultan.
+ */
+export function describeSignal(
+  signal: {
+    cycles?: number;
+    linkedCycles?: number;
+    unlinkedCycles?: number;
+    duplicateCycles?: number;
+    measuredCycles?: number;
+  },
+  listedCycles: number,
+): string {
+  const total = signal.cycles ?? listedCycles;
+  // Compatibilidad: un artefacto antiguo sin `linkedCycles` cae al nº realmente listado.
+  const linked = signal.linkedCycles ?? listedCycles;
+  const measured = signal.measuredCycles ?? 0;
+  const parts = [
+    `${linked} de ${total} ciclos enlazables`,
+    `${measured} medidos`,
+  ];
+  const unlinked = signal.unlinkedCycles ?? 0;
+  if (unlinked > 0) parts.push(`${unlinked} sin enlazar`);
+  const duplicates = signal.duplicateCycles ?? 0;
+  if (duplicates > 0) parts.push(`${duplicates} repetidos`);
+  return parts.join(" · ");
+}
+
 /** Etiqueta de un ciclo: ventana entrada→salida y R realizado (huecos declarados). */
 export function describeCycle(cycle: {
   entryDay?: string | null;

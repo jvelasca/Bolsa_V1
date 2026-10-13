@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import {
   describeCycle,
+  describeSignal,
   describeStrategy,
   describeVerdict,
   estudioValueState,
@@ -69,5 +70,37 @@ describe("estudio-audit-view", () => {
     expect(
       describeCycle({ entryDay: null, exitDay: null, realizedR: null }),
     ).toBe("sin día → sin día · Sin dato todavía");
+  });
+
+  it("describe la señal con los ciclos enlazables explícitos (cuadra con la lista)", () => {
+    expect(
+      describeSignal(
+        {
+          cycles: 3,
+          linkedCycles: 2,
+          unlinkedCycles: 1,
+          duplicateCycles: 0,
+          measuredCycles: 3,
+        },
+        2,
+      ),
+    ).toBe("2 de 3 ciclos enlazables · 3 medidos · 1 sin enlazar");
+    // Sin desglose (artefacto antiguo) cae al nº realmente listado, nunca al total declarado.
+    expect(describeSignal({ cycles: 3, measuredCycles: 3 }, 1)).toBe(
+      "1 de 3 ciclos enlazables · 3 medidos",
+    );
+    // Claves repetidas declaradas (deduplicadas).
+    expect(
+      describeSignal(
+        {
+          cycles: 2,
+          linkedCycles: 1,
+          unlinkedCycles: 0,
+          duplicateCycles: 1,
+          measuredCycles: 2,
+        },
+        1,
+      ),
+    ).toBe("1 de 2 ciclos enlazables · 2 medidos · 1 repetidos");
   });
 });

@@ -267,6 +267,68 @@ def test_value_without_cycles_lists_empty_never_invented() -> None:
     assert not any("cycleId" in gap for gap in entry["unmeasured"])
 
 
+def test_signal_counts_linked_and_unlinked_and_matches_listing() -> None:
+    """Los recuentos de la señal cuadran: ``linkedCycles == len(cycles[])`` y el total se desglosa."""
+    report = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[
+            _cycle("ACS", preset="sma_crossover", r=0.7, cycle_id="cyc-1"),
+            _cycle("ACS", preset="sma_crossover", r=-0.3, cycle_id="cyc-2"),
+            _cycle("ACS", preset="sma_crossover", r=0.1, cycle_id=""),
+        ],
+    )
+    entry = report.values[0]
+    signal = entry["signal"]
+    assert signal["cycles"] == 3
+    assert signal["linkedCycles"] == 2
+    assert signal["unlinkedCycles"] == 1
+    assert signal["duplicateCycles"] == 0
+    # Invariante: el recuento «enlazable» es EXACTAMENTE lo listado (nunca diverge).
+    assert signal["linkedCycles"] == len(entry["cycles"]) == 2
+    assert (
+        signal["linkedCycles"] + signal["unlinkedCycles"] + signal["duplicateCycles"]
+        == signal["cycles"]
+    )
+    assert any("sin cycleId" in gap for gap in entry["unmeasured"])
+
+
+def test_duplicate_cycle_id_is_deduplicated_and_declared() -> None:
+    """Un ``cycleId`` repetido no duplica el enlace: se deduplica y se declara el hueco."""
+    report = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[
+            _cycle("ACS", preset="sma_crossover", r=0.5, cycle_id="cyc-x"),
+            _cycle("ACS", preset="sma_crossover", r=0.9, cycle_id="cyc-x"),
+        ],
+    )
+    entry = report.values[0]
+    assert len(entry["cycles"]) == 1
+    assert entry["signal"]["duplicateCycles"] == 1
+    assert entry["signal"]["linkedCycles"] == 1
+    assert any("repetido" in gap for gap in entry["unmeasured"])
+    # Determinista bajo permutación de entrada (no elige «ganadora» por orden de llegada).
+    permuted = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[
+            _cycle("ACS", preset="sma_crossover", r=0.9, cycle_id="cyc-x"),
+            _cycle("ACS", preset="sma_crossover", r=0.5, cycle_id="cyc-x"),
+        ],
+    )
+    assert permuted.values[0]["cycles"] == entry["cycles"]
+
+
+def test_cycles_are_sorted_naturally_not_lexicographically() -> None:
+    """``cyc-2`` debe ir antes que ``cyc-10``: orden natural, no lexicográfico."""
+    report = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[
+            _cycle("ACS", preset="sma_crossover", cycle_id="cyc-10"),
+            _cycle("ACS", preset="sma_crossover", cycle_id="cyc-2"),
+        ],
+    )
+    assert [row["cycleId"] for row in report.values[0]["cycles"]] == ["cyc-2", "cyc-10"]
+
+
 def test_illegal_realized_r_is_a_declared_gap_not_zero() -> None:
     report = build_estudio_audit_report(
         values=[_value("ACS")],

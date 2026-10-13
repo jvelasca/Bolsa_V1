@@ -161,36 +161,51 @@ describe("AutoOperarPage", () => {
   });
 });
 
+function renderOperacion(cycleId: string) {
+  return render(
+    <MemoryRouter initialEntries={[`/auto/operar/operacion/${cycleId}`]}>
+      <Routes>
+        <Route
+          path="/auto/operar/operacion/:cycleId"
+          element={<AutoOperacionPage />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe("AutoOperacionPage", () => {
   it("expone un h1 con el instrumento del ciclo seleccionado", () => {
-    render(
-      <MemoryRouter initialEntries={["/auto/operar/operacion/cyc-2"]}>
-        <Routes>
-          <Route
-            path="/auto/operar/operacion/:cycleId"
-            element={<AutoOperacionPage />}
-          />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderOperacion("cyc-2");
     expect(singleH1()).toHaveLength(1);
     expect(singleH1()[0]?.textContent).toContain("MSFT");
   });
 
   it("un cycleId inexistente se declara con el id pedido, sin inventar otro ciclo", () => {
-    render(
-      <MemoryRouter initialEntries={["/auto/operar/operacion/does-not-exist"]}>
-        <Routes>
-          <Route
-            path="/auto/operar/operacion/:cycleId"
-            element={<AutoOperacionPage />}
-          />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderOperacion("does-not-exist");
     expect(singleH1()).toHaveLength(1);
     expect(singleH1()[0]?.textContent).toContain("does-not-exist");
     expect(singleH1()[0]?.textContent).not.toContain("AAPL");
     expect(singleH1()[0]?.textContent).not.toContain("MSFT");
+  });
+
+  it("un ciclo fuera de la ventana se distingue del id ausente y declara el id pedido", () => {
+    monitorState.isLoading = false;
+    monitorState.cycles = CYCLES; // solo cyc-1..cyc-3
+    renderOperacion("cyc-viejo");
+    const hole = screen.getByTestId("auto-operacion-sheet-hole");
+    expect(hole.textContent).toContain("cyc-viejo");
+    expect(hole.textContent).toContain("ventana");
+    // No cae a la ficha de otro ciclo ni se presenta como «cargando».
+    expect(screen.queryByTestId("auto-operacion-loading")).toBeNull();
+    expect(screen.queryByTestId("auto-operacion-page")).toBeTruthy();
+  });
+
+  it("mientras el monitor carga NO declara un falso hueco", () => {
+    monitorState.isLoading = true;
+    monitorState.cycles = [];
+    renderOperacion("cyc-2");
+    expect(screen.getByTestId("auto-operacion-loading")).toBeTruthy();
+    expect(screen.queryByTestId("auto-operacion-sheet-hole")).toBeNull();
   });
 });
