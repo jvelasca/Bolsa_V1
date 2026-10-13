@@ -122,4 +122,44 @@ no del sello. Total de tests idéntico entre sellos (1004).
 
 ## 7. Cita POST-TAG
 
-_(Pendiente de empujar el tag y resolver el `Release tag CI`; se completará al cerrar el sello.)_
+**Tag `v2.88.121-beta` empujado** (anotado, **unsigned**; objeto `82dd7038` → commit de sello `0bb06f97`).
+`origin/main` == `HEAD` == `0bb06f97`. `Release tag CI`
+[**38383921714**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38383921714) — **verde en 11m40s**
+(`createdAt` 2026-10-13T10:31:17Z → `updatedAt` 10:42:57Z), **12/12 jobs `success` + `certify`**
+(`playwright (integrated E2E, opt-in)` = `skipped` por diseño). Lo decisivo: **`replay-repro (regenera el
+artefacto del sello desde el fixture)`** cerró en **success** (`5m20s`) ⇒ el artefacto congelado **SE
+REPRODUCE**, coherente con **`Δ decisión = 0`**; y `lifecycle-pg` cerró con **sin migración** (head
+`053_dia_d_cycle_verifications`).
+
+| Job | Conclusión | Duración |
+| --- | --- | --- |
+| `security` (gitleaks) | ✅ success | 11s |
+| `shared` (build/typecheck/test) | ✅ success | 34s |
+| `a7-gate` (chaos real-PG) | ✅ success | 53s |
+| `lifecycle-pg` (Alembic + auth + golden restart) | ✅ success | 5m35s |
+| `frontend` (typecheck/lint/test/build + contract:check) | ✅ success | 2m15s |
+| `python` (ruff/imports/mypy/pytest offline) | ✅ success | 3m11s |
+| `dr-verify` (battery DB_DR / TCP CI) | ✅ success | 50s |
+| `playwright` (mock E2E) | ✅ success | 11m27s |
+| `playwright` (integrated AUTO S5) | ✅ success | 3m19s |
+| **`replay-repro`** (regenera el artefacto del sello) | ✅ **success** | 5m20s |
+| `decision-spine` | ✅ success | 26s |
+| `certify` (aggregate + artifact) | ✅ success | 4s |
+| `playwright` (integrated E2E, opt-in) | ⏭️ skipped (diseño) | — |
+
+**Nota (fallo local ≠ CI):** el único fallo que salió localmente
+(`chaos/live_a7/test_c3_crash_injection_recovery_worker.py::test_c3b…`) **no** se reproduce en CI: el job
+`a7-gate (A7 C3 chaos live_a7 · dedicated real-PG)` cerró **success** ⇒ confirma que era **timing local**,
+no un defecto del sello.
+
+CI de **rama** (`main`, `0bb06f97`): `Python CI`
+[38383918195](https://github.com/jvelasca/Bolsa_V1/actions/runs/38383918195) · `Frontend CI`
+[38383918212](https://github.com/jvelasca/Bolsa_V1/actions/runs/38383918212) · `Fase 2 scientific`
+[38383918103](https://github.com/jvelasca/Bolsa_V1/actions/runs/38383918103) · `Optimize lab`
+[38383918200](https://github.com/jvelasca/Bolsa_V1/actions/runs/38383918200) · `Gitleaks`
+[38383918119](https://github.com/jvelasca/Bolsa_V1/actions/runs/38383918119) — **todos `success`**.
+CI de **tag**: `Python CI` ([38383921707](https://github.com/jvelasca/Bolsa_V1/actions/runs/38383921707)) ·
+`Frontend CI` ([38383921560](https://github.com/jvelasca/Bolsa_V1/actions/runs/38383921560)) ·
+`Fase 2 scientific` ([38383921610](https://github.com/jvelasca/Bolsa_V1/actions/runs/38383921610)) ·
+`Optimize lab` ([38383921534](https://github.com/jvelasca/Bolsa_V1/actions/runs/38383921534)) — `success`.
+Tag anotado **sin firmar** (`unsigned`). **Sello CERRADO.**
