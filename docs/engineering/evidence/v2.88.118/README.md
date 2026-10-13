@@ -91,6 +91,12 @@ Orden de precedencia exacto de la rama `independent_sample` tras el cambio:
 
 ## 5. Cita POST-TAG
 
-**PENDIENTE** (tag por publicar). El tag previsto es `v2.88.118-beta` (base `v2.88.117-beta`); la cita de
-objeto/commit, los runs de CI y el cierre POST-TAG en `main` se completan cuando el tag esté sellado y
-publicado.
+Tag anotado **`v2.88.118-beta`** (objeto `370af6ff` → commit `340b49ef`) sellado y publicado en `origin`
+(`git ls-remote origin refs/tags/v2.88.118-beta*` resuelve objeto + `^{}`); `origin/main` == `HEAD` == `340b49ef`.
+Tag **anotado sin firmar** (`unsigned`) — declarado, no disimulado.
+
+- `Release tag CI` [**38356133040**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38356133040) → **`success`** (`11m51s`): **12 jobs `success` + `certify` `success`** (`playwright (integrated E2E, opt-in)` `skipped`, esperado). **`replay-repro`** → **`success`**: regenera el artefacto del sello desde el fixture **sin** mover el payload ⇒ el endurecimiento (fichero puro de banda) **no** tocó el artefacto congelado (`Δ decisión = 0`).
+- `Python CI` [**38356133017**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38356133017) `success` (`3m06s`) · `Frontend CI` [**38356133072**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38356133072) `success` (`3m12s`) · `Fase 2 scientific` [**38356133062**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38356133062) `success` (`1m22s`) · `Optimize lab` [**38356133116**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38356133116) `success` (`2m19s`).
+- CI de **rama** (`main`, `340b49ef`): `Python CI` [**38356115031**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38356115031) `success` · `Frontend CI` [**38356115053**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38356115053) `success` · `Fase 2 scientific` [**38356115030**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38356115030) `success` · `Optimize lab` [**38356115042**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38356115042) `success` · `Gitleaks` [**38356115029**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38356115029) `success`.
+- **Anotaciones del run:** solo avisos **preexistentes** y ajenos al diff (deprecación de Node 20 en `actions/*`, migración `ubuntu-latest`→26, avisos de `react-hooks/exhaustive-deps` en `apps/web`). **Ninguna** referida a `dia_d_multi_uncertainty`/`oos_finance_band`.
+- **Distinción:** *estado comunicado* (implementado y verificado localmente) vs *verificación externa* (tag/commit/run resueltos en GitHub) — aquí **ambos** confirmados. El sello **no** demuestra rentabilidad.
