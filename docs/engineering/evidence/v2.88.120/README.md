@@ -108,5 +108,28 @@ instrumentos). **No** lo introduce este sello ni lo toca.
 
 ## 6. Cita POST-TAG
 
-_Pendiente de empujar el tag `v2.88.120-beta` y de que `Release tag CI` cierre en verde (`replay-repro`
-debe **REPRODUCIR** el artefacto congelado: este sello no toca el payload del replay ⇒ `Δ decisión = 0`)._
+**Tag `v2.88.120-beta` empujado** (anotado, **unsigned**; commit de sello `664ec641`). `Release tag CI`
+[**38369913850**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38369913850) — **verde en 10m03s**
+(`createdAt` 2026-10-13T08:32:09Z → `updatedAt` 08:42:12Z), **12/12 jobs** (`playwright (integrated E2E,
+opt-in)` = `skipped` por diseño). Lo decisivo: el job **`replay-repro (regenera el artefacto del sello desde
+el fixture)`** cerró en **success** (08:32:13Z → 08:37:34Z): el artefacto congelado **SE REPRODUCE** —
+coherente con **`Δ decisión = 0`** (este sello no toca el payload del replay).
+
+| Job | Conclusión | Ventana |
+| --- | --- | --- |
+| `decision-spine` | ✅ success | 08:32:12 → 08:32:43 |
+| `a7-gate` (chaos real-PG) | ✅ success | 08:32:12 → 08:33:07 |
+| **`replay-repro`** (regenera el artefacto) | ✅ **success** | 08:32:13 → 08:37:34 |
+| `security` (gitleaks) | ✅ success | 08:32:13 → 08:32:21 |
+| `playwright` (integrated AUTO S5) | ✅ success | 08:32:12 → 08:35:33 |
+| `shared` (build/typecheck/test) | ✅ success | 08:32:16 → 08:32:53 |
+| `playwright` (mock E2E) | ✅ success | 08:32:24 → 08:42:04 |
+| `python` (ruff/imports/mypy/pytest offline) | ✅ success | 08:32:13 → 08:35:21 |
+| `lifecycle-pg` (Alembic + auth + golden restart) | ✅ success | 08:32:13 → 08:37:50 |
+| `frontend` (typecheck/lint/test/build + contract:check) | ✅ success | 08:32:38 → 08:36:35 |
+| `dr-verify` (battery DB_DR / TCP CI) | ✅ success | 08:32:29 → 08:33:29 |
+| `playwright` (integrated E2E, opt-in) | ⏭️ skipped (diseño) | — |
+| `certify` (aggregate + artifact) | ✅ success | 08:42:07 → 08:42:11 |
+
+`lifecycle-pg` cierra con **sin migración** (head `053_dia_d_cycle_verifications`). CI en verde ⇒ **sello CERRADO**.
+
