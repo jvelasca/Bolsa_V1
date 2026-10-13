@@ -431,7 +431,10 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_auto_estudio_universe_coverage_pg.py
+          --ignore=apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py
+          --ignore=apps/api-python/tests/test_auto_daily_coverage_pg.py
           --ignore=apps/api-python/tests/test_auto_dia_d_trace_pg.py
+          --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
           --ignore=apps/api-python/tests/test_auto_v46_hardkill_recovery_pg.py

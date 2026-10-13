@@ -766,7 +766,10 @@ def _settlement_step(
 
 
 def _cycle_closed_step(
-    closed: Mapping[str, Any] | None, *, window_truncated: bool = False
+    closed: Mapping[str, Any] | None,
+    *,
+    window_truncated: bool = False,
+    exit_reason: Any = None,
 ) -> dict[str, Any]:
     """``CYCLE_CLOSED`` — cierre reconstruido de los fills, DECLARADO si la ventana se truncó.
 
@@ -774,6 +777,13 @@ def _cycle_closed_step(
     puede reconstruir un cierre que la evidencia completa desmintiera: el paso **no** se afirma
     (``unknown``/``PARTIAL`` con nota), por coherencia con ``FILL``. Sin truncamiento se comporta
     como antes.
+
+    H1 — el motivo de cierre es un HECHO, no un literal: ``cycles_from_fills`` NO lo emite (sólo
+    reconstruye PnL/fecha desde los fills), así que el motivo se toma del ``exitReason`` del
+    settlement DURABLE del MISMO ciclo cuando consta. Sin hecho que lo declare viaja ``None`` con
+    medición ``UNKNOWN`` (hueco explícito, política ``UNKNOWN ≠ 0`` / «Sin dato todavía»): el
+    defecto histórico ``"flat"`` afirmaba en silencio un cierre por libro plano que ninguna
+    evidencia sostenía.
     """
     if closed is None:
         return _step("CYCLE_CLOSED", state=STEP_PENDING, measurement=MEASUREMENT_UNKNOWN)
@@ -784,11 +794,16 @@ def _cycle_closed_step(
             measurement=MEASUREMENT_PARTIAL,
             note="cycle_closed_window_truncated",
         )
+    # El motivo reconstruido por ``cycles_from_fills`` (si algún día lo emite) manda; si no
+    # consta, se usa el hecho durable del settlement. Sin ninguno, ``None`` declarado (no ``flat``).
+    reason = closed.get("reason")
+    if reason is None:
+        reason = exit_reason
     return _step(
         "CYCLE_CLOSED",
         state=STEP_REACHED,
         at=closed.get("closedAt"),
-        facts=[_fact("pnl", closed.get("pnl")), _fact("reason", closed.get("reason", "flat"))],
+        facts=[_fact("pnl", closed.get("pnl")), _fact("reason", reason)],
     )
 
 
@@ -863,7 +878,13 @@ def _build_cycle(
         _fill_step(cycle_fills, window_full=window_truncated),
         _protection_step(positions_by_cycle.get(cycle_id), protection),
         _settlement_step(settlement, cycle_fills, duplicate=duplicate_settlement),
-        _cycle_closed_step(closed, window_truncated=window_truncated),
+        # H1 — el motivo de cierre se lee del HECHO durable del settlement del MISMO ciclo (el
+        # único que declara ``exitReason``); sin él, un hueco explícito (nunca ``"flat"``).
+        _cycle_closed_step(
+            closed,
+            window_truncated=window_truncated,
+            exit_reason=_get(settlement, "exitReason"),
+        ),
     ]
     notes: list[str] = []
     for step in steps:

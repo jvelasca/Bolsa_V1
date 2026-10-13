@@ -53,6 +53,92 @@ const FIRST_LEVEL_TOKENS = FORBIDDEN_FIRST_LEVEL_TOKENS.filter(
   (token) => token !== "OpportunityScore",
 );
 
+/**
+ * Oleadas 2..6 del backlog §5 (`auditoria-ui-6-x-global-2026-10-08.md`) — superficies que
+ * aún no estaban en el censo. El gate es el mismo; cada entrada nombra su ola.
+ *
+ * - Oleada 2 · Cartera · Historial (`/mesa?view=posiciones`, `/history`).
+ * - Oleada 3 · Mercado (`/trading`).
+ * - Oleada 4 · Asesor (`/research`).
+ * - Oleada 5 · Chrome / palette.
+ * - Oleada 6 · Consola avanzada (`/operational-console`).
+ */
+const WAVE_TOKEN_SURFACES: Array<{ name: string; file: string }> = [
+  // Oleada 2 · Cartera · Historial
+  {
+    name: "Cartera · mesa-positions-summary.tsx",
+    file: "features/mesa/mesa-positions-summary.tsx",
+  },
+  {
+    name: "Cartera · mesa-position-row.tsx",
+    file: "features/mesa/mesa-position-row.tsx",
+  },
+  {
+    name: "Cartera · operations-panel.tsx",
+    file: "features/trading/operations-panel.tsx",
+  },
+  {
+    name: "Cartera · position-exit-drawer-actions.tsx",
+    file: "features/trading/position-exit-drawer-actions.tsx",
+  },
+  // Oleada 3 · Mercado
+  {
+    name: "Mercado · trading-status-bar.tsx",
+    file: "features/trading/trading-status-bar.tsx",
+  },
+  {
+    name: "Mercado · chart-toolbar-chart-bar.tsx",
+    file: "features/charts/chart-toolbar-chart-bar.tsx",
+  },
+  {
+    name: "Mercado · chart-toolbar-global-bar.tsx",
+    file: "features/charts/chart-toolbar-global-bar.tsx",
+  },
+  {
+    name: "Mercado · daily-nav.ts",
+    file: "features/confirm/daily-nav.ts",
+  },
+  // Oleada 4 · Asesor
+  {
+    name: "Asesor · research-trial-result-block.tsx",
+    file: "features/research/research-trial-result-block.tsx",
+  },
+  {
+    name: "Asesor · research-lab-evidence-summary.tsx",
+    file: "features/research/research-lab-evidence-summary.tsx",
+  },
+  {
+    name: "Asesor · estudio-opinion-alarm-poller.tsx",
+    file: "features/research/estudio-opinion-alarm-poller.tsx",
+  },
+  // Oleada 5 · Chrome / palette
+  {
+    name: "Chrome · admin-rail.tsx",
+    file: "components/layout/admin-rail.tsx",
+  },
+  {
+    name: "Chrome · operative-mode-chip.tsx",
+    file: "components/layout/operative-mode-chip.tsx",
+  },
+  {
+    name: "Chrome · platform-shell.tsx",
+    file: "components/layout/platform-shell.tsx",
+  },
+  // Oleada 6 · Consola avanzada
+  {
+    name: "Consola · operational-console-page.tsx",
+    file: "features/operational-console/operational-console-page.tsx",
+  },
+  {
+    name: "Consola · ops-incidents-and-links.tsx",
+    file: "features/operational-console/ops-incidents-and-links.tsx",
+  },
+  {
+    name: "Consola · auto-evidence-section.tsx",
+    file: "features/operational-console/auto-evidence-section.tsx",
+  },
+];
+
 const TOKEN_SURFACES: Array<{ name: string; file: string }> = [
   {
     name: "Mercado · chart-workspace-page.tsx",
@@ -122,9 +208,28 @@ const TOKEN_SURFACES: Array<{ name: string; file: string }> = [
     name: "AUTO · paper-confirmation-contract-labels.ts",
     file: "features/auto-monitor/paper-confirmation-contract-labels.ts",
   },
+  ...WAVE_TOKEN_SURFACES,
+];
+
+/**
+ * Oleadas 2..6 — superficies donde el gate de tokens NO aplica por fichero (la jerga
+ * prohibida vive DENTRO de un `TechnicalDetail` montado por otro módulo, o es un
+ * identificador TS), pero sí el barrido del comodín `—`. Ver auditoría de olas 2..6.
+ */
+const WAVE_DASH_SURFACES: string[] = [
+  // Oleada 2 · Cartera · Historial (el token `Ledger` colisiona con identificadores TS:
+  // `LedgerEntryDto`/`formatLedgerEntryLabel`; la palabra visible se audita en
+  // `history-first-level.test.tsx` con límite de palabra).
+  "features/history/history-page.tsx",
+  "features/mesa/mesa-libro-panel.tsx",
+  // Oleada 4 · Asesor (WFE/PBO solo en `compact` de nivel 3 → `TechnicalDetail`).
+  "features/research/research-lab-evidence.ts",
+  // Oleada 6 · Consola (`PAPER_D_EXECUTE` montado bajo el `TechnicalDetail` de la página).
+  "features/operational-console/operational-console-sections.tsx",
 ];
 
 const DASH_SURFACES: string[] = [
+  ...WAVE_DASH_SURFACES,
   "features/dashboard/dashboard-page.tsx",
   "features/accounts/account-detail-panel.tsx",
   "features/instruments/instruments-page.tsx",

@@ -91,4 +91,16 @@ describe("Asesor · primer nivel sin jerga de ingeniería (R-G1 / RT-04)", () =>
     expect(firstLevel).not.toContain("Ledger");
     expect(firstLevel).not.toContain("balance ledger");
   });
+
+  it("research-lab-evidence.ts no filtra `Ledger` en el tooltip de primer nivel", () => {
+    // El `title` del resumen de evidencia se monta como tooltip en la celda «Evidencia»
+    // de `/research?tab=history` (primer nivel): el vocabulario debe ser humano (UI5-20).
+    expect(readSource("research-lab-evidence.ts")).not.toContain("Ledger");
+  });
+
+  it("research-trial-result-block.tsx no usa el comodín `—` fuera del nivel 3", () => {
+    // El único guion permitido vive dentro del `TechnicalDetail` (helper `formatMetric`),
+    // y se referencia por el rótulo reservado, no por el literal (UI5-14).
+    expect(SOURCES["research-trial-result-block.tsx"]).not.toContain('"—"');
+  });
 });

@@ -127,11 +127,15 @@ from bolsa_api.background.auto_price_provider import (
     PriceSource,
     price_source_kind,
 )
+from bolsa_api.background.estudio_watch import SessionScopedEstudioList
 from bolsa_api.background.paper_auto_engine_worker import (
     DecisionProvider,
     _effective_venue,
     _kill_switch_env_on,
+    _watch_from_estudio_enabled,
     _watch_symbols,
+    refresh_watch_from_estudio,
+    sync_decider_watch,
 )
 from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.adaptive_gate_store import AdaptiveGateStore, sink_failures_from_state
@@ -7483,6 +7487,7 @@ async def auto_sim_loop(
     *,
     interval_seconds: float = 60.0,
     decider_refresher: Any = None,
+    watch_refresher: Any = None,
 ) -> None:
     """Task periódica (SIM-ONLY) del scheduler; no avanza si el gate está OFF.
 
@@ -7495,12 +7500,23 @@ async def auto_sim_loop(
     V2.26/A10: ``decider_refresher`` (opcional) es una corrutina que devuelve el
     ``DecisionProvider`` vigente (p. ej. el que sigue la estrategia ACTIVE) y se
     re-evalúa antes de cada tick; ``None`` ⇒ se mantiene el decider actual.
+
+    V2.88.123/S2: ``watch_refresher`` (opcional) refresca el watch diario desde el
+    universo ESTUDIO **antes** de resolver el decider y de operar, de modo que todo
+    el turno (y los sources que se componen por tick) vean el universo vigente.
     """
     logger.info("AutoSimulationWorker (SIM-ONLY) loop iniciado (tick=%ss)", interval_seconds)
     while True:
         await asyncio.sleep(interval_seconds)
         if not sim_worker_enabled():
             continue
+        # V2.88.123/S2: watch (universo ESTUDIO) ANTES del decider, para que el
+        # refresco de la estrategia ACTIVE ya vea el universo del turno.
+        if watch_refresher is not None:
+            try:
+                await watch_refresher()
+            except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
+                logger.exception("auto_sim watch refresh failed")
         if decider_refresher is not None:
             try:
                 refreshed = await decider_refresher()
@@ -7811,6 +7827,9 @@ def start_auto_sim_worker(
     edge_source: Any = None,
     liquidity_source: Callable[[str], float | None] | None = None,
     evidence_source: Any = None,
+    # V2.88.123/S2: puerto ESTUDIO inyectable (tests). Con ``None`` y el flag ON se
+    # compone el puerto session-scoped real desde ``session_factory``.
+    estudio_list: Any = None,
 ) -> asyncio.Task[None] | None:
     """start hook para ``_event_loop_starters()`` (env-gated; default OFF, SIM).
 
@@ -7830,6 +7849,8 @@ def start_auto_sim_worker(
     runtime: Any
     # V2.26/A10: refresco opcional del decider desde la estrategia ACTIVE (env-gated).
     decider_refresher: Any = None
+    # V2.88.123/S2: refresco opcional del watch desde ESTUDIO (env-gated, default OFF).
+    watch_refresher: Any = None
     if session_factory is None:
         # Sin composición PG no creamos un runtime "real"; degradamos al worker
         # inyectado (tests/hermético) o construimos uno SOLO si viene cableado.
@@ -7852,10 +7873,13 @@ def start_auto_sim_worker(
                 "account_id",
             )
             return None
+        # El spine determinista fija su ``watch`` al componerse; lo capturamos para
+        # poder alinearlo por tick cuando el flag ESTUDIO esté ON (V2.88.123/S2).
+        spine_decider = decider if decider is not None else _default_spine_decider()
         runtime = AutoSimRuntime(
             session_factory,
             worker=worker,
-            decider=decider if decider is not None else _default_spine_decider(),
+            decider=spine_decider,
             engine_id=engine_id or _sim_engine_id(),
             account_id=effective_account,
             finance_resolver=finance_resolver,
@@ -7865,20 +7889,23 @@ def start_auto_sim_worker(
             liquidity_source=liquidity_source,
             evidence_source=evidence_source,
         )
+        # V2.88.123/S2: refresco del watch (universo ESTUDIO) por tick, solo con el
+        # flag ON. Con OFF es ``None`` ⇒ byte-idéntico (no toca la BD).
+        watch_refresher = _compose_watch_refresher(
+            estudio_list if estudio_list is not None else SessionScopedEstudioList(session_factory),
+            spine_decider,
+        )
         # V2.26/A10: solo con runtime PG real y sin decider inyectado; el seam es el
         # ``DecisionProvider`` (no se toca RiskGate/SimulationGate ni se abre LIVE).
         if decider is None and active_strategy_enabled():
-            spine_watch = tuple(
-                s.strip()
-                for s in (os.getenv("AUTO_ENGINE_SIM_WATCH") or "").split(",")
-                if s.strip()
-            )
 
             async def _refresh_active_decider() -> DecisionProvider | None:
                 return await load_active_strategy_decider(
                     session_factory,
                     instrument_id=effective_account,
-                    watch=spine_watch,
+                    # V2.88.123/S2: con el flag ON el universo ACTIVE sigue a ESTUDIO
+                    # (cache vigente); con OFF, el CSV histórico ``AUTO_ENGINE_SIM_WATCH``.
+                    watch=_active_decider_watch(),
                     signal_enabled=active_strategy_signal_enabled(),
                     # W3: la señal se evalúa con las barras CERRADAS hasta la barra anterior
                     # (provider sobre el reloj del worker: el refresco es previo al turno,
@@ -7893,8 +7920,40 @@ def start_auto_sim_worker(
             runtime,
             interval_seconds=_sim_interval_seconds(interval_seconds),
             decider_refresher=decider_refresher,
+            watch_refresher=watch_refresher,
         )
     )
+
+
+def _active_decider_watch() -> tuple[str, ...]:
+    """Watch del decider de la estrategia ACTIVE (V2.88.123/S2).
+
+    Con el flag ``..._WATCH_FROM_ESTUDIO`` ON, el universo ESTUDIO vigente (cache
+    refrescada por tick); con OFF, el CSV histórico ``AUTO_ENGINE_SIM_WATCH``
+    exactamente como antes (byte-idéntico).
+    """
+    if _watch_from_estudio_enabled():
+        return tuple(_watch_symbols())
+    return tuple(
+        s.strip() for s in (os.getenv("AUTO_ENGINE_SIM_WATCH") or "").split(",") if s.strip()
+    )
+
+
+def _compose_watch_refresher(estudio_list: Any, spine_decider: Any) -> Any:
+    """Compone el refresco del watch desde ESTUDIO (V2.88.123/S2) o ``None``.
+
+    Con el flag OFF es ``None`` ⇒ ``auto_sim_loop`` no toca la BD (byte-idéntico).
+    Con ON resuelve el universo por tick y alinea el ``watch`` del spine determinista
+    (que fija su membresía al componerse) SIN recrear el motor.
+    """
+    if not _watch_from_estudio_enabled():
+        return None
+
+    async def _refresh() -> None:
+        await refresh_watch_from_estudio(estudio_list)
+        sync_decider_watch(spine_decider, _watch_symbols())
+
+    return _refresh
 
 
 def _sim_interval_seconds(default: float = 60.0) -> float:

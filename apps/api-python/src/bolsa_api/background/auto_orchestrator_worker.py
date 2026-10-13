@@ -44,7 +44,6 @@ from bolsa_api.api.dependencies import (
     get_cognitive_repository,
     get_hypothesis_belief_repository,
     get_instrument_repository,
-    get_list_repository,
     get_ohlcv_repository,
     get_optimization_run_repository,
     get_research_evidence_repository,
@@ -1228,29 +1227,12 @@ def _default_orchestrator(session_factory: Any) -> Any:
     return orchestrator
 
 
-class _SessionScopedEstudioList:
-    """``EstudioListPort`` real: abre una sesión por ``execute`` (lista ``estudio``).
-
-    ``resolve_estudio_universe`` solo necesita un objeto con ``execute(list_id)``;
-    este adaptador materializa el puerto con ``GetInstrumentList`` y una sesión
-    propia por llamada, sin retener sesiones de larga vida.
-    """
-
-    def __init__(self, session_factory: Any) -> None:
-        self._session_factory = session_factory
-
-    async def execute(self, list_id: str) -> Any:
-        from bolsa_application.lists import GetInstrumentList
-
-        async with self._session_factory() as session:
-            return await GetInstrumentList(get_list_repository(session)).execute(list_id)
-
-
 def _estudio_universe_resolver(session_factory: Any) -> Any:
     """``resolve_universe`` real: universo canónico ESTUDIO (fail-closed)."""
+    from bolsa_api.background.estudio_watch import SessionScopedEstudioList
     from bolsa_application.orchestrator_universe import make_estudio_universe_resolver
 
-    return make_estudio_universe_resolver(_SessionScopedEstudioList(session_factory))
+    return make_estudio_universe_resolver(SessionScopedEstudioList(session_factory))
 
 
 def _candidate_id_factory(instrument_id: str, index: int) -> str:

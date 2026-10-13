@@ -292,6 +292,43 @@ describe("AutoOperationStoryPanel", () => {
     );
   });
 
+  it("enciende la etapa DECISION con los reasonCodes durables del ciclo (H4)", async () => {
+    const monitor = await vi.mocked(api.getAutoOperationalMonitor)();
+    vi.mocked(api.getAutoOperationalMonitor).mockResolvedValueOnce({
+      ...monitor,
+      cycles: (monitor.cycles ?? []).map((cycle, index) =>
+        index === 0
+          ? {
+              ...cycle,
+              decision: {
+                decisionId: "dec-cyc-1",
+                approved: true,
+                action: "OPEN",
+                opportunityId: "opp-1",
+                reasonCodes: ["approved", "trend"],
+                at: "2026-09-29T20:00:00Z",
+                measurement: "COMPLETE",
+              },
+            }
+          : cycle,
+      ),
+    });
+
+    renderPanel();
+    await waitFor(() =>
+      expect(screen.getByTestId("auto-operation-story-cycles")).toBeTruthy(),
+    );
+
+    const decisions = screen
+      .getAllByTestId("auto-operation-story-stage")
+      .filter((stage) => stage.getAttribute("data-stage") === "DECISION");
+    expect(decisions).toHaveLength(1);
+    // El hecho durable de cartera enciende la etapa y publica el motivo (no «sin traza»).
+    expect(decisions[0].getAttribute("data-state")).toBe("REACHED");
+    expect(decisions[0].textContent).toContain("reasonCodes");
+    expect(decisions[0].textContent).toContain("approved");
+  });
+
   it("declara el contexto que originó la operación (universo PIT sin medir)", async () => {
     renderPanel();
     await waitFor(() =>

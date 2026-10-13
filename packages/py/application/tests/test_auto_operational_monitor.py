@@ -1458,3 +1458,58 @@ def test_cycle_result_pnl_uses_the_single_fifo_not_the_settlement() -> None:
     assert cycle["result"]["pnl"] == 100
     # El settlement es un hecho INDEPENDIENTE: no se promedia ni sustituye el PnL del ciclo.
     assert _fact(_step(cycle["steps"], "SETTLEMENT"), "pnl")["value"] == 999.0
+
+
+# ── H1 — el motivo de cierre es un HECHO durable, JAMÁS el literal ``"flat"`` ──────
+
+
+def test_cycle_closed_publishes_the_durable_exit_reason() -> None:
+    """H1 — ``CYCLE_CLOSED.reason`` sale del ``exitReason`` durable del settlement del ciclo.
+
+    ``cycles_from_fills`` no emite motivo; el único hecho que lo declara es la liquidación
+    durable (``SETTLEMENT.facts.exitReason``). Presente, el cierre lo publica MEDIDO.
+    """
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100),
+            _fill(side="sell", qty=10, price=110),
+        ],
+        settlements=[dict(_settlement_event(exitReason="time_exit").payload)],
+    )
+    reason = _fact(_step(dto["cycles"][0]["steps"], "CYCLE_CLOSED"), "reason")
+    assert reason["value"] == "time_exit"
+    assert reason["measurement"] == "COMPLETE"
+
+
+def test_cycle_closed_without_durable_reason_declares_a_gap_not_flat() -> None:
+    """H1 — sin hecho durable del motivo, el cierre declara el hueco: NUNCA un ``"flat"`` falso."""
+    # (a) Ciclo cerrado por fills SIN settlement durable: el motivo no consta.
+    without_settlement = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100),
+            _fill(side="sell", qty=10, price=110),
+        ],
+    )
+    reason = _fact(_step(without_settlement["cycles"][0]["steps"], "CYCLE_CLOSED"), "reason")
+    assert reason["value"] is None
+    assert reason["measurement"] == "UNKNOWN"
+    assert reason["value"] != "flat"
+
+    # (b) Settlement durable presente pero SIN motivo declarado (p. ej. recuperación de un
+    # crash, ``exitReason=None``): el hueco se conserva, no se rellena con el defecto histórico.
+    without_reason = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        fills=[
+            _fill(side="buy", qty=10, price=100),
+            _fill(side="sell", qty=10, price=110),
+        ],
+        settlements=[dict(_settlement_event(exitReason=None).payload)],
+    )
+    reason = _fact(_step(without_reason["cycles"][0]["steps"], "CYCLE_CLOSED"), "reason")
+    assert reason["value"] is None
+    assert reason["measurement"] == "UNKNOWN"

@@ -37,8 +37,13 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 
+from bolsa_api.background.estudio_watch import (
+    DailyWatchResolution,
+    SessionScopedEstudioList,
+    resolve_daily_watch,
+)
 from bolsa_application.auto_engine_state_store import (
     AutoEngineSnapshot,
     AutoEngineStore,
@@ -49,6 +54,7 @@ from bolsa_application.decision_contract import (
     derive_execution_plan,
     risk_gate_auto_paper_dry,
 )
+from bolsa_application.paper_desk_entry import EstudioListPort
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +69,11 @@ _ENV_SIM_ENABLED = "AUTO_ENGINE_SIMULATED_ENABLED"
 _ENV_SIM_INTERVAL = "AUTO_ENGINE_SIMULATED_INTERVAL_SECONDS"
 _ENV_SIM_WATCH = "AUTO_ENGINE_SIMULATED_WATCH"
 _ENV_SIM_VENUE = "AUTO_ENGINE_SIMULATED_VENUE"
+# V2.88.123 / S2: acoplamiento del watch diario al universo ESTUDIO (default OFF).
+# Con ON, el watch deriva de la lista canónica ESTUDIO y el CSV pasa a allowlist que
+# intersecta (fail-closed sin ESTUDIO); con OFF, byte-idéntico al CSV estático.
+_ENV_WATCH_FROM_ESTUDIO = "AUTO_ENGINE_DRY_WATCH_FROM_ESTUDIO"
+_ENV_SIM_WATCH_FROM_ESTUDIO = "AUTO_ENGINE_SIMULATED_WATCH_FROM_ESTUDIO"
 
 
 AutoEngineState = Literal[
@@ -93,6 +104,17 @@ def _enabled() -> bool:
     return _env_on(_ENV_ENABLED)
 
 
+def _watch_from_estudio_enabled() -> bool:
+    """V2.88.123 / S2: ¿el watch diario deriva del universo ESTUDIO? (default OFF).
+
+    Canónico SIM si está fijado; si no, alias DRY retrocompat (misma convención que
+    ``_enabled``). OFF ⇒ la lane diaria conserva el CSV estático exactamente como hoy.
+    """
+    if (os.getenv(_ENV_SIM_WATCH_FROM_ESTUDIO) or "").strip():
+        return _env_on(_ENV_SIM_WATCH_FROM_ESTUDIO)
+    return _env_on(_ENV_WATCH_FROM_ESTUDIO)
+
+
 def _interval_seconds(default: float) -> float:
     raw = (_prefer_sim(_ENV_SIM_INTERVAL, _ENV_INTERVAL) or "").strip()
     try:
@@ -101,9 +123,71 @@ def _interval_seconds(default: float) -> float:
         return default
 
 
+# V2.88.123 / S2: cache del watch canónico (universo ESTUDIO ∩ allowlist). Solo se
+# rellena con el flag ON; con OFF queda ``None`` y ``_watch_symbols`` lee el CSV.
+_CANONICAL_WATCH: DailyWatchResolution | None = None
+
+
+def _watch_allowlist() -> tuple[str, ...]:
+    """Allowlist explícita del CSV (sin el default ``AAA,IBEX``).
+
+    Con el flag ON, el CSV pasa a **filtro opcional** que intersecta ESTUDIO: si no
+    se define, el watch es el universo completo. El default ``AAA,IBEX`` NO se usa
+    aquí (era el watch estático, no una allowlist).
+    """
+    raw = _prefer_sim(_ENV_SIM_WATCH, _ENV_WATCH) or ""
+    return tuple(s.strip() for s in raw.split(",") if s.strip())
+
+
+async def refresh_watch_from_estudio(
+    estudio_list: EstudioListPort | None,
+) -> DailyWatchResolution | None:
+    """Refresca la cache del watch desde ESTUDIO (no-op si el flag está OFF).
+
+    Fail-closed: sin ESTUDIO ``ok`` (``empty``/``unavailable``/error) la cache queda
+    con watch vacío y el motor no opera; nunca cae a la allowlist. Se invoca una vez
+    por tick desde el loop (``watch_refresher``), antes de decidir.
+    """
+    global _CANONICAL_WATCH
+    if not _watch_from_estudio_enabled():
+        return _CANONICAL_WATCH
+    _CANONICAL_WATCH = await resolve_daily_watch(estudio_list, allowlist=_watch_allowlist())
+    return _CANONICAL_WATCH
+
+
+def reset_watch_memory_for_tests() -> None:
+    """Limpia la cache del watch canónico (solo tests; nunca en producción)."""
+    global _CANONICAL_WATCH
+    _CANONICAL_WATCH = None
+
+
 def _watch_symbols() -> list[str]:
+    """Símbolos del turno: universo ESTUDIO (flag ON) o CSV estático (flag OFF).
+
+    Con el flag ON el watch es la cache canónica (universo ESTUDIO ∩ allowlist)
+    refrescada por el loop; ``[]`` si aún no se resolvió o si ESTUDIO no está ``ok``
+    (fail-closed: no se opera). Con el flag OFF, byte-idéntico al CSV histórico.
+    """
+    if _watch_from_estudio_enabled():
+        return list(_CANONICAL_WATCH.instrument_ids) if _CANONICAL_WATCH is not None else []
     raw = _prefer_sim(_ENV_SIM_WATCH, _ENV_WATCH) or "AAA,IBEX"
     return [s.strip() for s in raw.split(",") if s.strip()]
+
+
+def sync_decider_watch(decider: object, watch: list[str]) -> None:
+    """V2.88.123 / S2: alinea el ``watch`` del decider con el vigente (si lo expone).
+
+    El spine determinista (``AutoDecisionEngine``) fija su ``watch`` al componerse, así
+    que con el flag ON —cuando el universo ESTUDIO puede cambiar entre ticks— hay que
+    refrescar su membresía SIN recrear el motor (se preserva el estado ``_state``/``_age``
+    del retén y del cooldown). Un decider sin atributo ``watch`` (p. ej. la estrategia
+    ACTIVE, que resuelve su universo por su propia vía) es no-op.
+    """
+    if decider is not None and hasattr(decider, "watch"):
+        try:
+            decider.watch = tuple(watch)
+        except Exception:  # noqa: BLE001 — un decider sin watch mutable no rompe el tick.
+            logger.exception("auto: no se pudo sincronizar el watch del decider")
 
 
 def _kill_switch_env_on() -> bool:
@@ -325,6 +409,9 @@ class PaperAutoEngine:
             "dryVetoes": self._vetoes,
             "pendingPlans": self._pending_plans,
             "lastReason": ", ".join(self._last_reason),
+            # V2.88.123 / S2: origen del watch (observabilidad aditiva; no decide nada).
+            "watchSource": "estudio" if _watch_from_estudio_enabled() else "csv",
+            "watchCount": len(_watch_symbols()),
         }
 
 
@@ -355,12 +442,19 @@ async def paper_auto_engine_loop(
     engine: PaperAutoEngine,
     *,
     interval_seconds: float = TICK_SECONDS,
+    watch_refresher: Any = None,
 ) -> None:
     logger.info("PaperAutoEngineWorker (SAFE/dry) iniciado tick=%ss", interval_seconds)
     while True:
         await asyncio.sleep(interval_seconds)
         if not _enabled():
             continue
+        # V2.88.123 / S2: refresco del watch (universo ESTUDIO) antes de decidir.
+        if watch_refresher is not None:
+            try:
+                await watch_refresher()
+            except Exception:  # noqa: BLE001 — un refresh fallido no tumba el motor.
+                logger.exception("paper_auto_engine watch refresh failed")
         try:
             if engine._store is not None:  # noqa: SLF001 — M4 durable
                 await durable_tick(engine, engine._store)
@@ -371,21 +465,52 @@ async def paper_auto_engine_loop(
             engine._state = "DEGRADED"  # noqa: SLF001
 
 
+def _watch_refresher(
+    estudio_list: Any,
+) -> Any:
+    """Compone el ``watch_refresher`` (V2.88.123/S2) o ``None`` si el flag está OFF.
+
+    Con el flag OFF devuelve ``None`` ⇒ el loop no toca la BD y es byte-idéntico.
+    """
+    if not _watch_from_estudio_enabled() or estudio_list is None:
+        return None
+
+    async def _refresh() -> None:
+        await refresh_watch_from_estudio(estudio_list)
+
+    return _refresh
+
+
 def start_paper_auto_engine_worker(
-    session_factory: object = None,  # legacy unused (SAFE/dry); M4 via store kwarg.
+    session_factory: object = None,  # V2.88.123/S2: usado solo si el gate ESTUDIO ON.
     *,
     engine: PaperAutoEngine | None = None,
     interval_seconds: float | None = None,
     store: AutoEngineStore | None = None,
+    estudio_list: Any = None,
 ) -> asyncio.Task[None] | None:
     """start hook para ``_event_loop_starters()`` del scheduler (SAFE/dry + M4).
 
     Sin env habilitado no arranca task (default OFF). Con ``store`` proporciona
     persistencia durable (Alembic 027); sin él queda el en-memoria SAFE clásico.
+
+    V2.88.123/S2: con ``AUTO_ENGINE_SIMULATED_WATCH_FROM_ESTUDIO`` ON, el watch diario
+    se deriva de ESTUDIO y se refresca por tick; ``session_factory`` (o un
+    ``estudio_list`` inyectado) provee el puerto. Con OFF ambos se ignoran y el
+    comportamiento es byte-idéntico al CSV estático.
     """
     if not _enabled():
         logger.info("PaperAutoEngineWorker desactivado (%s=false/off)", _ENV_ENABLED)
         return None
     eng = engine if engine is not None else PaperAutoEngine(store=store)
     eff = _interval_seconds(interval_seconds or TICK_SECONDS)
-    return asyncio.create_task(paper_auto_engine_loop(eng, interval_seconds=eff))
+    port = estudio_list
+    if port is None and session_factory is not None:
+        port = SessionScopedEstudioList(session_factory)
+    return asyncio.create_task(
+        paper_auto_engine_loop(
+            eng,
+            interval_seconds=eff,
+            watch_refresher=_watch_refresher(port),
+        )
+    )

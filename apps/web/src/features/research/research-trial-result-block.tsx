@@ -9,7 +9,11 @@ import { formatPct, formatPrice } from "@/features/charts/chart-utils";
 import { ResearchLabEvidenceSummary } from "@/features/research/research-lab-evidence-summary";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { TechnicalDetail } from "@/components/technical-detail";
-import { absentDataLabel, formatOrAbsent } from "@/components/absent-data";
+import {
+  ABSENT_DATA_TECHNICAL_DASH,
+  absentDataLabel,
+  formatOrAbsent,
+} from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
 function metricNum(
@@ -25,7 +29,7 @@ function formatMetric(
   v: number | null,
   kind: "ratio" | "pct" | "money" | "raw" = "ratio",
 ): string {
-  if (v == null) return "—";
+  if (v == null) return ABSENT_DATA_TECHNICAL_DASH;
   if (kind === "pct") return formatPct(v);
   if (kind === "money") return formatPrice(v);
   if (kind === "raw") return String(Math.round(v * 1000) / 1000);
@@ -188,7 +192,11 @@ export function ResearchTrialResultBlock({
             <Mini label="Profit Factor" value={formatMetric(pf)} />
             <Mini
               label="Win Rate"
-              value={wr == null ? "—" : `${(wr * 100).toFixed(1)}%`}
+              value={
+                wr == null
+                  ? ABSENT_DATA_TECHNICAL_DASH
+                  : `${(wr * 100).toFixed(1)}%`
+              }
             />
             <Mini
               label="Commission"

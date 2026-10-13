@@ -117,7 +117,7 @@ describe("buildAutoOperationStory", () => {
     ]);
   });
 
-  it("separa SELECTION (TOP-N) de DECISION (no medible)", () => {
+  it("separa SELECTION (TOP-N) de DECISION (no medible sin hecho durable)", () => {
     const story = buildAutoOperationStory({ cycle: cycle() });
     const byId = new Map(story.stages.map((stage) => [stage.id, stage]));
 
@@ -126,12 +126,65 @@ describe("buildAutoOperationStory", () => {
     expect(byId.get("SELECTION")?.label).toBe("Selección · TOP-N");
     expect(byId.get("SELECTION")?.state).toBe("REACHED");
 
-    // Decisión de cartera NO se iguala a TOP_N: no hay traza durable por ciclo.
+    // Decisión de cartera NO se iguala a TOP_N: sin hecho durable de decisión ⇒ NO MEDIDO.
     expect(byId.get("DECISION")?.sourceStepId).toBeNull();
     expect(byId.get("DECISION")?.state).toBe("NOT_MEASURED");
     expect(byId.get("DECISION")?.note).toContain(
       "no hay traza durable de decisión de cartera",
     );
+  });
+
+  it("enciende DECISION desde la decisión de cartera durable y publica sus reasonCodes", () => {
+    const withDecision = cycle();
+    withDecision.decision = {
+      decisionId: "dec-cyc-1",
+      approved: true,
+      action: "OPEN",
+      opportunityId: "opp-1",
+      reasonCodes: ["approved", "trend"],
+      at: "2026-09-29T20:00:00Z",
+      measurement: "COMPLETE",
+    };
+    const story = buildAutoOperationStory({ cycle: withDecision });
+    const decision = story.stages.find((stage) => stage.id === "DECISION");
+
+    // El hecho durable de cartera la enciende; NO es un paso del monitor (sourceStepId null).
+    expect(decision?.state).toBe("REACHED");
+    expect(decision?.sourceStepId).toBeNull();
+    expect(decision?.at).toBe("2026-09-29T20:00:00Z");
+    expect(decision?.measurement).toBe("COMPLETE");
+    // El motivo de la decisión (H4) deja de declararse ausente: se copia crudo, MEDIDO.
+    expect(
+      decision?.facts.find((fact) => fact.label === "reasonCodes"),
+    ).toEqual({
+      label: "reasonCodes",
+      value: ["approved", "trend"],
+      measurement: "COMPLETE",
+    });
+    expect(decision?.note).toBeNull();
+  });
+
+  it("declara el motivo NO MEDIDO cuando la decisión durable no trae reasonCodes", () => {
+    const withDecision = cycle();
+    withDecision.decision = {
+      decisionId: "dec-cyc-1",
+      approved: true,
+      reasonCodes: [],
+      measurement: "COMPLETE",
+    };
+    const story = buildAutoOperationStory({ cycle: withDecision });
+    const decision = story.stages.find((stage) => stage.id === "DECISION");
+
+    // El hecho existe ⇒ la etapa se enciende, pero el MOTIVO ausente se declara (no se finge).
+    expect(decision?.state).toBe("REACHED");
+    expect(
+      decision?.facts.find((fact) => fact.label === "reasonCodes"),
+    ).toEqual({
+      label: "reasonCodes",
+      value: null,
+      measurement: "UNKNOWN",
+    });
+    expect(decision?.note).toContain("sin reasonCodes");
   });
 
   it("pliega POSITION en FILL sin afirmar posición ni dinero", () => {

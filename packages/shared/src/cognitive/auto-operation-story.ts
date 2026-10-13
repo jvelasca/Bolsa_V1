@@ -486,6 +486,52 @@ function buildExplanationStage(
 }
 
 /**
+ * DECISIÓN de cartera DURABLE del ciclo (F2-2), o declarada si no hay hecho.
+ *
+ * La decisión que produjo el ciclo viaja sellada en el monitor (`cycle.decision`, leída del
+ * hecho durable `auto_entry_decision`) con sus `reasonCodes` (el motivo de la decisión). Cuando
+ * el hecho existe, la etapa se ENCIENDE y publica el motivo; cuando no, se declara la ausencia
+ * —nunca se iguala a `SELECTION` (el ranking TOP-N no es la decisión de cartera) ni se finge—.
+ * Un `reasonCodes` vacío se declara hueco (`UNKNOWN`), jamás un motivo de relleno.
+ */
+function buildDecisionStage(
+  spec: StageSpec,
+  index: number,
+  cycle: AutoMonitorCycleV1 | null,
+): AutoOperationStoryStage {
+  const decision = cycle?.decision ?? null;
+  if (!decision) {
+    return {
+      ...baseStage(spec, index, "NOT_MEASURED"),
+      note: spec.derivedNote ?? null,
+    };
+  }
+  const reasonCodes = (decision.reasonCodes ?? []).filter(
+    (code): code is string =>
+      typeof code === "string" && code.trim().length > 0,
+  );
+  const hasReasons = reasonCodes.length > 0;
+  return {
+    ...baseStage(spec, index, "REACHED"),
+    at: decision.at ?? null,
+    measurement: decision.measurement,
+    facts: [
+      {
+        label: "reasonCodes",
+        value: hasReasons ? reasonCodes : null,
+        measurement: hasReasons ? "COMPLETE" : "UNKNOWN",
+      },
+      measuredFact("approved", decision.approved ?? null),
+      measuredFact("action", decision.action ?? null),
+      measuredFact("opportunityId", decision.opportunityId ?? null),
+    ],
+    note: hasReasons
+      ? null
+      : "decisión durable sin reasonCodes: el motivo se declara NO MEDIDO",
+  };
+}
+
+/**
  * Desglose durable del score de ranking del ciclo (el «motivo de selección»), o `null`.
  *
  * Se lee del hecho durable del paso `TOP_N` (el desglose viaja sellado en el journal de la
@@ -573,6 +619,11 @@ export function buildAutoOperationStory(input: {
         ...baseStage(spec, index, "NOT_MEASURED"),
         note: spec.derivedNote ?? null,
       };
+    }
+    if (spec.id === "DECISION") {
+      // `DECISION` (cartera) ≠ `SELECTION` (ranking TOP-N): el hecho durable propio es
+      // `cycle.decision`, con sus `reasonCodes`. Sin hecho se declara (nunca se iguala al TOP-N).
+      return buildDecisionStage(spec, index, cycle);
     }
     if (spec.id === "EXPLANATION") {
       return buildExplanationStage(spec, index, input.explanation ?? null);

@@ -16,11 +16,11 @@ CERTIFICA (plan ``verificación AUTO/DÍA-D``, slice ``S1``):
    booby-trapeando el reloj de barras (``bar_tick``/``last_closed_bar_day``) y
    comprobando que la cobertura no cambia.
 
-HALLAZGO DECLARADO (slice ``S2``, NO cerrado aquí): la lane de OPERACIÓN DIARIA
-(``auto_simulation_worker``) NO deriva su watch del universo ESTUDIO — usa el CSV
-``AUTO_ENGINE_SIM_WATCH`` (default ``AAA,IBEX``). Este fichero certifica la lane de
-**orquestación/estrategia**; el desacoplamiento respecto a la lane diaria se fija y se
-declara en ``test_auto_daily_watch_coupling.py`` y en la evidencia del sello.
+ESTE FICHERO CERTIFICA LA LANE DE **ORQUESTACIÓN/ESTRATEGIA**. El desacoplamiento de la
+lane de **operación diaria** respecto a ESTUDIO (hallazgo ``S2`` declarado en ``v2.88.122``)
+se **cierra** en ``v2.88.123`` de forma **env-gated**: el watch diario deriva del universo
+canónico con ``AUTO_ENGINE_SIMULATED_WATCH_FROM_ESTUDIO`` (ver
+``test_auto_daily_watch_coupling.py`` y ``test_auto_daily_watch_from_estudio_pg.py``).
 
 GOBIERNO DE HONESTIDAD (patrón del repo): sin PostgreSQL real hace ``pytest.skip``; con
 ``AUTO_ESTUDIO_COVERAGE_PG_REQUIRED=1`` (job ``lifecycle-pg``) un skip silencioso es un
@@ -30,24 +30,28 @@ FALLO duro. NUNCA abre el bridge LIVE.
 from __future__ import annotations
 
 import asyncio
-import math
-import os
 import sys
 import uuid
-from datetime import UTC, datetime, timedelta
-from decimal import Decimal
-from pathlib import Path
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from tests._estudio_pg_helpers import (
+    cleanup_instrument,
+    make_pg_session_factory,
+    require_or_skip,
+    restore_estudio,
+    seed_instrument_with_trend,
+    set_estudio,
+)
 
 if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-_DOTENV = Path(__file__).resolve().parents[3] / ".env"
 #: Gate propio (fail-if-skipped) del job ``lifecycle-pg``.
 _REQUIRED_ENV = "AUTO_ESTUDIO_COVERAGE_PG_REQUIRED"
 
@@ -59,169 +63,17 @@ _N_INSTRUMENTS = 3
 _COVERAGE_POLLS = 120
 
 
-def _require_or_skip(exc: Exception) -> None:
-    if os.environ.get(_REQUIRED_ENV) == "1":
-        raise AssertionError(
-            f"PostgreSQL requerido para la cobertura del universo ESTUDIO pero no disponible: {exc}"
-        ) from exc
-    pytest.skip(f"PostgreSQL/Alembic (cobertura ESTUDIO) no disponible: {exc}")
-
-
 @pytest_asyncio.fixture
-async def estudio_pg_factory() -> async_sessionmaker[AsyncSession]:
-    from dotenv import load_dotenv
-
-    if _DOTENV.exists():
-        load_dotenv(_DOTENV, override=False)
-    from bolsa_infrastructure.config import get_settings
-    from bolsa_infrastructure.database.migrations import ensure_migrated
-    from bolsa_infrastructure.database.session import create_engine, create_session_factory
-
-    get_settings.cache_clear()
-    settings = get_settings()
+async def estudio_pg_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     try:
-        await asyncio.to_thread(ensure_migrated)
-        engine = create_engine(settings)
+        factory, engine = await make_pg_session_factory()
     except Exception as exc:  # noqa: BLE001 — skip/fail gate honesto por env.
-        _require_or_skip(exc)
+        require_or_skip(exc, required_env=_REQUIRED_ENV, what="cobertura ESTUDIO")
         raise
-    factory = create_session_factory(engine)
     try:
         yield factory
     finally:
         await engine.dispose()
-
-
-async def _seed_instrument_with_trend(
-    factory: async_sessionmaker[AsyncSession],
-    *,
-    instrument_id: str,
-    symbol: str,
-) -> None:
-    """Siembra un instrumento con una serie OHLCV con tendencia + oscilación.
-
-    El mismo patrón que ``test_strategy_lifecycle_pg.py`` (drift dominante sobre una
-    sinusoide): el campeón del LAB pasa los 4 gates ``lab_validated`` (CPCV/WF) y el
-    ciclo deja evaluación persistida. Sin serie, el LAB devuelve «sin evidencia» y el
-    valor NO deja el hecho durable que este test exige.
-    """
-    from bolsa_infrastructure.database.models.tables import InstrumentRow, OhlcvBarRow
-
-    async with factory() as session:
-        if await session.get(InstrumentRow, instrument_id) is not None:
-            return
-        now = datetime.now(UTC)
-        session.add(
-            InstrumentRow(
-                id=instrument_id,
-                symbol=symbol,
-                yahoo_symbol=f"{symbol}.MC",
-                name=f"ESTCO Test {symbol}",
-                exchange="MCE",
-                country="ES",
-                currency="EUR",
-                type="stock",
-                is_active=True,
-                created_at=now,
-                updated_at=now,
-            )
-        )
-        base = Decimal("10.00")
-        for day in range(420):
-            wave = Decimal(str(round(2.0 * math.sin(2 * math.pi * day / 60.0), 4)))
-            drift = Decimal(day) * Decimal("0.08")
-            price = base + drift + wave
-            session.add(
-                OhlcvBarRow(
-                    id=uuid.uuid4().hex,
-                    instrument_id=instrument_id,
-                    timeframe="1d",
-                    timestamp=now - timedelta(days=419 - day),
-                    open=price,
-                    high=price + Decimal("0.10"),
-                    low=price - Decimal("0.10"),
-                    close=price,
-                    volume=1000,
-                    adj_close=price,
-                    source="yahoo",
-                    created_at=now,
-                )
-            )
-        await session.commit()
-
-
-async def _add_to_estudio(
-    factory: async_sessionmaker[AsyncSession], instrument_ids: list[str]
-) -> list[str]:
-    """AÑADE valores a ESTUDIO preservando los existentes; devuelve los originales.
-
-    No destructivo: el cleanup restaura la lista original (patrón de
-    ``test_strategy_lifecycle_pg.py``). Lanza si la lista no admite edición (catálogo),
-    que sería un cambio de contrato ajeno a este sello.
-    """
-    from bolsa_infrastructure.database.repositories.list_repository import (
-        SqlAlchemyListRepository,
-    )
-
-    async with factory() as session:
-        repo = SqlAlchemyListRepository(session)
-        existing = await repo.ensure_estudio_list()
-        originals = list(existing.instrument_ids)
-        merged = list(dict.fromkeys([*originals, *instrument_ids]))
-        if merged != originals:
-            await repo.update(
-                SqlAlchemyListRepository.ESTUDIO_LIST_ID,
-                instrument_ids=merged,
-            )
-        await session.commit()
-        return originals
-
-
-async def _restore_estudio(
-    factory: async_sessionmaker[AsyncSession], originals: list[str]
-) -> None:
-    from bolsa_infrastructure.database.repositories.list_repository import (
-        SqlAlchemyListRepository,
-    )
-
-    async with factory() as session:
-        repo = SqlAlchemyListRepository(session)
-        await repo.ensure_estudio_list()
-        await repo.update(
-            SqlAlchemyListRepository.ESTUDIO_LIST_ID,
-            instrument_ids=originals,
-        )
-        await session.commit()
-
-
-async def _cleanup_instrument(
-    factory: async_sessionmaker[AsyncSession], instrument_id: str
-) -> None:
-    from bolsa_infrastructure.database.models.tables import (
-        InstrumentRow,
-        OhlcvBarRow,
-        StrategyCandidateRow,
-        StrategyEvaluationRow,
-    )
-
-    async with factory() as session:
-        await session.execute(
-            delete(StrategyEvaluationRow).where(
-                StrategyEvaluationRow.instrument_id == instrument_id
-            )
-        )
-        await session.execute(
-            delete(StrategyCandidateRow).where(
-                StrategyCandidateRow.instrument_id == instrument_id
-            )
-        )
-        await session.execute(
-            delete(OhlcvBarRow).where(OhlcvBarRow.instrument_id == instrument_id)
-        )
-        await session.execute(
-            delete(InstrumentRow).where(InstrumentRow.id == instrument_id)
-        )
-        await session.commit()
 
 
 async def _covered_instruments(
@@ -262,18 +114,23 @@ async def test_estudio_universe_is_traversed_by_the_loop_pg(
 
     suffix = uuid.uuid4().hex[:8]
     instruments = [f"inst-estco-{suffix}-{index}" for index in range(_N_INSTRUMENTS)]
-    # El instrumento debe EXISTIR antes de añadirlo a ESTUDIO: la lista resuelve su
+    # El instrumento debe EXISTIR antes de fijarlo en ESTUDIO: la lista resuelve su
     # detalle uniendo ``instrument_list_items`` con ``instruments``, así que un miembro
     # inexistente no aparecería en el universo.
+    # Se FIJA ESTUDIO al lote sembrado (``set_estudio``, no ``add_to_estudio``): el universo
+    # certificado es EXACTAMENTE estos valores. Anclar el alcance hace la verificación
+    # determinista (no depende de cuántos miembros arrastre ESTUDIO de otras pruebas ni del
+    # tamaño del catálogo) y acota el coste del bucle a los valores sembrados. El lote se
+    # restaura en el ``finally`` con ``restore_estudio`` (no destructivo).
     originals: list[str] | None = None
     try:
         for index, instrument_id in enumerate(instruments):
-            await _seed_instrument_with_trend(
+            await seed_instrument_with_trend(
                 estudio_pg_factory,
                 instrument_id=instrument_id,
                 symbol=f"EC{suffix[:3].upper()}{index}",
             )
-        originals = await _add_to_estudio(estudio_pg_factory, instruments)
+        originals = await set_estudio(estudio_pg_factory, instruments)
 
         # Composición REAL: store + ESTUDIO + LAB, sin inyectar nada.
         orchestrator = _default_orchestrator(estudio_pg_factory)
@@ -283,8 +140,7 @@ async def test_estudio_universe_is_traversed_by_the_loop_pg(
         assert resolution.status == "ok", f"ESTUDIO debe resolver ok: {resolution}"
         missing = [i for i in instruments if i not in resolution.instrument_ids]
         assert not missing, (
-            "resolve_universe debe devolver TODO el universo ESTUDIO sembrado; "
-            f"faltan={missing}"
+            f"resolve_universe debe devolver TODO el universo ESTUDIO sembrado; faltan={missing}"
         )
 
         # La función que usa el bucle ve EXACTAMENTE el mismo universo (sin allowlist).
@@ -296,17 +152,13 @@ async def test_estudio_universe_is_traversed_by_the_loop_pg(
         subset = await _instruments_for_cycle(orchestrator, allowlist=(instruments[0],))
         assert subset == (instruments[0],), f"la allowlist debe intersectar: {subset}"
         # …y un CSV sin intersección con ESTUDIO ⇒ NO se opera (fail-closed).
-        empty = await _instruments_for_cycle(
-            orchestrator, allowlist=("nope-not-in-estudio",)
-        )
+        empty = await _instruments_for_cycle(orchestrator, allowlist=("nope-not-in-estudio",))
         assert empty == (), f"una allowlist sin intersección no debe operar: {empty}"
 
         # Se conduce el BUCLE real una iteración (con periodo corto) y se corta en cuanto
         # cada valor ha dejado su candidata durable. No se reimplementa el cuerpo del
         # bucle: es el MISMO ``auto_orchestrator_loop`` que corre en producción.
-        task = asyncio.create_task(
-            auto_orchestrator_loop(orchestrator, interval_seconds=0.05)
-        )
+        task = asyncio.create_task(auto_orchestrator_loop(orchestrator, interval_seconds=0.05))
         covered: set[str] = set()
         try:
             for _ in range(_COVERAGE_POLLS):
@@ -330,23 +182,19 @@ async def test_estudio_universe_is_traversed_by_the_loop_pg(
             store = PostgresStrategyLifecycleStore(session)
             for instrument_id in instruments:
                 candidates = await store.list_candidates(instrument_id=instrument_id)
-                assert candidates, (
-                    f"el valor {instrument_id} de ESTUDIO no dejó candidata durable"
-                )
+                assert candidates, f"el valor {instrument_id} de ESTUDIO no dejó candidata durable"
                 evaluations = await store.list_evaluations(candidates[0].id)
-                assert evaluations, (
-                    f"el valor {instrument_id} no dejó evaluación de LAB persistida"
-                )
+                assert evaluations, f"el valor {instrument_id} no dejó evaluación de LAB persistida"
                 assert any(e.optimization_run_id for e in evaluations), (
                     f"la evaluación de {instrument_id} debe ser auditable "
                     "(_optimization_run_id_ persistido)"
                 )
     finally:
         for instrument_id in instruments:
-            await _cleanup_instrument(estudio_pg_factory, instrument_id)
+            await cleanup_instrument(estudio_pg_factory, instrument_id)
         # Solo se restaura si de verdad se modificó ESTUDIO (``originals`` capturado).
         if originals is not None:
-            await _restore_estudio(estudio_pg_factory, originals)
+            await restore_estudio(estudio_pg_factory, originals)
 
 
 @pytest.mark.asyncio
@@ -442,9 +290,7 @@ def test_universe_coverage_does_not_read_the_bar_clock(
             return type("_Detail", (), {"instrument_ids": ["AAA", "BBB"]})()
 
     watch = asyncio.run(
-        _instruments_for_cycle(
-            _Orch(make_estudio_universe_resolver(_PortList())), allowlist=()
-        )
+        _instruments_for_cycle(_Orch(make_estudio_universe_resolver(_PortList())), allowlist=())
     )
     assert watch == ("AAA", "BBB")
 

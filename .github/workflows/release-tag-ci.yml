@@ -821,7 +821,10 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_auto_estudio_universe_coverage_pg.py
+          --ignore=apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py
+          --ignore=apps/api-python/tests/test_auto_daily_coverage_pg.py
           --ignore=apps/api-python/tests/test_auto_dia_d_trace_pg.py
+          --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
           --ignore=apps/api-python/tests/test_auto_v46_hardkill_recovery_pg.py
@@ -988,6 +991,24 @@ jobs:
       # anti-skip (log + grep de ``skipped``).
       AUTO_ESTUDIO_COVERAGE_PG_REQUIRED: '1'
       AUTO_DIA_D_TRACE_PG_REQUIRED: '1'
+      # v2.88.123 (S2, cierre del hallazgo declarado en v2.88.122): el watch de la lane
+      # diaria AUTO debe derivar del universo ESTUDIO con el flag
+      # ``AUTO_ENGINE_SIMULATED_WATCH_FROM_ESTUDIO``; sobre PG real se certifica que el
+      # valor AÑADIDO entra y el RETIRADO sale, y que sin ESTUDIO se opera fail-closed.
+      # Sin PG real skipearía en mudo e invalidaría la certificación; su paso dedicado
+      # lleva guard anti-skip (log + grep de ``skipped``).
+      AUTO_DAILY_WATCH_ESTUDIO_PG_REQUIRED: '1'
+      # v2.88.124 (paso 2 del veredicto): la COBERTURA POR VALOR de la lane diaria AUTO
+      # sobre el universo ESTUDIO (``test_auto_daily_coverage_pg.py``) exige PG real; un
+      # skip mudo invalidaría la certificación. Su paso dedicado lleva guard anti-skip.
+      AUTO_DAILY_COVERAGE_PG_REQUIRED: '1'
+      # v2.88.125 (paso 4a del veredicto): el certificador de la VENTANA PAPER
+      # (``test_paper_window_certification_pg.py``) lee el material durable por el camino
+      # canónico y certifica sin fabricar (INCONCLUSIVE si no se alcanza la ventana). En
+      # CI no hay ventana real, así que ejercita la rama honesta; con PG presente un skip
+      # mudo invalidaría la certificación ⇒ paso dedicado con guard anti-skip. La corrida
+      # REAL de ≥4 días de reloj de pared sigue siendo OPERACIÓN (no CI).
+      PAPER_WINDOW_CERT_PG_REQUIRED: '1'
       # V2.46/AUTO-6 (Crash/Recovery + Concurrent AUTO): los dos escenarios reales sobre
       # PG (proceso scheduler matado en sucio + tres sesiones concurrentes sobre la misma
       # cuenta) deben ejecutarse; un skip mudo invalidaría la certificación del tag. Cada
@@ -1267,15 +1288,32 @@ jobs:
       #     enciende las 9 etapas canónicas desde hechos durables, sin ``unknown`` silencioso,
       #     y el P&L del monitor ↔ liquidación durable ↔ libro aplicado cuadra al quantum del
       #     dinero; controles negativos (``cycleId`` ajeno no hereda hechos).
-      - name: Pytest AUTO universe coverage + DÍA-D trace (PG, fail if skipped)
+      # v2.88.123 (S2): se suma la certificación del ACOPLAMIENTO del watch diario al
+      # universo ESTUDIO (``test_auto_daily_watch_from_estudio_pg.py``) al mismo paso
+      # dedicado con gate fail-if-skipped: valor añadido entra / retirado sale, allowlist
+      # CSV intersecta y sin ESTUDIO se opera fail-closed (nunca cae al CSV).
+      # v2.88.124 (paso 2 del veredicto, cierre en alcance): la COBERTURA POR VALOR de la
+      # lane diaria REAL (``test_auto_daily_coverage_pg.py``) sobre PG: cada valor de ESTUDIO
+      # se EVALÚA por el turno (``report.decided``) y los que producen candidata BUY dejan
+      # hecho durable por símbolo (journal M2/reserva/posición/TOP3). Declara el HUECO
+      # (HOLD sin hecho durable por símbolo) y es fail-if-skipped.
+      # v2.88.125 (paso 4a del veredicto): el CERTIFICADOR de la VENTANA PAPER
+      # (``test_paper_window_certification_pg.py``) lee el material durable por el camino
+      # canónico y certifica SIN FABRICAR (``INCONCLUSIVE`` si no se alcanza la ventana;
+      # ``UNKNOWN != 0``). Al mismo paso dedicado con gate fail-if-skipped: en CI no hay
+      # ventana real, así que ejercita la rama honesta, y su cableado mantiene el censo en 0.
+      - name: Pytest AUTO universe coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window (PG, fail if skipped)
         run: |
           set -o pipefail
           uv run pytest \
             apps/api-python/tests/test_auto_estudio_universe_coverage_pg.py \
             apps/api-python/tests/test_auto_dia_d_trace_pg.py \
+            apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py \
+            apps/api-python/tests/test_auto_daily_coverage_pg.py \
+            apps/api-python/tests/test_paper_window_certification_pg.py \
             -q --tb=short -rs | tee /tmp/auto-dia-d-pg.log
 
-      - name: Fail on skipped AUTO universe coverage / DÍA-D trace (no skip silencioso)
+      - name: Fail on skipped AUTO universe coverage / DÍA-D trace / daily watch / PAPER window (no skip silencioso)
         if: always()
         run: |
           if [ ! -s /tmp/auto-dia-d-pg.log ]; then

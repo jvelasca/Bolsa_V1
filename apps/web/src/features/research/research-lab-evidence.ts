@@ -92,7 +92,7 @@ export function summarizeLabEvidenceFromTrial(
     kind: evidence.kind,
     modeLabel: modeLabel(evidence.kind),
     compact,
-    title: `${compact}. Ledger lab — no es gate de producción.`,
+    title: `${compact}. Registro de laboratorio — no es gate de producción.`,
     hasLab: true,
   };
 }

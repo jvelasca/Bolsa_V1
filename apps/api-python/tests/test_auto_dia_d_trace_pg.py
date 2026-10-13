@@ -282,6 +282,23 @@ async def test_dia_d_chain_is_fully_traced_and_pnl_reconciled_pg(
                 "la liquidación durable debe declarar el MISMO realizado que el libro: "
                 f"settlement={settlement_facts['pnl']} libro={ledger_realized}"
             )
+
+        # ── H2 — el MOTIVO de cada decisión es un hecho durable verificado ─────────
+        # (i) SALIDA: la liquidación declara POR QUÉ se cerró. El cierre del día es por
+        # ``time_exit`` (techo de mantenimiento vencido); un ``exitReason`` nulo o ajeno sería
+        # un motivo perdido —hasta hoy el test solo miraba el P&L, nunca el porqué—.
+        exit_reason = settlement_facts.get("exitReason")
+        assert exit_reason == "time_exit", (
+            "la liquidación durable debe declarar el motivo de salida del cierre por "
+            f"``time_exit``; exitReason={exit_reason!r} facts={settlement_facts}"
+        )
+        # (ii) ENTRADA: la decisión durable del ciclo tomado trae sus ``reasonCodes``.
+        decision = closed_cycle.get("decision") or {}
+        reason_codes = decision.get("reasonCodes") or []
+        assert reason_codes, (
+            "la decisión durable del ciclo tomado debe publicar sus ``reasonCodes`` "
+            f"(motivo de entrada); decision={decision}"
+        )
         # La igualdad no es vacua: el día movió dinero (bruto > 0) con AMBOS lados.
         gross = await _gross_notional(trace_pg_factory, account_id)
         assert gross > 0, "el día debe mover notional bruto > 0 (si no, la conciliación no dice nada)"
@@ -321,6 +338,266 @@ async def test_dia_d_chain_is_fully_traced_and_pnl_reconciled_pg(
         assert again_closed is not None
         assert again_closed.get("cycleId") == closed_cycle.get("cycleId")
         assert _facts(_monitor_steps(again_closed)["CYCLE_CLOSED"])["pnl"] == closed_facts["pnl"]
+
+        # NUNCA bridge LIVE (régimen SIM declarado).
+        from bolsa_infrastructure.database.models.tables import ExecutionEventRow
+
+        async with trace_pg_factory() as session:
+            bad = int(
+                (
+                    await session.execute(
+                        select(func.count())
+                        .select_from(ExecutionEventRow)
+                        .where(
+                            ExecutionEventRow.account_id == account_id,
+                            func.lower(ExecutionEventRow.venue).in_(
+                                ("live", "broker_live", "xtb", "real", "live_bridge")
+                            ),
+                        )
+                    )
+                ).scalar()
+                or 0
+            )
+        assert bad == 0, "la traza DÍA-D NUNCA debe publicar al bridge LIVE"
+    finally:
+        if proc is not None:
+            await _stop(proc)
+        if account_id is not None:
+            from bolsa_infrastructure.database.models.tables import (
+                DecisionJournalEntryRow,
+                ExecutionEventRow,
+                SimAutoPositionRow,
+                SimConsumedSignalRow,
+                SimFillFinanceContextRow,
+            )
+            from bolsa_infrastructure.database.repositories.account_repository import (
+                SqlAlchemyAccountRepository,
+            )
+
+            async with trace_pg_factory() as session:
+                await session.execute(
+                    delete(SimAutoPositionRow).where(SimAutoPositionRow.account_id == account_id)
+                )
+                await session.execute(
+                    delete(SimConsumedSignalRow).where(
+                        SimConsumedSignalRow.account_id == account_id
+                    )
+                )
+                await session.execute(
+                    delete(SimFillFinanceContextRow).where(
+                        SimFillFinanceContextRow.account_id == account_id
+                    )
+                )
+                await session.execute(
+                    delete(ExecutionEventRow).where(ExecutionEventRow.account_id == account_id)
+                )
+                await session.execute(
+                    delete(DecisionJournalEntryRow).where(
+                        DecisionJournalEntryRow.account_id == account_id
+                    )
+                )
+                if edge_report_id is not None:
+                    from bolsa_infrastructure.database.models.tables import EdgeReportRow
+
+                    await session.execute(
+                        delete(EdgeReportRow).where(EdgeReportRow.id == edge_report_id)
+                    )
+                try:
+                    await SqlAlchemyAccountRepository(session).close_account(account_id)
+                except Exception:  # noqa: BLE001 — cleanup nunca tira el test
+                    pass
+                await session.commit()
+
+
+# ── H7 — la traza y el P&L concilian POR CADA valor y ciclo (sin herencia) ──────────
+#
+# El test de arriba acota el coste a UN instrumento. Aquí el MISMO día del PROCESO real corre
+# con DOS valores: la traza deja de ser un caso único y hay que demostrar que (a) cada ciclo
+# declara SU instrumento y SU liquidación —sin heredar hechos de otro valor—, (b) el P&L del
+# cierre (FIFO reconstruido) cuadra con el de la liquidación durable ciclo a ciclo, y (c) la
+# suma de los ciclos cuadra con el libro aplicado (fuente INDEPENDIENTE).
+@pytest.mark.asyncio
+async def test_dia_d_trace_reconciles_per_value_and_cycle_pg(
+    trace_pg_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Con ≥2 valores, la traza y el P&L concilian POR CADA valor/ciclo (sin herencia)."""
+    from tests.applied_fill_equity import realized_notional_from_applied_fills
+
+    instrument_ids = [_filling_instrument_id(prefix) for prefix in _INSTRUMENT_PREFIXES[:2]]
+    symbols = _SYMBOLS[:2]
+    sectors = _SECTORS[:2]
+    engine_id = f"auto-diad2-{uuid.uuid4().hex[:8]}"
+    log_path = Path(tempfile.gettempdir()) / f"diad2-{engine_id}.log"
+    account_id: str | None = None
+    edge_report_id: str | None = None
+    proc: Any = None
+
+    try:
+        account_id = await _seed_account(trace_pg_factory)
+        for instrument_id, symbol, sector in zip(instrument_ids, symbols, sectors, strict=True):
+            await _seed_instrument(
+                trace_pg_factory,
+                instrument_id=instrument_id,
+                symbol=symbol,
+                sector=sector,
+            )
+        edge_report_id = await _seed_edge_report(
+            trace_pg_factory, account_id=account_id, strategy_ref="unversioned"
+        )
+        env = _env_for(account_id, engine_id, instrument_ids=instrument_ids)
+
+        # ── FASE 1: apertura (una posición por valor) ────────────────────────────
+        proc = _spawn(env, log_path)
+        opened = 0
+        for _ in range(_OPEN_POLLS):
+            await asyncio.sleep(0.5)
+            if proc.poll() is not None:
+                raise AssertionError(
+                    _proc_failure(
+                        f"el proceso terminó (exit={proc.returncode}) antes de abrir",
+                        log_path,
+                    )
+                )
+            opened = await _count_positions(trace_pg_factory, account_id)
+            if opened >= len(instrument_ids):
+                break
+        assert opened >= len(instrument_ids), _proc_failure(
+            f"el proceso debe abrir una posición por valor (abiertas={opened} de "
+            f"{len(instrument_ids)})",
+            log_path,
+        )
+
+        # ── FASE 2: reinicio con el techo vencido ⇒ cierre por ``time_exit`` ──────
+        await _stop(proc)
+        proc = None
+        expired = await _expire_holding_deadlines(trace_pg_factory, account_id)
+        assert expired >= len(instrument_ids), (
+            f"deben vencer los {len(instrument_ids)} techos durables, no {expired}"
+        )
+
+        proc = _spawn(env, log_path)
+        sides: set[str] = set()
+        pending = 1
+        remaining = Decimal("0")
+        closed_polls = 0
+        for _ in range(_CLOSE_POLLS):
+            await asyncio.sleep(0.5)
+            if proc.poll() is not None:
+                raise AssertionError(
+                    _proc_failure(
+                        f"el proceso terminó (exit={proc.returncode}) durante el cierre",
+                        log_path,
+                    )
+                )
+            sides, pending, remaining = await _day_progress(trace_pg_factory, account_id)
+            if (
+                await _count_positions(trace_pg_factory, account_id) == 0
+                and {"buy", "sell"} <= sides
+                and pending == 0
+                and remaining == 0
+            ):
+                closed_polls += 1
+                if closed_polls >= _CLOSED_DAY_POLLS:
+                    break
+            else:
+                closed_polls = 0
+        assert await _count_positions(trace_pg_factory, account_id) == 0, _proc_failure(
+            "el día debe cerrar TODOS los planes durables (time_exit + rehidratación)", log_path
+        )
+        assert {"buy", "sell"} <= sides, _proc_failure(
+            f"cada ciclo debe ser BUY→SELL (lados={sorted(sides)})", log_path
+        )
+        assert pending == 0, _proc_failure(
+            f"quedan {pending} ExecutionEvents sin materializar", log_path
+        )
+        assert remaining == 0, _proc_failure("el libro no queda plano", log_path)
+        await _assert_materialized_and_flat(trace_pg_factory, account_id=account_id)
+
+        # ── Traza + P&L POR CADA valor y ciclo ───────────────────────────────────
+        cycles = await _read_monitor_cycles(
+            trace_pg_factory, account_id=account_id, engine_id=engine_id
+        )
+        closed_cycles = [c for c in cycles if c.get("closed") is True]
+        assert len(closed_cycles) >= len(instrument_ids), (
+            "debe haber un ciclo CERRADO por valor; "
+            f"ciclos={[(c.get('cycleId'), c.get('instrumentId')) for c in closed_cycles]}"
+        )
+
+        async with trace_pg_factory() as session:
+            ledger_realized = await realized_notional_from_applied_fills(session, account_id)
+
+        monitor_total = Decimal("0")
+        seen_instruments: set[str] = set()
+        seen_cycle_ids: set[str] = set()
+        seen_settlement_ids: set[str] = set()
+        for cycle in closed_cycles:
+            cycle_id = str(cycle.get("cycleId") or "")
+            instrument = str(cycle.get("instrumentId") or "")
+            assert cycle_id and cycle_id not in seen_cycle_ids, (
+                f"cada ciclo es ÚNICO: cycleId vacío o repetido ({cycle!r})"
+            )
+            seen_cycle_ids.add(cycle_id)
+            # Sin herencia entre valores: cada ciclo declara SU instrumento (del watch).
+            assert instrument in instrument_ids, (
+                f"el ciclo {cycle_id} declara un instrumento ajeno al watch: {instrument!r}"
+            )
+            seen_instruments.add(instrument)
+
+            steps = _monitor_steps(cycle)
+            assert (steps.get("SIGNAL") or {}).get("state") == "reached", (
+                f"el ciclo {cycle_id} debe encender SIGNAL desde su hecho durable"
+            )
+            # El SIGNAL del ciclo declara SU instrumento: no hereda el de otro valor.
+            signal_instrument = _facts(steps["SIGNAL"]).get("instrumentId")
+            assert signal_instrument == instrument, (
+                f"el SIGNAL del ciclo {cycle_id} debe declarar SU instrumento ({instrument!r}); "
+                f"declaró={signal_instrument!r}"
+            )
+
+            settlement_facts = _facts(steps["SETTLEMENT"])
+            assert settlement_facts.get("exitReason") == "time_exit", (
+                f"la liquidación de {instrument} debe declarar ``time_exit``; "
+                f"facts={settlement_facts}"
+            )
+            settlement_id = settlement_facts.get("settlementId")
+            assert settlement_id, f"la liquidación de {instrument} debe llevar su id"
+            assert str(settlement_id) not in seen_settlement_ids, (
+                f"una MISMA liquidación no puede servir a dos ciclos ({settlement_id!r})"
+            )
+            seen_settlement_ids.add(str(settlement_id))
+
+            decision = cycle.get("decision") or {}
+            assert decision.get("reasonCodes"), (
+                f"la decisión durable de {instrument} debe publicar ``reasonCodes`` "
+                f"(motivo de entrada); decision={decision}"
+            )
+
+            closed_facts = _facts(steps["CYCLE_CLOSED"])
+            assert "pnl" in closed_facts, f"el cierre de {instrument} no declara pnl: {closed_facts}"
+            assert settlement_facts.get("pnl") is not None, (
+                f"la liquidación de {instrument} no declara su pnl medido: {settlement_facts}"
+            )
+            cycle_pnl = _to_money(closed_facts["pnl"])
+            settlement_pnl = _to_money(settlement_facts["pnl"])
+            # Dos fuentes del MISMO resultado (FIFO reconstruido vs liquidación durable) que
+            # deben cuadrar ciclo a ciclo: una divergencia delata un ciclo contaminado.
+            assert cycle_pnl == settlement_pnl, (
+                f"el P&L de {instrument} debe cuadrar (cierre vs liquidación): "
+                f"cierre={cycle_pnl} settlement={settlement_pnl}"
+            )
+            monitor_total += cycle_pnl
+
+        # Cada valor del watch tiene su traza (no es un solo ciclo re-escrito).
+        assert seen_instruments == set(instrument_ids), (
+            f"debe haber traza por CADA valor del watch; vistos={sorted(seen_instruments)}"
+        )
+        # El total reconstruido por ciclo cuadra EXACTO con el libro aplicado (fuente independiente).
+        assert monitor_total == _to_money(ledger_realized), (
+            "la suma de los ciclos debe cuadrar EXACTO con el libro aplicado: "
+            f"ciclos={monitor_total} libro={ledger_realized}"
+        )
+        gross = await _gross_notional(trace_pg_factory, account_id)
+        assert gross > 0, "el día debe mover notional bruto > 0 (si no, la conciliación no dice nada)"
 
         # NUNCA bridge LIVE (régimen SIM declarado).
         from bolsa_infrastructure.database.models.tables import ExecutionEventRow
