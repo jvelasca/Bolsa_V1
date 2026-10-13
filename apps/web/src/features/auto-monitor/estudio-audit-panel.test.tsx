@@ -34,6 +34,16 @@ const AUDIT = {
         strategy: { presetKey: "sma_crossover", version: "ver-1" },
         why: { indicatorSpecs: null, recommendations: null },
         signal: { cycles: 3, measuredCycles: 3, daysCovered: 2 },
+        cycles: [
+          {
+            cycleId: "cyc-aaa-1",
+            entryDay: "2026-04-01",
+            exitDay: "2026-04-02",
+            strategyPresetKey: "sma_crossover",
+            strategyVersion: "ver-1",
+            realizedR: 0.4,
+          },
+        ],
         resultR: {
           verdict: "MIXED",
           verdictReason: "preliminary_sample",
@@ -64,6 +74,7 @@ const AUDIT = {
         strategy: { presetKey: null, version: null },
         why: { indicatorSpecs: null, recommendations: null },
         signal: { cycles: 1, measuredCycles: 1, daysCovered: 1 },
+        cycles: [],
         resultR: {
           verdict: "NOT_MEASURED",
           verdictReason: "insufficient_sample",
@@ -152,7 +163,25 @@ describe("EstudioAuditPanel", () => {
     expect(measured?.textContent).toContain("+0.40R");
     expect(measured?.textContent).toContain("+2.50%");
 
+    // El informe por valor enlaza con la operación canónica por `cycleId`.
+    expect(
+      measured
+        ?.querySelector('[data-testid="estudio-audit-value-cycle-link"]')
+        ?.getAttribute("href"),
+    ).toBe("/auto/operar/operacion/cyc-aaa-1");
+    expect(
+      measured?.querySelector('[data-testid="estudio-audit-value-cycle"]')
+        ?.textContent,
+    ).toContain("2026-04-01 → 2026-04-02");
+
     expect(gap?.getAttribute("data-measure-state")).toBe("unmeasured");
+    // Un valor sin ciclos enlazables declara el hueco (nunca se inventa un enlace).
+    expect(
+      gap?.querySelector('[data-testid="estudio-audit-value-cycles-gap"]'),
+    ).toBeTruthy();
+    expect(
+      gap?.querySelector('[data-testid="estudio-audit-value-cycle-link"]'),
+    ).toBeNull();
     // Un valor sin dato declara el hueco y sus motivos; nunca un 0 que finja medición.
     expect(gap?.textContent).toContain("Sin dato todavía");
     expect(gap?.textContent).not.toContain("0.00R");

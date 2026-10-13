@@ -8,9 +8,12 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
+import { autoOperacionHref } from "@/features/auto/auto-nav";
 import { useAutoEstudioAudit } from "@/features/auto-monitor/use-auto-dia-d-feedback";
 import {
   ESTUDIO_VALUE_LABELS,
+  describeCycle,
   describeStrategy,
   describeVerdict,
   estudioValueState,
@@ -99,6 +102,7 @@ export function EstudioAuditPanel() {
             {audit.values.map((value) => {
               const state = estudioValueState(value.measured);
               const gaps = value.unmeasured ?? [];
+              const cycles = value.cycles ?? [];
               return (
                 <li
                   key={value.symbol}
@@ -171,6 +175,40 @@ export function EstudioAuditPanel() {
                       </div>
                     </div>
                   </div>
+
+                  {cycles.length > 0 ? (
+                    <ul
+                      className="mt-1 space-y-0.5 text-[10px]"
+                      data-testid="estudio-audit-value-cycles"
+                    >
+                      {cycles.map((cycle) => (
+                        <li
+                          key={cycle.cycleId}
+                          className="flex flex-wrap items-center gap-2"
+                          data-testid="estudio-audit-value-cycle"
+                          data-cycle-id={cycle.cycleId}
+                        >
+                          <span className="font-mono text-muted-foreground">
+                            {describeCycle(cycle)}
+                          </span>
+                          <Link
+                            to={autoOperacionHref(cycle.cycleId)}
+                            className="underline hover:text-primary"
+                            data-testid="estudio-audit-value-cycle-link"
+                          >
+                            Ver operación →
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p
+                      className="mt-1 text-[10px] text-muted-foreground"
+                      data-testid="estudio-audit-value-cycles-gap"
+                    >
+                      Señal sin ciclos enlazables (Sin dato todavía)
+                    </p>
+                  )}
 
                   {gaps.length > 0 ? (
                     <ul

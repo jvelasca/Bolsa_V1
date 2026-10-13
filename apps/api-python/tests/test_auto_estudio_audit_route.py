@@ -113,6 +113,16 @@ async def test_latest_window_composes_value_audit(tmp_path: Path, monkeypatch: p
     value = body["audit"]["values"][0]
     assert value["symbol"] == "ACS"
     assert value["strategy"]["presetKey"] == "sma_crossover"
+    assert value["cycles"] == [
+        {
+            "cycleId": "cyc-1",
+            "entryDay": "2026-04-01",
+            "exitDay": "2026-04-02",
+            "strategyPresetKey": "sma_crossover",
+            "strategyVersion": "ver-1",
+            "realizedR": 0.5,
+        }
+    ]
     assert value["resultR"]["measured"] is True
     assert value["money"]["netReturnPct"] == 2.5
     assert value["measured"] is True

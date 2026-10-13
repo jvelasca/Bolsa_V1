@@ -8,7 +8,10 @@ valor). El sello 1 (`v2.88.112-beta`) enlazó la verificación DÍA-D con su cic
   H1 que el ciclo sella (``strategyPresetKey``).
 * **porqué** — ``definition.indicatorSpecs`` + ``coachFacts.recommendations[]``, si el llamante
   los aporta; ausente ⇒ hueco declarado (nunca se inventa una explicación).
-* **señal** — los ciclos de la ventana para ese valor (``cycles[]``).
+* **señal** — los ciclos de la ventana para ese valor: su recuento (``signal``) y la **lista
+  enlazable** (``cycles[]`` con ``cycleId``/entrada/salida/identidad/``realizedR``), la clave
+  canónica que permite navegar del informe por valor a la **operación** (un ciclo sin ``cycleId``
+  se declara hueco; nunca se inventa una clave para forzar el enlace).
 * **resultado** — en **R** (feedback por valor) y en **dinero** (reporte financiero OOS).
 
 Diseño (alineado con el proyecto):
@@ -123,6 +126,38 @@ def _signal_for_symbol(cycles: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             }
         ),
     }
+
+
+def _cycles_for_symbol(
+    cycles: Sequence[Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], int]:
+    """Ciclos del valor con la clave canónica para **enlazar** con la operación (PURA).
+
+    Lista ordenada por ``cycleId`` con los campos que el ciclo ya sella (día de entrada/salida,
+    identidad de estrategia y ``realizedR``). Solo se listan ciclos con ``cycleId`` legible: sin
+    esa clave no hay enlace canónico a la operación; los que no la declaran se **cuentan** aparte
+    (``unlinked``) para declarar el hueco — nunca se descartan en silencio. Un campo ausente es
+    ``None`` (hueco declarado, jamás ``""``/``0``).
+    """
+    rows: list[dict[str, Any]] = []
+    unlinked = 0
+    for cycle in cycles:
+        cycle_id = _text(cycle.get("cycleId"))
+        if not cycle_id:
+            unlinked += 1
+            continue
+        rows.append(
+            {
+                "cycleId": cycle_id,
+                "entryDay": _text(cycle.get("entryDay")),
+                "exitDay": _text(cycle.get("exitDay")),
+                "strategyPresetKey": _text(cycle.get("strategyPresetKey")),
+                "strategyVersion": _text(cycle.get("strategyVersion")),
+                "realizedR": _finite(cycle.get("realizedR")),
+            }
+        )
+    rows.sort(key=lambda row: row["cycleId"])
+    return rows, unlinked
 
 
 def _strategy_for_symbol(cycles: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -278,6 +313,7 @@ def build_estudio_audit_report(
             (row for row in values or () if _text(row.get("symbol")) == symbol), {}
         )
         symbol_cycles = cycles_by_symbol.get(symbol, [])
+        symbol_cycle_rows, unlinked_cycles = _cycles_for_symbol(symbol_cycles)
         strategy = _strategy_for_symbol(symbol_cycles)
         signal = _signal_for_symbol(symbol_cycles)
         r_bucket, r_reasons = _r_bucket(value, min_cycles=min_cycles)
@@ -306,6 +342,11 @@ def build_estudio_audit_report(
             )
         if indicator_specs is None and recommendations is None:
             unmeasured.append("porqué: la definición no viaja en el artefacto (Sin dato todavía)")
+        if unlinked_cycles:
+            unmeasured.append(
+                f"señal: {unlinked_cycles} ciclo(s) sin cycleId "
+                "(no enlazables a la operación)"
+            )
 
         measured = bool(r_bucket["measured"] and money_bucket["measured"])
         if measured:
@@ -325,6 +366,7 @@ def build_estudio_audit_report(
                     "recommendations": list(recommendations) if recommendations else None,
                 },
                 "signal": signal,
+                "cycles": symbol_cycle_rows,
                 "resultR": r_bucket,
                 "money": money_bucket,
                 "measured": measured,
@@ -345,6 +387,8 @@ def build_estudio_audit_report(
         "Un valor solo se declara «medido» si R y dinero alcanzan su suelo de muestra; en otro "
         "caso los ratios son None (nunca 0).",
         "La unión del dinero a la estrategia usa la clave EXACTA presetKey (H1); ambigua ⇒ hueco.",
+        "Cada valor lista sus ciclos por cycleId (entrada/salida/identidad/realizedR) para enlazar "
+        "con la operación; un ciclo sin cycleId se declara, no se descarta en silencio.",
     ]
     return EstudioAuditReport(
         values=tuple(entries), summary=summary, notes=tuple(notes)

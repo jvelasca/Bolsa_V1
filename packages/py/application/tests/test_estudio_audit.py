@@ -33,9 +33,16 @@ def _value(
     }
 
 
-def _cycle(symbol: str, *, preset: str | None, version: str | None = "ver-1", r: float = 0.5) -> dict:
+def _cycle(
+    symbol: str,
+    *,
+    preset: str | None,
+    version: str | None = "ver-1",
+    r: float = 0.5,
+    cycle_id: str | None = None,
+) -> dict:
     return {
-        "cycleId": f"cyc-{symbol}-{preset}-{version}",
+        "cycleId": cycle_id if cycle_id is not None else f"cyc-{symbol}-{preset}-{version}",
         "symbol": symbol,
         "entryDay": "2026-04-01",
         "exitDay": "2026-04-02",
@@ -210,3 +217,77 @@ def test_deterministic_and_ordered_by_symbol() -> None:
     second = build_estudio_audit_report(values=list(reversed(values)), cycles=cycles).to_dict()
     assert first == second
     assert [row["symbol"] for row in first["values"]] == ["ACS", "ITX"]
+
+
+def test_cycles_are_listed_per_value_ordered_by_cycle_id() -> None:
+    """Cada valor lista sus ciclos con la clave canónica (cycleId) para enlazar la operación."""
+    report = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[
+            _cycle("ACS", preset="sma_crossover", r=0.7, cycle_id="cyc-b"),
+            _cycle("ACS", preset="sma_crossover", r=-0.3, cycle_id="cyc-a"),
+        ],
+    )
+    entry = report.values[0]
+    assert [row["cycleId"] for row in entry["cycles"]] == ["cyc-a", "cyc-b"]
+    assert entry["cycles"][0] == {
+        "cycleId": "cyc-a",
+        "entryDay": "2026-04-01",
+        "exitDay": "2026-04-02",
+        "strategyPresetKey": "sma_crossover",
+        "strategyVersion": "ver-1",
+        "realizedR": -0.3,
+    }
+    # El orden es determinista bajo permutación de entrada (mismo estado ⇒ mismo payload).
+    permuted = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[
+            _cycle("ACS", preset="sma_crossover", r=-0.3, cycle_id="cyc-a"),
+            _cycle("ACS", preset="sma_crossover", r=0.7, cycle_id="cyc-b"),
+        ],
+    )
+    assert permuted.values[0]["cycles"] == entry["cycles"]
+
+
+def test_cycle_without_cycle_id_is_declared_not_silently_dropped() -> None:
+    """Un ciclo sin cycleId no es enlazable: se declara el hueco, nunca se descarta en silencio."""
+    report = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[_cycle("ACS", preset="sma_crossover", cycle_id="")],
+    )
+    entry = report.values[0]
+    assert entry["cycles"] == []
+    assert any("sin cycleId" in gap for gap in entry["unmeasured"])
+
+
+def test_value_without_cycles_lists_empty_never_invented() -> None:
+    report = build_estudio_audit_report(values=[_value("ACS")])
+    entry = report.values[0]
+    assert entry["cycles"] == []
+    assert not any("cycleId" in gap for gap in entry["unmeasured"])
+
+
+def test_illegal_realized_r_is_a_declared_gap_not_zero() -> None:
+    report = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[_cycle("ACS", preset="sma_crossover")],
+    )
+    report_illegal = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[
+            {
+                "cycleId": "cyc-ils",
+                "symbol": "ACS",
+                "entryDay": "2026-04-01",
+                "exitDay": None,
+                "strategyVersion": "ver-1",
+                "strategyPresetKey": "sma_crossover",
+                "realizedR": "no-numero",
+            }
+        ],
+    )
+    row = report_illegal.values[0]["cycles"][0]
+    assert row["realizedR"] is None  # hueco, nunca 0
+    assert row["exitDay"] is None
+    # El caso con dato válido no se altera.
+    assert report.values[0]["cycles"][0]["realizedR"] == 0.5

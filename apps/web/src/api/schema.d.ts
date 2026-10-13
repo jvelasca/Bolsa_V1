@@ -7007,6 +7007,24 @@ export interface components {
             };
         };
         /**
+         * EstudioAuditCycleDto
+         * @description Ciclo del valor con la clave canónica (``cycleId``) para enlazar con la operación.
+         */
+        EstudioAuditCycleDto: {
+            /** Cycleid */
+            cycleId: string;
+            /** Entryday */
+            entryDay?: string | null;
+            /** Exitday */
+            exitDay?: string | null;
+            /** Realizedr */
+            realizedR?: number | null;
+            /** Strategypresetkey */
+            strategyPresetKey?: string | null;
+            /** Strategyversion */
+            strategyVersion?: string | null;
+        };
+        /**
          * EstudioAuditDto
          * @description Auditoría por valor de ESTUDIO. ``available = false`` cuando no hay artefacto.
          */
@@ -7175,6 +7193,8 @@ export interface components {
         };
         /** EstudioAuditValueDto */
         EstudioAuditValueDto: {
+            /** Cycles */
+            cycles?: components["schemas"]["EstudioAuditCycleDto"][];
             /**
              * Measured
              * @default false

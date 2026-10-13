@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  describeCycle,
   describeStrategy,
   describeVerdict,
   estudioValueState,
@@ -55,5 +56,18 @@ describe("estudio-audit-view", () => {
     expect(describeVerdict({ verdict: "", verdictReason: null })).toBe(
       "NOT_MEASURED",
     );
+  });
+
+  it("describe un ciclo con su ventana y R, declarando los huecos", () => {
+    expect(
+      describeCycle({
+        entryDay: "2026-04-01",
+        exitDay: "2026-04-02",
+        realizedR: 0.4,
+      }),
+    ).toBe("2026-04-01 → 2026-04-02 · +0.40R");
+    expect(
+      describeCycle({ entryDay: null, exitDay: null, realizedR: null }),
+    ).toBe("sin día → sin día · Sin dato todavía");
   });
 });

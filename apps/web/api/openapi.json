@@ -7852,6 +7852,75 @@
         "title": "EnqueueStaleResponseDto",
         "type": "object"
       },
+      "EstudioAuditCycleDto": {
+        "description": "Ciclo del valor con la clave canónica (``cycleId``) para enlazar con la operación.",
+        "properties": {
+          "cycleId": {
+            "title": "Cycleid",
+            "type": "string"
+          },
+          "entryDay": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entryday"
+          },
+          "exitDay": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exitday"
+          },
+          "realizedR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realizedr"
+          },
+          "strategyPresetKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategypresetkey"
+          },
+          "strategyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategyversion"
+          }
+        },
+        "required": [
+          "cycleId"
+        ],
+        "title": "EstudioAuditCycleDto",
+        "type": "object"
+      },
       "EstudioAuditDto": {
         "description": "Auditoría por valor de ESTUDIO. ``available = false`` cuando no hay artefacto.",
         "properties": {
@@ -8190,6 +8259,13 @@
       },
       "EstudioAuditValueDto": {
         "properties": {
+          "cycles": {
+            "items": {
+              "$ref": "#/components/schemas/EstudioAuditCycleDto"
+            },
+            "title": "Cycles",
+            "type": "array"
+          },
           "measured": {
             "default": false,
             "title": "Measured",

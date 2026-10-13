@@ -79,6 +79,19 @@ class EstudioAuditSignalDto(BaseModel):
     daysCovered: int = 0
 
 
+class EstudioAuditCycleDto(BaseModel):
+    """Ciclo del valor con la clave canónica (``cycleId``) para enlazar con la operación."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    cycleId: str
+    entryDay: str | None = None
+    exitDay: str | None = None
+    strategyPresetKey: str | None = None
+    strategyVersion: str | None = None
+    realizedR: float | None = None
+
+
 class EstudioAuditResultRDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -114,6 +127,7 @@ class EstudioAuditValueDto(BaseModel):
     strategy: EstudioAuditStrategyDto
     why: EstudioAuditWhyDto
     signal: EstudioAuditSignalDto
+    cycles: list[EstudioAuditCycleDto] = Field(default_factory=list)
     resultR: EstudioAuditResultRDto
     money: EstudioAuditMoneyDto
     measured: bool = False

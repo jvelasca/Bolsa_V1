@@ -53,3 +53,20 @@ export function describeVerdict(resultR: {
   const reason = resultR.verdictReason?.trim();
   return reason ? `${verdict} · ${reason}` : verdict;
 }
+
+/** Día de calendario o «sin día» cuando no viaja (nunca se inventa una fecha). */
+export function formatDay(value: string | null | undefined): string {
+  const day = value?.trim();
+  return day ? day : "sin día";
+}
+
+/** Etiqueta de un ciclo: ventana entrada→salida y R realizado (huecos declarados). */
+export function describeCycle(cycle: {
+  entryDay?: string | null;
+  exitDay?: string | null;
+  realizedR?: number | null;
+}): string {
+  return `${formatDay(cycle.entryDay)} → ${formatDay(cycle.exitDay)} · ${formatR(
+    cycle.realizedR,
+  )}`;
+}
