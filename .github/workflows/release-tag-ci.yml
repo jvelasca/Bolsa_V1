@@ -820,6 +820,8 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
+          --ignore=apps/api-python/tests/test_auto_estudio_universe_coverage_pg.py
+          --ignore=apps/api-python/tests/test_auto_dia_d_trace_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
           --ignore=apps/api-python/tests/test_auto_v46_hardkill_recovery_pg.py
@@ -978,6 +980,14 @@ jobs:
       # ejecutarse; sin PG real el test skipearía en mudo e invalidaría la certificación
       # del tag. Guard anti-skip dedicado más abajo (log + grep de ``skipped``).
       AUTO_GOLDEN_DAY_V2_PG_REQUIRED: '1'
+      # v2.88.122 (Verificación AUTO/DÍA-D): (S1) el universo canónico del orquestador es
+      # la lista ESTUDIO y el BUCLE real debe recorrer CADA valor dejando evidencia durable;
+      # (S3) la cadena DÍA-D del ciclo CERRADO por el proceso debe encender las 9 etapas
+      # canónicas desde hechos durables y su P&L debe cuadrar con el libro aplicado. Sin PG
+      # real skipearían en mudo e invalidarían la certificación. Cada paso lleva su guard
+      # anti-skip (log + grep de ``skipped``).
+      AUTO_ESTUDIO_COVERAGE_PG_REQUIRED: '1'
+      AUTO_DIA_D_TRACE_PG_REQUIRED: '1'
       # V2.46/AUTO-6 (Crash/Recovery + Concurrent AUTO): los dos escenarios reales sobre
       # PG (proceso scheduler matado en sucio + tres sesiones concurrentes sobre la misma
       # cuenta) deben ejecutarse; un skip mudo invalidaría la certificación del tag. Cada
@@ -1243,6 +1253,38 @@ jobs:
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/golden-day-v2-pg.log; then
             echo "::error::Golden Day 2.0 dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/golden-day-v2-pg.log || true
+            exit 1
+          fi
+
+      # v2.88.122 (Verificación AUTO/DÍA-D): dos certificaciones nuevas con gate propio
+      # fail-if-skipped. Paso DEDICADO (no se toca el ``run: >`` del bloque lifecycle) para
+      # dejar log y aplicar el guard anti-skip, igual que el Golden Day.
+      #   * S1 ``test_auto_estudio_universe_coverage_pg.py``: el orquestador REAL resuelve
+      #     el universo ESTUDIO y el BUCLE real recorre CADA valor dejando evidencia durable
+      #     (candidata + evaluación con ``optimization_run_id``); allowlist solo intersecta;
+      #     fail-closed sin ESTUDIO; cobertura independiente del reloj.
+      #   * S3 ``test_auto_dia_d_trace_pg.py``: el ciclo CERRADO por el PROCESO scheduler
+      #     enciende las 9 etapas canónicas desde hechos durables, sin ``unknown`` silencioso,
+      #     y el P&L del monitor ↔ liquidación durable ↔ libro aplicado cuadra al quantum del
+      #     dinero; controles negativos (``cycleId`` ajeno no hereda hechos).
+      - name: Pytest AUTO universe coverage + DÍA-D trace (PG, fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_estudio_universe_coverage_pg.py \
+            apps/api-python/tests/test_auto_dia_d_trace_pg.py \
+            -q --tb=short -rs | tee /tmp/auto-dia-d-pg.log
+
+      - name: Fail on skipped AUTO universe coverage / DÍA-D trace (no skip silencioso)
+        if: always()
+        run: |
+          if [ ! -s /tmp/auto-dia-d-pg.log ]; then
+            echo "::error::AUTO universo/DÍA-D no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-dia-d-pg.log; then
+            echo "::error::AUTO universo/DÍA-D dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/auto-dia-d-pg.log || true
             exit 1
           fi
 
