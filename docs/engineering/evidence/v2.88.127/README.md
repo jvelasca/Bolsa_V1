@@ -63,9 +63,13 @@
 
 | Comprobación | Resultado |
 |--------------|-----------|
-| Guardián de bump (`uv run --no-sync pytest apps/api-python/tests/test_dia_d_bump_guard.py -q`) | **1 passed** (`2.11.127-beta`) |
+| Guardián de bump (`uv run --no-sync python -m pytest apps/api-python/tests/test_dia_d_bump_guard.py -q`) | **1 passed** (`2.11.127-beta`) |
+| Guarda de censo (`... python -m pytest apps/api-python/tests/test_ci_test_selection_census.py -q`) | **5 passed** |
+| Censo de selección (`uv run --no-sync python scripts/ci/test_selection.py --report`) | **620/620 ejecutados · 0 sin declarar · 0 obsoletas** |
+| Los **dos** tests de broker movidos al pase por commit (`test_broker_adapter` + `test_broker_venue_per_account`) | **29 passed** (idéntico con la BD alcanzable y con `DATABASE_URL` a host/puerto inexistentes ⇒ **herméticos**) |
 | `grep` de `2.11.126-beta` tras el bump | **solo** en documentos **históricos** (entrada `CHANGELOG` de `2.11.126-beta`, `PROJECT_STATE` de `v2.88.126`, `deuda-cierre-dia-d-h3-h5-h6` y `evidence/v2.88.126`), **ninguno** ligado al bump |
-| `ruff` / `mypy` / `pytest` completos, `pnpm --filter @bolsa/web test`, `contract:gen`/`contract:check` | **NO ejecutado** en esta pasada (documentación/sellado; sin cambio de lógica) |
+| `ruff` / `mypy` / `pytest` completos, `pnpm --filter @bolsa/web test`, `contract:gen`/`contract:check` | **NO ejecutado localmente** en esta pasada (sellado + cableado de CI); **sí** los cubre el `Release tag CI` del tag (ver §6) |
+| **`Release tag CI` del tag** ([run 38554913743](https://github.com/jvelasca/Bolsa_V1/actions/runs/38554913743)) | **`success` en 10m26s** — **12/12** jobs `success` + `certify` (`python`, `lifecycle-pg`, `frontend` incl. `contract:check`, `shared`, `decision-spine`, `dr-verify`, `replay-repro`, `a7-gate`, `playwright (mock E2E)`, `playwright (integrated AUTO S5)`, `security`, `certify`); `playwright (integrated E2E, opt-in)` = `skipped` por diseño |
 | Prettier | El `format` del repo cubre `**/*.{ts,tsx,js,json}` (**no** markdown) y `.prettierignore` excluye `docs/engineering/evidence/` ⇒ los `.md` de este sello viajan **sin reformatear** |
 
 ---
@@ -103,8 +107,12 @@ Informe completo: [`auditoria-aislamiento-ejecucion-xtb-2026-10-14.md`](../../au
 
 ---
 
-## 6. `Release tag CI` del sello — **PENDIENTE (no ejecutado)**
+## 6. `Release tag CI` del sello — **VERDE**
 
-El sello **no** se ha etiquetado ni empujado desde esta pasada (trabajo de **documentación/sellado**, `SIN commit`, `SIN tag`, `SIN push`). **No** se cita ningún `Release tag CI` porque **no existe** todavía: la afirmación de verde solo podrá hacerse contra un run real cuando el sello se publique.
+Sello **publicado**: `main` empujado y tag anotado **`v2.88.127-beta`** (objeto `f14049f22eaf2c2a22444b8e11891cbbc4072874` → commit `38c26ae940bc3e8de5f78859d13329dbff1088c1`, el contenido del sello).
 
-**Identidad prevista:** tag anotado `v2.88.127-beta` (**unsigned**), `package.json` = `2.11.127-beta`, Alembic head `053_dia_d_cycle_verifications` (**sin migración**).
+**`Release tag CI` [run 38554913743](https://github.com/jvelasca/Bolsa_V1/actions/runs/38554913743)** — `success` en **10m26s** (2026-10-14T11:12:12Z → 11:22:38Z): **12/12 jobs `success`** (`python`, `lifecycle-pg`, `frontend`, `shared`, `decision-spine`, `dr-verify`, `replay-repro`, `a7-gate`, `playwright (mock E2E)`, `playwright (integrated AUTO S5)`, `security`, `certify`) + `playwright (integrated E2E, opt-in)` = `skipped` por diseño. Los dos tests de aislamiento del broker (`G1`) corren ya en el job `python` **por commit**.
+
+**Identidad:** tag anotado `v2.88.127-beta` (**unsigned**; objeto `f14049f22eaf2c2a22444b8e11891cbbc4072874` → commit `38c26ae940bc3e8de5f78859d13329dbff1088c1`), `package.json` = `2.11.127-beta`, Alembic head `053_dia_d_cycle_verifications` (**sin migración**).
+
+**Audit pack (auditoría externa desde GitHub):** [`audit-pack-v2.88.127-beta-2026-10-14.md`](../../audit-pack-v2.88.127-beta-2026-10-14.md).

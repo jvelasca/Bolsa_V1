@@ -15,7 +15,7 @@ git clone --branch v2.88.127-beta --depth 1 https://github.com/jvelasca/Bolsa_V1
 O, más estricto (fija el **commit** exacto, no el tag):
 
 ```bash
-git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkout __TAG_COMMIT__
+git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkout 38c26ae940bc3e8de5f78859d13329dbff1088c1
 ```
 
 ---
@@ -25,15 +25,15 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 | Elemento | Valor |
 | --- | --- |
 | **Tag (anotado)** | `v2.88.127-beta` |
-| **Objeto de tag** | `__TAG_OBJECT__` |
-| **Commit apuntado** | `__TAG_COMMIT__` |
-| **Commit del contenido del sello** | `38c26ae940bc3e8de5f78859d13329dbff1088c1` (ola 6 + `H3` + auditoría de aislamiento XTB) |
-| **Base (tag anterior)** | `v2.88.126-beta` → `7801474c` |
+| **Objeto de tag** | `f14049f22eaf2c2a22444b8e11891cbbc4072874` |
+| **Commit apuntado** | `38c26ae940bc3e8de5f78859d13329dbff1088c1` (contenido del sello: ola 6 + `H3` + auditoría de aislamiento XTB) |
+| **Padre del commit** | `90bfce05ae1ea7cfebfa789da3aee0a38ff44bdd` (`H3`) |
+| **Base (tag anterior)** | `v2.88.126-beta` → `7801474c` (objeto `dcba2404`) |
 | **Versión monorepo** | `2.11.127-beta` ([`package.json`](../../package.json)) |
 | **Alembic head** | `053_dia_d_cycle_verifications` (**sin migración**) |
 | **Firma** | **unsigned** (anotado, sin GPG) |
 
-> **Nota:** la fila `Objeto de tag` / `Commit apuntado` se completa en el commit **POST-TAG** (que cita el `Release tag CI`), igual que en el audit pack de `v2.88.125`. El commit `38c26ae9` es el contenido del sello; el tag anotado apunta al commit que lo publica.
+> **Nota:** el tag anotado sella el **contenido** del sello (`38c26ae9`). Los documentos **POST-TAG** —este audit pack y la cita del `Release tag CI`— viven en `main`, **por delante** del tag, igual que en `v2.88.125`. El tag se **movió** de `070e67e6` a `38c26ae9` (objeto `3523e69d` → `f14049f2`) para que sellara exactamente el contenido (el audit pack es un artefacto POST-TAG, no parte del sello).
 
 ---
 
@@ -42,7 +42,7 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 | Forma | Comando / enlace |
 | --- | --- |
 | Clonar el tag (recomendado) | `git clone --branch v2.88.127-beta --depth 1 https://github.com/jvelasca/Bolsa_V1.git` |
-| Fijar el commit SHA | `git checkout __TAG_COMMIT__` |
+| Fijar el commit SHA | `git checkout 38c26ae9` |
 | Ver el árbol en la web | [tree/v2.88.127-beta](https://github.com/jvelasca/Bolsa_V1/tree/v2.88.127-beta) |
 | Ver el commit del sello | [commit/38c26ae9](https://github.com/jvelasca/Bolsa_V1/commit/38c26ae9) |
 
@@ -63,7 +63,32 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 
 ## 4. CI público (citable)
 
-**`Release tag CI` del tag:** __CI_SECTION__
+**`Release tag CI` del tag (VERDE):** [run **38554913743**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38554913743) — `success` en **10m26s** (2026-10-14T11:12:12Z → 11:22:38Z).
+
+| Job | Conclusión |
+| --- | --- |
+| `python (ruff/imports/mypy/pytest offline)` | success |
+| `lifecycle-pg (Alembic + auth + golden restart)` | success |
+| `frontend (typecheck/lint/test/build + contract:check)` | success |
+| `shared (build/typecheck/test)` | success |
+| `decision-spine` | success |
+| `dr-verify (battery DB_DR / TCP CI)` | success |
+| `replay-repro (regenera el artefacto del sello desde el fixture)` | success |
+| `a7-gate (A7 C3 chaos live_a7 · dedicated real-PG)` | success |
+| `playwright (mock E2E)` | success |
+| `playwright (integrated AUTO S5)` | success |
+| `security (gitleaks)` | success |
+| `certify (aggregate + artifact)` | success |
+| `playwright (integrated E2E, opt-in)` | **skipped** (opt-in por diseño) |
+
+**Lo decisivo:** `replay-repro` = `success` ⇒ el artefacto congelado **se reproduce** (coherente con **`Δ decisión = 0`**), y `playwright (integrated AUTO S5)` + `playwright (mock E2E)` = `success`. El job `python` (offline) recoge ya los dos tests de aislamiento del broker **por commit** (cierre de `G1`).
+
+**Artefactos descargables** (pestaña *Artifacts* del run):
+
+| Artefacto | Tamaño | Id | Qué es |
+| --- | --- | --- | --- |
+| `release-tag-ci-summary` | 430 B | `11890131826` | Resumen agregado de la certificación |
+| `replay-oos-durable-v2.88.7` | 306 720 B | `11889796176` | **Sello congelado** del replay OOS (reproducible) |
 
 ---
 
