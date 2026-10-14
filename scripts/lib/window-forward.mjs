@@ -251,11 +251,35 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * RE-ANCLAJE 2026-10-06 (sello `v2.88.77-beta`): en curso no es abierta.
  * Δ motor = 0. Árbol pinneado: `9b8e4904`. Pin anterior (`13d5bff6`):
  * `apps` `5b0d50e7…` / `packages` `f80b2285…`.
+ *
+ * RE-ANCLAJE 2026-10-14 (sello `v2.88.132-beta`): re-anclaje del pin DESFASADO para ABRIR la
+ * ventana PAPER (ADR-046; plan `plan-ventana-paper-arranque-operativo-2026-10-14.md` §C/§G.1). El
+ * pin anterior (sello `v2.88.77-beta`, commit `9b8e4904`) llevaba `apps` `79fb2685…` / `packages`
+ * `f80b2285…`; el arbol de `HEAD` ya habia avanzado y `run-day` abortaba fail-closed con
+ * `TREE_MOVED` antes de medir nada. Nuevo arbol pinneado: commit `1ec67416` (`apps` `04226aba…` /
+ * `packages` `d48ac37b…`, medidos con `git rev-parse "HEAD:apps" "HEAD:packages"`). Editar el pin NO
+ * mueve a su vez el arbol porque este modulo vive en `scripts/`, que NO participa del pin.
+ * **Honestidad:** este re-anclaje salta muchos sellos (`9b8e4904..1ec67416`) y NO se reclama
+ * `Δ motor = 0` aqui (los RE-ANCLAJE previos sí lo exigian porque ya habia dias `MEDIDO` que
+ * quedarian `STALE`). La legitimidad descansa en la regla de §G.1: **el pin anterior AUN NO HABIA
+ * MEDIDO NINGUN DIA** (ledger vacio, `v2_98` = `INCONCLUSIVE`) ⇒ mover el pin NO invalida nada.
+ *
+ * RE-ANCLAJE 2026-10-14 (2º, tras la ejecucion (a)(b)(c); sello `v2.88.132-beta`): el primer
+ * re-anclaje del dia pinneo `1ec67416` (`apps` `04226aba…`); despues se COMMITEARON los cambios
+ * funcionales del dia — `(b)` test hermetico del sellado `executionId -> cycle_id`
+ * (`apps/api-python/tests/test_auto_fill_cycle_seal_pg.py`) y `(c)` cierre de huecos de operativa
+ * diaria del AUTO en `apps/web/**` (P1-P5) — mas la nota de evidencia en `docs/`. Eso movio el
+ * arbol de `apps` y dejo el pin otra vez desfasado. Nuevo arbol pinneado: commit `05dc2d5b`
+ * (`apps` `5696698e…` / `packages` `d48ac37b…` — `packages` NO cambio). El dia ya registrado bajo
+ * `1ec67416` fue `NO_MEDIDO_REGIMEN` (no `MEDIDO`) ⇒ re-anclar NO invalida ningun dia medido.
+ * Regla operativa: los dias que CERTIFICAN la ventana deben correrse DESPUES de landear los
+ * cambios de codigo y de este re-anclaje final. `scripts/` NO participa del pin, asi que commitear
+ * este re-anclaje NO mueve a su vez el arbol.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '9b8e4904',
-  appsHash: '79fb268580fb46e4b2766c961b2b87f2d7c13b38',
-  packagesHash: 'f80b2285da4624474a56e8df71c6e56b532120f0',
+  commit: '05dc2d5b',
+  appsHash: '5696698ef9e83f74b5aebe66d23c56204d3e4146',
+  packagesHash: 'd48ac37bbf44b229b5c05da2949aa310d06fcd86',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
