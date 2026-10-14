@@ -40,6 +40,10 @@ import {
   STRATEGY_ADOPTION_LABELS,
   getAdoptionState,
 } from "@/features/platform/strategy-adoption";
+import {
+  AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL,
+  AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL,
+} from "@/features/auto/auto-operation-strategy";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import {
   adoptMandateFromCoreR,
@@ -872,10 +876,10 @@ export function StrategyMonitorPanel({
                           {strategyValidationLabel(row.evidenceLevel)} · TF{" "}
                           {row.timeframe}
                           {row.slot1Label
-                            ? ` · #1 ${row.slot1Label}${row.slot1Stars ? ` ★${row.slot1Stars}` : ""}`
+                            ? ` · ${AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL}: #1 ${row.slot1Label}${row.slot1Stars ? ` ★${row.slot1Stars}` : ""}`
                             : ""}
                           {" · "}
-                          Adopción:{" "}
+                          {`${AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL}: `}
                           {
                             STRATEGY_ADOPTION_LABELS[
                               getAdoptionState(

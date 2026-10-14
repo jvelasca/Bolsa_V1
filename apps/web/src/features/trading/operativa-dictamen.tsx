@@ -8,6 +8,10 @@ import {
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { absentDataLabel } from "@/components/absent-data";
+import {
+  AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL,
+  AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL,
+} from "@/features/auto/auto-operation-strategy";
 
 function starsLabel(n: number): string {
   return `${"★".repeat(n)}${"☆".repeat(Math.max(0, 5 - n))}`;
@@ -67,7 +71,7 @@ export function OperativaDictamenBlock({
         className,
       )}
       data-testid="operativa-dictamen"
-      title={`Dictamen ★${opinion.dictamenStars} · Estrategia ★${opinion.strategyStars ?? absentDataLabel()} · ${opinion.reasons?.join(", ") ?? ""}`}
+      title={`Dictamen ★${opinion.dictamenStars} · ${AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL} ★${opinion.strategyStars ?? absentDataLabel()} · ${opinion.reasons?.join(", ") ?? ""}`}
     >
       <p className="text-[9px] font-medium uppercase tracking-wide opacity-70">
         Postura sugerida hoy
@@ -80,9 +84,13 @@ export function OperativaDictamenBlock({
       </p>
       <p className="text-[10px] leading-snug opacity-85">
         Lectura rápida del pulso (no es una orden). Las ★ de aquí miden la
-        postura del día; las ★ del TOP Lab miden la calidad de la estrategia
-        {opinion.strategyStars != null ? ` (TOP ${opinion.strategyStars})` : ""}
-        .{opinion.distress ? " · Atención: alerta fundamental." : ""}
+        postura del día; las ★ del TOP Lab son la{" "}
+        {AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL} (referencia, no la
+        ejecutada)
+        {opinion.strategyStars != null ? ` (TOP ${opinion.strategyStars})` : ""}{" "}
+        — la {AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL} se declara por
+        ciclo.
+        {opinion.distress ? " · Atención: alerta fundamental." : ""}
       </p>
       {opinion.reasons && opinion.reasons.length > 0 ? (
         <p

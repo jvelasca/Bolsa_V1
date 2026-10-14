@@ -1005,6 +1005,12 @@ jobs:
       # sobre el universo ESTUDIO (``test_auto_daily_coverage_pg.py``) exige PG real; un
       # skip mudo invalidaría la certificación. Su paso dedicado lleva guard anti-skip.
       AUTO_DAILY_COVERAGE_PG_REQUIRED: '1'
+      # v2.88.131 (evidencia funcional AUTO por valor de ESTUDIO): la evidencia de la
+      # CADENA por valor (``test_auto_estudio_chain_evidence_pg.py``) conduce el PROCESO
+      # real sobre ESTUDIO y exige PG para encender las NUEVE etapas, sellar la identidad
+      # EJECUTADA y conciliar el P&L ciclo a ciclo. Un skip mudo invalidaría la
+      # certificación; su paso dedicado lleva guard anti-skip (log + grep de ``skipped``).
+      AUTO_ESTUDIO_CHAIN_PG_REQUIRED: '1'
       # v2.88.125 (paso 4a del veredicto): el certificador de la VENTANA PAPER
       # (``test_paper_window_certification_pg.py``) lee el material durable por el camino
       # canónico y certifica sin fabricar (INCONCLUSIVE si no se alcanza la ventana). En
@@ -1308,7 +1314,13 @@ jobs:
       # canónico y certifica SIN FABRICAR (``INCONCLUSIVE`` si no se alcanza la ventana;
       # ``UNKNOWN != 0``). Al mismo paso dedicado con gate fail-if-skipped: en CI no hay
       # ventana real, así que ejercita la rama honesta, y su cableado mantiene el censo en 0.
-      - name: Pytest AUTO universe coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window (PG, fail if skipped)
+      # v2.88.131 (evidencia funcional AUTO por valor de ESTUDIO): la CADENA por valor
+      # (``test_auto_estudio_chain_evidence_pg.py``) conduce el PROCESO real sobre ESTUDIO
+      # (``AUTO_ENGINE_SIMULATED_WATCH_FROM_ESTUDIO=1`` + ``AUTO_OPERATIONAL_AUDIT=1``) y
+      # exige, por cada valor y ciclo, las NUEVE etapas encendidas desde durable, la identidad
+      # EJECUTADA sellada y el P&L conciliado (cierre vs liquidación vs libro aplicado), con
+      # control negativo por ``cycleId`` ajeno. Al mismo paso dedicado con guard anti-skip.
+      - name: Pytest AUTO universe coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window + ESTUDIO chain (PG, fail if skipped)
         run: |
           set -o pipefail
           uv run pytest \
@@ -1317,9 +1329,10 @@ jobs:
             apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py \
             apps/api-python/tests/test_auto_daily_coverage_pg.py \
             apps/api-python/tests/test_paper_window_certification_pg.py \
+            apps/api-python/tests/test_auto_estudio_chain_evidence_pg.py \
             -q --tb=short -rs | tee /tmp/auto-dia-d-pg.log
 
-      - name: Fail on skipped AUTO universe coverage / DÍA-D trace / daily watch / PAPER window (no skip silencioso)
+      - name: Fail on skipped AUTO universe coverage / DÍA-D trace / daily watch / PAPER window / ESTUDIO chain (no skip silencioso)
         if: always()
         run: |
           if [ ! -s /tmp/auto-dia-d-pg.log ]; then

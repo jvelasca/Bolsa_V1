@@ -33,6 +33,10 @@ import { useAlertsStore } from "@/stores/alerts-store";
 import { useNotificationPrefsStore } from "@/stores/notification-prefs-store";
 import { MERCADO_PATH } from "@/features/confirm/daily-nav";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
+import {
+  AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL,
+  AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL,
+} from "@/features/auto/auto-operation-strategy";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -416,7 +420,11 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                   <div className="flex shrink-0 items-center gap-2 tabular-nums text-xs">
                     <span>★{item.dictamenStars}</span>
                     {item.strategyStars != null ? (
-                      <span className="text-muted-foreground">
+                      <span
+                        className="text-muted-foreground"
+                        title={`${AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL} — referencia, no la ejecutada. ${AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL} se declara por ciclo.`}
+                        data-testid="asesor-opinion-strategy-stars"
+                      >
                         TOP {item.strategyStars}
                       </span>
                     ) : null}
@@ -451,6 +459,14 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
               ? ` · asOf ${opinionsQuery.data[0].asOfBarDate}`
               : ""}
           </p>
+          {opinionsQuery.data?.some((o) => o.strategyStars != null) ? (
+            <p
+              className="text-[10px] text-muted-foreground"
+              data-testid="asesor-opinion-strategy-legend"
+            >
+              {`TOP ★n = ${AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL} (referencia); ${AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL} se declara por ciclo.`}
+            </p>
+          ) : null}
           {studyIds.length > 0 ? (
             <div className="space-y-1">
               <button

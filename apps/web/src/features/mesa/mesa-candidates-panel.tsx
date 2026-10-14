@@ -25,6 +25,10 @@ import {
   type PortfolioPositionRiskInput,
 } from "@bolsa/shared";
 import {
+  AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL,
+  AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL,
+} from "@/features/auto/auto-operation-strategy";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -504,8 +508,7 @@ export function MesaCandidatesPanel({
           )}
           {" · "}
           <span className="text-muted-foreground">
-            Provisional — estar arriba en la lista no significa que ya se haya
-            comprado
+            {`Ranking de candidatas: #1 = ${AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL}; estar arriba (ni ser #1) no implica compra — ${AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL} se declara por ciclo.`}
           </span>
         </CardDescription>
       </CardHeader>

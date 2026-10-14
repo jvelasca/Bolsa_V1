@@ -14,7 +14,9 @@ import type {
 } from "@bolsa/shared";
 import {
   AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL,
+  AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL,
   AUTO_OPERATION_STRATEGY_DECLARED_LABEL,
+  AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL,
   AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT,
   AUTO_OPERATION_STRATEGY_NO_DATA,
   AUTO_OPERATION_STRATEGY_VERIFY_EXECUTED_LABEL,
@@ -392,6 +394,26 @@ describe("copy de identidad (separación mejor-disponible vs ejecutada)", () => 
       "Sin dato todavía",
     );
     expect(AUTO_OPERATION_STRATEGY_MATCH_IS_EXACT).not.toContain("Coincide");
+  });
+
+  it("separa «mejor puntuada» (Finalistas #1) de «ejecutada» (identidad del ciclo)", () => {
+    // El #1 listado se rotula como MEJOR PUNTUADA, no como la ejecutada.
+    expect(AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL).toContain(
+      "Mejor puntuada",
+    );
+    expect(AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL).toContain("Finalistas");
+    // La ejecutada se declara como identidad sellada por el ciclo.
+    expect(AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL).toContain(
+      "Ejecutada",
+    );
+    expect(AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL).toContain("ciclo");
+    // Rótulos INEQUÍVOCAMENTE distintos: no se pueden confundir en la superficie.
+    expect(AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL).not.toBe(
+      AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL,
+    );
+    expect(AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL).not.toContain(
+      "puntuada",
+    );
   });
 });
 

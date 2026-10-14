@@ -47,6 +47,21 @@ export const AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL =
   "Mejor estrategia del valor (Finalistas)" as const;
 
 /**
+ * Rótulo EXPLÍCITO del slot #1 del TOP: es la MEJOR PUNTUADA del valor (Finalistas), NO la
+ * que se ejecutó. Se usa en los listados que pintan el TOP para que el usuario nunca confunda
+ * el #1 (referencia) con la estrategia EJECUTADA (identidad que sella el ciclo).
+ */
+export const AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL =
+  "Mejor puntuada (Finalistas)" as const;
+
+/**
+ * Rótulo EXPLÍCITO de la estrategia EJECUTADA en los listados operativos: la identidad que el
+ * ciclo sella (`strategyPresetKey`/`strategyVersion`). Distinto del #1 del TOP (referencia).
+ */
+export const AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL =
+  "Ejecutada (identidad del ciclo)" as const;
+
+/**
  * Rótulo del bloque de la estrategia EJECUTADA que declara el ciclo: la clave EXACTA
  * (`cycle.strategyPresetKey`, el mismo `presetKey` del TOP #1) y el sello opaco del motor
  * (`cycle.strategyVersion`, p. ej. `ActiveStrategy.version_id`). Es OTRA cosa que el TOP #1.

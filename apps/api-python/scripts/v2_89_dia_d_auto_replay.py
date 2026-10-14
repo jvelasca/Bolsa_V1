@@ -106,6 +106,7 @@ async def _read_executed_facts(
     """
     from sqlalchemy import select
 
+    from bolsa_application.auto_chain_durable_reader import day_durable_chain_counts
     from bolsa_application.dia_d_auto import cycle_closure_summary
     from bolsa_infrastructure.database.models.tables import (
         AutoExitOrderRow,
@@ -190,12 +191,19 @@ async def _read_executed_facts(
         executed["RESERVATION"] = reservations
         executed["FILL"] = fills
         # ``auto_exit_orders`` es el INTENT protector: es lo que la app registró como
-        # protección de una posición. No hay tabla de órdenes de ENTRADA separada (viven en
-        # la reserva), así que ``ORDER`` queda como hueco declarado.
+        # protección de una posición.
         executed["PROTECTION"] = exit_orders
         executed["CYCLE_CLOSED"] = closure["step"]
-    # ``SIGNAL``/``TOP_N``/``RISK``/``ORDER``/``SETTLEMENT`` no tienen una proyección durable
-    # fiable: se declaran huecos (``None``), no ceros.
+
+    # v2.88.131 — cierre de los huecos ``SIGNAL``/``TOP_N``/``RISK``/``ORDER``/``SETTLEMENT``
+    # del lado EJECUTADO: ahora TIENEN fuente durable (journal de decisión, foto TOP3 y
+    # reservas con riesgo), así que se cuentan como el lado DECLARADO (que también son
+    # cuentas). Una fuente ilegible deja el paso en ``None`` (hueco declarado), nunca un cero.
+    chain_counts = await day_durable_chain_counts(session, account_id, day)
+    for step_id in ("SIGNAL", "TOP_N", "RISK", "ORDER", "SETTLEMENT"):
+        value = chain_counts.get(step_id)
+        if value is not None:
+            executed[step_id] = value
 
     detail.update(
         {
@@ -209,6 +217,7 @@ async def _read_executed_facts(
             "closedCycles": closure["closed"],
             "openCycles": closure["open"],
             "cycleClosureUnmeasured": closure["unmeasured"],
+            "chainCounts": chain_counts,
         }
     )
     return executed, detail
@@ -385,6 +394,11 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         declared["CYCLE_CLOSED"] = _cycle_closed_step(oos)
 
         limits = list(DEFAULT_LIMITS)
+        limits.append(
+            "El lado EJECUTADO cubre las NUEVE etapas: SIGNAL/TOP_N/RISK/ORDER/SETTLEMENT se "
+            "cuentan desde hechos durables (journal de decisión, foto TOP3 y reservas con "
+            "riesgo); una fuente ilegible deja el paso en None (hueco declarado), nunca 0."
+        )
         if watch_source == "pit":
             limits.append(
                 "Universe(D) point-in-time: availability_from/until son REALES (barras D1); "
@@ -406,7 +420,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             },
             executed_detail=executed_detail,
             meta={
-                "bump": "2.11.130-beta",
+                "bump": "2.11.131-beta",
                 "phase": "V2.89 DIA-D AUTO SANDBOX",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),

@@ -60,6 +60,7 @@ export type InstrumentDailyOpinionV1 = {
   asOfBarDate: string;
   stance: InstrumentDailyOpinionStance;
   dictamenStars: number;
+  /** ★ de la estrategia mejor puntuada (Finalistas) — referencia, no la ejecutada. */
   strategyStars?: number | null;
   ioScore?: number | null;
   faScore?: number | null;
@@ -67,7 +68,13 @@ export type InstrumentDailyOpinionV1 = {
   distress: boolean;
   reasons?: InstrumentDailyOpinionReasonCode[];
   gateStatus?: "PASS" | "VETO" | "WARNING" | null;
+  /**
+   * Referencia «mejor puntuada (Finalistas)» del TOP Lab: id de la estrategia
+   * mejor puntuada. NO es la estrategia ejecutada: la identidad ejecutada se
+   * sella por ciclo (`portfolio_reservations` / `sim_*` / `dia_d_cycle_verifications`).
+   */
   topId?: string | null;
+  /** Versión de la referencia «mejor puntuada (Finalistas)»; no implica ejecución. */
   topVersion?: number | null;
   source: InstrumentDailyOpinionSource;
   engineVersion: string;

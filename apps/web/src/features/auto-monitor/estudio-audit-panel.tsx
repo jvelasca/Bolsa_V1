@@ -67,9 +67,10 @@ export function EstudioAuditPanel() {
           Auditoría por valor de ESTUDIO
         </CardTitle>
         <p className="text-[11px] text-muted-foreground">
-          Estrategia elegida + porqué + señal + resultado (R y dinero). Fuente:
-          artefacto de feedback de la ventana {query.data.window}. Un valor solo
-          se declara «medido» si R y dinero alcanzan su suelo de muestra.
+          Estrategia ejecutada (identidad del ciclo) + porqué + señal +
+          resultado (R y dinero). Fuente: artefacto de feedback de la ventana{" "}
+          {query.data.window}. Un valor solo se declara «medido» si R y dinero
+          alcanzan su suelo de muestra.
         </p>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -131,7 +132,9 @@ export function EstudioAuditPanel() {
 
                   <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] sm:grid-cols-4">
                     <div>
-                      <div className="text-muted-foreground">Estrategia</div>
+                      <div className="text-muted-foreground">
+                        Estrategia ejecutada (identidad del ciclo)
+                      </div>
                       <div
                         className="font-mono"
                         data-testid="estudio-audit-value-strategy"

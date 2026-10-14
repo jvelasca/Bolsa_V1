@@ -56,6 +56,10 @@ import {
 } from "@/features/backtests/backtest-period";
 import { loadBacktestRunContext } from "@/features/backtests/backtest-run-context";
 import { VERIFY_DIA_D_CTA } from "@/features/platform/product-universe";
+import {
+  AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL,
+  AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL,
+} from "@/features/auto/auto-operation-strategy";
 import { useDiaDVerifyLaunch } from "@/features/trading/use-dia-d-verify-launch";
 import {
   getDiaDExperimentTop,
@@ -282,6 +286,14 @@ function SlotRow({
             ? `Razón: ${reasons[0]}${reasons.length > 1 ? ` (+${reasons.length - 1})` : ""}`
             : "Razón: Sin dato todavía"}
         </p>
+        {slot.rank === 1 ? (
+          <p
+            className="mt-0.5 text-[10px] leading-snug text-muted-foreground/90"
+            data-testid="finalist-slot-rank1-legend"
+          >
+            {`${AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL}; la estrategia ejecutada se declara por ciclo (${AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL}).`}
+          </p>
+        ) : null}
       </div>
       <div className="flex flex-wrap gap-1.5">
         {canDiaD ? (

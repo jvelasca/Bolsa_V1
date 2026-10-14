@@ -217,6 +217,10 @@ describe("EstudioAuditPanel", () => {
     expect(
       screen.getByTestId("estudio-audit-point-citable").textContent,
     ).toContain("pointCitable = false");
+    // Rotula la estrategia como la EJECUTADA (identidad del ciclo), no como «elegida».
+    expect(screen.getByTestId("estudio-audit-panel").textContent).toContain(
+      "Estrategia ejecutada (identidad del ciclo)",
+    );
     expect(api.getAutoEstudioAudit).toHaveBeenCalled();
   });
 
