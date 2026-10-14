@@ -458,3 +458,22 @@ y 8 nuevos (1 test Python + 7 de `apps/web/**`), todos **sin commitear**. `packa
 - **Certificación de la operativa AUTO:** **sigue NO alcanzada** — por **falta de operación**, no de
   software. El pin está listo (`freeze OK`); falta correr la ventana en **≥4 fechas operables reales**
   y dejar que AUTO **cierre** ciclos con `cycle_id` (§14.a).
+
+### 14.f Cierre — commits y re-anclaje final (realizado)
+
+Se ejecutó el cierre pedido (**commitear (b)/(c) + re-anclar el pin**), todo **local, sin push**:
+
+| Commit | Contenido |
+| --- | --- |
+| `73d99147` | `(b)` test hermético del sellado `executionId → cycle_id` (`apps/api-python/tests/test_auto_fill_cycle_seal_pg.py`) |
+| `d3313def` | `(c)` huecos de UI de operativa diaria P1–P5 (`apps/web/**`) — lint-staged (prettier+eslint) OK |
+| `05dc2d5b` | docs: esta nota de evidencia |
+| `9e6e18df` | ops: re-anclaje del pin al árbol tras landear `(b)/(c)` |
+
+- **Pin final:** commit `05dc2d5b`, `apps 5696698e…`, `packages d48ac37b…` (`packages` **no** cambió).
+  `node scripts/window-forward-runner.mjs --dry-run run-day` → **`freeze OK`** verificado en
+  `HEAD = 9e6e18df` (`HEAD:apps` sigue `5696698e…` porque `scripts/` no participa del pin).
+- El día `20261014` (`NO_MEDIDO_REGIMEN`) queda registrado; **no se invalidó ningún día medido**
+  (ninguno existía).
+- **Estado:** árbol de trabajo **limpio**; la ventana queda **lista** (`freeze OK`), pendiente solo de
+  **días de mercado operables reales** (§14.a). Verificación final: `git status` vacío.
