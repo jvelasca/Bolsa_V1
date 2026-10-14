@@ -37,7 +37,15 @@ function MovementsTable({ entries }: { entries: LedgerEntryDto[] }) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    // `scrollable-region-focusable` (axe): en móvil (390×844) la tabla desborda y hace scroll;
+    // la región debe ser alcanzable por teclado y estar nombrada (mismo criterio que
+    // `journal-studies-table`, `/backtests` y las tablas fiscales).
+    <div
+      role="region"
+      aria-label="Movimientos contables"
+      tabIndex={0}
+      className="overflow-x-auto"
+    >
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -104,7 +112,13 @@ function TradesTable({ transactions }: { transactions: TransactionDto[] }) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    // `scrollable-region-focusable` (axe): misma razón que en `MovementsTable`.
+    <div
+      role="region"
+      aria-label="Operaciones ejecutadas"
+      tabIndex={0}
+      className="overflow-x-auto"
+    >
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">

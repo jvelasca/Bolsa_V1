@@ -186,6 +186,10 @@ Estados intermedios que prueban la **falsabilidad** de los arreglos (logs locale
 
 ## 4. Límites declarados / deuda que queda ABIERTA
 
+> **Actualización 2026-10-14 (tras el PRIMER run real del gate en CI):** los límites 1 y 3
+> quedan revisados en **§6** — el job se ejecutó de verdad, salió **rojo**, se diagnosticó la
+> causa raíz (precondición de datos de mercado) y se cerró.
+
 1. **El job `playwright-integrated-axe` NO se ha podido validar de extremo a extremo en CI
    localmente.** Se validó el YAML (carga correctamente y `certify.needs` lo incluye) y el
    spec en **modo requerido** contra el stack real local (`32 passed`). La validación REAL del
@@ -220,3 +224,96 @@ Estados intermedios que prueban la **falsabilidad** de los arreglos (logs locale
 - `apps/web/e2e/helpers/database.ts` — `selectOpenableInstrument()` (seed determinista).
 - `apps/web/src/features/decision-journal/journal-studies-table.tsx` — región de scroll focusable.
 - `docs/engineering/deuda-axe-cierre-integrado-2026-10-14.md` — este documento.
+
+## 6. PRIMER run real del gate en CI — rojo, causa raíz y cierre (2026-10-14)
+
+El job `playwright-integrated-axe` **sí** se validó de extremo a extremo: `workflow_dispatch`
+`38598160604` (job ID `115970162301`). Resultado: **ROJO** en el paso `Run integrated axe E2E`
+—`1 failed`, los otros **62 no ejecutados**— y verde el guard anti-skip (por eso el fallo es
+del barrido, no de un skip mudo).
+
+### 6.1 Síntoma exacto (log real del job)
+
+```
+1) … › 0 critical/serious + heading-order en /operational-console @desktop
+   Error: POST /api/portfolio/trade failed (403): {"detail":"risk_veto"}. Open position seed is required.
+     at apps/web/e2e/gp-e2e-ui5-0-axe-integrated.spec.ts:394:21   ← ensureMercadoIntegrationFixture
+
+1) … › 0 critical/serious + heading-order en /operational-console @desktop (retry #1)
+   Error: GET /paper-desk/daily-report failed (404): {"detail":"Cuenta no encontrada"}
+     at apps/web/e2e/gp-e2e-ui5-0-axe-integrated.spec.ts:393:17   ← ensureHoyIntegrationFixture
+```
+
+Un **`beforeAll` roto** marca el test 1 `✘` y el resto `-` (no ejecutado): el barrido a11y
+entero se cayó por una precondición que no tiene nada que ver con accesibilidad.
+
+### 6.2 Causa raíz (única, con dos síntomas)
+
+- `PLAN` sembrar una posición abierta (`buy`) pasa por el gate de apertura (`check_opening` →
+  **DS-05 frescura**): el catálogo de CI se siembra con `pnpm db:seed`, que **solo inserta
+  instrumentos** (`packages/database/prisma/seed.ts`, 104 líneas, **cero barras**). Sin barras,
+  **todos** los instrumentos quedan caducados, `selectOpenableInstrument` no encuentra ningún
+  candidato fresco y su fallback fail-closed (no inventar datos, §2.5) devuelve un instrumento
+  vetado → `403 risk_veto`. En local **no** se reproduce porque la BD de desarrollo tiene barras
+  ingeridas con fecha reciente.
+- **Síntoma 2 (flake, no causa):** la lectura `GET /paper-desk/daily-report` justo después de
+  `POST /api/accounts` devolvió `404 Cuenta no encontrada` en el retry (carrera
+  lectura-tras-escritura del fixture Hoy, preexistente).
+- **Diagnóstico de diseño:** un **gate de accesibilidad** no puede depender de la
+  **frescura de datos de mercado**. Acoplar ambos hace que un cambio legítimo del gate de
+  apertura (o, como aquí, el estado normal de una BD de CI sin barras) tumbe la certificación
+  a11y por un motivo ajeno.
+
+### 6.3 Cierre — fixtures en dos niveles, sin `buy`
+
+`apps/web/e2e/gp-e2e-ui5-0-axe-integrated.spec.ts` deja de consumir
+`ensureMercadoIntegrationFixture` / `ensureHoyIntegrationFixture` y construye fixtures propias
+por HTTP **sin posición abierta**:
+
+- **Nivel 1 (GATE DURO):** entorno integrado sano (`gateIntegratedE2eEnvironment`) + catálogo
+  real no vacío + cuentas efímeras (`POST /api/accounts`, prefijos `e2e-v168-*` / `e2e-v167-*`).
+  Ausencia ⇒ **FALLO** con `E2E_AXE_REQUIRED=1` (vía `declareGap`), nunca `skipped`.
+- **Nivel 2 (enriquecimiento, DECLARADO):** `POST /api/workspaces` real para `/trading`. Si el
+  entorno no lo permite, el barrido **no** se salta: se mide el estado real de la ruta y el
+  hueco se emite como `::warning::barrido axe integrado — hueco declarado: …` en el log del job.
+- Desaparece la lectura de `/paper-desk/daily-report` (era el único punto del flake 6.2) y con
+  ella la carrera: no queda ninguna lectura dependiente de datos para las rutas medidas.
+
+### 6.4 Arreglo REAL 3 — `scrollable-region-focusable` en `/history` @móvil
+
+Al correr el barrido **con datos** (cartera/ledger reales) el viewport móvil destapó una
+violación que el entorno vacío de CI **no** puede ver:
+
+```
+[/history @móvil 390×844] · scrollable-region-focusable [serious] ×1 —
+  Scrollable region must have keyboard access
+    .overflow-x-auto
+```
+
+`apps/web/src/features/history/history-page.tsx` (tabla de movimientos y de operaciones) gana
+`role="region"` + `aria-label` + `tabIndex={0}` — **mismo criterio** que el arreglo 1
+(§2.3). Cambio solo de semántica/teclado; representación idéntica.
+
+### 6.5 Evidencia del cierre (salida real)
+
+```
+# Barrido INTEGRADO en MODO REQUERIDO (mismo env que el job de CI), con datos reales
+$env:E2E_RUN="1"; $env:E2E_INTEGRATION="1"; $env:E2E_ALLOW_DEV_DB="1"; $env:E2E_AXE_REQUIRED="1"
+pnpm --filter @bolsa/web exec playwright test gp-e2e-ui5-0-axe-integrated
+  Running 32 tests using 8 workers
+  32 passed (36.3s)
+#   (antes del arreglo 6.4: 31 passed + 1 failed = /history @móvil)
+
+# Suite unitaria web afectada
+pnpm --filter @bolsa/web test            → 299 files / 2195 tests passed
+```
+
+### 6.6 Límite que queda declarado (honesto)
+
+Con la BD de CI **sin barras**, el barrido integrado mide los **estados estructurales** de las
+16 rutas (sin filas de cartera/ledger): las violaciones que solo afloran **con datos** (como el
+6.4) no son visibles desde el job. Esa cobertura con datos vive en el hermano **mock**
+(`gp-e2e-ui5-0-axe-touched-routes-mock`, con `install*Mocks`) y en la ejecución **local**
+documentada. Cerrar ese hueco exigiría sembrar barras sintéticas en la BD de CI —decisión de
+datos de mercado, fuera de un gate de accesibilidad— y **no** se hace aquí.
+

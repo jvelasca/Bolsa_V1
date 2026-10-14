@@ -4,9 +4,9 @@
  * mocks de `/api/*`.
  *
  * Hermano INTEGRADO de `gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts` (que barre las
- * rutas L1 con la API mockeada). Aquí se reutiliza el stack real: sólo se siembra lo
- * mínimo con los helpers de `e2e/integration.ts` (cuenta efímera Hoy / Mercado), sin
- * reimplementar la maquinaria de mocks.
+ * rutas L1 con la API mockeada). Aquí se reutiliza el stack real: sólo se siembra lo mínimo
+ * por HTTP real (cuentas efímeras Hoy/Mercado y, si el entorno lo permite, el workspace
+ * Mercado), sin reimplementar la maquinaria de mocks y **sin** depender de datos de mercado.
  *
  * Rutas cubiertas (deterministas con cuenta demo/seed, ya ejercitadas por los specs
  * integrados del repo):
@@ -15,7 +15,7 @@
  *   - `/mesa`                       (cuenta efímera Hoy)
  *   - `/mesa?view=posiciones`       (cuenta efímera Hoy — Cartera)
  *   - `/trading`                    (cuenta + workspace efímeros)
- *   - `/auto-monitor?mode=current`  (cuenta efímera Hoy leída)
+ *   - `/auto-monitor?mode=current`  (cuenta efímera Hoy)
  *   - `/overview`                   (sin seed)
  *   - `/accounts`                   (sin seed)
  *   - `/fiscal`                     (sin seed)
@@ -40,6 +40,19 @@
  * Cada ruta exige: 0 violaciones `critical`/`serious` (WCAG A/AA), `heading-order` sin
  * saltos, y exactamente un `main` + un `h1`.
  *
+ * Fixtures del barrido (dos niveles — hallazgo del 1er run real de CI, 2026-10-14):
+ *   · Nivel 1 (GATE DURO): entorno integrado sano + catálogo real + cuentas efímeras creadas
+ *     por HTTP real. Ausente ⇒ FALLO con `E2E_AXE_REQUIRED=1` (jamás un skip mudo).
+ *   · Nivel 2 (enriquecimiento, DECLARADO): workspace Mercado real para `/trading`. Si el
+ *     entorno no lo permite, el barrido NO se salta: se mide el estado real de la ruta y el
+ *     hueco se emite como `::warning::` en el log del job.
+ *   · NO se siembra posición abierta (`buy`). Un `buy` pasa por el gate de apertura
+ *     (`check_opening` → DS-05 frescura): con un catálogo recién sembrado y sin barras —el caso
+ *     de CI— TODOS los instrumentos quedan vetados (`403 risk_veto`) y el barrido a11y entero se
+ *     caía por una precondición de datos de mercado ajena a la accesibilidad. Un gate de
+ *     accesibilidad no debe depender de la frescura de datos de mercado; la cobertura con
+ *     cartera poblada vive en el hermano mock (`gp-e2e-ui5-0-axe-touched-routes-mock`).
+ *
  * Skip-by-default (opt-in): `E2E_RUN=1 E2E_INTEGRATION=1 E2E_ALLOW_DEV_DB=1`. El gate
  * `gateIntegratedE2eEnvironment` exige API sana y `E2E_ALLOW_DEV_DB=1` (los fixtures
  * mutan PG creando cuentas `e2e-*` efímeras). Sin entorno ⇒ skip declarado con motivo.
@@ -61,17 +74,23 @@
  *
  * Default (no env): skipped.
  */
-import { test, expect, type Page } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+import {
+  test,
+  expect,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { e2eEnabled, E2E_SKIP_REASON } from "./fixtures";
 import {
-  ensureHoyIntegrationFixture,
-  ensureMercadoIntegrationFixture,
+  E2E_HOY_ACCOUNT_PREFIX,
+  E2E_INSTRUMENT_ID,
+  E2E_MERCADO_ACCOUNT_PREFIX,
   gateIntegratedE2eEnvironment,
+  mercadoWorkspaceDocument,
   seedHoyBrowserState,
   seedMercadoBrowserState,
-  type HoyIntegrationFixture,
-  type MercadoIntegrationFixture,
 } from "./integration";
 
 const DESKTOP = { width: 1366, height: 768 } as const;
@@ -85,10 +104,19 @@ const VIEWPORTS = [
 
 type Viewport = (typeof VIEWPORTS)[number];
 
-/** Fixtures integradas compartidas (sembradas en `beforeAll`). */
+/** Fixtures integradas compartidas (sembradas en `beforeAll`; ver «Fixtures del barrido»). */
 type Fixtures = {
-  hoy: HoyIntegrationFixture;
-  mercado: MercadoIntegrationFixture;
+  /** Cuenta efímera Hoy (`e2e-v168-*`) para `/mesa*` y `/auto-monitor`. */
+  hoy: { accountId: string };
+  /** Cuenta efímera Mercado (`e2e-v167-*`) + workspace real (nivel 2, declarado). */
+  mercado: {
+    accountId: string;
+    instrumentId: string;
+    symbol: string;
+    /** `null` si el workspace no se pudo sembrar: hueco declarado, la ruta se mide igual. */
+    workspaceId: string | null;
+    workspaceDocument: ReturnType<typeof mercadoWorkspaceDocument>;
+  };
 };
 
 /**
@@ -135,6 +163,149 @@ async function expectH1(page: Page, name: string) {
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible({
     timeout: 20_000,
   });
+}
+
+function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Nivel 1 (GATE DURO): cuenta efímera por HTTP real. Sin cuenta no hay superficie que barrer,
+ * así que la ausencia es FALLO en modo requerido (nunca skip mudo).
+ */
+async function createEphemeralAccount(
+  request: APIRequestContext,
+  baseURL: string,
+  prefix: string,
+): Promise<string> {
+  const res = await request.post(new URL("/api/accounts", baseURL).toString(), {
+    data: {
+      name: `${prefix}-${randomUUID().slice(0, 8)}`,
+      currency: "EUR",
+      initialDeposit: 100_000,
+    },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `POST /api/accounts failed (${res.status()}): ${await res.text()}`,
+    );
+  }
+  return (await res.json()).data.id as string;
+}
+
+/** Nivel 1: el catálogo real es precondición de `/instruments` y `/instruments/:id`. */
+async function fetchInstrumentCatalog(
+  request: APIRequestContext,
+  baseURL: string,
+): Promise<Array<{ id: string; symbol: string }>> {
+  const res = await request.get(
+    new URL("/api/instruments", baseURL).toString(),
+  );
+  if (!res.ok()) {
+    throw new Error(
+      `GET /api/instruments failed (${res.status()}): ${await res.text()}`,
+    );
+  }
+  const catalog = (await res.json()).data as Array<{
+    id: string;
+    symbol: string;
+  }>;
+  if (catalog.length === 0) {
+    throw new Error(
+      "Catálogo de instrumentos vacío: el barrido no puede medir /instruments/:id.",
+    );
+  }
+  return catalog;
+}
+
+/**
+ * Nivel 2 (DECLARADO): workspace Mercado real para `/trading`. Si el entorno no lo permite, se
+ * sigue barriendo con el estado por defecto del cliente y el hueco queda declarado en el log
+ * (`::warning::`), nunca en silencio.
+ */
+async function createWorkspaceDeclaringGap(
+  request: APIRequestContext,
+  baseURL: string,
+  instrument: { id: string; symbol: string },
+  warnings: string[],
+): Promise<{
+  workspaceId: string | null;
+  workspaceDocument: ReturnType<typeof mercadoWorkspaceDocument>;
+}> {
+  const document = mercadoWorkspaceDocument({
+    instrumentId: instrument.id,
+    symbol: instrument.symbol,
+    name: `E2E A11y ${randomUUID().slice(0, 8)}`,
+  });
+  try {
+    const res = await request.post(
+      new URL("/api/workspaces", baseURL).toString(),
+      {
+        data: { name: document.name, document, isDefault: false },
+      },
+    );
+    if (!res.ok()) {
+      throw new Error(
+        `POST /api/workspaces failed (${res.status()}): ${await res.text()}`,
+      );
+    }
+    const workspaceId = (await res.json()).data.id as string;
+    return {
+      workspaceId,
+      workspaceDocument: { ...document, id: workspaceId },
+    };
+  } catch (err) {
+    warnings.push(
+      `workspace Mercado no sembrado (${messageOf(err)}): /trading se mide con el estado por defecto del cliente`,
+    );
+    return { workspaceId: null, workspaceDocument: document };
+  }
+}
+
+/**
+ * Fixtures del barrido (nivel 1 duro + nivel 2 declarado). Deliberadamente NO siembra posición
+ * abierta: ver «Fixtures del barrido» en la cabecera (el `buy` queda vetado por `check_opening`
+ * en un catálogo sin barras frescas, que es el estado de CI).
+ */
+async function resolveAxeFixtures(
+  request: APIRequestContext,
+  baseURL: string,
+): Promise<Fixtures> {
+  const warnings: string[] = [];
+  const catalog = await fetchInstrumentCatalog(request, baseURL);
+  const instrument =
+    catalog.find((row) => row.id === E2E_INSTRUMENT_ID) ?? catalog[0]!;
+  const hoyAccountId = await createEphemeralAccount(
+    request,
+    baseURL,
+    E2E_HOY_ACCOUNT_PREFIX,
+  );
+  const mercadoAccountId = await createEphemeralAccount(
+    request,
+    baseURL,
+    E2E_MERCADO_ACCOUNT_PREFIX,
+  );
+  const workspace = await createWorkspaceDeclaringGap(
+    request,
+    baseURL,
+    instrument,
+    warnings,
+  );
+  for (const warning of warnings) {
+    console.log(
+      `::warning::barrido axe integrado — hueco declarado: ${warning}`,
+    );
+  }
+  return {
+    hoy: { accountId: hoyAccountId },
+    mercado: {
+      accountId: mercadoAccountId,
+      instrumentId: instrument.id,
+      symbol: instrument.symbol,
+      workspaceId: workspace.workspaceId,
+      workspaceDocument: workspace.workspaceDocument,
+    },
+  };
 }
 
 const ROUTES: readonly RouteCase[] = [
@@ -192,7 +363,8 @@ const ROUTES: readonly RouteCase[] = [
       const { accountId, workspaceId, workspaceDocument } = fixtures.mercado;
       await seedMercadoBrowserState(page, {
         accountId,
-        workspaceId,
+        // Nivel 2 declarado: sin workspace real se siembra el layout por defecto del cliente.
+        workspaceId: workspaceId ?? undefined,
         workspaceDocument,
       });
     },
@@ -389,10 +561,13 @@ test.describe("GP-E2E UI5-0 — rutas L1 integradas (axe, API real)", () => {
       e2eSkipReason: E2E_SKIP_REASON,
     });
     if (environmentSkip || !baseURL) return;
-    // Un mínimo de seed para las rutas que no caen sobre la cuenta demo por defecto.
-    const hoy = await ensureHoyIntegrationFixture(request, baseURL);
-    const mercado = await ensureMercadoIntegrationFixture(request, baseURL);
-    fixtures = { hoy, mercado };
+    try {
+      // Nivel 1 duro (entorno + cuentas) + nivel 2 declarado (workspace). Sin posición abierta.
+      fixtures = await resolveAxeFixtures(request, baseURL);
+    } catch (err) {
+      // Nivel 1 no alcanzable: en modo requerido es FALLO, no skip (vía `declareGap`).
+      environmentSkip = `fixtures integradas base no alcanzables — ${messageOf(err)}`;
+    }
   });
 
   test.beforeEach(() => {
