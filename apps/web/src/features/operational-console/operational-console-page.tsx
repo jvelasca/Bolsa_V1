@@ -22,6 +22,7 @@ import {
   OpsSelfEvalSection,
 } from "@/features/operational-console/operational-console-sections";
 import { TechnicalDetail } from "@/components/technical-detail";
+import { SurfaceLevelDeclaration } from "@/components/surface-level";
 import { OpsAutoEvidenceSection } from "@/features/operational-console/auto-evidence-section";
 import {
   OpsIncidentsSection,
@@ -80,8 +81,8 @@ export function OperationalConsolePage() {
             Consola operacional
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Resolver excepciones — recon · incidentes · posición no nacida ·
-            órdenes sin estado conocido
+            Resolver excepciones de la operación: cuadre de cartera y
+            posiciones, incidencias activas y órdenes cuyo estado no se conoce
             {account ? ` · ${account.name}` : ""}.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -107,6 +108,13 @@ export function OperationalConsolePage() {
         </Button>
       </div>
 
+      <SurfaceLevelDeclaration
+        level={3}
+        testId="ops-surface-level"
+        title="Superficie de diagnóstico · nivel 3"
+        detail="Aquí vive el detalle de ingeniería de la consola (nomenclatura técnica admitida). La operación diaria está en Hoy y Cartera."
+      />
+
       {selfEvalQuery.isLoading ? (
         <p className="text-sm text-muted-foreground">Cargando scorecard…</p>
       ) : null}
@@ -131,7 +139,6 @@ export function OperationalConsolePage() {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <OpsAutoEvidenceSection />
         <OpsReconSection report={report} />
         {effectiveAccountId ? (
           <OpsIncidentsSection
@@ -162,6 +169,7 @@ export function OperationalConsolePage() {
 
       <TechnicalDetail testId="ops-technical-detail">
         <div className="grid gap-4 lg:grid-cols-2">
+          <OpsAutoEvidenceSection />
           <OpsReadinessSection report={report} />
           <OpsRuntimeSection report={report} />
           <OpsSelfEvalSection report={report} />

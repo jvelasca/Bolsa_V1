@@ -132,5 +132,15 @@ describe("OperationalConsolePage V1.55", () => {
     expect(screen.getByTestId("ops-auto-evidence")).toBeTruthy();
     expect(screen.getByText(/Resolver excepciones/i)).toBeTruthy();
     expect(screen.getByText(/Detalle técnico/i)).toBeTruthy();
+    expect(
+      screen
+        .getByTestId("ops-surface-level")
+        .getAttribute("data-surface-level"),
+    ).toBe("3");
+    expect(
+      screen
+        .getByTestId("ops-technical-detail")
+        .contains(screen.getByTestId("ops-auto-evidence")),
+    ).toBe(true);
   });
 });

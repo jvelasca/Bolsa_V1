@@ -2,6 +2,8 @@
 
 > **AsOf:** 2026-10-13 · **Versión del árbol:** `2.11.124-beta` (raíz; `apps/web` = `0.1.0`).
 > **Revisión 2026-10-14 (pasada de profundidad UI):** se cierra **`O6-06`** —los tres paneles de lifecycle del primer nivel de la consola colapsaban huecos a `0`/verde— con *fix* + gate `findFirstLevelFalseZeros`; se ajustan §6 (§6.1/§6.2), §7 (censo) y §10-§11 en consecuencia. `Δ motor` y `Δ contrato` = 0.
+>
+> **Revisión 2026-10-14 (cierre de la ola 6):** se cierran **`O6-01`/`O6-02`/`O6-03`** declarando la consola como superficie de **nivel 3** (nuevo primitivo `SurfaceLevelDeclaration`), sacando la evidencia AUTO del primer nivel (bajo el `TechnicalDetail`) y humanizando el copy de cabecera. La ola 6 pasa a **DONE**. `Δ motor` y `Δ contrato` = 0 (solo `apps/web/**` + este doc).
 > **Estado:** **AUDITORÍA EN SOLO LECTURA** del código + **censo ejecutable ampliado** + **residuos mecánicos cerrados**. **NO es implementación de rediseño**: no se reescribe UI, no se mueve motor ni contrato HTTP.
 > **Naturaleza:** UI / producto / semántica. **`Δ motor = 0`** por construcción (el cambio solo toca `apps/web/**` + este doc).
 > **Padres:** [Auditoría UI 6.x global](./auditoria-ui-6-x-global-2026-10-08.md) (partición de olas §5, checklist §1.3, vara §4) · [UI Contract 5.0](./spec-ui-contract-5-0-2026-10-08.md) (registro regla→estado §5, `R-G1`/`R-G2` §2) · [entrega v2.88.91](./entrega-auditoria-externa-mia-v2.88.91-2026-10-08.md) (W2/W3/W4) · [entrega v2.88.92](./entrega-auditoria-externa-mia-v2.88.92-2026-10-08.md) §60 y [entrega v2.88.93](./entrega-auditoria-externa-mia-v2.88.93-2026-10-08.md) §59 (remediación: «ampliar el censo de superficies por oleadas con el mismo gate»).
@@ -160,33 +162,38 @@ La pregunta de esta fase: **¿siguen abiertas las olas 2..6?** Se re-verifica ca
 
 ## 6. Ola 6 · Consola avanzada (`/operational-console`)
 
-**Veredicto: P2 abierto (PARTIAL).** La fila §5 pedía «Nivel 3 explícito; sin `—` ni `órdenes UNKNOWN` cuando el dato se muestre fuera de nivel 3». La consola **ya** pliega readiness/runtime/autoeval/telemetría tras `TechnicalDetail` y usa vocabulario Opción B, pero **su primer nivel no está rotulado como nivel 3** y conserva jerga de arquitectura.
+**Veredicto: DONE (nivel 3 declarado).** La fila §5 pedía «Nivel 3 explícito; sin `—` ni `órdenes UNKNOWN` cuando el dato se muestre fuera de nivel 3». La consola pliega readiness/runtime/autoeval/telemetría tras `TechnicalDetail`, usa vocabulario Opción B y **ahora declara explícitamente su nivel 3** (`SurfaceLevelDeclaration`), extrayendo del primer nivel la evidencia AUTO. La jerga de arquitectura que queda en el primer nivel (`OR-4`, `DEX-3`, `PositionState→Lifecycle`…) es **admitida por `R-G1`** precisamente por esa declaración.
 
 ### 6.1 Checklist §1.3
 
 | # | Ítem | Evidencia | Estado |
 | --- | --- | --- | --- |
 | 1 | `h1` «Consola operacional» + copy de propósito | `operational-console-page.tsx:79-88` | ✅ |
-| 2 | Términos prohibidos | `PAPER_D_EXECUTE` solo tras el `TechnicalDetail` de la página (`:165-177`); `WFE` en primer nivel (ver O6-01) | ⚠️ |
+| 2 | Términos prohibidos | `PAPER_D_EXECUTE` y `WFE` solo tras/ dentro del `TechnicalDetail` de la página (O6-01 cerrado) | ✅ |
 | 3 | `—` / `UNKNOWN` | `—` cerrado (O6-05); los recuentos de los tres paneles de lifecycle se colapsaban a `0`/verde | ✅ **(O6-06 corregido)** |
-| 4 | Disclosure único (`RT-04`) | `TechnicalDetail testId="ops-technical-detail"` (`operational-console-page.tsx:165`) | ✅ |
+| 4 | Disclosure único (`RT-04`) | `TechnicalDetail testId="ops-technical-detail"` (`operational-console-page.tsx:170`) | ✅ |
 | 5 | Nav vs acción vs información | «Resolver» = acción; «Ir a Cartera · Posiciones» = navegación; chips de estado = información | ✅ |
-| 6 | Semáforo | **P2 abierto** | ⚠️ |
+| 6 | Nivel 3 declarado (`R-G1`) | `SurfaceLevelDeclaration` (`operational-console-page.tsx:111-116`, `surface-level.tsx`) | ✅ |
+| 7 | Semáforo | **verde** | ✅ |
 
 ### 6.2 Hallazgos itemizados
 
 | # | Hallazgo | Evidencia (`file:line`) | Regla | Sev. | Veredicto |
 | --- | --- | --- | --- | --- | --- |
-| O6-01 | `AUTO EVIDENCE` se monta en el **primer nivel** de la consola y rotula filas con jerga de ingeniería (`WFE`, `P(R>0)`, conteos de `fills`) | `auto-evidence-section.tsx:381-388` (montaje en `operational-console-page.tsx:134`), `auto-evidence-report.ts:789-799`, `:84-87` | `R-G1`/`UI5-14` | **P2** | **abierto:** mover bajo el disclosure o rotular el bloque como nivel 3 |
-| O6-02 | Primer nivel con jerga de arquitectura interna: `PositionState→Lifecycle`, `reconciliation:portfolio_drift`, `OR-4`, `DEX-3`, `OI-6`/`LR-1` | `operational-console-sections.tsx:175`, `:330`, `:528-531`, `:509` | `R-G1`/`RT-02` | **P2** | **abierto:** la consola es la superficie donde `R-G1` **admite** nivel 3, pero debe declararlo (banner «Diagnóstico · nivel 3») |
-| O6-03 | Copy de cabecera mezcla propósito humano con abreviaturas (`recon`, «órdenes sin estado conocido») | `operational-console-page.tsx:82-88` | `RT-02` | **P2** | **abierto (menor):** unificar con el nivel 3 declarado |
+| O6-01 | `AUTO EVIDENCE` se montaba en el **primer nivel** de la consola con jerga de ingeniería (`WFE`, `P(R>0)`, conteos de `fills`) | `auto-evidence-section.tsx`; montaje movido a `operational-console-page.tsx:172`; rótulos en `auto-evidence-report.ts:789-799`, `:64-72` | `R-G1`/`UI5-14` | **P2** | **cerrado (2026-10-14):** `<OpsAutoEvidenceSection />` pasa al `TechnicalDetail` de la página (nivel 3); la procedencia (badge PAPER REAL/FIXTURE) sigue siendo lo primero que se ve al abrir el bloque |
+| O6-02 | Primer nivel con jerga de arquitectura interna: `PositionState→Lifecycle`, `reconciliation:portfolio_drift`, `OR-4`, `DEX-3`, `OI-6`/`LR-1` | `operational-console-sections.tsx:179-180`, `:348`, `:526`, `:546-549`, `:553`; `ops-incidents-and-links.tsx:12-14`, `:31` | `R-G1`/`RT-02` | **P2** | **cerrado (2026-10-14):** la consola **declara** su nivel 3 (`SurfaceLevelDeclaration`), que es el cierre que `R-G1` admite para esta superficie; la jerga queda admitida, no eliminada |
+| O6-03 | Copy de cabecera mezclaba propósito humano con abreviaturas (`recon`, «órdenes sin estado conocido») | `operational-console-page.tsx:83-87` | `RT-02` | **P2** | **cerrado (2026-10-14):** el copy pasa a «Resolver excepciones de la operación: cuadre de cartera y posiciones, incidencias activas y órdenes cuyo estado no se conoce» (se conserva el prefijo «Resolver excepciones» que asertan los tests y los E2E) |
 | O6-04 | `PAPER_D_EXECUTE` presente en `operational-console-sections.tsx` **solo** bajo el `TechnicalDetail` de la página | `operational-console-sections.tsx:461`, `:718` | `R-G1` | — | aceptado: **artefacto de alcance del gate por fichero** (ver §8). No es fuga de nivel 1 |
 | O6-05 | Huecos con vocabulario Opción B (`absentDataLabel`), nunca `—` | `operational-console-sections.tsx:112`, `:166`, `:216` | `UI5-14` | — | **cerrado (W2)** |
 | O6-06 | Los tres paneles de lifecycle (primer nivel) **colapsaban el hueco a `0`** y pintaban **SLA verde sin dato** (`?? 0`): `UNKNOWN ≠ 0` violado, no solo el guion | `operational-console-sections.tsx:83-101`, `:145-151`, `:247-263`, `:312-324`; `operational-console-page.tsx:70` | `UI5-14`/`RT-02` | **P1** | **cerrado (esta pasada):** la rejilla exige dato (`!stats`/`!report` ⇒ hueco declarado con `absentDataLabel()`) y el gate `findFirstLevelFalseZeros` lo blinda |
 
 > **O6-06 (registrado en la re-verificación de 2026-10-14).** La pasada anterior declaró la ola 6 «P2 abierto» dando por buenos los huecos por el hecho de que no había `—`. Eso confundía dos invariantes distintos: *sin comodín `—`* (cierto) y *sin colapsar el hueco a `0`/verde* (falso). Los tres paneles de lifecycle se montan en el **primer nivel** de la consola (fuera del `TechnicalDetail` de la página), y con la query deshabilitada (`effectiveAccountId` nulo) o sin material aún, `isLoading` es `false` en TanStack v5 ⇒ el guard `!isLoading && !isError` dejaba pasar la rejilla con `data === undefined`, pintando `pending 0`, `dead 0`, `drift 0` y un **SLA `ok` verde**. La ruta no tiene guarda de cuenta. Corregido gateando la rejilla por **presencia de dato** (patrón `loaded` de `auto-risk-summary.ts`) y sustituyendo cada `?? 0` de primer nivel por `absentDataLabel()`; el `pendingConfirm` de «Cola SEMI» y el literal `"unknown"` de `OpsReconSection` se alinean con el vocabulario Opción B.
 
-**Abiertos:** O6-01, O6-02, O6-03 (P2, diseño). La ola 6 **sigue ABIERTA** (es la única con trabajo de diseño pendiente). **O6-06 (P1) queda cerrado** en esta re-verificación.
+> **O6-01/02/03 (registrado en el cierre de ola del 2026-10-14).** Se crea el patrón que faltaba, `SurfaceLevelDeclaration` (`apps/web/src/components/surface-level.tsx`), que materializa en el primer nivel la declaración de profundidad exigida por `R-G1`/`RT-02` (`data-surface-level="3"`). La consola lo monta bajo la cabecera (`ops-surface-level`, `operational-console-page.tsx:111`). Con la superficie declarada nivel 3, la jerga de arquitectura del primer nivel (O6-02) queda **admitida** por `R-G1`; el bloque `AUTO EVIDENCE` (O6-01) se mueve **dentro** del `TechnicalDetail` de la página, y el copy de cabecera (O6-03) pierde las abreviaturas.
+>
+> **Residuales declarados (honestidad de alcance):** (a) la jerga de `operational-console-sections.tsx` (`OR-4`, `DEX-3`, `PositionState→Lifecycle`…) **no** se reescribió: se declara nivel 3 y queda admitida, no eliminada; (b) los rótulos de `auto-evidence-report.ts` (`WFE`, `P(R>0)`, `Fills…`) no se humanizaron: quedan bajo el `TechnicalDetail`; (c) el tip de ayuda `mesa-tip-catalog.ts:84-90` aún cita «recon OI-6 y incidentes DEX-3» en su cuerpo — es otra superficie (ayuda), fuera de esta ola.
+
+**Abiertos:** ninguno. La ola 6 queda **DONE**. **O6-06 (P1)** y **O6-01/02/03 (P2)** cerrados.
 
 ---
 
@@ -208,8 +215,8 @@ Se amplía [`barrido-global-first-level.test.tsx`](../../apps/web/src/features/b
 **Por qué algunos ficheros no entran en el censo de tokens (declarado, no maquillado):**
 
 - `history-page.tsx` — el token `Ledger` colisiona como **subcadena** con identificadores TS (`LedgerEntryDto`, `formatLedgerEntryLabel`, `api.getAccountLedger`); la palabra **visible** se audita con límite de palabra en [`history-first-level.test.tsx`](../../apps/web/src/features/history/history-first-level.test.tsx).
-- `research-lab-evidence.ts` — `WFE`/`PBO` viven solo en `compact`, que se pinta **dentro** del `TechnicalDetail` (panel) o en un resumen de nivel 2/3; el token `WFE` de la fila de evidencia se declara en O6-01.
-- `operational-console-sections.tsx` — `PAPER_D_EXECUTE` se monta bajo el `TechnicalDetail` de la **página** (`operational-console-page.tsx:165`), no del fichero: artefacto de alcance del gate por fichero, no violación de nivel 1.
+- `research-lab-evidence.ts` — `WFE`/`PBO` viven solo en `compact`, que se pinta **dentro** del `TechnicalDetail` (panel) o en un resumen de nivel 2/3; el token `WFE` de la fila de evidencia queda bajo el `TechnicalDetail` de la Consola (O6-01 cerrado).
+- `operational-console-sections.tsx` — `PAPER_D_EXECUTE` se monta bajo el `TechnicalDetail` de la **página** (`operational-console-page.tsx:170`), no del fichero: artefacto de alcance del gate por fichero, no violación de nivel 1.
 
 **Control de falsabilidad del censo:** sigue verde con las nuevas superficies; se conservan los `it` de control positivo (`findFirstLevelViolations("<p>Recommendation · runId</p>")` detecta; el guion de prosa y el nivel 3 no se marcan).
 
@@ -237,9 +244,9 @@ Además se cierran dos residuos triviales fuera de ese trío, en la ola 4:
 | **3** | Mercado | `/trading` | **DONE** (1 P2 declarado) | **W3** (v2.88.91) | O3-02/O3-03 cerrados; O3-01 abierto; censo §7 |
 | **4** | Asesor | `/research` | **DONE** (2 P2 + 2 triviales) | **W4** (v2.88.91) | O4-03/O4-04 cerrados; O4-01/O4-02 abiertos; censo §7 |
 | **5** | Chrome · palette | barra + rail + palette | **DONE** (1 P2 declarado) | **W3** (v2.88.91) | O5-02/O5-03 cerrados; O5-01 abierto parcial |
-| **6** | Consola avanzada | `/operational-console` | **ABIERTA (P2)** | **W2** parcial + re-verif. 2026-10-14 | O6-01…O6-03 abiertos; O6-05 cerrado; **O6-06 (P1) cerrado** |
+| **6** | Consola avanzada | `/operational-console` | **DONE** | **W2** parcial + re-verif. 2026-10-14 | O6-01…O6-03 y O6-06 cerrados; O6-05 cerrado; nivel 3 declarado (`SurfaceLevelDeclaration`) |
 
-**Agregado:** olas 2-5 **DONE** (los P2 son residuos declarados, no fugas de primer nivel); **ola 6 ABIERTA** (nivel 3 explícito pendiente). Con esto «olas 2..6 abiertas» queda **falsado para 2..5** y **acotado a la ola 6**.
+**Agregado:** olas 2-6 **DONE** (los P2 son residuos declarados, no fugas de primer nivel). Con esto «olas 2..6 abiertas» queda **falsado por completo**.
 
 ---
 
@@ -254,6 +261,8 @@ Además se cierran dos residuos triviales fuera de ese trío, en la ola 4:
 | 5 | El censo cubre las superficies de las olas 2..6. | Que una superficie declarada en §7 desaparezca del test o que un fichero nuevo del alcance quede fuera. |
 | 6 | Esta auditoría no cambia motor ni contrato. | Que el diff toque `packages/py/**`, worker, umbrales, Alembic o `contract:gen`. |
 | 7 | La consola no colapsa un hueco a `0`/verde en primer nivel (`O6-06`). | Que `findFirstLevelFalseZeros` devuelva algo distinto de `[]` en `FALSE_ZERO_SURFACES`, o que un panel de lifecycle pinte recuentos/SLA sin dato (test de render). |
+| 8 | La consola declara su nivel 3 y la evidencia AUTO no vive en el primer nivel (`O6-01`/`O6-02`). | Que `ops-surface-level` desaparezca o deje de exponer `data-surface-level="3"`, o que `OpsAutoEvidenceSection` vuelva a montarse fuera de `ops-technical-detail` (`operational-console-page.test.tsx`). |
+| 9 | El copy de cabecera no usa abreviaturas (`O6-03`). | Que vuelvan `recon` o «órdenes sin estado conocido» al `<p>` de propósito de `operational-console-page.tsx`. |
 
 ---
 
@@ -274,13 +283,21 @@ Además se cierran dos residuos triviales fuera de ese trío, en la ola 4:
 - **Modificado:** `apps/web/src/features/operational-console/ops-incidents-and-links.tsx` (`OpsQuickLinksSection` declara el hueco de la cola).
 - **Modificado:** `apps/web/src/features/operational-console/lifecycle-panel-query.test.tsx` (test de render por panel).
 
+**Cierre de ola 6 (2026-10-14) — `O6-01`/`O6-02`/`O6-03`:**
+
+- **Creado:** `apps/web/src/components/surface-level.tsx` (`SurfaceLevelDeclaration`, `SURFACE_LEVEL_ATTR`).
+- **Creado:** `apps/web/src/components/surface-level.test.tsx`.
+- **Modificado:** `apps/web/src/features/operational-console/operational-console-page.tsx` (banner `ops-surface-level`, copy humanizado, `OpsAutoEvidenceSection` bajo el `TechnicalDetail`).
+- **Modificado:** `apps/web/src/features/operational-console/operational-console-page.test.tsx` (asserta `data-surface-level="3"` y que la evidencia AUTO vive dentro de `ops-technical-detail`).
+
 **Decisión declarada (no se toca):** `research-trial-result-block.tsx:213` (`commissionBps ?? 0` · `slippageBps ?? 0` · `spreadBps ?? 0`) usa el literal `0` **dentro** del `TechnicalDetail` (nivel 3) y representa el **coste por defecto del motor**, no un hueco de medida; se deja como está y queda fuera del gate `FALSE_ZERO_SURFACES`.
 
 ---
 
 ## 12. Límites declarados
 
-- **Solo lectura del producto:** no se rediseña ninguna pantalla; los únicos cambios de código son el censo y dos residuos mecánicos que preservan semántica.
-- **`axe`/Playwright:** no se re-certifica `axe` en vivo ni se ejecuta E2E integrado; se mantiene la deuda declarada (§4 de la [auditoría 6.x](./auditoria-ui-6-x-global-2026-10-08.md) §6).
+- **Solo lectura del producto:** no se rediseña ninguna pantalla; los únicos cambios de código son el censo, dos residuos mecánicos y el cierre de ola 6 (declaración de nivel 3 + humanización de copy), que preservan semántica.
+- **Ola 6 — jerga admitida, no eliminada:** el cierre de `O6-02` es la **declaración** de nivel 3 (lo que `R-G1` admite para esta superficie), no la reescritura de `OR-4`/`DEX-3`/`PositionState→Lifecycle`. Los rótulos de `auto-evidence-report.ts` tampoco se humanizan: quedan bajo el `TechnicalDetail`.
+- **`axe`/Playwright:** no se re-certifica `axe` en vivo ni se ejecuta E2E integrado; se mantiene la deuda declarada (§4 de la [auditoría 6.x](./auditoria-ui-6-x-global-2026-10-08.md) §6). Los E2E de la consola (`gp-e2e-02`, `gp-v164-ui`) asertan `/Resolver excepciones/i`, que se conserva; no se re-ejecutaron localmente.
 - **`heading-order` en 11 rutas L1:** deuda preexistente, fuera del alcance de este slice.
 - **`Δ motor = 0`:** el diff no toca `packages/py/**`, worker, umbrales, Alembic ni `contract:gen`.
