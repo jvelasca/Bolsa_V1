@@ -161,18 +161,30 @@ export async function seedAutoCycleForAccount(opts: {
   accountId: string;
   symbol: string;
   apiBase: string;
+  /**
+   * H6 — `presetKey` que el ciclo DECLARARÁ como identidad EXACTA (`payload.strategyPresetKey`).
+   * Debe ser la MISMA clave que el `strategyType` del TOP que el spec siembra, o el CTA
+   * «Verificar D→hoy» queda (correctamente) inhabilitado por el fail-closed de H6. Omitido ⇒
+   * se usa el default del CLI (`sma_crossover`).
+   */
+  strategyPresetKey?: string;
 }): Promise<AutoCycleSeedOutcome> {
   if (!autoCycleSeedEnabled()) {
     return { ok: false, reason: AUTO_CYCLE_SEED_DISABLED_REASON };
   }
-  return runSeedCli([
+  const args = [
     "--account-id",
     opts.accountId,
     "--symbol",
     opts.symbol,
     "--api-base",
     opts.apiBase,
-  ]);
+  ];
+  const presetKey = opts.strategyPresetKey?.trim();
+  if (presetKey) {
+    args.push("--strategy-preset-key", presetKey);
+  }
+  return runSeedCli(args);
 }
 
 /**

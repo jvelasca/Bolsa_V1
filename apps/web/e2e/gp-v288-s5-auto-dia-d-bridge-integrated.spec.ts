@@ -454,6 +454,10 @@ async function seedAutoBridge(
       accountId: state.accountId,
       symbol: seedTarget.symbol,
       apiBase: baseURL,
+      // H6 — la identidad EXACTA que el ciclo declara debe ser la MISMA clave que el
+      // `strategyType` del TOP que este spec siembra justo después (`PRESET_KEY`), o el CTA
+      // «Verificar D→hoy» queda inhabilitado por el fail-closed (hueco declarado, no un bug).
+      strategyPresetKey: PRESET_KEY,
     });
     if (!seeded.ok) seedReason = seeded.reason;
   } else {
@@ -738,6 +742,14 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
     await expect(page.getByTestId("auto-operation-strategy-gap")).toHaveCount(
       0,
     );
+    // H6 — el CTA verifica la estrategia EJECUTADA del ciclo, resuelta por identidad EXACTA
+    // (`presetKey`) dentro del TOP sembrado; NO la «mejor disponible» por accidente.
+    await expect(
+      page.getByTestId("auto-operation-strategy-executed"),
+    ).toHaveAttribute("data-verify-target", "executed");
+    await expect(
+      page.getByTestId("auto-operation-strategy-verify-dia-d"),
+    ).toHaveAttribute("data-verify-target", "executed");
     await expect(
       page.getByTestId("auto-operation-strategy-verify-dia-d"),
     ).toBeEnabled();

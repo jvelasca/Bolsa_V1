@@ -15,8 +15,12 @@ sin copiar su lógica):
 * el spine — ``decision_journal_entries`` vía ``SqlAlchemyJournalRepository``:
   ``auto_entry_decision`` + ``build_reservation_claim_entry`` +
   ``build_reservation_reconciliation_entry`` (``bolsa_application.auto_operational_audit``).
+  El hecho de decisión DECLARA la identidad EXACTA de la estrategia
+  (``payload.strategyPresetKey``, ``H6``): es la clave con la que la tarjeta de la operación
+  resuelve la estrategia EJECUTADA dentro del TOP del valor (nunca se cae al #1 en silencio).
 * el TOP de Finalistas — por HTTP ``PUT /api/instruments/{uuid}/strategy-top`` (NUNCA por
-  tabla directa), con un ``strategyDefinitionId`` REAL sacado de ``GET /api/strategies``.
+  tabla directa), con un ``strategyDefinitionId`` REAL sacado de ``GET /api/strategies`` y
+  ``strategyType`` = la MISMA ``presetKey`` que el ciclo declara.
 
 El patrón está calcado de ``apps/api-python/tests/test_auto_operational_monitor_pg.py``
 (helpers ``_reservation``/``_seed_fill``/``_seed_journal`` y fixture que carga ``.env`` +
@@ -153,32 +157,41 @@ def _resolve_instrument(
     return str(row["id"]), str(row["symbol"])
 
 
-def _resolve_strategy(api_base: str) -> tuple[str, str, str]:
+def _resolve_strategy(api_base: str, *, preset_key: str) -> tuple[str, str, str]:
     """Devuelve ``(strategyDefinitionId, token, label)`` de una estrategia REAL.
 
     ``token`` es el ``presetKey`` (o el id): es el sello que casa con el ``strategyType`` del
-    slot del TOP (emparejamiento textual que exige la UI de la operación).
+    slot del TOP (emparejamiento textual que exige la UI de la operación). Con ``preset_key`` se
+    REUTILIZA la estrategia guardada que declara ESA MISMA clave; si no existe ninguna se crea
+    desde ese preset. El sello queda así **determinista**: es la identidad EXACTA (``H6``) que el
+    ciclo declara y contra la que el CTA «Verificar D→hoy» resuelve la estrategia EJECUTADA en el
+    TOP (el harness siembra el TOP con ese mismo ``strategyType``).
     """
     payload = _http_json("GET", "/api/strategies", api_base=api_base)
     rows = payload.get("data") or []
-    chosen = next((r for r in rows if str(r.get("presetKey") or "").strip()), None)
-    if chosen is None and rows:
-        chosen = rows[0]
+    chosen = next(
+        (r for r in rows if str(r.get("presetKey") or "").strip() == preset_key),
+        None,
+    )
     if chosen is None:
-        print("· no hay estrategias guardadas: creo una desde preset sma_crossover")
+        print(f"· no hay estrategia guardada con preset {preset_key!r}: la creo desde preset")
         created = _http_json(
             "POST",
             "/api/strategies/from-preset",
             api_base=api_base,
             body={
-                "name": "Seed UI · Cruce SMA 20/50",
-                "presetKey": DEFAULT_PRESET_KEY,
+                "name": (
+                    "Seed UI · Cruce SMA 20/50"
+                    if preset_key == DEFAULT_PRESET_KEY
+                    else f"Seed UI · {preset_key}"
+                ),
+                "presetKey": preset_key,
                 "timeframe": "1d",
             },
         )
         chosen = created["data"]
     definition_id = str(chosen["id"])
-    token = str(chosen.get("presetKey") or "").strip() or definition_id
+    token = str(chosen.get("presetKey") or "").strip() or preset_key
     label = str(chosen.get("name") or "Estrategia #1")
     return definition_id, token, label
 
@@ -319,6 +332,7 @@ async def _seed_journal(
     cycle_id: str,
     instrument: str,
     strategy_version_id: str,
+    strategy_preset_key: str,
     reservation_id: str,
 ) -> None:
     from bolsa_application.auto_cycle_journal import cycle_decision_id
@@ -351,6 +365,10 @@ async def _seed_journal(
                 "cycleId": cycle_id,
                 "instrumentId": instrument,
                 "strategyVersion": strategy_version_id,
+                # H6 — identidad EXACTA declarada por el ciclo (`presetKey`): el monitor operativo
+                # la publica ADITIVA desde ESTE hecho durable y la tarjeta resuelve con ella la
+                # estrategia EJECUTADA dentro del TOP (misma clave que su `strategyType`).
+                "strategyPresetKey": strategy_preset_key,
                 "rank": 1,
                 "opportunityScore": 0.9,
                 "engineId": ENGINE_ID,
@@ -431,6 +449,7 @@ async def _seed_db(
     account_id: str,
     symbol: str,
     strategy_version_id: str,
+    strategy_preset_key: str,
     cycle_id: str,
 ) -> str:
     from bolsa_application.reservation_store import PostgresReservationStore
@@ -486,6 +505,7 @@ async def _seed_db(
                 cycle_id=cycle_id,
                 instrument=symbol,
                 strategy_version_id=strategy_version_id,
+                strategy_preset_key=strategy_preset_key,
                 reservation_id=reservation_id,
             )
     finally:
@@ -545,7 +565,9 @@ async def _run_seed(args: argparse.Namespace) -> int:
     instrument_uuid, symbol = _resolve_instrument(
         args.api_base, symbol=args.symbol, instrument_id=args.instrument_id
     )
-    definition_id, token, label = _resolve_strategy(args.api_base)
+    definition_id, token, label = _resolve_strategy(
+        args.api_base, preset_key=args.strategy_preset_key
+    )
     cycle_id = _cycle_id_for(args.account_id, symbol)
 
     print(f"· instrumento: {symbol} · {instrument_uuid}")
@@ -556,6 +578,7 @@ async def _run_seed(args: argparse.Namespace) -> int:
         account_id=args.account_id,
         symbol=symbol,
         strategy_version_id=token,
+        strategy_preset_key=token,
         cycle_id=cycle_id,
     )
     _put_strategy_top(
@@ -646,6 +669,14 @@ def main() -> int:
     )
     parser.add_argument(
         "--account-id", default=DEFAULT_ACCOUNT_ID, help=f"Cuenta (default {DEFAULT_ACCOUNT_ID})."
+    )
+    parser.add_argument(
+        "--strategy-preset-key",
+        default=DEFAULT_PRESET_KEY,
+        help=(
+            "`presetKey` de la estrategia sembrada; es la identidad EXACTA que el ciclo declara "
+            f"y con la que el harness casa su TOP (default {DEFAULT_PRESET_KEY})."
+        ),
     )
     parser.add_argument(
         "--cleanup",

@@ -167,6 +167,12 @@ export type E2eMockRouteOpts = {
    * feedback, para certificar la navegación `Operación → detalle técnico/DÍA-D`.
    */
   auto?: boolean;
+  /**
+   * S5/H6 — `presetKey` que DECLARA el ciclo AUTO del mock. Por defecto
+   * `E2E_AUTO_PRESET_KEY` (casa con el `strategyType` del TOP ⇒ CTA habilitado). Un valor que
+   * NO esté en el TOP ejercita el fail-closed de H6 (CTA deshabilitado + hueco declarado).
+   */
+  autoCyclePresetKey?: string | null;
 };
 
 /** Ciclo AUTO mínimo y determinista para el mock de navegación UI 2.1. */
@@ -177,16 +183,27 @@ const E2E_AUTO_WINDOW = "2026-09-29_2026-09-30";
 /** S5 — UUID determinista del valor para el puente AUTO → estrategia (UI-only, mock). */
 const E2E_AUTO_INSTRUMENT_ID = "inst-e2e-aaa";
 const E2E_AUTO_STRATEGY_ID = "def-e2e-1";
+/**
+ * S5 — `presetKey` que DECLARA el ciclo AUTO del mock: la identidad EXACTA (`H6`) que el CTA
+ * «Verificar D→hoy» resuelve contra el TOP del valor (`strategyType` del slot #1). Casa con
+ * `autoStrategyTopMock()` ⇒ camino habilitado (`data-verify-target="executed"`). Un valor que no
+ * esté en el TOP ejercita el fail-closed (CTA deshabilitado + hueco declarado).
+ */
+const E2E_AUTO_PRESET_KEY = "sma_crossover";
 
 function autoMonitorCycle(
   cycleId: string,
   instrumentId: string,
   closed: boolean,
+  strategyPresetKey: string | null,
 ) {
   return {
     cycleId,
     instrumentId,
     strategyVersion: "sv-e2e",
+    // H6 — identidad EXACTA declarada por el ciclo (`presetKey`): es la base de la resolución de
+    // la estrategia EJECUTADA. `null` = el ciclo no la declara (hueco honesto, CTA inhabilitado).
+    strategyPresetKey,
     direction: "long",
     closed,
     closedMeasurement: "COMPLETE",
@@ -273,7 +290,7 @@ function autoStrategyDefinitionMock() {
   };
 }
 
-function autoOperationalMonitorMock() {
+function autoOperationalMonitorMock(cyclePresetKey: string | null) {
   return {
     key: "auto_operational_monitor_v1",
     readOnly: true,
@@ -302,8 +319,9 @@ function autoOperationalMonitorMock() {
       asOf: "2026-10-01T00:00:00Z",
     },
     cycles: [
-      autoMonitorCycle(E2E_AUTO_CYCLE_A, E2E_AUTO_SYMBOL, true),
-      autoMonitorCycle(E2E_AUTO_CYCLE_B, "BBB", false),
+      autoMonitorCycle(E2E_AUTO_CYCLE_A, E2E_AUTO_SYMBOL, true, cyclePresetKey),
+      // El ciclo B NO declara `presetKey`: es el hueco honesto del contrato H6 (no se rellena).
+      autoMonitorCycle(E2E_AUTO_CYCLE_B, "BBB", false, null),
     ],
     reservations: [],
     concurrency: {
@@ -579,7 +597,11 @@ export function routeBody(
   // V2.88.56 — espacio AUTO: monitor operativo + artefactos DÍA-D de feedback.
   if (opts?.auto === true) {
     if (path === "/api/auto/operational-monitor") {
-      return autoOperationalMonitorMock();
+      return autoOperationalMonitorMock(
+        opts.autoCyclePresetKey === undefined
+          ? E2E_AUTO_PRESET_KEY
+          : opts.autoCyclePresetKey,
+      );
     }
     if (path === "/api/auto/dia-d-feedback") {
       return autoDiaDFeedbackListMock();

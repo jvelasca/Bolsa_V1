@@ -16,6 +16,7 @@ import { test, expect, type Page } from "@playwright/test";
 import {
   e2eEnabled,
   E2E_SKIP_REASON,
+  installApiMocks,
   installAutoWorkspaceMocks,
 } from "./fixtures";
 
@@ -51,16 +52,33 @@ test.describe("GP-E2E-S5 — puente AUTO → estrategia → DÍA-D", () => {
     await expect(page.getByTestId("auto-operation-strategy-gap")).toHaveCount(
       0,
     );
+    // H6 — el ciclo DECLARA su `presetKey` y este casa con el `strategyType` del TOP #1: la
+    // estrategia EJECUTADA queda resuelta (identidad EXACTA, no la «mejor disponible»).
+    await expect(
+      page.getByTestId("auto-operation-strategy-preset-key"),
+    ).toContainText("sma_crossover");
+    await expect(
+      page.getByTestId("auto-operation-strategy-match"),
+    ).toHaveAttribute("data-match", "same");
+    await expect(
+      page.getByTestId("auto-operation-strategy-executed"),
+    ).toHaveAttribute("data-verify-target", "executed");
+    await expect(
+      page.getByTestId("auto-operation-strategy-executed"),
+    ).toContainText("#1 SMA cross");
     await expectSingleMain(page);
   });
 
-  test("«Verificar D→hoy» navega al verificador DÍA-D LAB con el instrumento y la #1 (P4)", async ({
+  test("«Verificar D→hoy» navega al verificador DÍA-D LAB con el instrumento y la EJECUTADA (P4)", async ({
     page,
   }) => {
     await page.goto("/auto/operar/operacion/e2e-cycle-aaa");
 
     const cta = page.getByTestId("auto-operation-strategy-verify-dia-d");
     await expect(cta).toBeVisible();
+    // H6 — el CTA verifica la estrategia EJECUTADA del ciclo (resuelta por identidad EXACTA),
+    // no la «mejor disponible» del TOP.
+    await expect(cta).toHaveAttribute("data-verify-target", "executed");
     await expect(cta).toBeEnabled();
     await cta.click();
 
@@ -73,5 +91,43 @@ test.describe("GP-E2E-S5 — puente AUTO → estrategia → DÍA-D", () => {
     expect(url.searchParams.get("verify")).toBe("1");
     // El host del verificador DÍA-D queda montado (banner + película).
     await expect(page.getByTestId("dia-d-verify-host")).toBeVisible();
+  });
+
+  test("sin estrategia ejecutada resoluble el CTA se inhabilita y declara el hueco (H6)", async ({
+    page,
+  }) => {
+    // El ciclo declara una `presetKey` que NO existe en el TOP del valor: H6 es fail-closed y
+    // NUNCA cae en silencio al #1 (se declara el hueco y el CTA queda deshabilitado).
+    await installApiMocks(page, {
+      auto: true,
+      autoCyclePresetKey: "estrategia_no_declarada_en_el_top",
+    });
+    await page.goto("/auto/operar/operacion/e2e-cycle-aaa");
+
+    await expect(page.getByTestId("auto-operation-strategy")).toBeVisible();
+    // La cadena (instrumento → TOP → definición) SÍ se resuelve: el hueco es solo de la ejecutada.
+    await expect(page.getByTestId("auto-operation-strategy-gap")).toHaveCount(
+      0,
+    );
+    await expect(
+      page.getByTestId("auto-operation-strategy-preset-key"),
+    ).toContainText("estrategia_no_declarada_en_el_top");
+    await expect(
+      page.getByTestId("auto-operation-strategy-match"),
+    ).toHaveAttribute("data-match", "differs");
+
+    const executed = page.getByTestId("auto-operation-strategy-executed");
+    await expect(executed).toHaveAttribute("data-verify-target", "none");
+    await expect(executed).toContainText(
+      "no está entre las estrategias del valor",
+    );
+
+    const cta = page.getByTestId("auto-operation-strategy-verify-dia-d");
+    await expect(cta).toHaveAttribute("data-verify-target", "none");
+    await expect(cta).toBeDisabled();
+    await expect(cta).toHaveAttribute(
+      "title",
+      /no está entre las estrategias del valor/,
+    );
   });
 });
