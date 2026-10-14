@@ -73,6 +73,26 @@ Este sello **subsume** el cierre de `heading-order` de `v2.88.129` (`CardTitle` 
 
 ---
 
-## 6. `Release tag CI` del sello — **PENDIENTE**
+## 6. `Release tag CI` del sello — **VERDE**
 
-Tag `v2.88.130-beta` **pendiente de publicación**. **Base:** `v2.88.129-beta`.
+**Tag** `v2.88.130-beta` (anotado, unsigned) ⇒ objeto `1a91470c` ⇒ commit `f28bfb98b7d8d7d065b878cd93c6321f3b775947`. **Base:** `v2.88.129-beta`.
+
+**`Release tag CI`:** [run **`38578003227`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38578003227) — **`SUCCESS`** en **~14 min** (`2026-10-14T14:09:26Z` → `14:23:48Z`), **todos los jobs verdes**:
+
+| Job | Conclusión |
+| --- | --- |
+| `playwright (mock E2E)` | success |
+| `playwright (integrated AUTO S5)` | success |
+| `shared (build/typecheck/test)` | success |
+| `frontend (typecheck/lint/test/build + contract:check)` | success |
+| `python (ruff/imports/mypy/pytest offline)` | success |
+| `lifecycle-pg (Alembic + auth + golden restart)` | success |
+| `dr-verify (battery DB_DR / TCP CI)` | success |
+| `replay-repro (regenera el artefacto del sello desde el fixture)` | success |
+| `a7-gate (A7 C3 chaos live_a7 · dedicated real-PG)` | success |
+| `decision-spine` | success |
+| `security (gitleaks)` | success |
+| `certify (aggregate + artifact)` | success |
+| `playwright (integrated E2E, opt-in)` | **skipped** (opt-in por diseño) |
+
+**Lo decisivo:** el job `playwright (mock E2E)` —el que **rompió** a `v2.88.129` a móvil 390×844— queda **`success`** aquí; `certify` agrega y **certifica** con todos los obligatorios verdes. Con este run **VERDE**, el sello **subsume** definitivamente a `v2.88.129` (cuyo run `38574943655` quedó rojo).
