@@ -4,7 +4,7 @@
 > **Propósito:** reunir en un solo sitio **todo lo necesario para auditar esta versión desde GitHub sin credenciales**: identidad inmutable, cómo obtenerla, dónde está la evidencia, qué **certifica**, qué **NO**, y cómo **falsarlo**.
 > **Naturaleza:** documento de **evidencia/enlace**, no de producto. **`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0`** (verificación/tests + a11y de UI + E2E + docs). Tag **unsigned**.
 >
-> **⏳ Estado (POST-TAG):** la **identidad inmutable** del tag (§1) y el **run de CI del sello** (§4) **se citan en el commit POST-TAG** (patrón ya usado por `v2.88.131`); el resto de este pack queda **completo**.
+> **✅ Estado (POST-TAG):** la **identidad inmutable** del tag (§1: `lightweight` ⇒ commit `49f578408dc094a3db8b29459195032b6eb82f8b`) y el **run de CI del sello** (§4: `38602858232`) ya están **citados**; este pack queda **completo**.
 
 ---
 
@@ -14,7 +14,7 @@
 git clone --branch v2.88.132-beta --depth 1 https://github.com/jvelasca/Bolsa_V1.git
 ```
 
-> El `<SHA_DEL_SELLO>` exacto y la identidad completa del tag **se citan en el commit POST-TAG** (ver §1).
+> El `<SHA_DEL_SELLO>` exacto es **`49f578408dc094a3db8b29459195032b6eb82f8b`** (ver §1).
 
 ---
 
@@ -22,15 +22,15 @@ git clone --branch v2.88.132-beta --depth 1 https://github.com/jvelasca/Bolsa_V1
 
 | Elemento | Valor |
 | --- | --- |
-| **Tag** | `v2.88.132-beta` — **unsigned** (se cita en el POST-TAG si es anotado o *lightweight*) |
-| **Objeto de tag** | **se cita en el commit POST-TAG** |
-| **Commit apuntado** | **se cita en el commit POST-TAG** (el commit del fix del gate `axe` es `4ee01267`; el 2º arreglo —`aria-label` del `Dialog`, §2.4-bis de la evidencia— va en el commit del sello) |
+| **Tag** | `v2.88.132-beta` — **lightweight** (**unsigned**) |
+| **Objeto de tag** | **no hay objeto de tag** (lightweight: el nombre apunta **directo** al commit) |
+| **Commit apuntado** | `49f578408dc094a3db8b29459195032b6eb82f8b` (`v2.88.132 sello: …`; el commit previo del fix del gate `axe` es `4ee01267`; el 2º arreglo —`aria-label` del `Dialog`, §2.4-bis de la evidencia— va en el commit del sello) |
 | **Base (tag anterior)** | `v2.88.131-beta` → commit `6fec78b1611f8eb4024e7070cee960d3aec73b8e` |
 | **Versión monorepo** | `2.11.132-beta` ([`package.json`](../../package.json)) |
 | **Alembic head** | `053_dia_d_cycle_verifications` (**sin migración**) |
 | **Firma** | **unsigned** |
 
-> **Nota (flujo del repo).** Los sellos de este repo citan el **run del `Release tag CI`** en un **commit POST-TAG** (push del tag + publicación de la evidencia). Aquí, por tanto, la identidad del objeto de tag y el SHA apuntado **se completan en ese commit POST-TAG**; todo lo demás es auditable ya.
+> **Nota (flujo del repo).** Los sellos de este repo citan el **run del `Release tag CI`** en un **commit POST-TAG** (push del tag + publicación de la evidencia). Aquí, por tanto, la identidad del objeto de tag y el SHA apuntado **se completaron en el commit POST-TAG** (ya citados en §1/§4); todo lo demás es auditable ya.
 
 ---
 
@@ -39,7 +39,7 @@ git clone --branch v2.88.132-beta --depth 1 https://github.com/jvelasca/Bolsa_V1
 | Forma | Comando / enlace |
 | --- | --- |
 | Clonar el tag (recomendado) | `git clone --branch v2.88.132-beta --depth 1 https://github.com/jvelasca/Bolsa_V1.git` |
-| Fijar el commit SHA | `git checkout <SHA_DEL_SELLO>` (**se cita en el commit POST-TAG**) |
+| Fijar el commit SHA | `git checkout 49f578408dc094a3db8b29459195032b6eb82f8b` (**ver §1**) |
 | Ver el árbol en la web | [tree/v2.88.132-beta](https://github.com/jvelasca/Bolsa_V1/tree/v2.88.132-beta) |
 
 ---
@@ -61,12 +61,12 @@ git clone --branch v2.88.132-beta --depth 1 https://github.com/jvelasca/Bolsa_V1
 
 ## 4. CI público (citable)
 
-**Run del `Release tag CI` del sello:** **se cita en el commit POST-TAG** (patrón del repo). No se inventa su id ni su veredicto aquí.
+**Run del `Release tag CI` del sello:** [`38602858232`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38602858232) — **VERDE** (~11m19s, `2026-10-14T17:00:00Z` → `17:11:19Z`; **todos los jobs `success`, incluido el agregado `certify`**, con `playwright (integrated E2E, opt-in)` = `skipped` **por diseño**). El **gate duro** `playwright (integrated axe)` (job `115986220473`) queda **`success`** (`17:00:04Z` → `17:03:53Z`) y `replay-repro` **REPRODUCIDO** ⇒ `Δ decisión = 0` confirmado por CI. **Sello CERRADO.**
 
 **Runs reales ya conocidos y citables (referencias del flujo, NO el sello):**
 
 - **`workflow_dispatch` run [`38598160604`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38598160604)** (job ID `115970162301`): **el primer run real del gate `axe` integrado salió ROJO** en el paso `Run integrated axe E2E` (`1 failed` + 62 no ejecutados; el guard anti-skip pasó). Es la **evidencia del síntoma** que motivó el arreglo (§2.1/§2.2 de la evidencia).
-- **`workflow_dispatch` run `38600619089`** (job `playwright (integrated axe)` id `115978625527`): disparado **tras el fix `4ee01267`** (validación previa al sello). El job salió **ROJO en el intento 1** por `button-name` en `/trading @desktop` (botón de cierre del `Dialog` sin nombre accesible) y **VERDE en el reintento** (conclusión actual del job: `success`); **el run global quedó sin cerrar** (`in_progress`) porque el job `playwright (mock E2E)` quedó **atascado en cola** (infra del runner, ajeno al sello y a la accesibilidad). Causa raíz cerrada con `aria-label="Cerrar"` en [`dialog.tsx`](../../apps/web/src/components/ui/dialog.tsx) (evidencia §2.4-bis).
+- **`workflow_dispatch` run `38600619089`** (job `playwright (integrated axe)` id `115978625527`): disparado **tras el fix `4ee01267`** (validación previa al sello). El job salió **ROJO en el intento 1** por `button-name` en `/trading @desktop` (botón de cierre del `Dialog` sin nombre accesible) y **VERDE en el reintento** (conclusión actual del job: `success`); **el run global CERRÓ VERDE** (`completed`/`success`, 14m16s, `2026-10-14T16:58:37Z`; `playwright (mock E2E)` y `certify` verdes). Causa raíz cerrada con `aria-label="Cerrar"` en [`dialog.tsx`](../../apps/web/src/components/ui/dialog.tsx) (evidencia §2.4-bis).
 
 **Referencia de la base** `v2.88.131-beta`: `Release tag CI` [run `38594446027`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38594446027) — `success` (~13m22s).
 

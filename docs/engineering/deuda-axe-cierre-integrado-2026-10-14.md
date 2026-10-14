@@ -340,8 +340,11 @@ Error: [/trading @desktop] · button-name [critical] ×1 — Buttons must have d
   selector: .p-1.hover\:text-foreground.rounded
 ```
 
-El **run global quedó `in_progress`** (sin cerrar) porque el job `playwright (mock E2E)` quedó
-**atascado en cola** (infra del runner), **ajeno** al sello y a la accesibilidad.
+El **run global CERRÓ VERDE**: `completed` / `success` en 14m16s (`2026-10-14T16:58:37Z`), con
+`playwright (mock E2E)` y el agregado `certify` verdes (`playwright (integrated E2E, opt-in)` =
+`skipped` por diseño). **Corrección honesta:** una **lectura intermedia** de la vigilancia vio el
+job `playwright (mock E2E)` aún `queued` y se redactó «sin cerrar / atascado en cola»; el veredicto
+**final** es `success`, el de arriba.
 
 #### Causa raíz — botón icono-solo sin nombre accesible en el `Dialog` compartido
 
