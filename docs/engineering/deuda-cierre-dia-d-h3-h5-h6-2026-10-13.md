@@ -17,6 +17,14 @@
 > **sin migración** (head `053_dia_d_cycle_verifications`). **`H3`** (etapa `EXIT` propia) **sigue
 > ABIERTO** (exige ratificar el modelo semántico; fuera del alcance de esta pasada). El detalle y el
 > mapeo criterio→test están en cada sección.
+>
+> **Sello CERRADO (2026-10-14).** El tag `v2.88.126-beta` (anotado, **unsigned**; objeto `dcba2404` →
+> commit `7801474c`) quedó **verde** en `Release tag CI` [**38520405195**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38520405195)
+> (**15m24s**; 12/12 jobs `success` + `certify` `success`). El **primer** CI del sello (`38474776465`)
+> fue **rojo** por los **dos** E2E de `S5`: los **fixtures** no declaraban `strategyPresetKey` y, con
+> `H6`, el CTA es **fail-closed** (se deshabilita al no poder resolver la ejecutada). Corregido en
+> `7801474c` (`v2.88.126 FIX CI`: **solo fixtures + un test nuevo**; motor/decisión intactos) y el tag
+> se **movió** de `a6cd4fe3` a `7801474c`.
 
 ---
 

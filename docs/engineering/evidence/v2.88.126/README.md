@@ -82,3 +82,31 @@
 2. **Ventana PAPER longitudinal (`P3-2`/`P3-3`, ADR-046)** — el certificador **existe** (`v2.88.125`), pero la ventana **real** sigue **`NO MEDIDO`** (OPERACIÓN: ≥4 días de calendario / ≥2 episodios / ≥32 ciclos). **No** se emite `CONFIRMED`.
 3. **Ola 6 (Consola avanzada)** — sigue abierta (nivel 3 explícito pendiente); `heading-order` (11 rutas L1) y `axe` (solo con mocks) siguen como deuda preexistente.
 4. **P&L** — el DÍA-D certifica **identidad de fuentes y motivos**, no la **rentabilidad** ni la **magnitud** del resultado.
+
+---
+
+## 5. `Release tag CI` del sello — **verde** (con corrección declarada)
+
+**Resultado.** `Release tag CI` [**38520405195**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38520405195) **verde en 15m24s**: **12/12 jobs `success`** + `certify` `success` (`playwright (integrated E2E, opt-in)` = `skipped` por diseño). Lo decisivo para este incremento:
+
+| Job | Resultado | Qué certifica |
+|-----|-----------|---------------|
+| `playwright (integrated AUTO S5)` | **`success`** | El journey integrado del puente AUTO → estrategia → DÍA-D contra PG + API **reales**, con gates `E2E_S5_REQUIRED=1` + `E2E_INTEGRATION=1` + `E2E_ALLOW_DEV_DB=1` y **guard anti-skip sin `::error`**. |
+| `playwright (mock E2E)` | **`success`** | La suite E2E **completa** de mocks (incluye `GP-E2E-S5`, con la nueva aserción de la rama **fail-closed** de `H6`). |
+| `python (ruff/imports/mypy/pytest offline)` | **`success`** | `H5`: contrato aditivo + read-model + store (ruff/mypy/import-linter/pytest). |
+| `frontend (typecheck/lint/test/build + contract:check)` | **`success`** | `H6` (UI/shared) + contrato sincronizado (`contract:gen`/`contract:check`). |
+| `replay-repro` | **`success`** | El sello congelado **se reproduce** (`Δ decisión = 0`). |
+
+**Identidad del sello.** Tag anotado `v2.88.126-beta` (**unsigned**), objeto `dcba2404`, apuntando al commit `7801474c`; `origin/main` == `HEAD` == `7801474c`.
+
+**Corrección declarada (`v2.88.126 FIX CI`, commit `7801474c`).** El **primer** `Release tag CI` del sello (`38474776465`) salió **rojo** por los **dos** jobs E2E de `S5` — **no** por un defecto del código, sino porque los **fixtures** de test **no declaraban** la identidad de la estrategia **ejecutada** del ciclo (`strategyPresetKey`) y, con `H6`, el CTA «Verificar D→hoy» es **fail-closed**: al no poder resolver la ejecutada se **deshabilita** declarando el hueco (comportamiento **correcto** por diseño). Los specs esperaban el comportamiento **previo a `H6`** (CTA habilitado sin declarar la ejecutada).
+
+Qué se cambió (solo fixtures + un test nuevo; **motor/decisión intactos**):
+
+- [`e2e-mock-routes.ts`](../../../../apps/web/e2e/helpers/e2e-mock-routes.ts): `autoMonitorCycle` **declara** `strategyPresetKey` (default `sma_crossover`, que casa con el `strategyType` del TOP del mock) y se añade la opción `autoCyclePresetKey` para forzar el **desajuste**; el ciclo B queda **sin** clave (hueco honesto del contrato).
+- [`seed_auto_cycle_for_ui.py`](../../../../scripts/dev/seed_auto_cycle_for_ui.py): el hecho durable `auto_entry_decision` **sella** la identidad EXACTA (`payload.strategyPresetKey`, que el monitor publica aditivo) y se añade `--strategy-preset-key` (default `sma_crossover`); `_resolve_strategy` **reutiliza/crea** la estrategia de esa MISMA clave (sello determinista).
+- [`auto-cycle-seed.ts`](../../../../apps/web/e2e/helpers/auto-cycle-seed.ts): `seedAutoCycleForAccount` acepta `strategyPresetKey` y lo propaga al CLI.
+- [`gp-v288-s5-...-integrated.spec.ts`](../../../../apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts): siembra el ciclo con `PRESET_KEY` y aserta `data-verify-target="executed"`.
+- [`gp-e2e-s5-...-mock.spec.ts`](../../../../apps/web/e2e/gp-e2e-s5-auto-dia-d-bridge-mock.spec.ts): aserta la rama **habilitada** y añade un test **nuevo** que fija la rama **fail-closed** (`presetKey` ausente del TOP ⇒ CTA deshabilitado + hueco declarado).
+
+**Verificación local del fix.** `gp-e2e-s5` **3/3** · specs AUTO mock (`v28856`/`v28857`/`v28865`) **20/20** · integrada AUTO S5 (`E2E_S5_REQUIRED=1`, PG + API reales) **4/4** · `pnpm --filter @bolsa/web test` **2175 passed** · `typecheck`/`prettier`/`ruff check` **OK**. El tag se **movió** de `a6cd4fe3` a `7801474c` para que el sello apunte a un commit **verde** (mismo criterio que `v2.88.125-beta`).
