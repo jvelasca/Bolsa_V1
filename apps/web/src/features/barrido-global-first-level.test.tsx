@@ -20,6 +20,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   findFirstLevelDashes,
+  findFirstLevelFalseZeros,
   findFirstLevelGateLiterals,
   findFirstLevelViolations,
   FORBIDDEN_FIRST_LEVEL_TOKENS,
@@ -228,6 +229,31 @@ const WAVE_DASH_SURFACES: string[] = [
   "features/operational-console/operational-console-sections.tsx",
 ];
 
+/**
+ * Oleada 6 · Consola — superficies donde un hueco NO debe colapsarse a `0` (`UI5-14`,
+ * `UNKNOWN ≠ 0`). Es la fuga simétrica del comodín `—`: el guion admite que falta el dato,
+ * el `0` lo niega y se lee como «medido y en orden» (dead 0, drift 0, SLA verde). El gate
+ * exige `?? 0` fuera de un `TechnicalDetail`.
+ *
+ * Sólo se listan los tres ficheros de la consola cuyo PRIMER NIVEL se monta fuera del
+ * `TechnicalDetail` de la página (`operational-console-page.tsx:133-160`); el resto de
+ * superficies del repo queda fuera de este gate para no marcar ceros legítimos de nivel 2/3.
+ */
+const FALSE_ZERO_SURFACES: Array<{ name: string; file: string }> = [
+  {
+    name: "Consola · operational-console-page.tsx",
+    file: "features/operational-console/operational-console-page.tsx",
+  },
+  {
+    name: "Consola · operational-console-sections.tsx",
+    file: "features/operational-console/operational-console-sections.tsx",
+  },
+  {
+    name: "Consola · ops-incidents-and-links.tsx",
+    file: "features/operational-console/ops-incidents-and-links.tsx",
+  },
+];
+
 const DASH_SURFACES: string[] = [
   ...WAVE_DASH_SURFACES,
   "features/dashboard/dashboard-page.tsx",
@@ -428,5 +454,27 @@ describe("barrido global · «Gate» sin valor crudo en primer nivel (R-G1 / H-0
         "<TechnicalDetail>Gate ${x}</TechnicalDetail>",
       ),
     ).toEqual([]);
+  });
+});
+
+describe("barrido global · huecos sin colapsar a 0 en primer nivel (UI5-14 · UNKNOWN ≠ 0)", () => {
+  it.each(FALSE_ZERO_SURFACES)(
+    "$name declara el hueco en vez de rellenarlo con 0",
+    ({ file }) => {
+      expect(findFirstLevelFalseZeros(readSurface(file))).toEqual([]);
+    },
+  );
+
+  it("el gate de falso-cero detecta el colapso y respeta el nivel 3", () => {
+    expect(findFirstLevelFalseZeros("{stats?.dead ?? 0}")).toHaveLength(1);
+    expect(
+      findFirstLevelFalseZeros("<dd>{report.checked ?? 0}</dd>"),
+    ).toHaveLength(1);
+    expect(findFirstLevelFalseZeros("{stats.pending}")).toEqual([]);
+    expect(
+      findFirstLevelFalseZeros("<TechnicalDetail>{x ?? 0}</TechnicalDetail>"),
+    ).toEqual([]);
+    // Un cero legítimo ya materializado (sin `??`) no se marca.
+    expect(findFirstLevelFalseZeros("const x = 0;")).toEqual([]);
   });
 });

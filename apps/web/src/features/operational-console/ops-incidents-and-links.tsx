@@ -4,6 +4,7 @@ import {
   type OperationalIncidentKindV1,
   type OperationalIncidentV1,
 } from "@bolsa/shared";
+import { absentDataLabel } from "@/components/absent-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useActiveOperationalIncidents } from "@/features/operations/use-active-operational-incidents";
@@ -85,7 +86,7 @@ export function OpsIncidentsSection({
 export function OpsQuickLinksSection({
   pendingConfirm,
 }: {
-  pendingConfirm: number;
+  pendingConfirm: number | null;
 }) {
   const tiles = [
     {
@@ -103,7 +104,10 @@ export function OpsQuickLinksSection({
     {
       to: "/confirm",
       label: "Confirmar",
-      hint: `Cola SEMI (${pendingConfirm} pendientes)`,
+      hint:
+        pendingConfirm === null
+          ? `Cola SEMI (${absentDataLabel()})`
+          : `Cola SEMI (${pendingConfirm} pendientes)`,
       testId: "ops-link-confirm",
     },
     {

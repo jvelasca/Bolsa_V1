@@ -93,3 +93,22 @@ const GATE_LITERAL = /\bGate\b[^\S\n]*(?:\$\{|\{|[A-Z])/g;
 export function findFirstLevelGateLiterals(source: string): string[] {
   return stripTechnicalDetailBlocks(source).match(GATE_LITERAL) ?? [];
 }
+
+/**
+ * Colapso de un hueco a `0` en primer nivel (`UI5-14`, `UNKNOWN ≠ 0`).
+ *
+ * `?? 0` como valor de relleno de una celda convierte un dato **no medido** en un `0`
+ * que se lee como «medido y todo en orden» (p. ej. `dead 0`, `drift 0`, SLA verde). Es
+ * la fuga **simétrica** del comodín `—`: el guion admite que falta el dato, el `0` lo
+ * niega. Un hueco se declara (`absentDataLabel()`), nunca se colapsa a cero ni a verde.
+ *
+ * El gate exige el operador `??` pegado a un `0` literal, de modo que un cero **legítimo**
+ * (un recuento real ya proveniente de un dato materializado, o un valor dentro de un
+ * `TechnicalDetail`) no se marca.
+ */
+const FALSE_ZERO = /\?\?\s*0(?![.\d])/g;
+
+/** `?? 0` de primer nivel (vacío si el relleno solo vive en nivel 3 o no colapsa a cero). */
+export function findFirstLevelFalseZeros(source: string): string[] {
+  return stripTechnicalDetailBlocks(source).match(FALSE_ZERO) ?? [];
+}

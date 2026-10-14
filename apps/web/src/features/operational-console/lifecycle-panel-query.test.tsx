@@ -21,6 +21,7 @@ import {
 import {
   OpsFinancialIntegritySection,
   OpsLifecycleOutboxSection,
+  OpsLifecycleReconSection,
 } from "@/features/operational-console/operational-console-sections";
 
 afterEach(() => cleanup());
@@ -86,5 +87,27 @@ describe("paneles de lifecycle — mensaje honesto", () => {
     expect(
       screen.getByText(/No se pudo cargar financial integrity\./),
     ).toBeTruthy();
+  });
+});
+
+describe("paneles de lifecycle — el hueco se declara, no se colapsa a 0 (UI5-14)", () => {
+  it("outbox: sin dato declara el hueco y no pinta recuentos ni SLA verde", () => {
+    render(<OpsLifecycleOutboxSection stats={undefined} />);
+    expect(screen.getByTestId("ops-outbox-absent")).toBeTruthy();
+    expect(screen.queryByTestId("ops-outbox-sla")).toBeNull();
+    expect(screen.queryByTestId("ops-outbox-pending")).toBeNull();
+    expect(screen.queryByText("ok")).toBeNull();
+  });
+
+  it("integrity: sin dato declara el hueco y no pinta «clean» ni ceros", () => {
+    render(<OpsFinancialIntegritySection report={undefined} />);
+    expect(screen.getByTestId("ops-financial-integrity-absent")).toBeTruthy();
+    expect(screen.queryByTestId("ops-financial-integrity-status")).toBeNull();
+  });
+
+  it("recon: sin dato declara el hueco y no pinta «clean» ni ceros", () => {
+    render(<OpsLifecycleReconSection report={undefined} />);
+    expect(screen.getByTestId("ops-lifecycle-recon-absent")).toBeTruthy();
+    expect(screen.queryByTestId("ops-lifecycle-recon-status")).toBeNull();
   });
 });

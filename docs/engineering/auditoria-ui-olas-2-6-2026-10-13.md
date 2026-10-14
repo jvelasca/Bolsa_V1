@@ -1,6 +1,7 @@
 # Auditoría UI — olas 2..6 (re-verificación itemizada)
 
 > **AsOf:** 2026-10-13 · **Versión del árbol:** `2.11.124-beta` (raíz; `apps/web` = `0.1.0`).
+> **Revisión 2026-10-14 (pasada de profundidad UI):** se cierra **`O6-06`** —los tres paneles de lifecycle del primer nivel de la consola colapsaban huecos a `0`/verde— con *fix* + gate `findFirstLevelFalseZeros`; se ajustan §6 (§6.1/§6.2), §7 (censo) y §10-§11 en consecuencia. `Δ motor` y `Δ contrato` = 0.
 > **Estado:** **AUDITORÍA EN SOLO LECTURA** del código + **censo ejecutable ampliado** + **residuos mecánicos cerrados**. **NO es implementación de rediseño**: no se reescribe UI, no se mueve motor ni contrato HTTP.
 > **Naturaleza:** UI / producto / semántica. **`Δ motor = 0`** por construcción (el cambio solo toca `apps/web/**` + este doc).
 > **Padres:** [Auditoría UI 6.x global](./auditoria-ui-6-x-global-2026-10-08.md) (partición de olas §5, checklist §1.3, vara §4) · [UI Contract 5.0](./spec-ui-contract-5-0-2026-10-08.md) (registro regla→estado §5, `R-G1`/`R-G2` §2) · [entrega v2.88.91](./entrega-auditoria-externa-mia-v2.88.91-2026-10-08.md) (W2/W3/W4) · [entrega v2.88.92](./entrega-auditoria-externa-mia-v2.88.92-2026-10-08.md) §60 y [entrega v2.88.93](./entrega-auditoria-externa-mia-v2.88.93-2026-10-08.md) §59 (remediación: «ampliar el censo de superficies por oleadas con el mismo gate»).
@@ -167,7 +168,7 @@ La pregunta de esta fase: **¿siguen abiertas las olas 2..6?** Se re-verifica ca
 | --- | --- | --- | --- |
 | 1 | `h1` «Consola operacional» + copy de propósito | `operational-console-page.tsx:79-88` | ✅ |
 | 2 | Términos prohibidos | `PAPER_D_EXECUTE` solo tras el `TechnicalDetail` de la página (`:165-177`); `WFE` en primer nivel (ver O6-01) | ⚠️ |
-| 3 | `—` / `UNKNOWN` | `absentDataLabel()` en todas las celdas de hueco | ✅ |
+| 3 | `—` / `UNKNOWN` | `—` cerrado (O6-05); los recuentos de los tres paneles de lifecycle se colapsaban a `0`/verde | ✅ **(O6-06 corregido)** |
 | 4 | Disclosure único (`RT-04`) | `TechnicalDetail testId="ops-technical-detail"` (`operational-console-page.tsx:165`) | ✅ |
 | 5 | Nav vs acción vs información | «Resolver» = acción; «Ir a Cartera · Posiciones» = navegación; chips de estado = información | ✅ |
 | 6 | Semáforo | **P2 abierto** | ⚠️ |
@@ -181,8 +182,11 @@ La pregunta de esta fase: **¿siguen abiertas las olas 2..6?** Se re-verifica ca
 | O6-03 | Copy de cabecera mezcla propósito humano con abreviaturas (`recon`, «órdenes sin estado conocido») | `operational-console-page.tsx:82-88` | `RT-02` | **P2** | **abierto (menor):** unificar con el nivel 3 declarado |
 | O6-04 | `PAPER_D_EXECUTE` presente en `operational-console-sections.tsx` **solo** bajo el `TechnicalDetail` de la página | `operational-console-sections.tsx:461`, `:718` | `R-G1` | — | aceptado: **artefacto de alcance del gate por fichero** (ver §8). No es fuga de nivel 1 |
 | O6-05 | Huecos con vocabulario Opción B (`absentDataLabel`), nunca `—` | `operational-console-sections.tsx:112`, `:166`, `:216` | `UI5-14` | — | **cerrado (W2)** |
+| O6-06 | Los tres paneles de lifecycle (primer nivel) **colapsaban el hueco a `0`** y pintaban **SLA verde sin dato** (`?? 0`): `UNKNOWN ≠ 0` violado, no solo el guion | `operational-console-sections.tsx:83-101`, `:145-151`, `:247-263`, `:312-324`; `operational-console-page.tsx:70` | `UI5-14`/`RT-02` | **P1** | **cerrado (esta pasada):** la rejilla exige dato (`!stats`/`!report` ⇒ hueco declarado con `absentDataLabel()`) y el gate `findFirstLevelFalseZeros` lo blinda |
 
-**Abiertos:** O6-01, O6-02, O6-03 (P2, diseño). La ola 6 **sigue ABIERTA** (es la única con trabajo de diseño pendiente).
+> **O6-06 (registrado en la re-verificación de 2026-10-14).** La pasada anterior declaró la ola 6 «P2 abierto» dando por buenos los huecos por el hecho de que no había `—`. Eso confundía dos invariantes distintos: *sin comodín `—`* (cierto) y *sin colapsar el hueco a `0`/verde* (falso). Los tres paneles de lifecycle se montan en el **primer nivel** de la consola (fuera del `TechnicalDetail` de la página), y con la query deshabilitada (`effectiveAccountId` nulo) o sin material aún, `isLoading` es `false` en TanStack v5 ⇒ el guard `!isLoading && !isError` dejaba pasar la rejilla con `data === undefined`, pintando `pending 0`, `dead 0`, `drift 0` y un **SLA `ok` verde**. La ruta no tiene guarda de cuenta. Corregido gateando la rejilla por **presencia de dato** (patrón `loaded` de `auto-risk-summary.ts`) y sustituyendo cada `?? 0` de primer nivel por `absentDataLabel()`; el `pendingConfirm` de «Cola SEMI» y el literal `"unknown"` de `OpsReconSection` se alinean con el vocabulario Opción B.
+
+**Abiertos:** O6-01, O6-02, O6-03 (P2, diseño). La ola 6 **sigue ABIERTA** (es la única con trabajo de diseño pendiente). **O6-06 (P1) queda cerrado** en esta re-verificación.
 
 ---
 
@@ -209,6 +213,8 @@ Se amplía [`barrido-global-first-level.test.tsx`](../../apps/web/src/features/b
 
 **Control de falsabilidad del censo:** sigue verde con las nuevas superficies; se conservan los `it` de control positivo (`findFirstLevelViolations("<p>Recommendation · runId</p>")` detecta; el guion de prosa y el nivel 3 no se marcan).
 
+**Gate de falso-cero (`O6-06`).** Se añade `findFirstLevelFalseZeros` (`first-level-gate.ts`) y el bloque `FALSE_ZERO_SURFACES` al censo: exige que **no haya `?? 0` fuera de un `TechnicalDetail`** en los tres ficheros de la consola cuyo primer nivel se monta fuera del disclosure (`operational-console-page.tsx`, `operational-console-sections.tsx`, `ops-incidents-and-links.tsx`). Es la fuga simétrica del gate de `—`: el guion admite el hueco, el `0` lo niega. Se acompaña de un test de render por panel (`lifecycle-panel-query.test.tsx`) que verifica que, sin dato, los paneles declaran el hueco y **no** pintan recuentos ni SLA verde.
+
 ---
 
 ## 8. Residuos `—` (entregable 3)
@@ -231,7 +237,7 @@ Además se cierran dos residuos triviales fuera de ese trío, en la ola 4:
 | **3** | Mercado | `/trading` | **DONE** (1 P2 declarado) | **W3** (v2.88.91) | O3-02/O3-03 cerrados; O3-01 abierto; censo §7 |
 | **4** | Asesor | `/research` | **DONE** (2 P2 + 2 triviales) | **W4** (v2.88.91) | O4-03/O4-04 cerrados; O4-01/O4-02 abiertos; censo §7 |
 | **5** | Chrome · palette | barra + rail + palette | **DONE** (1 P2 declarado) | **W3** (v2.88.91) | O5-02/O5-03 cerrados; O5-01 abierto parcial |
-| **6** | Consola avanzada | `/operational-console` | **ABIERTA (P2)** | **W2** parcial | O6-01…O6-03 abiertos; O6-05 cerrado |
+| **6** | Consola avanzada | `/operational-console` | **ABIERTA (P2)** | **W2** parcial + re-verif. 2026-10-14 | O6-01…O6-03 abiertos; O6-05 cerrado; **O6-06 (P1) cerrado** |
 
 **Agregado:** olas 2-5 **DONE** (los P2 son residuos declarados, no fugas de primer nivel); **ola 6 ABIERTA** (nivel 3 explícito pendiente). Con esto «olas 2..6 abiertas» queda **falsado para 2..5** y **acotado a la ola 6**.
 
@@ -247,6 +253,7 @@ Además se cierran dos residuos triviales fuera de ese trío, en la ola 4:
 | 4 | El comodín `—` no existe en primer nivel en las superficies del censo. | Que `findFirstLevelDashes` devuelva algo distinto de `[]`. |
 | 5 | El censo cubre las superficies de las olas 2..6. | Que una superficie declarada en §7 desaparezca del test o que un fichero nuevo del alcance quede fuera. |
 | 6 | Esta auditoría no cambia motor ni contrato. | Que el diff toque `packages/py/**`, worker, umbrales, Alembic o `contract:gen`. |
+| 7 | La consola no colapsa un hueco a `0`/verde en primer nivel (`O6-06`). | Que `findFirstLevelFalseZeros` devuelva algo distinto de `[]` en `FALSE_ZERO_SURFACES`, o que un panel de lifecycle pinte recuentos/SLA sin dato (test de render). |
 
 ---
 
@@ -257,6 +264,17 @@ Además se cierran dos residuos triviales fuera de ese trío, en la ola 4:
 - **Modificado:** `apps/web/src/features/research/research-trial-result-block.tsx` (O4-03).
 - **Modificado:** `apps/web/src/features/research/research-lab-evidence.ts` (O4-04).
 - **Modificado:** `apps/web/src/features/research/research-first-level.test.tsx` (guardas O4-03/O4-04).
+
+**Re-verificación de profundidad (2026-10-14) — cierre de `O6-06`:**
+
+- **Modificado:** `apps/web/src/components/first-level-gate.ts` (`findFirstLevelFalseZeros`).
+- **Modificado:** `apps/web/src/features/barrido-global-first-level.test.tsx` (`FALSE_ZERO_SURFACES` + control de falsabilidad).
+- **Modificado:** `apps/web/src/features/operational-console/operational-console-sections.tsx` (rejilla por presencia de dato + `absentDataLabel()`; `OpsReconSection` sin `"unknown"`; dry-run con `formatOrAbsent`).
+- **Modificado:** `apps/web/src/features/operational-console/operational-console-page.tsx` (`pendingConfirm` nullable).
+- **Modificado:** `apps/web/src/features/operational-console/ops-incidents-and-links.tsx` (`OpsQuickLinksSection` declara el hueco de la cola).
+- **Modificado:** `apps/web/src/features/operational-console/lifecycle-panel-query.test.tsx` (test de render por panel).
+
+**Decisión declarada (no se toca):** `research-trial-result-block.tsx:213` (`commissionBps ?? 0` · `slippageBps ?? 0` · `spreadBps ?? 0`) usa el literal `0` **dentro** del `TechnicalDetail` (nivel 3) y representa el **coste por defecto del motor**, no un hueco de medida; se deja como está y queda fuera del gate `FALSE_ZERO_SURFACES`.
 
 ---
 

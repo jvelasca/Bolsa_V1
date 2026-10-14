@@ -12,7 +12,7 @@ import { fetchEstudioInstrumentIds } from "@/features/trading/estudio-membership
 import { api } from "@/lib/api";
 import { isAuthError } from "@/features/operational-console/lifecycle-panel-query";
 import { formatDateTimeCompact } from "@/lib/format";
-import { absentDataLabel } from "@/components/absent-data";
+import { absentDataLabel, formatOrAbsent } from "@/components/absent-data";
 
 function markClasses(mark: string): string {
   if (mark === "PASS") {
@@ -71,105 +71,109 @@ export function OpsLifecycleOutboxSection({
           <p className="text-xs text-muted-foreground">Cargando cola…</p>
         ) : null}
         {isError ? <SectionError error={error} what="outbox stats" /> : null}
-        {!isLoading && !isError ? (
-          <>
-            <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div>
-                <dt className="text-xs text-muted-foreground">pending</dt>
-                <dd
-                  className="font-medium tabular-nums"
-                  data-testid="ops-outbox-pending"
-                >
-                  {stats?.pending ?? 0}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">processing</dt>
-                <dd
-                  className="font-medium tabular-nums"
-                  data-testid="ops-outbox-processing"
-                >
-                  {stats?.processing ?? 0}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">dead</dt>
-                <dd
-                  className="font-medium tabular-nums"
-                  data-testid="ops-outbox-dead"
-                >
-                  {stats?.dead ?? 0}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">
-                  oldest pending
-                </dt>
-                <dd
-                  className="font-medium tabular-nums"
-                  data-testid="ops-outbox-oldest-age"
-                >
-                  {stats?.oldestPendingAgeSeconds == null
-                    ? absentDataLabel()
-                    : `${Math.round(stats.oldestPendingAgeSeconds)}s`}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">
-                  oldest processing
-                </dt>
-                <dd
-                  className="font-medium tabular-nums"
-                  data-testid="ops-outbox-oldest-processing"
-                >
-                  {stats?.oldestProcessingAgeSeconds == null
-                    ? absentDataLabel()
-                    : `${Math.round(stats.oldestProcessingAgeSeconds)}s`}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">oldest dead</dt>
-                <dd
-                  className="font-medium tabular-nums"
-                  data-testid="ops-outbox-oldest-dead"
-                >
-                  {stats?.oldestDeadAgeSeconds == null
-                    ? absentDataLabel()
-                    : `${Math.round(stats.oldestDeadAgeSeconds)}s`}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">SLA</dt>
-                <dd
-                  className={cn(
-                    "font-medium",
-                    stats?.slaBreached
-                      ? "text-rose-700 dark:text-rose-300"
+        {!isLoading && !isError && !stats ? (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="ops-outbox-absent"
+          >
+            {absentDataLabel()}
+          </p>
+        ) : null}
+        {!isLoading && !isError && stats ? (
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div>
+              <dt className="text-xs text-muted-foreground">pending</dt>
+              <dd
+                className="font-medium tabular-nums"
+                data-testid="ops-outbox-pending"
+              >
+                {stats.pending}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">processing</dt>
+              <dd
+                className="font-medium tabular-nums"
+                data-testid="ops-outbox-processing"
+              >
+                {stats.processing}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">dead</dt>
+              <dd
+                className="font-medium tabular-nums"
+                data-testid="ops-outbox-dead"
+              >
+                {stats.dead}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">oldest pending</dt>
+              <dd
+                className="font-medium tabular-nums"
+                data-testid="ops-outbox-oldest-age"
+              >
+                {stats.oldestPendingAgeSeconds == null
+                  ? absentDataLabel()
+                  : `${Math.round(stats.oldestPendingAgeSeconds)}s`}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">
+                oldest processing
+              </dt>
+              <dd
+                className="font-medium tabular-nums"
+                data-testid="ops-outbox-oldest-processing"
+              >
+                {stats.oldestProcessingAgeSeconds == null
+                  ? absentDataLabel()
+                  : `${Math.round(stats.oldestProcessingAgeSeconds)}s`}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">oldest dead</dt>
+              <dd
+                className="font-medium tabular-nums"
+                data-testid="ops-outbox-oldest-dead"
+              >
+                {stats.oldestDeadAgeSeconds == null
+                  ? absentDataLabel()
+                  : `${Math.round(stats.oldestDeadAgeSeconds)}s`}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">SLA</dt>
+              <dd
+                className={cn(
+                  "font-medium",
+                  stats.slaBreached
+                    ? "text-rose-700 dark:text-rose-300"
+                    : "text-emerald-700 dark:text-emerald-300",
+                )}
+                data-testid="ops-outbox-sla"
+              >
+                {stats.slaBreached ? "BREACHED" : "ok"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">ops state</dt>
+              <dd
+                className={cn(
+                  "font-medium",
+                  stats.operationalState === "BLOCKED"
+                    ? "text-rose-700 dark:text-rose-300"
+                    : stats.operationalState === "DEGRADED"
+                      ? "text-amber-800 dark:text-amber-200"
                       : "text-emerald-700 dark:text-emerald-300",
-                  )}
-                  data-testid="ops-outbox-sla"
-                >
-                  {stats?.slaBreached ? "BREACHED" : "ok"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">ops state</dt>
-                <dd
-                  className={cn(
-                    "font-medium",
-                    stats?.operationalState === "BLOCKED"
-                      ? "text-rose-700 dark:text-rose-300"
-                      : stats?.operationalState === "DEGRADED"
-                        ? "text-amber-800 dark:text-amber-200"
-                        : "text-emerald-700 dark:text-emerald-300",
-                  )}
-                  data-testid="ops-outbox-operational-state"
-                >
-                  {stats?.operationalState ?? absentDataLabel()}
-                </dd>
-              </div>
-            </dl>
-          </>
+                )}
+                data-testid="ops-outbox-operational-state"
+              >
+                {stats.operationalState ?? absentDataLabel()}
+              </dd>
+            </div>
+          </dl>
         ) : null}
         <p className="text-xs text-muted-foreground">
           Cola durable PositionState→Lifecycle · SLA ok + dead≠0 ≠ sano · no
@@ -205,7 +209,15 @@ export function OpsFinancialIntegritySection({
         {isError ? (
           <SectionError error={error} what="financial integrity" />
         ) : null}
-        {!isLoading && !isError ? (
+        {!isLoading && !isError && !report ? (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="ops-financial-integrity-absent"
+          >
+            {absentDataLabel()}
+          </p>
+        ) : null}
+        {!isLoading && !isError && report ? (
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div>
               <dt className="text-xs text-muted-foreground">status</dt>
@@ -213,7 +225,7 @@ export function OpsFinancialIntegritySection({
                 className="font-medium"
                 data-testid="ops-financial-integrity-status"
               >
-                {report?.status ?? absentDataLabel()}
+                {report.status}
               </dd>
             </div>
             <div>
@@ -221,33 +233,33 @@ export function OpsFinancialIntegritySection({
               <dd
                 className={cn(
                   "font-medium text-base",
-                  report?.operationalState === "BLOCKED"
+                  report.operationalState === "BLOCKED"
                     ? "text-rose-700 dark:text-rose-300"
-                    : report?.operationalState === "DEGRADED"
+                    : report.operationalState === "DEGRADED"
                       ? "text-amber-800 dark:text-amber-200"
                       : "text-emerald-700 dark:text-emerald-300",
                 )}
                 data-testid="ops-financial-integrity-ops"
               >
-                {report?.operationalState ?? absentDataLabel()}
+                {report.operationalState}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">portfolio</dt>
               <dd className="font-medium tabular-nums">
-                {report?.portfolioStatus ?? absentDataLabel()}
+                {report.portfolioStatus ?? absentDataLabel()}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">fill links</dt>
               <dd className="font-medium tabular-nums">
-                {report?.fillLinkIssues?.length ?? 0}
+                {report.fillLinkIssues?.length ?? absentDataLabel()}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">lifecycle</dt>
               <dd className="font-medium">
-                {report?.lifecycle?.status ?? absentDataLabel()}
+                {report.lifecycle?.status ?? absentDataLabel()}
               </dd>
             </div>
             <div>
@@ -255,9 +267,9 @@ export function OpsFinancialIntegritySection({
                 drift / lag / blocked
               </dt>
               <dd className="font-medium tabular-nums">
-                {report?.lifecycle?.driftCount ?? 0} /{" "}
-                {report?.lifecycle?.lagCount ?? 0} /{" "}
-                {report?.lifecycle?.blockedCount ?? 0}
+                {report.lifecycle?.driftCount ?? absentDataLabel()} /{" "}
+                {report.lifecycle?.lagCount ?? absentDataLabel()} /{" "}
+                {report.lifecycle?.blockedCount ?? absentDataLabel()}
               </dd>
             </div>
           </dl>
@@ -295,7 +307,15 @@ export function OpsLifecycleReconSection({
           <p className="text-xs text-muted-foreground">Cargando recon…</p>
         ) : null}
         {isError ? <SectionError error={error} what="lifecycle recon" /> : null}
-        {!isLoading && !isError ? (
+        {!isLoading && !isError && !report ? (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="ops-lifecycle-recon-absent"
+          >
+            {absentDataLabel()}
+          </p>
+        ) : null}
+        {!isLoading && !isError && report ? (
           <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div>
               <dt className="text-xs text-muted-foreground">status</dt>
@@ -303,25 +323,21 @@ export function OpsLifecycleReconSection({
                 className="font-medium"
                 data-testid="ops-lifecycle-recon-status"
               >
-                {report?.status ?? absentDataLabel()}
+                {report.status}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">checked</dt>
-              <dd className="font-medium tabular-nums">
-                {report?.checked ?? 0}
-              </dd>
+              <dd className="font-medium tabular-nums">{report.checked}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">drift</dt>
-              <dd className="font-medium tabular-nums">
-                {report?.driftCount ?? 0}
-              </dd>
+              <dd className="font-medium tabular-nums">{report.driftCount}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">lag / blocked</dt>
               <dd className="font-medium tabular-nums">
-                {report?.lagCount ?? 0} / {report?.blockedCount ?? 0}
+                {report.lagCount} / {report.blockedCount}
               </dd>
             </div>
           </dl>
@@ -500,7 +516,8 @@ export function OpsReconSection({
     string,
     unknown
   >;
-  const status = typeof recon.status === "string" ? recon.status : "unknown";
+  const status =
+    typeof recon.status === "string" ? recon.status : absentDataLabel();
   const note = typeof recon.note === "string" ? recon.note : null;
 
   return (
@@ -641,8 +658,8 @@ export function OpsEstudioAutoSection({
     },
     onSuccess: (res) => {
       const d = res.data;
-      const hits = d.hitCount ?? 0;
-      const cands = d.candidateCount ?? 0;
+      const hits = formatOrAbsent(d.hitCount, (v) => String(v));
+      const cands = formatOrAbsent(d.candidateCount, (v) => String(v));
       const status = d.executeStatus ?? "dry_run";
       setDryRunMsg(
         `Dry-run OK · ${status} · ${hits} hit(s) / ${cands} cand. · no execute`,

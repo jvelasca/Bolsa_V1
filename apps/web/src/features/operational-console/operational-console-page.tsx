@@ -67,7 +67,7 @@ export function OperationalConsolePage() {
     });
   }
 
-  const pendingConfirm = boardQuery.data?.data?.buckets?.pendingConfirm ?? 0;
+  const pendingConfirm = boardQuery.data?.data?.buckets?.pendingConfirm ?? null;
 
   return (
     <div
