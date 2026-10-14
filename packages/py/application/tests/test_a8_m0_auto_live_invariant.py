@@ -36,11 +36,31 @@ su superficie y su poder de detección:
   (``resolve_broker_adapter``, ``XtbBrokerAdapter``, ``IBrokerAdapter``,
   ``broker_adapter``, ``bolsa_application.broker_adapter``). Alcanzar la vía real
   por ``getattr``/``import`` dinámico ya no es un punto ciego.
+
+§8b (endurecimiento del residual `G3`, 2026-10-14) — se cubren formas **NO
+literales** sin introducir falsos positivos sobre el árbol actual:
+
+* ``getattr(<receptor>, <nombre NO literal>)`` cuando el receptor es un **módulo
+  importado** (nombre ligado a ``import``/``from … import``) o su identificador es
+  un nombre prohibido ⇒ ``getattr:dynamic@L<n>``.
+* ``importlib.import_module(...)`` / ``__import__(...)`` / ``eval(...)`` / ``exec(...)``
+  ya se marcan incondicionalmente (cubren el argumento literal y el no literal).
+* **Composición estática**: ``ast.BinOp`` (``+``) y ``ast.JoinedStr`` (f-strings)
+  cuyo texto reconstruible es IGUAL a un nombre prohibido ⇒
+  ``composed-name:<valor>@L<n>`` (p. ej. ``"resolve_broker" + "_adapter"``), aunque
+  ningún fragmento suelto coincida.
+
+**Residual declarado:** ``getattr(<objeto-local>, <variable>)`` sobre un objeto de
+datos (``getattr(self, field_name)``, ``getattr(row, name)``…) NO se marca: es
+indistinguible del acceso dinámico benigno sin análisis de flujo de datos y
+marcarlo rompería los barridos con ~46 falsos positivos. El invariante lo declara
+como límite (ver auditoría §7/§9), no como ausencia de barrera.
 """
 
 from __future__ import annotations
 
 import ast
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -131,6 +151,77 @@ def _imported_money_symbols(tree: ast.AST) -> set[str]:
     return found
 
 
+def _string_literal(node: ast.AST) -> str | None:
+    """Valor de un literal string, o ``None`` si el nodo no es un literal str."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
+
+
+def _composed_static_string(node: ast.AST) -> str | None:
+    """Texto estático de una composición de strings, o ``None`` si no es resoluble.
+
+    Cubre ``ast.BinOp`` con ``+`` (concatenación) y ``ast.JoinedStr`` (f-strings)
+    **solo** cuando TODAS sus partes son literales resolubles. Si alguna parte es
+    dinámica (variable, llamada…) devuelve ``None``: el invariante prefiere el falso
+    negativo (declarado en la auditoría) al falso positivo sobre el árbol actual.
+    """
+    literal = _string_literal(node)
+    if literal is not None:
+        return literal
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left = _composed_static_string(node.left)
+        right = _composed_static_string(node.right)
+        if left is None or right is None:
+            return None
+        return left + right
+    if isinstance(node, ast.JoinedStr):
+        parts: list[str] = []
+        for value in node.values:
+            if isinstance(value, ast.FormattedValue):
+                part = _composed_static_string(value.value)
+            else:
+                part = _composed_static_string(value)
+            if part is None:
+                return None
+            parts.append(part)
+        return "".join(parts)
+    return None
+
+
+def _module_bound_names(tree: ast.AST) -> set[str]:
+    """Nombres locales ligados a un ``import`` (módulo o alias) en el propio fichero.
+
+    Un ``getattr`` con 2º argumento NO literal solo es señal de dispatch dinámico
+    cuando el receptor puede ser un **módulo** (p. ej. ``import a.b as ba; getattr(ba, n)``
+    o ``from x import broker_adapter; getattr(broker_adapter, n)``). Sobre un objeto de
+    datos (``getattr(self, field_name)``, ``getattr(row, name)``…) es acceso de atributo
+    ordinario: marcarlo sería un falso positivo masivo sobre el repositorio actual y
+    obligaría a silenciar media base de código. Ese caso queda **declarado** como
+    residual del invariante.
+    """
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                names.add(alias.asname or alias.name.split(".")[0])
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                names.add(alias.asname or alias.name)
+    return names
+
+
+def _receiver_identifiers(node: ast.AST) -> set[str]:
+    """Identificadores que aparecen en la expresión receptora de un ``getattr``."""
+    identifiers: set[str] = set()
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Name):
+            identifiers.add(sub.id)
+        elif isinstance(sub, ast.Attribute):
+            identifiers.add(sub.attr)
+    return identifiers
+
+
 def _dynamic_dispatch_symbols(tree: ast.AST) -> set[str]:
     """G3 — referencias a la vía real construidas por NOMBRE/string en runtime.
 
@@ -138,25 +229,35 @@ def _dynamic_dispatch_symbols(tree: ast.AST) -> set[str]:
 
     * ``getattr(obj, "<símbolo de dinero>")`` (el 2º argumento es un literal igual a
       un nombre prohibido);
+    * ``getattr(<receptor>, <nombre NO literal>)`` cuando el receptor es un **módulo
+      importado** (o su identificador es un nombre prohibido) — dispatch construido
+      en runtime, p. ej. ``getattr(broker_adapter, name)``;
     * ``importlib.import_module(...)`` (import dinámico);
     * el builtin ``__import__(...)``;
     * los builtins ``eval(...)`` / ``exec(...)`` (código generado);
     * **literales string IGUALES** a un nombre prohibido (p. ej. la cadena
-      ``"resolve_broker_adapter"`` usada para construir la referencia).
+      ``"resolve_broker_adapter"`` usada para construir la referencia);
+    * **concatenaciones/f-strings** (``ast.BinOp`` / ``ast.JoinedStr``) cuyo texto
+      estático reconstruible es IGUAL a un nombre prohibido (p. ej.
+      ``"resolve_broker" + "_adapter"`` o ``f"{'resolve_broker'}_adapter"``), aunque
+      ninguno de sus fragmentos sueltos coincida por separado.
     """
     found: set[str] = set()
+    module_bound = _module_bound_names(tree)
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             func = node.func
             if isinstance(func, ast.Name):
                 if func.id == "getattr":
-                    if (
-                        len(node.args) >= 2
-                        and isinstance(node.args[1], ast.Constant)
-                        and isinstance(node.args[1].value, str)
-                        and node.args[1].value in _FORBIDDEN_DYNAMIC_NAMES
-                    ):
-                        found.add(f"getattr:{node.args[1].value}@L{node.lineno}")
+                    if len(node.args) >= 2:
+                        literal = _string_literal(node.args[1])
+                        if literal is not None:
+                            if literal in _FORBIDDEN_DYNAMIC_NAMES:
+                                found.add(f"getattr:{literal}@L{node.lineno}")
+                        elif _receiver_identifiers(node.args[0]) & (
+                            module_bound | _FORBIDDEN_DYNAMIC_NAMES
+                        ):
+                            found.add(f"getattr:dynamic@L{node.lineno}")
                 elif func.id == "__import__":
                     found.add(f"__import__@L{node.lineno}")
                 elif func.id in {"eval", "exec"}:
@@ -171,6 +272,10 @@ def _dynamic_dispatch_symbols(tree: ast.AST) -> set[str]:
         elif isinstance(node, ast.Constant) and isinstance(node.value, str):
             if node.value in _FORBIDDEN_DYNAMIC_NAMES:
                 found.add(f"string-literal:{node.value}@L{node.lineno}")
+        elif isinstance(node, (ast.BinOp, ast.JoinedStr)):
+            composed = _composed_static_string(node)
+            if composed is not None and composed in _FORBIDDEN_DYNAMIC_NAMES:
+                found.add(f"composed-name:{composed}@L{node.lineno}")
     return found
 
 
@@ -358,3 +463,115 @@ def test_auto_spine_execution_router_has_no_broker_adapter_dependency() -> None:
     assert "resolve_broker_adapter" not in source
     assert "XtbBrokerAdapter" not in source
     assert "IBrokerAdapter" not in source
+
+
+# ── 5. G3 residual: dispatch dinámico NO literal (tests puros, AST) ───────────────
+def _dynamic_hits(source: str) -> set[str]:
+    """Hallazgos del detector G3 para un fragmento de código (sin tocar el disco)."""
+    return _dynamic_dispatch_symbols(ast.parse(textwrap.dedent(source)))
+
+
+class TestDynamicDispatchSymbols:
+    """Fija por unidad el contrato del detector de dispatch dinámico (G3).
+
+    Positivos = formas construidas por nombre/string que SÍ deben marcar.
+    Negativos = formas benignas dominantes del repo que NO deben marcar (si marcan,
+    los barridos del monorepo dejan de estar en 0 hallazgos).
+    """
+
+    def test_literal_forbidden_getattr_marks(self) -> None:
+        # El literal del 2º arg también dispara la guarda de string-literal (esperado).
+        hits = _dynamic_hits('getattr(obj, "resolve_broker_adapter")')
+        assert "getattr:resolve_broker_adapter@L1" in hits, hits
+        assert "string-literal:resolve_broker_adapter@L1" in hits, hits
+
+    def test_literal_forbidden_module_getattr_marks(self) -> None:
+        hits = _dynamic_hits('getattr(obj, "broker_adapter")')
+        assert "getattr:broker_adapter@L1" in hits, hits
+        assert "string-literal:broker_adapter@L1" in hits, hits
+
+    def test_nonliteral_getattr_on_imported_module_marks(self) -> None:
+        hits = _dynamic_hits(
+            """
+            from bolsa_application import broker_adapter
+
+            name = "resolve"
+            fn = getattr(broker_adapter, name)
+            """
+        )
+        assert any(h.startswith("getattr:dynamic@L") for h in hits), hits
+
+    def test_nonliteral_getattr_on_import_alias_marks(self) -> None:
+        hits = _dynamic_hits(
+            """
+            import bolsa_application.broker_adapter as ba
+
+            fn = getattr(ba, attr_name)
+            """
+        )
+        assert any(h.startswith("getattr:dynamic@L") for h in hits), hits
+
+    def test_nonliteral_getattr_on_forbidden_ident_marks(self) -> None:
+        # DI: el receptor NO es un import, pero su identificador es un símbolo prohibido.
+        hits = _dynamic_hits("fn = getattr(self.broker_adapter, method_name)")
+        assert any(h.startswith("getattr:dynamic@L") for h in hits), hits
+
+    def test_nonliteral_getattr_on_instance_does_not_mark(self) -> None:
+        # Negativo = forma benigna dominante del repo (self/row/...): NO marca.
+        hits = _dynamic_hits(
+            """
+            def f(self, row):
+                a = getattr(self, field_name)
+                b = getattr(row, name, None)
+                return a, b
+            """
+        )
+        assert hits == set(), hits
+
+    def test_literal_benign_getattr_does_not_mark(self) -> None:
+        hits = _dynamic_hits('getattr(obj, "instrument_id")')
+        assert hits == set(), hits
+
+    def test_importlib_import_module_marks(self) -> None:
+        hits = _dynamic_hits(
+            """
+            import importlib
+
+            mod = importlib.import_module(build_name())
+            """
+        )
+        assert any(h.startswith("importlib.import_module@L") for h in hits), hits
+
+    def test_dunder_import_marks(self) -> None:
+        hits = _dynamic_hits("__import__(name)")
+        assert any(h.startswith("__import__@L") for h in hits), hits
+
+    def test_eval_marks(self) -> None:
+        hits = _dynamic_hits("eval(payload)")
+        assert any(h.startswith("builtin:eval@L") for h in hits), hits
+
+    def test_exec_marks(self) -> None:
+        hits = _dynamic_hits("exec(payload)")
+        assert any(h.startswith("builtin:exec@L") for h in hits), hits
+
+    def test_binop_composed_forbidden_name_marks(self) -> None:
+        # Ningún fragmento suelto es prohibido: solo la composición lo es.
+        hits = _dynamic_hits('name = "resolve_broker" + "_adapter"')
+        assert hits == {"composed-name:resolve_broker_adapter@L1"}, hits
+
+    def test_fstring_composed_forbidden_name_marks(self) -> None:
+        hits = _dynamic_hits("name = f\"{'resolve_broker'}{'_adapter'}\"")
+        assert hits == {"composed-name:resolve_broker_adapter@L1"}, hits
+
+    def test_binop_with_dynamic_part_does_not_mark(self) -> None:
+        hits = _dynamic_hits('name = "resolve_broker" + suffix')
+        assert not any(h.startswith("composed-name:") for h in hits), hits
+
+    def test_fstring_with_dynamic_part_does_not_mark(self) -> None:
+        hits = _dynamic_hits('name = f"resolve_{suffix}"')
+        assert not any(h.startswith("composed-name:") for h in hits), hits
+
+    def test_benign_similar_literal_does_not_mark(self) -> None:
+        # "broker_venue" NO es un nombre prohibido (guarda anti-sobreajuste).
+        hits = _dynamic_hits('label = "broker_venue"')
+        assert hits == set(), hits

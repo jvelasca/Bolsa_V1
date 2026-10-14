@@ -223,6 +223,7 @@ Estados intermedios que prueban la **falsabilidad** de los arreglos (logs locale
 - `apps/web/e2e/helpers/e2e-mock-routes.ts` — `meta` del mock de instrumento suelto.
 - `apps/web/e2e/helpers/database.ts` — `selectOpenableInstrument()` (seed determinista).
 - `apps/web/src/features/decision-journal/journal-studies-table.tsx` — región de scroll focusable.
+- `apps/web/src/components/ui/dialog.tsx` — `aria-label="Cerrar"` en el botón de cierre (2º hallazgo real en CI, §6.7).
 - `docs/engineering/deuda-axe-cierre-integrado-2026-10-14.md` — este documento.
 
 ## 6. PRIMER run real del gate en CI — rojo, causa raíz y cierre (2026-10-14)
@@ -308,6 +309,11 @@ pnpm --filter @bolsa/web exec playwright test gp-e2e-ui5-0-axe-integrated
 pnpm --filter @bolsa/web test            → 299 files / 2195 tests passed
 ```
 
+Tras el arreglo del `button-name` del `Dialog` (**§6.7**) el mismo barrido re-verificó en **modo
+requerido** con **32 passed** (38.3s), `/trading @desktop` **ok** y **0 violaciones `button-name`**;
+`pnpm --filter @bolsa/web test` **299 ficheros / 2195 passed**, `typecheck` **OK** y `lint`
+**0 errores / 23 warnings** (preexistentes); `prettier --check` del fichero tocado, limpio.
+
 ### 6.6 Límite que queda declarado (honesto)
 
 Con la BD de CI **sin barras**, el barrido integrado mide los **estados estructurales** de las
@@ -316,4 +322,85 @@ Con la BD de CI **sin barras**, el barrido integrado mide los **estados estructu
 (`gp-e2e-ui5-0-axe-touched-routes-mock`, con `install*Mocks`) y en la ejecución **local**
 documentada. Cerrar ese hueco exigiría sembrar barras sintéticas en la BD de CI —decisión de
 datos de mercado, fuera de un gate de accesibilidad— y **no** se hace aquí.
+
+### 6.7 SEGUNDO run real del gate en CI — rojo INTERMITENTE por `button-name` (botón de cierre del `Dialog`) y cierre
+
+Tras el fix `4ee01267`, el `Release tag CI` `workflow_dispatch` **`38600619089`** (sobre `main`,
+disparado `2026-10-14T16:44:21Z`) volvió a ejecutar el job `playwright (integrated axe)`
+(id **`115978625527`**) →
+https://github.com/jvelasca/Bolsa_V1/actions/runs/38600619089/job/115978625527.
+Resultado: **ROJO en el intento 1** y **VERDE en el reintento** (la conclusión actual del job es
+`success`). Es un hallazgo **distinto** del §6 (no es la precondición de datos de mercado).
+
+#### Síntoma exacto (log real del job, intento 1)
+
+```
+Error: [/trading @desktop] · button-name [critical] ×1 — Buttons must have discernible text
+  "html": "<button type=\"button\" class=\"rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground\">"
+  selector: .p-1.hover\:text-foreground.rounded
+```
+
+El **run global quedó `in_progress`** (sin cerrar) porque el job `playwright (mock E2E)` quedó
+**atascado en cola** (infra del runner), **ajeno** al sello y a la accesibilidad.
+
+#### Causa raíz — botón icono-solo sin nombre accesible en el `Dialog` compartido
+
+El botón de cierre del componente compartido **`Dialog`**
+([`dialog.tsx`](apps/web/src/components/ui/dialog.tsx)) es un botón **icono-solo**
+(`<X className="h-4 w-4" />`) **sin nombre accesible**. Su hermano
+[`slide-over.tsx`](apps/web/src/components/ui/slide-over.tsx) ya lo tenía (`aria-label="Cerrar panel"`).
+
+#### Barrido de hermanos (completitud) — 9 apariciones de la clase exacta
+
+**9 apariciones** de la clase exacta `rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground` en el árbol; `dialog.tsx` era la **ÚNICA** sin nombre accesible:
+
+| Fichero:línea | Nombre accesible |
+| --- | --- |
+| [`slide-over.tsx`](apps/web/src/components/ui/slide-over.tsx) :86 | `aria-label="Cerrar panel"` |
+| [`dialog.tsx`](apps/web/src/components/ui/dialog.tsx) :64 | ❌ → **ARREGLADO** `aria-label="Cerrar"` |
+| [`workspace-picker-dialog.tsx`](apps/web/src/features/workspace/workspace-picker-dialog.tsx) :281 | `title="Renombrar"` |
+| [`instruments-hub-filter-bar.tsx`](apps/web/src/features/instruments/instruments-hub-filter-bar.tsx) :242 | `title` + `aria-label="Configurar filtros favoritos"` |
+| [`instruments-hub-detail-panel.tsx`](apps/web/src/features/instruments/instruments-hub-detail-panel.tsx) :314 y :338 | `title="Desplegar detalle"` |
+| [`decision-ficha-panel.tsx`](apps/web/src/features/decision-journal/decision-ficha-panel.tsx) :729 y :757 | `title="Desplegar ficha"` |
+| [`backtest-favorites-menu.tsx`](apps/web/src/features/backtests/backtest-favorites-menu.tsx) :152 | `title` + `aria-label="${title}: más opciones y favoritos"` |
+
+#### Por qué era un FLAKE (real, no falso positivo)
+
+El `Dialog` se monta globalmente en
+[`platform-shell.tsx`](apps/web/src/components/layout/platform-shell.tsx) (p. ej.
+`WorkspacePickerDialog`) y solo está en el árbol accesible **si hay un diálogo abierto**; en el
+entorno del job (BD de CI **sin barras** y con el Nivel 2 de fixtures declarado como hueco) puede
+quedar abierto, mientras que en local (con datos/workspaces) no. El **reintento pasó precisamente
+porque el diálogo no estaba abierto** ⇒ el rojo era **real pero intermitente**; el arreglo
+elimina la **causa**, no el síntoma.
+
+#### Cierre
+
+`aria-label="Cerrar"` en el botón de cierre de
+[`dialog.tsx`](apps/web/src/components/ui/dialog.tsx) (**línea 65**), **línea única** añadida, en
+el commit del sello. **Falsabilidad:** si el `Dialog` vuelve a quedar sin nombre accesible,
+`button-name` vuelve a romper el barrido en cuanto un diálogo esté abierto.
+
+#### Evidencia local DESPUÉS del arreglo (salida real)
+
+```
+# Barrido integrado en MODO REQUERIDO (mismo env que el job de CI)
+pnpm --filter @bolsa/web exec playwright test gp-e2e-ui5-0-axe-integrated
+  Running 32 tests using 8 workers
+  32 passed (38.3s)          # /trading @desktop ok · 0 violaciones button-name
+
+pnpm --filter @bolsa/web test        → 299 ficheros / 2195 passed
+pnpm --filter @bolsa/web typecheck   → OK
+pnpm --filter @bolsa/web lint        → 0 errores / 23 warnings (preexistentes)
+pnpm exec prettier --check <fichero tocado> → limpio
+```
+
+#### Límite declarado (honesto, importante)
+
+El barrido integrado mide el **estado MONTADO** de cada ruta; los **estados modales** (diálogos
+y slide-overs) solo quedan cubiertos **si ocurren** durante el barrido. **NO** se fuerza la
+apertura de diálogos en el barrido ⇒ esta clase de violación puede quedar **latente** hasta que un
+modal se abra. Queda como **deuda declarada** (mejora futura: un leg determinista que abra el
+`Dialog` compartido y lo barra), **no** como cobertura lograda. **NO** se siembran barras ni
+workspaces sintéticos en CI (decisión de datos de mercado).
 
