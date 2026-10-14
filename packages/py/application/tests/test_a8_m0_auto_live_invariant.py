@@ -18,6 +18,24 @@ humano y la propia definición del puerto (``broker_adapter``).
    nuevo (AUTO o no) que cablee el broker rompe en CI sin que nadie recuerde añadirlo.
 2. **Doble-negación + ausencia de vía real en apps.** El spine ``execution_router`` no
    inyecta adapter, y NINGÚN módulo bajo ``apps/`` referencia la vía real.
+
+§8 (cierre de huecos de auditoría `G2`/`G3`, 2026-10-14) — el invariante amplía
+su superficie y su poder de detección:
+
+* **`G2` — alcance completo del monorepo.** El barrido ya NO se acota a
+  ``bolsa_application`` + ``apps/*/src``: también censa ``packages/py/{analytics,
+  infrastructure, market, domain, ai}/src``. La allowlist invertida sigue vigente:
+  la vía real solo puede vivir en ``bolsa_application.broker_adapter`` y en los
+  módulos CONFIRM autorizados; en el resto de paquetes la allowlist es **vacía**.
+  Un módulo nuevo de cualquier paquete que cablee el broker rompe en CI sin que
+  nadie recuerde añadirlo.
+* **`G3` — dispatch dinámico.** El detector deja de ser puramente nominal y marca
+  también referencias construidas por nombre/string: ``getattr(obj, "<símbolo de
+  dinero>")``, ``importlib.import_module(...)``, ``__import__(...)``, ``eval(...)``
+  / ``exec(...)``, y **literales string IGUALES** a un nombre prohibido
+  (``resolve_broker_adapter``, ``XtbBrokerAdapter``, ``IBrokerAdapter``,
+  ``broker_adapter``, ``bolsa_application.broker_adapter``). Alcanzar la vía real
+  por ``getattr``/``import`` dinámico ya no es un punto ciego.
 """
 
 from __future__ import annotations
@@ -36,6 +54,20 @@ _WORKER = (
 _BROKER_MODULE = "bolsa_application.broker_adapter"
 # Símbolos de la vía real (money).
 _MONEY_SYMBOLS = {"IBrokerAdapter", "resolve_broker_adapter", "XtbBrokerAdapter"}
+# G3 — nombres prohibidos que, apareciendo como string literal o como nombre de
+# ``getattr``, delatan una referencia DINÁMICA (construida por nombre) a la vía real.
+_FORBIDDEN_DYNAMIC_NAMES: frozenset[str] = frozenset(
+    _MONEY_SYMBOLS | {"broker_adapter", _BROKER_MODULE}
+)
+# G2 — paquetes del monorepo cuyo ``src`` también se barre. Para ellos la allowlist
+# invertida es VACÍA: la vía real solo puede vivir en bolsa_application.
+_OTHER_PACKAGE_ROOTS: dict[str, Path] = {
+    "analytics": _REPO / "packages" / "py" / "analytics" / "src",
+    "infrastructure": _REPO / "packages" / "py" / "infrastructure" / "src",
+    "market": _REPO / "packages" / "py" / "market" / "src",
+    "domain": _REPO / "packages" / "py" / "domain" / "src",
+    "ai": _REPO / "packages" / "py" / "ai" / "src",
+}
 
 # ── Allowlist INVERTIDA (única enumeración manual) ────────────────────────────────
 # Los ÚNICOS módulos que legítimamente pueden tocar la vía real. Todo lo demás —
@@ -65,7 +97,11 @@ _AUTO_BY_ROLE = (
 
 
 def _imported_money_symbols(tree: ast.AST) -> set[str]:
-    """Símbolos de la vía real importados/referenciados en un AST (imports + attrs)."""
+    """Símbolos de la vía real importados/referenciados en un AST (imports + attrs).
+
+    Cada hallazgo se anota con su línea (``símbolo@L<n>``) para que el fallo sea
+    trazable a ``file:line``.
+    """
     found: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
@@ -73,15 +109,15 @@ def _imported_money_symbols(tree: ast.AST) -> set[str]:
                 for alias in node.names:
                     name = alias.name.split(".")[0]
                     if name in _MONEY_SYMBOLS:
-                        found.add(name)
+                        found.add(f"{name}@L{node.lineno}")
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 if alias.name.startswith(_BROKER_MODULE):
-                    found.add("(module import of broker_adapter)")
+                    found.add(f"(module import of broker_adapter)@L{node.lineno}")
     # Referencias por atributo (p. ej. broker_adapter.resolve_broker_adapter(...)).
     for node in ast.walk(tree):
         if isinstance(node, ast.Attribute) and node.attr in _MONEY_SYMBOLS:
-            found.add(f"attribute:{node.attr}")
+            found.add(f"attribute:{node.attr}@L{node.lineno}")
     # El verbo que MUEVE dinero en la vía real: cualquier ``X.submit(...)`` (así se
     # detecta también lo que llega por DI — un adapter inyectado como callable, p. ej.
     # ``confirm/execution.py``— sin nombrar el símbolo del puerto).
@@ -91,7 +127,50 @@ def _imported_money_symbols(tree: ast.AST) -> set[str]:
             and isinstance(node.func, ast.Attribute)
             and node.func.attr == "submit"
         ):
-            found.add("call:.submit")
+            found.add(f"call:.submit@L{node.lineno}")
+    return found
+
+
+def _dynamic_dispatch_symbols(tree: ast.AST) -> set[str]:
+    """G3 — referencias a la vía real construidas por NOMBRE/string en runtime.
+
+    Marca los puntos ciegos del detector nominal:
+
+    * ``getattr(obj, "<símbolo de dinero>")`` (el 2º argumento es un literal igual a
+      un nombre prohibido);
+    * ``importlib.import_module(...)`` (import dinámico);
+    * el builtin ``__import__(...)``;
+    * los builtins ``eval(...)`` / ``exec(...)`` (código generado);
+    * **literales string IGUALES** a un nombre prohibido (p. ej. la cadena
+      ``"resolve_broker_adapter"`` usada para construir la referencia).
+    """
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Name):
+                if func.id == "getattr":
+                    if (
+                        len(node.args) >= 2
+                        and isinstance(node.args[1], ast.Constant)
+                        and isinstance(node.args[1].value, str)
+                        and node.args[1].value in _FORBIDDEN_DYNAMIC_NAMES
+                    ):
+                        found.add(f"getattr:{node.args[1].value}@L{node.lineno}")
+                elif func.id == "__import__":
+                    found.add(f"__import__@L{node.lineno}")
+                elif func.id in {"eval", "exec"}:
+                    found.add(f"builtin:{func.id}@L{node.lineno}")
+            elif (
+                isinstance(func, ast.Attribute)
+                and func.attr == "import_module"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "importlib"
+            ):
+                found.add(f"importlib.import_module@L{node.lineno}")
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if node.value in _FORBIDDEN_DYNAMIC_NAMES:
+                found.add(f"string-literal:{node.value}@L{node.lineno}")
     return found
 
 
@@ -123,8 +202,13 @@ def _app_source_roots() -> dict[str, Path]:
 
 
 def _reference_money(path: Path) -> set[str]:
+    """Toda señal (estática + dinámica) de que un módulo toca la vía real.
+
+    Une el censo nominal (``_imported_money_symbols``: imports/attrs/``.submit``) con
+    el detector de dispatch dinámico (``_dynamic_dispatch_symbols``: G3).
+    """
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    return _imported_money_symbols(tree)
+    return _imported_money_symbols(tree) | _dynamic_dispatch_symbols(tree)
 
 
 def _derive_auto_modules() -> dict[str, Path]:
@@ -198,6 +282,34 @@ def test_no_app_module_references_live_money_path() -> None:
     assert not offenders, (
         "Módulos de app referencian la vía LIVE real (prohibido: CONFIRM vive en el "
         f"paquete): {offenders}"
+    )
+
+
+# ── 2b. Barrido ampliado (G2): NINGÚN otro paquete del monorepo toca la vía real ──
+def test_no_other_package_references_live_money_path() -> None:
+    """G2 — el censo cubre TODOS los paquetes, no solo ``bolsa_application``.
+
+    La vía real solo puede vivir en la allowlist de ``bolsa_application``. Para el
+    resto de paquetes (``analytics``, ``infrastructure``, ``market``, ``domain``,
+    ``ai``) la allowlist invertida es VACÍA: cualquier módulo que importe/referencie
+    el puerto, llame a ``.submit`` o lo alcance por dispatch dinámico (G3) rompe aquí.
+    El mensaje lista cada hallazgo como ``paquete/fichero.py:símbolo@L<línea>``.
+    """
+    discovered = 0
+    offenders: list[str] = []
+    for pkg, root in _OTHER_PACKAGE_ROOTS.items():
+        assert root.is_dir(), (
+            f"paquete esperado ausente del barrido G2: {root}. Si de verdad ya no "
+            "existe, retíralo de _OTHER_PACKAGE_ROOTS (punto de auditoría)."
+        )
+        for rel, path in _collect_modules(root).items():
+            discovered += 1
+            for finding in sorted(_reference_money(path)):
+                offenders.append(f"{pkg}/{rel}:{finding}")
+    assert discovered, "el barrido ampliado G2 no descubrió ningún módulo — revisa las raíces"
+    assert not offenders, (
+        "Paquetes fuera de bolsa_application referencian la vía LIVE real (la vía real "
+        f"solo puede vivir en bolsa_application): {offenders}"
     )
 
 
