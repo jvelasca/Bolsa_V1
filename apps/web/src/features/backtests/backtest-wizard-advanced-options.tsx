@@ -63,7 +63,7 @@ export function BacktestWizardAdvancedOptions({
         <span className="font-medium text-foreground/80">
           Opciones avanzadas
         </span>
-        <span className="min-w-0 truncate tabular-nums opacity-80">
+        <span className="min-w-0 truncate tabular-nums">
           {isDiaDInPast(diaD) ? `DÍA D ${effectiveDiaD(diaD)} · ` : ""}
           {PERIOD_PRESET_OPTIONS.find((o) => o.value === periodPreset)?.label ??
             periodPreset}

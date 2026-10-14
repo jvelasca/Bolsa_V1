@@ -11,6 +11,11 @@
  *   - `/confirm`
  *   - command palette (overlay abierto con Ctrl/Cmd+K en `/mesa`)
  *
+ * UI 6.x — deuda `heading-order` (best-practice): se añaden las rutas L1 del censo
+ * (`/overview`, `/backtests`, `/accounts`, `/screeners`, `/alerts`, `/fiscal`,
+ * `/operational-console`, `/auto-monitor`) al mismo barrido; `expectNoHeadingOrderViolations`
+ * exige jerarquía `h1→h2→h3` sin saltos en ellas.
+ *
  * Patrón gemelo de `gp-e2e-v28865-auto-axe-mock.spec.ts` (skip-by-default).
  * UI/read-model puro: no toca motor (`Delta motor = 0`).
  *
@@ -30,6 +35,7 @@ import {
   installHoyPaperDayApiMocks,
   installLiveVirtualConfirmMocks,
   installMercadoApiMocks,
+  installAutoWorkspaceMocks,
 } from "./fixtures";
 
 const DESKTOP = { width: 1366, height: 768 } as const;
@@ -40,6 +46,12 @@ type RouteCase = {
   path: string;
   install: (page: Page) => Promise<void>;
   ready: (page: Page) => Promise<void>;
+  /**
+   * Sustituye la aserción de `main` por defecto. `/backtests` monta su contenido en el host
+   * keep-alive de `PlatformShell` (`data-testid="backtests-keepalive-host"`), que ES su `main`:
+   * el helper genérico lo excluye y resolvería a 0.
+   */
+  expectMain?: (page: Page) => Promise<void>;
 };
 
 const ROUTES: readonly RouteCase[] = [
@@ -106,6 +118,90 @@ const ROUTES: readonly RouteCase[] = [
       ).toBeVisible({ timeout: 15_000 });
     },
   },
+  // UI 6.x — deuda `heading-order`: rutas L1 con `<h1>` + cards que saltaban a `h3`.
+  // Cubren el fix (`CardTitle level="h2"`) por el mismo barrido axe que el resto.
+  {
+    name: "overview",
+    path: "/overview",
+    install: installApiMocks,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Overview" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  },
+  {
+    name: "backtests",
+    path: "/backtests",
+    install: installApiMocks,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Laboratorio" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+    // El `main` de `/backtests` es el host keep-alive del shell: se cuenta en vez de excluirlo.
+    expectMain: expectSingleMainIncludingKeepAlive,
+  },
+  {
+    name: "accounts",
+    path: "/accounts",
+    install: installApiMocks,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Cuentas" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  },
+  {
+    name: "screeners",
+    path: "/screeners",
+    install: installApiMocks,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Señales" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  },
+  {
+    name: "alerts",
+    path: "/alerts",
+    install: installApiMocks,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Alertas de precio" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  },
+  {
+    name: "fiscal",
+    path: "/fiscal",
+    install: installApiMocks,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Informe fiscal" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  },
+  {
+    name: "operational-console",
+    path: "/operational-console",
+    install: installApiMocks,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Consola operacional" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  },
+  {
+    name: "auto-monitor",
+    path: "/auto-monitor",
+    install: installAutoWorkspaceMocks,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Monitor AUTO" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  },
 ];
 
 /** Falla con detalle accionable si hay violaciones `critical`/`serious`. */
@@ -159,12 +255,21 @@ async function expectSingleMain(page: Page) {
   ).toHaveCount(1);
 }
 
+/**
+ * `/backtests` — su `main` ES el host keep-alive de `PlatformShell`, así que aquí se cuenta
+ * (a diferencia de `expectSingleMain`, que lo excluye porque en otras rutas puede estar montado
+ * oculto). El requisito de accesibilidad es el mismo: exactamente un `main` en el documento.
+ */
+async function expectSingleMainIncludingKeepAlive(page: Page) {
+  await expect(page.locator("main")).toHaveCount(1);
+}
+
 async function expectSingleH1(page: Page) {
   await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
 }
 
 test.describe("GP-E2E UI5-0 — rutas tocadas (axe)", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async () => {
     test.skip(!e2eEnabled(), E2E_SKIP_REASON);
   });
 
@@ -181,7 +286,7 @@ test.describe("GP-E2E UI5-0 — rutas tocadas (axe)", () => {
         await page.setViewportSize({ width: vp.width, height: vp.height });
         await page.goto(route.path);
         await route.ready(page);
-        await expectSingleMain(page);
+        await (route.expectMain ?? expectSingleMain)(page);
         await expectSingleH1(page);
         await expectNoHeadingOrderViolations(page, `${route.path} @${vp.name}`);
         await expectNoCriticalSerious(page, `${route.path} @${vp.name}`);

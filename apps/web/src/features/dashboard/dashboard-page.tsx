@@ -93,9 +93,9 @@ function ActiveAccountPanel() {
           ) : account ? (
             <>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="truncate text-xl font-semibold tracking-tight">
+                <h2 className="truncate text-xl font-semibold tracking-tight">
                   {account.name}
-                </h3>
+                </h2>
                 <span className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                   {accountTypeShortLabel(account.type)}
                 </span>
@@ -318,9 +318,9 @@ function ResearchHighlights() {
     <section className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Investigación · sync {HELP_CONTENT_AS_OF}
-          </h3>
+          </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Últimas mejoras: embudo Backtesting y motor de análisis fundamental
             (FIE).
@@ -549,9 +549,9 @@ export function OverviewPage() {
       <ResearchHighlights />
 
       <div>
-        <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Accesos
-        </h3>
+        </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <NavCard
             title="Trading"

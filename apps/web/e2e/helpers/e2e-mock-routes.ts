@@ -411,6 +411,62 @@ function autoDiaDFeedbackListMock() {
   };
 }
 
+/**
+ * Informe fiscal (`GET /api/accounts/{id}/tax-report`) — shape mínimo del `TaxReportSummaryDto`.
+ *
+ * Sin esta rama, `routeBody` cae al default `{ data: [] }`: `TaxReportPage` hace
+ * `report.realizedLines.length` sobre un ARRAY y revienta en el error boundary, así que el
+ * barrido axe de `/fiscal` nunca llegaba a ver su jerarquía real.
+ */
+function taxReportMock(year = new Date().getFullYear()) {
+  return {
+    data: {
+      accountId: E2E_ACCOUNT_ID,
+      currency: "EUR",
+      method: "fifo",
+      jurisdiction: "ES",
+      year,
+      periodLabel: `Ejercicio ${year}`,
+      realizedLines: [
+        {
+          id: "e2e-tax-line-1",
+          instrumentId: E2E_INSTRUMENT_ID,
+          symbol: E2E_SYMBOL,
+          sellTransactionId: "e2e-tax-tx-1",
+          executedAt: "2026-03-04T10:00:00.000Z",
+          quantity: 10,
+          sellPrice: 110,
+          proceeds: 1100,
+          costBasis: 1000,
+          realizedGain: 100,
+          method: "fifo",
+          acquisitionDates: ["2026-01-15T10:00:00.000Z"],
+        },
+      ],
+      totalGains: 100,
+      totalLosses: 0,
+      netRealizedGain: 100,
+      estimatedTaxLiability: null,
+      unrealizedLines: [
+        {
+          instrumentId: E2E_INSTRUMENT_ID,
+          symbol: E2E_SYMBOL,
+          quantity: 10,
+          avgCost: 100,
+          marketPrice: 102,
+          costBasis: 1000,
+          marketValue: 1020,
+          unrealizedGain: 20,
+        },
+      ],
+      totalUnrealizedGain: 20,
+      feesPaidTotal: 5,
+      dividendWithholdingPct: 19,
+      openPositionCount: 1,
+    },
+  };
+}
+
 /** Cola mínima para hidratar SupervisedF3 en smoke LIVE VIRTUAL. */
 function liveVirtualSupervisedF3Bundle() {
   const itemId = "e2e-live-virtual-f3-1";
@@ -857,6 +913,9 @@ export function routeBody(
         dayPnlPct: lifecycleSnap ? lifecycleSnap.dayPnlPct : deskDay ? 0.06 : 0,
       },
     };
+  }
+  if (path.endsWith("/tax-report")) {
+    return taxReportMock();
   }
   if (path.endsWith("/decision-studies")) {
     if (lifecycleDesk) {

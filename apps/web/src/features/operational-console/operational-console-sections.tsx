@@ -523,7 +523,9 @@ export function OpsReconSection({
   return (
     <Card data-testid="ops-recon-section">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Reconciliación OI-6 / LR-1</CardTitle>
+        <CardTitle level="h2" className="text-base">
+          Reconciliación OI-6 / LR-1
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
         <p

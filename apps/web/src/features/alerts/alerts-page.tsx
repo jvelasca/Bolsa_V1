@@ -151,7 +151,9 @@ export function AlertsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Nueva alerta</CardTitle>
+          <CardTitle level="h2" className="text-base">
+            Nueva alerta
+          </CardTitle>
           <CardDescription>
             Elige la fuente de precio según el tipo de alerta que necesites.
           </CardDescription>

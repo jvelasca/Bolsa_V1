@@ -67,7 +67,12 @@ function RealizedTable({ report }: { report: TaxReportSummaryDto }) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div
+      className="overflow-x-auto"
+      role="region"
+      aria-label={`Plusvalías realizadas · ${report.periodLabel}`}
+      tabIndex={0}
+    >
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -133,7 +138,12 @@ function UnrealizedTable({ report }: { report: TaxReportSummaryDto }) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div
+      className="overflow-x-auto"
+      role="region"
+      aria-label={`Posiciones abiertas · ${report.periodLabel}`}
+      tabIndex={0}
+    >
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs text-muted-foreground">
@@ -230,7 +240,9 @@ export function TaxReportPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Parámetros</CardTitle>
+          <CardTitle level="h2" className="text-base">
+            Parámetros
+          </CardTitle>
           <CardDescription>
             Método de coste y jurisdicción definidos en la cuenta ·{" "}
             <Link

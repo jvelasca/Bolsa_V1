@@ -45,7 +45,9 @@ export function AutoMonitorHeader({ header }: { header: AutoMonitorHeaderV1 }) {
       data-testid="auto-monitor-header"
     >
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Motor AUTO</CardTitle>
+        <CardTitle level="h2" className="text-sm">
+          Motor AUTO
+        </CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <Field

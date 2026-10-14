@@ -613,6 +613,7 @@ export function BacktestsPageRunTab({ vm }: { vm: BacktestPageViewModel }) {
           <Card className="border-0 shadow-none">
             <CardHeader className="space-y-0 px-3 pb-1.5 pt-3">
               <CardTitle
+                level="h2"
                 className="text-sm font-semibold"
                 title={
                   universeMode === "list"

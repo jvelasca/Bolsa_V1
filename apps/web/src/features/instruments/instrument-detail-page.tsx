@@ -290,7 +290,9 @@ export function InstrumentDetailPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Último cierre</CardTitle>
+            <CardTitle level="h2" className="text-sm font-medium">
+              Último cierre
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold tabular-nums">

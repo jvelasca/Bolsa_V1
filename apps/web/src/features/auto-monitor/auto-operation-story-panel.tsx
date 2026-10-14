@@ -360,7 +360,7 @@ export function AutoOperationStoryPanel({
       <Card className="rounded-xl border border-border bg-card">
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <CardTitle className="text-base">
+            <CardTitle level="h2" className="text-base">
               {identityLabel ?? "Operación"}
             </CardTitle>
             {selected ? (

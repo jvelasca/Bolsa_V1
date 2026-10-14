@@ -273,7 +273,7 @@ export function AccountDetailPanel({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-lg font-semibold">{account.name}</h3>
+              <h2 className="text-lg font-semibold">{account.name}</h2>
               {isWorkingAccount && !isClosed && (
                 <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-primary">
                   Activa

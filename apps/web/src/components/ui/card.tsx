@@ -27,12 +27,26 @@ export function CardHeader({
   );
 }
 
+/**
+ * Tags de encabezado admitidos por `CardTitle` (jerarquía documental).
+ * Se excluye `h1` a propósito: el `h1` es único por página y se escribe inline en la propia página.
+ */
+export type CardTitleLevel = "h2" | "h3" | "h4" | "h5" | "h6";
+
 export function CardTitle({
   className,
+  /**
+   * Nivel del encabezado. Por defecto `h3` (retrocompatible con las superficies
+   * existentes, donde la card cuelga de un `h2`). Pásalo a `"h2"` cuando la card
+   * sea el primer bloque de una página y su título deba colgar directamente del
+   * `h1` (evita el salto `h1 → h3` de la regla `heading-order`).
+   */
+  level = "h3",
   ...props
-}: React.HTMLAttributes<HTMLHeadingElement>) {
+}: React.HTMLAttributes<HTMLHeadingElement> & { level?: CardTitleLevel }) {
+  const Heading = level;
   return (
-    <h3
+    <Heading
       className={cn(
         "text-lg font-semibold leading-none tracking-tight",
         className,

@@ -166,7 +166,7 @@ Pregunta principal acordada: **«¿Qué requiere mi atención?»**. La pantalla 
 
 | Deuda | Estado | Ubicación |
 | --- | --- | --- |
-| `heading-order` (best-practice) en 11 rutas L1 | Abierta desde `v2.88.54`; preexistente, fuera del alcance de los sellos UI 6.0 | Declarada en §4 de [entrega v2.88.90](./entrega-auditoria-externa-mia-v2.88.90-2026-10-08.md) (no hay artefacto de código en `apps/web`) |
+| `heading-order` (best-practice) en 11 rutas L1 | **CERRADO en `v2.88.129` (2026-10-14)**: `CardTitle` con `level` opcional (default `h3`) + primer encabezado de las 8 rutas heredadas (+ `/instruments/:id`) a `h2`; gate unitario durable + barrido axe ampliado. Abierta desde `v2.88.54`; fuera del alcance de los sellos UI 6.0 | Declarada en §4 de [entrega v2.88.90](./entrega-auditoria-externa-mia-v2.88.90-2026-10-08.md) (no había artefacto de código en `apps/web`) |
 | Playwright **integrado** (E2E contra stack real) | `opt-in` / `skipped`; la certificación `axe` de `v2.88.90` es **con mocks** | [entrega v2.88.90](./entrega-auditoria-externa-mia-v2.88.90-2026-10-08.md) §4 |
 | `Gate N` en `mesa-candidates-panel` | Conservado como dato de decisión (no prohibido) | [`mesa-candidates-panel.tsx:225`](../../apps/web/src/features/mesa/mesa-candidates-panel.tsx) |
 | `submitted ≠ fill` en `account-venue-preference.tsx` | Conservado fuera de los slices | [`account-venue-preference.tsx:42-44`](../../apps/web/src/features/accounts/account-venue-preference.tsx) |
