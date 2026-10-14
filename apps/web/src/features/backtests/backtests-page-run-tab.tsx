@@ -604,6 +604,14 @@ export function BacktestsPageRunTab({ vm }: { vm: BacktestPageViewModel }) {
     zonePrefs,
   } = vm;
 
+  // `scrollable-region-focusable` (axe): el contenedor de resultados desborda y hace scroll
+  // cuando no está en foco de análisis; debe ser alcanzable por teclado (mismo criterio que las
+  // tablas fiscales). En el foco de análisis es `overflow-hidden` (no scrollea) y no aplica.
+  const resultsRegionScrollable = !(
+    isAnalysisResultFocus(resultFocus) &&
+    (detail || instrumentId)
+  );
+
   return (
     <>
       <BacktestHubLayout
@@ -1093,6 +1101,11 @@ export function BacktestsPageRunTab({ vm }: { vm: BacktestPageViewModel }) {
               </div>
             </CardHeader>
             <CardContent
+              role={resultsRegionScrollable ? "region" : undefined}
+              aria-label={
+                resultsRegionScrollable ? "Resultados del backtest" : undefined
+              }
+              tabIndex={resultsRegionScrollable ? 0 : undefined}
               className={cn(
                 "min-h-0 flex-1 p-3",
                 isAnalysisResultFocus(resultFocus) && (detail || instrumentId)

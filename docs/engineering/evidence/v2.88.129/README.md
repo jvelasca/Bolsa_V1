@@ -89,6 +89,17 @@ El error boundary / keep-alive **ocultaba** dos violaciones `serious` preexisten
 
 ---
 
-## 7. `Release tag CI` del sello — **PENDIENTE**
+## 7. `Release tag CI` del sello — **FALLIDO** (SUPERADO por `v2.88.130`)
 
-Tag `v2.88.129-beta` **pendiente de publicación**. **Base:** `v2.88.128-beta`.
+**Tag** `v2.88.129-beta` (anotado, unsigned) ⇒ objeto `b30e6bb0` ⇒ commit `51b368bf`. **Base:** `v2.88.128-beta`.
+
+**`Release tag CI`:** [run **`38574943655`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38574943655) — **`FAILED`** en el job **`playwright (mock E2E)`**, con el test literal:
+
+```
+[/backtests @móvil 390×844] · scrollable-region-focusable [serious] ×1 — Scrollable region must have keyboard access
+```
+
+sobre el nodo `.p-3.overflow-auto.pt-0`. El resto de jobs del run quedaron **verde** (incl. `playwright (integrated AUTO S5)`) y `certify` falló **por agregar el job rojo**.
+
+**SUPERADO por `v2.88.130`:** [`../v2.88.130/README.md`](../v2.88.130/README.md) corrige la causa (a11y del contenedor de resultados scrolleable de backtests) y subsume este cierre con CI verde.
+

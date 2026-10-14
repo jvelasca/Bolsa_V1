@@ -319,13 +319,18 @@ jobs:
       # el host DÍA-D y arranca el run real; el tramo del puente se declara SKIPPED con motivo
       # explícito si la BD no tiene un ciclo AUTO durable (el worker del motor no corre en CI),
       # igual que el resto de huecos declarados de este job opt-in.
+      #
+      # GP-E2E UI5-0 (integrado): barrido `axe` (WCAG A/AA critical/serious + `heading-order`)
+      # sobre un subconjunto ACOTADO de rutas L1 contra el stack real (hermano integrado del
+      # barrido mock). Es OPT-IN como el resto del job: sin `E2E_INTEGRATION=1` + API sana +
+      # `E2E_ALLOW_DEV_DB=1` el spec se declara SKIPPED con motivo, nunca un falso verde.
       - name: Run integrated browser E2E
         working-directory: apps/web
         env:
           E2E_RUN: '1'
           E2E_INTEGRATION: '1'
           E2E_ALLOW_DEV_DB: '1'
-        run: pnpm exec playwright test gp-v164-ui gp-v167 gp-v168 gp-v170-list gp-v187 gp-v288-s5
+        run: pnpm exec playwright test gp-v164-ui gp-v167 gp-v168 gp-v170-list gp-v187 gp-v288-s5 gp-e2e-ui5-0-axe-integrated
 
   # V2.88.106 (H2) — el E2E integrado del S5 (puente AUTO → estrategia → DÍA-D) deja de ser
   # opt-in: se ejecuta en CADA push de tag contra PostgreSQL + API reales. `E2E_S5_REQUIRED=1`
