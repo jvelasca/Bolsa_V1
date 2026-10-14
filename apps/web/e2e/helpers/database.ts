@@ -74,6 +74,60 @@ export async function assertApiHealthy(
 }
 
 /** Crea cuenta aislada, workspace con gráfico AAPL y buy opcional vía HTTP real. */
+/**
+ * Elige un instrumento **abrible** para el seed integrado.
+ *
+ * `check_opening` (DS-05) veta el buy si las barras están caducadas (>5 días, alineado con
+ * `EOD_STALE_MAX_DAYS`) o traen saltos >50 % (advertencia `movimiento … %` /
+ * `split/dividendo`, típico de un split sin ajustar). El catálogo real puede presentar
+ * instrumentos vetados (p. ej. ACS, +802 % hoy) y el orden de `/api/instruments` no es
+ * contractual, así que escoger `instruments[0]` a ciegas hace el fixture **no determinista**
+ * (`403 risk_veto`). Aquí se prefiltra por `/data-status` con el MISMO criterio del gate:
+ * sin advertencia de `movimiento`/`split` y con `lastBarDate` ≤ 5 días. Si ningún candidato
+ * pasa el filtro (fail-closed) se devuelve preferido/primero y será el gate real quien
+ * decida — nunca se inventan datos.
+ */
+async function selectOpenableInstrument(
+  request: APIRequestContext,
+  baseURL: string,
+  catalog: Array<{ id: string; symbol: string }>,
+  maxProbes = 25,
+): Promise<{ id: string; symbol: string } | undefined> {
+  const preferred = catalog.find((row) => row.id === E2E_INSTRUMENT_ID);
+  const ordered = preferred
+    ? [preferred, ...catalog.filter((row) => row.id !== preferred.id)]
+    : [...catalog];
+  for (const candidate of ordered.slice(0, maxProbes)) {
+    try {
+      const statusRes = await request.get(
+        new URL(
+          `/api/instruments/${candidate.id}/data-status`,
+          baseURL,
+        ).toString(),
+      );
+      if (!statusRes.ok()) continue;
+      const status = (
+        (await statusRes.json()) as {
+          data?: { lastBarDate?: string | null; sanityWarnings?: string[] };
+        }
+      ).data;
+      const sanityVeto = (status?.sanityWarnings ?? []).some((warning) =>
+        /movimiento|split\/dividendo/i.test(warning),
+      );
+      const lastBar = status?.lastBarDate;
+      const ageDays = lastBar
+        ? (Date.now() - Date.parse(lastBar)) / 86_400_000
+        : Number.POSITIVE_INFINITY;
+      if (!sanityVeto && ageDays <= 5) {
+        return candidate;
+      }
+    } catch {
+      // `/data-status` no disponible ⇒ se prueba el siguiente candidato.
+    }
+  }
+  return ordered[0];
+}
+
 export async function ensureMercadoIntegrationFixture(
   request: APIRequestContext,
   baseURL: string,
@@ -92,8 +146,11 @@ export async function ensureMercadoIntegrationFixture(
     id: string;
     symbol: string;
   }>;
-  const instrument =
-    instruments.find((row) => row.id === E2E_INSTRUMENT_ID) ?? instruments[0];
+  const instrument = await selectOpenableInstrument(
+    request,
+    baseURL,
+    instruments,
+  );
   if (!instrument) {
     throw new Error("No instruments available for Mercado E2E seed.");
   }

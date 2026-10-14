@@ -16,6 +16,13 @@
  * `/operational-console`, `/auto-monitor`) al mismo barrido; `expectNoHeadingOrderViolations`
  * exige jerarquía `h1→h2→h3` sin saltos en ellas.
  *
+ * Ampliación 2026-10-14 (cobertura mock COMPLETA): se suman las rutas L1 del censo que aún
+ * no barría este spec — `/instruments`, `/instruments/:id` y `/decision-journal`. Con ellas
+ * el censo **no-AUTO** queda cubierto al completo (el espacio AUTO tiene su propio barrido
+ * `gp-e2e-v28865-auto-axe-mock.spec.ts`). Además se rellenó el `meta`
+ * (`priceSummary`/`lastSync`) del mock de instrumento suelto: sin él `/instruments/:id`
+ * reventaba en el error boundary y el barrido nunca veía su jerarquía real.
+ *
  * Patrón gemelo de `gp-e2e-v28865-auto-axe-mock.spec.ts` (skip-by-default).
  * UI/read-model puro: no toca motor (`Delta motor = 0`).
  *
@@ -37,6 +44,7 @@ import {
   installMercadoApiMocks,
   installAutoWorkspaceMocks,
 } from "./fixtures";
+import { E2E_INSTRUMENT_ID } from "./integration";
 
 const DESKTOP = { width: 1366, height: 768 } as const;
 const MOBILE = { width: 390, height: 844 } as const;
@@ -200,6 +208,42 @@ const ROUTES: readonly RouteCase[] = [
       await expect(
         page.getByRole("heading", { level: 1, name: "Monitor AUTO" }),
       ).toBeVisible({ timeout: 15_000 });
+    },
+  },
+  // Cobertura mock COMPLETA — rutas L1 que aún no barría este spec (el resto del censo
+  // no-AUTO ya estaba cubierto; el espacio AUTO tiene su propio barrido `gp-e2e-v28865`).
+  {
+    name: "instruments",
+    path: "/instruments",
+    install: installMercadoApiMocks,
+    ready: async (page) => {
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Instrumentos" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  },
+  {
+    name: "instruments-detail",
+    path: `/instruments/${E2E_INSTRUMENT_ID}`,
+    install: installMercadoApiMocks,
+    ready: async (page) => {
+      // La ficha monta su `h1` (símbolo + nombre) cuando el instrumento cargó.
+      await expect(
+        page.getByRole("heading", { level: 1, name: "AAPL" }),
+      ).toBeVisible({ timeout: 15_000 });
+    },
+  },
+  {
+    name: "decision-journal",
+    path: "/decision-journal",
+    install: installApiMocks,
+    ready: async (page) => {
+      await expect(page.getByTestId("decision-journal")).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Decision Journal" }),
+      ).toBeVisible();
     },
   },
 ];

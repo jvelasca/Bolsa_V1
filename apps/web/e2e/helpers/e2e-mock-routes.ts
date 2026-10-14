@@ -1220,6 +1220,22 @@ export function routeBody(
         exchange: "NASDAQ",
         currency: "USD",
       },
+      // `InstrumentDetailResponseDto` exige `meta` (`priceSummary`/`lastSync`): sin él la
+      // ficha `/instruments/:id` revienta en el error boundary ("Cannot read properties of
+      // undefined (reading 'priceSummary')") y el barrido axe nunca ve su jerarquía real.
+      meta: {
+        lastSync: {
+          lastSyncAt: "2026-08-30T00:00:00.000Z",
+          status: "success",
+          barCount: 30,
+        },
+        priceSummary: {
+          lastClose: 102,
+          changePct: 2,
+          barCount: 30,
+          lastBarDate: "2026-08-30",
+        },
+      },
     };
   }
   if ((mercado || multi || hoyStale) && path.endsWith("/strategy-top")) {

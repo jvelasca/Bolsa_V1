@@ -354,7 +354,18 @@ export function JournalStudiesTable({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto">
+      {/*
+        `scrollable-region-focusable` (axe): en móvil (390×844) la tabla desborda y hace
+        scroll; la región debe ser alcanzable por teclado (mismo criterio que
+        `/backtests` y las tablas fiscales). `role="region"` + `aria-label` la nombran
+        para lectores de pantalla.
+      */}
+      <div
+        role="region"
+        aria-label="Estudios del Decision Journal"
+        tabIndex={0}
+        className="min-h-0 flex-1 overflow-auto"
+      >
         <div
           className="sticky top-0 z-[1] border-b border-border bg-muted/80 backdrop-blur-sm"
           style={{ minWidth: gridMinWidth }}
