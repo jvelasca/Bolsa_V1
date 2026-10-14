@@ -442,8 +442,6 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v46_multiprocess_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           --ignore=packages/py/application/tests/test_auto_engine_state_store_hermetic.py
-          --ignore=packages/py/application/tests/test_broker_adapter.py
-          --ignore=packages/py/application/tests/test_broker_venue_per_account.py
           --ignore=packages/py/application/tests/test_custody_idempotency.py
           --ignore=packages/py/application/tests/test_decision_spine.py
           --ignore=packages/py/application/tests/test_dex2_crash_restart_cross_pid.py

@@ -831,8 +831,6 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v46_crash_injection_pg.py
           --ignore=apps/api-python/tests/test_auto_v46_multiprocess_pg.py
           --ignore=packages/py/application/tests/test_auto_engine_state_store_hermetic.py
-          --ignore=packages/py/application/tests/test_broker_adapter.py
-          --ignore=packages/py/application/tests/test_broker_venue_per_account.py
           --ignore=packages/py/application/tests/test_custody_idempotency.py
           --ignore=packages/py/application/tests/test_decision_spine.py
           --ignore=packages/py/application/tests/test_dex2_crash_restart_cross_pid.py
@@ -1038,9 +1036,14 @@ jobs:
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
       # G2 / `OBS-19` (2026-10-03) — tanda W-G2/2 del agujero DECLARADO de selección de tests.
-      # Estos 34 ficheros existían y NO los ejecutaba ningún job: el job offline los deja fuera
+      # Estos 32 ficheros existían y NO los ejecutaba ningún job: el job offline los deja fuera
       # con `--ignore` porque requieren PostgreSQL real. Verificado antes de cablear contra PG
       # real (200 passed, 1 xfailed) y cubierto por el gate de procedencia de abajo.
+      # v2.88.127 — cierre de G1 P2: `test_broker_adapter.py` y
+      # `test_broker_venue_per_account.py` se MUEVEN de esta tanda al pase por commit de
+      # `python-ci.yml` (pase de directorio `packages/py/application/tests`) por ser
+      # HERMÉTICOS: pasan sin PG alcanzable (verificado con `DATABASE_URL` a host/puerto
+      # inexistente). El lote PG baja de 34 a 32 ficheros.
       #
       # Va en paso DEDICADO (sesión de pytest propia) a propósito: la sesión larga de
       # lifecycle/golden certifica otra cosa y ésta es una certiFICACIÓN PG autocontenida
@@ -1052,13 +1055,11 @@ jobs:
       # estos ficheros vuelve a quedarse sin job; la línea base declarada vive en
       # `scripts/ci/ci-test-selection-baseline.json` y se regenera con
       # `uv run --no-sync python scripts/ci/test_selection.py --write-baseline`.
-      - name: Pytest W-G2/2 PostgreSQL batch (34 files, OBS-19/G2)
+      - name: Pytest W-G2/2 PostgreSQL batch (32 files, OBS-19/G2)
         run: >
           uv run pytest
           apps/api-python/tests/test_f7b_legacy_user_id_backfill.py
           packages/py/application/tests/test_auto_engine_state_store_hermetic.py
-          packages/py/application/tests/test_broker_adapter.py
-          packages/py/application/tests/test_broker_venue_per_account.py
           packages/py/application/tests/test_custody_idempotency.py
           packages/py/application/tests/test_decision_spine.py
           packages/py/application/tests/test_dex2_crash_restart_cross_pid.py
