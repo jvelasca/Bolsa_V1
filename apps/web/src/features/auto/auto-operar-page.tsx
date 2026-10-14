@@ -30,6 +30,7 @@ import {
 } from "@/features/auto/auto-nav";
 import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
 import { AutoTop3Panel } from "@/features/auto/auto-top3-panel";
+import { AutoOperarVerifyAction } from "@/features/auto/auto-operar-verify-action";
 import { useAutoTop3Opportunities } from "@/features/auto/use-auto-top3-opportunities";
 import { AUTO_OPERATION_MODE } from "@/features/operations/operation-mode";
 import { mesaOportunidadesHref } from "@/features/mesa/mesa-nav-links";
@@ -131,13 +132,16 @@ export function AutoOperarPage() {
                 statusLabel: ladder.label,
               });
               return (
-                <li key={cycle.cycleId}>
+                <li
+                  key={cycle.cycleId}
+                  className="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-accent"
+                >
                   <Link
                     to={autoOperacionHref(cycle.cycleId)}
                     data-testid="auto-operar-operation-link"
                     data-cycle-id={cycle.cycleId}
                     title={identity.label}
-                    className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border border-border px-3 py-2 text-sm hover:bg-accent hover:text-foreground"
+                    className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 hover:text-foreground"
                   >
                     <span className="font-medium">{identity.label}</span>
                     <ModeBadge
@@ -153,6 +157,9 @@ export function AutoOperarPage() {
                       Ver operación →
                     </span>
                   </Link>
+                  {/* P2 — entrada descubrible a la verificación DÍA-D desde el listado:
+                      solo aparece si la estrategia EJECUTADA del ciclo se resuelve. */}
+                  <AutoOperarVerifyAction cycle={cycle} />
                 </li>
               );
             })}

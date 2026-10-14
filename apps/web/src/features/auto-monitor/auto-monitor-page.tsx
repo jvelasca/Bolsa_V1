@@ -45,7 +45,7 @@ export function AutoMonitorPage() {
   const mode = readAutoMonitorMode(searchParams);
   // Deep-link desde la operación canónica: `?cycle=` enfoca el ciclo en la vista `current`.
   const focusCycleId = searchParams.get("cycle");
-  const setMode = (next: AutoMonitorMode) => {
+  const setMode = (next: AutoMonitorMode, focus = false) => {
     setSearchParams(
       (prev) => {
         const params = new URLSearchParams(prev);
@@ -54,6 +54,12 @@ export function AutoMonitorPage() {
       },
       { replace: true },
     );
+    if (focus) {
+      // Foco tras el commit de estado: patrón WAI-ARIA de tabs.
+      requestAnimationFrame(() => {
+        document.getElementById(`auto-monitor-mode-tab-${next}`)?.focus();
+      });
+    }
   };
   // La pestaña DÍA-D no debe seguir sondeando `/auto/operational-monitor` cada 20 s: el hook
   // sólo se habilita fuera de DÍA-D (su `refetch` manual sigue disponible).
@@ -98,60 +104,70 @@ export function AutoMonitorPage() {
         </div>
       </div>
 
-      {mode === "operation" ? <AutoOperationStoryPanel /> : null}
+      <section
+        role="tabpanel"
+        id={`auto-monitor-mode-panel-${mode}`}
+        aria-labelledby={`auto-monitor-mode-tab-${mode}`}
+        tabIndex={0}
+      >
+        {mode === "operation" ? <AutoOperationStoryPanel /> : null}
 
-      {mode === "dia-d" ? <DiaDAutoPanel /> : null}
+        {mode === "dia-d" ? <DiaDAutoPanel /> : null}
 
-      {mode === "current" && isLoading ? (
-        <p
-          className="text-sm text-muted-foreground"
-          data-testid="auto-monitor-loading"
-        >
-          Cargando monitor…
-        </p>
-      ) : null}
+        {mode === "current" && isLoading ? (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="auto-monitor-loading"
+          >
+            Cargando monitor…
+          </p>
+        ) : null}
 
-      {mode === "current" && isError ? (
-        <p
-          className="text-sm text-destructive"
-          data-testid="auto-monitor-error"
-        >
-          No se pudo cargar el monitor operativo.
-        </p>
-      ) : null}
+        {mode === "current" && isError ? (
+          <p
+            className="text-sm text-destructive"
+            data-testid="auto-monitor-error"
+          >
+            No se pudo cargar el monitor operativo.
+          </p>
+        ) : null}
 
-      {mode === "current" && view ? (
-        <>
-          <AutoMonitorHeader header={view.header} />
+        {mode === "current" && view ? (
+          <>
+            <AutoMonitorHeader header={view.header} />
 
-          {view.notes && view.notes.length > 0 ? (
-            <Card className="rounded-xl border border-amber-500/30 bg-amber-500/5">
-              <CardContent className="py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                  Huecos declarados
-                </p>
-                <ul
-                  className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground"
-                  data-testid="auto-monitor-notes"
-                >
-                  {view.notes.map((note) => (
-                    <li key={note} className="font-mono">
-                      {note}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ) : null}
+            {view.notes && view.notes.length > 0 ? (
+              <Card className="rounded-xl border border-amber-500/30 bg-amber-500/5">
+                <CardContent className="py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                    Huecos declarados
+                  </p>
+                  <ul
+                    className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground"
+                    data-testid="auto-monitor-notes"
+                  >
+                    {view.notes.map((note) => (
+                      <li key={note} className="font-mono">
+                        {note}
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ) : null}
 
-          <AutoCycleTimeline cycles={view.cycles} focusCycleId={focusCycleId} />
+            <AutoCycleTimeline
+              cycles={view.cycles}
+              focusCycleId={focusCycleId}
+            />
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <AutoReservationPanel reservations={view.reservations} />
-            <AutoConcurrencyPanel concurrency={view.concurrency} />
-          </div>
-        </>
-      ) : null}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <AutoReservationPanel reservations={view.reservations} />
+              <AutoConcurrencyPanel concurrency={view.concurrency} />
+            </div>
+          </>
+        ) : null}
+      </section>
     </div>
   );
 }

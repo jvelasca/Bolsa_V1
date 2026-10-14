@@ -39,6 +39,12 @@ vi.mock("@/features/auto/use-auto-top3-opportunities", () => ({
   }),
 }));
 
+// P2 — la lanzadera de verificación tiene su propio test; aquí se aísla la estructura de la
+// sección (evita montar las queries de estrategia/TOP en este test de páginas).
+vi.mock("@/features/auto/auto-operar-verify-action", () => ({
+  AutoOperarVerifyAction: () => null,
+}));
+
 import { AutoOperarPage } from "@/features/auto/auto-operar-page";
 import { AutoOperacionPage } from "@/features/auto/auto-operacion-page";
 

@@ -106,7 +106,7 @@ export const AUTO_NAV: { label: string; items: readonly AutoNavItem[] } = {
       id: AUTO_SECTION.analisis,
       label: "Análisis",
       path: AUTO_ANALISIS_PATH,
-      hint: "DÍA-D, evidencia, estrategias e investigación",
+      hint: "D→hoy, evidencia, estrategias e investigación",
       tier: "secondary",
     },
     {

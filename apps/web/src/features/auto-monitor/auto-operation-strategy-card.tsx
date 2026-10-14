@@ -46,6 +46,19 @@ export function AutoOperationStrategyCard({
   // Fail-closed: el CTA SOLO se habilita si hay una estrategia EJECUTADA verificable
   // (`verifyTarget === "executed"`). Un hueco se declara; nunca se cae al #1 en silencio.
   const verifyDisabled = disabled || view.verifyTarget === null;
+  // P3 — asociación programática del motivo del CTA inhabilitado: el texto visible (hueco)
+  // ya existe; `aria-describedby` apunta a él para que teclado/lector lo anuncien junto al
+  // botón, en vez de depender solo del `title`.
+  const executedShowsVerifyReason =
+    !loading && !view.executedStrategyLabel && Boolean(view.verifyGapReason);
+  const verifyReasonDescribedBy = verifyDisabled
+    ? [
+        executedShowsVerifyReason ? "auto-operation-strategy-executed" : null,
+        view.gapReason ? "auto-operation-strategy-gap" : null,
+      ]
+        .filter((id): id is string => id !== null)
+        .join(" ") || undefined
+    : undefined;
 
   return (
     <Card
@@ -151,6 +164,7 @@ export function AutoOperationStrategyCard({
                 {AUTO_OPERATION_STRATEGY_VERIFY_EXECUTED_LABEL}
               </span>
               <span
+                id="auto-operation-strategy-executed"
                 className="block font-medium"
                 data-testid="auto-operation-strategy-executed"
                 data-verify-target={view.verifyTarget ?? "none"}
@@ -180,6 +194,7 @@ export function AutoOperationStrategyCard({
           </p>
         ) : view.gapReason ? (
           <p
+            id="auto-operation-strategy-gap"
             className="text-xs text-muted-foreground"
             data-testid="auto-operation-strategy-gap"
           >
@@ -194,6 +209,8 @@ export function AutoOperationStrategyCard({
           data-verify-target={view.verifyTarget ?? "none"}
           className="h-7 rounded px-2 text-xs"
           disabled={verifyDisabled}
+          aria-disabled={verifyDisabled ? true : undefined}
+          aria-describedby={verifyReasonDescribedBy}
           title={
             verifyDisabled
               ? (view.verifyGapReason ??

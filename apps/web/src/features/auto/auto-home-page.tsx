@@ -404,7 +404,7 @@ export function AutoHomePage() {
                 className="underline hover:text-primary"
                 data-testid="auto-home-link-dia-d"
               >
-                DÍA-D
+                D→hoy
               </Link>
             </li>
             <li>

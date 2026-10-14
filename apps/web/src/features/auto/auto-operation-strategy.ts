@@ -37,7 +37,7 @@ export const AUTO_OPERATION_STRATEGY_TITLE =
   "Estrategia que sustenta la señal" as const;
 
 export const AUTO_OPERATION_STRATEGY_DESCRIPTION =
-  "La mejor estrategia del valor en Finalistas, con los indicadores que la sustentan. Puedes verificar por tu cuenta que la operativa diaria usa esa estrategia con DÍA-D." as const;
+  "La mejor estrategia del valor en Finalistas, con los indicadores que la sustentan. Puedes verificar por tu cuenta que la operativa diaria usa esa estrategia con la verificación D→hoy." as const;
 
 /**
  * Rótulo del bloque de la MEJOR estrategia DISPONIBLE del valor (Finalistas TOP #1), la que

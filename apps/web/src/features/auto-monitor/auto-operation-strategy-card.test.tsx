@@ -275,6 +275,70 @@ describe("AutoOperationStrategyCard", () => {
     ).toContain("no declara su estrategia ejecutada");
   });
 
+  it("asocia programáticamente el motivo del CTA inhabilitado (P3)", () => {
+    renderCard({
+      view: view({
+        executedStrategyDefinitionId: null,
+        executedStrategyLabel: null,
+        executedStrategyRank: null,
+        verifyTarget: null,
+        verifyGapReason:
+          "Sin dato todavía: el ciclo no declara su estrategia ejecutada (`presetKey`).",
+        verifyHref: null,
+      }),
+    });
+
+    const button = screen.getByTestId("auto-operation-strategy-verify-dia-d");
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.getAttribute("aria-describedby")).toBe(
+      "auto-operation-strategy-executed",
+    );
+    // El id descrito EXISTE y contiene el motivo visible (no solo el `title`).
+    const described = document.getElementById(
+      "auto-operation-strategy-executed",
+    );
+    expect(described?.textContent).toContain(
+      "no declara su estrategia ejecutada",
+    );
+  });
+
+  it("el CTA habilitado no declara un motivo de inhabilitación (P3)", () => {
+    renderCard();
+
+    const button = screen.getByTestId("auto-operation-strategy-verify-dia-d");
+    expect(button.getAttribute("aria-disabled")).toBeNull();
+    expect(button.getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("cuando el hueco es el de la cadena, el CTA se describe con el hueco visible (P3)", () => {
+    renderCard({
+      view: view({
+        // La cadena de REFERENCIA está incompleta: el hueco visible es `gapReason`.
+        instrumentId: null,
+        strategyDefinitionId: null,
+        strategyLabel: AUTO_OPERATION_STRATEGY_NO_DATA,
+        rank: null,
+        executedStrategyDefinitionId: null,
+        executedStrategyLabel: null,
+        executedStrategyRank: null,
+        verifyTarget: null,
+        verifyGapReason: null,
+        verifyHref: null,
+        gapReason:
+          "Sin dato todavía: no se pudo resolver el instrumento de la operación.",
+      }),
+    });
+
+    const button = screen.getByTestId("auto-operation-strategy-verify-dia-d");
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.getAttribute("aria-describedby")).toBe(
+      "auto-operation-strategy-gap",
+    );
+    expect(
+      document.getElementById("auto-operation-strategy-gap")?.textContent,
+    ).toContain("no se pudo resolver el instrumento");
+  });
+
   it("llama a onVerify al pulsar y respeta el estado deshabilitado", () => {
     const { onVerify } = renderCard();
     fireEvent.click(screen.getByTestId("auto-operation-strategy-verify-dia-d"));

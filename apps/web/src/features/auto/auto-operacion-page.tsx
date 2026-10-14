@@ -35,7 +35,7 @@ export function AutoOperacionPage() {
         </Link>
         <AutoSectionHeading
           title={`Operación · ${title}`}
-          description="Qué pasó → por qué → qué riesgo tenía → qué precio se aplicó → qué resultado → qué enseña DÍA-D."
+          description="Qué pasó → por qué → qué riesgo tenía → qué precio se aplicó → qué resultado → qué enseña la verificación D→hoy."
         />
       </div>
 

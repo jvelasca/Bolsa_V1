@@ -74,6 +74,7 @@ import {
   useDiaDTradingSessionStore,
 } from "@/stores/dia-d-trading-session-store";
 import { useDiaDEvidenceArchiveStore } from "@/stores/dia-d-evidence-archive-store";
+import { buildDiaDCycleVerificationPayload } from "@/features/auto-monitor/dia-d-cycle-verification-link";
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
@@ -143,6 +144,9 @@ export function TradingDiaDReplayPanel() {
   const [iaEngine, setIaEngine] = useState<string | null>(null);
   const [previewArchiveId, setPreviewArchiveId] = useState<string | null>(null);
   const [archiveImportMsg, setArchiveImportMsg] = useState<string | null>(null);
+  // P4 — estado NO silencioso del enlace ciclo↔verificación (persistencia automática).
+  const [cycleLinkError, setCycleLinkError] = useState<string | null>(null);
+  const cycleLinkPersistedRef = useRef<string | null>(null);
   const archiveFileRef = useRef<HTMLInputElement>(null);
   const movieRowRef = useRef<HTMLDivElement>(null);
   const bottomRowRef = useRef<HTMLDivElement>(null);
@@ -395,6 +399,63 @@ export function TradingDiaDReplayPanel() {
     });
   }, [session, autoDetail, detail]);
 
+  // P4 — el enlace ciclo↔verificación se persiste como PARTE del flujo de verificación, no
+  // solo al pulsar «Guardar Evidence». El POST es idempotente por (ciclo, D, fin, modo), así
+  // que re-verificar actualiza la fila en vez de duplicarla. Un fallo NO se silencia: se declara
+  // en la UI para que la tabla de ciclos no parezca «Sin verificación» por un error de red.
+  useEffect(() => {
+    const s = session;
+    if (!s?.cycleId || !sessionEvidence) return;
+    const payload = buildDiaDCycleVerificationPayload({
+      cycleId: s.cycleId,
+      instrumentId: s.instrumentId,
+      symbol: s.symbol,
+      diaD: s.diaD,
+      endDate: s.endDate,
+      mode: s.mode,
+      strategyDefinitionId: s.strategyDefinitionId,
+      strategyPresetKey: s.strategyPresetKey ?? null,
+      strategyVersion: s.strategyVersion ?? null,
+      evidence: sessionEvidence,
+      researchEvidenceId: null,
+    });
+    if (!payload) return;
+    const key = [
+      payload.cycleId,
+      payload.diaD,
+      payload.endDate,
+      payload.mode,
+      payload.band,
+    ].join("|");
+    if (cycleLinkPersistedRef.current === key) return;
+    cycleLinkPersistedRef.current = key;
+    let cancelled = false;
+    setCycleLinkError(null);
+    void api.persistDiaDCycleVerification(payload).catch((err: unknown) => {
+      if (cancelled) return;
+      setCycleLinkError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo enlazar la verificación con su ciclo.",
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    session?.cycleId,
+    session?.instrumentId,
+    session?.symbol,
+    session?.diaD,
+    session?.endDate,
+    session?.mode,
+    session?.strategyDefinitionId,
+    session?.strategyPresetKey,
+    session?.strategyVersion,
+    sessionEvidence,
+  ]);
+
   const productionTopQuery = useQuery({
     queryKey: [
       "instrument-strategy-top",
@@ -624,6 +685,7 @@ export function TradingDiaDReplayPanel() {
         : sessionEvidence;
       let researchEvidenceId: string | null = null;
       let apiOk = false;
+      let cycleLinkError: string | null = null;
       try {
         const res = await api.persistDiaDSessionEvidence({
           instrumentId: session.instrumentId,
@@ -640,30 +702,31 @@ export function TradingDiaDReplayPanel() {
       } catch {
         // Archivo local siempre; Fase 2 opcional si API no tiene la ruta.
       }
-      // P2 — enlaza la verificación con su ciclo AUTO (solo si se lanzó desde uno; un
-      // ciclo ausente NO se fabrica). Best-effort como la persistencia de Fase 2.
-      if (session.cycleId) {
+      // P2/P4 — enlaza la verificación con su ciclo AUTO (solo si se lanzó desde uno; un
+      // ciclo ausente NO se fabrica). Comparte payload con la persistencia automática del
+      // flujo. Un fallo NO se silencia: se devuelve para que la UI lo declare (la tabla de
+      // ciclos no debe aparentar «Sin verificación» por un error de red).
+      const linkPayload = buildDiaDCycleVerificationPayload({
+        cycleId: session.cycleId,
+        instrumentId: session.instrumentId,
+        symbol: session.symbol,
+        diaD: session.diaD,
+        endDate: session.endDate,
+        mode: session.mode,
+        strategyDefinitionId: session.strategyDefinitionId,
+        strategyPresetKey: session.strategyPresetKey ?? null,
+        strategyVersion: session.strategyVersion ?? null,
+        evidence: evidencePayload,
+        researchEvidenceId,
+      });
+      if (linkPayload) {
         try {
-          await api.persistDiaDCycleVerification({
-            cycleId: session.cycleId,
-            instrumentId: session.instrumentId,
-            symbol: session.symbol,
-            diaD: session.diaD,
-            endDate: session.endDate,
-            mode: session.mode,
-            strategyPresetKey: session.strategyPresetKey ?? null,
-            strategyVersion: session.strategyVersion ?? null,
-            strategyDefinitionId: session.strategyDefinitionId,
-            band: evidencePayload.band,
-            result: {
-              band: evidencePayload.band,
-              confidence: evidencePayload.confidence,
-              metrics: evidencePayload.metrics,
-            },
-            researchEvidenceId,
-          });
-        } catch {
-          // El enlace durable es best-effort; el archivo local ya conserva el cicloId.
+          await api.persistDiaDCycleVerification(linkPayload);
+        } catch (err) {
+          cycleLinkError =
+            err instanceof Error
+              ? err.message
+              : "No se pudo enlazar la verificación con su ciclo.";
         }
       }
       const archived = useDiaDEvidenceArchiveStore.getState().save({
@@ -679,7 +742,7 @@ export function TradingDiaDReplayPanel() {
         evidence: evidencePayload,
         narrativeParagraphs: iaNarrative,
       });
-      return { archived, apiOk };
+      return { archived, apiOk, cycleLinkError };
     },
   });
 
@@ -881,6 +944,19 @@ export function TradingDiaDReplayPanel() {
               ))}
             </ul>
           ) : null}
+          {/* P4 — el enlace con el ciclo se persiste al completar la verificación (no solo al
+              guardar). Si falla, se declara (no se silencia) para que la tabla de ciclos no
+              parezca «Sin verificación» por un error de red. */}
+          {cycleLinkError ? (
+            <p
+              className="text-[9px] leading-snug text-amber-800 dark:text-amber-200"
+              role="alert"
+              data-testid="dia-d-cycle-link-error"
+            >
+              No se pudo enlazar la verificación con el ciclo: {cycleLinkError}{" "}
+              La tabla de ciclos puede mostrar «Sin verificación».
+            </p>
+          ) : null}
           <Button
             type="button"
             size="sm"
@@ -908,6 +984,18 @@ export function TradingDiaDReplayPanel() {
               {saveEvidenceMutation.data.apiOk
                 ? ` · Fase 2 ${saveEvidenceMutation.data.archived.researchEvidenceId?.slice(0, 8)}…`
                 : " · solo archivo local (reinicia API para Fase 2)"}
+            </p>
+          ) : null}
+          {saveEvidenceMutation.isSuccess &&
+          saveEvidenceMutation.data.cycleLinkError ? (
+            <p
+              className="text-[9px] leading-snug text-amber-800 dark:text-amber-200"
+              role="alert"
+              data-testid="dia-d-cycle-link-save-error"
+            >
+              No se pudo enlazar la verificación con el ciclo:{" "}
+              {saveEvidenceMutation.data.cycleLinkError} La tabla de ciclos
+              puede mostrar «Sin verificación».
             </p>
           ) : null}
           {iaEngine ? (
