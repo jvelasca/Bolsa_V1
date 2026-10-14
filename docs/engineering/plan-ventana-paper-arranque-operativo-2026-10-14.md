@@ -179,7 +179,9 @@ pnpm run window:run-day            # añadir --force solo si se sabe por qué
 # 3) estado de la ventana (días/episodios/ciclos + si está desbloqueada)
 pnpm run window:status
 
-# 4) si el gate está bloqueado por el pin del árbol, tras re-anclar legítimamente:
+# 4) `window:unlock` NO re-ancla el pin: solo reclama/borra el lock diario (.run.lock/).
+#    Ante `TREE_MOVED` hay que re-anclar WINDOW_CONFIG (ver §G.1), no hacer unlock.
+#    Úsalo solo si un lock diario quedó colgado sin proceso vivo.
 pnpm run window:unlock
 ```
 
@@ -297,3 +299,267 @@ lo que la hipótesis de software **no está probada**; solo está probado que **
 | Runner y CLIs | `scripts/window-forward-runner.mjs:6-10,74-77,119-120`; `package.json:67-71` |
 | Cuenta/versiones/flags de operación | `scripts/lib/window-forward.mjs:256-270` |
 | Certificador `v2_98` | `apps/api-python/scripts/v2_98_paper_window_certification.py:6-31,171-192` |
+
+---
+
+## G. Estado del pin a 2026-10-14 (preflight real)
+
+> Sección de **solo lectura** sobre el código y la BD (preflight/status read-only). No re-ancla nada, no
+> escribe en la BD, no avanza la ventana. Evidencia medida hoy, con salida **literal**.
+
+### G.1 El freeze y el re-anclaje legítimo del pin (punto c)
+
+**Qué es el freeze (TREE_MOVED).** El runner forward exige que el árbol de código que va a medir la
+ventana sea **un único árbol congelado**. Antes de correr cualquier paso de un día, compara
+`git rev-parse "HEAD:apps" "HEAD:packages"` con los hashes pinneados en `WINDOW_CONFIG`
+(`scripts/lib/window-forward.mjs:256-258`) y, si no coinciden, **aborta fail-closed** con
+`TREE_MOVED` (`scripts/window-forward-runner.mjs:600-611`, chequeo en `gitFreeze` `:234-253`, contraste
+en `freezeCheck` `scripts/lib/window-forward.mjs:573-585`). El commit `commit: '9b8e4904'` es solo el
+**nombre** del commit cuyo árbol queda pinneado; lo que se compara de verdad son los dos **tree hashes**
+(`appsHash` / `packagesHash`).
+
+**Cómo se calcula el hash del árbol.** No es un hash de ficheros ni del working tree: es el
+**tree object id de git** para los subdirectorios `apps/` y `packages/` en `HEAD`, obtenido con
+`git rev-parse "HEAD:apps" "HEAD:packages"` (`window-forward-runner.mjs:236`) y parseado en
+`parseRevParse` (`window-forward.mjs:557-567`, dos líneas en orden `apps`, `packages`). Por diseño
+**`scripts/` no participa del pin** (por eso editar `WINDOW_CONFIG` no mueve a su vez el árbol;
+`window-forward.mjs:43-45,54-55`). Caveat declarado: el freeze lee el **árbol de `HEAD` (commits
+commiteados)**, no el working tree; modificaciones/ficheros sin commitear bajo `apps/`/`packages/`
+**no** los detecta el freeze.
+
+**Qué hace `window:unlock`.** Nada que ver con el pin: `window:unlock` es un *escape hatch* que reclama
+(el borra, si procede) el **directorio-lock diario** `.run.lock/` de un día, aplicando la misma lógica de
+ownership que `run-day` (`cmdUnlock` `window-forward-runner.mjs:920-957`; `unlockDecision`
+`window-forward.mjs:417-449`). Nunca borra el lock de un PID vivo de este host; `--force` solo reclama
+un lock ajeno con TTL fresco o ilegible. **No re-ancla el pin ni desbloquea el gate de la ventana.** Por
+tanto, la redacción de §C.1 («si el gate está bloqueado por el pin del árbol … `window:unlock`») es
+imprecisa: ante un `TREE_MOVED` real hay que **re-anclar `WINDOW_CONFIG`** (G.1), no `unlock`.
+
+**Qué implica `--unsafe-override-window-config` (y por qué NO sirve como evidencia).** Permite que las
+variables `WINDOW_APPS_HASH`/`WINDOW_PACKAGES_HASH`/`WINDOW_ACCOUNT`/`WINDOW_VERSION_A`/
+`WINDOW_VERSION_B`/`WINDOW_WATCH_SIZE` sustituyan la config certificada (`windowConfig`
+`window-forward.mjs:294-319`; `FREEZE_ENV_KEYS` `:276-284`). Sella `configMode = 'UNSAFE'` y el runner
+avisa de que el gate de esos días **no es válido** (`window-forward-runner.mjs:1029-1034`). Además la
+provenance lo **rechaza** explícitamente: `verifyWindowProvenance` empuja el problema
+`config_override_unsafe` y el gate sale `STALE`/`NO_MEDIDO` (`window-forward.mjs:687`; test
+`window-forward.test.mjs:322-332`). Es un bypass administrativo para depurar, **no** un mecanismo de
+ventana: con él, el material medido no acredita la ventana. No usarlo como evidencia.
+
+**Procedimiento de re-anclaje legítimo (documental; NO ejecutado aquí).** No existe **ninguna** CLI ni
+script en `scripts/` que recalcule o actualice `appsHash`/`packagesHash` (búsqueda en `scripts/` de
+`appsHash|packagesHash|HEAD:apps|rev-parse|hash-object|tree`: solo aparecen el propio modulador y el
+runner). El re-anclaje es **edición manual** de `WINDOW_CONFIG` en
+`scripts/lib/window-forward.mjs:256-258`, siguiendo el patrón ya documentado en
+`docs/engineering/runbook-ventana-forward-v2.78-2026-09-27.md:15-26` (§0) y en los múltiples
+«RE-ANCLAJE» del propio fichero (`window-forward.mjs:45-253`). Pasos:
+
+1. Fijar el árbol de código que se quiere congelar (el `HEAD` actual del repo, ya commiteado).
+2. `git rev-parse "HEAD:apps" "HEAD:packages"` → dos hashes (orden `apps`, `packages`).
+3. Editar en `WINDOW_CONFIG` los tres campos: `commit` (nombre corto del commit), `appsHash` y
+   `packagesHash`. Los campos de identidad (`account`, `versionA`, `versionB`, `watchSize`) **no** se
+   tocan (`window-forward.mjs:259-263`).
+4. Regla de legitimidad: el re-anclaje es legítimo cuando el árbol movido **no cambia el motor** relativamente
+   al pin anterior (Δ motor = 0; los RE-ANCLAJE del fichero lo exigen y el replay-repro byte a byte lo
+   certifica). Si el pin anterior aún no había medido ningún día, mover el pin no invalida nada.
+
+**¿Invalida la ventana ya medida?** No hay nada que invalidar hoy: la ventana está **NO MEDIDO** (ledger
+vacío, §G.3) y el certificador `v2_98` nunca dio `CERTIFIED`. Regla general: si el pin se re-anclara con
+días ya `MEDIDO` bajo el árbol viejo, esos días dejarían de verificar (`verifyWindowProvenance` exige
+`manifest.freeze.apps === frozen.appsHash` → los días viejos caerían a `STALE`, `window-forward.mjs:681-685`).
+
+### G.2 Salida LITERAL del preflight (punto a)
+
+Comando: `pnpm run window:preflight` (exit code del runner = `0`; el script Python devolvió `exit 2` = veto de régimen, que el runner **declara**, no trata como fallo). Ejecutado 2026-10-14:
+
+```text
+> bolsa-v1@2.11.128-beta window:preflight C:\Users\josea\Documents\Informatica\Typescript\Bolsa_V1
+> node scripts/window-forward-runner.mjs preflight
+
+node.exe : INFO alembic.runtime.plugins setup plugin alembic.autogenerate.schemas
+En C:\Users\josea\AppData\Roaming\npm\pnpm.ps1: 24 Carácter: 5
++     & "node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (INFO alembic.ru...enerate.schemas:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.tables
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.types
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.constraints
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.defaults
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.comments
+INFO alembic.runtime.plugins setup plugin alembic.autogenerate.checkconstraint_byname
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+# preflight: entradas LONG VETADAS (eje BEAR_TREND); no se escribió nada
+{
+  "account": "(no sembrada: el preflight no escribe)",
+  "bump": "2.01.0-beta",
+  "level": "evidence",
+  "marketRegime": {
+    "aggregateTrialRegime": "trend_down",
+    "barsLoaded": 20,
+    "bySymbol": {
+      "0a5dc12fd5a24f0a89a91d36a": "trend_down",
+      "0cf0907837fc422db221b0149": "trend_down",
+      "240a4ae01a944d3bba1cf1b24": "range",
+      "31f9a597d03249319ea0c9345": "trend_down",
+      "381dd3b0699a44e8b9d13ac13": "range",
+      "49596ff25acb4294b265f321b": "trend_down",
+      "4d24ea029283461cb9304421a": "trend_up",
+      "54283bcb54674ec1b70b4db72": "trend_down",
+      "5a130eea1ad54dcaaa50b67b9": "trend_down",
+      "5c34aaec1448406ebec94b20f": "trend_up",
+      "615d243eb830473ab009c8997": "range",
+      "6655c5faff8a458186dcd8adc": "range",
+      "67c117a7d88f4c75a7174e998": "trend_down",
+      "6db46176cc2d4845845b6ee6e": "trend_up",
+      "6f6215d935c04e0f9ac7bfef7": "trend_up",
+      "74c66a856dde4cbaad4888908": "range",
+      "7721cde9af0c49d29576786d5": "range",
+      "840a307d2b074e2db4dfc3373": "range",
+      "856510e40dda4c758f4d4df89": "trend_up",
+      "8601a0c3f8d248b0b8052b963": "trend_down"
+    },
+    "counts": {
+      "range": 7,
+      "trend_down": 8,
+      "trend_up": 5
+    },
+    "entriesAllowedLong": false,
+    "operationalRegime": "BEAR_TREND"
+  },
+  "minBars": 60,
+  "minCyclesPerStrategy": 32,
+  "mode": "preflight",
+  "phase": "V2.76 AUTO-MATERIAL-4 MARKET MATERIAL FORWARD",
+  "venue": "paper",
+  "watchA": [
+    "0a5dc12fd5a24f0a89a91d36a",
+    "0cf0907837fc422db221b0149",
+    "240a4ae01a944d3bba1cf1b24",
+    "31f9a597d03249319ea0c9345",
+    "381dd3b0699a44e8b9d13ac13",
+    "49596ff25acb4294b265f321b",
+    "4d24ea029283461cb9304421a",
+    "54283bcb54674ec1b70b4db72",
+    "5a130eea1ad54dcaaa50b67b9",
+    "5c34aaec1448406ebec94b20f"
+  ],
+  "watchB": [
+    "615d243eb830473ab009c8997",
+    "6655c5faff8a458186dcd8adc",
+    "67c117a7d88f4c75a7174e998",
+    "6db46176cc2d4845845b6ee6e",
+    "6f6215d935c04e0f9ac7bfef7",
+    "74c66a856dde4cbaad4888908",
+    "7721cde9af0c49d29576786d5",
+    "840a307d2b074e2db4dfc3373",
+    "856510e40dda4c758f4d4df89",
+    "8601a0c3f8d248b0b8052b963"
+  ],
+  "watchSize": 20
+}
+[window] preflight: eje BEAR_TREND · LONG VETADAS (exit 2)
+[window] veto de regimen legitimo: se DECLARA NO_MEDIDO_REGIMEN; no se fuerza el gobernador
+```
+
+Notas de lectura: las líneas `node.exe : ... NativeCommandError` son **ruido de PowerShell** al envolver
+el `stderr` del hijo (no son errores); el JSON y las dos líneas `[window] ...` son la salida real. El
+preflight declaró «no se escribió nada» y `mode: "preflight"`; no se ejecutó ninguna migración (Alembic
+solo inicializa su contexto). **El preflight NO comprueba el freeze**: `cmdPreflight`
+(`window-forward-runner.mjs:508-541`) no llama a `gitFreeze`; el `TREE_MOVED` solo lo evalúa `run-day`
+(`:600-611`). Por eso el preflight pasó pese a que el árbol está movido (§G.4).
+
+### G.3 Salida LITERAL de `window:status` (read-only)
+
+Comando: `pnpm run window:status` (exit code `0`). Ejecutado 2026-10-14:
+
+```text
+> bolsa-v1@2.11.128-beta window:status C:\Users\josea\Documents\Informatica\Typescript\Bolsa_V1
+> node scripts/window-forward-runner.mjs status
+
+[window] estado de la ventana · 4 dias / 2 episodios / 32 ciclos
+node.exe : [window] ledger vacio: aun no hay ningun dia registrado (NO MEDIDO, nunca 0)
+En C:\Users\josea\AppData\Roaming\npm\pnpm.ps1: 24 Carácter: 5
++     & "node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([window] ledger...EDIDO, nunca 0):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+  resumen: medidos=0 veto=0 declarados=0 duros=0
+  gate: NO_MEDIDO (sin dias medidos)
+  ledger: operability_runs/window-runs/ledger.jsonl
+```
+
+`window:status` es read-only (solo lee `ledger.jsonl` y los `manifest.json`/`window.json` de los runs;
+`cmdStatus` `window-forward-runner.mjs:869-910`). Confirma el estado real: **ledger vacío** (0 días
+registrados), gate `NO_MEDIDO`. Coincide con la medición de `v2_98` de §A (`INCONCLUSIVE`).
+
+### G.4 Diagnóstico (¿TREE_MOVED? ¿qué falta?)
+
+**Evidencia git medida hoy (2026-10-14, rama `main`):**
+
+```text
+HEAD                                    = 0d0a8c15 (v2.88.128 sello ...)
+git rev-parse HEAD:apps                 = 25c8fc8f0e90379273522f331cd1e035d9d6a273
+git rev-parse HEAD:packages             = 7882ea89127eefd11bad470e216bce620194724b
+pin appsHash   (esperado)               = 79fb268580fb46e4b2766c961b2b87f2d7c13b38
+pin packagesHash (esperado)             = f80b2285da4624474a56e8df71c6e56b532120f0
+git cat-file -t 9b8e4904                = commit  (existe)
+git rev-parse 9b8e4904:apps              = 79fb2685... (coincide con el pin)
+git rev-parse 9b8e4904:packages          = f80b2285... (coincide con el pin)
+```
+
+**Veredicto: el pin está DESFASADO ⇒ `TREE_MOVED` garantizado.** El pin apunta al árbol del commit
+`9b8e4904` (sello `v2.88.77-beta`); el HEAD actual es `0d0a8c15` (sello `v2.88.128`). Ambos tree hashes
+difieren de los pinneados. Si se lanzara `pnpm run window:run-day`, abortaría con `TREE_MOVED` **antes**
+de la fase de preflight (`window-forward-runner.mjs:600-611`), sin escribir la ventana.
+
+**Qué bloquea hoy, en orden, para arrancar la ventana:**
+
+1. **Pin desfasado (`TREE_MOVED`)** — bloqueador **operativo** del runner, no un hueco de motor (§B). Es
+   el único bloqueador **medido hoy** con certeza a nivel de runner: sin re-anclar, `run-day` no arranca.
+2. **Sin días registrados** — el ledger está vacío (`≠` 0 fabricado; es «no medido»). No hay ventana en
+   curso: `v2_98` sigue `INCONCLUSIVE` (dias=42/4, episodios=0/2, ciclos=0/32).
+3. **Régimen de HOY = `BEAR_TREND` con LONG vetadas** — el preflight de hoy declara veto legítimo. Esto
+   **no** es un fallo ni se fuerza: un día con veto se registra `NO_MEDIDO_REGIMEN` (§C.1). Para sumar
+   `episodes`/`cycles` hacen falta días de mercado operables (LONG permitidas) y **días distintos** (§C.3).
+4. **Precondiciones de entorno que hoy SÍ responden:** el preflight cargó `barsLoaded: 20` desde la BD
+   (PostgreSQL + venv operativos en esta máquina). No se midió el estado de la API `/api/health/ready`
+   (el preflight no la exige; solo `run-day` la exige para el forward, `:670-686`) ⇒ **no verificado hoy**.
+
+No hay, por tanto, un bloqueador de software en el camino de la ventana: el bloqueo es **operar**
+(re-anclar pin + correr días operables reales). La falsación de §D sigue sin cumplirse (no hay ciclos).
+
+### G.5 Siguiente paso concreto y responsable
+
+1. **Quién/cuándo — re-anclar (responsable: propietario del repo / operador de la ventana; cuando se decida
+   arrancar).** Editar `WINDOW_CONFIG` en `scripts/lib/window-forward.mjs:256-258` con:
+   - `commit`: `0d0a8c15`
+   - `appsHash`: `25c8fc8f0e90379273522f331cd1e035d9d6a273`
+   - `packagesHash`: `7882ea89127eefd11bad470e216bce620194724b`
+
+   (valores medidos hoy; **no re-anclados en esta sesión**). Antes de fijarlos, confirmar la regla de
+   legitimidad de G.1 (Δ motor = 0 respecto al pin anterior, o ventana aún no medida —hoy lo segundo se
+   cumple—). Es un fichero de `scripts/`, fuera del pin de motor.
+2. **Verificar el re-anclaje sin medir:** `node scripts/window-forward-runner.mjs --dry-run run-day`
+   (valida config/freeze/cadena **sin** abrir el motor; `dryRunDay` `window-forward-runner.mjs:802-836`
+   y exige `freeze.ok`). Debe imprimir `freeze OK`. (No ejecutado aquí por ser potencialmente
+   preparatorio del run-day; el freeze se puede previsualizar con el `git rev-parse` de G.4.)
+3. **Arrancar la operación real** — solo con re-anclaje hecho y un día de mercado **operable**: la
+   secuencia de §C.1/§C.2 (`window:preflight` → `window:run-day` → `window:status`), un día de pared
+   distinto por corrida, sin forzar régimen y sin escribir en la BD. `window:unlock` **no** es parte de
+   este paso (solo gestiona el lock diario huérfano).
+4. **Certificar** con `v2_98` (§D) cuando haya ≥4 fechas, ≥2 regímenes y ≥32 ciclos medibles.
+
+### G.6 Puntos no verificados en esta sección (declarados)
+
+- No se ejecutó `window:run-day` (ni `--dry-run run-day`), `window:unlock` ni `window:task:*`; **no** se
+  re-ancló el pin. El `TREE_MOVED` se **infiere** de los `git rev-parse` (G.4), no de un run real.
+- No se comprobó `/api/health/ready` (la API que mantiene las barras frescas para el forward); el
+  preflight no la requiere, así que su estado queda **NO MEDIDO**.
+- El preflight leyó PostgreSQL (contexto Alembic + `barsLoaded`) pero **no** se ejecutó ninguna migración
+  ni escritura; el propio script declara `mode: "preflight"` y «no se escribió nada».
+- El freeze compara el árbol de `HEAD` **commiteado**, no el working tree: cambios o ficheros sin
+  commitear bajo `apps/`/`packages/` no los vería (a la fecha de esta sección el árbol estaba **limpio**
+  en `0d0a8c15`; verificar el working tree antes de medir es responsabilidad del operador).

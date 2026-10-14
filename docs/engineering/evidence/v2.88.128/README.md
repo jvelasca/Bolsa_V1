@@ -73,6 +73,12 @@ El test es **hermético/offline** (`REDIS_URL=""` ⇒ runtime no-op; la única l
 
 ---
 
-## 6. `Release tag CI` del sello — **PENDIENTE**
+## 6. `Release tag CI` del sello — **VERDE**
 
-Este incremento **aún no está etiquetado**: **no** se ha creado el tag `v2.88.128-beta` ni empujado, y no hay run de `Release tag CI` que citar. Estado: **PENDIENTE**.
+**Tag** `v2.88.128-beta` (anotado, unsigned) ⇒ objeto `b347d76ab5b20073b7eed714aacce9d24cdc82e8` ⇒ commit `0d0a8c153831cba79fe06c89196d115a90ada656`. **Base:** `v2.88.127-beta` (`38c26ae9`).
+
+**`Release tag CI`:** [run **38560567905**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38560567905) — **`success`** en **~11m56s** (2026-10-14T12:00:07Z → 12:12:03Z). Jobs decisivos: `replay-repro` = `success` (el artefacto congelado se reproduce ⇒ `Δ decisión = 0`), `lifecycle-pg` = `success` (el nuevo `test_risk_control_auth.py` pasa contra el stack real), `python (offline)` = `success` (recoge el invariante AST ampliado por commit). `playwright (integrated E2E, opt-in)` = `skipped` por diseño.
+
+**Artefactos:** `release-tag-ci-summary` (429 B, id `11893430893`) y `replay-oos-durable-v2.88.7` (306 720 B, id `11891634452`).
+
+Audit pack POST-TAG: [`audit-pack-v2.88.128-beta-2026-10-14.md`](../../audit-pack-v2.88.128-beta-2026-10-14.md).
