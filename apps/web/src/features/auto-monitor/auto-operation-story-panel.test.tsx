@@ -238,7 +238,7 @@ afterEach(() => {
 });
 
 describe("AutoOperationStoryPanel", () => {
-  it("pinta las 10 filas de operación (OPPORTUNITY fuera, POSITION y EXIT plegados, EXPLANATION aparte)", async () => {
+  it("pinta las 11 filas de operación (OPPORTUNITY fuera, POSITION plegada, EXPLANATION aparte)", async () => {
     renderPanel();
 
     // El selector de ciclos sólo aparece con el monitor cargado: esperar a él evita asertar
@@ -257,6 +257,7 @@ describe("AutoOperationStoryPanel", () => {
       "ORDER",
       "FILL",
       "PROTECTION",
+      "EXIT",
       "SETTLEMENT",
       "RESULT",
     ]);
@@ -273,10 +274,12 @@ describe("AutoOperationStoryPanel", () => {
     expect(byStage.has("POSITION")).toBe(false);
     expect(byStage.get("FILL")?.textContent).toContain("no afirma la posición");
     expect(byStage.get("FILL")?.textContent).toContain("Precio aplicado");
-    // EXIT se pliega en SETTLEMENT: no es una fila independiente…
-    expect(byStage.has("EXIT")).toBe(false);
-    // …y deja su intención como NOTA de la liquidación (una sola fila por hecho).
-    expect(byStage.get("SETTLEMENT")?.textContent).toContain("liquidación");
+    // EXIT es fila PROPIA (H3). El mock de este test no trae paso SETTLEMENT, así que la salida
+    // se declara NO MEDIDA (hueco), nunca inventada.
+    expect(byStage.has("EXIT")).toBe(true);
+    expect(byStage.get("EXIT")?.getAttribute("data-state")).toBe(
+      "NOT_MEASURED",
+    );
 
     expect(byStage.get("SIGNAL")?.getAttribute("data-state")).toBe("REACHED");
     expect(byStage.get("SELECTION")?.getAttribute("data-state")).toBe(

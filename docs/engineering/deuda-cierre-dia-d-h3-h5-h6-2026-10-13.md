@@ -14,9 +14,10 @@
 > del ciclo, no el #1) y **`H5`** (el monitor admite consulta **por instrumento**). `H5` cambia el
 > **contrato HTTP** de forma **aditiva** (`?instrumentId` + `filterInstrumentId`, `contract:gen`/
 > `contract:check` ✅) y el read-model; `H6` es **UI/shared puro** (`Δ contrato = 0`). **`Δ decisión = 0`**,
-> **sin migración** (head `053_dia_d_cycle_verifications`). **`H3`** (etapa `EXIT` propia) **sigue
-> ABIERTO** (exige ratificar el modelo semántico; fuera del alcance de esta pasada). El detalle y el
+> **sin migración** (head `053_dia_d_cycle_verifications`). **`H3`** (etapa `EXIT` propia) **se CIERRA en la 3ª pasada (2026-10-14)** con el modelo **ratificado a 14 conceptos** (ver §H3). El detalle y el
 > mapeo criterio→test están en cada sección.
+>
+> **3ª pasada (2026-10-14) — `H3` RESUELTO.** Ratificado el modelo semántico: desplegar `EXIT` **no** añade un concepto nuevo (`EXIT` ya era el #11 de `AUTO_OPERATION_STORY_ORDER`); lo que cambia es el **plegado**. `EXIT` pasa a **fila propia** leyendo el hecho durable `SETTLEMENT.facts.exitReason` (o declarando el hueco). **`Δ motor = 0`**, **`Δ contrato = 0`**, **`Δ decisión = 0`** (solo `packages/shared` + `apps/web`); **sin migración**.
 >
 > **Sello CERRADO (2026-10-14).** El tag `v2.88.126-beta` (anotado, **unsigned**; objeto `dcba2404` →
 > commit `7801474c`) quedó **verde** en `Release tag CI` [**38520405195**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38520405195)
@@ -28,30 +29,53 @@
 
 ---
 
-## H3 — la «señal de SALIDA» no tiene etapa propia (está plegada en `SETTLEMENT`) · **ABIERTO**
+## H3 — la «señal de SALIDA» no tiene etapa propia (está plegada en `SETTLEMENT`) · **RESUELTO (2026-10-14)**
 
-**Dónde:** `packages/shared/src/cognitive/auto-operation-story.ts:279-287` (`id: "EXIT"`,
+**Dónde (antes):** `packages/shared/src/cognitive/auto-operation-story.ts` (`id: "EXIT"`,
 `kind: "DERIVED"`, `sourceStepId: "SETTLEMENT"`, `foldedInto: "SETTLEMENT"`).
 
-**Qué falta:** la **intención/motivo** de salida (`time_exit`/`thesis_exit`/…) no se materializa
-como fila independiente del modelo semántico; se pliega visualmente en la liquidación. El hecho
-durable existe (`SETTLEMENT.facts.exitReason`), pero la historia de 14 conceptos no lo expone como
-etapa propia.
+**Qué faltaba:** la **intención/motivo** de salida (`time_exit`/`thesis_exit`/…) no se materializaba
+como fila independiente del modelo semántico; se plegaba visualmente en la liquidación. El hecho
+durable existe (`SETTLEMENT.facts.exitReason`), pero la historia no lo exponía como etapa propia.
 
-**Por qué es deuda y no un cambio de este incremento:** desplegar `EXIT` como fila propia cambia la
-forma de la historia (14 → 15 conceptos del modelo semántico, `auto-operation-story.ts:24-39`), el
-contrato de la UI de tres bloques y sus tests de orden/plegado
-(`auto-operation-story.test.ts`, `auto-operation-story-panel.test.tsx`). Requiere ratificar el
-modelo semántico antes de tocar la superficie.
+**Ratificación del modelo (2026-10-14).** El propio hallazgo apuntaba a un salto «14 → 15 conceptos
+(`auto-operation-story.ts:24-39`)». Eso era **impreciso**: `AUTO_OPERATION_STORY_ORDER` **ya** tiene
+14 entradas y **`EXIT` es la #11**. Desplegarla **no añade ningún concepto**; lo que cambia es el
+**plegado** (la UI de la historia pasa de 10 a 11 filas de operación). El modelo semántico se
+mantiene en **14 conceptos** y así queda en la spec (§2/§4.2).
 
-**Criterio de aceptación FALSABLE (cuando se aborde):**
-1. Dado un ciclo cuyo `SETTLEMENT.facts.exitReason == "time_exit"`, la etapa `EXIT` existe como
-   **fila propia** (`foldedInto === null`), `state === "REACHED"`, y su hecho `reason` publica
-   `"time_exit"` con medición `COMPLETE`.
-2. Dado un ciclo cuyo settlement **no** declara `exitReason`, `EXIT` declara el hueco
-   (`reason` `null`/`UNKNOWN`), **nunca** un motivo de relleno ni `"flat"`.
+**Cambios (implementación):**
+- [`auto-operation-story.ts`](../../packages/shared/src/cognitive/auto-operation-story.ts): la entrada
+  `EXIT` de `STORY_STAGE_SPECS` pierde `foldedInto`/`derivedNote`; nuevo helper puro `stepExitReason`
+  (lee el hecho `exitReason` del settlement o `reason` de un paso `EXIT` propio, si algún día existe)
+  y la rama `EXIT` de `buildAutoOperationStory` publica el hecho `reason` (o el hueco) y fija
+  `foldedInto = null`. `AUTO_OPERATION_STORY_ORDER`, `kind` (`DERIVED`) y `sourceStepId` (`SETTLEMENT`)
+  **no** cambian.
+- Sin cambios en el read-model ni en el contrato: el motivo durable **ya** viajaba en
+  `SETTLEMENT.facts.exitReason` ([`auto_operational_monitor.py:733-736`](../../packages/py/application/src/bolsa_application/auto_operational_monitor.py)).
+- [`auto-operation-story-panel.tsx`](../../apps/web/src/features/auto-monitor/auto-operation-story-panel.tsx):
+  la rejilla de operación ya no filtra `EXIT` (pasa de 10 a 11 filas); solo comentarios actualizados.
+
+**Criterio de aceptación FALSABLE (cumplido):**
+1. Con `SETTLEMENT.facts.exitReason == "time_exit"`, la etapa `EXIT` es **fila propia**
+   (`foldedInto === null`), `state === "REACHED"`, y su hecho `reason` publica `"time_exit"` con
+   medición `COMPLETE`.
+2. Sin `exitReason`, `EXIT` declara el hueco (`reason` `null` / `UNKNOWN`), **nunca** un motivo de
+   relleno ni `"flat"`.
 3. `buildAutoOperationStory` mantiene `SELECTION (TOP-N) ≠ DECISION` y no duplica el hecho
-   financiero de `SETTLEMENT` (una sola fila `REACHED` por hecho).
+   financiero de `SETTLEMENT` (`EXIT.facts` solo lleva `reason`).
+
+**Mapeo criterio → test (evidencia):**
+- **(1) y (2)** [`auto-operation-story.test.ts`](../../packages/shared/src/cognitive/auto-operation-story.test.ts):
+  `it("H3 · EXIT es fila propia y lee el motivo durable del settlement (exitReason)")` y
+  `it("H3 · sin motivo declarado, EXIT declara el hueco (nunca «flat» ni relleno)")`.
+- **(1)** también en el `it("despliega EXIT como fila propia si existe una traza durable de salida")`
+  (paso `EXIT` propio con `reason`).
+- **(3)** los `it` de `SELECTION ≠ DECISION` (sin cambios) y el `not.toContain("closedQty")` del test H3.
+- **UI:** [`auto-operation-story-panel.test.tsx`](../../apps/web/src/features/auto-monitor/auto-operation-story-panel.test.tsx)
+  pinta 11 filas con `EXIT` y, sin paso `SETTLEMENT` en el mock, lo declara `NOT_MEASURED`.
+
+**Verificación:** `pnpm --filter @bolsa/shared test` **98 files / 830 passed (1 todo)** · `pnpm --filter @bolsa/web test` **298 files / 2184 passed** · `typecheck` (shared + web) **OK** · `lint` **0 errores** (23 warnings preexistentes).
 
 ---
 
@@ -156,3 +180,8 @@ la estrategia EJECUTADA**; si no se puede resolver, el CTA se **deshabilita** y 
 - **H4** — `packages/shared/src/cognitive/auto-operation-story.ts`: la etapa `DECISION` consume
   `cycle.decision.reasonCodes` cuando el hecho durable existe (y declara el hueco cuando no);
   tests en `packages/shared/src/cognitive/auto-operation-story.test.ts`.
+- **H3** — `packages/shared/src/cognitive/auto-operation-story.ts`: la etapa `EXIT` ya **no** se
+  pliega; lee el hecho durable `SETTLEMENT.facts.exitReason` (helper `stepExitReason`) y publica
+  `reason` medido, o declara el hueco (`null`/`UNKNOWN`, nunca `"flat"`). Modelo ratificado a **14
+  conceptos**; tests `H3` en `packages/shared/src/cognitive/auto-operation-story.test.ts` y en
+  `apps/web/src/features/auto-monitor/auto-operation-story-panel.test.tsx`.

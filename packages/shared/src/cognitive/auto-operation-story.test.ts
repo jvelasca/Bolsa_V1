@@ -2,9 +2,10 @@
  * AUTO UI REFACTOR 1.0 — view model de "operación única".
  *
  * Invariantes: orden fijo de los 14 conceptos del modelo; `SELECTION` (TOP-N) ≠ `DECISION`
- * (no hay traza durable de decisión de cartera ⇒ `NOT_MEASURED`); `EXIT` es DERIVADA de
- * `SETTLEMENT`; `OPPORTUNITY` vive en el bloque `context`; una etapa sin traza es
- * `NOT_MEASURED` (nunca `0`) y los hechos se copian del paso durable con su medición.
+ * (no hay traza durable de decisión de cartera ⇒ `NOT_MEASURED`); `EXIT` es fila propia (H3): su
+ * hecho `reason` viene del `exitReason` durable de `SETTLEMENT`; `OPPORTUNITY` vive en el bloque
+ * `context`; una etapa sin traza es `NOT_MEASURED` (nunca `0`) y los hechos se copian del paso
+ * durable con su medición.
  */
 
 import { describe, expect, it } from "vitest";
@@ -229,22 +230,58 @@ describe("buildAutoOperationStory", () => {
     expect(byId.get("FILL")?.note ?? "").not.toContain("no afirma la posición");
   });
 
-  it("pliega EXIT en SETTLEMENT sin duplicar el hecho financiero", () => {
+  it("H3 · EXIT es fila propia y lee el motivo durable del settlement (exitReason)", () => {
+    const withReason = cycle();
+    withReason.steps = withReason.steps.map((step) =>
+      step.id === "SETTLEMENT"
+        ? {
+            ...step,
+            facts: [
+              { key: "closedQty", value: 10, measurement: "COMPLETE" },
+              {
+                key: "exitReason",
+                value: "time_exit",
+                measurement: "COMPLETE",
+              },
+            ],
+          }
+        : step,
+    );
+    const story = buildAutoOperationStory({ cycle: withReason });
+    const byId = new Map(story.stages.map((stage) => [stage.id, stage]));
+    const exit = byId.get("EXIT");
+
+    // Fila PROPIA (ya no se pliega) y ALCANZADA: la salida ocurrio (el settlement es durable).
+    expect(exit?.kind).toBe("DERIVED");
+    expect(exit?.sourceStepId).toBe("SETTLEMENT");
+    expect(exit?.foldedInto).toBeNull();
+    expect(exit?.state).toBe("REACHED");
+    // Publica el motivo MEDIDO y NO duplica el hecho financiero de la liquidacion.
+    expect(exit?.facts).toEqual([
+      { label: "reason", value: "time_exit", measurement: "COMPLETE" },
+    ]);
+    expect(JSON.stringify(exit?.facts)).not.toContain("closedQty");
+    expect(exit?.note).toBeNull();
+    // La liquidacion conserva su hecho financiero intacto.
+    expect(byId.get("SETTLEMENT")?.facts).toEqual([
+      { label: "closedQty", value: 10, measurement: "COMPLETE" },
+      { label: "exitReason", value: "time_exit", measurement: "COMPLETE" },
+    ]);
+  });
+
+  it("H3 · sin motivo declarado, EXIT declara el hueco (nunca «flat» ni relleno)", () => {
     const story = buildAutoOperationStory({ cycle: cycle() });
     const byId = new Map(story.stages.map((stage) => [stage.id, stage]));
+    const exit = byId.get("EXIT");
 
-    expect(byId.get("SETTLEMENT")?.kind).toBe("FACT");
-    expect(byId.get("SETTLEMENT")?.state).toBe("REACHED");
-    // La intención de salida queda como NOTA de la liquidación (una sola fila REACHED).
-    expect(byId.get("SETTLEMENT")?.note).toContain("liquidación");
-
-    expect(byId.get("EXIT")?.kind).toBe("DERIVED");
-    expect(byId.get("EXIT")?.sourceStepId).toBe("SETTLEMENT");
-    // Se pliega: sin traza durable propia de salida no se pinta como evento independiente.
-    expect(byId.get("EXIT")?.foldedInto).toBe("SETTLEMENT");
-    // Y NO copia los hechos financieros de la liquidación.
-    expect(byId.get("EXIT")?.facts).toEqual([]);
-    expect(byId.get("EXIT")?.note).toContain("liquidación");
+    expect(exit?.foldedInto).toBeNull();
+    expect(exit?.facts).toEqual([
+      { label: "reason", value: null, measurement: "UNKNOWN" },
+    ]);
+    expect(exit?.facts[0]?.value).not.toBe("flat");
+    expect(exit?.note).toContain("NO MEDIDO");
+    // La liquidacion ya no absorbe la intencion (no hay fila duplicada por el mismo hecho).
+    expect(byId.get("SETTLEMENT")?.note ?? "").not.toContain("liquidación");
   });
 
   it("despliega EXIT como fila propia si existe una traza durable de salida", () => {
@@ -267,6 +304,8 @@ describe("buildAutoOperationStory", () => {
     expect(exit?.facts).toEqual([
       { label: "reason", value: "STOP", measurement: "COMPLETE" },
     ]);
+    expect(exit?.state).toBe("REACHED");
+    expect(exit?.note).toBeNull();
   });
 
   it("expone OPPORTUNITY y el resto del universo en el bloque context", () => {

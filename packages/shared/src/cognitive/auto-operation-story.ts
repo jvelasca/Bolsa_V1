@@ -9,7 +9,8 @@
  * declara su `kind` (hecho / derivada / contexto / explicación) y su `group`. Los 14 conceptos del
  * modelo son `OPPORTUNITY → SIGNAL → SELECTION → DECISION → RISK → RESERVATION → ORDER → FILL →
  * POSITION → PROTECTION → EXIT → SETTLEMENT → RESULT → EXPLANATION`; `OPPORTUNITY` es CONTEXTO
- * (no un hecho de la operación) y `SELECTION` (TOP-N) es distinto de `DECISION` (cartera).
+ * (no un hecho de la operación), `SELECTION` (TOP-N) es distinto de `DECISION` (cartera) y `EXIT`
+ * es fila propia (H3): publica el MOTIVO de salida, distinto del hecho financiero de `SETTLEMENT`.
  *
  * @see packages/py/application/src/bolsa_application/auto_operational_monitor.py
  */
@@ -101,9 +102,10 @@ export type AutoOperationStoryStage = {
   /** Paso durable del que se copia la etapa (``null`` = etapa derivada/contextual). */
   sourceStepId: string | null;
   /**
-   * Etapa en la que esta se PLIEGA visualmente (``null`` = fila propia). `EXIT` se pliega en
-   * `SETTLEMENT` y `POSITION` en `FILL` mientras no exista una traza durable propia: la UI no
-   * pinta dos filas `REACHED` a partir del MISMO hecho (spec §4.2).
+   * Etapa en la que esta se PLIEGA visualmente (``null`` = fila propia). `POSITION` se pliega en
+   * `FILL` mientras no exista una traza durable propia: la UI no pinta dos filas `REACHED` a
+   * partir del MISMO hecho (spec §4.2). `EXIT` es fila propia desde H3: su hecho es el MOTIVO de
+   * salida, distinto del hecho financiero de la liquidación (`SETTLEMENT`).
    */
   foldedInto: AutoOperationStoryStageId | null;
   state: AutoOperationStoryState;
@@ -274,16 +276,14 @@ const STORY_STAGE_SPECS: readonly StageSpec[] = [
     sourceStepId: "PROTECTION",
   },
   {
-    // SALIDA = intención/motivo; el hecho financiero durable es la LIQUIDACIÓN. Mientras no
-    // exista traza propia de salida, esta fila se PLIEGA en `SETTLEMENT` (no se duplica el hecho).
+    // SALIDA = intencion/motivo (fila propia); la LIQUIDACION = hecho financiero. Ya NO se
+    // pliega: publica el motivo durable (`SETTLEMENT.exitReason`) como hecho `reason`, o declara
+    // el hueco (nunca un motivo de relleno ni «flat»).
     id: "EXIT",
     label: "Salida",
     kind: "DERIVED",
     group: "OPERATION",
     sourceStepId: "SETTLEMENT",
-    foldedInto: "SETTLEMENT",
-    derivedNote:
-      "salida = intención/motivo; el hecho durable es la liquidación",
   },
   {
     id: "SETTLEMENT",
@@ -600,6 +600,19 @@ function buildContext(
 }
 
 /**
+ * Motivo de salida durable de un paso: el hecho `exitReason` (settlement) o `reason` (paso `EXIT`
+ * propio, si el spine lo expone algun dia). Sin hecho ⇒ `null` (la etapa declara el hueco; nunca
+ * un motivo de relleno ni `"flat"`).
+ */
+function stepExitReason(step: AutoMonitorStepV1 | undefined): unknown {
+  if (!step) return null;
+  const fact = step.facts.find(
+    (item) => item.key === "exitReason" || item.key === "reason",
+  );
+  return fact ? fact.value : null;
+}
+
+/**
  * Pliega un ciclo del monitor (y, si existe, su explicación OOS/DÍA-D) en la historia única.
  *
  * ``cycle`` ausente ⇒ todos los conceptos de traza quedan `NOT_MEASURED` (nunca `0`/`REACHED`).
@@ -655,27 +668,37 @@ export function buildAutoOperationStory(input: {
       };
     }
     if (spec.id === "EXIT") {
-      // Intención/motivo de salida: NO fabrica un hecho financiero propio. Sin traza durable de
-      // salida se PLIEGA en `SETTLEMENT`; con traza propia vuelve a ser fila independiente.
+      // SALIDA = intencion/motivo. El hecho financiero durable es la LIQUIDACION, que es OTRO
+      // hecho: aqui solo se materializa el motivo (`exitReason` del settlement o un paso `EXIT`
+      // propio, si algun dia lo emite el spine). Fila PROPIA: la intencion deja de plegarse.
       const ownExit = stepsById.get("EXIT");
       const settlement = stepsById.get("SETTLEMENT");
       const evidence = ownExit ?? settlement;
-      const foldedInto: AutoOperationStoryStageId | null = ownExit
-        ? null
-        : "SETTLEMENT";
+      const rawReason = ownExit
+        ? stepExitReason(ownExit)
+        : stepExitReason(settlement);
+      const hasReason =
+        rawReason != null && String(rawReason).trim().length > 0;
       return {
         ...baseStage(spec, index, mapStepState(evidence)),
         at: evidence?.at ?? null,
         measurement: evidence?.measurement ?? "UNKNOWN",
-        facts: ownExit
-          ? ownExit.facts.map((fact) => ({
-              label: fact.key,
-              value: fact.value,
-              measurement: fact.measurement,
-            }))
+        facts: evidence
+          ? [
+              {
+                label: "reason",
+                value: hasReason ? rawReason : null,
+                measurement: hasReason ? "COMPLETE" : "UNKNOWN",
+              },
+            ]
           : [],
-        foldedInto,
-        note: joinNote(spec.derivedNote, ownExit),
+        foldedInto: null,
+        note: hasReason
+          ? null
+          : joinNote(
+              "la liquidación no declara el motivo de salida: se declara NO MEDIDO",
+              evidence,
+            ),
       };
     }
     const step = spec.sourceStepId
@@ -691,8 +714,9 @@ export function buildAutoOperationStory(input: {
     };
   });
 
-  // Una etapa plegada deja su nota (la intención de salida) en la fila que la absorbe: una sola
-  // fila `REACHED`, sin duplicar el mismo hecho (spec §4.2).
+  // Una etapa plegada deja su nota en la fila que la absorbe: una sola fila `REACHED`, sin
+  // duplicar el mismo hecho (spec §4.2). HOY sólo aplica a `POSITION` -> `FILL`; `EXIT` ya no se
+  // pliega (es fila propia desde H3).
   for (const stage of stages) {
     if (stage.foldedInto === null) continue;
     const target = stages.find(

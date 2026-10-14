@@ -3,9 +3,10 @@
  *
  * Pinta la historia ordenada de UN ciclo y la separa en el modelo mental del usuario:
  *
- *   1. HISTORIA DE ESTA OPERACIÓN — los hechos del ciclo (grupo `OPERATION`; `EXIT` plegado en
- *      `SETTLEMENT`): Señal → Selección → Decisión → Riesgo → Reserva → Orden → Ejecución →
- *      Posición → Protección → Liquidación → Resultado.
+ *   1. HISTORIA DE ESTA OPERACIÓN — los hechos del ciclo (grupo `OPERATION`; `EXIT` es fila
+ *      propia desde H3, con el MOTIVO de salida, distinto del financiero de la liquidación):
+ *      Señal → Selección → Decisión → Riesgo → Reserva → Orden → Ejecución →
+ *      Posición → Protección → Salida → Liquidación → Resultado.
  *   2. CONTEXTO — lo que la originó (instrumento/estrategia/dirección + universo PIT/régimen/
  *      ranking declarados `NO MEDIDO`).
  *   3. ¿QUÉ APRENDEMOS? — la etapa `EXPLANATION` (DÍA-D/OOS), que es conocimiento **cross-ciclo**
@@ -324,7 +325,8 @@ export function AutoOperationStoryPanel({
   );
 
   // Tres bloques: hechos de la operación (sin `EXPLANATION`, que es cross-ciclo), contexto que la
-  // originó y aprendizaje. Una etapa plegada (EXIT → SETTLEMENT) no se pinta como fila propia.
+  // originó y aprendizaje. La única etapa plegada es POSITION → FILL; `EXIT` es fila propia (H3)
+  // y por eso SÍ se pinta como fila independiente.
   const operationStages = story.stages.filter(
     (stage) => stage.group === "OPERATION" && stage.foldedInto === null,
   );

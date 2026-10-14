@@ -32,7 +32,7 @@ Este documento **congela la semántica** de la interfaz AUTO *antes* de extender
 
 ## 2. Los 14 conceptos del modelo y su clasificación
 
-> **Nomenclatura (AUTO UI REFACTOR 1.1).** `OPPORTUNITY` es **contexto**, no una etapa operacional: este documento habla de los **14 conceptos del modelo**, no de «14 etapas». La UI pinta 12 filas de hechos (`EXIT` se pliega en `SETTLEMENT`, §4.2).
+> **Nomenclatura (AUTO UI REFACTOR 1.1).** `OPPORTUNITY` es **contexto**, no una etapa operacional: este documento habla de los **14 conceptos del modelo**, no de «14 etapas». La UI pinta **11 filas de hechos** (`POSITION` se pliega en `FILL`; `EXIT` es **fila propia** desde `H3`, §4.2 — el modelo sigue con 14 conceptos: `EXIT` ya era el #11).
 
 | # | Concepto | Clase | Fuente canónica | Traza durable hoy |
 | --- | --- | --- | --- | --- |
@@ -89,6 +89,8 @@ Este documento **congela la semántica** de la interfaz AUTO *antes* de extender
 - Si **no** existe traza específica de `SALIDA`, **no** se presentan como dos eventos independientes: se muestra una sola fila con la intención como **nota derivada** (`derivedNote`), no como etapa alcanzada por duplicado.
 
 **RESUELTO en `v2.88.53` (AUTO UI REFACTOR 1.1).** El view-model declara `EXIT.foldedInto = "SETTLEMENT"` mientras no exista traza durable propia de salida: la UI no pinta una segunda fila `REACHED`; la intención de salida queda como **nota** de la liquidación. Si algún día el spine expone un paso durable `EXIT`, `foldedInto = null` y vuelve a ser fila independiente (falsable).
+
+**RATIFICADO y RESUELTO en `H3` (2026-10-14).** La premisa «no existe traza específica de `SALIDA`» era **falsa**: el settlement **sí** publica el motivo durable como hecho `exitReason` (`auto_operational_monitor.py`). Se despliega `EXIT` como **fila propia** (`foldedInto = null`), con un hecho `reason` leído de `SETTLEMENT.exitReason` (medición `COMPLETE`) o el **hueco declarado** (`reason` `null` / `UNKNOWN`) cuando el settlement no lo declara — **nunca** un motivo de relleno ni `"flat"`. El **modelo semántico sigue con 14 conceptos** (`EXIT` ya era el #11 de `AUTO_OPERATION_STORY_ORDER`): lo que cambia es el **plegado**, no la lista de conceptos (la formulación «14 → 15» del doc de deuda era imprecisa). `EXIT` **no** copia el hecho financiero de `SETTLEMENT` (su único hecho es `reason`), así que no hay doble `REACHED` por el mismo hecho.
 
 ### 4.3 `OPORTUNIDAD` debe ser **contexto**, no un `NO MEDIDO` suelto (P3 UX)
 
@@ -202,7 +204,7 @@ Cada paso es **aditivo**: no se borra ninguna pantalla antes de que su sustituto
 | # | Afirmación | Cómo se rompe |
 | --- | --- | --- |
 | 1 | `TOP_N ≠ DECISIÓN` | Que exista una traza durable que demuestre que la cartera decidió abrir en un ciclo donde `TOP_N` no alcanzó (o viceversa). |
-| 2 | `SALIDA` sin traza propia no se pinta como etapa independiente | Que el spine exponga una traza durable de **intención** de salida distinta de `SETTLEMENT`. |
+| 2 | `SALIDA` es fila propia que publica el motivo durable del settlement (`exitReason`), o declara el hueco | Que `EXIT` vuelva a `foldedInto = "SETTLEMENT"`, que copie hechos financieros de `SETTLEMENT`, o que sin `exitReason` publique un motivo de relleno / `"flat"` en vez de `null`/`UNKNOWN`. |
 | 3 | `OPORTUNIDAD` es contexto, no etapa | Que la oportunidad PIT pase a materializarse **por ciclo** (existiría entonces un hecho). |
 | 4 | Toda cifra viaja con su medición | Que una vista pinte un número sin su `MeasurementValue` (fallo de §4.4). |
 | 5 | El usuario no navega por conceptos internos | Que la navegación definitiva exponga `Signal`/`Risk`/`ThesisExit` como destinos L1/L2. |
@@ -223,7 +225,7 @@ Cada paso es **aditivo**: no se borra ninguna pantalla antes de que su sustituto
 | Fill | `FILL` | Correcto |
 | Posición | — (derivada de `FILL`) | Correcto (declara `derivedNote`) |
 | Protección | `PROTECTION` | Correcto |
-| Salida | — (intención; se pliega en `SETTLEMENT`) | Plegada en la Liquidación (1.1); sin doble `REACHED` |
+| Salida | `SETTLEMENT` (`facts.exitReason`) | **Fila propia (H3)**: hecho `reason` = `exitReason` durable, o hueco declarado |
 | Liquidación | `SETTLEMENT` | Correcto |
 | Resultado | `CYCLE_CLOSED` | Correcto |
 | Explicación | — (DÍA-D/OOS) | Identidad formalizada por instrumento + ejes (1.1); migrar a `cycleId` (§6) |
