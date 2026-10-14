@@ -2,9 +2,9 @@
 
 > **AsOf:** 2026-10-14 · **Repo:** [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) (**público**) · **Tag:** `v2.88.131-beta`
 > **Propósito:** reunir en un solo sitio **todo lo necesario para auditar esta versión desde GitHub sin credenciales**: identidad inmutable, cómo obtenerla, dónde está la evidencia, qué **certifica**, qué **NO**, y cómo **falsarlo**.
-> **Naturaleza:** documento de **evidencia/enlace**, no de producto. **`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0`** (dominio puro read-only + CLI + gate PG + UI/shared + docs). Tag **unsigned** (anotado, sin firma GPG).
+> **Naturaleza:** documento de **evidencia/enlace**, no de producto. **`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0`** (dominio puro read-only + CLI + gate PG + UI/shared + docs). Tag **unsigned** (lightweight, sin firma GPG).
 >
-> **⚠️ Estado:** el tag `v2.88.131-beta` y su `Release tag CI` **aún no existen** en el momento de escribir este pack (el contenido está en el árbol de trabajo). Las secciones **1** (identidad: objeto/commit SHA) y **4** (run de CI) se **completan en el commit POST-TAG** tras empujar el tag, **sin** placeholders fabricados. Mismo patrón que `v2.88.130`/`v2.88.127`.
+> **✅ Estado (POST-TAG):** el tag `v2.88.131-beta` y su `Release tag CI` **ya existen y están VERDES**; este pack queda **completo** (§1 identidad, §4 run de CI). **Desviación declarada:** el tag es **lightweight** (no anotado) — ver la nota en §1.
 
 ---
 
@@ -17,10 +17,10 @@ git clone --branch v2.88.131-beta --depth 1 https://github.com/jvelasca/Bolsa_V1
 O, más estricto (fija el **commit** exacto, no el tag):
 
 ```bash
-git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkout <SHA_DEL_SELLO>
+git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkout 6fec78b1611f8eb4024e7070cee960d3aec73b8e
 ```
 
-> El `<SHA_DEL_SELLO>` y el objeto de tag se anotan en la §1 en el commit POST-TAG.
+> El `<SHA_DEL_SELLO>` es `6fec78b1`; la identidad completa del tag está en §1.
 
 ---
 
@@ -28,13 +28,15 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 
 | Elemento | Valor |
 | --- | --- |
-| **Tag (anotado)** | `v2.88.131-beta` — **PENDIENTE de crear/empujar** |
-| **Objeto de tag** | **PENDIENTE** (POST-TAG) |
-| **Commit apuntado** | **PENDIENTE** (POST-TAG) |
+| **Tag** | `v2.88.131-beta` — **lightweight** (ver nota) |
+| **Objeto de tag** | **N/A** (un tag *lightweight* **no** tiene objeto) |
+| **Commit apuntado** | `6fec78b1611f8eb4024e7070cee960d3aec73b8e` |
 | **Base (tag anterior)** | `v2.88.130-beta` → commit `f28bfb98` (objeto `1a91470c`) |
 | **Versión monorepo** | `2.11.131-beta` ([`package.json`](../../package.json)) |
 | **Alembic head** | `053_dia_d_cycle_verifications` (**sin migración**) |
-| **Firma** | **unsigned** (anotado, sin GPG) |
+| **Firma** | **unsigned** (lightweight, sin GPG) |
+
+> **Nota (desviación honesta).** Los sellos previos usan tag **anotado**; aquí `v2.88.131-beta` es **lightweight** porque reescribir el tag **ya publicado** a anotado fue **bloqueado por el auto-review**. Funcionalmente es **idéntico**: apunta al **mismo commit** (`6fec78b1`) y `Release tag CI` dispara igual con `push: tags: v*`; el run citado en §4 es el **real** de este tag.
 
 ---
 
@@ -43,7 +45,7 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 | Forma | Comando / enlace |
 | --- | --- |
 | Clonar el tag (recomendado) | `git clone --branch v2.88.131-beta --depth 1 https://github.com/jvelasca/Bolsa_V1.git` |
-| Fijar el commit SHA | `git checkout <SHA_DEL_SELLO>` (POST-TAG) |
+| Fijar el commit SHA | `git checkout 6fec78b1611f8eb4024e7070cee960d3aec73b8e` |
 | Ver el árbol en la web | [tree/v2.88.131-beta](https://github.com/jvelasca/Bolsa_V1/tree/v2.88.131-beta) |
 
 ---
@@ -63,7 +65,7 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 
 ## 4. CI público (citable)
 
-**`Release tag CI` del tag:** **PENDIENTE** (se cita en el commit POST-TAG).
+**`Release tag CI` del tag** `v2.88.131-beta`: [run **`38594446027`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38594446027) — **`success`** (~13m22s, `2026-10-14T16:01:11Z` → `16:14:33Z`), **todos los jobs `success`** salvo `playwright (integrated E2E, opt-in)` = `skipped` por diseño. `lifecycle-pg` (donde entra el gate de cadena ESTUDIO, `AUTO_ESTUDIO_CHAIN_PG_REQUIRED=1`) = `success`; `replay-repro` = `success` (Δ decisión = 0 confirmado por CI); `frontend` = `success` (`contract:check` OK); `certify` = `success`.
 
 Referencia de la **base** `v2.88.130-beta`: [run **`38578003227`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38578003227) — `success` (~14m22s, `2026-10-14T14:09:26Z` → `14:23:48Z`).
 

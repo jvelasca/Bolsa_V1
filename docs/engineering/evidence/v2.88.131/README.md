@@ -156,6 +156,28 @@ Rótulos canónicos nuevos en [`auto-operation-strategy.ts`](../../../../apps/we
 
 ---
 
-## 9. `Release tag CI` del sello — **PENDIENTE (se cita POST-TAG)**
+## 9. `Release tag CI` del sello — **VERDE**
 
-El tag `v2.88.131-beta` **aún no se ha creado/empujado**. Siguiendo el patrón de la casa (el `Release tag CI` solo corre al empujar el tag, así que su resultado **no puede** existir dentro del propio tag), la **cita real del run** se escribirá en un commit **POST-TAG** en `main` — **sin** placeholders fabricados. **Base:** `v2.88.130-beta` ([run `38578003227`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38578003227) **verde**).
+**Tag** `v2.88.131-beta` (**lightweight**, unsigned) ⇒ apunta **directamente** al commit `6fec78b1611f8eb4024e7070cee960d3aec73b8e` (**no** hay objeto de tag). **Base:** `v2.88.130-beta`.
+
+**`Release tag CI`:** [run **`38594446027`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38594446027) — **`SUCCESS`** en **~13 min** (`2026-10-14T16:01:11Z` → `16:14:33Z`), **todos los jobs verdes**:
+
+| Job | Conclusión |
+| --- | --- |
+| `decision-spine` | success |
+| `security (gitleaks)` | success |
+| `playwright (mock E2E)` | success |
+| `shared (build/typecheck/test)` | success |
+| `playwright (integrated AUTO S5)` | success |
+| `python (ruff/imports/mypy/pytest offline)` | success |
+| `dr-verify (battery DB_DR / TCP CI)` | success |
+| `lifecycle-pg (Alembic + auth + golden restart)` | success |
+| `a7-gate (A7 C3 chaos live_a7 · dedicated real-PG)` | success |
+| `frontend (typecheck/lint/test/build + contract:check)` | success |
+| `replay-repro (regenera el artefacto del sello desde el fixture)` | success |
+| `certify (aggregate + artifact)` | success |
+| `playwright (integrated E2E, opt-in)` | **skipped** (opt-in por diseño) |
+
+**Lo decisivo:** el job `lifecycle-pg` —donde entra el **gate de cadena ESTUDIO** (`AUTO_ESTUDIO_CHAIN_PG_REQUIRED=1`, paso DEDICADO con guard anti-skip)— queda **`success`**; `replay-repro` **REPRODUCIDO** ⇒ `Δ decisión = 0` confirmado por CI; `frontend` verde ⇒ `contract:check` OK (`Δ contrato HTTP = 0`); `certify` agrega y **certifica** con todos los obligatorios verdes.
+
+**Desviación honesta declarada.** A diferencia de los sellos previos (tag **anotado**), `v2.88.131-beta` es **lightweight**: el re-tag a anotado fue **bloqueado por el auto-review** al tratarse de reescribir un tag **ya publicado**. Funcionalmente es **idéntico** (mismo commit; `Release tag CI` dispara igual con `push: tags: v*`), y el run citado **es el real** de este tag.
