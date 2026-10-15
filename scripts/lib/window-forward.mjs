@@ -333,10 +333,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-15 — pin del arbol re-anclado a `1ee09a48`
+ * (`apps` `37340d14b9cdf265845b4e191d8b02a402f1c9dd` / `packages` `b6de90f3204352565eb1e7b7aaf00c40c7e65432`).
+ * Motivo: diagnostico READ-ONLY del arranque en frio de S5-04 (fases del servidor env-gated + red por intento + repro en frio); sin tocar timeout/retries/umbrales ADR-046
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'f23032c6',
-  appsHash: '9e81f1cbc8211295e13654408ea498e691154fa2',
-  packagesHash: 'd48ac37bbf44b229b5c05da2949aa310d06fcd86',
+  commit: '1ee09a48',
+  appsHash: '37340d14b9cdf265845b4e191d8b02a402f1c9dd',
+  packagesHash: 'b6de90f3204352565eb1e7b7aaf00c40c7e65432',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
