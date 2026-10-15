@@ -134,10 +134,17 @@ def _filling_seed(
 
 
 def _filling_symbol_for_tick(tick: int, *, side: str = "buy") -> str:
-    """Símbolo cuyo fill (seed del MOTOR = ``fill_seed(tick, symbol)``) sí llena.
+    """Símbolo cuyo fill (seed del MOTOR = ``fill_seed(tick, symbol)``) LLENA COMPLETO.
 
     Es el análogo de ``_filling_instrument_id`` de los tests PG, pero anclado al tick de
     barra que calcula el propio worker (no a un literal de reloj).
+
+    Exige llenado TOTAL (``status == "filled"``), no solo «algún fill»: ``_settle`` cuenta
+    como ``applied_qty`` la suma del schedule y ``_v2_release_reservations_for_fill`` con un
+    fill PARCIAL deja la reserva viva en la cola (``status`` sigue ``OPEN``; el docstring de
+    la liberación lo declara). El caso que ``test_structural_mode_releases_by_fill_without_
+    durable_evidence`` PINNEA es la liberación TOTAL, así que necesita un símbolo que llene
+    los ``_QTY`` enteros — pickear un fill parcial probaba otro escenario y rompía el assert.
     """
     from bolsa_application.simulated_broker import fill_seed, simulated_fill_schedule
 
@@ -152,10 +159,11 @@ def _filling_symbol_for_tick(tick: int, *, side: str = "buy") -> str:
             fill_chunks=_FILL_CHUNKS,
             base_mid=float(_ENTRY),
         )
-        if result.fills:
+        if result.fills and result.status == "filled":
             return candidate
     raise AssertionError(
-        f"ningún símbolo llena en el tick de barra {tick} ({side}); revisar fill_seed/noise"
+        f"ningún símbolo llena COMPLETO los {_QTY} en el tick de barra {tick} ({side}); "
+        "revisar fill_seed/noise"
     )
 
 
