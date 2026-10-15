@@ -1,0 +1,430 @@
+{
+  "config": {
+    "argv": [
+      "/opt/hostedtoolcache/node/22.23.3/x64/bin/node",
+      "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/node_modules/@playwright/test/cli.js",
+      "test",
+      "gp-v288-s5",
+      "--reporter=list",
+      "--reporter=json"
+    ],
+    "configFile": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/playwright.config.ts",
+    "rootDir": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "ci": {
+        "commitHref": "https://github.com/jvelasca/Bolsa_V1/commit/9f0203ef53bdb4ad786a89b39af665832507b398",
+        "commitHash": "9f0203ef53bdb4ad786a89b39af665832507b398",
+        "buildHref": "https://github.com/jvelasca/Bolsa_V1/actions/runs/38735478442"
+      },
+      "gitCommit": {
+        "shortHash": "9f0203e",
+        "hash": "9f0203ef53bdb4ad786a89b39af665832507b398",
+        "subject": "ops(window): re-ancla el pin PAPER al arbol POST-TAG (apps 37340d14 / packages b6de90f3) -- freeze OK",
+        "body": "ops(window): re-ancla el pin PAPER al arbol POST-TAG (apps 37340d14 / packages b6de90f3) -- freeze OK\n\nConsecuencia del commit de instrumentacion READ-ONLY del diagnostico de S5-04 (1ee09a48): el arbol de apps/packages avanzo y el freeze pasa a anclar a los nuevos tree hashes. Editar el pin no mueve a su vez el arbol (scripts/ no participa del freeze).\n\nCo-authored-by: Cursor <cursoragent@cursor.com>\n",
+        "author": {
+          "name": "jvelasca",
+          "email": "josealberto.vel@gmail.com",
+          "time": 1792066815000
+        },
+        "committer": {
+          "name": "jvelasca",
+          "email": "josealberto.vel@gmail.com",
+          "time": 1792066815000
+        },
+        "branch": "main"
+      },
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "ci": {
+            "commitHref": "https://github.com/jvelasca/Bolsa_V1/commit/9f0203ef53bdb4ad786a89b39af665832507b398",
+            "commitHash": "9f0203ef53bdb4ad786a89b39af665832507b398",
+            "buildHref": "https://github.com/jvelasca/Bolsa_V1/actions/runs/38735478442"
+          },
+          "gitCommit": {
+            "shortHash": "9f0203e",
+            "hash": "9f0203ef53bdb4ad786a89b39af665832507b398",
+            "subject": "ops(window): re-ancla el pin PAPER al arbol POST-TAG (apps 37340d14 / packages b6de90f3) -- freeze OK",
+            "body": "ops(window): re-ancla el pin PAPER al arbol POST-TAG (apps 37340d14 / packages b6de90f3) -- freeze OK\n\nConsecuencia del commit de instrumentacion READ-ONLY del diagnostico de S5-04 (1ee09a48): el arbol de apps/packages avanzo y el freeze pasa a anclar a los nuevos tree hashes. Editar el pin no mueve a su vez el arbol (scripts/ no participa del freeze).\n\nCo-authored-by: Cursor <cursoragent@cursor.com>\n",
+            "author": {
+              "name": "jvelasca",
+              "email": "josealberto.vel@gmail.com",
+              "time": 1792066815000
+            },
+            "committer": {
+              "name": "jvelasca",
+              "email": "josealberto.vel@gmail.com",
+              "time": 1792066815000
+            },
+            "branch": "main"
+          },
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e",
+        "testIgnore": [
+          "**/helpers/**/*.test.ts"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm dev",
+      "url": "http://localhost:5173",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts",
+      "file": "gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
+          "file": "gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts",
+          "line": 575,
+          "column": 6,
+          "specs": [
+            {
+              "title": "GP-V288-S5-01: /auto/operar monta y declara su estado sin fabricar la operación",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4061,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-15T12:34:25.433Z",
+                      "annotations": [],
+                      "attachments": []
+                    },
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4964,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-10-15T12:35:51.122Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/test-results/gp-v288-s5-auto-dia-d-brid-64a5e-o-sin-fabricar-la-operación-retry1/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d20fa249d5f664a7435d-7de70081a0bc2dee5046",
+              "file": "gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts",
+              "line": 688,
+              "column": 3
+            },
+            {
+              "title": "GP-V288-S5-02: la operación AUTO muestra la estrategia #1 con sus indicadores (P3)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4166,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-15T12:34:35.774Z",
+                      "annotations": [],
+                      "attachments": []
+                    },
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5269,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-10-15T12:35:57.992Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/test-results/gp-v288-s5-auto-dia-d-brid-f6ef4-a-1-con-sus-indicadores-P3--retry1/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d20fa249d5f664a7435d-0ed6a7ff7c7535e3e320",
+              "file": "gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts",
+              "line": 715,
+              "column": 3
+            },
+            {
+              "title": "GP-V288-S5-03: «Verificar D→hoy» monta el host DÍA-D y arranca el run real (P4)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4480,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-15T12:34:39.958Z",
+                      "annotations": [],
+                      "attachments": []
+                    },
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6252,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-10-15T12:36:03.385Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/test-results/gp-v288-s5-auto-dia-d-brid-59bbd-D-y-arranca-el-run-real-P4--retry1/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d20fa249d5f664a7435d-08c2a9c3d6798980279b",
+              "file": "gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts",
+              "line": 759,
+              "column": 3
+            },
+            {
+              "title": "GP-V288-S5-04: guardar registra el enlace durable verificación ↔ cicloId (P2)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 64595,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: 'Guardar Evidence' })\nExpected: visible\nTimeout: 60000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: 'Guardar Evidence' })\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: 'Guardar Evidence' })\nExpected: visible\nTimeout: 60000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: 'Guardar Evidence' })\u001b[22m\n\n    at /home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts:865:28\n    at /home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts:863:7",
+                        "location": {
+                          "file": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts",
+                          "column": 28,
+                          "line": 865
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 863 |\u001b[39m       \u001b[36mawait\u001b[39m test\u001b[33m.\u001b[39mstep(\u001b[32m\"S5-04 · esperar la evidencia de la sesión LAB\"\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m () \u001b[33m=>\u001b[39m {\n \u001b[90m 864 |\u001b[39m         \u001b[90m// La sesión LAB arranca el run; cuando la evidencia de sesión está lista aparece el guardado.\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 865 |\u001b[39m         \u001b[36mawait\u001b[39m expect(save)\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m60\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 866 |\u001b[39m         \u001b[36mawait\u001b[39m expect(save)\u001b[33m.\u001b[39mtoBeEnabled({ timeout\u001b[33m:\u001b[39m \u001b[35m60\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m 867 |\u001b[39m       })\u001b[33m;\u001b[39m\n \u001b[90m 868 |\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts",
+                            "column": 28,
+                            "line": 865
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: 'Guardar Evidence' })\nExpected: visible\nTimeout: 60000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: 'Guardar Evidence' })\u001b[22m\n\n\n  863 |       await test.step(\"S5-04 · esperar la evidencia de la sesión LAB\", async () => {\n  864 |         // La sesión LAB arranca el run; cuando la evidencia de sesión está lista aparece el guardado.\n> 865 |         await expect(save).toBeVisible({ timeout: 60_000 });\n      |                            ^\n  866 |         await expect(save).toBeEnabled({ timeout: 60_000 });\n  867 |       });\n  868 |\n    at /home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts:865:28\n    at /home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts:863:7"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "S5-04 · abrir la operación AUTO",
+                          "duration": 4341
+                        },
+                        {
+                          "title": "S5-04 · lanzar la verificación D→hoy",
+                          "duration": 173
+                        },
+                        {
+                          "title": "S5-04 · esperar la evidencia de la sesión LAB",
+                          "duration": 60004,
+                          "error": {
+                            "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: 'Guardar Evidence' })\nExpected: visible\nTimeout: 60000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: 'Guardar Evidence' })\u001b[22m\n",
+                            "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: 'Guardar Evidence' })\nExpected: visible\nTimeout: 60000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 60000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: 'Guardar Evidence' })\u001b[22m\n\n    at /home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts:865:28\n    at /home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts:863:7",
+                            "location": {
+                              "file": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts",
+                              "column": 28,
+                              "line": 865
+                            },
+                            "snippet": "\u001b[0m \u001b[90m 863 |\u001b[39m       \u001b[36mawait\u001b[39m test\u001b[33m.\u001b[39mstep(\u001b[32m\"S5-04 · esperar la evidencia de la sesión LAB\"\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m () \u001b[33m=>\u001b[39m {\n \u001b[90m 864 |\u001b[39m         \u001b[90m// La sesión LAB arranca el run; cuando la evidencia de sesión está lista aparece el guardado.\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 865 |\u001b[39m         \u001b[36mawait\u001b[39m expect(save)\u001b[33m.\u001b[39mtoBeVisible({ timeout\u001b[33m:\u001b[39m \u001b[35m60\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 866 |\u001b[39m         \u001b[36mawait\u001b[39m expect(save)\u001b[33m.\u001b[39mtoBeEnabled({ timeout\u001b[33m:\u001b[39m \u001b[35m60\u001b[39m_000 })\u001b[33m;\u001b[39m\n \u001b[90m 867 |\u001b[39m       })\u001b[33m;\u001b[39m\n \u001b[90m 868 |\u001b[39m\u001b[0m"
+                          }
+                        }
+                      ],
+                      "startTime": "2026-10-15T12:34:44.455Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/test-results/gp-v288-s5-auto-dia-d-brid-06f4a--verificación-↔-cicloId-P2-/error-context.md"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/test-results/gp-v288-s5-auto-dia-d-brid-06f4a--verificación-↔-cicloId-P2-/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts",
+                        "column": 28,
+                        "line": 865
+                      }
+                    },
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 7389,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 1,
+                      "steps": [
+                        {
+                          "title": "S5-04 · abrir la operación AUTO",
+                          "duration": 5169
+                        },
+                        {
+                          "title": "S5-04 · lanzar la verificación D→hoy",
+                          "duration": 100
+                        },
+                        {
+                          "title": "S5-04 · esperar la evidencia de la sesión LAB",
+                          "duration": 1351
+                        },
+                        {
+                          "title": "S5-04 · guardar y verificar el enlace durable",
+                          "duration": 442
+                        }
+                      ],
+                      "startTime": "2026-10-15T12:36:09.787Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/home/runner/work/Bolsa_V1/Bolsa_V1/apps/web/test-results/gp-v288-s5-auto-dia-d-brid-06f4a--verificación-↔-cicloId-P2--retry1/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "d20fa249d5f664a7435d-050d977e3d8ee3262eac",
+              "file": "gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts",
+              "line": 810,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-15T12:34:20.718Z",
+    "duration": 118248.966,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 1
+  }
+}

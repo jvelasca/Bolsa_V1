@@ -322,6 +322,56 @@ enmascarar nada: la instrumentación read-only queda cableada para que el próxi
 distribución real (red + fases) en el artefacto `playwright-integrated-auto-s5-timings`, que es el
 único sitio donde el fenómeno aparece.
 
+### 6.2 Comparación con CI `38735478442` (evidencia cruda)
+
+El run de CI [`38735478442`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38735478442) sí dejó
+los artefactos crudos de la instrumentación. Se conservan **verbatim** en
+[`docs/engineering/evidence/v2.88.135/s5-ci-run-38735478442/`](./evidence/v2.88.135/s5-ci-run-38735478442/)
+(`s5-timings.txt`, `s5-network.txt`, `s5-network-timings.json.attempt0.json`, `…attempt1.json`,
+`s5-integrated-report.json`). Esta es la comparación directa con el N=3 local:
+
+**Tiempos por intento (`s5-timings.txt`).**
+
+| test | intento | estado | duración | tramos |
+| --- | --- | --- | --- | --- |
+| `S5-04` | 1 | **failed** | **64.59s** | esperar la evidencia de la sesión LAB **60.00s** · abrir la operación AUTO 4.34s · lanzar la verificación D→hoy 0.17s |
+| `S5-04` | 2 (retry) | passed | 7.39s | abrir la operación AUTO 5.17s · esperar la evidencia de la sesión LAB **1.35s** · guardar y verificar el enlace durable 0.44s |
+
+Delta primer intento − retry: **57.21s**. El timeout cae **exactamente** en el tramo
+`esperar la evidencia de la sesión LAB` (el `expect(save).toBeVisible({ timeout: 60_000 })`), el
+**mismo** paso que en local tarda 0.66-1.25 s.
+
+**Red por intento (`s5-network.txt`).**
+
+| fase | intento 0 (failed) | retry (passed) | delta |
+| --- | --- | --- | --- |
+| `api:other` | 52 pet. · suma 11.97s · **máx 8.89s** | 38 pet. · suma 3.64s · máx 0.23s | +8.33s |
+| `module:src` | 739 pet. · máx 0.56s | 739 pet. · máx 0.65s | −20.39s (suma) |
+| `module:dep` | 222 pet. · máx 0.55s | 222 pet. · máx 0.63s | +3.74s (suma) |
+| `api:run` | 2 pet. · máx 0.10s | 2 pet. · máx 0.37s | −0.54s (suma) |
+
+La petición más lenta del intento 0 es **`POST /api/instruments/cmv9ispyq00074cgfg32n5jdl/sync`**:
+`status 200`, `durationMs **8892**`, `offsetMs 13803` (`s5-network-timings.json.attempt0.json`,
+`index 1006`). En el retry **no se repite**: `api:other` baja a máx 0.23s y **desaparece** la petición
+`/sync`.
+
+**Lectura (evidencia → causa, acotada).**
+
+- El fenómeno es **solo de CI**: el N=3 local no reproduce ningún tramo cercano a 60 s (§6.1).
+- La espera que revienta es la **readiness asíncrona de la cadena LAB/scan** (el botón
+  `Guardar Evidence` aparece cuando la evidencia de sesión está lista), **no** el motor de
+  backtesting ni el cálculo de indicadores: las fases Python medidas siguen <65 ms y sin pico en la
+  1ª llamada, y `api:run` = 2 en ambos intentos (sin waterfall/re-run).
+- El `POST /instruments/<id>/sync` de **8.89 s** es un **coste observable** del arranque en frío,
+  pero **no demuestra por sí solo** ser la causa de los ~60 s de espera: es un único candidato medido
+  dentro de `api:other`, no el tramo que agota el timeout. El retry también pasa **sin** `/sync`
+  porque parte de estado caliente.
+
+**Alcance del cierre.** Esto **cierra la incidencia de DIAGNÓSTICO** (`S5-04` medido, causa acotada,
+sin tocar `timeout`/`retries`). **No** demuestra que la intermitencia del runner de CI haya
+desaparecido: la reproducción local confirma **estabilidad local**, no elimina el fallo intermitente
+del runner.
+
 **Guardarraíles.** No se toca `timeout`/`retries`/aserciones; sin cambios de contrato HTTP; los logs
 son env-gated (default OFF). `PAPER` sigue **`INCONCLUSIVE`**; los vetos `BEAR_TREND` siguen
 registrados como `NO_MEDIDO_REGIMEN` y **no** cuentan como días medidos ni ciclos.

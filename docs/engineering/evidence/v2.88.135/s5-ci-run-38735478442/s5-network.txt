@@ -1,0 +1,46 @@
+# AUTO S5 · red por intento (READ-ONLY; no cambia timeouts ni retries)
+
+## Intento 0 (/tmp/s5-network-timings.json.attempt0.json)
+
+| fase | peticiones | medida | suma | max | fallidas |
+| --- | --- | --- | --- | --- | --- |
+| module:src | 739 | 739 | 256.60s | 0.56s | 0 |
+| module:dep | 222 | 222 | 98.52s | 0.55s | 0 |
+| api:other | 52 | 52 | 11.97s | 8.89s | 0 |
+| api:run | 2 | 2 | 0.20s | 0.10s | 0 |
+| api:monitor | 1 | 1 | 0.15s | 0.15s | 0 |
+| other | 2 | 2 | 0.03s | 0.02s | 0 |
+| api:strategy-top | 1 | 1 | 0.01s | 0.01s | 0 |
+
+## Intento 1 (/tmp/s5-network-timings.json.attempt1.json)
+
+| fase | peticiones | medida | suma | max | fallidas |
+| --- | --- | --- | --- | --- | --- |
+| module:src | 739 | 739 | 277.00s | 0.65s | 0 |
+| module:dep | 222 | 222 | 94.78s | 0.63s | 0 |
+| api:other | 38 | 38 | 3.64s | 0.23s | 0 |
+| api:run | 2 | 2 | 0.74s | 0.37s | 0 |
+| api:monitor | 1 | 1 | 0.15s | 0.15s | 0 |
+| api:dia-d-verifications | 2 | 2 | 0.12s | 0.06s | 0 |
+| api:detail | 2 | 2 | 0.09s | 0.06s | 0 |
+| api:ohlcv | 1 | 1 | 0.06s | 0.06s | 0 |
+| other | 2 | 2 | 0.04s | 0.03s | 0 |
+| api:strategy-top | 1 | 1 | 0.01s | 0.01s | 0 |
+
+## Delta primer intento - retry (por fase; positivo = mas lento en frio)
+
+| fase | primero (suma) | retry (suma) | delta | peticiones 1o vs retry |
+| --- | --- | --- | --- | --- |
+| api:other | 11.97s | 3.64s | 8.33s | 52 vs 38 |
+| module:dep | 98.52s | 94.78s | 3.74s | 222 vs 222 |
+| api:monitor | 0.15s | 0.15s | 0.00s | 1 vs 1 |
+| api:strategy-top | 0.01s | 0.01s | -0.00s | 1 vs 1 |
+| other | 0.03s | 0.04s | -0.01s | 2 vs 2 |
+| api:ohlcv | 0.00s | 0.06s | -0.06s | 0 vs 1 |
+| api:detail | 0.00s | 0.09s | -0.09s | 0 vs 2 |
+| api:dia-d-verifications | 0.00s | 0.12s | -0.12s | 0 vs 2 |
+| api:run | 0.20s | 0.74s | -0.54s | 2 vs 2 |
+| module:src | 256.60s | 277.00s | -20.39s | 739 vs 739 |
+
+# intento 0: fase mas pesada por suma module:src 256.60s (739 peticiones)
+# intento 1: fase mas pesada por suma module:src 277.00s (739 peticiones)

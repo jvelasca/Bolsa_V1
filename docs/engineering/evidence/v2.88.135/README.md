@@ -188,6 +188,31 @@ primer arranque**, no un defecto del producto.
 **Regla:** medir en varias ejecuciones **antes** de optimizar; nunca ampliar `timeout`/`retries` para
 «pasar ni ocultar el fallo.
 
+**Comparación con CI (`38735478442`).** El run de CI
+[`38735478442`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38735478442) dejó la evidencia cruda
+de la instrumentación, conservada **verbatim** en
+[`s5-ci-run-38735478442/`](./s5-ci-run-38735478442/) (`s5-timings.txt`, `s5-network.txt`,
+`s5-network-timings.json.attempt0.json`, `…attempt1.json`, `s5-integrated-report.json`). Es la
+comparación directa con el **N=3 local en frío** (§6.1 del runbook) y **no** se reproduce localmente:
+
+- **`S5-04` intento 1: `failed` 64.59 s** — timeout **exacto** en el tramo
+  `esperar la evidencia de la sesión LAB` (**60.00 s**); `abrir la operación AUTO` 4.34 s; `lanzar la
+  verificación D→hoy` 0.17 s. **Retry: `passed` 7.39 s** (esperar LAB **1.35 s**). **Delta 57.21 s.**
+- **Red:** en el intento 0, `api:other` = 52 peticiones / suma 11.97 s / **máx 8.89 s**, y esa máxima
+  es **`POST /api/instruments/<id>/sync`** (`status 200`, `durationMs 8892`, `offsetMs 13803`). En el
+  retry `api:other` baja a máx 0.23 s y **desaparece** la petición `/sync`. `module:src` = 739
+  peticiones en ambos intentos (máx 0.56 / 0.65 s) y `api:run` = 2 en ambos (sin waterfall/re-run).
+
+**Lectura acotada.** El fallo apunta a la **readiness asíncrona de la cadena LAB/scan** (el botón
+`Guardar Evidence` aparece cuando la evidencia de sesión está lista), **no** al motor de backtesting
+ni al cálculo de indicadores (fases Python <65 ms, sin pico en la 1ª llamada). El
+`POST /instruments/<id>/sync` de **8.89 s** es un **coste observable** del arranque en frío, pero
+**no demuestra por sí solo** ser la causa de los ~60 s de espera.
+
+**Alcance.** Esto **cierra la incidencia de DIAGNÓSTICO**; **no** demuestra que la intermitencia del
+runner de CI haya desaparecido (estabilidad local **≠** ausencia de flakiness en el runner). `timeout`
+y `retries` siguen en **1** y los umbrales `ADR-046` **sin cambios**.
+
 ### 10.3 Estado de la ventana (sin cambios de honestidad)
 
 `P1` sigue **`INCONCLUSIVE`** (`0/4 días`, `0/2 regímenes`, `0/32 ciclos`) por veto `BEAR_TREND`;

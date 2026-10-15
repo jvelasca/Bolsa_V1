@@ -1,0 +1,18 @@
+# AUTO S5 · tiempos por intento (READ-ONLY; no cambia timeouts ni retries)
+
+| test | intento | retry | estado | duracion | pasos mas lentos |
+| --- | --- | --- | --- | --- | --- |
+| GP-V288-S5-01: /auto/operar monta y declara su estado sin fabricar la operación | 1 | 0 | passed | 4.06s |  |
+| GP-V288-S5-01: /auto/operar monta y declara su estado sin fabricar la operación | 2 | 1 | passed | 4.96s |  |
+| GP-V288-S5-02: la operación AUTO muestra la estrategia #1 con sus indicadores (P3) | 1 | 0 | passed | 4.17s |  |
+| GP-V288-S5-02: la operación AUTO muestra la estrategia #1 con sus indicadores (P3) | 2 | 1 | passed | 5.27s |  |
+| GP-V288-S5-03: «Verificar D→hoy» monta el host DÍA-D y arranca el run real (P4) | 1 | 0 | passed | 4.48s |  |
+| GP-V288-S5-03: «Verificar D→hoy» monta el host DÍA-D y arranca el run real (P4) | 2 | 1 | passed | 6.25s |  |
+| GP-V288-S5-04: guardar registra el enlace durable verificación ↔ cicloId (P2) | 1 | 0 | failed | 64.59s | S5-04 · esperar la evidencia de la sesión LAB 60.00s · S5-04 · abrir la operación AUTO 4.34s · S5-04 · lanzar la verificación D→hoy 0.17s |
+| GP-V288-S5-04: guardar registra el enlace durable verificación ↔ cicloId (P2) | 2 | 1 | passed | 7.39s | S5-04 · abrir la operación AUTO 5.17s · S5-04 · esperar la evidencia de la sesión LAB 1.35s · S5-04 · guardar y verificar el enlace durable 0.44s |
+
+- GP-V288-S5-01: /auto/operar monta y declara su estado sin fabricar la operación: primer intento 4.06s · retry 4.96s · delta primero-retry -0.90s
+- GP-V288-S5-02: la operación AUTO muestra la estrategia #1 con sus indicadores (P3): primer intento 4.17s · retry 5.27s · delta primero-retry -1.10s
+- GP-V288-S5-03: «Verificar D→hoy» monta el host DÍA-D y arranca el run real (P4): primer intento 4.48s · retry 6.25s · delta primero-retry -1.77s
+- GP-V288-S5-04: guardar registra el enlace durable verificación ↔ cicloId (P2): primer intento 64.59s · retry 7.39s · delta primero-retry 57.21s
+# S5-04 delta primero-retry 57.21s (primero 64.59s · retry 7.39s)
