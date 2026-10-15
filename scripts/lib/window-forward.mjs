@@ -292,10 +292,26 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * **Honestidad:** la ventana PAPER real sigue `INCONCLUSIVE` (`0/4 dias`, `0/2 regimenes`,
  * `0/32 ciclos`); lo que falta es OPERACION, no software. Los dias que CERTIFICAN la ventana deben
  * correrse DESPUES de este re-anclaje.
+ *
+ * RE-ANCLAJE 2026-10-15 (sello `v2.88.134-beta`, DOCS-ONLY): sello de la `respuesta a la auditoria
+ * externa del sello v2.88.133` — documento de respuesta, verificacion propia del sello (6/7
+ * afirmaciones sostenidas; el PIN se re-anclo en commit POST-TAG, no en el commit sellado) y
+ * trazado de los pendientes operativos `P1`-`P4` con criterio falsable — mas el bump de
+ * `package.json`/`meta.bump` de 12 CLIs. NO hay cambio de producto (`Delta motor = 0`,
+ * `Delta decision = 0`, `Delta contrato HTTP = 0`, sin migracion): `packages/` NO cambia (mismo
+ * arbol que `v2.88.132`/`v2.88.133`) y `apps/` cambia SOLO por el `meta.bump` de los 12 CLIs del
+ * sello. El arbol pinneado es el del commit del sello `7cef7fcc` (`apps` `86052343…` / `packages`
+ * `d48ac37b…`, medidos con `git rev-parse "HEAD:apps" "HEAD:packages"`). Editar el pin NO mueve a
+ * su vez el arbol porque este modulo vive en `scripts/`, que NO participa del pin. Pin anterior
+ * (sello `v2.88.133-beta`, commit `530fa674`): `apps` `07fa362c…` / `packages` `d48ac37b…`.
+ * **Honestidad:** la ventana PAPER real sigue `INCONCLUSIVE` (`0/4 dias`, `0/2 regimenes`,
+ * `0/32 ciclos`); el preflight de hoy (2026-10-15) declara `BEAR_TREND` con LONG vetadas ⇒
+ * `run-day` NO produce dia medible (bloqueo de MERCADO, no de software). Los dias que CERTIFICAN
+ * la ventana deben correrse DESPUES de este re-anclaje.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '530fa674',
-  appsHash: '07fa362c413f6282d8948fa02f29cfb3bdac234b',
+  commit: '7cef7fcc',
+  appsHash: '86052343a5dcfcbb092139aa5117bcb7aa77b9f6',
   packagesHash: 'd48ac37bbf44b229b5c05da2949aa310d06fcd86',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
