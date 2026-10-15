@@ -45,7 +45,10 @@ from bolsa_application.auto_operational_monitor import (
     STEP_UNKNOWN,
     read_operational_monitor,
 )
-from bolsa_application.dia_d_cycle_verification import build_dia_d_cycle_verification_draft
+from bolsa_application.dia_d_cycle_verification import (
+    DiaDCycleFacts,
+    build_dia_d_cycle_verification_draft,
+)
 
 #: Resolutores canónicos del informe por valor de ESTUDIO (fuente única): se reutilizan tal cual
 #: para no re-derivar ni la clave canónica del ciclo ni la identidad única/AMBIGUA del valor.
@@ -73,6 +76,7 @@ __all__ = [
     "read_dia_d_verifications",
     "read_estudio_chain_evidence",
     "read_top3_snapshot",
+    "resolve_dia_d_cycle_facts",
     "resolve_executed_vs_best",
     "value_strategy",
 ]
@@ -666,6 +670,73 @@ async def read_dia_d_verifications(
             "result": dict(result) if isinstance(result, Mapping) else result,
         }
     return out
+
+
+async def resolve_dia_d_cycle_facts(
+    session: Any,
+    account_id: str,
+    *,
+    cycle_id: str,
+) -> DiaDCycleFacts | None:
+    """Identidad DURABLE del ciclo AUTO para anclar la verificación DÍA-D (``None`` si no existe).
+
+    Resuelve, ACOTADO POR CUENTA, el instrumento (de la reserva de entrada del ciclo), su
+    símbolo (del catálogo) y la identidad EXACTA de la estrategia ejecutada que sella el ciclo
+    (``strategyPresetKey``/``strategyVersion``, leída del hecho durable, NUNCA del navegador).
+    Un ``cycleId`` sin reserva durable en esa cuenta ⇒ ``None`` (el llamante declara ``404``).
+    """
+    import sqlalchemy as sa
+
+    from bolsa_application.reservation_store import PostgresReservationStore
+    from bolsa_infrastructure.database.models.tables import InstrumentRow
+
+    key = str(cycle_id or "").strip()
+    if not key or not account_id:
+        return None
+    reservations = await PostgresReservationStore(
+        session, autocommit=False
+    ).list_by_cycle_ids(account_id, [key], limit=1)
+    if not reservations:
+        return None
+
+    instrument_id = str(reservations[0].instrument_id or "").strip() or None
+    symbol: str | None = None
+    if instrument_id:
+        try:
+            # El motor identifica el instrumento por su id, pero los entornos de siembra/legacy
+            # pueden usar el propio símbolo como id: se acepta cualquiera de las dos costuras
+            # (nunca se inventa: sin fila, el símbolo es un hueco declarado).
+            raw_symbol = await session.scalar(
+                sa.select(InstrumentRow.symbol).where(
+                    sa.or_(
+                        InstrumentRow.id == instrument_id,
+                        InstrumentRow.symbol == instrument_id,
+                    )
+                )
+            )
+            symbol = str(raw_symbol).strip() if raw_symbol else None
+        except Exception:  # noqa: BLE001 — catálogo ilegible: el símbolo es un hueco declarado.
+            symbol = None
+
+    monitor = await read_operational_monitor(session, account_id, cycle_id=key, limit=1)
+    cycle = next(
+        (
+            row
+            for row in (monitor.get("cycles") or [])
+            if str(row.get("cycleId")) == key
+        ),
+        None,
+    )
+    cycle_map = cycle if isinstance(cycle, Mapping) else {}
+    preset = cycle_map.get("strategyPresetKey")
+    version = cycle_map.get("strategyVersion")
+    return DiaDCycleFacts(
+        cycle_id=key,
+        instrument_id=instrument_id,
+        symbol=symbol,
+        strategy_preset_key=str(preset).strip() if preset is not None and str(preset).strip() else None,
+        strategy_version=str(version).strip() if version is not None and str(version).strip() else None,
+    )
 
 
 async def read_estudio_chain_evidence(

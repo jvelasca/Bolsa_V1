@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   BacktestEquityPointDto,
   BacktestRunDetailDto,
@@ -124,6 +124,7 @@ export function TradingDiaDReplayPanel() {
     (s) => s.clearGateDecisions,
   );
   const hudPrefs = useBacktestHudPrefs();
+  const queryClient = useQueryClient();
 
   const [replayCursor, setReplayCursor] = useState<string | null>(null);
   const [replayBarIndex, setReplayBarIndex] = useState(0);
@@ -431,14 +432,23 @@ export function TradingDiaDReplayPanel() {
     cycleLinkPersistedRef.current = key;
     let cancelled = false;
     setCycleLinkError(null);
-    void api.persistDiaDCycleVerification(payload).catch((err: unknown) => {
-      if (cancelled) return;
-      setCycleLinkError(
-        err instanceof Error
-          ? err.message
-          : "No se pudo enlazar la verificación con su ciclo.",
-      );
-    });
+    void api
+      .persistDiaDCycleVerification(payload, s.accountId ?? null)
+      .then(() => {
+        if (cancelled) return;
+        // v111 — sin esto la tabla de ciclos podía mostrar «Sin verificación» hasta 30 s.
+        void queryClient.invalidateQueries({
+          queryKey: ["dia-d-cycle-verifications"],
+        });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setCycleLinkError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo enlazar la verificación con su ciclo.",
+        );
+      });
     return () => {
       cancelled = true;
     };
@@ -453,6 +463,7 @@ export function TradingDiaDReplayPanel() {
     session?.strategyDefinitionId,
     session?.strategyPresetKey,
     session?.strategyVersion,
+    session?.accountId,
     sessionEvidence,
   ]);
 
@@ -721,7 +732,13 @@ export function TradingDiaDReplayPanel() {
       });
       if (linkPayload) {
         try {
-          await api.persistDiaDCycleVerification(linkPayload);
+          await api.persistDiaDCycleVerification(
+            linkPayload,
+            session.accountId ?? null,
+          );
+          void queryClient.invalidateQueries({
+            queryKey: ["dia-d-cycle-verifications"],
+          });
         } catch (err) {
           cycleLinkError =
             err instanceof Error

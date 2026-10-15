@@ -455,11 +455,71 @@ class SignalAlertSubscriptionRow(Base):
         nullable=True,
     )
     note: Mapped[str | None] = mapped_column(String, nullable=True)
+    #: v111 — ownership: la suscripción pertenece a UNA cuenta (fail-closed en las queries).
+    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
+    #: v111 — *claim* atómico del bar en curso (evita despacho doble por concurrencia).
+    processing_bar_timestamp: Mapped[str | None] = mapped_column(
+        "processing_bar_timestamp", String, nullable=True
+    )
+    processing_token: Mapped[str | None] = mapped_column(
+        "processing_token", String, nullable=True
+    )
+    processing_started_at: Mapped[datetime | None] = mapped_column(
+        "processing_started_at", DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
     instrument: Mapped[InstrumentRow] = relationship()
     strategy_definition: Mapped["StrategyDefinitionRow | None"] = relationship(
         back_populates="signal_alert_subscriptions",
+    )
+
+
+class AlertDeliveryRow(Base):
+    """v111 — OUTBOX de entrega de avisos de señal (una fila por bar + canal).
+
+    Un fallo de SMTP/webhook NO se confunde con una entrega: la fila queda en
+    ``retryable_failed``/``dead_letter`` y se reintenta, en vez de marcar el bar como
+    "notificado" y perder el aviso en silencio.
+    """
+
+    __tablename__ = "alert_deliveries"
+    __table_args__ = (
+        UniqueConstraint(
+            "subscription_id",
+            "bar_timestamp",
+            "channel",
+            name="alert_deliveries_subscription_bar_channel_key",
+        ),
+        Index("alert_deliveries_account_id_idx", "account_id"),
+        Index("alert_deliveries_status_retry_idx", "status", "next_retry_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    subscription_id: Mapped[str] = mapped_column(
+        "subscription_id",
+        ForeignKey("signal_alert_subscriptions.id", ondelete="CASCADE"),
+    )
+    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
+    bar_timestamp: Mapped[str] = mapped_column("bar_timestamp", String)
+    signal_kind: Mapped[str | None] = mapped_column("signal_kind", String, nullable=True)
+    channel: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String)
+    attempt: Mapped[int] = mapped_column(Integer, server_default="0")
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    last_error: Mapped[str | None] = mapped_column("last_error", String, nullable=True)
+    next_retry_at: Mapped[datetime | None] = mapped_column(
+        "next_retry_at", DateTime(timezone=True), nullable=True
+    )
+    claimed_at: Mapped[datetime | None] = mapped_column(
+        "claimed_at", DateTime(timezone=True), nullable=True
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(
+        "delivered_at", DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+    updated_at: Mapped[datetime | None] = mapped_column(
+        "updated_at", DateTime(timezone=True), nullable=True
     )
 
 
@@ -1085,6 +1145,7 @@ class DiaDCycleVerificationRow(Base):
     __tablename__ = "dia_d_cycle_verifications"
     __table_args__ = (
         UniqueConstraint(
+            "account_id",
             "cycle_id",
             "dia_d",
             "end_date",
@@ -1116,6 +1177,10 @@ class DiaDCycleVerificationRow(Base):
     research_evidence_id: Mapped[str | None] = mapped_column(
         "research_evidence_id", String, nullable=True
     )
+    #: v111 — hash determinista de los hechos durables que respaldan la verificación.
+    facts_hash: Mapped[str | None] = mapped_column("facts_hash", String, nullable=True)
+    #: v111 — actor humano que lanzó/confirmó la verificación (si lo declara).
+    verified_by: Mapped[str | None] = mapped_column("verified_by", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 

@@ -68,12 +68,19 @@ def run_migrations_online() -> None:
         with context.begin_transaction():
             context.run_migrations()
         return
+    # ``_resolved_url()`` SE USA TAMBIÉN AQUÍ (no solo en modo offline): si la ruta
+    # online se construyera desde ``alembic.ini`` a secas, la precedencia documentada
+    # arriba (``DATABASE_URL`` > ``config.attributes["DATABASE_URL"]`` > ini) sería
+    # mentira y ``alembic upgrade head`` migraría una BD DISTINTA de aquella sobre la
+    # que consulta el proceso — con la BD de desarrollo como destino silencioso. El
+    # resto de la sección se preserva tal cual para no perder otras opciones del ini.
+    section = config.get_section(config.config_ini_section, {})
+    section["sqlalchemy.url"] = _resolved_url()
     engine = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-    engine.url = engine.url.set(drivername="postgresql+psycopg")
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():

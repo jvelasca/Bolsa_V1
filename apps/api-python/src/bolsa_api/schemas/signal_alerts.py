@@ -25,6 +25,8 @@ class SignalAlertSubscriptionDto(BaseModel):
     last_signal_price: float | None = Field(default=None, alias="lastSignalPrice")
     note: str | None = None
     created_at: str = Field(alias="createdAt")
+    #: v111 — dueño de la suscripción (aislamiento por cuenta).
+    account_id: str | None = Field(default=None, alias="accountId")
 
 
 class SignalAlertSubscriptionsResponseDto(BaseModel):
@@ -56,6 +58,10 @@ class AlertChannelDispatchDto(BaseModel):
     channel: str
     ok: bool
     error: str | None = None
+    #: v111 — trazabilidad del OUTBOX.
+    attempt: int = 0
+    will_retry: bool = Field(default=False, alias="willRetry")
+    delivery_id: str | None = Field(default=None, alias="deliveryId")
 
 
 class TriggeredSignalAlertDto(BaseModel):
@@ -68,4 +74,10 @@ class TriggeredSignalAlertDto(BaseModel):
 
 class EvaluateSignalAlertsResponseDto(BaseModel):
     data: list[TriggeredSignalAlertDto]
+    dispatches: list[AlertChannelDispatchDto] = Field(default_factory=list)
+
+
+class ProcessAlertDeliveriesResponseDto(BaseModel):
+    """v111 — resultado del worker del OUTBOX (reintentos + entregas de esta pasada)."""
+
     dispatches: list[AlertChannelDispatchDto] = Field(default_factory=list)

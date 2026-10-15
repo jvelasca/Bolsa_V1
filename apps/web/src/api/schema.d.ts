@@ -1163,6 +1163,9 @@ export interface paths {
         /**
          * Persist Auto Dia D Verification
          * @description Registra (idempotente) la verificación DÍA-D enlazada al ciclo del principal.
+         *
+         *     El ciclo se RESUELVE en el servidor: inexistente ⇒ 404; identidad declarada en conflicto con
+         *     el hecho durable ⇒ 409. Nunca se persiste la identidad declarada por el navegador.
          */
         post: operations["persist_auto_dia_d_verification_api_auto_dia_d_verifications_post"];
         delete?: never;
@@ -3837,6 +3840,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/signal-alerts/deliveries/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Process Signal Alert Deliveries
+         * @description Worker del OUTBOX: reintenta las entregas vencidas (PENDING/RETRYABLE_FAILED).
+         *
+         *     Idempotente y sin ámbito de cuenta: reclama CUALQUIER entrega vencida (el dueño viaja en la
+         *     fila) para que un fallo de SMTP/webhook no se pierda. Pensado para cron/scheduler.
+         */
+        post: operations["process_signal_alert_deliveries_api_signal_alerts_deliveries_process_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/signal-alerts/evaluate": {
         parameters: {
             query?: never;
@@ -4338,14 +4364,26 @@ export interface components {
         };
         /** AlertChannelDispatchDto */
         AlertChannelDispatchDto: {
+            /**
+             * Attempt
+             * @default 0
+             */
+            attempt: number;
             /** Channel */
             channel: string;
+            /** Deliveryid */
+            deliveryId?: string | null;
             /** Error */
             error?: string | null;
             /** Ok */
             ok: boolean;
             /** Subscriptionid */
             subscriptionId: string;
+            /**
+             * Willretry
+             * @default false
+             */
+            willRetry: boolean;
         };
         /** AppendDecisionMemoryRequest */
         AppendDecisionMemoryRequest: {
@@ -6421,7 +6459,7 @@ export interface components {
         };
         /**
          * DiaDCycleVerificationDto
-         * @description Verificación durable enlazada a un ciclo (una fila por ciclo + ventana + modo).
+         * @description Verificación durable enlazada a un ciclo (una fila por cuenta + ciclo + ventana + modo).
          */
         DiaDCycleVerificationDto: {
             /** Accountid */
@@ -6436,6 +6474,8 @@ export interface components {
             diaD: string;
             /** Enddate */
             endDate: string;
+            /** Factshash */
+            factsHash?: string | null;
             /** Id */
             id: string;
             /** Instrumentid */
@@ -6456,6 +6496,8 @@ export interface components {
             strategyVersion?: string | null;
             /** Symbol */
             symbol: string;
+            /** Verifiedby */
+            verifiedBy?: string | null;
         };
         /** DiaDCycleVerificationListResponseDto */
         DiaDCycleVerificationListResponseDto: {
@@ -6469,6 +6511,11 @@ export interface components {
         /**
          * DiaDCycleVerificationPersistRequestDto
          * @description Payload de la verificación D→hoy lanzada desde un ciclo. Huecos ⇒ campo ausente.
+         *
+         *     Sólo ``cycleId``/``diaD``/``endDate``/``mode`` son indispensables. ``instrumentId``,
+         *     ``symbol`` y las claves de estrategia son OPCIONALES y actúan como **contraste**: si se
+         *     declaran y contradicen el hecho durable del ciclo, el servidor responde ``409`` (nunca se
+         *     persiste lo declarado por el navegador).
          */
         DiaDCycleVerificationPersistRequestDto: {
             /** Band */
@@ -6480,7 +6527,7 @@ export interface components {
             /** Enddate */
             endDate: string;
             /** Instrumentid */
-            instrumentId: string;
+            instrumentId?: string | null;
             /** Mode */
             mode: string;
             /** Researchevidenceid */
@@ -6496,7 +6543,9 @@ export interface components {
             /** Strategyversion */
             strategyVersion?: string | null;
             /** Symbol */
-            symbol: string;
+            symbol?: string | null;
+            /** Verifiedby */
+            verifiedBy?: string | null;
         };
         /** DiaDCycleVerificationResponseDto */
         DiaDCycleVerificationResponseDto: {
@@ -10420,6 +10469,14 @@ export interface components {
             /** Previousclose */
             previousClose: number | null;
         };
+        /**
+         * ProcessAlertDeliveriesResponseDto
+         * @description v111 — resultado del worker del OUTBOX (reintentos + entregas de esta pasada).
+         */
+        ProcessAlertDeliveriesResponseDto: {
+            /** Dispatches */
+            dispatches?: components["schemas"]["AlertChannelDispatchDto"][];
+        };
         /** ProposeRecommendationRequest */
         ProposeRecommendationRequest: {
             /** Accountid */
@@ -11113,6 +11170,8 @@ export interface components {
         };
         /** SignalAlertSubscriptionDto */
         SignalAlertSubscriptionDto: {
+            /** Accountid */
+            accountId?: string | null;
             /** Channels */
             channels?: string[];
             /** Createdat */
@@ -19746,7 +19805,9 @@ export interface operations {
             query?: {
                 activeOnly?: boolean;
             };
-            header?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -19775,7 +19836,9 @@ export interface operations {
     create_signal_alert_api_signal_alerts_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -19805,10 +19868,43 @@ export interface operations {
             };
         };
     };
+    process_signal_alert_deliveries_api_signal_alerts_deliveries_process_post: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessAlertDeliveriesResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     evaluate_signal_alerts_api_signal_alerts_evaluate_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -19823,12 +19919,23 @@ export interface operations {
                     "application/json": components["schemas"]["EvaluateSignalAlertsResponseDto"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     delete_signal_alert_api_signal_alerts__subscription_id__delete: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
             path: {
                 subscription_id: string;
             };
@@ -19857,7 +19964,9 @@ export interface operations {
     reset_signal_alert_dedupe_api_signal_alerts__subscription_id__reset_dedupe_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
             path: {
                 subscription_id: string;
             };

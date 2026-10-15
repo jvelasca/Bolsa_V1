@@ -132,6 +132,7 @@ from bolsa_application.signal_alerts import (
     DeleteSignalAlertSubscription,
     EvaluateSignalAlertSubscriptions,
     ListSignalAlertSubscriptions,
+    ProcessAlertDeliveries,
     ResetSignalAlertDedupe,
 )
 from bolsa_application.strategies import (
@@ -954,11 +955,17 @@ def get_reset_signal_alert_use_case(session: AsyncSession) -> ResetSignalAlertDe
 
 
 def get_evaluate_signal_alerts_use_case(session: AsyncSession) -> EvaluateSignalAlertSubscriptions:
+    repo = get_signal_alert_repository(session)
     return EvaluateSignalAlertSubscriptions(
-        get_signal_alert_repository(session),
+        repo,
         get_strategy_definition_repository(session),
         get_ohlcv_repository(session),
+        outbox=ProcessAlertDeliveries(repo),
     )
+
+
+def get_process_alert_deliveries_use_case(session: AsyncSession) -> ProcessAlertDeliveries:
+    return ProcessAlertDeliveries(get_signal_alert_repository(session))
 
 
 def get_list_instruments_use_case(session: AsyncSession) -> ListInstrumentsWithMeta:

@@ -997,6 +997,8 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py
           --ignore=apps/api-python/tests/test_auto_daily_coverage_pg.py
           --ignore=apps/api-python/tests/test_auto_dia_d_trace_pg.py
+          --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
+          --ignore=apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
@@ -1137,6 +1139,10 @@ jobs:
       # ``NULL``) solo se certifican contra PG real. Un skip mudo dejaría el enlace durable
       # sin medir en el tag.
       DIA_D_CYCLE_VERIFICATION_PG_REQUIRED: '1'
+      # OBS-19 (hallazgo de la remediación v111): el certificador del SELLO DE CICLO
+      # (``test_auto_fill_cycle_seal_pg.py``) no lo ejecutaba ningún job: no estaba ignorado
+      # en el offline (skipeaba en mudo) ni listado en ningún job PG. Se da de alta aquí.
+      AUTO_FILL_CYCLE_SEAL_PG_REQUIRED: '1'
       # V2.25/A10: persistencia del Strategy Lifecycle (migración 030) en PG real.
       STRATEGY_LIFECYCLE_PG_REQUIRED: '1'
       # V2.26/A10: ciclo completo del Auto Orchestrator sobre PG real (promoción solo
@@ -1179,6 +1185,12 @@ jobs:
       # EJECUTADA y conciliar el P&L ciclo a ciclo. Un skip mudo invalidaría la
       # certificación; su paso dedicado lleva guard anti-skip (log + grep de ``skipped``).
       AUTO_ESTUDIO_CHAIN_PG_REQUIRED: '1'
+      # v111 (remediación de la auditoría): las ALERTAS DE SEÑAL se certifican sobre PG real —
+      # el claim atómico por ``(suscripción, barra)`` (worker vs. evaluación manual no pueden
+      # despachar dos veces), el OUTBOX ``alert_deliveries`` (PENDING → DELIVERED |
+      # RETRYABLE_FAILED → DEAD_LETTER con backoff) y la ownership por ``account_id`` de la
+      # migración 054. Sin PG real skipearía en mudo e invalidaría la certificación del lote.
+      SIGNAL_ALERTS_PG_REQUIRED: '1'
       # v2.88.125 (paso 4a del veredicto): el certificador de la VENTANA PAPER
       # (``test_paper_window_certification_pg.py``) lee el material durable por el camino
       # canónico y certifica sin fabricar (INCONCLUSIVE si no se alcanza la ventana). En
@@ -1372,6 +1384,8 @@ jobs:
           apps/api-python/tests/test_auto_operational_monitor_pg.py
           apps/api-python/tests/test_dia_d_cycle_verification_pg.py
           apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
+          apps/api-python/tests/test_signal_alerts_v111_pg.py
+          apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
           apps/api-python/tests/test_health.py

@@ -130,3 +130,39 @@ describe("dia-d cycle linkage (P2)", () => {
     expect(session?.strategyVersion).toBeNull();
   });
 });
+
+describe("dia-d account ownership (v111)", () => {
+  beforeEach(() => {
+    localStorage.removeItem("bolsa-dia-d-trading-session-v1");
+    useDiaDTradingSessionStore.setState({ session: null });
+  });
+
+  it("carries the owning accountId into the session", () => {
+    useDiaDTradingSessionStore.getState().enterSession({
+      instrumentId: "i1",
+      symbol: "ACS",
+      strategyDefinitionId: "s1",
+      strategyLabel: "SMA",
+      rank: 1,
+      diaD: "2024-01-01",
+      endDate: "2024-12-31",
+      accountId: "acc-7",
+    });
+    expect(useDiaDTradingSessionStore.getState().session?.accountId).toBe(
+      "acc-7",
+    );
+  });
+
+  it("declares a missing accountId as null (never fabricated)", () => {
+    useDiaDTradingSessionStore.getState().enterSession({
+      instrumentId: "i1",
+      symbol: "ACS",
+      strategyDefinitionId: "s1",
+      strategyLabel: "SMA",
+      rank: 1,
+      diaD: "2024-01-01",
+      endDate: "2024-12-31",
+    });
+    expect(useDiaDTradingSessionStore.getState().session?.accountId).toBeNull();
+  });
+});

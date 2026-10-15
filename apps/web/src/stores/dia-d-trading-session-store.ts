@@ -45,6 +45,12 @@ export type DiaDTradingSession = {
   cycleId?: string | null;
   strategyPresetKey?: string | null;
   strategyVersion?: string | null;
+  /**
+   * v111 — cuenta DUEÑA de la sesión. La verificación se persiste con ESTA cuenta explícita
+   * (no sólo con el middleware `X-Account-Id`), para que el ciclo de A no se enlace a la
+   * cabecera activa si el usuario cambia de cuenta a mitad de sesión.
+   */
+  accountId?: string | null;
   /** Run Auto cacheado (D→hoy) para no re-lanzar al remontar. */
   autoRunId?: string | null;
   /** Log Semi/Manual: aceptaciones/rechazos. Reescriben fills/equity en v0.4. */
@@ -92,6 +98,7 @@ export const useDiaDTradingSessionStore = create<DiaDTradingSessionState>()(
             cycleId: input.cycleId ?? null,
             strategyPresetKey: input.strategyPresetKey ?? null,
             strategyVersion: input.strategyVersion ?? null,
+            accountId: input.accountId ?? null,
             autoRunId: null,
             gateDecisions: [],
             fullBleedMovie: input.fullBleedMovie ?? false,

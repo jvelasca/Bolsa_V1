@@ -1,6 +1,19 @@
-"""Use-cases de alertas por señal."""
+"""Use-cases de alertas por señal (v111: ownership + claim atómico + OUTBOX de entrega).
+
+Cambios de la auditoría v111:
+
+* **Ownership** — todas las operaciones aceptan ``account_id`` y acotan por dueño.
+* **Claim atómico** — el disparo de una barra se reclama con ``last_bar_timestamp IS DISTINCT
+  FROM`` + lease; sólo el ganador encola/despacha (fin del doble despacho worker/manual).
+* **OUTBOX** — la entrega vive en ``alert_deliveries`` (PENDING/DELIVERED/RETRYABLE_FAILED/
+  DEAD_LETTER): un fallo de SMTP/webhook se reintenta con backoff, no se pierde en silencio.
+"""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any, Literal, cast
 
 from bolsa_analytics.research.manifest import strategy_definition_from_preset
@@ -18,9 +31,12 @@ from bolsa_infrastructure.alerts.alert_channels import (
     AlertChannelDispatchResult,
     SignalAlertChannelDispatcher,
     normalize_alert_channels,
+    signal_event_to_payload,
     validate_alert_channel_config,
 )
+from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.repositories.signal_alert_repository import (
+    AlertDeliveryRecord,
     SignalAlertSubscriptionRecord,
     SqlAlchemySignalAlertRepository,
     filter_signal_events_by_kinds,
@@ -31,29 +47,39 @@ from bolsa_infrastructure.database.repositories.signal_alert_repository import (
 @dataclass(frozen=True, slots=True)
 class TriggeredSignalAlert:
     """Use-case / tipo: Triggered Signal Alert."""
+
     subscription: SignalAlertSubscriptionRecord
     signal: SignalEventV1
     dispatches: list[AlertChannelDispatchResult]
+    deliveries: list[AlertDeliveryRecord]
 
 
 @dataclass(frozen=True, slots=True)
 class EvaluateSignalAlertsResult:
     """Evalúa Signal Alerts Result."""
+
     triggered: list[TriggeredSignalAlert]
     dispatches: list[AlertChannelDispatchResult]
 
 
 class ListSignalAlertSubscriptions:
-    """Lista Signal Alert Subscriptions."""
+    """Lista Signal Alert Subscriptions (acotada al dueño)."""
+
     def __init__(self, repo: SqlAlchemySignalAlertRepository) -> None:
         self._repo = repo
 
-    async def execute(self, *, active_only: bool = False) -> list[SignalAlertSubscriptionRecord]:
-        return await self._repo.list_all(active_only=active_only)
+    async def execute(
+        self,
+        *,
+        account_id: str | None = None,
+        active_only: bool = False,
+    ) -> list[SignalAlertSubscriptionRecord]:
+        return await self._repo.list_all(account_id=account_id, active_only=active_only)
 
 
 class CreateSignalAlertSubscription:
     """Crea Signal Alert Subscription."""
+
     def __init__(
         self,
         repo: SqlAlchemySignalAlertRepository,
@@ -66,6 +92,7 @@ class CreateSignalAlertSubscription:
         self,
         *,
         instrument_id: str,
+        account_id: str | None = None,
         strategy_definition_id: str | None = None,
         preset_key: Literal["sma_crossover", "rsi_mean_reversion"] | None = None,
         timeframe: str = "1d",
@@ -101,6 +128,7 @@ class CreateSignalAlertSubscription:
 
         return await self._repo.create(
             instrument_id=instrument_id,
+            account_id=account_id,
             strategy_definition_id=strategy_definition_id,
             preset_key=preset_key,
             timeframe=resolved_timeframe,
@@ -113,44 +141,51 @@ class CreateSignalAlertSubscription:
 
 
 class DeleteSignalAlertSubscription:
-    """Elimina Signal Alert Subscription."""
+    """Elimina Signal Alert Subscription (sólo del dueño)."""
+
     def __init__(self, repo: SqlAlchemySignalAlertRepository) -> None:
         self._repo = repo
 
-    async def execute(self, subscription_id: str) -> None:
-        deleted = await self._repo.delete(subscription_id)
+    async def execute(self, subscription_id: str, *, account_id: str | None = None) -> None:
+        deleted = await self._repo.delete(subscription_id, account_id=account_id)
         if not deleted:
             raise ValueError("Suscripción no encontrada")
 
 
 class ResetSignalAlertDedupe:
     """Use-case / tipo: Reset Signal Alert Dedupe."""
+
     def __init__(self, repo: SqlAlchemySignalAlertRepository) -> None:
         self._repo = repo
 
-    async def execute(self, subscription_id: str) -> SignalAlertSubscriptionRecord:
-        updated = await self._repo.reset_bar_dedupe(subscription_id)
+    async def execute(
+        self, subscription_id: str, *, account_id: str | None = None
+    ) -> SignalAlertSubscriptionRecord:
+        updated = await self._repo.reset_bar_dedupe(subscription_id, account_id=account_id)
         if updated is None:
             raise ValueError("Suscripción no encontrada")
         return updated
 
 
 class EvaluateSignalAlertSubscriptions:
-    """Evalúa Signal Alert Subscriptions."""
+    """Evalúa Signal Alert Subscriptions: claim atómico + encolado en el OUTBOX."""
+
     def __init__(
         self,
         subscription_repo: SqlAlchemySignalAlertRepository,
         strategy_repo: StrategyDefinitionRepository,
         ohlcv_repo: OhlcvRepository,
         channel_dispatcher: SignalAlertChannelDispatcher | None = None,
+        outbox: ProcessAlertDeliveries | None = None,
     ) -> None:
         self._subscriptions = subscription_repo
         self._strategies = strategy_repo
         self._ohlcv = ohlcv_repo
         self._dispatcher = channel_dispatcher or SignalAlertChannelDispatcher()
+        self._outbox = outbox
 
-    async def execute(self) -> EvaluateSignalAlertsResult:
-        active = await self._subscriptions.list_all(active_only=True)
+    async def execute(self, *, account_id: str | None = None) -> EvaluateSignalAlertsResult:
+        active = await self._subscriptions.list_all(account_id=account_id, active_only=True)
         if not active:
             return EvaluateSignalAlertsResult(triggered=[], dispatches=[])
 
@@ -160,21 +195,55 @@ class EvaluateSignalAlertSubscriptions:
             event = await self._evaluate_subscription(subscription)
             if event is None:
                 continue
-            updated = await self._subscriptions.mark_bar_triggered(
+            claim = await self._subscriptions.claim_bar(
                 subscription.id,
+                account_id=account_id,
                 bar_timestamp=event.timestamp,
                 signal_kind=event.kind,
                 signal_price=event.price,
             )
-            if updated is None:
+            if claim is None:
+                # Otra pista (worker o evaluación manual) ya reclamó esta barra.
                 continue
-            dispatches = await self._dispatcher.dispatch(updated, event)
+            claimed = claim.subscription
+            deliveries = await self._enqueue_deliveries(claimed, event)
+            await self._subscriptions.finish_bar_claim(claimed.id, claim.token)
+            await self._subscriptions.commit()
+
+            dispatches: list[AlertChannelDispatchResult] = []
+            if deliveries and self._outbox is not None:
+                dispatches = await self._outbox.process(deliveries)
             all_dispatches.extend(dispatches)
             triggered.append(
-                TriggeredSignalAlert(subscription=updated, signal=event, dispatches=dispatches)
+                TriggeredSignalAlert(
+                    subscription=claimed,
+                    signal=event,
+                    dispatches=dispatches,
+                    deliveries=deliveries,
+                )
             )
 
         return EvaluateSignalAlertsResult(triggered=triggered, dispatches=all_dispatches)
+
+    async def _enqueue_deliveries(
+        self, subscription: SignalAlertSubscriptionRecord, event: SignalEventV1
+    ) -> list[AlertDeliveryRecord]:
+        payload = signal_event_to_payload(subscription, event)
+        deliveries: list[AlertDeliveryRecord] = []
+        for channel in normalize_alert_channels(subscription.channels):
+            if channel == "toast":
+                continue
+            deliveries.append(
+                await self._subscriptions.enqueue_delivery(
+                    subscription_id=subscription.id,
+                    account_id=subscription.account_id,
+                    bar_timestamp=event.timestamp,
+                    signal_kind=event.kind,
+                    channel=channel,
+                    payload=payload,
+                )
+            )
+        return deliveries
 
     async def _evaluate_subscription(self, subscription: SignalAlertSubscriptionRecord) -> SignalEventV1 | None:
         try:
@@ -232,3 +301,135 @@ class EvaluateSignalAlertSubscriptions:
             )
 
         raise ValueError("Suscripción sin estrategia ejecutable")
+
+
+def _signal_view(payload: dict[str, Any] | None) -> Any:
+    """Reconstruye la vista mínima de la señal desde el ``payload`` durable del OUTBOX."""
+    nested = (payload or {}).get("signal") or {}
+    return SimpleNamespace(
+        id=nested.get("id"),
+        instrument_id=nested.get("instrumentId"),
+        timestamp=nested.get("timestamp"),
+        kind=nested.get("kind"),
+        strategy_definition_id=nested.get("strategyDefinitionId"),
+        strategy_version=nested.get("strategyVersion"),
+        bar_index=nested.get("barIndex"),
+        price=nested.get("price"),
+        data_version=nested.get("dataVersion"),
+        indicator_snapshot_hash=nested.get("indicatorSnapshotHash"),
+        preset_key=nested.get("presetKey"),
+    )
+
+
+class ProcessAlertDeliveries:
+    """Worker del OUTBOX: reclama entregas vencidas, las envía y transiciona su estado.
+
+    Reintentos con **backoff** exponencial y presupuesto acotado (``max_attempts``): al agotarlo
+    la fila pasa a ``DEAD_LETTER``. Nunca se pierde una entrega en silencio.
+    """
+
+    def __init__(
+        self,
+        subscription_repo: SqlAlchemySignalAlertRepository,
+        channel_dispatcher: SignalAlertChannelDispatcher | None = None,
+        *,
+        max_attempts: int | None = None,
+        base_backoff_seconds: float | None = None,
+        lease_seconds: float | None = None,
+    ) -> None:
+        settings = get_settings()
+        self._repo = subscription_repo
+        self._dispatcher = channel_dispatcher or SignalAlertChannelDispatcher(settings)
+        self._max_attempts: int = max_attempts or settings.alert_delivery_max_attempts
+        self._base_backoff: float = float(
+            base_backoff_seconds or settings.alert_delivery_base_backoff_seconds
+        )
+        self._lease: float = lease_seconds or settings.alert_delivery_lease_seconds
+
+    async def execute(self, *, limit: int = 50) -> list[AlertChannelDispatchResult]:
+        claimed = await self._repo.claim_due_deliveries(
+            limit=limit, lease_seconds=self._lease, max_attempts=self._max_attempts
+        )
+        if not claimed:
+            return []
+        # Se suelta el lock del claim ANTES de la I/O de red (el lease cubre una caída).
+        await self._repo.commit()
+        return await self.process(claimed)
+
+    async def process(
+        self, deliveries: list[AlertDeliveryRecord]
+    ) -> list[AlertChannelDispatchResult]:
+        results: list[AlertChannelDispatchResult] = []
+        for delivery in deliveries:
+            results.append(await self._process_one(delivery))
+        return results
+
+    async def _process_one(self, delivery: AlertDeliveryRecord) -> AlertChannelDispatchResult:
+        subscription = await self._repo.get_by_id(
+            delivery.subscription_id, account_id=delivery.account_id
+        )
+        if subscription is None:
+            await self._repo.mark_delivery_failed(
+                delivery.id,
+                error="suscripción no encontrada",
+                next_retry_at=None,
+                dead_letter=True,
+            )
+            await self._repo.commit()
+            return AlertChannelDispatchResult(
+                subscription_id=delivery.subscription_id,
+                channel=delivery.channel,
+                ok=False,
+                error="suscripción no encontrada",
+                attempt=delivery.attempt + 1,
+                will_retry=False,
+                delivery_id=delivery.id,
+            )
+
+        signal = _signal_view(delivery.payload)
+        dispatched = await self._dispatcher.dispatch_channels(
+            subscription, signal, channel=delivery.channel
+        )
+        result = dispatched[0] if dispatched else AlertChannelDispatchResult(
+            subscription_id=delivery.subscription_id,
+            channel=delivery.channel,
+            ok=True,
+        )
+
+        if result.ok:
+            await self._repo.mark_delivery_delivered(delivery.id)
+            await self._repo.commit()
+            return AlertChannelDispatchResult(
+                subscription_id=delivery.subscription_id,
+                channel=delivery.channel,
+                ok=True,
+                attempt=delivery.attempt + 1,
+                delivery_id=delivery.id,
+            )
+
+        attempt_after = delivery.attempt + 1
+        dead_letter = attempt_after >= self._max_attempts
+        next_retry_at = None if dead_letter else datetime.now(UTC) + timedelta(
+            seconds=self._backoff_seconds(attempt_after)
+        )
+        await self._repo.mark_delivery_failed(
+            delivery.id,
+            error=result.error,
+            next_retry_at=next_retry_at,
+            dead_letter=dead_letter,
+        )
+        await self._repo.commit()
+        return AlertChannelDispatchResult(
+            subscription_id=delivery.subscription_id,
+            channel=delivery.channel,
+            ok=False,
+            error=result.error,
+            attempt=attempt_after,
+            will_retry=not dead_letter,
+            delivery_id=delivery.id,
+        )
+
+    def _backoff_seconds(self, attempt: int) -> float:
+        # Backoff exponencial acotado (30s, 60s, 120s…) — determinista y auditable.
+        # ``2.0`` (y no ``2``) para que el producto sea ``float`` y no ``Any`` (mypy).
+        return self._base_backoff * (2.0 ** max(0, attempt - 1))

@@ -459,6 +459,23 @@ describe("DiaDAutoFeedbackPanel", () => {
     expect(card.textContent).toContain("Sin dato todavía");
     expect(card.textContent).not.toContain("unmotivo_no_catalogado");
   });
+
+  it("declara el error de DETALLE de la ventana (no solo el de la lista)", async () => {
+    const mock = vi.mocked(api.getAutoDiaDFeedback);
+    const original = mock.getMockImplementation();
+    mock.mockRejectedValue(new Error("artifact corrupto"));
+
+    renderWithClient(
+      <DiaDAutoFeedbackPanel />,
+      "/auto-monitor?mode=dia-d&view=feedback&window=2026-09-29_2026-09-30",
+    );
+
+    const err = await screen.findByTestId("dia-d-auto-feedback-detail-error");
+    expect(err.getAttribute("role")).toBe("alert");
+    expect(err.textContent).toContain("artifact corrupto");
+
+    if (original) mock.mockImplementation(original);
+  });
 });
 
 describe("DiaDAutoPanel view switching", () => {

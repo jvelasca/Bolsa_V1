@@ -331,6 +331,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
       diaD: asOf,
       endDate: todayIsoDate(),
       mode: "auto",
+      accountId: effectiveAccountId ?? null,
     });
     navigate(diaDVerifyHref(instrumentId));
   }

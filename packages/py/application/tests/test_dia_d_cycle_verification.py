@@ -11,9 +11,13 @@ from typing import Any
 import pytest
 
 from bolsa_application.dia_d_cycle_verification import (
+    DiaDCycleFacts,
+    DiaDCycleIdentityConflictError,
+    DiaDCycleNotFoundError,
     ListDiaDCycleVerifications,
-    PersistDiaDCycleVerification,
+    ResolveDiaDCycleVerification,
     build_dia_d_cycle_verification_draft,
+    compute_dia_d_facts_hash,
 )
 from bolsa_domain.entities.dia_d_cycle_verification import DiaDCycleVerification
 
@@ -143,14 +147,32 @@ class _FakeRepo:
         ]
 
 
+class _FakeFactsResolver:
+    def __init__(self, facts: DiaDCycleFacts | None) -> None:
+        self._facts = facts
+        self.calls: list[dict[str, Any]] = []
+
+    async def resolve(self, *, account_id: str, cycle_id: str) -> DiaDCycleFacts | None:
+        self.calls.append({"account_id": account_id, "cycle_id": cycle_id})
+        return self._facts
+
+
+_GOOD_FACTS = DiaDCycleFacts(
+    cycle_id="cyc-9",
+    instrument_id="inst-9",
+    symbol="IBE",
+    strategy_preset_key="sma_crossover",
+    strategy_version="ver-1",
+)
+
+
 @pytest.mark.asyncio
-async def test_persist_use_case_passes_account_scope() -> None:
+async def test_resolve_use_case_derives_identity_and_passes_account_scope() -> None:
     repo = _FakeRepo()
-    row = await PersistDiaDCycleVerification(repo).execute(
+    resolver = _FakeFactsResolver(_GOOD_FACTS)
+    row = await ResolveDiaDCycleVerification(repo, resolver).execute(
         {
             "cycleId": "cyc-9",
-            "instrumentId": "inst-9",
-            "symbol": "IBE",
             "diaD": "2026-05-01",
             "endDate": "2026-05-02",
             "mode": "auto",
@@ -158,19 +180,90 @@ async def test_persist_use_case_passes_account_scope() -> None:
         account_id="acc-1",
     )
     assert row is not None
-    assert repo.calls[0]["account_id"] == "acc-1"
-    assert repo.calls[0]["cycle_id"] == "cyc-9"
+    call = repo.calls[0]
+    assert call["account_id"] == "acc-1"
+    assert call["cycle_id"] == "cyc-9"
+    # La identidad se DERIVA del hecho durable, no del payload.
+    assert call["instrument_id"] == "inst-9"
+    assert call["symbol"] == "IBE"
+    assert call["strategy_preset_key"] == "sma_crossover"
+    assert call["strategy_version"] == "ver-1"
+    assert call["facts_hash"] is not None
+    assert resolver.calls[0] == {"account_id": "acc-1", "cycle_id": "cyc-9"}
 
 
 @pytest.mark.asyncio
-async def test_persist_use_case_is_noop_without_indispensable_key() -> None:
+async def test_resolve_use_case_rejects_unknown_cycle() -> None:
     repo = _FakeRepo()
-    row = await PersistDiaDCycleVerification(repo).execute(
-        {"cycleId": "", "instrumentId": "i", "symbol": "S", "diaD": "d", "endDate": "e", "mode": "m"},
-        account_id="acc-1",
-    )
-    assert row is None
+    resolver = _FakeFactsResolver(None)
+    with pytest.raises(DiaDCycleNotFoundError):
+        await ResolveDiaDCycleVerification(repo, resolver).execute(
+            {"cycleId": "cyc-9", "diaD": "2026-05-01", "endDate": "2026-05-02", "mode": "auto"},
+            account_id="acc-1",
+        )
     assert repo.calls == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_use_case_rejects_conflicting_declared_identity() -> None:
+    repo = _FakeRepo()
+    resolver = _FakeFactsResolver(_GOOD_FACTS)
+    with pytest.raises(DiaDCycleIdentityConflictError):
+        await ResolveDiaDCycleVerification(repo, resolver).execute(
+            {
+                "cycleId": "cyc-9",
+                "diaD": "2026-05-01",
+                "endDate": "2026-05-02",
+                "mode": "auto",
+                "strategyPresetKey": "rsi_mean_reversion",
+            },
+            account_id="acc-1",
+        )
+    assert repo.calls == []
+
+
+@pytest.mark.asyncio
+async def test_resolve_use_case_requires_indispensable_keys() -> None:
+    repo = _FakeRepo()
+    resolver = _FakeFactsResolver(_GOOD_FACTS)
+    with pytest.raises(ValueError):
+        await ResolveDiaDCycleVerification(repo, resolver).execute(
+            {"cycleId": "", "diaD": "d", "endDate": "e", "mode": "m"},
+            account_id="acc-1",
+        )
+    assert repo.calls == []
+
+
+def test_facts_hash_is_deterministic_and_sensitive() -> None:
+    base = compute_dia_d_facts_hash(
+        cycle_id="c",
+        instrument_id="i",
+        strategy_preset_key="p",
+        strategy_version="v",
+        dia_d="2026-01-01",
+        end_date="2026-01-02",
+        mode="auto",
+    )
+    same = compute_dia_d_facts_hash(
+        cycle_id="c",
+        instrument_id="i",
+        strategy_preset_key="p",
+        strategy_version="v",
+        dia_d="2026-01-01",
+        end_date="2026-01-02",
+        mode="auto",
+    )
+    changed = compute_dia_d_facts_hash(
+        cycle_id="c",
+        instrument_id="i",
+        strategy_preset_key="p",
+        strategy_version="v",
+        dia_d="2026-01-01",
+        end_date="2026-01-03",
+        mode="auto",
+    )
+    assert base == same
+    assert base != changed
 
 
 @pytest.mark.asyncio

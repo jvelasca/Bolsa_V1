@@ -31,6 +31,7 @@ import { AccountsPage } from "@/features/accounts/accounts-page";
 import { HistoryPage } from "@/features/history/history-page";
 import { TaxReportPage } from "@/features/fiscal/tax-report-page";
 import { OperationalConsolePage } from "@/features/operational-console/operational-console-page";
+import { OperationsPage } from "@/features/operations/operations-page";
 import { AutoMonitorPage } from "@/features/auto-monitor/auto-monitor-page";
 import { AutoWorkspaceLayout } from "@/components/layout/auto-workspace-layout";
 import { AutoHomePage } from "@/features/auto/auto-home-page";
@@ -98,7 +99,7 @@ const router = createBrowserRouter([
 
       {
         path: "operations",
-        element: <Navigate to="/mesa?view=posiciones" replace />,
+        element: <OperationsPage />,
       },
 
       { path: "operational-console", element: <OperationalConsolePage /> },

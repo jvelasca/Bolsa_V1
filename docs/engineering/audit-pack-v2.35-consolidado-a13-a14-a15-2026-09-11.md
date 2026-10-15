@@ -1,10 +1,21 @@
-# Audit Pack — V2.35 / Consolidado A13 · A14 · A15
+# Audit Pack — V2.35–V2.36 / Consolidado A13 · A14 · A15 · V2.36 (`1.61.0-beta`)
 
-> **Para el auditor externo.** Punto de entrada único para auditar desde **GitHub**, sin acceso
-> al entorno de desarrollo, las tres últimas fases del núcleo de Strategy Intelligence:
-> **A13 — Paper Forward**, **A14 — Strategy Intelligence (gramática controlada de Discovery)** y
-> **A15 — Observabilidad y gobernanza de la gramática**. Fecha: 2026-09-11. Estado auditado:
-> `main` == `f47e0ceb`, tag **`v2.35-beta`**.
+> **Para el auditor externo.** Punto de entrada único y **ACUMULADO** para auditar desde
+> **GitHub**, sin acceso al entorno de desarrollo, las fases del núcleo de Strategy
+> Intelligence: **A13 — Paper Forward**, **A14 — Strategy Intelligence (gramática controlada de
+> Discovery)**, **A15 — Observabilidad y gobernanza de la gramática** y **V2.36 — Strategy
+> Intelligence adaptativa (incremento 1: carril `adaptive`)**. Fecha: 2026-09-11. Estado
+> auditado: `main` == `f47e0ceb`, tag **`v2.35-beta`** (A13/A14/A15) · `main` == `cb147d89`,
+> tag **`v2.36-beta`** = package **`1.61.0-beta`** (V2.36).
+>
+> **Cierre documental (docs-verify `1.61.0-beta`).** Este pack acumula la matriz de V2.36 que
+> hasta ahora vivía aislada en su propio [`audit-pack-v2.36-adaptive-allocator-2026-09-11.md`](./audit-pack-v2.36-adaptive-allocator-2026-09-11.md)
+> (§9.3 del [relevo V2.36](./traspaso-relevo-v2-36-adaptive-allocator-2026-09-11.md)). **No
+> existe un `docs-verify` como job/script de CI**: la verificación documental es manual
+> (enlaces, tag→commit, `Alembic head` y coherencia CHANGELOG ↔ relevo ↔ `PROJECT_STATE`).
+> Las fases posteriores a V2.36 (A16 y siguientes) **no** entran en este pack: se documentan en
+> su propio CHANGELOG y evidencia de fase.
+
 
 ## 0. Qué auditar y dónde
 
@@ -175,6 +186,52 @@ AUTO emite logs estructurados y acumula contadores de proceso.
 
 ---
 
+## 5.1 V2.36 — Strategy Intelligence adaptativa (incremento 1: carril `adaptive`) — tag `v2.36-beta` / package `1.61.0-beta`
+
+Cierra la **primera mitad** del bucle `evidence → aprender → ajustar búsqueda`: el carril
+`adaptive` del `DiscoveryBudgetAllocator` (hasta entonces peso `0.0`, un hueco semántico) se
+alimenta de un **snapshot de evidencia inmutable, determinista y versionado**, calculado **fuera
+del hot path** por un job batch/CLI e **inyectado** en el worker. El discovery sigue siendo una
+**función pura dada `(instrument_id, snapshot)`**.
+
+**Alcance explícito (no confundir):** el incremento 1 asigna **cupo real y observable** al carril
+`adaptive`; **NO** añade espacio de búsqueda nuevo ni emisión adaptativa (eso es el incremento 2).
+Catálogo, gramática simple y gramática compuesta quedan **intactos**.
+
+| #    | Afirmación                                                             | Punto de código                                                                                 | Test que lo bloquea                                                                                |
+| ---- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| V236-01 | El discovery es función pura de `(instrument_id, snapshot)`; aprende el allocator, no el motor | `auto_orchestrator_worker._make_discovery_runner` + `_refresh_adaptive_snapshot`                | `test_loop_reads_adaptive_snapshot_once_per_cycle`                                                 |
+| V236-02 | Misma evidencia ⇒ mismo `snapshot_hash` y mismos pesos                  | `discovery_evidence.snapshot_hash`                                                              | `test_same_evidence_yields_same_hash_and_weights`                                                  |
+| V236-03 | El hash es orden-insensible                                            | `compute_family_weights` (orden canónico)                                                       | `test_family_order_does_not_change_hash`, `test_snapshot_hash_is_stable_across_equivalent_dicts`   |
+| V236-04 | Fail-closed: sin evidencia ⇒ `adaptive_weight = 0.0`                    | `compute_lane_weights`                                                                          | `test_no_evidence_yields_zero_adaptive_weight`, `test_families_below_min_samples_do_not_enable_lane` |
+| V236-05 | Cota anti-multiple-testing del prior (`[0, 0.5]`)                       | `compute_lane_weights` (clamp)                                                                  | `test_adaptive_weight_is_bounded_by_max`, `test_adaptive_weight_never_exceeds_one_even_with_high_scores` |
+| V236-06 | El carril adaptativo recibe cupo real sin romper el presupuesto global  | `DiscoveryBudgetAllocator.allocate`                                                             | `test_allocator_gives_adaptive_lane_a_real_quota_without_breaking_global`                          |
+| V236-07 | Flag nuevo `AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR` **OFF por defecto**    | `adaptive_allocator_enabled`                                                                    | `test_adaptive_allocator_defaults_off`, `test_start_does_not_wire_adaptive_provider_when_disabled`  |
+| V236-08 | El snapshot manda sobre el env; sin clave adaptativa ⇒ 0                | `_discovery_allocator`                                                                          | `test_allocator_snapshot_overrides_env_weight`, `test_allocator_snapshot_without_adaptive_key_is_fail_closed` |
+| V236-09 | Una lectura de snapshot por ciclo (no por instrumento)                  | bucle + `_refresh_adaptive_snapshot`                                                            | `test_loop_reads_adaptive_snapshot_once_per_cycle`                                                 |
+| V236-10 | Con el flag OFF no se toca la BD (byte-idéntico a v2.35.1)              | `start_auto_orchestrator`                                                                       | `test_loop_without_provider_does_not_touch_snapshot`                                               |
+| V236-11 | Provider que falla ⇒ fail-closed, no tumba el ciclo                     | `_refresh_adaptive_snapshot`                                                                    | `test_refresh_adaptive_snapshot_fail_closed_on_provider_error`                                     |
+| V236-12 | Migración aditiva `036` con `up`/`down` limpio                          | `036_discovery_evidence_snapshots.py` (`down_revision=035_paper_forward_evidence`)              | `test_migration_036_roundtrip`                                                                     |
+| V236-13 | `save` idempotente por hash (snapshots inmutables)                      | repo SQL `SqlAlchemyDiscoveryEvidenceSnapshotRepository`                                        | `test_save_is_idempotent_by_hash`, `test_batch_job_is_idempotent_by_hash`                          |
+| V236-14 | `get_latest`/`get_by_hash` devuelven el snapshot correcto               | repo SQL                                                                                        | `test_get_by_hash_and_latest`                                                                      |
+| V236-15 | Agregación por familia H0 determinista y ordenada                      | `family_evidence_summary`                                                                       | `test_family_evidence_summary_aggregates_by_preset`                                                |
+| V236-16 | El job es idempotente de verdad (corte dato-dependiente, no reloj)      | `build_discovery_evidence_snapshot.py`                                                          | `test_batch_job_is_idempotent_by_hash` + ejecución manual (2.ª = `persisted=false`)                |
+
+**Verificación (tres bloques, local, 2026-09-11):** `ruff` OK · `lint-imports` 4/4 · `mypy` **474
+files Success** · offline **1518 passed** · PG con gates **10 passed** + snapshot PG **6 passed**
++ lifecycle **57 passed** (anti-explosión `len(plans) == 1784` intacto).
+
+**Elevación:** `main == cb147d89` == tag **`v2.36-beta`** (package `1.61.0-beta`, bump desde
+`1.60.1-beta`). Release-tag CI **GREEN verificado** (run
+[`34604803938`](https://github.com/jvelasca/Bolsa_V1/actions/runs/34604803938), `success`,
+2026-09-11). **Alembic head:** `036_discovery_evidence_snapshots`.
+
+> **Deuda declarada de V2.36:** el incremento 1 **asigna cupo**, no añade capacidad de búsqueda
+> (incremento 2). La ventana PAPER/ADR-046 sigue **INCONCLUSIVE**: ni V2.36 ni este cierre
+> documental certifican el rollout.
+
+---
+
 ## 6. Inventario tag → commit → veredicto de CI (desde `v2.11-beta`)
 
 Veredicto = resultado de la **última** ejecución de `release-tag-ci` disparada por el tag (run
@@ -210,13 +267,14 @@ Veredicto = resultado de la **última** ejecución de `release-tag-ci` disparada
 | `v2.32.1-beta` | `f552716e` | 2026-09-11 | ✅ success     |
 | `v2.34-beta`   | `129f3baa` | 2026-09-11 | ✅ success     |
 | `v2.35-beta`   | `f47e0ceb` | 2026-09-11 | ✅ success     |
+| `v2.36-beta`   | `cb147d89` | 2026-09-11 | ✅ success     |
 
 > Los tags `v2.24-beta`/`v2.25-beta`/`v2.26-beta` apuntan al **mismo commit** (`a970f053`,
 > fix de head-guard `029→030`): son re-tags de la misma elevación, no fases distintas.
 
 ---
 
-## 7. Invariantes congelados (no se tocan en A13/A14/A15)
+## 7. Invariantes congelados (no se tocan en A13/A14/A15/V2.36)
 
 - `AUTO ⇒ SIMULATED`; **LIVE bloqueado** por `LIVE_EXECUTION_AUTHORIZED` +
   `LIVE_EXECUTION_UNLOCKED` (ambas false). **Cero caminos LIVE nuevos.**
@@ -224,34 +282,41 @@ Veredicto = resultado de la **última** ejecución de `release-tag-ci` disparada
 - COACH advisory; RiskGate / SimulationGate / Ledger / Reconciliation deterministas.
 - Fail-closed: ausencia de evidencia ≠ aprobación.
 - Migraciones **aditivas/nullables, sin backfill**, con `downgrade()` completo.
-  Alembic head único: **`035_paper_forward_evidence`**.
+  Alembic head único acumulado: **`036_discovery_evidence_snapshots`** (`v2.36-beta`), tras
+  `035_paper_forward_evidence`.
 - Gramática A14 tras `AUTO_ORCHESTRATOR_GRAMMAR` (**OFF por defecto**).
+- Carril `adaptive` tras `AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR` (**OFF por defecto**; con OFF la
+  salida es **byte-idéntica a `v2.35.1-beta`**).
 - A15 es **solo lectura**: no cambia ninguna decisión.
 
 ---
 
 ## 8. Checklist de auditoría (sugerido)
 
-- [ ] `git checkout v2.35-beta` y confirmar la cadena `v2.32.1-beta → v2.34-beta → v2.35-beta`.
-- [ ] Revisar `git diff v2.32.1-beta..v2.35-beta` fichero a fichero contra §2–§5.
+- [ ] `git checkout v2.36-beta` y confirmar la cadena `v2.32.1-beta → v2.34-beta → v2.35-beta → v2.35.1-beta → v2.36-beta`.
+- [ ] Revisar `git diff v2.32.1-beta..v2.36-beta` fichero a fichero contra §2–§5.1.
 - [ ] Confirmar el **fail-closed** de A13 (barras nuevas) y de A15 (shadow sin provider ⇒ 0).
 - [ ] Confirmar que la gramática A14 es **determinista** y el techo anti-explosión (1784 planes) sigue.
 - [ ] Confirmar que A15 **no** cambia la emisión con gramática OFF (test de regresión byte-idéntico).
-- [ ] Confirmar migración única `035`, aditiva/nullable, `downgrade()` completo, sin migración en A14/A15.
-- [ ] Confirmar **OFF por defecto** de `AUTO_ORCHESTRATOR_GRAMMAR` y wiring reversible.
+- [ ] Confirmar migraciones aditivas/nullables, `downgrade()` completo: `035` (A13) y `036` (V2.36).
+- [ ] Confirmar **OFF por defecto** de `AUTO_ORCHESTRATOR_GRAMMAR` y `AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR`; wiring reversible.
 - [ ] Confirmar invariante **LIVE congelado**: 0 caminos nuevos; `AUTO ⇒ SIMULATED`.
 - [ ] Correr la verificación de §1 (calidad + puros + PG).
 - [ ] Revisar §6 y aceptar/rebatir los dos tags en ⚠️ (`v2.12-beta`, `v2.22-beta`).
 
 ---
 
-## 9. Fuera de alcance (no imputable a A13/A14/A15)
+## 9. Fuera de alcance (no imputable a A13/A14/A15/V2.36)
 
+- **V2.36 incremento 2 — emisión adaptativa real**: hoy el carril `adaptive` solo recibe **cupo
+  observable**; generar candidatas nuevas con ese cupo, persistir `lane`/`grammar_plan` por trial y
+  cualquier forma de bandit online quedan **fuera** (§5.1).
 - **A16 — Gobernanza del rollout con datos reales**: convertir la procedencia de A15 en consultable
   desde la BD (sin migración) y fijar la política de producción (allowlist de bloques/variantes y
   presupuesto). **Aparcada** a fecha de este pack.
 - Contadores de A15 no persistidos (deuda declarada, §5).
 - Fases LIVE (thaw) y sus gates: ver `roadmap-live-execution-core-2026-09-07.md`.
+
 
 ---
 

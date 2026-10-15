@@ -7,6 +7,7 @@ import {
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { useAlertsStore } from "@/stores/alerts-store";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { formatPrice } from "@/features/charts/chart-utils";
 
 const DAILY_INTERVAL_MS = 20_000;
@@ -20,17 +21,28 @@ const priceSourceLabels: Record<AlertPriceSource, string> = {
 export function AlertsMonitor() {
   const pushToast = useAlertsStore((s) => s.pushToast);
   const queryClient = useQueryClient();
+  // v111 — el monitor se ancla a la cuenta ACTIVA: sus queries llevan `effectiveAccountId` en
+  // la clave y los `Set` de dedupe se VACÍAN al cambiar de cuenta (si no, reaparecían avisos
+  // del contexto anterior o se silenciaban los de la cuenta nueva por colisión de claves).
+  const { effectiveAccountId } = useActiveAccount();
   const seenPriceTriggered = useRef<Set<string>>(new Set());
   const seenSignalTriggered = useRef<Set<string>>(new Set());
 
+  useEffect(() => {
+    seenPriceTriggered.current = new Set();
+    seenSignalTriggered.current = new Set();
+  }, [effectiveAccountId]);
+
   const activeQuery = useQuery({
-    queryKey: ["alerts", "active"],
+    queryKey: ["alerts", "active", effectiveAccountId],
     queryFn: () => api.getAlerts(true),
+    enabled: Boolean(effectiveAccountId),
   });
 
   const signalAlertsQuery = useQuery({
-    queryKey: ["signal-alerts", "active"],
+    queryKey: ["signal-alerts", "active", effectiveAccountId],
     queryFn: () => api.getSignalAlerts(true),
+    enabled: Boolean(effectiveAccountId),
   });
 
   const activeAlerts = activeQuery.data?.data ?? [];

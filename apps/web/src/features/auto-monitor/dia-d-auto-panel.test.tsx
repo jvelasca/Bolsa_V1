@@ -186,6 +186,22 @@ describe("DiaDAutoPanel", () => {
     );
   });
 
+  it("declara el error de DETALLE del día (no solo el de la lista)", async () => {
+    // Rechazo PERSISTENTE (no `Once`): la query del día se remonta una vez tras el primer
+    // fallo, así que un rechazo de un solo uso dejaría la vista en verde por error.
+    const mock = vi.mocked(api.getAutoDiaDReplay);
+    const original = mock.getMockImplementation();
+    mock.mockRejectedValue(new Error("artefacto ilegible"));
+
+    renderPanel();
+
+    const err = await screen.findByTestId("dia-d-auto-detail-error");
+    expect(err.getAttribute("role")).toBe("alert");
+    expect(err.textContent).toContain("artefacto ilegible");
+
+    if (original) mock.mockImplementation(original);
+  });
+
   it("completa el patrón WAI-ARIA: tab ↔ tabpanel y roving tabIndex", () => {
     renderPanel();
 

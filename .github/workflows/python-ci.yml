@@ -311,6 +311,13 @@ jobs:
         # con nombre propio. Su certificación PG (``test_auto_operational_monitor_pg.py``) va en
         # ``--ignore`` aquí —sin PG skipearía en mudo— y corre en ``auto-v2-durable-pg`` con
         # gate fail-if-skipped.
+        # v111 (remediación de la auditoría): mismo criterio para las dos certificaciones PG
+        # nuevas del lote. ``test_dia_d_cycle_verification_pg.py`` (verificación DÍA-D del
+        # servidor, migración 054) y ``test_signal_alerts_v111_pg.py`` (claim atómico por
+        # ``(suscripción, barra)`` + outbox ``alert_deliveries`` + ownership por ``account_id``)
+        # van en ``--ignore`` aquí y corren por COMMIT en ``auto-v2-durable-pg`` con
+        # ``DIA_D_CYCLE_VERIFICATION_PG_REQUIRED=1`` / ``SIGNAL_ALERTS_PG_REQUIRED=1`` y guard
+        # anti-skip: sin PG skipearían en mudo y la certificación sería fantasma.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -434,6 +441,9 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py
           --ignore=apps/api-python/tests/test_auto_daily_coverage_pg.py
           --ignore=apps/api-python/tests/test_auto_dia_d_trace_pg.py
+          --ignore=apps/api-python/tests/test_dia_d_cycle_verification_pg.py
+          --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
+          --ignore=apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
           --ignore=apps/api-python/tests/test_concurrent_auto_pg.py
@@ -752,6 +762,25 @@ jobs:
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
       # de un estado no verificable solo se certifican contra PostgreSQL real.
       AUTO_V2_LIFECYCLE_PG_REQUIRED: '1'
+      # v111 (remediación de la auditoría): la VERIFICACIÓN DÍA-D del servidor (migración
+      # 054) —unicidad ``(account_id, cycle_id, dia_d, end_date, mode)``, upsert atómico
+      # con guarda de propiedad y roundtrip de la migración— solo se certifica contra PG
+      # real. Sin PG el test skipearía en mudo y el seam quedaría sin medir por commit.
+      DIA_D_CYCLE_VERIFICATION_PG_REQUIRED: '1'
+      # v111 (remediación de la auditoría): las ALERTAS DE SEÑAL se certifican IGUAL por
+      # commit — el claim atómico por ``(suscripción, barra)`` (el worker y la evaluación
+      # manual no pueden despachar dos veces), el OUTBOX ``alert_deliveries`` (PENDING →
+      # DELIVERED | RETRYABLE_FAILED → DEAD_LETTER con backoff) y la ownership por
+      # ``account_id`` de la 054. Un skip silencioso aquí invalidaría el lote.
+      SIGNAL_ALERTS_PG_REQUIRED: '1'
+      # OBS-19 (hallazgo de la remediación v111): el certificador del SELLO DE CICLO
+      # (``test_auto_fill_cycle_seal_pg.py``) existía y **no lo ejecutaba ningún job** —
+      # ni estaba en ``--ignore`` del offline (así que allí skipeaba en mudo) ni figuraba
+      # en ninguna lista PG. Su gate no estaba declarado en ningún workflow y el fichero se
+      # quedó invisible al censo porque el pase de directorio del offline lo «cubría».
+      # Se da de alta aquí: exige fill COMPLETO y que la liberación de la reserva sea
+      # BY_FILL con el contexto del ciclo persistido, todo contra PG real.
+      AUTO_FILL_CYCLE_SEAL_PG_REQUIRED: '1'
       # El reinicio real usa el mismo camino durable del scheduler AUTO.
       AUTO_SCHEDULER_PG_REQUIRED: '1'
     steps:
@@ -826,6 +855,9 @@ jobs:
             apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py \
             apps/api-python/tests/test_auto_paper_evidence_pg.py \
             apps/api-python/tests/test_auto_paper_evidence_restart_pg.py \
+            apps/api-python/tests/test_dia_d_cycle_verification_pg.py \
+            apps/api-python/tests/test_signal_alerts_v111_pg.py \
+            apps/api-python/tests/test_auto_fill_cycle_seal_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 
       - name: Fail on skipped AUTO 2.0 durable PG (no skip silencioso)

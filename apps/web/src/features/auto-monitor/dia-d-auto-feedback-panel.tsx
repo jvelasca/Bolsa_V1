@@ -315,6 +315,23 @@ export function DiaDAutoFeedbackPanel() {
         </p>
       ) : null}
 
+      {/* v111 — el error de DETALLE de la ventana seleccionada se declara (no solo el de la
+          lista): si falla la ventana elegida, la vista no debe quedar en blanco. */}
+      {detailQuery.isError ? (
+        <p
+          className="text-sm text-destructive"
+          data-testid="dia-d-auto-feedback-detail-error"
+          role="alert"
+        >
+          No se pudo cargar el feedback de la ventana {window ?? "seleccionada"}
+          :{" "}
+          {detailQuery.error instanceof Error
+            ? detailQuery.error.message
+            : "error desconocido"}
+          .
+        </p>
+      ) : null}
+
       {window === null && !listQuery.isLoading && !listQuery.isError ? (
         <p
           className="text-xs text-muted-foreground"

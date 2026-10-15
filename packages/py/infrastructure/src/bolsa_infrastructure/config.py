@@ -68,6 +68,26 @@ class Settings(BaseSettings):
         default=10.0,
         validation_alias="ALERT_WEBHOOK_TIMEOUT_SECONDS",
     )
+    #: v111 — anti-SSRF: exigir HTTPS (por defecto), allowlist de hosts y tope de respuesta.
+    alert_webhook_allow_http: bool = Field(
+        default=False, validation_alias="ALERT_WEBHOOK_ALLOW_HTTP"
+    )
+    alert_webhook_allowed_hosts: str | None = Field(
+        default=None, validation_alias="ALERT_WEBHOOK_ALLOWED_HOSTS"
+    )
+    alert_webhook_max_response_bytes: int = Field(
+        default=65536, validation_alias="ALERT_WEBHOOK_MAX_RESPONSE_BYTES"
+    )
+    #: v111 — OUTBOX de entregas: presupuesto de reintentos, lease y backoff base.
+    alert_delivery_max_attempts: int = Field(
+        default=5, validation_alias="ALERT_DELIVERY_MAX_ATTEMPTS"
+    )
+    alert_delivery_lease_seconds: float = Field(
+        default=120.0, validation_alias="ALERT_DELIVERY_LEASE_SECONDS"
+    )
+    alert_delivery_base_backoff_seconds: float = Field(
+        default=30.0, validation_alias="ALERT_DELIVERY_BASE_BACKOFF_SECONDS"
+    )
     signal_alert_eval_interval_seconds: float = Field(
         default=20.0,
         validation_alias="SIGNAL_ALERT_EVAL_INTERVAL_SECONDS",

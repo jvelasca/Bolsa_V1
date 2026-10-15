@@ -2190,12 +2190,21 @@ export const api = {
       }),
     ),
 
-  /** P2 — enlace durable de la verificación DÍA-D a su ciclo AUTO. */
+  /**
+   * P2 — enlace durable de la verificación DÍA-D a su ciclo AUTO.
+   *
+   * ``accountId`` (v111) fija el dueño EXPLÍCITAMENTE en la cabecera, sin depender sólo del
+   * middleware: la verificación del ciclo se ancla a la cuenta dueña de la sesión.
+   */
   persistDiaDCycleVerification: (
     body: import("@bolsa/shared").DiaDCycleVerificationPersistDto,
+    accountId?: string | null,
   ) =>
     call<{ data: import("@bolsa/shared").DiaDCycleVerificationV1Dto }>(() =>
-      client.POST("/api/auto/dia-d-verifications", { body: apiBody(body) }),
+      client.POST("/api/auto/dia-d-verifications", {
+        body: apiBody(body),
+        headers: accountId ? { "X-Account-Id": accountId } : undefined,
+      }),
     ),
 
   /** P2 — verificaciones DÍA-D del principal (opcionalmente acotadas a un ciclo). */

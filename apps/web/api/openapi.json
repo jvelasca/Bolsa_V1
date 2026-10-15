@@ -290,9 +290,25 @@
       },
       "AlertChannelDispatchDto": {
         "properties": {
+          "attempt": {
+            "default": 0,
+            "title": "Attempt",
+            "type": "integer"
+          },
           "channel": {
             "title": "Channel",
             "type": "string"
+          },
+          "deliveryId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deliveryid"
           },
           "error": {
             "anyOf": [
@@ -312,6 +328,11 @@
           "subscriptionId": {
             "title": "Subscriptionid",
             "type": "string"
+          },
+          "willRetry": {
+            "default": false,
+            "title": "Willretry",
+            "type": "boolean"
           }
         },
         "required": [
@@ -6486,7 +6507,7 @@
         "type": "object"
       },
       "DiaDCycleVerificationDto": {
-        "description": "Verificación durable enlazada a un ciclo (una fila por ciclo + ventana + modo).",
+        "description": "Verificación durable enlazada a un ciclo (una fila por cuenta + ciclo + ventana + modo).",
         "properties": {
           "accountId": {
             "anyOf": [
@@ -6525,6 +6546,17 @@
           "endDate": {
             "title": "Enddate",
             "type": "string"
+          },
+          "factsHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Factshash"
           },
           "id": {
             "title": "Id",
@@ -6597,6 +6629,17 @@
           "symbol": {
             "title": "Symbol",
             "type": "string"
+          },
+          "verifiedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verifiedby"
           }
         },
         "required": [
@@ -6641,7 +6684,7 @@
         "type": "object"
       },
       "DiaDCycleVerificationPersistRequestDto": {
-        "description": "Payload de la verificación D→hoy lanzada desde un ciclo. Huecos ⇒ campo ausente.",
+        "description": "Payload de la verificación D→hoy lanzada desde un ciclo. Huecos ⇒ campo ausente.\n\nSólo ``cycleId``/``diaD``/``endDate``/``mode`` son indispensables. ``instrumentId``,\n``symbol`` y las claves de estrategia son OPCIONALES y actúan como **contraste**: si se\ndeclaran y contradicen el hecho durable del ciclo, el servidor responde ``409`` (nunca se\npersiste lo declarado por el navegador).",
         "properties": {
           "band": {
             "anyOf": [
@@ -6667,8 +6710,15 @@
             "type": "string"
           },
           "instrumentId": {
-            "title": "Instrumentid",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentid"
           },
           "mode": {
             "title": "Mode",
@@ -6731,14 +6781,30 @@
             "title": "Strategyversion"
           },
           "symbol": {
-            "title": "Symbol",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "verifiedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verifiedby"
           }
         },
         "required": [
           "cycleId",
-          "instrumentId",
-          "symbol",
           "diaD",
           "endDate",
           "mode"
@@ -18295,6 +18361,20 @@
         "title": "PriceSummaryDto",
         "type": "object"
       },
+      "ProcessAlertDeliveriesResponseDto": {
+        "description": "v111 — resultado del worker del OUTBOX (reintentos + entregas de esta pasada).",
+        "properties": {
+          "dispatches": {
+            "items": {
+              "$ref": "#/components/schemas/AlertChannelDispatchDto"
+            },
+            "title": "Dispatches",
+            "type": "array"
+          }
+        },
+        "title": "ProcessAlertDeliveriesResponseDto",
+        "type": "object"
+      },
       "ProposeRecommendationRequest": {
         "properties": {
           "accountId": {
@@ -20236,6 +20316,17 @@
       },
       "SignalAlertSubscriptionDto": {
         "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
           "channels": {
             "items": {
               "type": "string"
@@ -27024,7 +27115,7 @@
         ]
       },
       "post": {
-        "description": "Registra (idempotente) la verificación DÍA-D enlazada al ciclo del principal.",
+        "description": "Registra (idempotente) la verificación DÍA-D enlazada al ciclo del principal.\n\nEl ciclo se RESUELVE en el servidor: inexistente ⇒ 404; identidad declarada en conflicto con\nel hecho durable ⇒ 409. Nunca se persiste la identidad declarada por el navegador.",
         "operationId": "persist_auto_dia_d_verification_api_auto_dia_d_verifications_post",
         "parameters": [
           {
@@ -35378,6 +35469,22 @@
               "title": "Activeonly",
               "type": "boolean"
             }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
           }
         ],
         "responses": {
@@ -35409,6 +35516,24 @@
       },
       "post": {
         "operationId": "create_signal_alert_api_signal_alerts_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -35447,9 +35572,73 @@
         ]
       }
     },
+    "/api/signal-alerts/deliveries/process": {
+      "post": {
+        "description": "Worker del OUTBOX: reintenta las entregas vencidas (PENDING/RETRYABLE_FAILED).\n\nIdempotente y sin ámbito de cuenta: reclama CUALQUIER entrega vencida (el dueño viaja en la\nfila) para que un fallo de SMTP/webhook no se pierda. Pensado para cron/scheduler.",
+        "operationId": "process_signal_alert_deliveries_api_signal_alerts_deliveries_process_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessAlertDeliveriesResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Process Signal Alert Deliveries",
+        "tags": [
+          "signal-alerts"
+        ]
+      }
+    },
     "/api/signal-alerts/evaluate": {
       "post": {
         "operationId": "evaluate_signal_alerts_api_signal_alerts_evaluate_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -35460,6 +35649,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Evaluate Signal Alerts",
@@ -35479,6 +35678,22 @@
             "schema": {
               "title": "Subscription Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
             }
           }
         ],
@@ -35514,6 +35729,22 @@
             "schema": {
               "title": "Subscription Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
             }
           }
         ],

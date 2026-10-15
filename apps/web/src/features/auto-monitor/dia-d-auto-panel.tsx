@@ -217,6 +217,22 @@ export function DiaDAutoSandbox() {
         </p>
       ) : null}
 
+      {/* v111 — el error de DETALLE no se silencia: si falla el día seleccionado hay que
+          declararlo (antes solo se veía el error de la LISTA y el detalle podía parecer vacío). */}
+      {detailQuery.isError ? (
+        <p
+          className="text-sm text-destructive"
+          data-testid="dia-d-auto-detail-error"
+          role="alert"
+        >
+          No se pudo cargar el artefacto de {day ?? "el día seleccionado"}:{" "}
+          {detailQuery.error instanceof Error
+            ? detailQuery.error.message
+            : "error desconocido"}
+          .
+        </p>
+      ) : null}
+
       {day === null && !daysQuery.isLoading ? (
         <p
           className="text-xs text-muted-foreground"

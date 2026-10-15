@@ -1,4 +1,5 @@
 from bolsa_infrastructure.database.models.tables import (
+    AlertDeliveryRow,
     BacktestRunRow,
     BacktestTradeRow,
     Base,
@@ -62,6 +63,7 @@ from bolsa_infrastructure.database.models.tables import (
 )
 
 __all__ = [
+    "AlertDeliveryRow",
     "BacktestRunRow",
     "BacktestTradeRow",
     "Base",

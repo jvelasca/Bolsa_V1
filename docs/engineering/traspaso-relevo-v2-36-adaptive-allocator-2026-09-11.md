@@ -184,5 +184,8 @@ uv run --project apps/api-python python \
    **Release-tag CI GREEN verificado** (run `34604803938`, `success`).
 2. Incremento 2 (fuera de alcance hoy): **emisión adaptativa real** en el carril con cupo, ya
    preparada por este diseño.
-3. Actualizar el audit-pack consolidado A13+A14+A15 con la matriz de esta fase si se quiere un
-   punto de entrada único acumulado (hoy la matriz de v2.36 vive en su propio audit-pack).
+3. **Audit-pack consolidado (HECHO — docs-verify `1.61.0-beta`)**: la matriz de esta fase ya está
+   integrada como **§5.1** en el punto de entrada único acumulado
+   [`audit-pack-v2.35-consolidado-a13-a14-a15-2026-09-11.md`](./audit-pack-v2.35-consolidado-a13-a14-a15-2026-09-11.md)
+   (que ahora cubre **A13 + A14 + A15 + V2.36**). Este pack de fase se conserva como detalle
+   ampliado, pero ya **no es el único** sitio donde vive V2.36.

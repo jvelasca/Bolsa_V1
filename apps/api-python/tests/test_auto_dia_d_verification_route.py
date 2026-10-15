@@ -1,9 +1,10 @@
-"""P2 — contrato HTTP de la verificación DÍA-D ENLAZADA a un ciclo AUTO.
+"""P2/v111 — contrato HTTP de la verificación DÍA-D ENLAZADA a un ciclo AUTO.
 
-Hermético (sin PostgreSQL): se sustituyen la sesión y el repositorio por dobles, y se
-verifica la resolución de cuenta. Cubre: registro idempotente (doble), fail-closed sin
-cuenta (POST 400 / GET vacío), payload incompleto (no fabrica enlace) y que un ciclo sin
-identidad de estrategia persiste el hueco declarado (nunca cadena vacía).
+Hermético (sin PostgreSQL): se sustituyen la sesión, el repositorio y el RESOLUTOR de hechos
+durables por dobles, y se verifica la resolución de cuenta. Cubre: registro idempotente (doble),
+identidad DERIVADA del servidor (no del payload), ``404`` para un ciclo inexistente, ``409`` si
+lo declarado contradice el hecho durable, fail-closed sin cuenta (POST 400 / GET vacío) y que un
+ciclo sin identidad de estrategia persiste el hueco declarado (nunca cadena vacía).
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from httpx import ASGITransport, AsyncClient
 import bolsa_api.api.v1.routes.auto_dia_d_verification as route
 from bolsa_api.api.dependencies import get_db_session
 from bolsa_api.main import create_app
+from bolsa_application.dia_d_cycle_verification import DiaDCycleFacts
 from bolsa_domain.entities.dia_d_cycle_verification import DiaDCycleVerification
 
 
@@ -40,6 +42,8 @@ class _FakeRepo:
             band=kwargs.get("band"),
             result=kwargs.get("result"),
             research_evidence_id=kwargs.get("research_evidence_id"),
+            facts_hash=kwargs.get("facts_hash"),
+            verified_by=kwargs.get("verified_by"),
         )
         self.rows = [r for r in self.rows if r.cycle_id != row.cycle_id] + [row]
         return row
@@ -67,6 +71,24 @@ class _Session:
         return None
 
 
+_FACTS = {
+    "cyc-1": DiaDCycleFacts(
+        cycle_id="cyc-1",
+        instrument_id="inst-durable-1",
+        symbol="ACA",
+        strategy_preset_key="sma_crossover",
+        strategy_version="ver-durable",
+    ),
+    "cyc-2": DiaDCycleFacts(
+        cycle_id="cyc-2",
+        instrument_id="inst-durable-2",
+        symbol="ITX",
+        strategy_preset_key=None,
+        strategy_version=None,
+    ),
+}
+
+
 def _app(repo: _FakeRepo, scope: str | None):  # noqa: ANN202 — helper de test
     app = create_app()
 
@@ -76,17 +98,19 @@ def _app(repo: _FakeRepo, scope: str | None):  # noqa: ANN202 — helper de test
     async def _scope(_request: Any, _account_id: Any) -> str | None:  # noqa: ANN202
         return scope
 
+    async def _facts(_session: Any, _account_id: str, *, cycle_id: str):  # noqa: ANN202
+        return _FACTS.get(cycle_id)
+
     app.dependency_overrides[get_db_session] = _session
     route.get_dia_d_cycle_verification_repository = lambda _session: repo  # type: ignore[assignment]
     route.resolve_account_scope_or_default = _scope  # type: ignore[assignment]
+    route.resolve_dia_d_cycle_facts = _facts  # type: ignore[assignment]
     return app
 
 
 def _body(**overrides: Any) -> dict[str, Any]:
     body: dict[str, Any] = {
         "cycleId": "cyc-1",
-        "instrumentId": "inst-1",
-        "symbol": "ACS",
         "diaD": "2026-04-01",
         "endDate": "2026-04-02",
         "mode": "auto",
@@ -108,15 +132,12 @@ async def _get(app, path: str):  # noqa: ANN001
 
 
 @pytest.mark.asyncio
-async def test_post_persists_link_with_exact_identity() -> None:
+async def test_post_persists_server_derived_identity() -> None:
     repo = _FakeRepo()
     app = _app(repo, scope="acc-1")
     response = await _post(
         app,
         _body(
-            strategyPresetKey="sma_crossover",
-            strategyVersion="ver-1",
-            strategyDefinitionId="def-1",
             band="favorable",
             result={"band": "favorable", "returnPct": 3.2},
             researchEvidenceId="ev-1",
@@ -126,17 +147,51 @@ async def test_post_persists_link_with_exact_identity() -> None:
     data = response.json()["data"]
     assert data["cycleId"] == "cyc-1"
     assert data["accountId"] == "acc-1"
+    # Derivado del SERVIDOR (aunque el payload no lo declare).
+    assert data["instrumentId"] == "inst-durable-1"
+    assert data["symbol"] == "ACA"
     assert data["strategyPresetKey"] == "sma_crossover"
-    assert data["strategyVersion"] == "ver-1"
-    assert data["researchEvidenceId"] == "ev-1"
+    assert data["strategyVersion"] == "ver-durable"
+    assert data["factsHash"]
     assert repo.rows[0].account_id == "acc-1"
+
+
+@pytest.mark.asyncio
+async def test_post_accepts_consistent_declared_identity() -> None:
+    repo = _FakeRepo()
+    app = _app(repo, scope="acc-1")
+    response = await _post(
+        app,
+        _body(instrumentId="inst-durable-1", symbol="ACA", strategyPresetKey="sma_crossover"),
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_post_rejects_conflicting_declared_identity() -> None:
+    repo = _FakeRepo()
+    app = _app(repo, scope="acc-1")
+    response = await _post(app, _body(strategyPresetKey="rsi_mean_reversion"))
+    assert response.status_code == 409
+    assert response.json()["detail"]["error"] == "cycle_identity_conflict"
+    assert repo.rows == []
+
+
+@pytest.mark.asyncio
+async def test_post_rejects_unknown_cycle() -> None:
+    repo = _FakeRepo()
+    app = _app(repo, scope="acc-1")
+    response = await _post(app, _body(cycleId="cyc-unknown"))
+    assert response.status_code == 404
+    assert response.json()["detail"] == "cycle_not_found"
+    assert repo.rows == []
 
 
 @pytest.mark.asyncio
 async def test_post_declares_gaps_without_fabricating_identity() -> None:
     repo = _FakeRepo()
     app = _app(repo, scope="acc-1")
-    data = (await _post(app, _body())).json()["data"]
+    data = (await _post(app, _body(cycleId="cyc-2"))).json()["data"]
     assert data["strategyPresetKey"] is None
     assert data["strategyVersion"] is None
     assert data["strategyDefinitionId"] is None

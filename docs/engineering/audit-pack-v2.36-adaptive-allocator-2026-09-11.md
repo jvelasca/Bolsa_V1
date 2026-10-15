@@ -5,6 +5,10 @@
 > con un snapshot de evidencia determinista, versionado y persistido, calculado fuera del hot
 > path e inyectado en el worker.
 >
+> **Este pack de fase es el detalle ampliado.** El **punto de entrada único acumulado** que ya
+> integra esta matriz (junto con A13 + A14 + A15) es
+> [`audit-pack-v2.35-consolidado-a13-a14-a15-2026-09-11.md`](./audit-pack-v2.35-consolidado-a13-a14-a15-2026-09-11.md) §5.1.
+>
 > **Estado auditado:** `main == cb147d89` == tag **`v2.36-beta`** (base `5348bee0` == tag `v2.35.1-beta`).
 > **Alembic head:** `036_discovery_evidence_snapshots`.
 > **Bump:** `1.60.1-beta` → `1.61.0-beta`.

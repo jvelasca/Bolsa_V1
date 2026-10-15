@@ -84,6 +84,7 @@ export function useDiaDVerifyLaunch(): (args: DiaDVerifyLaunchArgs) => void {
         cycleId: args.cycleId ?? null,
         strategyPresetKey: args.strategyPresetKey ?? null,
         strategyVersion: args.strategyVersion ?? null,
+        accountId: effectiveAccountId ?? null,
       });
 
       // La adopción solo se escribe con cuenta activa (como en los dos llamantes originales).

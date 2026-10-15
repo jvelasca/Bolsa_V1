@@ -1,14 +1,15 @@
-"""P2 — persistencia durable de la verificación DÍA-D enlazada a un ciclo (PG, gated).
+"""P2/v111 — persistencia durable de la verificación DÍA-D enlazada a un ciclo (PG, gated).
 
 Cubre la tabla aditiva ``dia_d_cycle_verifications`` y su repositorio:
 
-* la tabla/índices están en head y la head es ``053_dia_d_cycle_verifications``;
-* ``upsert`` es idempotente por ``(cycle_id, dia_d, end_date, mode)``;
+* la tabla/índices están en head y la head es ``054_dia_d_verified_and_alerts``;
+* ``upsert`` es idempotente y ATÓMICO por ``(account_id, cycle_id, dia_d, end_date, mode)``;
 * ``list_verifications`` acota por cuenta y por ciclo;
+* el ciclo ya verificado por OTRA cuenta se RECHAZA (nunca se reasigna ni se duplica);
 * los huecos de identidad se persisten como ``NULL`` («Sin dato todavía»), nunca ``""``;
-* el ``downgrade``/``upgrade`` de la 053 deja el esquema como estaba (roundtrip).
+* el ``downgrade``/``upgrade`` de la 054 deja el esquema como estaba (roundtrip).
 
-Requiere PostgreSQL. Es GATE cuando ``A14_GRAMMAR_PG_REQUIRED=1``; si no, ``pytest.skip``.
+Requiere PostgreSQL. Es GATE cuando ``DIA_D_CYCLE_VERIFICATION_PG_REQUIRED=1``; si no, ``pytest.skip``.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_infrastructure.database.repositories.dia_d_cycle_verification_repository import (
+    DiaDCycleVerificationOwnershipConflictError,
     SqlAlchemyDiaDCycleVerificationRepository,
 )
 
@@ -32,7 +34,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 _REQUIRED = "DIA_D_CYCLE_VERIFICATION_PG_REQUIRED"
-_ALEMBIC_HEAD = "053_dia_d_cycle_verifications"
+_ALEMBIC_HEAD = "054_dia_d_verified_and_alerts"
 _TABLE = "dia_d_cycle_verifications"
 _CYCLE_PREFIX = "itest-p2-"
 
@@ -185,8 +187,50 @@ async def test_list_scopes_by_account_and_cycle(pg_session: AsyncSession) -> Non
 
 
 @pytest.mark.asyncio
-async def test_migration_053_roundtrip(pg_session: AsyncSession) -> None:
-    """``downgrade``/``upgrade`` de la 053 dejan la tabla como estaba."""
+async def test_same_cycle_from_another_account_is_rejected_not_reassigned(
+    pg_session: AsyncSession,
+) -> None:
+    """Un ``cycleId`` ya verificado por OTRA cuenta se declara en conflicto (409), no se pisa.
+
+    Hallazgo 2 (endurecimiento defensivo, multi-cuenta): el defecto era ``_find`` sin
+    ``account_id`` + ``SET account_id`` ⇒ la cuenta B «robaba» la fila de A. Con la clave natural
+    acotada por ``account_id`` el ``ON CONFLICT`` ya no puede tocar la fila ajena; la guarda
+    explícita convierte el caso en un conflicto declarado en vez de crear una verificación fantasma.
+    """
+    repo = SqlAlchemyDiaDCycleVerificationRepository(pg_session)
+    cycle = f"{_CYCLE_PREFIX}cross"
+    row_a = await repo.upsert(
+        cycle_id=cycle,
+        instrument_id="i",
+        symbol="A",
+        dia_d="2026-07-01",
+        end_date="2026-07-02",
+        mode="auto",
+        account_id="acc-a",
+        band="favorable",
+    )
+    await pg_session.flush()
+    with pytest.raises(DiaDCycleVerificationOwnershipConflictError):
+        await repo.upsert(
+            cycle_id=cycle,
+            instrument_id="i",
+            symbol="B",
+            dia_d="2026-07-01",
+            end_date="2026-07-02",
+            mode="auto",
+            account_id="acc-b",
+            band="mixed",
+        )
+    # La fila de A sigue siendo de A y CONSERVA su banda: no hubo reasignación.
+    rows_a = await repo.list_verifications(account_id="acc-a", cycle_id=cycle)
+    assert [r.id for r in rows_a] == [row_a.id]
+    assert [r.band for r in rows_a] == ["favorable"]
+    assert await repo.list_verifications(account_id="acc-b", cycle_id=cycle) == []
+
+
+@pytest.mark.asyncio
+async def test_migration_054_roundtrip(pg_session: AsyncSession) -> None:
+    """``downgrade``/``upgrade`` de la 054 dejan la tabla como estaba."""
     pytest.importorskip("alembic")
     from alembic import command
     from sqlalchemy import create_engine
@@ -201,11 +245,11 @@ async def test_migration_053_roundtrip(pg_session: AsyncSession) -> None:
     engine = create_engine(url)
     cfg = _alembic_config()
 
-    def _table_present(connection: object) -> bool:
+    def _has_facts_hash(connection: object) -> bool:
         row = connection.execute(  # type: ignore[attr-defined]
             text(
-                "SELECT 1 FROM information_schema.tables "
-                "WHERE table_schema='public' AND table_name=:t"
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema='public' AND table_name=:t AND column_name='facts_hash'"
             ),
             {"t": _TABLE},
         ).scalar_one_or_none()
@@ -214,17 +258,17 @@ async def test_migration_053_roundtrip(pg_session: AsyncSession) -> None:
     try:
         with engine.connect() as connection:
             cfg.attributes["connection"] = connection
-            command.downgrade(cfg, "052_top3_opportunities")
+            command.downgrade(cfg, "053_dia_d_cycle_verifications")
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
-            assert _table_present(connection) is False
+            assert _has_facts_hash(connection) is False
 
         with engine.connect() as connection:
             cfg.attributes["connection"] = connection
             command.upgrade(cfg, "head")
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
-            assert _table_present(connection) is True
+            assert _has_facts_hash(connection) is True
         assert alembic_head() == _ALEMBIC_HEAD
     finally:
         engine.dispose()
