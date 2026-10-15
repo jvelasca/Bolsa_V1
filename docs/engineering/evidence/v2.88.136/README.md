@@ -230,6 +230,8 @@ Por eso la lista PG completa se midió sobre BD **scratch limpia** (el camino qu
 
 **No era flakiness: era una regresión REAL de este sello** (el reintento la confirmó). Ver §13.
 
+**Intento 2 (VERDE).** Tras el arreglo, el tag se **movió** al commit de corrección **`71d366e5`** (`git tag -f` + push forzado del ref; **lightweight**, unsigned). `Release tag CI` [run **`38795110802`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38795110802) **VERDE**: **12 jobs `success`** + `certify` `success`, incluido `playwright (integrated AUTO S5)`, y `replay-repro` **`REPRODUCIDO`**.
+
 ---
 
 ## 13. Incidente de CI (declarado y cerrado): regresión de la identidad DÍA-D
@@ -254,6 +256,6 @@ El panel marca el guardado como **exitoso** porque el archivo local y la Fase 2 
 
 **Verificación tras el arreglo (local).** `pytest packages/py/application/tests` **2784 passed** · `test_auto_dia_d_verification_route.py` + los tres PG-gated (`DIA_D_CYCLE_VERIFICATION_PG_REQUIRED=1`, `SIGNAL_ALERTS_PG_REQUIRED=1`, `AUTO_FILL_CYCLE_SEAL_PG_REQUIRED=1`) **32 passed** · `ruff` **`All checks passed!`** · `mypy` **0 errores** · censo **634/634, 0 sin declarar**.
 
-**Cierre.** Tag **movido** al commit del arreglo (`git tag -f` + push forzado del ref; el tag es **lightweight** y **unsigned**, y el sello no estaba publicado ni anunciado). **La cita del `Release tag CI` del intento 2 va en el commit POST-TAG.** El **intento 0 lento** de `S5-04` (readiness LAB en frío) sigue **ABIERTO** y declarado: lo que se cerró aquí es la regresión de identidad, **no** la intermitencia del arranque en frío del runner (no se tocaron `timeouts`, `retries` ni umbrales `ADR-046`).
+**Cierre.** Tag **movido** al commit del arreglo (`git tag -f` + push forzado del ref; el tag es **lightweight** y **unsigned**, y el sello no estaba publicado ni anunciado). **Intento 2 (VERDE).** `Release tag CI` [run **`38795110802`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38795110802) **VERDE** (~13m43s, `2026-10-15T19:35:11Z` → `19:48:54Z`; **12 jobs `success`** + `certify` `success`; `playwright (integrated E2E, opt-in)` `skipped`, declarado): `playwright (integrated AUTO S5)` **`success`** con `S5-04` verde en el **reintento** (`7.33 s`; «guardar y verificar el enlace durable» `0.49 s`) y `replay-repro` **`REPRODUCIDO`** (`sha256 1E3ADAC2…929A37E7`). El intento 0 de `S5-04` sigue consumiendo `64.96 s` (espera LAB `60.00 s`) — la intermitencia del arranque en frío **sigue ABIERTA** y declarada (§13).
 
 **Base:** `v2.88.135-beta`.
