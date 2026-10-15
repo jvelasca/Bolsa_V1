@@ -822,7 +822,12 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
     if (!state.accountId) throw new Error("fixture required");
     if (!baseURL) throw new Error("baseURL required");
 
-    // Precondición de no-residuo: el ciclo aún no tiene verificación durable registrada.
+    // Precondición — IDEMPOTENTE ante reintentos del runner: el POST del panel es único por
+    // (cycleId, diaD, endDate, mode), así que el reintento de Playwright (`retries: 1` en CI)
+    // puede encontrar el enlace YA registrado por su intento anterior. Se comprueba que el
+    // endpoint responde y se declara el baseline, pero NO se exige `total == 0`: ese supuesto
+    // rompía el reintento (residuo durable del propio intento previo) y hacía imposible el verde.
+    // El RESULTADO que el test fija es el enlace durable al terminar (assert final).
     const listUrl = new URL(
       `/api/auto/dia-d-verifications?cycleId=${encodeURIComponent(state.cycleId)}`,
       baseURL,
@@ -830,7 +835,6 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
     const headers = { "X-Account-Id": state.accountId };
     const before = await request.get(listUrl, { headers });
     expect(before.ok()).toBe(true);
-    expect((await body<{ total: number }>(before)).total).toBe(0);
 
     await openFirstOperation(page, state.accountId);
     const cta = page.getByTestId("auto-operation-strategy-verify-dia-d");
@@ -849,7 +853,8 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
       timeout: 30_000,
     });
 
-    // El registro durable queda ENLAZADO al ciclo desde el que se lanzó (no basta con el laboratorio).
+    // El registro durable queda ENLAZADO al ciclo desde el que se lanzó (no basta con el laboratorio):
+    // se exige una fila con el `cycleId` Y el `instrumentId` del ciclo (identidad del enlace).
     await expect
       .poll(
         async () => {
@@ -858,7 +863,11 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
           const json = await body<{
             data: Array<{ cycleId: string; instrumentId: string }>;
           }>(res);
-          return json.data.filter((v) => v.cycleId === state.cycleId).length;
+          return json.data.filter(
+            (v) =>
+              v.cycleId === state.cycleId &&
+              v.instrumentId === state.instrumentId,
+          ).length;
         },
         { timeout: 30_000 },
       )

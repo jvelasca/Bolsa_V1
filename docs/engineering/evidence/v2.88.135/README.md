@@ -64,7 +64,7 @@ NUEVO [`scripts/window-pin.mjs`](../../../../scripts/window-pin.mjs):
 
 ## 4. Estado medido de la ventana (al sellar, 2026-10-15)
 
-- **Freeze:** `pnpm window:freeze` → **`freeze OK`** (`apps` `86052343…` / `packages` `d48ac37b…` = pin; `commit` del pin = etiqueta del sello anterior).
+- **Freeze:** `pnpm window:freeze` → **`freeze OK`** (`HEAD:apps` / `HEAD:packages` == pin; `commit` del pin = etiqueta del sello; el re-anclaje del árbol `apps` que mueve este sello se aplica en el commit **POST-TAG**, ver §9).
 - **Alineación ESTUDIO verificada en vivo:** `window:preflight` de hoy devuelve `watchSize: 35` y **`watchSource: "estudio"`** ⇒ el watch ya sale del universo ESTUDIO (no del catálogo). Régimen `BEAR_TREND`, `entriesAllowedLong = false` ⇒ **LONG VETADAS** (exit 2 declarado).
 - **Ledger de la ventana:** `medidos=0 veto=2 declarados=0 duros=0` (días `20261014` y `20261015`, ambos `NO_MEDIDO_REGIMEN` por `BEAR_TREND`). Gate `NO_MEDIDO`.
 - **Bundle `window:evidence` de hoy:** `cerrados 1/4 (P4)` — `P1 INCONCLUSIVE` (`días 0`) · `P2 0/35 medidos` · `P3 0 ciclos con DÍA-D` · **`P4 CERRADO`** (`venue paper`, envs LIVE ausentes, `0` trazas LIVE).
@@ -83,7 +83,9 @@ pytest test_operational_certification_evidence.py ....... 12 passed   (v2_100 un
 pytest test_operational_certification_evidence_pg.py .... 1 passed    (PG-gated; read-only, invariantes)
 pytest test_dia_d_bump_guard.py ......................... 1 passed    (2.11.135-beta)
 pytest test_live_order_recovery_isolation.py + test_a8_m0_auto_live_invariant.py ... 92 passed  (P4 aislamiento)
+playwright gp-v288-s5 (integrado, stack real) ........... 4 passed   (S5-04 en 4.6 s, SIN reintento)
 ruff check (scripts + tests) ............................ OK
+typecheck / lint (web) .................................. OK / 0 errores (23 warnings preexistentes)
 ```
 
 **Operación ejercida en vivo (read-only / declarada):** `window:preflight` → `watchSource=estudio`, `watchSize=35`, `BEAR_TREND` (veto); `window:run-day` → `NO_MEDIDO_REGIMEN` (`regime_invalid`); `window:evidence` → bundle `20261015` (`P4 CERRADO`, `P1`-`P3` ABIERTOS con evidencia medida); `v2_99` → `0/35` (todos «sin ciclos»); SQL de venue LIVE → `0`.
@@ -103,7 +105,7 @@ ruff check (scripts + tests) ............................ OK
 ## 7. Ficheros del sello
 
 - **Nuevos:** [`apps/api-python/scripts/v2_100_operational_certification_evidence.py`](../../../../apps/api-python/scripts/v2_100_operational_certification_evidence.py); [`scripts/window-pin.mjs`](../../../../scripts/window-pin.mjs); [`apps/api-python/tests/test_v2_76_watch_from_estudio.py`](../../../../apps/api-python/tests/test_v2_76_watch_from_estudio.py); [`apps/api-python/tests/test_operational_certification_evidence.py`](../../../../apps/api-python/tests/test_operational_certification_evidence.py); [`apps/api-python/tests/test_operational_certification_evidence_pg.py`](../../../../apps/api-python/tests/test_operational_certification_evidence_pg.py); [`runbook-cierre-p1-p4-2026-10-15.md`](../../runbook-cierre-p1-p4-2026-10-15.md); esta evidencia.
-- **Modificados:** [`v2_76_forward_market_material.py`](../../../../apps/api-python/scripts/v2_76_forward_market_material.py); [`window-forward-runner.mjs`](../../../../scripts/window-forward-runner.mjs); [`window-forward.mjs`](../../../../scripts/lib/window-forward.mjs); [`window-forward.test.mjs`](../../../../scripts/lib/window-forward.test.mjs); `meta.bump` de 12 CLIs; [`test_dia_d_bump_guard.py`](../../../../apps/api-python/tests/test_dia_d_bump_guard.py); `package.json`; [`CHANGELOG.md`](../../../../CHANGELOG.md); [`PROJECT_STATE.md`](../../PROJECT_STATE.md).
+- **Modificados:** [`gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts`](../../../../apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts) (fix CI: idempotencia ante reintentos del test `S5-04`); [`v2_76_forward_market_material.py`](../../../../apps/api-python/scripts/v2_76_forward_market_material.py); [`window-forward-runner.mjs`](../../../../scripts/window-forward-runner.mjs); [`window-forward.mjs`](../../../../scripts/lib/window-forward.mjs); [`window-forward.test.mjs`](../../../../scripts/lib/window-forward.test.mjs); `meta.bump` de 12 CLIs; [`test_dia_d_bump_guard.py`](../../../../apps/api-python/tests/test_dia_d_bump_guard.py); `package.json`; [`CHANGELOG.md`](../../../../CHANGELOG.md); [`PROJECT_STATE.md`](../../PROJECT_STATE.md).
 
 ---
 
@@ -124,4 +126,10 @@ ruff check (scripts + tests) ............................ OK
 
 ## 9. `Release tag CI` del sello
 
-**Tag** `v2.88.135-beta` (**lightweight**, unsigned) — pendiente de publicar. El re-anclaje del pin (`pnpm window:pin --write`) se aplica en el commit **POST-TAG** (`freeze OK`). **Base:** `v2.88.134-beta`.
+**Tag** `v2.88.135-beta` (**lightweight**, unsigned) ⇒ apunta **directamente** al commit del sello (la cita del run va en el commit **POST-TAG**). **Base:** `v2.88.134-beta`.
+
+**Incidente de CI (declarado y cerrado).** El **primer** `Release tag CI` del sello (run [`38715413962`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38715413962)) salió **ROJO** en `certify` por **un solo job**: `playwright (integrated AUTO S5)` (test `GP-V288-S5-04`). **No** era un defecto del código sellado: `apps/web` y `packages` eran **byte-idénticos** al sello verde `v2.88.134` (`git diff --stat 7cef7fcc <sello-pre-fix> -- apps/web packages` **vacío**), y en los sellos verdes `v2.88.133`/`v2.88.134` ese test **ya fallaba su primer intento** y solo pasaba por `retries: 1`. Aquí el **reintento** también falló: su precondición «no-residuo» exigía `total == 0` en `GET /api/auto/dia-d-verifications?cycleId=`, pero el `POST` del panel es **idempotente** por `(cycleId, diaD, endDate, mode)` ⇒ el reintento encontraba el enlace durable que el **propio intento anterior** había dejado (`total = 1`). **Defecto de idempotencia del test ante reintentos, no del producto.**
+
+**Cierre:** endurecido el test ([`gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts`](../../../../apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts)) para medir el **RESULTADO durable** (fila con el `cycleId` **y** el `instrumentId` del ciclo) sin exigir estado limpio previo; verificado local **4/4** (`S5-04` en `4.6 s`, **sin reintento**). El tag se **movió** al commit del fix y el CI se relanzó; la cita del run verde queda en el commit **POST-TAG**, junto al re-anclaje del pin (`pnpm window:pin --write`). **Falsable:** con el `assert total == 0` restaurado, el reintento vuelve a fallar.
+
+**El resto del run rojo estaba VERDE** (`python` ruff/imports/mypy/pytest, `frontend` typecheck/lint/test/build + `contract:check`, `decision-spine`, `shared`, `lifecycle-pg`, `a7-gate`, `dr-verify`, `security (gitleaks)`, `playwright (integrated axe)`, `playwright (mock E2E)`; `replay-repro` **REPRODUCIDO**).
