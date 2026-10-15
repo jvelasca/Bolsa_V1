@@ -1,5 +1,10 @@
 """Use-cases de backtests (listar, obtener, run+save)."""
 
+import logging
+import os
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -29,6 +34,84 @@ from bolsa_domain.repositories.strategy_definition_repository import StrategyDef
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.ids import new_id
+
+# Instrumentación READ-ONLY y opt-in del arranque en frío del journey S5-04 (evidencia LAB).
+# Default OFF: sin la env, `_PhaseTimer` no mide ni loguea, de modo que el comportamiento
+# (resultado, contrato HTTP, latencia de logging) es byte-equivalente al histórico.
+_BACKTEST_TIMING_ENV = "BOLSA_BACKTEST_TIMING"
+_TIMING_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def _timing_enabled() -> bool:
+    """¿Está activada la medición por fases? Solo con la env explícita."""
+    return os.getenv(_BACKTEST_TIMING_ENV, "").strip().lower() in _TIMING_TRUTHY
+
+
+_TIMING_LOGGER_READY = False
+
+
+def _timing_logger() -> logging.Logger:
+    """Logger del diagnóstico con handler propio.
+
+    Necesario porque el proceso uvicorn NO configura el root logger a INFO: un
+    `logging.getLogger(__name__).info(...)` propagaría a un root sin handler y se perdería
+    (solo el `lastResort` de WARNING+ se emite). Con la env activa se le da a ESTE logger un
+    handler y un nivel INFO, de modo que la línea sale en cualquier host (uvicorn, CI, tests).
+    Solo se ejecuta con la instrumentación encendida, así que el default OFF no cambia nada.
+    """
+    global _TIMING_LOGGER_READY
+    logger = logging.getLogger(__name__)
+    if not _TIMING_LOGGER_READY:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s [%(name)s] %(message)s"))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+        _TIMING_LOGGER_READY = True
+    return logger
+
+
+class _PhaseTimer:
+    """Medidor de fases de pared por `perf_counter`, puramente declarativo.
+
+    NO altera el resultado del backtest ni el contrato HTTP: solo agrega, por fase
+    (`instrument_lookup`, `ohlcv_load`, `compute`, …), cuánto tiempo de pared consume
+    cada una, para poder aislar QUÉ componente causa la lentitud del primer intento de
+    `S5-04` sin ampliar `timeout` ni `retries`.
+    """
+
+    def __init__(self, label: str) -> None:
+        self._label = label
+        self._enabled = _timing_enabled()
+        self._marks: list[tuple[str, float]] = []
+        self._t0 = time.perf_counter() if self._enabled else 0.0
+
+    @contextmanager
+    def phase(self, name: str) -> Iterator[None]:
+        """Cronometra un bloque como una fase con nombre (no-op si está desactivado)."""
+        if not self._enabled:
+            yield
+            return
+        start = time.perf_counter()
+        try:
+            yield
+        finally:
+            self._marks.append((name, (time.perf_counter() - start) * 1000.0))
+
+    def log(self, **extra: Any) -> None:
+        """Emite UNA línea por ejecución con todas las fases y el total medidos."""
+        if not self._enabled:
+            return
+        total_ms = (time.perf_counter() - self._t0) * 1000.0
+        phases = " ".join(f"{name}={ms:.1f}ms" for name, ms in self._marks)
+        extras = " ".join(f"{key}={value}" for key, value in extra.items())
+        _timing_logger().info(
+            "[backtest-timing] label=%s %s total=%.1fms %s",
+            self._label,
+            phases,
+            total_ms,
+            extras,
+        )
 
 
 def backtest_risk_policy_from_trading_policy(policy: Any | None = None) -> BacktestRiskPolicy:
@@ -115,55 +198,59 @@ class RunAndSaveBacktest:
         lab_evidence: dict[str, Any] | None = None,
         hypothesis_id: str | None = None,
     ) -> RunAndSaveBacktestResult:
-        instrument = await self._instruments.get_by_id(instrument_id)
-        if instrument is None:
-            raise ValueError("Instrumento no encontrado")
+        timer = _PhaseTimer("run_and_save_backtest")
+        with timer.phase("instrument_lookup"):
+            instrument = await self._instruments.get_by_id(instrument_id)
+            if instrument is None:
+                raise ValueError("Instrumento no encontrado")
 
-        if hypothesis_id:
-            if self._hypotheses is None:
-                raise ValueError("Hypothesis repository no configurado")
-            hyp = await self._hypotheses.get_by_id(hypothesis_id)
-            if hyp is None:
-                raise ValueError("Hypothesis not found")
+            if hypothesis_id:
+                if self._hypotheses is None:
+                    raise ValueError("Hypothesis repository no configurado")
+                hyp = await self._hypotheses.get_by_id(hypothesis_id)
+                if hyp is None:
+                    raise ValueError("Hypothesis not found")
 
         saved_strategy = None
-        if strategy_definition_id:
-            saved_strategy = await self._strategies.get_definition(strategy_definition_id)
-            if saved_strategy is None:
-                raise ValueError("Estrategia no encontrada")
-            resolved = saved_strategy.preset_key
-            if not is_valid_preset_key(resolved):
-                nested = saved_strategy.definition.get("presetKey")
-                resolved = str(nested) if isinstance(nested, str) else None
-            # Client may also send strategyType (Finalistas re-run) as fallback.
-            if not is_valid_preset_key(resolved) and is_valid_preset_key(strategy_type):
-                resolved = strategy_type
-            if not is_valid_preset_key(resolved):
-                raise ValueError(
-                    "Solo estrategias con preset ejecutable (catálogo Genéricas). "
-                    f"preset_key={saved_strategy.preset_key!r}"
-                )
-            strategy_type = resolved
-            timeframe = saved_strategy.timeframe
-            execution = saved_strategy.definition.get("execution", {})
-            if isinstance(execution, dict):
-                commission_bps = int(execution.get("commissionBps", commission_bps))
-                slippage_bps = int(execution.get("slippageBps", slippage_bps))
-                spread_bps = int(execution.get("spreadBps", spread_bps))
-        elif strategy_type is None:
-            raise ValueError("Indica strategyType o strategyDefinitionId")
-        elif not is_valid_preset_key(strategy_type):
-            raise ValueError(f"Preset no reconocido: {strategy_type}")
+        with timer.phase("strategy_lookup"):
+            if strategy_definition_id:
+                saved_strategy = await self._strategies.get_definition(strategy_definition_id)
+                if saved_strategy is None:
+                    raise ValueError("Estrategia no encontrada")
+                resolved = saved_strategy.preset_key
+                if not is_valid_preset_key(resolved):
+                    nested = saved_strategy.definition.get("presetKey")
+                    resolved = str(nested) if isinstance(nested, str) else None
+                # Client may also send strategyType (Finalistas re-run) as fallback.
+                if not is_valid_preset_key(resolved) and is_valid_preset_key(strategy_type):
+                    resolved = strategy_type
+                if not is_valid_preset_key(resolved):
+                    raise ValueError(
+                        "Solo estrategias con preset ejecutable (catálogo Genéricas). "
+                        f"preset_key={saved_strategy.preset_key!r}"
+                    )
+                strategy_type = resolved
+                timeframe = saved_strategy.timeframe
+                execution = saved_strategy.definition.get("execution", {})
+                if isinstance(execution, dict):
+                    commission_bps = int(execution.get("commissionBps", commission_bps))
+                    slippage_bps = int(execution.get("slippageBps", slippage_bps))
+                    spread_bps = int(execution.get("spreadBps", spread_bps))
+            elif strategy_type is None:
+                raise ValueError("Indica strategyType o strategyDefinitionId")
+            elif not is_valid_preset_key(strategy_type):
+                raise ValueError(f"Preset no reconocido: {strategy_type}")
 
         tf = TimeFrame(timeframe) if timeframe in {t.value for t in TimeFrame} else TimeFrame.D1
         resolved_limit = 10_000 if limit is None and (date_from or date_to) else (limit if limit is not None else 500)
-        bars = await self._ohlcv.get_bars(
-            instrument_id,
-            timeframe=tf,
-            limit=resolved_limit,
-            date_from=date_from,
-            date_to=date_to,
-        )
+        with timer.phase("ohlcv_load"):
+            bars = await self._ohlcv.get_bars(
+                instrument_id,
+                timeframe=tf,
+                limit=resolved_limit,
+                date_from=date_from,
+                date_to=date_to,
+            )
         if len(bars) < MIN_SCAN_BARS:
             raise ValueError(
                 f"Se necesitan al menos {MIN_SCAN_BARS} barras en {tf.value} "
@@ -171,160 +258,172 @@ class RunAndSaveBacktest:
                 f"o cambia el TF de la estrategia (p. ej. a 1d)."
             )
 
-        fingerprints = [
-            BarFingerprint(
-                timestamp=bar.timestamp,
-                open=float(bar.open),
-                high=float(bar.high),
-                low=float(bar.low),
-                close=float(bar.close),
-                volume=float(bar.volume),
-            )
-            for bar in bars
-        ]
-        data_version = compute_data_version(fingerprints)
-
-        costs = BacktestCostModel(
-            commission_bps=commission_bps,
-            slippage_bps=slippage_bps,
-            spread_bps=spread_bps,
-        )
-        settings = get_settings()
-        cost_v2 = cost_v2_from_fixed(
-            commission_bps=commission_bps,
-            slippage_bps=slippage_bps,
-            spread_bps=spread_bps,
-            enabled=bool(settings.cost_model_v2_enabled),
-            illiquid_extra=int(settings.cost_model_v2_illiquid_extra_bps),
-            volume_ratio_illiquid=float(settings.cost_model_v2_volume_ratio_illiquid),
-        )
-        result = run_backtest(
-            [
-                BacktestBarInput(
+        with timer.phase("fingerprints"):
+            fingerprints = [
+                BarFingerprint(
                     timestamp=bar.timestamp,
-                    close=bar.close,
-                    open=bar.open,
-                    high=bar.high,
-                    low=bar.low,
+                    open=float(bar.open),
+                    high=float(bar.high),
+                    low=float(bar.low),
+                    close=float(bar.close),
                     volume=float(bar.volume),
                 )
                 for bar in bars
-            ],
-            strategy_type,
-            initial_cash,
-            costs=costs,
-            cost_v2=cost_v2 if cost_v2.enabled else None,
-            strategy_definition=saved_strategy.definition if saved_strategy else None,
-            risk_policy=backtest_risk_policy_from_trading_policy(),
-        )
+            ]
+            data_version = compute_data_version(fingerprints)
 
-        run_id = new_id()
-        strategy_payload = saved_strategy.definition if saved_strategy else None
-        equity_curve_payload: list[dict[str, float | str]] = [
-            {"timestamp": point.timestamp, "equity": round(point.equity, 2)}
-            for point in result.equity_curve
-        ]
-        manifest = build_run_manifest(
-            run_id=run_id,
-            instrument_id=instrument_id,
-            strategy_type=strategy_type,
-            bars=fingerprints,
-            timeframe=tf.value,
-            initial_cash=result.initial_cash,
-            commission_bps=commission_bps,
-            slippage_bps=slippage_bps,
-            total_return_pct=result.total_return_pct,
-            max_drawdown_pct=result.max_drawdown_pct,
-            trade_count=result.trade_count,
-            final_equity=result.final_equity,
-            equity_curve=equity_curve_payload,
-            strategy=strategy_payload,
-        )
-        # Enrich outputs with IS metrics (primary payload for research_trials.is_metrics).
-        outputs = manifest.get("outputs")
-        if isinstance(outputs, dict):
-            outputs["isMetrics"] = result.is_metrics
-            outputs["spreadBps"] = spread_bps
-            outputs["tradeReasons"] = [trade.reason for trade in result.trades]
+        with timer.phase("compute"):
+            costs = BacktestCostModel(
+                commission_bps=commission_bps,
+                slippage_bps=slippage_bps,
+                spread_bps=spread_bps,
+            )
+            settings = get_settings()
+            cost_v2 = cost_v2_from_fixed(
+                commission_bps=commission_bps,
+                slippage_bps=slippage_bps,
+                spread_bps=spread_bps,
+                enabled=bool(settings.cost_model_v2_enabled),
+                illiquid_extra=int(settings.cost_model_v2_illiquid_extra_bps),
+                volume_ratio_illiquid=float(settings.cost_model_v2_volume_ratio_illiquid),
+            )
+            result = run_backtest(
+                [
+                    BacktestBarInput(
+                        timestamp=bar.timestamp,
+                        close=bar.close,
+                        open=bar.open,
+                        high=bar.high,
+                        low=bar.low,
+                        volume=float(bar.volume),
+                    )
+                    for bar in bars
+                ],
+                strategy_type,
+                initial_cash,
+                costs=costs,
+                cost_v2=cost_v2 if cost_v2.enabled else None,
+                strategy_definition=saved_strategy.definition if saved_strategy else None,
+                risk_policy=backtest_risk_policy_from_trading_policy(),
+            )
 
-        run = await self._backtests.save_run(
-            instrument_id=instrument_id,
-            strategy_type=strategy_type,
-            initial_cash=result.initial_cash,
-            final_equity=result.final_equity,
-            total_return_pct=result.total_return_pct,
-            max_drawdown_pct=result.max_drawdown_pct,
-            trade_count=result.trade_count,
-            win_count=result.win_count,
-            bar_count=result.bar_count,
-            first_date=result.first_date,
-            last_date=result.last_date,
-            trades=[
-                (trade.type, trade.timestamp, trade.price, trade.quantity, trade.equity_after)
-                for trade in result.trades
-            ],
-            timeframe=tf.value,
-            data_version=data_version,
-            commission_bps=commission_bps,
-            slippage_bps=slippage_bps,
-            manifest=manifest,
-            run_id=run_id,
-            strategy_definition_id=strategy_definition_id,
-        )
+        with timer.phase("manifest"):
+            run_id = new_id()
+            strategy_payload = saved_strategy.definition if saved_strategy else None
+            equity_curve_payload: list[dict[str, float | str]] = [
+                {"timestamp": point.timestamp, "equity": round(point.equity, 2)}
+                for point in result.equity_curve
+            ]
+            manifest = build_run_manifest(
+                run_id=run_id,
+                instrument_id=instrument_id,
+                strategy_type=strategy_type,
+                bars=fingerprints,
+                timeframe=tf.value,
+                initial_cash=result.initial_cash,
+                commission_bps=commission_bps,
+                slippage_bps=slippage_bps,
+                total_return_pct=result.total_return_pct,
+                max_drawdown_pct=result.max_drawdown_pct,
+                trade_count=result.trade_count,
+                final_equity=result.final_equity,
+                equity_curve=equity_curve_payload,
+                strategy=strategy_payload,
+            )
+            # Enrich outputs with IS metrics (primary payload for research_trials.is_metrics).
+            outputs = manifest.get("outputs")
+            if isinstance(outputs, dict):
+                outputs["isMetrics"] = result.is_metrics
+                outputs["spreadBps"] = spread_bps
+                outputs["tradeReasons"] = [trade.reason for trade in result.trades]
 
-        blocks = trial_blocks_from_lab_evidence_snapshot(lab_evidence)
-        dataset_meta = dataset_metadata_from_bars(bars)
-        blocks = merge_dataset_into_blocks(blocks, dataset_meta)
-        campaign_id = campaign.strip() if isinstance(campaign, str) and campaign.strip() else None
-        trial_params: dict[str, Any] = {
-            "initialCash": initial_cash,
-            "timeframe": tf.value,
-            "barLimit": resolved_limit,
-            "dateFrom": date_from,
-            "dateTo": date_to,
-            "commissionBps": commission_bps,
-            "slippageBps": slippage_bps,
-            "spreadBps": spread_bps,
-            "costModelV2": bool(cost_v2.enabled),
-            "datasetStart": dataset_meta.get("datasetStart"),
-            "datasetEnd": dataset_meta.get("datasetEnd"),
-            "bars": dataset_meta.get("bars"),
-        }
-        if campaign_id:
-            trial_params["campaign"] = campaign_id
-        trial = await self._trials.insert_trial(
-            instrument_id=instrument_id,
-            backtest_run_id=run.id,
-            strategy_definition_id=strategy_definition_id,
-            preset_key=strategy_type,
-            strategy_name=strategy_type,
-            hypothesis_id=hypothesis_id,
-            params=trial_params,
-            is_metrics=result.is_metrics,
-            is_score=result.total_return_pct,
-            proposed_by="human",
-            k_contribution=1,
-            blocks=blocks,
-            manifest_ref={
-                "dataVersion": data_version,
-                "engine": manifest.get("engine"),
-                "runId": run.id,
+        with timer.phase("save_run"):
+            run = await self._backtests.save_run(
+                instrument_id=instrument_id,
+                strategy_type=strategy_type,
+                initial_cash=result.initial_cash,
+                final_equity=result.final_equity,
+                total_return_pct=result.total_return_pct,
+                max_drawdown_pct=result.max_drawdown_pct,
+                trade_count=result.trade_count,
+                win_count=result.win_count,
+                bar_count=result.bar_count,
+                first_date=result.first_date,
+                last_date=result.last_date,
+                trades=[
+                    (trade.type, trade.timestamp, trade.price, trade.quantity, trade.equity_after)
+                    for trade in result.trades
+                ],
+                timeframe=tf.value,
+                data_version=data_version,
+                commission_bps=commission_bps,
+                slippage_bps=slippage_bps,
+                manifest=manifest,
+                run_id=run_id,
+                strategy_definition_id=strategy_definition_id,
+            )
+
+        with timer.phase("trial"):
+            blocks = trial_blocks_from_lab_evidence_snapshot(lab_evidence)
+            dataset_meta = dataset_metadata_from_bars(bars)
+            blocks = merge_dataset_into_blocks(blocks, dataset_meta)
+            campaign_id = campaign.strip() if isinstance(campaign, str) and campaign.strip() else None
+            trial_params: dict[str, Any] = {
+                "initialCash": initial_cash,
+                "timeframe": tf.value,
+                "barLimit": resolved_limit,
+                "dateFrom": date_from,
+                "dateTo": date_to,
+                "commissionBps": commission_bps,
+                "slippageBps": slippage_bps,
+                "spreadBps": spread_bps,
+                "costModelV2": bool(cost_v2.enabled),
                 "datasetStart": dataset_meta.get("datasetStart"),
                 "datasetEnd": dataset_meta.get("datasetEnd"),
-                "barCount": dataset_meta.get("bars"),
-                **({"campaign": campaign_id} if campaign_id else {}),
-                **({"labEvidenceSource": "adopt"} if lab_evidence else {}),
-            },
-        )
+                "bars": dataset_meta.get("bars"),
+            }
+            if campaign_id:
+                trial_params["campaign"] = campaign_id
+            trial = await self._trials.insert_trial(
+                instrument_id=instrument_id,
+                backtest_run_id=run.id,
+                strategy_definition_id=strategy_definition_id,
+                preset_key=strategy_type,
+                strategy_name=strategy_type,
+                hypothesis_id=hypothesis_id,
+                params=trial_params,
+                is_metrics=result.is_metrics,
+                is_score=result.total_return_pct,
+                proposed_by="human",
+                k_contribution=1,
+                blocks=blocks,
+                manifest_ref={
+                    "dataVersion": data_version,
+                    "engine": manifest.get("engine"),
+                    "runId": run.id,
+                    "datasetStart": dataset_meta.get("datasetStart"),
+                    "datasetEnd": dataset_meta.get("datasetEnd"),
+                    "barCount": dataset_meta.get("bars"),
+                    **({"campaign": campaign_id} if campaign_id else {}),
+                    **({"labEvidenceSource": "adopt"} if lab_evidence else {}),
+                },
+            )
         # Attach blocks / hypothesis for evidence classification (mocks may omit).
         from dataclasses import replace
 
-        if trial.blocks is None and blocks is not None:
-            trial = replace(trial, blocks=blocks)
-        if trial.hypothesis_id is None and hypothesis_id is not None:
-            trial = replace(trial, hypothesis_id=hypothesis_id)
-        await emit_evidence_for_trial(
-            self._evidence, trial, belief_repo=self._beliefs
-        )
+        with timer.phase("evidence"):
+            if trial.blocks is None and blocks is not None:
+                trial = replace(trial, blocks=blocks)
+            if trial.hypothesis_id is None and hypothesis_id is not None:
+                trial = replace(trial, hypothesis_id=hypothesis_id)
+            await emit_evidence_for_trial(
+                self._evidence, trial, belief_repo=self._beliefs
+            )
 
+        timer.log(
+            instrument_id=instrument_id,
+            strategy_type=strategy_type,
+            bars=len(bars),
+            limit=resolved_limit,
+        )
         return RunAndSaveBacktestResult(run=run, trial_id=trial.id, metrics=result.is_metrics)

@@ -369,6 +369,11 @@ jobs:
       JWT_SIGNING_KEY: ci-e2e-integration-test-secret-key
       APP_AUTH_SECRET: ci-e2e-integration-test-secret-key
       CORS_ORIGIN: http://localhost:5173
+      # Diagnóstico del arranque en frío de S5-04 (READ-ONLY): emite UNA línea por
+      # `POST /api/backtests/run` con el tiempo de pared por fase (`instrument_lookup`,
+      # `ohlcv_load`, `compute`, …). Default OFF en el producto; aquí se enciende SOLO
+      # para este job de medición. NO cambia el resultado ni el contrato HTTP.
+      BOLSA_BACKTEST_TIMING: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -418,7 +423,9 @@ jobs:
 
       - name: Start API
         run: |
-          uvicorn bolsa_api.main:app --host 127.0.0.1 --port 8000 &
+          # Redirige la salida a un fichero para CAPTURAR la instrumentación `[backtest-timing]`
+          # (BOLSA_BACKTEST_TIMING=1) del arranque en frío de S5-04 y subirla como artefacto.
+          uvicorn bolsa_api.main:app --host 127.0.0.1 --port 8000 > /tmp/s5-api.log 2>&1 &
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:8000/api/health >/dev/null; then
               echo "API ready"
@@ -444,6 +451,10 @@ jobs:
           # Segundo reporter (JSON) a FICHERO: mide por intento (primero vs retry) sin tocar el
           # log `list` que lee el guard anti-skip de abajo. NO cambia `retries` ni `timeout`.
           PLAYWRIGHT_JSON_OUTPUT_NAME: /tmp/s5-integrated-report.json
+          # Volcado READ-ONLY de la RED por intento (API + módulos de Vite) para atribuir los
+          # ~60 s del primer intento a una FASE concreta (helper `attachS5NetworkTimings`).
+          # NO cambia `timeout`/`retries`/aserciones; sin esta env, la medición es un no-op.
+          S5_TIMINGS_OUT: /tmp/s5-network-timings.json
         run: |
           set -o pipefail
           pnpm exec playwright test gp-v288-s5 --reporter=list --reporter=json | tee /tmp/s5-integrated.log
@@ -456,6 +467,14 @@ jobs:
         run: |
           node scripts/ci/playwright-attempt-timings.mjs /tmp/s5-integrated-report.json | tee /tmp/s5-timings.txt
 
+      # Medicion READ-ONLY de la RED por intento: declara QUE COMPONENTE (módulos de Vite en frío
+      # vs waterfall de API) consume el tiempo, complementando los `test.step`. Hueco si no hay
+      # informe (no se pone rojo). NO toca timeouts/retries.
+      - name: Measure AUTO S5 network timings (read-only)
+        if: always()
+        run: |
+          node scripts/ci/s5-network-timings.mjs /tmp/s5-network-timings.json | tee /tmp/s5-network.txt
+
       - uses: actions/upload-artifact@v4
         # `if: always()`: un rojo tambien TIENE que entregar el informe y los tiempos medidos.
         if: always()
@@ -464,6 +483,9 @@ jobs:
           path: |
             /tmp/s5-integrated-report.json
             /tmp/s5-timings.txt
+            /tmp/s5-network-timings.json.attempt*.json
+            /tmp/s5-network.txt
+            /tmp/s5-api.log
           if-no-files-found: warn
 
       - name: Fail on skipped AUTO S5 (no skip silencioso)

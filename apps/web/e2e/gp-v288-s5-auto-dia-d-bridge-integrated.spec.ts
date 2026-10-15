@@ -61,6 +61,7 @@ import {
   seedAutoCycleForAccount,
   AUTO_CYCLE_SEED_DISABLED_REASON,
 } from "./helpers/auto-cycle-seed";
+import { attachS5NetworkTimings } from "./helpers/s5-network-timings";
 
 /** Ciclo AUTO durable ausente: el motor (worker) no corre en el harness ⇒ hueco declarado. */
 const NO_CYCLE_REASON =
@@ -810,7 +811,7 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
     page,
     request,
     baseURL,
-  }) => {
+  }, testInfo) => {
     if (!state.cycleId) {
       declareGap(state.noCycleReason ?? NO_CYCLE_REASON);
       return;
@@ -834,58 +835,68 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
       baseURL,
     ).toString();
     const headers = { "X-Account-Id": accountId };
-    const before = await request.get(listUrl, { headers });
-    expect(before.ok()).toBe(true);
 
-    // `test.step` = INSTRUMENTACIÓN read-only: nombra las fases cuyo tiempo consume el primer
-    // intento del journey (ese primer intento > 60 s es el motivo de la flakiness de CI). NO
-    // cambia timeouts, retries ni aserciones; solo hace medible QUÉ fase es lenta.
-    await test.step("S5-04 · abrir la operación AUTO", async () => {
-      await openFirstOperation(page, accountId);
-    });
+    // Medición READ-ONLY de la red (arranque en frío): registra el tiempo de CADA petición
+    // (API + módulos de Vite) para atribuir los ~60 s del primer intento a una FASE concreta,
+    // no solo a un `test.step`. NO cambia `timeout`/`retries`/aserciones; el informe se vuelca
+    // SIEMPRE (también en rojo) vía `finally`. Sin `S5_TIMINGS_OUT`, es un no-op.
+    const netTimings = attachS5NetworkTimings(page, testInfo);
+    try {
+      const before = await request.get(listUrl, { headers });
+      expect(before.ok()).toBe(true);
 
-    const save = page.getByRole("button", { name: "Guardar Evidence" });
-    await test.step("S5-04 · lanzar la verificación D→hoy", async () => {
-      const cta = page.getByTestId("auto-operation-strategy-verify-dia-d");
-      await expect(cta).toBeVisible({ timeout: 20_000 });
-      await expect(cta).toBeEnabled();
-      await cta.click();
-    });
-
-    await test.step("S5-04 · esperar la evidencia de la sesión LAB", async () => {
-      // La sesión LAB arranca el run; cuando la evidencia de sesión está lista aparece el guardado.
-      await expect(save).toBeVisible({ timeout: 60_000 });
-      await expect(save).toBeEnabled({ timeout: 60_000 });
-    });
-
-    await test.step("S5-04 · guardar y verificar el enlace durable", async () => {
-      await save.click();
-      await expect(
-        page.getByText("Guardado", { exact: false }).first(),
-      ).toBeVisible({
-        timeout: 30_000,
+      // `test.step` = INSTRUMENTACIÓN read-only: nombra las fases cuyo tiempo consume el primer
+      // intento del journey (ese primer intento > 60 s es el motivo de la flakiness de CI). NO
+      // cambia timeouts, retries ni aserciones; solo hace medible QUÉ fase es lenta.
+      await test.step("S5-04 · abrir la operación AUTO", async () => {
+        await openFirstOperation(page, accountId);
       });
 
-      // El registro durable queda ENLAZADO al ciclo desde el que se lanzó (no basta con el laboratorio):
-      // se exige una fila con el `cycleId` Y el `instrumentId` del ciclo (identidad del enlace).
-      await expect
-        .poll(
-          async () => {
-            const res = await request.get(listUrl, { headers });
-            if (!res.ok()) return -1;
-            const json = await body<{
-              data: Array<{ cycleId: string; instrumentId: string }>;
-            }>(res);
-            return json.data.filter(
-              (v) =>
-                v.cycleId === state.cycleId &&
-                v.instrumentId === state.instrumentId,
-            ).length;
-          },
-          { timeout: 30_000 },
-        )
-        .toBeGreaterThan(0);
-    });
+      const save = page.getByRole("button", { name: "Guardar Evidence" });
+      await test.step("S5-04 · lanzar la verificación D→hoy", async () => {
+        const cta = page.getByTestId("auto-operation-strategy-verify-dia-d");
+        await expect(cta).toBeVisible({ timeout: 20_000 });
+        await expect(cta).toBeEnabled();
+        await cta.click();
+      });
+
+      await test.step("S5-04 · esperar la evidencia de la sesión LAB", async () => {
+        // La sesión LAB arranca el run; cuando la evidencia de sesión está lista aparece el guardado.
+        await expect(save).toBeVisible({ timeout: 60_000 });
+        await expect(save).toBeEnabled({ timeout: 60_000 });
+      });
+
+      await test.step("S5-04 · guardar y verificar el enlace durable", async () => {
+        await save.click();
+        await expect(
+          page.getByText("Guardado", { exact: false }).first(),
+        ).toBeVisible({
+          timeout: 30_000,
+        });
+
+        // El registro durable queda ENLAZADO al ciclo desde el que se lanzó (no basta con el laboratorio):
+        // se exige una fila con el `cycleId` Y el `instrumentId` del ciclo (identidad del enlace).
+        await expect
+          .poll(
+            async () => {
+              const res = await request.get(listUrl, { headers });
+              if (!res.ok()) return -1;
+              const json = await body<{
+                data: Array<{ cycleId: string; instrumentId: string }>;
+              }>(res);
+              return json.data.filter(
+                (v) =>
+                  v.cycleId === state.cycleId &&
+                  v.instrumentId === state.instrumentId,
+              ).length;
+            },
+            { timeout: 30_000 },
+          )
+          .toBeGreaterThan(0);
+      });
+    } finally {
+      netTimings.flush();
+    }
   });
 });
 

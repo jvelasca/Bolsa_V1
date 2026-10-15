@@ -219,6 +219,113 @@ PLAYWRIGHT_JSON_OUTPUT_NAME=/tmp/s5-integrated-report.json \
 node ../../scripts/ci/playwright-attempt-timings.mjs /tmp/s5-integrated-report.json
 ```
 
+### 6.1 Diagnóstico del arranque en frío de `S5-04`: de «dónde espera» a «qué componente tarda»
+
+Lo anterior mide **dónde** espera el test (`test.step`), no **qué componente** consume el tiempo. Para
+atribuir los ~60 s del primer intento a una fase con evidencia medida, se añade instrumentación
+**read-only** (commiteada) en tres capas. **No** se amplía `timeout`, **no** se cambia `retries: 1`,
+**no** se tocan aserciones, umbrales ADR-046 ni se crea sello nuevo.
+
+**A. Fases del servidor (`RunAndSaveBacktest`).** En [`backtests.py`](../../packages/py/application/src/bolsa_application/backtests.py),
+`_PhaseTimer` cronometra con `perf_counter` cada fase (`instrument_lookup`, `strategy_lookup`,
+`ohlcv_load`, `fingerprints`, `compute`, `manifest`, `save_run`, `trial`, `evidence`) y emite **una**
+línea por `POST /api/backtests/run`, **gated** por `BOLSA_BACKTEST_TIMING=1` (default **OFF**: sin la
+env, el comportamiento es equivalente al histórico; no cambia el resultado ni el contrato HTTP):
+
+```
+[backtest-timing] label=run_and_save_backtest instrument_lookup=..ms ohlcv_load=..ms compute=..ms \
+  ... total=..ms instrument_id=.. strategy_type=.. bars=.. limit=..
+```
+
+**B. Red/navegador.** [`apps/web/e2e/helpers/s5-network-timings.ts`](../../apps/web/e2e/helpers/s5-network-timings.ts)
+se engancha en el test `S5-04` (listeners `requestfinished`/`requestfailed`) y registra
+`{method, pathname, resourceType, status, durationMs, offsetMs}` por petición. Vuelca a
+`<S5_TIMINGS_OUT>.attempt<N>.json` — **un fichero por intento**, para que el retry no sobrescriba al
+primer intento — y lo hace en `finally` (también en rojo). Sin `S5_TIMINGS_OUT` es un **no-op**.
+
+**C. Parser puro.** [`scripts/ci/s5-network-timings.mjs`](../../scripts/ci/s5-network-timings.mjs)
+(+ `s5-network-timings.test.mjs`, ejercitado por `pnpm ci:timings:test`) agrupa por fase
+(`api:run`, `api:detail`, `api:ohlcv`, `api:strategy-top`, `api:dia-d-verifications`, `module:src`,
+`module:dep`, `other`), suma/`max`/conteo (para detectar re-runs) y **compara primer intento vs retry**.
+Un informe ausente es un **hueco declarado** (exit 0), nunca un rojo.
+
+**D. Cableado en CI.** El job `playwright (integrated AUTO S5)` enciende `BOLSA_BACKTEST_TIMING=1`,
+redirige la salida de la API a `/tmp/s5-api.log`, exporta `S5_TIMINGS_OUT=/tmp/s5-network-timings.json`
+al paso de Playwright y añade un paso read-only que renderiza el parser de red; el artefacto
+`playwright-integrated-auto-s5-timings` pasa a incluir los JSON de red, `s5-network.txt` y `s5-api.log`.
+
+**Reproducción local en frío (primero local, luego CI).**
+
+```bash
+pnpm ci:s5:cold        # vacía apps/web/node_modules/.vite, stack fresco (webServer→pnpm dev),
+                       # playwright test gp-v288-s5 --retries=1, y renderiza AMBOS parsers
+S5_COLD_GREP=GP-V288-S5-04 pnpm ci:s5:cold   # el journey AISLADO (caso más frío: nada lo precalienta)
+```
+
+Repetir **N≥3** veces para tener varias muestras del primer intento. Requiere PostgreSQL arriba y
+migrado y las dependencias instaladas (se declara, no se finge).
+
+**Criterio de decisión (evidencia → causa; no se pre-decide):**
+
+| Observación medida | Causa | Fix candidato (sin tocar timeout/retries) |
+| --- | --- | --- |
+| `module:src`/`module:dep` altos **solo** en intento 1 y retry plano | Vite dev transforma en frío dentro del tramo | `optimizeDeps.include` o servir build/`preview` |
+| Fases Python altas **solo** en la 1ª llamada y planas después | import/warm-up del proceso | pre-calentar la ruta en el setup de CI |
+| `ohlcv_load`/`compute` altos **también** en caliente | datos/cálculo | limitar barras / índices |
+| `POST /api/backtests/run` contado > 1 en el tramo | re-run por orquestación cliente | corregir la orquestación |
+
+**Resultado medido — arranque en frío local (caché de Vite vaciada en cada corrida).**
+
+En las tres muestras completas no hubo **ningún** reintento: los 4 tests pasan en el primer intento.
+
+| corrida | 4 tests | `S5-04` | abrir la operación | esperar evidencia LAB | guardar |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 27.8s | 4.65s | 3.44s | **0.68s** | 0.37s |
+| 2 | 27.9s | 5.26s | 3.57s | **1.21s** | 0.40s |
+| 3 (sesión previa) | 27.6s | 5.23s | 3.47s | **1.25s** | 0.40s |
+
+Fases del servidor por `POST /api/backtests/run` (`BOLSA_BACKTEST_TIMING=1`; una línea por llamada):
+
+| llamada | instrument_lookup | strategy_lookup | ohlcv_load | compute | save_run | total |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 37.1ms | 4.5ms | 9.4ms | 1.4ms | 64.6ms | 126.3ms |
+| 2 | 2.7ms | 0.9ms | 2.6ms | 1.4ms | 64.5ms | 78.9ms |
+| 3 | 6.6ms | 1.1ms | 2.4ms | 1.3ms | 57.4ms | 74.9ms |
+| 4 | 4.3ms | 4.3ms | 3.4ms | 1.2ms | 59.2ms | 78.3ms |
+
+Ninguna fase se acerca a los ~60 s y **no hay pico de «primera llamada»** (la #1 no es más lenta que
+la #4). La mayor es `save_run` (escritura durable), ~57-65 ms y **estable** en todas las llamadas.
+
+Red (intento 0): `module:src` 739 peticiones (máx **0.17-0.19s**), `module:dep` 222 (máx 0.19s),
+`api:run` 2 (máx 0.25s), `api:other` 40-44 (máx 1.20-1.22s). **Ninguna petición supera ~1.3 s** y hay
+**una sola** petición `document` (no hubo recarga de página ⇒ no se disparó el re-optimize de Vite).
+
+**Caso más frío (aislado).** `S5_COLD_GREP=GP-V288-S5-04 pnpm ci:s5:cold` (el journey solo, sin que
+ningún test previo precaliente módulos): test 7.18s, con el sobrecoste de frío en **abrir la
+operación AUTO** (6.05s vs 3.44-3.57s de la corrida completa) y **no** en la espera de evidencia LAB
+(**0.66s**, incluso menor que en la corrida completa). Es decir: el paso que se cuelga en CI
+—`expect(save).toBeVisible({ timeout: 60_000 })`— es el **menos** sensible al frío.
+
+**Conclusión del diagnóstico (mapea evidencia → causa).**
+
+| Rama del criterio | Evidencia medida | Veredicto |
+| --- | --- | --- |
+| Vite dev frío | 739 `module:src` pero máx 0.17-0.19 s/petición; el frío se paga al **montar** la UI (+~2.5 s) y la espera LAB aislada es 0.66 s | real pero ~2.5 s: **no explica los ~60 s** |
+| Python frío | todas las fases <65 ms y sin pico en la 1ª llamada | **refutado** |
+| Cómputo/datos | `ohlcv_load` 2-9 ms y `compute` 1.2-1.4 ms en todas las llamadas | **refutado** |
+| Waterfall/re-run cliente | `api:run` = 2 en toda la corrida (uno por run); `S5-04` dispara **un** run | **refutado** |
+
+**No se reproduce** en local (N=3 completas + 1 aislada) ningún tramo cercano a los ~60 s: el
+fenómeno es **solo de CI** y no queda atribuido a ninguna fase medida. Por el criterio de decisión
+**no hay causa demostrada que corregir**, así que se cierra sin tocar `timeout`/`retries` y sin
+enmascarar nada: la instrumentación read-only queda cableada para que el próximo CI de tag deje la
+distribución real (red + fases) en el artefacto `playwright-integrated-auto-s5-timings`, que es el
+único sitio donde el fenómeno aparece.
+
+**Guardarraíles.** No se toca `timeout`/`retries`/aserciones; sin cambios de contrato HTTP; los logs
+son env-gated (default OFF). `PAPER` sigue **`INCONCLUSIVE`**; los vetos `BEAR_TREND` siguen
+registrados como `NO_MEDIDO_REGIMEN` y **no** cuentan como días medidos ni ciclos.
+
 ---
 
 ## 7. Auditoría de calidad de señales (cuando existan ciclos)
