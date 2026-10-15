@@ -51,6 +51,7 @@ __all__ = [
     "GrammarBudget",
     "GrammarComponent",
     "GrammarPlan",
+    "GrammarPolicy",
     "enumerate_grammar_plans",
     "grammar_variants_for_plan",
 ]
@@ -719,6 +720,90 @@ class GrammarBudget:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class GrammarPolicy:
+    """V2.36/A16 — política de producción declarada de la gramática (allowlist).
+
+    Restringe de forma determinista QUÉ variantes de cada bloque entran en la
+    enumeración, sin tocar el vocabulario declarado ni el presupuesto. Es un dato
+    puro (sin IA/red/DB) y **OFF por defecto**: ``policy=None`` ⇒ comportamiento
+    histórico byte-idéntico.
+
+    ``allowed_variants`` es un mapping ``bloque -> nombres permitidos``:
+
+    * un bloque AUSENTE del mapping queda SIN restringir (entran todas sus variantes);
+    * un bloque PRESENTE se restringe a los nombres listados que EXISTAN, en el orden
+      declarado del vocabulario (fail-closed: un nombre desconocido se descarta, nunca
+      revienta);
+    * si en un bloque presente todos los nombres eran desconocidos, ese bloque queda
+      sin variantes (fail-closed): si es ``entry_trigger``/``exit`` no se emite plan.
+
+    ``max_components`` / ``max_per_component_variant`` son overrides OPCIONALES del
+    presupuesto (``None`` ⇒ se usa el valor de ``GrammarBudget``). La allowlist se
+    aplica SIEMPRE **antes** del corte por presupuesto, preservando el orden
+    determinista (nº de opcionales → combinación de bloques → producto de variantes).
+    """
+
+    allowed_variants: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    max_components: int | None = None
+    max_per_component_variant: int | None = None
+
+    def normalized(self) -> GrammarPolicy:
+        """Valida el mapping y descarta nombres/bloques desconocidos (fail-closed).
+
+        Nunca lanza: un bloque inexistente o un nombre no declarado se ignora. El
+        resultado conserva el orden DECLARADO de las variantes (no el del mapping de
+        entrada), de modo que la enumeración sigue siendo determinista aunque la
+        allowlist llegue desordenada.
+        """
+        normalized: dict[str, tuple[str, ...]] = {}
+        for kind, names in (self.allowed_variants or {}).items():
+            declared = GRAMMAR_VARIANTS.get(kind)
+            if declared is None:
+                # Bloque desconocido: se descarta la entrada entera (fail-closed).
+                continue
+            allowed = {str(name) for name in tuple(names or ())}
+            normalized[kind] = tuple(
+                component.name for component in declared if component.name in allowed
+            )
+
+        def _cap(value: int | None) -> int | None:
+            if value is None:
+                return None
+            try:
+                number = int(value)
+            except (TypeError, ValueError):
+                return None
+            return max(1, number)
+
+        max_components = _cap(self.max_components)
+        if max_components is not None:
+            max_components = min(max_components, MAX_OPTIONAL_COMPONENTS)
+        return GrammarPolicy(
+            allowed_variants=normalized,
+            max_components=max_components,
+            max_per_component_variant=_cap(self.max_per_component_variant),
+        )
+
+
+def _allowed_components(
+    declared: Sequence[GrammarComponent],
+    *,
+    kind: str,
+    policy: GrammarPolicy | None,
+) -> tuple[GrammarComponent, ...]:
+    """Variantes de ``kind`` permitidas por la política, en orden declarado.
+
+    ``policy=None`` (o bloque ausente) ⇒ todas las variantes declaradas. Una allowlist
+    vacía para el bloque ⇒ ninguna variante (fail-closed, no se cae al conjunto entero).
+    """
+    if policy is None or kind not in policy.allowed_variants:
+        return tuple(declared)
+    allowed = set(policy.allowed_variants[kind])
+    return tuple(component for component in declared if component.name in allowed)
+
+
+
 def _ordered_variants() -> dict[str, tuple[GrammarComponent, ...]]:
     """Variantes en orden de tupla (estable)."""
     return GRAMMAR_VARIANTS
@@ -726,6 +811,8 @@ def _ordered_variants() -> dict[str, tuple[GrammarComponent, ...]]:
 
 def enumerate_grammar_plans(
     budget: GrammarBudget | None = None,
+    *,
+    policy: GrammarPolicy | None = None,
 ) -> tuple[GrammarPlan, ...]:
     """Enumera los planes gramaticales de forma determinista y acotada.
 
@@ -735,16 +822,31 @@ def enumerate_grammar_plans(
     un índice mixto que recorre la ÚLTIMA dimensión más rápido (producto cartesiano
     estable). El corte se aplica por presupuesto ANTES de materializar.
 
+    V2.36/A16: ``policy`` (allowlist opcional por bloque) se aplica **antes** del corte
+    por presupuesto y preserva el orden determinista. Con ``policy=None`` el resultado
+    es **byte-idéntico** al histórico.
+
     Nunca hay aleatoriedad: el mismo presupuesto produce siempre la misma tupla de
     planes, en el mismo orden.
     """
     effective = (budget or GrammarBudget()).normalized()
+    effective_policy = policy.normalized() if policy is not None else None
     variants = _ordered_variants()
-    cap = effective.max_per_component_variant
 
-    # Variantes recortadas por bloque, en orden estable.
+    cap = effective.max_per_component_variant
+    max_components = effective.max_components
+    if effective_policy is not None:
+        if effective_policy.max_per_component_variant is not None:
+            cap = effective_policy.max_per_component_variant
+        if effective_policy.max_components is not None:
+            max_components = effective_policy.max_components
+
+    # Variantes permitidas por la política y luego recortadas por bloque (orden estable).
     pool: dict[str, tuple[GrammarComponent, ...]] = {
-        kind: tuple(variants.get(kind, ()))[:cap] for kind in variants
+        kind: _allowed_components(
+            tuple(variants.get(kind, ())), kind=kind, policy=effective_policy
+        )[:cap]
+        for kind in variants
     }
 
     optional_kinds = tuple(
@@ -757,7 +859,7 @@ def enumerate_grammar_plans(
 
     plans: list[GrammarPlan] = []
 
-    for count in range(1, effective.max_components + 1):
+    for count in range(1, max_components + 1):
         for combo in combinations(optional_kinds, count):
             # Producto cartesiano estable de las variantes de los opcionales.
             optionals: list[list[GrammarComponent]] = [
@@ -817,6 +919,7 @@ def grammar_variants_for_plan(
     *,
     max_variants: int = 4,
     axis_index: int = 0,
+    policy: GrammarPolicy | None = None,
 ) -> list[dict[str, Any]]:
     """Grid de variantes hermanas del plan para el LAB (A14).
 
@@ -843,9 +946,14 @@ def grammar_variants_for_plan(
     series del trigger anterior y la señal de entrada quedaría inalcanzable, dejando el
     plan con <2 trials y sin PBO (grid degenerado).
 
+    V2.36/A16: ``policy`` (allowlist) restringe también el grid de variantes hermanas:
+    si no, el LAB re-optimizaría sobre variantes vetadas. Un nombre vetado no entra
+    (fail-closed); con ``policy=None`` el grid es byte-idéntico al histórico.
+
     Determinista y acotado a ``max_variants``. Fail-closed: las variantes que no
     materializan se descartan (no se inventan puntos).
     """
+    effective_policy = policy.normalized() if policy is not None else None
     variants: list[dict[str, Any]] = []
     own = plan.materialize()
     if own is None:
@@ -869,7 +977,9 @@ def grammar_variants_for_plan(
     if not permutable_kinds:
         return variants
     swap_kind = permutable_kinds[int(axis_index) % len(permutable_kinds)]
-    pool = GRAMMAR_VARIANTS.get(swap_kind, ())
+    pool = _allowed_components(
+        GRAMMAR_VARIANTS.get(swap_kind, ()), kind=swap_kind, policy=effective_policy
+    )
 
     # Si el eje es el trigger y su exit homónimo está presente, se permutan AMBOS: el
     # exit acompaña al trigger por PAR (no por nombre), de modo que la señal de salida
@@ -903,7 +1013,11 @@ def grammar_variants_for_plan(
             )
             if pair_index is None:
                 continue
-            pool_exits = GRAMMAR_VARIANTS.get(COMPONENT_EXIT, ())
+            pool_exits = _allowed_components(
+                GRAMMAR_VARIANTS.get(COMPONENT_EXIT, ()),
+                kind=COMPONENT_EXIT,
+                policy=effective_policy,
+            )
             exit_index = next(
                 (
                     index

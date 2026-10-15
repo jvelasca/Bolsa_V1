@@ -73,6 +73,11 @@ AUTO_ORCHESTRATOR_DISCOVERY_MAX_CANDIDATES = "AUTO_ORCHESTRATOR_DISCOVERY_MAX_CA
 AUTO_ORCHESTRATOR_GRAMMAR = "AUTO_ORCHESTRATOR_GRAMMAR"
 AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS = "AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS"
 AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS = "AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS"
+# V2.36/A16 — política de producción de la gramática (allowlist de variantes).
+# OFF/inerte por defecto: sin este CSV no se construye ``GrammarPolicy`` y la
+# enumeración es byte-idéntica a A14/A15. Con CSV, solo entran las variantes listadas
+# (fail-closed: nombres desconocidos se descartan, nunca revienta).
+AUTO_ORCHESTRATOR_GRAMMAR_ALLOWED_VARIANTS = "AUTO_ORCHESTRATOR_GRAMMAR_ALLOWED_VARIANTS"
 # V2.36/A16 (P2-03): pesos del allocator explícito por carril (catálogo / gramática
 # simple / gramática compuesta / adaptive). Override por env; defaults seguros.
 AUTO_ORCHESTRATOR_ALLOCATOR_CATALOG_WEIGHT = "AUTO_ORCHESTRATOR_ALLOCATOR_CATALOG_WEIGHT"
@@ -278,6 +283,54 @@ def _grammar_budget(discovery_budget: Any) -> Any:
         base=discovery_budget,
         max_components=_int_env(AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS, 3),
         max_per_component_variant=_int_env(AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS, 4),
+    )
+
+
+def _grammar_policy() -> Any:
+    """V2.36/A16 — política de producción declarada de la gramática (allowlist).
+
+    OFF/inerte por defecto: sin ``AUTO_ORCHESTRATOR_GRAMMAR_ALLOWED_VARIANTS`` devuelve
+    ``None`` y la enumeración es byte-idéntica a A14/A15. Con un CSV de nombres de
+    variante, construye un ``GrammarPolicy`` que restringe CADA bloque a las variantes
+    listadas; reutiliza ``..._MAX_COMPONENTS`` y ``..._MAX_VARIANTS`` como overrides de
+    presupuesto. Fail-closed: los nombres/bloques desconocidos se descartan en
+    ``GrammarPolicy.normalized()``, nunca revienta el ciclo.
+    """
+    raw = (os.getenv(AUTO_ORCHESTRATOR_GRAMMAR_ALLOWED_VARIANTS) or "").strip()
+    if not raw:
+        return None
+
+    from bolsa_application.discovery_grammar import GRAMMAR_VARIANTS, GrammarPolicy
+
+    names = {part.strip() for part in raw.split(",") if part.strip()}
+    if not names:
+        return None
+
+    # Allowlist EXACTA sobre todo el vocabulario: un nombre ausente no entra. Es
+    # fail-closed de verdad — si el CSV no declara ninguna variante válida de un
+    # bloque, ese bloque queda sin variantes (un typo no «abre» el vocabulario entero).
+    allowed_variants = {
+        kind: tuple(component.name for component in declared if component.name in names)
+        for kind, declared in GRAMMAR_VARIANTS.items()
+    }
+
+    return GrammarPolicy(
+        allowed_variants=allowed_variants,
+        max_components=_int_env(AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS, 3),
+        max_per_component_variant=_int_env(AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS, 4),
+    )
+
+
+def _grammar_policy_label(policy: Any) -> str:
+    """Etiqueta compacta y determinista de la política efectiva (observabilidad)."""
+    if policy is None:
+        return "none"
+    allowed = getattr(policy, "allowed_variants", {}) or {}
+    total = sum(len(names) for names in allowed.values())
+    return (
+        f"allowed_variants={total},"
+        f"max_components={getattr(policy, 'max_components', None)},"
+        f"max_variants={getattr(policy, 'max_per_component_variant', None)}"
     )
 
 
@@ -599,6 +652,12 @@ def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
     # V2.36/A16: con gramática OFF no se consulta el allocator (salida histórica
     # intacta); con ON se inyecta el reparto explícito por carriles (P2-03).
     enabled = grammar_budget is not None
+    # V2.36/A16: allowlist de producción (OFF/inerte por defecto ⇒ ``None``). Con
+    # ``None`` la enumeración es byte-idéntica a A14/A15.
+    grammar_policy = _grammar_policy() if enabled else None
+    # V2.36/A16: allowlist de producción (OFF/inerte por defecto ⇒ ``None``). Con
+    # ``None`` la enumeración es byte-idéntica a A14/A15.
+    grammar_policy = _grammar_policy() if enabled else None
 
     def _current_snapshot() -> Any:
         if not isinstance(adaptive_snapshot, list) or not adaptive_snapshot:
@@ -648,12 +707,15 @@ def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
             # la evidencia persistida es identica a V2.37 (sin region) y el colapso del
             # snapshot es un no-op: equivalencia real, no aproximada.
             emit_param_region=adaptive_param_region_enabled(),
+            # V2.36/A16: allowlist de producción (None ⇒ salida histórica intacta).
+            policy=grammar_policy,
         )
         _record_discovery_summary(summary)
         logger.info(
             "auto_orchestrator discovery instrument=%s grammar_enabled=%s "
             "catalog=%s grammar=%s adaptive=%s adaptive_regions=%s total=%s trials=%s "
-            "catalog_cap=%s grammar_cap=%s adaptive_cap=%s policy_hash=%s bar_count_ok=%s",
+            "catalog_cap=%s grammar_cap=%s adaptive_cap=%s policy_hash=%s bar_count_ok=%s "
+            "grammar_policy=%s",
             instrument_id,
             summary.grammar_enabled,
             summary.catalog_candidates,
@@ -667,6 +729,7 @@ def _make_discovery_runner(budget: Any, adaptive_snapshot: Any = None) -> Any:
             summary.adaptive_cap,
             summary.adaptive_policy_hash,
             summary.bar_count_ok,
+            _grammar_policy_label(grammar_policy),
         )
         return candidates
 

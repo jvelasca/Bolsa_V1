@@ -43,6 +43,7 @@ from bolsa_application.discovery_catalog import (
 )
 from bolsa_application.discovery_grammar import (
     GrammarBudget,
+    GrammarPolicy,
     enumerate_grammar_plans,
     grammar_variants_for_plan,
 )
@@ -171,6 +172,7 @@ def discover_for_instrument_with_summary(
     allocator: DiscoveryBudgetAllocator | None = None,
     search_policy: Any = None,
     emit_param_region: bool = True,
+    policy: GrammarPolicy | None = None,
 ) -> tuple[tuple[StrategyCandidate, ...], DiscoveryEmissionSummary]:
     """V2.35/A15 — como ``discover_for_instrument`` pero devuelve también el resumen.
 
@@ -314,6 +316,7 @@ def discover_for_instrument_with_summary(
             data_snapshot_id=data_snapshot_id,
             candidate_id_factory=candidate_id_factory,
             bar_count=bar_count,
+            policy=policy,
         )
         bar_count_ok = bar_count is None or bar_count >= int(effective_grammar.min_bars)
     else:
@@ -477,6 +480,7 @@ def discover_for_instrument(
     grammar_budget: GrammarBudget | None = None,
     allocator: DiscoveryBudgetAllocator | None = None,
     search_policy: Any = None,
+    policy: GrammarPolicy | None = None,
 ) -> tuple[StrategyCandidate, ...]:
     """Genera las candidatas de descubrimiento para un instrumento.
 
@@ -514,6 +518,7 @@ def discover_for_instrument(
         grammar_budget=grammar_budget,
         allocator=allocator,
         search_policy=search_policy,
+        policy=policy,
     )
     return candidates
 
@@ -529,6 +534,7 @@ def _extend_with_grammar(
     data_snapshot_id: str | None,
     candidate_id_factory: CandidateIdFactory | None,
     bar_count: int | None,
+    policy: GrammarPolicy | None = None,
 ) -> tuple[list[StrategyCandidate], int]:
     """Emite candidatas gramaticales consumiendo el cupo que fija el allocator.
 
@@ -536,6 +542,10 @@ def _extend_with_grammar(
     solo se corta por el ``grammar_cap`` (del allocator explícito, P2-03), por el
     presupuesto global y por warm-up. Fail-closed: un plan que no materializa no emite
     candidata.
+
+    V2.36/A16: ``policy`` (allowlist de producción, default ``None``) se propaga a la
+    enumeración y al grid de variantes hermanas. Con ``policy=None`` la emisión es
+    byte-idéntica a la histórica.
     """
     effective_grammar = grammar_budget.normalized()
     if bar_count is not None and bar_count < int(effective_grammar.min_bars):
@@ -550,7 +560,7 @@ def _extend_with_grammar(
     grammar_emission_cap = max(0, int(grammar_cap))
 
     emitted_for_grammar = 0
-    for plan in enumerate_grammar_plans(effective_grammar):
+    for plan in enumerate_grammar_plans(effective_grammar, policy=policy):
         if len(candidates) >= effective_budget.max_candidates:
             break
         if trials_used >= effective_budget.max_trials_total:
@@ -574,6 +584,7 @@ def _extend_with_grammar(
             plan,
             max_variants=max(2, int(effective_grammar.max_per_component_variant)),
             axis_index=emitted_for_grammar,
+            policy=policy,
         )
         candidates.append(
             StrategyCandidate(
@@ -610,6 +621,7 @@ def discover_candidates(
     grammar_budget: GrammarBudget | None = None,
     allocator: DiscoveryBudgetAllocator | None = None,
     search_policy: Any = None,
+    policy: GrammarPolicy | None = None,
 ) -> tuple[StrategyCandidate, ...]:
     """Alias público estable de ``discover_for_instrument`` (nombre del motor)."""
     return discover_for_instrument(
@@ -623,6 +635,7 @@ def discover_candidates(
         grammar_budget=grammar_budget,
         allocator=allocator,
         search_policy=search_policy,
+        policy=policy,
     )
 
 
@@ -636,6 +649,7 @@ def discover_from_universe(
     grammar_budget: GrammarBudget | None = None,
     allocator: DiscoveryBudgetAllocator | None = None,
     search_policy: Any = None,
+    policy: GrammarPolicy | None = None,
 ) -> dict[str, tuple[StrategyCandidate, ...]]:
     """Descubre candidatas para todo un universo (útil fuera del orquestador).
 
@@ -657,5 +671,6 @@ def discover_from_universe(
             grammar_budget=grammar_budget,
             allocator=allocator,
             search_policy=search_policy,
+            policy=policy,
         )
     return out

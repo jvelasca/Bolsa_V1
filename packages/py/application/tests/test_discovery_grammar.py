@@ -33,6 +33,7 @@ from bolsa_application.discovery_grammar import (
     GrammarBudget,
     GrammarComponent,
     GrammarPlan,
+    GrammarPolicy,
     enumerate_grammar_plans,
     grammar_variants_for_plan,
 )
@@ -789,4 +790,187 @@ def test_grammar_donchian_trigger_is_reachable() -> None:
     }
     metrics = _simulate_rules_strategy(bars, definition, initial_cash=10000.0)
     assert metrics["tradeCount"] >= 1, "el trigger Donchian debe poder abrir posición"
+
+
+# ── V2.36/A16: política de producción (allowlist) ──────────────────────────────
+
+
+def test_policy_none_is_identical_to_baseline() -> None:
+    """Regresión A16: ``policy=None`` (explícito o ausente) NO altera la salida.
+
+    Se compara el resultado posicional histórico con el resultado con ``policy=None``
+    (nombres + definiciones materializadas) en varios presupuestos. Es el contrato de
+    no-regresión: la política es estrictamente aditiva y OFF por defecto.
+    """
+    budgets = (
+        None,
+        GrammarBudget(),
+        GrammarBudget(max_components=1),
+        GrammarBudget(max_per_component_variant=2),
+    )
+    for budget in budgets:
+        baseline = enumerate_grammar_plans(budget)
+        explicit = enumerate_grammar_plans(budget, policy=None)
+        assert [p.name for p in baseline] == [p.name for p in explicit]
+        assert [p.materialize() for p in baseline] == [p.materialize() for p in explicit]
+    # El contrato anti-explosión sigue intacto (mismo techo combinatorio).
+    assert len(enumerate_grammar_plans()) == len(enumerate_grammar_plans(policy=None))
+
+
+def test_policy_variants_grid_is_identical_when_none() -> None:
+    """Regresión A16: ``grammar_variants_for_plan`` con ``policy=None`` no cambia."""
+    plans = enumerate_grammar_plans(GrammarBudget(max_per_component_variant=2))
+    for plan in plans[:20]:
+        for axis in range(3):
+            baseline = grammar_variants_for_plan(plan, max_variants=4, axis_index=axis)
+            explicit = grammar_variants_for_plan(
+                plan, max_variants=4, axis_index=axis, policy=None
+            )
+            assert [v["label"] for v in baseline] == [v["label"] for v in explicit]
+            assert [v["definition"] for v in baseline] == [v["definition"] for v in explicit]
+
+
+def test_policy_allowlist_filters_variants_and_plans() -> None:
+    """La allowlist elimina variantes vetadas y recorta el número de planes."""
+    baseline = enumerate_grammar_plans()
+    allowed_regime = "regime_price_above_sma200"
+    policy = GrammarPolicy(allowed_variants={COMPONENT_REGIME: (allowed_regime,)})
+    filtered = enumerate_grammar_plans(policy=policy)
+    assert filtered, "la allowlist no debe dejar la gramática sin planes"
+    for plan in filtered:
+        for component in plan.components:
+            if component.kind == COMPONENT_REGIME:
+                assert component.name == allowed_regime
+    # Solo se han ELIMINADO combinaciones: todo plan filtrado existía ya sin política.
+    assert len(filtered) < len(baseline)
+    assert {p.name for p in filtered} < {p.name for p in baseline}
+
+
+def test_policy_restricts_axial_blocks_too() -> None:
+    """Trigger/exit también se restringen (son los bloques obligatorios)."""
+    policy = GrammarPolicy(
+        allowed_variants={
+            COMPONENT_TRIGGER: ("trigger_ema10_cross_ema50",),
+            COMPONENT_EXIT: ("exit_ema10_cross_ema50",),
+        }
+    )
+    plans = enumerate_grammar_plans(GrammarBudget(max_per_component_variant=2), policy=policy)
+    assert plans, "con trigger/exit permitidos debe haber planes"
+    for plan in plans:
+        by_kind = {component.kind: component for component in plan.components}
+        assert by_kind[COMPONENT_TRIGGER].name == "trigger_ema10_cross_ema50"
+        assert by_kind[COMPONENT_EXIT].name == "exit_ema10_cross_ema50"
+
+
+def test_policy_unknown_names_are_dropped_fail_closed() -> None:
+    """Nombres/bloques desconocidos se descartan sin lanzar (fail-closed)."""
+    policy = GrammarPolicy(
+        allowed_variants={
+            "bogus_block": ("whatever",),
+            COMPONENT_MOMENTUM: ("momentum_rsi_gt50", "momentum_does_not_exist"),
+        },
+        max_components=99,
+        max_per_component_variant=999,
+    )
+    normalized = policy.normalized()  # no lanza
+    assert "bogus_block" not in normalized.allowed_variants
+    assert normalized.allowed_variants[COMPONENT_MOMENTUM] == ("momentum_rsi_gt50",)
+    # El techo duro de componentes sigue vigente vía ``normalized``.
+    assert normalized.max_components == MAX_OPTIONAL_COMPONENTS
+    plans = enumerate_grammar_plans(policy=policy)
+    assert plans
+    for plan in plans:
+        for component in plan.components:
+            if component.kind == COMPONENT_MOMENTUM:
+                assert component.name == "momentum_rsi_gt50"
+
+
+def test_policy_unknown_trigger_names_veto_all_plans() -> None:
+    """Un bloque obligatorio sin ninguna variante válida ⇒ no hay planes (fail-closed)."""
+    policy = GrammarPolicy(allowed_variants={COMPONENT_TRIGGER: ("trigger_does_not_exist",)})
+    assert enumerate_grammar_plans(policy=policy) == ()
+
+
+def test_policy_normalization_is_order_independent_and_deterministic() -> None:
+    """El orden de la allowlist no importa: se normaliza al orden declarado."""
+    first = GrammarPolicy(
+        allowed_variants={COMPONENT_REGIME: ("regime_adx_gt25", "regime_price_above_sma200")}
+    )
+    second = GrammarPolicy(
+        allowed_variants={COMPONENT_REGIME: ("regime_price_above_sma200", "regime_adx_gt25")}
+    )
+    assert first.normalized() == second.normalized()
+    assert first.normalized().allowed_variants[COMPONENT_REGIME] == (
+        "regime_price_above_sma200",
+        "regime_adx_gt25",
+    )
+    assert [p.name for p in enumerate_grammar_plans(policy=first)] == [
+        p.name for p in enumerate_grammar_plans(policy=second)
+    ]
+
+
+def test_policy_filters_sibling_variant_grid() -> None:
+    """El grid de variantes hermanas del LAB también respeta la allowlist."""
+    plan = next(
+        p for p in enumerate_grammar_plans() if any(c.kind == COMPONENT_REGIME for c in p.components)
+    )
+    own_regime = next(c.name for c in plan.components if c.kind == COMPONENT_REGIME)
+    other_regimes = {c.name for c in GRAMMAR_VARIANTS[COMPONENT_REGIME]} - {own_regime}
+    policy = GrammarPolicy(allowed_variants={COMPONENT_REGIME: (own_regime,)})
+    variants = grammar_variants_for_plan(plan, max_variants=4, axis_index=0, policy=policy)
+    assert variants[0]["label"] == plan.name
+    # La única variante de régimen permitida es la propia ⇒ no hay alternativas.
+    assert len(variants) == 1
+    for variant in variants[1:]:
+        assert not (set(variant["label"].split("__")) & other_regimes)
+
+
+def test_policy_max_variant_override_caps_enumeration() -> None:
+    """Los overrides de presupuesto de la política acotan la enumeración."""
+    uncapped = len(enumerate_grammar_plans(GrammarBudget(max_per_component_variant=4)))
+    capped = len(
+        enumerate_grammar_plans(
+            GrammarBudget(max_per_component_variant=4),
+            policy=GrammarPolicy(max_per_component_variant=1),
+        )
+    )
+    assert capped < uncapped
+
+
+def test_engine_policy_none_matches_grammar_baseline() -> None:
+    """Integración A16: el engine con ``policy=None`` es idéntico a sin política."""
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    grammar_budget = GrammarBudget(base=budget)
+    baseline = discover_for_instrument(
+        instrument_id="AAA", budget=budget, grammar_budget=grammar_budget
+    )
+    explicit_none = discover_for_instrument(
+        instrument_id="AAA", budget=budget, grammar_budget=grammar_budget, policy=None
+    )
+    assert [c.id for c in baseline] == [c.id for c in explicit_none]
+    assert [c.strategy_family for c in baseline] == [
+        c.strategy_family for c in explicit_none
+    ]
+
+
+def test_engine_applies_policy_allowlist_to_grammar_candidates() -> None:
+    """El engine propaga la allowlist: solo se emiten planes con trigger permitido."""
+    budget = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+    grammar_budget = GrammarBudget(base=budget)
+    allowed_trigger = "trigger_ema10_cross_ema50"
+    policy = GrammarPolicy(allowed_variants={COMPONENT_TRIGGER: (allowed_trigger,)})
+    candidates = discover_for_instrument(
+        instrument_id="AAA",
+        budget=budget,
+        grammar_budget=grammar_budget,
+        policy=policy,
+    )
+    grammar_candidates = [
+        c for c in candidates if c.strategy_family.startswith(GRAMMAR_FAMILY_PREFIX)
+    ]
+    assert grammar_candidates, "la allowlist no debe dejar la gramática sin candidatas"
+    for candidate in grammar_candidates:
+        # El ``presetKey`` del plan viaja como familia; el trigger permitido debe estar
+        # presente (el prefijo ``grammar_`` del presetKey no altera la comprobación).
+        assert allowed_trigger in candidate.strategy_family
 

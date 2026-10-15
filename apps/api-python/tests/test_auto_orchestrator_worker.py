@@ -31,6 +31,7 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
         w.AUTO_ORCHESTRATOR_GRAMMAR,
         w.AUTO_ORCHESTRATOR_GRAMMAR_MAX_COMPONENTS,
         w.AUTO_ORCHESTRATOR_GRAMMAR_MAX_VARIANTS,
+        w.AUTO_ORCHESTRATOR_GRAMMAR_ALLOWED_VARIANTS,
         w.AUTO_ORCHESTRATOR_ADAPTIVE_ALLOCATOR,
         w.AUTO_ORCHESTRATOR_ALLOCATOR_ADAPTIVE_WEIGHT,
         w.AUTO_ORCHESTRATOR_ALLOCATOR_CATALOG_WEIGHT,
@@ -411,6 +412,128 @@ def test_grammar_budget_caps_excessive_components() -> None:
 
     budget = w._grammar_budget(DiscoveryBudget())
     assert budget.normalized().max_components <= 3
+
+
+# ── V2.36/A16: política de producción (allowlist OFF por defecto) ───────────────
+
+
+def test_grammar_policy_defaults_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sin CSV, la política es ``None`` (OFF/inerte): salida histórica intacta."""
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_GRAMMAR_ALLOWED_VARIANTS, raising=False)
+    assert w._grammar_policy() is None
+
+
+def test_grammar_policy_empty_csv_is_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Un CSV vacío (solo separadores) equivale a no configurar la política."""
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_GRAMMAR_ALLOWED_VARIANTS, " , ,, ")
+    assert w._grammar_policy() is None
+
+
+def test_grammar_policy_builds_allowlist_and_drops_unknown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El CSV construye la allowlist; los nombres desconocidos se descartan."""
+    monkeypatch.setenv(
+        w.AUTO_ORCHESTRATOR_GRAMMAR_ALLOWED_VARIANTS,
+        "trigger_ema10_cross_ema50,exit_ema10_cross_ema50,does_not_exist",
+    )
+    policy = w._grammar_policy()
+    assert policy is not None
+    normalized = policy.normalized()
+    allowed = {
+        name for names in normalized.allowed_variants.values() for name in names
+    }
+    assert allowed == {"trigger_ema10_cross_ema50", "exit_ema10_cross_ema50"}
+    assert "does_not_exist" not in allowed
+    # Los overrides de presupuesto reutilizan las env-gates existentes.
+    assert normalized.max_components == 3
+    assert normalized.max_per_component_variant == 4
+
+
+def test_grammar_policy_unset_keeps_runner_identical(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con el CSV sin definir, el runner con gramática ON es idéntico a ``policy=None``."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+    from bolsa_application.strategy_discovery_engine import discover_for_instrument
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_GRAMMAR, "1")
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_GRAMMAR_ALLOWED_VARIANTS, raising=False)
+    base = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+
+    runner_candidates = w._make_discovery_runner(base)("AAA")
+    baseline = discover_for_instrument(
+        instrument_id="AAA",
+        budget=base,
+        grammar_budget=w._grammar_budget(base),
+        policy=None,
+    )
+    assert [c.id for c in runner_candidates] == [c.id for c in baseline]
+    assert [c.strategy_family for c in runner_candidates] == [
+        c.strategy_family for c in baseline
+    ]
+
+
+def test_grammar_runner_emits_only_allowed_variants(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con allowlist explícita, el runner solo emite variantes permitidas.
+
+    La política del worker es una allowlist EXACTA (todas las variantes no listadas
+    quedan fuera). Como el vocabulario exige al menos un bloque opcional, el CSV debe
+    incluir un opcional además del trigger/exit obligatorios.
+    """
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_GRAMMAR, "1")
+    monkeypatch.setenv(
+        w.AUTO_ORCHESTRATOR_GRAMMAR_ALLOWED_VARIANTS,
+        "trigger_ema10_cross_ema50,exit_ema10_cross_ema50,regime_price_above_sma200",
+    )
+    base = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+
+    candidates = w._make_discovery_runner(base)("AAA")
+    grammar = [c for c in candidates if str(c.strategy_family).startswith("grammar:")]
+    assert grammar, "la allowlist (trigger+exit+regime) debe emitir planes"
+    for candidate in grammar:
+        family = str(candidate.strategy_family)
+        assert "trigger_ema10_cross_ema50" in family
+        assert "exit_ema10_cross_ema50" in family
+        assert "regime_price_above_sma200" in family
+
+
+def test_grammar_runner_all_unknown_allowlist_vetoes_grammar(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un CSV solo con nombres desconocidos no emite candidatas (fail-closed)."""
+    from bolsa_application.discovery_catalog import DiscoveryBudget
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_GRAMMAR, "1")
+    monkeypatch.setenv(
+        w.AUTO_ORCHESTRATOR_GRAMMAR_ALLOWED_VARIANTS, "nope,also_nope"
+    )
+    base = DiscoveryBudget(max_trials_total=60, max_per_family=8, max_candidates=40)
+
+    candidates = w._make_discovery_runner(base)("AAA")
+    assert not [
+        c for c in candidates if str(c.strategy_family).startswith("grammar:")
+    ]
+
+
+def test_grammar_policy_label_is_compact_and_deterministic() -> None:
+    """La etiqueta de observabilidad resume la política efectiva (o ``none``)."""
+    from bolsa_application.discovery_grammar import GrammarPolicy
+
+    assert w._grammar_policy_label(None) == "none"
+    policy = GrammarPolicy(
+        allowed_variants={"entry_trigger": ("trigger_ema10_cross_ema50",)},
+        max_components=2,
+        max_per_component_variant=3,
+    )
+    label = w._grammar_policy_label(policy)
+    assert label == w._grammar_policy_label(policy)
+    assert "allowed_variants=1" in label
+    assert "max_components=2" in label
 
 
 def test_discovery_runner_includes_grammar_only_when_enabled(
