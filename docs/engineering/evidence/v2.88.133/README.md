@@ -117,6 +117,6 @@ guardián de bump .............................. 1 passed (2.11.133-beta)
 
 ---
 
-## 9. `Release tag CI` del sello — **PENDIENTE**
+## 9. `Release tag CI` del sello — **run `38704219628` VERDE (sello CERRADO)**
 
-Esta evidencia se redacta **antes** del tag. La **cita POST-TAG** (tag `v2.88.133-beta` + su `Release tag CI`) se añadirá **tras** ejecutar el tag. **Base:** `v2.88.132-beta`.
+**Tag** `v2.88.133-beta` (**lightweight**, unsigned) ⇒ apunta **directamente** al commit del sello **`530fa674290e23b0a23f074dc160f5f7c0681bf2`**. El **`Release tag CI`** del tag, [run **`38704219628`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38704219628), salió **VERDE** (~13m23s, `2026-10-15T08:14:12Z` → `08:27:35Z`; **todos los jobs `success`, incluido `certify`** (job `116324738769`), con `playwright (integrated E2E, opt-in)` = `skipped` por diseño; el gate duro `playwright (integrated axe)`, job `116319502643`, **`success`**; `replay-repro` **REPRODUCIDO** (job `116319502482`) ⇒ `Δ decisión = 0` confirmado por CI; `lifecycle-pg` **`success`**, job `116319502387`; `playwright (mock E2E)` **`success`**, job `116319502244`). **Sello CERRADO.** El **pin de la ventana** (`WINDOW_CONFIG`) se re-ancla en el commit inmediatamente posterior (`ops(window)`, `freeze OK`). **Base:** `v2.88.132-beta`.
