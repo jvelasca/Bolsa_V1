@@ -178,6 +178,50 @@ def test_p4_unknown_count_is_hueco_not_zero() -> None:
     assert pending["liveVenueEvents"] is None
 
 
+def test_p4_requires_explicit_paper_venue() -> None:
+    """El contrato exige ``BROKER_VENUE == paper``: cualquier otro venue NO cierra P4."""
+    cli = _load_cli()
+    # Venue ausente/vacío/desconocido + envs LIVE ausentes + 0 trazas ⇒ ABIERTO (fail-closed).
+    for venue in (None, "", "   ", "xtb", "binance", "unknown", "PAPERX"):
+        pending = cli._p4_pending(
+            {
+                "BROKER_VENUE": venue,
+                "LIVE_EXECUTION_UNLOCKED": None,
+                "LIVE_EXECUTION_AUTHORIZED": None,
+            },
+            0,
+        )
+        assert pending["closed"] is False, f"venue={venue!r} no debe cerrar P4"
+
+
+def test_p4_empty_venue_is_declared_hueco_not_fabricated() -> None:
+    cli = _load_cli()
+    pending = cli._p4_pending(
+        {"BROKER_VENUE": "   ", "LIVE_EXECUTION_UNLOCKED": None, "LIVE_EXECUTION_AUTHORIZED": None},
+        0,
+    )
+    assert pending["brokerVenue"] is None
+
+
+def test_p4_paper_venue_canonicalises_case_and_space() -> None:
+    cli = _load_cli()
+    pending = cli._p4_pending(
+        {"BROKER_VENUE": "  PAPER  ", "LIVE_EXECUTION_UNLOCKED": None, "LIVE_EXECUTION_AUTHORIZED": None},
+        0,
+    )
+    assert pending["closed"] is True
+
+
+def test_p4_live_venue_event_nonzero_does_not_close() -> None:
+    cli = _load_cli()
+    pending = cli._p4_pending(
+        {"BROKER_VENUE": "paper", "LIVE_EXECUTION_UNLOCKED": None, "LIVE_EXECUTION_AUTHORIZED": None},
+        3,
+    )
+    assert pending["closed"] is False
+    assert pending["liveVenueEvents"] == 3
+
+
 # ---------------------------------------------------------------------------
 # Render del bundle
 # ---------------------------------------------------------------------------

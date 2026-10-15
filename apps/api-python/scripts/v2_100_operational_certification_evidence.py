@@ -182,8 +182,20 @@ def _p3_pending(chain: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+#: Venue EXIGIDO por el contrato de aislamiento P4. Un venue ausente/vacío/desconocido NO cierra.
+_REQUIRED_VENUE = "paper"
+
+
 def _p4_pending(env: dict[str, str | None], live_venue_events: int | None) -> dict[str, Any]:
-    """Resumen FALSABLE de P4 a partir del entorno y del invariante de venue LIVE."""
+    """Resumen FALSABLE de P4 a partir del entorno y del invariante de venue LIVE.
+
+    Contrato fail-closed (el MISMO que declaran el README de evidencia y el runbook):
+    P4 sólo cierra con ``BROKER_VENUE == "paper"`` **explícito**, las dos envs LIVE ausentes
+    y CERO trazas con venue LIVE MEDIDAS. ``venue != "live"`` era más débil que el contrato:
+    un venue vacío, ``xtb`` o desconocido podía cerrar P4 si las demás condiciones se cumplían.
+    ``UNKNOWN != 0``: con ``live_venue_events is None`` (BD ilegible) el invariante es un hueco
+    y P4 queda ABIERTO, nunca un ``0`` de relleno.
+    """
     venue = (env.get("BROKER_VENUE") or "").strip().lower()
     live_envs_absent = all(not (env.get(name) or "").strip() for name in _LIVE_ENVS)
     return {
@@ -191,9 +203,9 @@ def _p4_pending(env: dict[str, str | None], live_venue_events: int | None) -> di
         "brokerVenue": venue or None,
         "liveExecutionEnvsAbsent": live_envs_absent,
         "liveVenueEvents": live_venue_events,
-        # Se valida mientras los defaults (venue=paper, sin las dos env LIVE) no produzcan
-        # ninguna traza con venue LIVE.
-        "closed": venue != "live" and live_envs_absent and live_venue_events == 0,
+        # Se valida con el contrato EXACTO: venue=paper, sin las dos env LIVE y sin ninguna
+        # traza con venue LIVE medida.
+        "closed": venue == _REQUIRED_VENUE and live_envs_absent and live_venue_events == 0,
     }
 
 

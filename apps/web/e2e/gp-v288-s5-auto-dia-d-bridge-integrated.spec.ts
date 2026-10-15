@@ -821,6 +821,7 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
     }
     if (!state.accountId) throw new Error("fixture required");
     if (!baseURL) throw new Error("baseURL required");
+    const accountId = state.accountId;
 
     // Precondición — IDEMPOTENTE ante reintentos del runner: el POST del panel es único por
     // (cycleId, diaD, endDate, mode), así que el reintento de Playwright (`retries: 1` en CI)
@@ -832,46 +833,59 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
       `/api/auto/dia-d-verifications?cycleId=${encodeURIComponent(state.cycleId)}`,
       baseURL,
     ).toString();
-    const headers = { "X-Account-Id": state.accountId };
+    const headers = { "X-Account-Id": accountId };
     const before = await request.get(listUrl, { headers });
     expect(before.ok()).toBe(true);
 
-    await openFirstOperation(page, state.accountId);
-    const cta = page.getByTestId("auto-operation-strategy-verify-dia-d");
-    await expect(cta).toBeVisible({ timeout: 20_000 });
-    await expect(cta).toBeEnabled();
-    await cta.click();
-
-    // La sesión LAB arranca el run; cuando la evidencia de sesión está lista aparece el guardado.
-    const save = page.getByRole("button", { name: "Guardar Evidence" });
-    await expect(save).toBeVisible({ timeout: 60_000 });
-    await expect(save).toBeEnabled({ timeout: 60_000 });
-    await save.click();
-    await expect(
-      page.getByText("Guardado", { exact: false }).first(),
-    ).toBeVisible({
-      timeout: 30_000,
+    // `test.step` = INSTRUMENTACIÓN read-only: nombra las fases cuyo tiempo consume el primer
+    // intento del journey (ese primer intento > 60 s es el motivo de la flakiness de CI). NO
+    // cambia timeouts, retries ni aserciones; solo hace medible QUÉ fase es lenta.
+    await test.step("S5-04 · abrir la operación AUTO", async () => {
+      await openFirstOperation(page, accountId);
     });
 
-    // El registro durable queda ENLAZADO al ciclo desde el que se lanzó (no basta con el laboratorio):
-    // se exige una fila con el `cycleId` Y el `instrumentId` del ciclo (identidad del enlace).
-    await expect
-      .poll(
-        async () => {
-          const res = await request.get(listUrl, { headers });
-          if (!res.ok()) return -1;
-          const json = await body<{
-            data: Array<{ cycleId: string; instrumentId: string }>;
-          }>(res);
-          return json.data.filter(
-            (v) =>
-              v.cycleId === state.cycleId &&
-              v.instrumentId === state.instrumentId,
-          ).length;
-        },
-        { timeout: 30_000 },
-      )
-      .toBeGreaterThan(0);
+    const save = page.getByRole("button", { name: "Guardar Evidence" });
+    await test.step("S5-04 · lanzar la verificación D→hoy", async () => {
+      const cta = page.getByTestId("auto-operation-strategy-verify-dia-d");
+      await expect(cta).toBeVisible({ timeout: 20_000 });
+      await expect(cta).toBeEnabled();
+      await cta.click();
+    });
+
+    await test.step("S5-04 · esperar la evidencia de la sesión LAB", async () => {
+      // La sesión LAB arranca el run; cuando la evidencia de sesión está lista aparece el guardado.
+      await expect(save).toBeVisible({ timeout: 60_000 });
+      await expect(save).toBeEnabled({ timeout: 60_000 });
+    });
+
+    await test.step("S5-04 · guardar y verificar el enlace durable", async () => {
+      await save.click();
+      await expect(
+        page.getByText("Guardado", { exact: false }).first(),
+      ).toBeVisible({
+        timeout: 30_000,
+      });
+
+      // El registro durable queda ENLAZADO al ciclo desde el que se lanzó (no basta con el laboratorio):
+      // se exige una fila con el `cycleId` Y el `instrumentId` del ciclo (identidad del enlace).
+      await expect
+        .poll(
+          async () => {
+            const res = await request.get(listUrl, { headers });
+            if (!res.ok()) return -1;
+            const json = await body<{
+              data: Array<{ cycleId: string; instrumentId: string }>;
+            }>(res);
+            return json.data.filter(
+              (v) =>
+                v.cycleId === state.cycleId &&
+                v.instrumentId === state.instrumentId,
+            ).length;
+          },
+          { timeout: 30_000 },
+        )
+        .toBeGreaterThan(0);
+    });
   });
 });
 

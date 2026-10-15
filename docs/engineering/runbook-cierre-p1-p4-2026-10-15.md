@@ -53,7 +53,10 @@ pnpm run window:preflight
   **`NO_MEDIDO_REGIMEN`** y **no se opera** (el runner lo hace solo). **No se fuerza el régimen.**
   Repite en el siguiente día operable.
 - Error duro (sin payload, PostgreSQL caído, watch ESTUDIO vacío) ⇒ **no** es veto: revísalo antes de
-  continuar.
+  continuar. El runner solo acepta un `exit 2` como veto si trae el **payload de preflight válido**
+  (`mode: preflight` + `marketRegime`); un `exit 2` **sin** payload (p. ej. el intérprete no arrancó)
+  se trata como **FALLO DURO** (exit 1), nunca como veto. Así se distingue «no hay entradas
+  permitidas» de «no se pudo ejecutar o medir».
 
 ### Paso 3 — Correr el día (forward + journal + ventana + auditoría)
 
@@ -133,7 +136,13 @@ GET /api/auto/dia-d-verifications?cycleId=<cycleId>
 
 ### `P4` — Aislamiento fail-closed (MANTENER)
 
-No requiere acción diaria; **evidencia** = suite de aislamiento verde **+** invariante de venue:
+No requiere acción diaria; **evidencia** = suite de aislamiento verde **+** invariante de venue.
+
+**Criterio ESTRICTO (corregido en `v2.88.135`).** El bundle `v2_100` sólo cierra `P4` con
+`BROKER_VENUE == "paper"` **explícito**, las dos envs LIVE ausentes **y** CERO trazas con venue LIVE
+**medidas**. Antes cerraba con `venue != "live"`, que era **más débil** que este contrato: un venue
+vacío, `xtb` o desconocido podía cerrar `P4`. Un venue vacío/desconocido ahora **no** cierra `P4`.
+`UNKNOWN ≠ 0`: si la BD no se puede leer, el conteo es un hueco y `P4` queda **ABIERTO**, nunca `0`.
 
 ```sql
 -- Debe devolver 0 con los defaults (venue=paper, envs LIVE ausentes).
@@ -176,3 +185,58 @@ previos.
 - `P1`/`P2`/`P3` dependen de **días de mercado operables** (`P2`/`P3` dependen de `P1`).
 - La **magnitud/rentabilidad** del P&L sigue **NO MEDIDA**.
 - Con `BEAR_TREND`, el cierre puede tardar **semanas**: es **MERCADO**, no software.
+
+---
+
+## 6. Incidencia de CI `S5-04` — medir el primer intento, NO cambiar `timeouts`
+
+**Diagnóstico.** El primer intento del journey integrado `GP-V288-S5-04` supera los 60 s y el retry
+pasa. No es un defecto del producto: es **lentitud del primer arranque**. El fix de `v2.88.135` hizo
+el test idempotente ante reintentos, pero **no** eliminó esa lentitud.
+
+**Instrumentación read-only (sin tocar `timeout` ni `retries`).**
+
+- El job `playwright (integrated AUTO S5)` de [`release-tag-ci.yml`](../../.github/workflows/release-tag-ci.yml)
+  añade un segundo reporter **JSON** a fichero (`/tmp/s5-integrated-report.json`); el reporter `list`
+  sigue alimentando el guard anti-skip (`/tmp/s5-integrated.log`), que **no** se toca.
+- Un paso publica los tiempos por intento con [`scripts/ci/playwright-attempt-timings.mjs`](../../scripts/ci/playwright-attempt-timings.mjs)
+  (parser puro) y sube el JSON + `s5-timings.txt` como artefacto
+  `playwright-integrated-auto-s5-timings` (incluso en rojo).
+- Los tramos lentos de `S5-04` (abrir la operación, lanzar la verificación D→hoy, esperar la
+  evidencia LAB, guardar/verificar el enlace durable) se nombran con `test.step`, de modo que el
+  informe JSON declara **qué fase** consume el tiempo.
+
+**Regla operativa.** No ampliar `timeout` ni `retries` para «pasar». Primero **medir** en varias
+ejecuciones (local o CI); solo con el delta y la fase identificada se decide una optimización, y
+nunca ocultando el fallo mediante reintentos.
+
+Reproducción local (mismo informe):
+
+```bash
+cd apps/web
+PLAYWRIGHT_JSON_OUTPUT_NAME=/tmp/s5-integrated-report.json \
+  pnpm exec playwright test gp-v288-s5 --reporter=list --reporter=json --retries=1
+node ../../scripts/ci/playwright-attempt-timings.mjs /tmp/s5-integrated-report.json
+```
+
+---
+
+## 7. Auditoría de calidad de señales (cuando existan ciclos)
+
+`P1`/`P2`/`P3` solo se pueden **auditar** cuando la ventana produzca ciclos medibles. Mientras el
+mercado vete LONG, este checklist queda **sin aplicar** (no se fabrica). Por instrumento del
+universo ESTUDIO, sobre el artefacto de `v2_99` (`auto_chain_durable_reader`):
+
+1. **Secuencia completa de 9 etapas** — `SIGNAL → TOP_N → RISK → RESERVATION → ORDER → FILL →
+   PROTECTION → SETTLEMENT → CYCLE_CLOSED`; una etapa sin traza durable se declara `None` (hueco),
+   **no** `0`.
+2. **Identidad** — la estrategia EJECUTADA del ciclo resuelta por identidad EXACTA (`presetKey`),
+   no la «mejor disponible» por accidente.
+3. **Riesgo ↔ fill** — `RESERVATION`/`reserved_risk` coherente con el fill y la cantidad.
+4. **Protección y liquidación** — `PROTECTION`/`SETTLEMENT` presentes antes de `CYCLE_CLOSED`.
+5. **Conciliación del P&L** — `pnl.reconciled == true` (la magnitud/rentabilidad es análisis
+   **separado**, no parte de la certificación operativa).
+6. **Enlace DÍA-D** — `executedVsDiaD.matches != null` (True o False; nunca fabricado con una sola
+   fuente).
+
+Solo con esta secuencia verificada hay evidencia para valorar el funcionamiento operativo.

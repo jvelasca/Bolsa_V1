@@ -72,6 +72,7 @@
     "window:freeze": "node scripts/window-pin.mjs --check",
     "window:pin": "node scripts/window-pin.mjs --write",
     "window:test": "node --test scripts/lib/window-forward.test.mjs",
+    "ci:timings:test": "node --test scripts/ci/playwright-attempt-timings.test.mjs",
     "window:task:install": "node scripts/window-forward-runner.mjs task:install",
     "window:task:remove": "node scripts/window-forward-runner.mjs task:remove",
     "format": "prettier --write \"**/*.{ts,tsx,js,json}\"",

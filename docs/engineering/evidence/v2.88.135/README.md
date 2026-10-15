@@ -133,3 +133,65 @@ typecheck / lint (web) .................................. OK / 0 errores (23 war
 **Cierre:** endurecido el test ([`gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts`](../../../../apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts)) para medir el **RESULTADO durable** (fila con el `cycleId` **y** el `instrumentId` del ciclo) sin exigir estado limpio previo; verificado local **4/4** (`S5-04` en `4.6 s`, **sin reintento**). El tag se **movió** de `1c60b58e` a **`73317a9e`** y el CI se relanzó: `Release tag CI` [run **`38720406853`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38720406853) **VERDE** (~12m55s, `2026-10-15T10:27:35Z` → `10:40:30Z`; **todos los jobs `success`**, incluido `certify`; `playwright (integrated AUTO S5)` **`success`** con `S5-04` verde en el **retry #1** ~5.5s). El primer intento de `S5-04` en CI sigue siendo **flaky** (lentitud del primer run > 60 s), pero el retry ahora **no** choca con el residuo ⇒ job verde. El pin se re-ancla en el commit **POST-TAG** (`pnpm window:pin --write` → `freeze OK`, `apps c49d561f…` / `packages d48ac37b…`). **Falsable:** con el `assert total == 0` restaurado, el reintento vuelve a fallar.
 
 **El resto del run rojo estaba VERDE** (`python` ruff/imports/mypy/pytest, `frontend` typecheck/lint/test/build + `contract:check`, `decision-spine`, `shared`, `lifecycle-pg`, `a7-gate`, `dr-verify`, `security (gitleaks)`, `playwright (integrated axe)`, `playwright (mock E2E)`; `replay-repro` **REPRODUCIDO**).
+
+---
+
+## 10. Seguimiento POST-TAG (2026-10-15) — precisión P4 y medición de `S5-04`
+
+> Lo de arriba (§1-§9) es la evidencia **del sello**; esto documenta el trabajo **posterior al
+> tag**, para no reescribir la verificación histórica. Naturaleza: **tooling y tests**, `Δ motor = 0`,
+> `Δ decisión = 0`, `Δ contrato HTTP = 0`, **sin migración**.
+
+### 10.1 `P4` — precisión del certificador (fail-closed estricto)
+
+**Hallazgo.** El contrato de `P4` (README §2, `limits` del bundle, runbook §2) exige
+`BROKER_VENUE == "paper"`, pero `_p4_pending` cerraba con `venue != "live"`: un venue **vacío,
+`xtb` o desconocido** podía cerrar `P4` si las envs LIVE estaban ausentes y el conteo era `0`. Es
+una debilidad del **certificador de evidencia** (no demuestra por sí mismo que AUTO enviara órdenes
+reales).
+
+**Cambio.** [`v2_100_operational_certification_evidence.py`](../../../../apps/api-python/scripts/v2_100_operational_certification_evidence.py):
+`_p4_pending` exige ahora `venue == "paper"` explícito (`_REQUIRED_VENUE`). `UNKNOWN ≠ 0`: con
+`liveVenueEvents is None` (BD ilegible) `P4` queda **ABIERTO**. La lista `_LIVE_VENUES` y el conteo
+SQL no cambian.
+
+**Pruebas (falsables).**
+- [`test_operational_certification_evidence.py`](../../../../apps/api-python/tests/test_operational_certification_evidence.py):
+  `16 passed` (antes 12). Nuevas negativas: venue `None`/vacío/espacios/`xtb`/`binance`/`unknown`/`PAPERX`
+  ⇒ **no** cierra; venue vacío se declara hueco (`None`); `paper` con espacios/mayúsculas se
+  canoniza y **sí** cierra; `paper` con `liveVenueEvents > 0` **no** cierra.
+- [`test_operational_certification_evidence_pg.py`](../../../../apps/api-python/tests/test_operational_certification_evidence_pg.py):
+  el assert débil `brokerVenue != "live"` pasa a `brokerVenue == "paper"` (PG-gated).
+- `ruff check ... --config pyproject.toml`: **OK**.
+
+**Falsable:** restaurado `venue != "live"`, `test_p4_requires_explicit_paper_venue` **rompe**.
+
+### 10.2 `S5-04` — medición del primer intento vs retry (sin tocar `timeouts`)
+
+**Hallazgo (§9).** El primer intento de `S5-04` supera los 60 s; el retry pasa. Es **lentitud del
+primer arranque**, no un defecto del producto.
+
+**Instrumentación read-only (NO cambia `timeout`, `retries` ni aserciones).**
+- Job `playwright (integrated AUTO S5)` de [`release-tag-ci.yml`](../../../../.github/workflows/release-tag-ci.yml):
+  segundo reporter **JSON** a fichero (`PLAYWRIGHT_JSON_OUTPUT_NAME=/tmp/s5-integrated-report.json`)
+  junto al `list` que alimenta el guard anti-skip (intacto). Paso de medición + artefacto
+  `playwright-integrated-auto-s5-timings` (incluso en rojo).
+- NUEVO [`scripts/ci/playwright-attempt-timings.mjs`](../../../../scripts/ci/playwright-attempt-timings.mjs):
+  parser **puro** que resume, por test, el tiempo de cada intento (primero vs retry, delta) y los
+  pasos más lentos. Declara un **hueco** (y no falla) si el informe no existe. Test:
+  [`scripts/ci/playwright-attempt-timings.test.mjs`](../../../../scripts/ci/playwright-attempt-timings.test.mjs)
+  (`node --test` → `8 passed`).
+- [`gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts`](../../../../apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts):
+  `test.step` nombra los tramos lentos (abrir operación, lanzar D→hoy, esperar evidencia LAB,
+  guardar/verificar enlace). Solo instrumenta; el primer intento sigue mandando.
+
+**Regla:** medir en varias ejecuciones **antes** de optimizar; nunca ampliar `timeout`/`retries` para
+«pasar ni ocultar el fallo.
+
+### 10.3 Estado de la ventana (sin cambios de honestidad)
+
+`P1` sigue **`INCONCLUSIVE`** (`0/4 días`, `0/2 regímenes`, `0/32 ciclos`) por veto `BEAR_TREND`;
+`P2`/`P3` dependen de `P1`. No se declara AUTO certificado, no se relajan umbrales ni `ADR-046`, no se
+fuerza el régimen. El runner distingue «no hay entradas permitidas» (veto declarado con payload de
+preflight **válido**) de «no se pudo ejecutar/medir» (fallo duro) — ver runbook §1 y
+[`window-forward-runner.mjs`](../../../../scripts/window-forward-runner.mjs).

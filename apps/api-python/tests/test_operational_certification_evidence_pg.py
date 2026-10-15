@@ -157,9 +157,10 @@ async def test_bundle_reads_real_material_and_never_fabricates(
         assert p3["matchesTrue"] + p3["matchesFalse"] > 0
     assert p3["matchesNull"] >= 0
 
-    # (5) P4: invariante de aislamiento con los defaults.
+    # (5) P4: invariante de aislamiento con los defaults. El contrato exige `venue == paper`
+    # EXPLÍCITO (no basta `!= live`): un venue vacío/desconocido NO cierra P4.
     p4 = pend["P4"]
-    assert p4["brokerVenue"] != "live"
+    assert p4["brokerVenue"] == "paper"
     assert p4["liveExecutionEnvsAbsent"] is True
     if p4["closed"]:
         assert p4["liveVenueEvents"] == 0

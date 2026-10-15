@@ -61,6 +61,9 @@ jobs:
       - name: Window runner guards (lock/config/provenance)
         run: pnpm window:test
 
+      - name: CI helper guards (playwright attempt timings)
+        run: pnpm ci:timings:test
+
   spine:
     name: decision-spine
     runs-on: ubuntu-latest
@@ -438,9 +441,30 @@ jobs:
           E2E_INTEGRATION: '1'
           E2E_ALLOW_DEV_DB: '1'
           E2E_S5_REQUIRED: '1'
+          # Segundo reporter (JSON) a FICHERO: mide por intento (primero vs retry) sin tocar el
+          # log `list` que lee el guard anti-skip de abajo. NO cambia `retries` ni `timeout`.
+          PLAYWRIGHT_JSON_OUTPUT_NAME: /tmp/s5-integrated-report.json
         run: |
           set -o pipefail
-          pnpm exec playwright test gp-v288-s5 | tee /tmp/s5-integrated.log
+          pnpm exec playwright test gp-v288-s5 --reporter=list --reporter=json | tee /tmp/s5-integrated.log
+
+      # Medicion READ-ONLY del primer intento vs retry (S5-04): la lentitud del primer arranque
+      # (> 60 s) es una incidencia de CI que se arregla MIDIENDO antes de optimizar. El parser NO
+      # cambia timeouts/retries y declara un hueco (sin ponerse rojo) si el informe no existe.
+      - name: Measure AUTO S5 attempt timings (first vs retry)
+        if: always()
+        run: |
+          node scripts/ci/playwright-attempt-timings.mjs /tmp/s5-integrated-report.json | tee /tmp/s5-timings.txt
+
+      - uses: actions/upload-artifact@v4
+        # `if: always()`: un rojo tambien TIENE que entregar el informe y los tiempos medidos.
+        if: always()
+        with:
+          name: playwright-integrated-auto-s5-timings
+          path: |
+            /tmp/s5-integrated-report.json
+            /tmp/s5-timings.txt
+          if-no-files-found: warn
 
       - name: Fail on skipped AUTO S5 (no skip silencioso)
         if: always()
