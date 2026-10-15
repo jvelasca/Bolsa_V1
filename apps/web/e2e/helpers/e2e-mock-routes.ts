@@ -1275,5 +1275,15 @@ export function routeBody(
     return { data: { features: [] } };
   }
 
+  // `FundamentalCardDto` es un OBJETO con `facts`/`derived`/`metadata` REQUERIDOS: el fallback
+  // genérico `[]` (una lista) hace que el panel FA reviente en el error boundary
+  // ("Cannot read properties of undefined (reading 'forwardPe')") y tumba toda la página, lo que
+  // a su vez impide montar el verificador DÍA-D. Aquí se declara la AUSENCIA de snapshot como
+  // `null` (estado «Sin datos FA»), que es lo que el cliente ya tipa (`data: FundamentalCardDto
+  // | null`), nunca como lista.
+  if (/\/api\/instruments\/[^/]+\/fundamentals$/.test(path)) {
+    return { data: null };
+  }
+
   return { data: [] };
 }

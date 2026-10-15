@@ -33,10 +33,30 @@ function markRefreshing(id: string, active: boolean) {
   notifyRefreshListeners();
 }
 
+/**
+ * Guarda de **forma** del wire: `FundamentalCardDto` declara `facts`/`derived`/`metadata`
+ * REQUERIDOS (`packages/shared/src/fundamental-card.ts`). Un payload que no los traiga (respuesta
+ * malformada, lista `[]` de un mock, versión antigua del API) NO es una tarjeta: se declara
+ * ausencia (`null`) en lugar de romper el render con `card.facts.x`.
+ *
+ * Crítico porque el objeto era *truthy* hasta en el fallo: `[]` pasaba el `if (!card)` y el panel
+ * reventaba en `card.facts.forwardPe` → «Cannot read properties of undefined (reading 'forwardPe')».
+ */
+export function isFundamentalCardDto(
+  value: unknown,
+): value is FundamentalCardDto {
+  const isRecord = (v: unknown): v is Record<string, unknown> =>
+    typeof v === "object" && v !== null && !Array.isArray(v);
+  if (!isRecord(value)) return false;
+  return (
+    isRecord(value.facts) && isRecord(value.derived) && isRecord(value.metadata)
+  );
+}
+
 export function fundamentalsSnapshotMissing(
   card: FundamentalCardDto | null | undefined,
 ): boolean {
-  if (!card) return true;
+  if (!card || !isFundamentalCardDto(card)) return true;
   // Respuesta as-of bloqueada o reconstruida: no auto-refresh.
   if (card.metadata?.pointInTime === "blocked") return false;
   if (card.metadata?.pointInTime === "reconstructed") return false;
@@ -100,7 +120,10 @@ export function useEnsureInstrumentFundamentals(
     },
   });
 
-  const card = query.data?.data ?? null;
+  // El payload del wire se VALIDA antes de exponerse: un objeto que no cumple el DTO se declara
+  // como ausencia (`null`), nunca como una tarjeta a medio formar.
+  const rawCard = query.data?.data ?? null;
+  const card = isFundamentalCardDto(rawCard) ? rawCard : null;
   const missing =
     !query.isLoading && !query.isError && fundamentalsSnapshotMissing(card);
   const sharedRefreshing = Boolean(

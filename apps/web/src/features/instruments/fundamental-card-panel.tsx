@@ -26,7 +26,10 @@ import {
   formatCompositeLegMethod,
   formatCompositeLegStatus,
 } from "@/features/instruments/composite-leg-labels";
-import { useEnsureInstrumentFundamentals } from "@/features/instruments/use-ensure-instrument-fundamentals";
+import {
+  isFundamentalCardDto,
+  useEnsureInstrumentFundamentals,
+} from "@/features/instruments/use-ensure-instrument-fundamentals";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -327,7 +330,12 @@ export function FundamentalCardPanel({
     },
   });
 
-  const card = ensuredCard ?? query.data?.data ?? null;
+  // Guarda de forma (defensa en profundidad): el fallback a `query.data?.data` NUNCA debe
+  // reinyectar un payload que no cumple el DTO (p. ej. la lista `[]` del fallback genérico del
+  // mock). Si no es una tarjeta válida, se declara ausencia; el render ya tiene su estado «Sin
+  // datos FA» en vez de reventar en `card.facts`.
+  const rawCard = query.data?.data ?? null;
+  const card = ensuredCard ?? (isFundamentalCardDto(rawCard) ? rawCard : null);
   const filings: InstrumentFilingMetaV1[] = filingsQuery.data?.data ?? [];
   const composite: CompositeCardDto | null = compositeQuery.data?.data ?? null;
   const askTargetId =
