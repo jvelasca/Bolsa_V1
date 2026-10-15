@@ -275,10 +275,27 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * Regla operativa: los dias que CERTIFICAN la ventana deben correrse DESPUES de landear los
  * cambios de codigo y de este re-anclaje final. `scripts/` NO participa del pin, asi que commitear
  * este re-anclaje NO mueve a su vez el arbol.
+ *
+ * RE-ANCLAJE 2026-10-15 (sello `v2.88.133-beta`): sello del cierre de `G6` a nivel de HANDLER (la
+ * redaccion de credenciales alcanza de verdad a `root`/`uvicorn`/workers), del panel FA robusto ante
+ * un payload que VIOLA `FundamentalCardDto` (guarda `isFundamentalCardDto` + normalizacion en
+ * `useEnsureInstrumentFundamentals` y en el segundo camino del panel: deja de blanquear `/backtests`
+ * y de tumbar el verificador DIA-D), del refresco de los goldens win32 del certificado visual (drift
+ * +20px de alto PREEXISTENTE, contenido identico; el spec se salta en CI) y del helper del sello de
+ * ciclo `test_auto_fill_cycle_seal_pg.py` (exige fill COMPLETO), mas el bump de
+ * `package.json`/`meta.bump` de 12 CLIs. Tocan `apps/` (logging src + web + tests + scripts + e2e) y
+ * `packages/` NO cambia (mismo arbol que `v2.88.132`). `Delta motor = 0`: CERO ficheros de motor. El
+ * arbol pinneado es el del commit funcional `530fa674` (`apps` `07fa362c…` / `packages` `d48ac37b…`,
+ * medidos con `git rev-parse "HEAD:apps" "HEAD:packages"`). Editar el pin NO mueve a su vez el arbol
+ * porque este modulo vive en `scripts/`, que NO participa del pin. Pin anterior (sello
+ * `v2.88.132-beta`, 2º re-anclaje, commit `05dc2d5b`): `apps` `5696698e…` / `packages` `d48ac37b…`.
+ * **Honestidad:** la ventana PAPER real sigue `INCONCLUSIVE` (`0/4 dias`, `0/2 regimenes`,
+ * `0/32 ciclos`); lo que falta es OPERACION, no software. Los dias que CERTIFICAN la ventana deben
+ * correrse DESPUES de este re-anclaje.
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '05dc2d5b',
-  appsHash: '5696698ef9e83f74b5aebe66d23c56204d3e4146',
+  commit: '530fa674',
+  appsHash: '07fa362c413f6282d8948fa02f29cfb3bdac234b',
   packagesHash: 'd48ac37bbf44b229b5c05da2949aa310d06fcd86',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
