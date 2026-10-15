@@ -672,6 +672,33 @@ async def read_dia_d_verifications(
     return out
 
 
+def canonical_instrument_identity(
+    raw_instrument_id: Any,
+    catalog_row: Sequence[Any] | None,
+) -> tuple[str | None, str | None]:
+    """Canoniza la identidad del instrumento a la del **catálogo** (``(id, symbol)``).
+
+    El motor identifica el instrumento por su ``id``, pero los entornos de **siembra/legacy**
+    (p. ej. el seed del harness E2E) pueden usar el propio **SÍMBOLO** como ``instrument_id``.
+    Cuando el catálogo conoce el instrumento —por ``id`` **o** por ``symbol``— la identidad
+    persistida se canoniza a su **id de catálogo**: la MISMA que usa el resto del producto
+    (``/instruments/<id>/…``) y la que el navegador declara como contraste en el DTO DÍA-D.
+
+    Sin fila de catálogo se conserva el valor **CRUDO** y el símbolo es un **hueco declarado**:
+    nunca se inventa una identidad (doctrina ``UNKNOWN ≠ 0``).
+
+    Falsable: ``canonical_instrument_identity("ACS", ("uuid-1", "ACS")) == ("uuid-1", "ACS")``;
+    ``canonical_instrument_identity("ACS", None) == ("ACS", None)``.
+    """
+    raw = str(raw_instrument_id or "").strip() or None
+    if catalog_row is None:
+        return raw, None
+    catalog_id = str(catalog_row[0] or "").strip() or None
+    raw_symbol = catalog_row[1]
+    symbol = str(raw_symbol).strip() if raw_symbol else None
+    return catalog_id or raw, symbol
+
+
 async def resolve_dia_d_cycle_facts(
     session: Any,
     account_id: str,
@@ -683,6 +710,8 @@ async def resolve_dia_d_cycle_facts(
     Resuelve, ACOTADO POR CUENTA, el instrumento (de la reserva de entrada del ciclo), su
     símbolo (del catálogo) y la identidad EXACTA de la estrategia ejecutada que sella el ciclo
     (``strategyPresetKey``/``strategyVersion``, leída del hecho durable, NUNCA del navegador).
+    La identidad del instrumento se **canoniza** al id del catálogo cuando el catálogo lo conoce
+    (siembra/legacy pueden usar el símbolo como id); sin fila se conserva el valor crudo.
     Un ``cycleId`` sin reserva durable en esa cuenta ⇒ ``None`` (el llamante declara ``404``).
     """
     import sqlalchemy as sa
@@ -699,24 +728,29 @@ async def resolve_dia_d_cycle_facts(
     if not reservations:
         return None
 
-    instrument_id = str(reservations[0].instrument_id or "").strip() or None
-    symbol: str | None = None
-    if instrument_id:
+    raw_instrument_id = str(reservations[0].instrument_id or "").strip() or None
+    catalog_row: Sequence[Any] | None = None
+    if raw_instrument_id:
         try:
             # El motor identifica el instrumento por su id, pero los entornos de siembra/legacy
-            # pueden usar el propio símbolo como id: se acepta cualquiera de las dos costuras
-            # (nunca se inventa: sin fila, el símbolo es un hueco declarado).
-            raw_symbol = await session.scalar(
-                sa.select(InstrumentRow.symbol).where(
-                    sa.or_(
-                        InstrumentRow.id == instrument_id,
-                        InstrumentRow.symbol == instrument_id,
+            # pueden usar el propio símbolo como id: se aceptan las DOS costuras y, con fila de
+            # catálogo, la identidad se canoniza a su id (nunca se inventa: sin fila se conserva
+            # el valor crudo y el símbolo es un hueco declarado).
+            catalog_row = (
+                await session.execute(
+                    sa.select(InstrumentRow.id, InstrumentRow.symbol)
+                    .where(
+                        sa.or_(
+                            InstrumentRow.id == raw_instrument_id,
+                            InstrumentRow.symbol == raw_instrument_id,
+                        )
                     )
+                    .limit(1)
                 )
-            )
-            symbol = str(raw_symbol).strip() if raw_symbol else None
-        except Exception:  # noqa: BLE001 — catálogo ilegible: el símbolo es un hueco declarado.
-            symbol = None
+            ).first()
+        except Exception:  # noqa: BLE001 — catálogo ilegible: crudo + huecos declarados.
+            catalog_row = None
+    instrument_id, symbol = canonical_instrument_identity(raw_instrument_id, catalog_row)
 
     monitor = await read_operational_monitor(session, account_id, cycle_id=key, limit=1)
     cycle = next(

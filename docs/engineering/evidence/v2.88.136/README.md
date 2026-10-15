@@ -171,11 +171,14 @@ engine = engine_from_config(section, prefix="sqlalchemy.", poolclass=pool.NullPo
 ruff check packages/py apps/api-python --config pyproject.toml ...... All checks passed!
 mypy (gate bloqueante) .............................................. Success: 0 errores / 555 ficheros
 lint-imports --config packages/py/.importlinter ..................... 4 kept / 0 broken
+pytest packages/py/application/tests ................................ 2784 passed   (incl. 11 del nuevo test de identidad)
+pytest (test_resolve_dia_d_cycle_facts + test_dia_d_cycle_verification + ruta DÍA-D)  35 passed
+pytest (ruta DÍA-D + 3 suites PG-gated, con sus gates activos) ............... 32 passed
 pytest <gate offline `quality` del YAML> ............................ 5140 passed, 1 skipped, 0 failed
 pytest <job `auto-v2-durable-pg` completo, BD recién creada> ........ 122 passed, 0 skipped
 pytest <steps `lifecycle-pg` del tag con las entradas nuevas> ....... 176 passed  +  218 passed, 0 skipped
 test_dia_d_bump_guard.py ............................................ 1 passed    (2.11.136-beta)
-scripts/ci/test_selection.py --report ............................... 633/633 ejecutados, 0 sin declarar
+scripts/ci/test_selection.py --report ............................... 634/634 ejecutados, 0 sin declarar
 web: pnpm typecheck / vitest / contract:check ....................... OK / 2232 passed (307 ficheros) / OK
 ```
 
@@ -198,6 +201,7 @@ Por eso la lista PG completa se midió sobre BD **scratch limpia** (el camino qu
 - **Contrato HTTP:** **sin ampliación** de endpoints; `contract:check` compara contra el commit.
 - **Migración:** `054` es **aditiva**; el identificador se mantiene **≤ 32** por límite físico de `alembic_version.version_num`.
 - **Tag unsigned.**
+- **Arranque en frío de `S5-04` en CI:** el **primer** intento puede seguir superando los 60 s de espera de la evidencia LAB (intermitencia del runner, **ABIERTA** y declarada, §13). Este sello **no** la cierra y **no** tocó `timeouts`, `retries` ni umbrales `ADR-046`.
 - **Este sello no demuestra rentabilidad.**
 
 **Falsabilidad.**
@@ -208,19 +212,48 @@ Por eso la lista PG completa se midió sobre BD **scratch limpia** (el camino qu
 - Si un webhook pudiera apuntar a loopback/privado/metadata, `test_alert_channels_ssrf.py` **rompe**.
 - Si un test PG nuevo no se cableara **o** dejara de ignorarse en el offline, el **censo** (`test_ci_test_selection_census.py`) **rompe**.
 - Si la ruta online de `env.py` volviera a ignorar `DATABASE_URL`, `test_alembic_env_url_precedence.py` **rompe**.
+- Si la identidad del instrumento del ciclo se propagara **cruda** (sin canonizar al id del catálogo), `test_resolve_dia_d_cycle_facts.py` **rompe** (§13).
 - Si `meta.bump` de cualquier CLI difiere de `package.json`, el guardián **rompe**.
 
 ---
 
 ## 11. Ficheros del sello
 
-- **Nuevos:** [`054_dia_d_verified_and_alerts.py`](../../../../packages/py/infrastructure/alembic/versions/054_dia_d_verified_and_alerts.py); [`test_054_dia_d_verified_and_alerts.py`](../../../../packages/py/infrastructure/tests/test_054_dia_d_verified_and_alerts.py); [`test_alert_channels_ssrf.py`](../../../../packages/py/infrastructure/tests/test_alert_channels_ssrf.py); [`test_alembic_env_url_precedence.py`](../../../../packages/py/infrastructure/tests/test_alembic_env_url_precedence.py); [`test_signal_alerts_v111_pg.py`](../../../../apps/api-python/tests/test_signal_alerts_v111_pg.py); [`alerts-monitor.test.tsx`](../../../../apps/web/src/features/alerts/alerts-monitor.test.tsx); [`operations-route.test.ts`](../../../../apps/web/src/features/operations/operations-route.test.ts); esta evidencia.
+- **Nuevos:** [`054_dia_d_verified_and_alerts.py`](../../../../packages/py/infrastructure/alembic/versions/054_dia_d_verified_and_alerts.py); [`test_054_dia_d_verified_and_alerts.py`](../../../../packages/py/infrastructure/tests/test_054_dia_d_verified_and_alerts.py); [`test_alert_channels_ssrf.py`](../../../../packages/py/infrastructure/tests/test_alert_channels_ssrf.py); [`test_alembic_env_url_precedence.py`](../../../../packages/py/infrastructure/tests/test_alembic_env_url_precedence.py); [`test_signal_alerts_v111_pg.py`](../../../../apps/api-python/tests/test_signal_alerts_v111_pg.py); [`test_resolve_dia_d_cycle_facts.py`](../../../../packages/py/application/tests/test_resolve_dia_d_cycle_facts.py) (guardia de la regresión de identidad, §13); [`alerts-monitor.test.tsx`](../../../../apps/web/src/features/alerts/alerts-monitor.test.tsx); [`operations-route.test.ts`](../../../../apps/web/src/features/operations/operations-route.test.ts); esta evidencia.
 - **Modificados (selección):** [`dia_d_cycle_verification.py`](../../../../packages/py/application/src/bolsa_application/dia_d_cycle_verification.py) · [`signal_alerts.py`](../../../../packages/py/application/src/bolsa_application/signal_alerts.py) · [`auto_chain_durable_reader.py`](../../../../packages/py/application/src/bolsa_application/auto_chain_durable_reader.py) · [`alert_channels.py`](../../../../packages/py/infrastructure/src/bolsa_infrastructure/alerts/alert_channels.py) · [`signal_alert_repository.py`](../../../../packages/py/infrastructure/src/bolsa_infrastructure/database/repositories/signal_alert_repository.py) · [`dia_d_cycle_verification_repository.py`](../../../../packages/py/infrastructure/src/bolsa_infrastructure/database/repositories/dia_d_cycle_verification_repository.py) · [`tables.py`](../../../../packages/py/infrastructure/src/bolsa_infrastructure/database/models/tables.py) · [`config.py`](../../../../packages/py/infrastructure/src/bolsa_infrastructure/config.py) · [`env.py`](../../../../packages/py/infrastructure/alembic/env.py) · la ruta y los esquemas de DÍA-D y de alertas · la UI de DÍA-D/alerts/operativa · [`app.tsx`](../../../../apps/web/src/app.tsx) · `meta.bump` de 13 CLIs · [`package.json`](../../../../package.json) · [`CHANGELOG.md`](../../../../CHANGELOG.md) · [`PROJECT_STATE.md`](../../PROJECT_STATE.md) · [`CURRENT_SYSTEM.md`](../../../CURRENT_SYSTEM.md) · los packs A13+A14+A15 y V2.36 · el relevo V2.36 · los dos workflows.
 
 ---
 
 ## 12. `Release tag CI` del sello
 
-**Pendiente.** El tag `v2.88.136-beta` (**unsigned**) se crea sobre el commit del sello y su `Release tag CI` se cita en el commit **POST-TAG**. **Documento honesto: no se afirma CI de un tag aún no creado.**
+**Intento 1 (ROJO, declarado).** Tag `v2.88.136-beta` (lightweight, unsigned) sobre el commit del sello `c4f83568`. `Release tag CI` [run **`38779113120`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38779113120) **ROJO** con **un solo job** en fallo: `playwright (integrated AUTO S5)` (test `GP-V288-S5-04`), que falló **también el reintento**. Todo lo demás **VERDE**: `security (gitleaks)`, `shared`, `decision-spine`, `frontend` (typecheck/lint/test/build + `contract:check`), `python` (ruff/imports/mypy/pytest offline), `playwright (mock E2E)`, `playwright (integrated axe)`, `lifecycle-pg` (**con los gates PG nuevos de este sello**), `replay-repro` (**REPRODUCIDO**), `dr-verify`, `a7-gate`; `playwright (integrated E2E, opt-in)` queda `skipped` (opt-in declarado) y `certify` falla **solo** por agregación (`exit 1` sobre el job rojo).
+
+**No era flakiness: era una regresión REAL de este sello** (el reintento la confirmó). Ver §13.
+
+---
+
+## 13. Incidente de CI (declarado y cerrado): regresión de la identidad DÍA-D
+
+**Síntoma.** `GP-V288-S5-04` falló **dos veces**: el intento 0 en `S5-04 · esperar la evidencia de la sesión LAB` (el botón `Guardar Evidence` no aparece en 60 s — la readiness del arranque en frío del runner ya documentada en `v2.88.135` §10.2) y, lo importante, el **reintento** en `S5-04 · guardar y verificar el enlace durable`: se pulsó guardar, la UI declaró `Guardado`, y **el enlace durable no existía**.
+
+**Causa raíz (medida, no inferida).**
+
+| Pieza | Valor que aporta |
+| --- | --- |
+| Reserva durable del ciclo (harness de siembra `scripts/dev/seed_auto_cycle_for_ui.py`) | `instrument_id = "ACS"` — el **SÍMBOLO** (`_reservation(instrument=symbol)`) |
+| Panel DÍA-D (`trading-dia-d-replay-panel.tsx`) | declara `instrumentId: session.instrumentId` — el **id de catálogo** (UUID) |
+| `_declared_conflicts` (contrato v111) | compara **cadenas**: `"8f6c2b1e-…" != "ACS"` ⇒ **`409 cycle_identity_conflict`** |
+
+El panel marca el guardado como **exitoso** porque el archivo local y la Fase 2 **sí** ocurrieron; el fallo del enlace viaja como `cycleLinkError` (aviso declarado, no silencio). Resultado medible: el E2E ve `Guardado` y, después, **cero filas** con el `cycleId` **y** el `instrumentId` del ciclo.
+
+**Por qué es una regresión de ESTE sello.** Antes de v111 la identidad del enlace la declaraba el **navegador** (siempre el id de catálogo) y el servidor la persistía tal cual. v111 —correctamente— movió la derivación al servidor, pero la derivó del valor **crudo** de la reserva. El defecto vivía **latente** en la costura siembra/legacy (el propio docstring del resolver la reconocía) y solo se hizo visible al dejar de aceptar lo declarado por el navegador.
+
+**Arreglo.** NUEVO `canonical_instrument_identity(raw, catalog_row)` en [`auto_chain_durable_reader.py`](../../../../packages/py/application/src/bolsa_application/auto_chain_durable_reader.py): cuando el catálogo conoce el instrumento —por `id` **o** por `symbol`— la identidad se canoniza a su **id de catálogo** (la misma que usa el resto del producto y la que el navegador declara como contraste). Sin fila de catálogo se conserva el valor **crudo** y el símbolo es un **hueco declarado**: nunca se inventa identidad (`UNKNOWN ≠ 0`). `resolve_dia_d_cycle_facts` pasa a leer `(id, symbol)` en una sola consulta.
+
+**Guardia falsable (el test que faltaba).** NUEVO [`test_resolve_dia_d_cycle_facts.py`](../../../../packages/py/application/tests/test_resolve_dia_d_cycle_facts.py) — **11 passed**: regla pura de canonización (+ hueco declarado sin catálogo) y el **resolver real** con las costuras de la siembra. Incluye la **reproducción explícita de la regresión**: con la identidad **sin canonizar**, el contraste declarado lanza `DiaDCycleIdentityConflictError` y **no se escribe nada** (`assert repo.calls == []`). Antes de v111 el resolver real no tenía **ningún** test directo (la ruta lo monkeypatcheaba), y ése fue el hueco que dejó pasar la regresión.
+
+**Verificación tras el arreglo (local).** `pytest packages/py/application/tests` **2784 passed** · `test_auto_dia_d_verification_route.py` + los tres PG-gated (`DIA_D_CYCLE_VERIFICATION_PG_REQUIRED=1`, `SIGNAL_ALERTS_PG_REQUIRED=1`, `AUTO_FILL_CYCLE_SEAL_PG_REQUIRED=1`) **32 passed** · `ruff` **`All checks passed!`** · `mypy` **0 errores** · censo **634/634, 0 sin declarar**.
+
+**Cierre.** Tag **movido** al commit del arreglo (`git tag -f` + push forzado del ref; el tag es **lightweight** y **unsigned**, y el sello no estaba publicado ni anunciado). **La cita del `Release tag CI` del intento 2 va en el commit POST-TAG.** El **intento 0 lento** de `S5-04` (readiness LAB en frío) sigue **ABIERTO** y declarado: lo que se cerró aquí es la regresión de identidad, **no** la intermitencia del arranque en frío del runner (no se tocaron `timeouts`, `retries` ni umbrales `ADR-046`).
 
 **Base:** `v2.88.135-beta`.
