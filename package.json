@@ -1,6 +1,6 @@
 {
   "name": "bolsa-v1",
-  "version": "2.11.134-beta",
+  "version": "2.11.135-beta",
   "private": true,
   "description": "Plataforma personal de gestión bursátil — IBEX, Europa, acciones",
   "scripts": {
@@ -67,7 +67,10 @@
     "window:preflight": "node scripts/window-forward-runner.mjs preflight",
     "window:run-day": "node scripts/window-forward-runner.mjs run-day",
     "window:status": "node scripts/window-forward-runner.mjs status",
+    "window:evidence": "node scripts/window-forward-runner.mjs evidence",
     "window:unlock": "node scripts/window-forward-runner.mjs unlock",
+    "window:freeze": "node scripts/window-pin.mjs --check",
+    "window:pin": "node scripts/window-pin.mjs --write",
     "window:test": "node --test scripts/lib/window-forward.test.mjs",
     "window:task:install": "node scripts/window-forward-runner.mjs task:install",
     "window:task:remove": "node scripts/window-forward-runner.mjs task:remove",

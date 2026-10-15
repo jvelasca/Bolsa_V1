@@ -317,6 +317,14 @@ export const WINDOW_CONFIG = Object.freeze({
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
   watchSize: 20,
+  /**
+   * V2.88.135 — la lane operada de la ventana mide el universo **ESTUDIO** (no el
+   * catálogo) para que los mismos días sirvan a P1 (ventana 4/2/32) y a P2 (cadena
+   * durable por instrumento del ESTUDIO). Fail-closed: sin ESTUDIO `ok` el watch
+   * queda vacío y el día se declara, sin caer al catálogo. NO es clave de freeze
+   * (no es identidad del árbol); con `false` el comportamiento es el histórico.
+   */
+  watchFromEstudio: true,
   days: WINDOW_MIN_DAYS,
   /** Flags de operacion: se inyectan SOLO en el `env` del proceso hijo. */
   operatorEnv: Object.freeze({

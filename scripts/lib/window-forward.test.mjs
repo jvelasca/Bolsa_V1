@@ -26,6 +26,7 @@ import {
   verifyWindowProvenance,
   windowConfig,
 } from './window-forward.mjs';
+import { applyPin, freezeStatus, parsePinFields } from '../window-pin.mjs';
 
 // ---------------------------------------------------------------------------
 // Config inmutable (P1)
@@ -385,3 +386,78 @@ test('parseRevParse y parseGate no inventan valores', () => {
   assert.equal(gate.minDays, 4);
   assert.equal(gate.ready, false);
 });
+
+// ---------------------------------------------------------------------------
+// Pin de la ventana: parseo, freeze y re-anclaje (puro, sin git)
+// ---------------------------------------------------------------------------
+
+test('parsePinFields extrae los tres campos y no inventa si faltan', () => {
+  const text = [
+    'export const WINDOW_CONFIG = Object.freeze({',
+    "  commit: 'abc12345',",
+    `  appsHash: '${'a'.repeat(40)}',`,
+    `  packagesHash: '${'b'.repeat(40)}',`,
+    '});',
+  ].join('\n');
+  const pin = parsePinFields(text);
+  assert.equal(pin.commit, 'abc12345');
+  assert.equal(pin.appsHash, 'a'.repeat(40));
+  assert.equal(pin.packagesHash, 'b'.repeat(40));
+  assert.deepEqual(parsePinFields('sin campos'), {
+    commit: null,
+    appsHash: null,
+    packagesHash: null,
+  });
+});
+
+test('freezeStatus: el freeze real son los dos tree hashes; el commit es etiqueta', () => {
+  const pin = { commit: 'old', appsHash: 'A', packagesHash: 'P' };
+  assert.equal(
+    freezeStatus(pin, { commit: 'new', appsHash: 'A', packagesHash: 'P' }).ok,
+    true,
+  );
+  assert.equal(
+    freezeStatus(pin, { commit: 'new', appsHash: 'A', packagesHash: 'P' }).commitLabelStale,
+    true,
+  );
+  const moved = freezeStatus(pin, { commit: 'new', appsHash: 'A2', packagesHash: 'P' });
+  assert.equal(moved.ok, false);
+  assert.deepEqual(moved.mismatches, ['appsHash']);
+});
+
+test('applyPin reescribe los tres campos y es idempotente', () => {
+  const text = [
+    'export const WINDOW_CONFIG = Object.freeze({',
+    "  commit: 'old00000',",
+    `  appsHash: '${'x'.repeat(40)}',`,
+    `  packagesHash: '${'y'.repeat(40)}',`,
+    "  account: 'cuenta-fija',",
+    '});',
+  ].join('\n');
+  const next = applyPin(text, {
+    commit: 'new11111',
+    appsHash: 'a'.repeat(40),
+    packagesHash: 'b'.repeat(40),
+    note: 'prueba',
+    day: '2026-10-15',
+  });
+  assert.equal(next.changed, true);
+  const parsed = parsePinFields(next.text);
+  assert.equal(parsed.commit, 'new11111');
+  assert.equal(parsed.appsHash, 'a'.repeat(40));
+  assert.equal(parsed.packagesHash, 'b'.repeat(40));
+  // La identidad NO se toca.
+  assert.match(next.text, /account: 'cuenta-fija'/);
+  assert.match(next.text, /RE-ANCLAJE 2026-10-15/);
+  // Idempotente: aplicar el mismo pin no cambia nada.
+  const again = applyPin(next.text, {
+    commit: 'new11111',
+    appsHash: 'a'.repeat(40),
+    packagesHash: 'b'.repeat(40),
+    note: 'prueba',
+    day: '2026-10-15',
+  });
+  assert.equal(again.changed, false);
+  assert.equal(again.text, next.text);
+});
+

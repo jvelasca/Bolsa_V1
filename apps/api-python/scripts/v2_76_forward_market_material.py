@@ -50,6 +50,10 @@ Uso (desde la raíz del repo)::
     uv run --no-sync python apps/api-python/scripts/v2_76_forward_market_material.py \\
         --preflight-only --watch-size 20
 
+    # Universo ESTUDIO (lane canónica de la ventana PAPER; fail-closed, sin catálogo).
+    uv run --no-sync python apps/api-python/scripts/v2_76_forward_market_material.py \\
+        --account-id <uuid> --watch-from-estudio --json --out evidencia-forward.json
+
 Códigos de salida: ``0`` si el material alcanza el nivel pedido (default ``evidence``); ``2`` si no
 lo alcanza o no se pudo ejercitar (se declara por stderr); ``1`` uso incorrecto. En
 ``--preflight-only``: ``0`` si el universo admite entradas LONG hoy y ``2`` si el eje operativo las
@@ -146,6 +150,61 @@ async def _watch_from_catalog(factory: Any, size: int, *, min_bars: int) -> list
             .limit(max(1, int(size)))
         )
         return [str(row[0]) for row in (await session.execute(stmt)).all()]
+
+
+async def _watch_from_estudio(factory: Any, *, allowlist: tuple[str, ...]) -> Any:
+    """Watch canónico del universo **ESTUDIO** ∩ allowlist (fail-closed).
+
+    Reutiliza ``resolve_daily_watch`` —la MISMA composición que la lane diaria AUTO
+    (``AUTO_ENGINE_SIMULATED_WATCH_FROM_ESTUDIO``)— para que la ventana PAPER mida el
+    universo canónico (el que exige la evidencia por instrumento del ESTUDIO).
+
+    Regla dura: sin ESTUDIO ``ok`` el watch queda VACÍO y se DECLARA; **nunca** se cae
+    al catálogo (caer a ``_watch_from_catalog`` fabricaría un universo medible que no es
+    el que se quiere certificar). Devuelve ``DailyWatchResolution``.
+    """
+    from bolsa_api.background.estudio_watch import (
+        SessionScopedEstudioList,
+        resolve_daily_watch,
+    )
+
+    return await resolve_daily_watch(SessionScopedEstudioList(factory), allowlist=allowlist)
+
+
+async def _resolve_forward_watch(
+    factory: Any,
+    *,
+    from_estudio: bool,
+    cli_watch: Sequence[str],
+    watch_size: int,
+    min_bars: int,
+) -> tuple[list[str], str]:
+    """Resuelve el watch del forward y DECLARA su origen (CLI/ESTUDIO/catálogo).
+
+    Orden y fail-closed:
+
+    * ``--watch-from-estudio``: el watch es el universo ESTUDIO ∩ allowlist; sin
+      ESTUDIO ``ok`` el watch queda VACÍO y se DECLARA (``RuntimeError``), **nunca**
+      se cae al catálogo (caer fabricaría un universo que no se quiere certificar).
+    * Sin el flag: watch explícito del CLI o, si falta, derivado del CATÁLOGO.
+    """
+    watch = [str(s) for s in cli_watch if str(s).strip()]
+    source = "cli" if watch else ""
+    if from_estudio:
+        resolution = await _watch_from_estudio(factory, allowlist=tuple(watch))
+        watch = list(resolution.instrument_ids)
+        source = "estudio"
+        if not watch:
+            raise RuntimeError(
+                f"watch ESTUDIO vacío y fail-closed (status={resolution.status!r}): "
+                "no se cae al catálogo"
+            )
+    elif not watch:
+        watch = await _watch_from_catalog(factory, int(watch_size), min_bars=int(min_bars))
+        source = "catalog"
+    if not watch:
+        raise RuntimeError("el catálogo no aportó ningún instrumento con sector y barras")
+    return watch, source
 
 
 def _quote_price(quote: Any) -> float | None:
@@ -541,6 +600,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     engine_base = f"auto-v76-{os.urandom(4).hex()}"
     account_id = str(args.account_id or "")
     watch = _watch_from_cli(args.watch)
+    watch_source = "cli" if watch else ""
     version_a = str(args.version_a or f"v76-forward-{engine_base[-4:]}")
     version_b = ""
     ticks = 0
@@ -559,12 +619,13 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     }
     last_gate_reason: list[str] = []
     try:
-        if not watch:
-            watch = await _watch_from_catalog(
-                factory, int(args.watch_size), min_bars=int(args.min_bars)
-            )
-        if not watch:
-            raise RuntimeError("el catálogo no aportó ningún instrumento con sector y barras")
+        watch, watch_source = await _resolve_forward_watch(
+            factory,
+            from_estudio=bool(args.watch_from_estudio),
+            cli_watch=watch,
+            watch_size=int(args.watch_size),
+            min_bars=int(args.min_bars),
+        )
         os.environ[_SYMBOLS_ENV] = ",".join(watch)
 
         # Reparto determinista del universo en las dos versiones (A determinista, B = ACTIVE).
@@ -589,6 +650,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 "watchA": list(watch_a),
                 "watchB": list(watch_b),
                 "watchSize": len(watch),
+                "watchSource": watch_source,
                 "marketRegime": market_regime,
             }
 
@@ -711,6 +773,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         "pairActive": bool(secondary_loaded and version_b and watch_b),
         "pairAvailable": bool(secondary_loaded and version_b and watch_b),
         "watchSize": len(watch),
+        "watchSource": watch_source,
         "ticks": ticks,
         "turnTotals": totals,
         "lastGateReason": last_gate_reason,
@@ -732,10 +795,20 @@ def main(argv: list[str] | None = None) -> int:
         "--account-id", default=None, help="cuenta PAPER existente (si falta, se crea)"
     )
     parser.add_argument(
-        "--watch", default=None, help="instrumentos separados por coma (si falta, catálogo)"
+        "--watch",
+        default=None,
+        help="instrumentos separados por coma (si falta y no hay ESTUDIO, catálogo)",
     )
     parser.add_argument(
         "--watch-size", type=int, default=20, help="tamaño del watch derivado del catálogo"
+    )
+    parser.add_argument(
+        "--watch-from-estudio",
+        action="store_true",
+        help=(
+            "deriva el watch del universo ESTUDIO (fail-closed; nunca cae al catálogo). "
+            "--watch pasa a ser allowlist que INTERSECTA"
+        ),
     )
     parser.add_argument(
         "--min-bars",

@@ -75,6 +75,7 @@ const SCRIPT_FORWARD = 'apps/api-python/scripts/v2_76_forward_market_material.py
 const SCRIPT_JOURNAL = 'apps/api-python/scripts/v2_77_market_operability.py';
 const SCRIPT_WINDOW = 'apps/api-python/scripts/v2_80_market_window.py';
 const SCRIPT_AUDIT = 'apps/api-python/scripts/v2_83_window_audit.py';
+const SCRIPT_EVIDENCE = 'apps/api-python/scripts/v2_100_operational_certification_evidence.py';
 
 const TASK_NAME = 'BolsaV1_WindowForward';
 const DEFAULT_TASK_TIME = '18:00';
@@ -119,6 +120,8 @@ Comandos:
   preflight                 Solo v2_76 --preflight-only (read-only). Declara el regimen de hoy.
   run-day [--force]         Dia completo: preflight -> forward -> v2_77 -> v2_80 -> v2_83.
   status                    Dias del ledger + gate LIGADO al run (>=4 dias, >=2 episodios, >=32 ciclos).
+  evidence                  Bundle diario P1-P4 (read-only): certificador v2_98 + cadena ESTUDIO v2_99
+                            + enlace DIA-D + aislamiento. Escribe operability_runs/daily-evidence/<DIA>/.
   unlock [--force]          Reclama el lock diario de hoy SOLO si esta huerfano (misma logica de
                             ownership que run-day). Nunca borra un PID vivo de este host: si hay un
                             run en curso, deniega (exit 1). --force solo fuerza un lock ajeno con TTL
@@ -480,11 +483,13 @@ function printDaySummary(manifest) {
 // ---------------------------------------------------------------------------
 
 function preflightArgs(config) {
-  return ['--preflight-only', '--watch-size', String(config.watchSize), '--json'];
+  const args = ['--preflight-only', '--watch-size', String(config.watchSize), '--json'];
+  if (config.watchFromEstudio) args.push('--watch-from-estudio');
+  return args;
 }
 
 function forwardArgs(config, day) {
-  return [
+  const args = [
     '--account-id',
     config.account,
     '--version-a',
@@ -502,6 +507,8 @@ function forwardArgs(config, day) {
     '--out',
     forwardPath(day),
   ];
+  if (config.watchFromEstudio) args.push('--watch-from-estudio');
+  return args;
 }
 
 async function cmdPreflight(config, flags) {
@@ -910,6 +917,45 @@ function cmdStatus() {
 }
 
 /**
+ * `evidence` — bundle diario P1-P4 (read-only) sobre la config pinneada.
+ *
+ * Encadena el certificador de la ventana (`v2_98`) y la cadena durable del ESTUDIO
+ * (`v2_99`) en un paquete por dia, ligado a la MISMA cuenta/versiones del pin. NO
+ * sustituye la operacion real: solo ORDENA y PERSISTE la evidencia medida.
+ */
+function evidenceArgs(config) {
+  const args = [
+    '--account-id',
+    config.account,
+    '--strategy-version',
+    config.versionA,
+    '--strategy-version',
+    config.versionB,
+    '--engine-id',
+    'auto-sim',
+  ];
+  return args;
+}
+
+async function cmdEvidence(config, flags) {
+  const launcher = await resolveLauncher();
+  if (flags.dryRun) {
+    logInfo(
+      SCOPE,
+      `--dry-run · evidence: ${launcher.label} ${SCRIPT_EVIDENCE} ${evidenceArgs(config).join(' ')}`,
+    );
+    return 0;
+  }
+  const res = await runPython(SCRIPT_EVIDENCE, evidenceArgs(config), { env: childEnv(config) });
+  if (res.code !== 0) {
+    logError(SCOPE, `evidencia: v2_100 salio con codigo ${res.code} (material no leido)`);
+  } else {
+    logInfo(SCOPE, 'evidencia: bundle P1-P4 escrito en operability_runs/daily-evidence/<DIA>/');
+  }
+  return res.code ?? 1;
+}
+
+/**
  * `unlock` (escape hatch administrativo) reclama el lock del dia SOLO si esta
  * huerfano: aplica exactamente la misma logica de ownership que `run-day`
  * (`unlockDecision`). Nunca borra el lock de un proceso vivo: para un PID vivo
@@ -1041,6 +1087,8 @@ async function main() {
       return cmdRunDay(config, flags);
     case 'status':
       return cmdStatus();
+    case 'evidence':
+      return cmdEvidence(config, flags);
     case 'unlock':
       return cmdUnlock(flags);
     case 'task:install':

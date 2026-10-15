@@ -24,6 +24,11 @@ _SCRIPTS = {
     "v2_97": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_97_dia_d_thesis_exit.py",
     "v2_98": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_98_paper_window_certification.py",
     "v2_99": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_99_auto_estudio_chain_evidence.py",
+    "v2_100": _REPO_ROOT
+    / "apps"
+    / "api-python"
+    / "scripts"
+    / "v2_100_operational_certification_evidence.py",
 }
 _BUMP_RE = re.compile(r'"bump"\s*:\s*"([^"]+)"')
 
