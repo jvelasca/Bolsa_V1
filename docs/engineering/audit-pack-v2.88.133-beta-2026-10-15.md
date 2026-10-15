@@ -56,6 +56,7 @@ git clone --branch v2.88.133-beta --depth 1 https://github.com/jvelasca/Bolsa_V1
 | 6 | [`test_q2_hygiene.py`](../../apps/api-python/tests/test_q2_hygiene.py) | Higiene: emisión desde un logger **HIJO** (no el que monta el filtro) ⇒ cubre el fallo que `G6` cierra |
 | 7 | [`fundamental-card-panel.test.tsx`](../../apps/web/src/features/instruments/fundamental-card-panel.test.tsx) + [`use-ensure-instrument-fundamentals.test.ts`](../../apps/web/src/features/instruments/use-ensure-instrument-fundamentals.test.ts) | Guarda de forma `isFundamentalCardDto` + regresión del panel FA (un payload inválido ⇒ **ausencia**, nunca tarjeta a medio formar) |
 | 8 | [`test_auto_fill_cycle_seal_pg.py`](../../apps/api-python/tests/test_auto_fill_cycle_seal_pg.py) | Helper del sello de ciclo exige fill **COMPLETO** (`status == 'filled'`) |
+| 9 | [`respuesta-auditoria-v2.88.133-beta-2026-10-15.md`](./respuesta-auditoria-v2.88.133-beta-2026-10-15.md) | **Respuesta a la revisión externa**: verificación propia del sello (§4: 6/7 afirmaciones sostenidas + el **pin** re-anclado POST-TAG) y pendientes `P1`-`P4` con **criterio falsable** (§6) |
 
 ---
 
@@ -88,6 +89,8 @@ Cierra el `G6` a nivel de handler y blinda el panel FA, sin tocar motor de decis
 4. **No ejecutado en local (declarado).** `replay-repro` **no es ejecutable en Windows** (CRLF/entorno); `dr-verify` y `security` **no se pudieron correr** en local (**faltan binarios**). Se cubren en CI (§4).
 5. **Goldens win32.** El drift era **preexistente** (+20px de alto, contenido idéntico); el spec se **salta en CI**.
 6. **Habilitación real:** `AUTO_ORCHESTRATOR_ENABLED`/`AUTO_SIMULATION_WORKER_ENABLED` nacen **OFF** (SIM-only).
+
+> **Trazabilidad de la revisión externa (2026-10-15).** Los cuatro pendientes operativos (`P1` ventana PAPER, `P2` evidencia por valor de ESTUDIO, `P3` DÍA-D ligado al ciclo, `P4` barreras fail-closed) y la **verificación propia del sello** (6/7 afirmaciones sostenidas; el **pin** se re-ancló en el commit POST-TAG `fcfc57f0`) están en §4/§6 de [`respuesta-auditoria-v2.88.133-beta-2026-10-15.md`](./respuesta-auditoria-v2.88.133-beta-2026-10-15.md). Discrepancias documentales declaradas allí: `dias=42/4` vs `0/4`, `verdict` es `READY`/`INCONCLUSIVE` (no `CERTIFIED`) y el campo real es `PAPER_EVIDENCE_SNAPSHOT_ENABLED`.
 
 ---
 
