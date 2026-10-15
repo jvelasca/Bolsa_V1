@@ -2,7 +2,7 @@
 
 > **Bump:** `2.11.133-beta` → **`2.11.134-beta`** (`package.json` + `meta.bump` del CLI OOS `v2_87`, de los 9 CLIs `v2_89`…`v2_97`, del certificador `v2_98` y del CLI `v2_99` — **12 scripts** en [`apps/api-python/scripts`](../../../../apps/api-python/scripts/); guardián [`test_dia_d_bump_guard`](../../../../apps/api-python/tests/test_dia_d_bump_guard.py) **1 passed**).
 >
-> **Naturaleza:** incremento **solo documentación** — **no** toca motor, decisión, contrato HTTP ni esquema. Se añade el **documento de respuesta a la auditoría externa** y se **enlaza** desde el estado vivo y el audit-pack del sello anterior. · **`Δ motor de decisión = 0`** · **`Δ decisión = 0`** · **`Δ contrato HTTP = 0`** (no se amplía ningún endpoint) · **SIN migración** (head `053_dia_d_cycle_verifications`). Tag **unsigned**.
+> **Naturaleza:** incremento **de documentación + bump de versión** (`meta.bump` de 12 CLIs) — **no** toca motor, decisión, contrato HTTP ni esquema. Se añade el **documento de respuesta a la auditoría externa** y se **enlaza** desde el estado vivo y el audit-pack del sello anterior. · **`Δ motor de decisión = 0`** · **`Δ decisión = 0`** · **`Δ contrato HTTP = 0`** (no se amplía ningún endpoint) · **SIN migración** (head `053_dia_d_cycle_verifications`). Tag **unsigned**.
 >
 > **Base:** `v2.88.133-beta`.
 
@@ -56,7 +56,7 @@ Comprobación **estática** sobre el árbol del sello (`apps`/`packages` de `HEA
 - En `HEAD` el pin **coincide** con `git rev-parse HEAD:apps`/`HEAD:packages` ⇒ **freeze OK**.
 - **Consecuencia declarada:** un auditor que use el **árbol del tag literal** para este punto obtendrá **NO SOSTENIDA**; el pin es correcto a partir del commit inmediatamente posterior. No es defecto de motor ni de operación (`scripts/` **no** participa del freeze del motor).
 
-> **Nota sobre este sello (docs-only).** Como `v2.88.134-beta` **no** toca `apps/`/`packages/`, los tree hashes del pin **no cambian** (`apps 07fa362c…` / `packages d48ac37b…` siguen siendo los de `HEAD:apps`/`HEAD:packages`): el freeze sigue **OK sin re-anclaje**. El campo `commit` del pin es solo una etiqueta; el contraste real del freeze son los dos tree hashes.
+> **Nota sobre este sello.** Aunque **no** hay cambio de producto, el **`meta.bump` de los 12 CLIs vive en `apps/api-python/scripts/`**, que **sí** pertenece al árbol `apps`: al commitear el sello, `HEAD:apps` pasa de `07fa362c…` a **`86052343…`** (`packages` **no** cambia: `d48ac37b…`). Por eso el pin **sí** se mueve y se **re-ancla en el commit POST-TAG** a `commit:'7cef7fcc'`, `appsHash:'86052343…'`, `packagesHash:'d48ac37b…'` ([`window-forward.mjs`](../../../../scripts/lib/window-forward.mjs)); `scripts/` no participa del pin, así que re-anclar no mueve a su vez el árbol. El campo `commit` del pin es una etiqueta; el contraste real del freeze son los dos tree hashes.
 
 ---
 
@@ -122,4 +122,4 @@ guardián de bump .............................. 1 passed (2.11.134-beta)
 
 ## 10. `Release tag CI` del sello
 
-**Tag** `v2.88.134-beta` (**lightweight**, unsigned) ⇒ apunta **directamente** al commit del sello. El `Release tag CI` del tag corre en **push** (el workflow declara que un **stamp docs-only también certifica**; [`.github/workflows/release-tag-ci.yml:3`](../../../../.github/workflows/release-tag-ci.yml)). El run concreto y su veredicto se citan en el **audit-pack POST-TAG** ([`audit-pack-v2.88.134-beta-2026-10-15.md`](../../audit-pack-v2.88.134-beta-2026-10-15.md) §4). **Base:** `v2.88.133-beta`.
+**Tag** `v2.88.134-beta` (**lightweight**, unsigned) ⇒ apunta **directamente** al commit del sello **`7cef7fcce0befbae54bd2e6062e357f116c0c3f4`**. El `Release tag CI` del tag, [run **`38708375980`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38708375980), salió **VERDE** (~14m30s, `2026-10-15T08:49:03Z` → `09:03:33Z`; **todos los jobs `success`**, incluido `certify`, con `playwright (integrated E2E, opt-in)` = `skipped` por diseño; el gate duro `playwright (integrated axe)` **`success`**; `replay-repro` **REPRODUCIDO** ⇒ `Δ decisión = 0` confirmado por CI). El **re-anclaje del pin** (`WINDOW_CONFIG`) se aplica en el commit **POST-TAG** (`freeze OK`). **Base:** `v2.88.133-beta`.
