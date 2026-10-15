@@ -2,21 +2,21 @@
 
 > **Qué es:** la secuencia **manual y guiada** para operar la ventana PAPER de `AUTO` y cerrar los
 > pendientes operativos `P1`-`P4` de la auditoría `v2.88.134-beta`, con los instrumentos del sello
-> `v2.88.135-beta` (lane alineada al universo **ESTUDIO**, bundle de evidencia `v2_100` y helper de
+> `v2.88.136-beta` (lane alineada al universo **ESTUDIO**, bundle de evidencia `v2_100` y helper de
 > pin `window:pin`).
 >
 > **Qué NO es:** no es un pipeline de CI. **≥4 días de CALENDARIO operables** salen del **reloj de
 > pared** y de un **mercado que permita LONG**: no se fabrica ni se fuerza el régimen. Si el mercado
 > veta LONG, el día **no es medible** y se declara `NO_MEDIDO_REGIMEN` (no es un fallo).
 
-**Base:** [`docs/engineering/evidence/v2.88.135/README.md`](./evidence/v2.88.135/README.md) ·
+**Base:** [`docs/engineering/evidence/v2.88.136/README.md`](./evidence/v2.88.136/README.md) ·
 **Criterios falsables:** [`respuesta-auditoria-v2.88.133-beta-2026-10-15.md`](./respuesta-auditoria-v2.88.133-beta-2026-10-15.md) §6.
 
 ---
 
 ## 0. Preparación (una vez)
 
-- **PostgreSQL** arriba y migrado (head `053_dia_d_cycle_verifications`).
+- **PostgreSQL** arriba y migrado (head `054_dia_d_verified_and_alerts`).
 - **API** arriba: `GET /api/health/ready` → `status: ready` (el scheduler de barras vive en el API).
 - **Universe ESTUDIO sembrado** (~35 valores): si `resolve_daily_watch` devuelve `empty`/`unavailable`,
   el watch de la ventana queda vacío y el día **no se opera** (fail-closed). Siémbralo **antes** de empezar.
@@ -170,7 +170,7 @@ WHERE account_id = '1484e253d2d54645945a6b1d7'
 
 ```bash
 pnpm run window:freeze                                   # ¿freeze OK o TREE_MOVED?
-pnpm run window:pin -- --note "sello v2.88.135"          # re-ancla commit/appsHash/packagesHash
+pnpm run window:pin -- --note "sello v2.88.136"          # re-ancla commit/appsHash/packagesHash
 pnpm run window:freeze                                   # debe volver a freeze OK
 ```
 

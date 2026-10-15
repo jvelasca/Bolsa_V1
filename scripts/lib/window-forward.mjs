@@ -349,10 +349,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-15 — pin del arbol re-anclado a `c3bccf88`
+ * (`apps` `6df2725fef9cda9e3fbad43d7bd074b96fea1dbb` / `packages` `471af9f08ddf64c94b05725ce7601abe60518676`).
+ * Motivo: sello v2.88.136-beta: reanclaje POST-TAG (correccion de identidad DIA-D)
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '5624789c',
-  appsHash: 'c26315b0b69e3aa271218e4f2e071c729f1642b3',
-  packagesHash: 'fea248f25609a49cd173d7466b895830a99a7731',
+  commit: 'c3bccf88',
+  appsHash: '6df2725fef9cda9e3fbad43d7bd074b96fea1dbb',
+  packagesHash: '471af9f08ddf64c94b05725ce7601abe60518676',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
