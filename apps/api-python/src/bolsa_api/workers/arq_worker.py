@@ -12,6 +12,7 @@ from bolsa_api.api.dependencies import (
     get_process_optimization_run_use_case,
     get_process_scan_job_use_case,
 )
+from bolsa_api.logging_redact import install_log_redact
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.session import create_engine, create_session_factory
 from bolsa_infrastructure.queue.scan_job_arq import redis_settings_from_url
@@ -98,6 +99,9 @@ async def on_shutdown(ctx: dict[str, Any]) -> None:
 
 
 def run() -> None:
+    # F6/G6: arq no configura logging por sí mismo; este proceso emite por
+    # logging.getLogger(__name__), así que instala el filtro antes de arrancar.
+    install_log_redact()
     settings = get_settings()
     worker = Worker(
         functions=[process_scan_job, process_optimization_job],

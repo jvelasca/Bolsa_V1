@@ -51,6 +51,7 @@ from bolsa_api.background.paper_evidence_snapshot_worker import (
 )
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
+from bolsa_api.logging_redact import install_log_redact
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.migrations import database_bootstrap
 from bolsa_infrastructure.database.session import create_engine, create_session_factory
@@ -128,6 +129,10 @@ async def _run_scheduler(
 
 def run() -> None:
     logging.basicConfig(level=logging.INFO)
+    # F6/G6: este proceso emite por logging.getLogger(__name__); sin instalar el
+    # filtro aquí, sus logs saldrían sin redactar (el filtro de logger de main.py
+    # no cubre este proceso).
+    install_log_redact()
     settings = get_settings()
     engine: AsyncEngine = create_engine(settings)
     session_factory = create_session_factory(engine)

@@ -11,6 +11,7 @@ una cuenta sin cartera legacy abortaba el job completo.
 from __future__ import annotations
 
 import asyncio
+import logging
 import sys
 import warnings
 from collections.abc import Iterator
@@ -286,3 +287,43 @@ def _cleanup_residuals_around_session() -> Iterator[None]:
     _purge_residuals_once()
     yield
     _purge_residuals_once()
+
+
+# ── Wiring de logging para las suites de redacción de credenciales (G6) ────────────────
+#: Loggers que `install_log_redact()` muta (root + estos nombres).
+_REDACT_TOUCHED_LOGGERS = ("bolsa_api", "uvicorn", "uvicorn.error", "uvicorn.access")
+
+
+@pytest.fixture
+def logging_redact_state() -> Iterator[None]:
+    """Snapshot/restore del wiring de logging mutado por `install_log_redact()`.
+
+    `install_log_redact()` adjunta `RedactFilter` a root, `bolsa_api`, uvicorn, sus handlers
+    y `logging.lastResort`. Sin restaurar, el filtro sobrevive a la prueba y puede alterar
+    la salida capturada por otras suites (pytest-randomly varía el orden de ejecución).
+    """
+    loggers = [
+        logging.getLogger(),
+        *(logging.getLogger(name) for name in _REDACT_TOUCHED_LOGGERS),
+    ]
+    snapshots = [
+        (
+            log,
+            list(log.filters),
+            list(log.handlers),
+            log.propagate,
+            [(handler, list(handler.filters)) for handler in log.handlers],
+        )
+        for log in loggers
+    ]
+    last_resort_filters = list(logging.lastResort.filters)
+    try:
+        yield
+    finally:
+        for log, filters, handlers, propagate, handler_filters in snapshots:
+            log.filters[:] = filters
+            log.handlers[:] = handlers
+            log.propagate = propagate
+            for handler, filters_snapshot in handler_filters:
+                handler.filters[:] = filters_snapshot
+        logging.lastResort.filters[:] = last_resort_filters

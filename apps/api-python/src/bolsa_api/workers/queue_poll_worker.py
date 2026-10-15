@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from bolsa_api.background.optimization_worker import start_optimization_worker
 from bolsa_api.background.scan_worker import start_scan_worker
+from bolsa_api.logging_redact import install_log_redact
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.migrations import database_bootstrap
 from bolsa_infrastructure.database.session import create_engine, create_session_factory
@@ -75,6 +76,9 @@ async def _run_queue_poll(
 
 def run() -> None:
     logging.basicConfig(level=logging.INFO)
+    # F6/G6: proceso dedicado que emite por logging.getLogger(__name__); instala el
+    # filtro aquí (el install_log_redact de main.py no cubre este proceso).
+    install_log_redact()
     settings = get_settings()
 
     if settings.scan_queue_backend.lower() == "arq":

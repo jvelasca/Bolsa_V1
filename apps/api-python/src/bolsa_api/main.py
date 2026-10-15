@@ -41,6 +41,9 @@ from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Reafirma la redacción: cubre handlers creados entre el import del módulo
+    # (create_app → install_log_redact) y el arranque real (uvicorn/lifespan). Idempotente.
+    install_log_redact()
     settings = get_settings()
     engine = create_engine(settings)
     app.state.engine = engine
