@@ -363,3 +363,12 @@ guardián **2 passed**).
 (`schtasks /query /tn "BolsaV1_WindowForward"` → no existe; se corre `run-day` a mano). El primer día
 medible exige LONG permitida y la **API levantada desde el árbol pineado** (ya lo está: `ready` en
 `e51cdf48`); a partir del primer día medido, `apps/` queda **congelado**.
+
+**Resultado POST-TAG (cierre del sello).** Tag **`v2.88.139-beta`** anotado (objeto `f374f771`) →
+commit re-anclado **`0739daae`**; sello de contenido **`fddd7a85`**. **`Release tag CI`
+[run `38933157663`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38933157663) — VERDE**
+(`2026-10-16T16:35:32Z` → `16:49:27Z`, ~**13m55s**; **13 jobs `success` + `certify` `success`**;
+`playwright (integrated E2E, opt-in)` `skipped`): `shared` con el gate **`freeze OK (0739daae)`** y
+`replay-repro` **REPRODUCIDO** (`sha256 1E3ADAC2…929A37E7`, 3 340 728 bytes, **idéntico** a
+`.136`/`.137`/`.138` ⇒ **`Δ decisión = 0` medido**). Evidencia:
+[`evidence/v2.88.139/README.md`](./evidence/v2.88.139/README.md) §4.1.

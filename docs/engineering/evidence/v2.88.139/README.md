@@ -91,9 +91,31 @@ raíz §1.2, y el de caos `test_c3a` por un **servidor dev vivo** cuyo worker co
 El gate `window:freeze` del job `shared` de
 [`release-tag-ci.yml`](../../../../.github/workflows/release-tag-ci.yml) es **fail-closed**: compara
 los dos *tree hashes* del pin con `HEAD`. Por eso `window:pin` re-ancla el pin al árbol del sello y el
-tag `v2.88.139-beta` (**anotado, unsigned**) se crea sobre el commit **cuyo pin casa con su árbol**
-(el commit del re-anclaje), **no** sobre el commit del sello. Como la ventana sigue con **0 días
-`MEDIDO`**, re-anclar **no** invalida nada.
+tag `v2.88.139-beta` (**anotado, unsigned**, objeto `f374f771`) se crea sobre el commit **cuyo pin
+casa con su árbol** — el commit del re-anclaje **`0739daae`** (sello de **contenido** `fddd7a85`),
+**no** sobre el commit del sello. Como la ventana seguía con **0 días `MEDIDO`**, re-anclar **no**
+invalidó nada.
 
-> Los hashes exactos del sello (contenido) y del re-anclaje se citan en el **POST-TAG**, junto al run
-> de `Release tag CI` (el owner lo revisa en GitHub).
+### 4.1 Cita POST-TAG — CI del sello
+
+**`Release tag CI` [run `38933157663`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38933157663)
+— VERDE** (`2026-10-16T16:35:32Z` → `16:49:27Z`, ~**13m55s**; **13 jobs `success` + `certify`
+`success`**; `playwright (integrated E2E, opt-in)` `skipped`, declarado):
+
+| Job | Resultado |
+| --- | --- |
+| `shared (build/typecheck/test)` | **`success`** — gate `window:freeze` **`freeze OK (0739daae)`** |
+| `replay-repro (regenera el artefacto del sello desde el fixture)` | **`success`** — **REPRODUCIDO** `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (3 340 728 bytes), **idéntico** a `.136`/`.137`/`.138` ⇒ **`Δ decisión = 0` medido** |
+| `python (ruff/imports/mypy/pytest offline)` | **`success`** — incluye el guardián de bump (`2.11.139-beta`, **13** scripts) |
+| `lifecycle-pg`, `a7-gate`, `dr-verify`, `decision-spine`, `frontend`, `playwright (mock E2E)`, `playwright (integrated AUTO S5)`, `playwright (integrated axe)`, `security (gitleaks)` | **`success`** |
+| `certify (aggregate + artifact)` | **`success`** |
+
+`Python CI` [run `38933157648`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38933157648) ·
+`Frontend CI` [run `38933157675`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38933157675) ·
+`Fase 2 scientific` [run `38933157627`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38933157627) ·
+`Optimize lab` [run `38933157634`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38933157634) —
+**VERDES** sobre el tag.
+
+**Nota de intermitencia (declarada, no nueva).** `S5-04` (`playwright integrated AUTO S5`) mantiene la
+intermitencia de arranque en frío ya **ABIERTA** en `.137`/`.138`; en este run el job salió **verde**
+en el reintento, **sin** tocar `timeouts`/`retries`/`ADR-046`.
