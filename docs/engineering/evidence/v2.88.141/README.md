@@ -67,7 +67,7 @@ cambio de comportamiento: es orden de imports.
 | `pnpm types:py` (mypy) | **`Success: no issues found in 557 source files`** |
 | `pytest test_dia_d_bump_guard.py test_window_day_watch.py test_scheduler_worker.py` | **24 passed** (guardián `2.11.141-beta` **2 passed**) |
 | `pnpm window:test` | **28 passed / 0 failed** |
-| `pnpm window:freeze` | **OK** (mismo par de *tree hashes*: `apps d38dc7ae` / `packages e96a12b8`) |
+| `pnpm window:freeze` | **OK** tras el re-anclaje — `apps` `e151cd43` (**movido**: el árbol pinado de `apps/` **incluye `apps/api-python/tests`**, no sólo `src`) / `packages` `e96a12b8` (**idéntico** al `.140`) |
 | `pnpm window:status` | `medidos=0 · veto=3 · duros=0` ⇒ gate **`NO_MEDIDO`** |
 | Sonda del vigía contra el ledger real (read-only) | `2026-10-16 20:01` ⇒ `VETO/info` (no alerta); día ausente ⇒ `MISSED/alert`; sábado ⇒ `NON_MARKET_DAY` |
 
@@ -101,11 +101,13 @@ cambio de comportamiento: es orden de imports.
 ## 4. Publicación del sello
 
 El gate `window:freeze` del job `shared` es **fail-closed** (compara los dos *tree hashes* del pin con
-`HEAD`). El sello `.141` **no toca `apps/` ni `packages/`** (sólo `tests/`, `package.json`, `scripts/` y
-`docs/`), de modo que el par de hashes es **idéntico** al del `.140`; igualmente se **re-ancla** el pin al
-árbol del sello por disciplina y el tag `v2.88.141-beta` (**anotado, unsigned**) se crea sobre el commit
-del **re-anclaje**. Como la ventana sigue con **0 días `MEDIDO`**, re-anclar **no** invalida ningún día
-medido.
+`HEAD`). **Medido — y corrige una suposición previa de este mismo documento:** el sello `.141` **sí
+mueve** `appsHash` (`d38dc7ae…` → **`e151cd43…`**) porque el árbol pinado de `apps/` **incluye
+`apps/api-python/tests`** (no sólo `src`): **tocar un test mueve el pin**. `packagesHash` queda
+**idéntico** (`e96a12b8…`). Por eso `window:pin` **re-ancla** el pin al árbol del sello y el tag
+`v2.88.141-beta` (**anotado, unsigned**) se crea sobre el commit del **re-anclaje**, **no** sobre el del
+sello de contenido (mismo patrón que `.139` y `.140`). Como la ventana sigue con **0 días `MEDIDO`**,
+re-anclar **no** invalida ningún día medido.
 
 ### 4.1 Cita POST-TAG — CI del sello
 
