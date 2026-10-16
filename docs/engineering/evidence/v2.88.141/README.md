@@ -79,6 +79,13 @@ cambio de comportamiento: es orden de imports.
 | [38939275569](https://github.com/jvelasca/Bolsa_V1/actions/runs/38939275569) | Python CI | `v2.88.140-beta` | **failure** (1m11s) |
 | [38939270481](https://github.com/jvelasca/Bolsa_V1/actions/runs/38939270481) | Python CI | `main` | **failure** (1m1s) |
 
+**Nota de transparencia (afirmación no medida, corregida).** Durante el sellado quedó un commit
+**intermedio local** `93600ce4` (un re-anclaje previo del pin; **no** es el commit del tag) cuyo
+**mensaje** cita el `appsHash` **anterior** (`d38dc7ae` — leído de la *working tree* **antes** de
+commitear el sello): la lectura de la *working tree* **no** refleja el árbol pinado, que es el del
+**commit**; el valor **medido** de ese re-anclaje fue **`e151cd43`**. El commit del tag es `818b8370`
+(pin re-anclado al árbol del sello) y tanto el pin como esta evidencia llevan los valores **medidos**.
+
 ---
 
 ## 3. Límites declarados (sin fabricar)
