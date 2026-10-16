@@ -159,8 +159,12 @@ atribución se declara `false`. La etapa `EXPLANATION` de `@bolsa/shared` gana e
 `estrategia (clave)` para poder afirmarlo (o declarar el hueco, nunca fingir la identidad).
 
 **Sesión LAB:** vive en `localStorage` (`bolsa-dia-d-trading-session-v1`) y se declara **local, no
-durable**. La evidencia durable es la verificación enlazada al ciclo. Una sesión de **otra**
-estrategia no explica esta operación (`active = false`).
+durable**. La evidencia durable es la verificación enlazada al ciclo. La sesión sólo se da por
+**vinculada a esta operación** con identidad **completa y exacta** en los **tres** espacios de
+claves — instrumento (UUID), cuenta (UUID) y estrategia (`presetKey`); un hueco en cualquiera de
+ellos, o una diferencia, deja la sesión **no vinculada** (`active = false`). Nunca se sustituye una
+identidad por otra (no se usa el `definitionId` como clave) ni se atribuye una sesión de otro
+instrumento, de otra cuenta o de otra estrategia.
 
 ## 7. Invariantes falsables (y dónde viven)
 
@@ -172,6 +176,8 @@ estrategia no explica esta operación (`active = false`).
 | `UNKNOWN ≠ 0` (contadores ausentes ⇒ `null`; `0` medido viaja `0`) | ídem |
 | Fallo de lectura ⇒ «No disponible»; `loading` ⇒ hueco **transitorio** | ídem + [`auto-operation-strategy-card.test.tsx`](../../apps/web/src/features/auto-monitor/auto-operation-strategy-card.test.tsx) |
 | Tri-estado de verificación (`linked` / `not-verified` / `unknown`) | ídem + [`dia-d-cycle-verification-status.ts`](../../apps/web/src/features/auto-monitor/dia-d-cycle-verification-status.ts) |
+| Fallo de lectura de verificaciones ⇒ «No disponible» (`unknown`), nunca «Sin verificación» | ídem |
+| Sesión LAB sólo vinculada con instrumento + cuenta + clave EXACTA (fail-closed ante cualquier hueco) | ídem |
 | La clave EXACTA del ciclo llega a la fila `EXPLANATION` y la nota declara el alcance | [`auto-operation-story.test.ts`](../../packages/shared/src/cognitive/auto-operation-story.test.ts) + [`auto-operation-story-panel.test.tsx`](../../apps/web/src/features/auto-monitor/auto-operation-story-panel.test.tsx) |
 
 ## 8. Pruebas automatizadas (comandos y jobs)

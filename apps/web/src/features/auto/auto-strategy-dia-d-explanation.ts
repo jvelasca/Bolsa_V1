@@ -74,6 +74,10 @@ export const AUTO_STRATEGY_EXPLANATION_LAB_LOCAL_NOTE =
 export const AUTO_STRATEGY_EXPLANATION_LAB_INACTIVE_LABEL =
   "Sin sesión LAB abierta para esta operación" as const;
 
+/** Con sesión LAB abierta pero identidad NO verificable: no se atribuye a esta operación. */
+export const AUTO_STRATEGY_EXPLANATION_LAB_UNLINKED_LABEL =
+  "Sesión LAB abierta de otra operación (no vinculada)" as const;
+
 /** Fila del ciclo dentro del artefacto (el único eje con identidad de estrategia). */
 export type AutoStrategyExplanationCycleEvidenceV1 = {
   cycleId: string;
@@ -176,6 +180,11 @@ export type AutoStrategyDiaDExplanationInput = {
   } | null;
   /** Artefacto DÍA-D de la ventana (`null` = no leído). */
   artifact: DiaDFeedbackDto | null;
+  /**
+   * Cuenta DUEÑA de la operación (la Activa). La sesión LAB sólo se da por vinculada si su
+   * cuenta coincide: una sesión persistida de otra cuenta no explica esta operación.
+   */
+  accountId?: string | null;
   /** Capa de reconciliación (sandbox por día) si está disponible; si no, se declara hueco. */
   reconciliation?: DiaDEvidenceAggregateInput["reconciliation"];
   /** Verificaciones durables del principal (read-only). */
@@ -183,6 +192,7 @@ export type AutoStrategyDiaDExplanationInput = {
   /** Sesión LAB local vigente para este instrumento, si la hay (no durable). */
   labSession?: {
     instrumentId?: string | null;
+    accountId?: string | null;
     strategyPresetKey?: string | null;
     diaD?: string | null;
     endDate?: string | null;
@@ -228,28 +238,35 @@ function resolveVerification(
   cycleId: string | null,
   verificationsError: boolean,
 ): AutoStrategyExplanationVerificationV1 {
-  const state = resolveDiaDCycleVerificationState({
-    cycleId,
-    verified: Boolean(
-      cycleId && (verifications ?? []).some((row) => row.cycleId === cycleId),
-    ),
-  });
+  const hasCycleId = cycleId != null;
+  const linked = Boolean(
+    hasCycleId && (verifications ?? []).some((row) => row.cycleId === cycleId),
+  );
+  // Un FALLO de lectura (con un ciclo que enlazar y sin fila) NO demuestra ausencia: se declara
+  // «No disponible» (`unknown`), NUNCA «Sin verificación». Sin ciclo, el hueco es real.
+  const readFailed = verificationsError && hasCycleId && !linked;
+  const state: DiaDCycleVerificationState = readFailed
+    ? "unknown"
+    : resolveDiaDCycleVerificationState({ cycleId, verified: linked });
   const row =
     cycleId != null
       ? ((verifications ?? []).find((item) => item.cycleId === cycleId) ?? null)
       : null;
   let gapReason: string | null = null;
-  if (state === "not-verified") {
-    gapReason = verificationsError
-      ? `${ABSENT_DATA_NOT_AVAILABLE}: no se pudieron leer las verificaciones DÍA-D del ciclo.`
-      : "Sin dato todavía: la verificación D→hoy de esta operación todavía no se ha guardado.";
+  if (readFailed) {
+    gapReason = `${ABSENT_DATA_NOT_AVAILABLE}: no se pudieron leer las verificaciones DÍA-D del ciclo.`;
+  } else if (state === "not-verified") {
+    gapReason =
+      "Sin dato todavía: la verificación D→hoy de esta operación todavía no se ha guardado.";
   } else if (state === "unknown") {
     gapReason =
       "Sin dato todavía: el ciclo no declara su identificador, así que no hay nada que enlazar.";
   }
   return {
     state,
-    stateLabel: DIA_D_CYCLE_VERIFICATION_LABELS[state],
+    stateLabel: readFailed
+      ? ABSENT_DATA_NOT_AVAILABLE
+      : DIA_D_CYCLE_VERIFICATION_LABELS[state],
     createdAt: str(row?.createdAt),
     strategyPresetKey: str(row?.strategyPresetKey),
     strategyVersion: str(row?.strategyVersion),
@@ -261,15 +278,7 @@ function resolveLab(
   input: AutoStrategyDiaDExplanationInput,
 ): AutoStrategyExplanationLabV1 {
   const session = input.labSession ?? null;
-  // Fail-closed: la sesión sólo aplica si es la MISMA estrategia que se está explicando.
-  const expected =
-    input.cycle?.strategyPresetKey?.trim() ||
-    input.strategy.executedStrategyDefinitionId?.trim() ||
-    null;
-  const sessionKey = session?.strategyPresetKey?.trim() || null;
-  const active =
-    Boolean(session) && (expected === null || sessionKey === expected);
-  if (!active) {
+  if (!session) {
     return {
       active: false,
       label: AUTO_STRATEGY_EXPLANATION_LAB_INACTIVE_LABEL,
@@ -279,14 +288,41 @@ function resolveLab(
       note: AUTO_STRATEGY_EXPLANATION_LAB_LOCAL_NOTE,
     };
   }
+  // Fail-closed: la sesión sólo se atribuye a esta operación con identidad COMPLETA y EXACTA.
+  // Son TRES espacios de claves distintos (UUID de instrumento, UUID de cuenta y clave
+  // `presetKey`): NO se sustituye una por otra (jamás se usa el `definitionId` como clave) y un
+  // hueco NUNCA se rellena. Si algo no se puede comprobar, la sesión se declara NO vinculada.
+  const expectedInstrumentId = str(input.strategy.instrumentId);
+  const expectedAccountId = str(input.accountId);
+  const expectedKey = str(input.cycle?.strategyPresetKey);
+  const sessionInstrumentId = str(session.instrumentId);
+  const sessionAccountId = str(session.accountId);
+  const sessionKey = str(session.strategyPresetKey);
+  const active =
+    expectedInstrumentId !== null &&
+    expectedAccountId !== null &&
+    expectedKey !== null &&
+    sessionInstrumentId === expectedInstrumentId &&
+    sessionAccountId === expectedAccountId &&
+    sessionKey === expectedKey;
+  if (!active) {
+    return {
+      active: false,
+      label: AUTO_STRATEGY_EXPLANATION_LAB_UNLINKED_LABEL,
+      diaD: null,
+      endDate: null,
+      mode: null,
+      note: AUTO_STRATEGY_EXPLANATION_LAB_LOCAL_NOTE,
+    };
+  }
   return {
     active: true,
-    label: str(session?.diaD)
-      ? `DÍA D ${session?.diaD} → ${str(session?.endDate) ?? absentDataLabel()}`
+    label: str(session.diaD)
+      ? `DÍA D ${session.diaD} → ${str(session.endDate) ?? absentDataLabel()}`
       : AUTO_STRATEGY_EXPLANATION_LAB_INACTIVE_LABEL,
-    diaD: str(session?.diaD),
-    endDate: str(session?.endDate),
-    mode: str(session?.mode),
+    diaD: str(session.diaD),
+    endDate: str(session.endDate),
+    mode: str(session.mode),
     note: AUTO_STRATEGY_EXPLANATION_LAB_LOCAL_NOTE,
   };
 }

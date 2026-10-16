@@ -228,7 +228,7 @@ export function AutoOperationStoryPanel({
   /** Sustituye la escritura de `?cycle=` (p. ej. navegar a la ruta canónica). */
   onSelectCycle?: (cycleId: string) => void;
 } = {}) {
-  const { view, isLoading, isError } = useAutoOperationalMonitor();
+  const { view, isLoading, isError, accountId } = useAutoOperationalMonitor();
   const feedbackList = useAutoDiaDFeedbackList();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -350,9 +350,12 @@ export function AutoOperationStoryPanel({
         : null,
       artifact: feedbackList.data?.artifact ?? null,
       verifications: verifications.data?.data ?? null,
+      // Identidad de la OPERACIÓN (cuenta Activa): la sesión LAB sólo se atribuye si casa con ella.
+      accountId,
       labSession: labSession
         ? {
             instrumentId: labSession.instrumentId,
+            accountId: labSession.accountId ?? null,
             strategyPresetKey: labSession.strategyPresetKey ?? null,
             diaD: labSession.diaD,
             endDate: labSession.endDate,
@@ -373,6 +376,7 @@ export function AutoOperationStoryPanel({
     verifications.isError,
     verifications.isLoading,
     labSession,
+    accountId,
   ]);
 
   const story = useMemo(

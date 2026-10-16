@@ -653,6 +653,67 @@ describe("AutoOperationStoryPanel", () => {
     expect(verification.textContent).toContain("2026-09-30T16:00:00Z");
   });
 
+  it("una sesión LAB de OTRA cuenta no se atribuye a esta operación (fail-closed)", async () => {
+    useDiaDTradingSessionStore.getState().enterSession({
+      instrumentId: "uuid-aaa",
+      symbol: "AAA",
+      strategyDefinitionId: "def-1",
+      strategyLabel: "SMA cross",
+      rank: 1,
+      diaD: "2026-09-29",
+      endDate: "2026-09-30",
+      accountId: "acc-OTRA",
+      strategyPresetKey: "sma_crossover",
+      strategyVersion: "sv-1",
+      cycleId: "cyc-1",
+    });
+
+    renderPanel();
+    await screen.findByTestId("auto-strategy-dia-d");
+    await waitFor(() =>
+      expect(
+        screen
+          .getByTestId("auto-strategy-dia-d-lab")
+          .getAttribute("data-lab-active"),
+      ).toBe("false"),
+    );
+    expect(screen.getByTestId("auto-strategy-dia-d-lab").textContent).toContain(
+      "no vinculada",
+    );
+    expect(screen.getByTestId("auto-strategy-dia-d-lab").textContent).toContain(
+      "no es evidencia durable",
+    );
+  });
+
+  it("una sesión LAB de la MISMA operación (cuenta + instrumento + clave) sí se atribuye", async () => {
+    useDiaDTradingSessionStore.getState().enterSession({
+      instrumentId: "uuid-aaa",
+      symbol: "AAA",
+      strategyDefinitionId: "def-1",
+      strategyLabel: "SMA cross",
+      rank: 1,
+      diaD: "2026-09-29",
+      endDate: "2026-09-30",
+      accountId: "acc-1",
+      strategyPresetKey: "sma_crossover",
+      strategyVersion: "sv-1",
+      cycleId: "cyc-1",
+    });
+
+    renderPanel();
+    await screen.findByTestId("auto-strategy-dia-d");
+    await waitFor(() =>
+      expect(
+        screen
+          .getByTestId("auto-strategy-dia-d-lab")
+          .getAttribute("data-lab-active"),
+      ).toBe("true"),
+    );
+    expect(screen.getByTestId("auto-strategy-dia-d-lab").textContent).toContain(
+      "2026-09-29",
+    );
+  });
+
   it("enlaza la EXPLICACIÓN al heatmap DÍA-D canónico (workspace AUTO) con símbolo y ventana", async () => {
     renderPanel();
     await waitFor(() =>

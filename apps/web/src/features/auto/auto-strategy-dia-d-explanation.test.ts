@@ -112,6 +112,7 @@ function input(
       strategyPresetKey: "sma_crossover",
       strategyVersion: "v-9",
     },
+    accountId: "acc-1",
     artifact: artifact(),
     ...overrides,
   };
@@ -364,17 +365,19 @@ describe("buildAutoStrategyDiaDExplanation · verificación durable (tri-estado)
     const view = buildAutoStrategyDiaDExplanation(
       input({ verifications: [], verificationsError: true }),
     );
+    expect(view.verification.state).toBe("unknown");
+    expect(view.verification.stateLabel).toBe(ABSENT_DATA_NOT_AVAILABLE);
     expect(view.verification.gapReason).toContain(ABSENT_DATA_NOT_AVAILABLE);
-    expect(view.verification.stateLabel).toBe("Sin verificación");
   });
 });
 
 describe("buildAutoStrategyDiaDExplanation · sesión LAB (local, no durable)", () => {
-  it("declara la sesión LOCAL y su límite cuando la clave casa", () => {
+  it("declara la sesión LOCAL y su límite sólo con identidad COMPLETA y EXACTA", () => {
     const view = buildAutoStrategyDiaDExplanation(
       input({
         labSession: {
           instrumentId: "inst-1",
+          accountId: "acc-1",
           strategyPresetKey: "sma_crossover",
           diaD: "2026-09-29",
           endDate: "2026-10-01",
@@ -391,19 +394,82 @@ describe("buildAutoStrategyDiaDExplanation · sesión LAB (local, no durable)", 
     const view = buildAutoStrategyDiaDExplanation(
       input({
         labSession: {
+          instrumentId: "inst-1",
+          accountId: "acc-1",
           strategyPresetKey: "otra_estrategia",
           diaD: "2026-09-29",
         },
       }),
     );
     expect(view.lab.active).toBe(false);
-    expect(view.lab.label).toContain("Sin sesión LAB");
+    expect(view.lab.label).toContain("no vinculada");
+  });
+
+  it("el MISMO preset en OTRO instrumento no explica esta operación", () => {
+    const view = buildAutoStrategyDiaDExplanation(
+      input({
+        labSession: {
+          instrumentId: "inst-OTRO",
+          accountId: "acc-1",
+          strategyPresetKey: "sma_crossover",
+          diaD: "2026-09-29",
+        },
+      }),
+    );
+    expect(view.lab.active).toBe(false);
+    expect(view.lab.label).toContain("no vinculada");
+  });
+
+  it("la misma estrategia e instrumento en OTRA cuenta no explica esta operación", () => {
+    const view = buildAutoStrategyDiaDExplanation(
+      input({
+        labSession: {
+          instrumentId: "inst-1",
+          accountId: "acc-OTRA",
+          strategyPresetKey: "sma_crossover",
+          diaD: "2026-09-29",
+        },
+      }),
+    );
+    expect(view.lab.active).toBe(false);
+    expect(view.lab.label).toContain("no vinculada");
+  });
+
+  it("sin identidad esperada (ciclo sin clave) NO se atribuye ninguna sesión", () => {
+    const view = buildAutoStrategyDiaDExplanation(
+      input({
+        cycle: { cycleId: "cyc-1" },
+        labSession: {
+          instrumentId: "inst-1",
+          accountId: "acc-1",
+          strategyPresetKey: "sma_crossover",
+          diaD: "2026-09-29",
+        },
+      }),
+    );
+    expect(view.lab.active).toBe(false);
+    expect(view.lab.label).toContain("no vinculada");
+  });
+
+  it("una sesión sin cuenta NO se atribuye (fail-closed), aunque el resto casa", () => {
+    const view = buildAutoStrategyDiaDExplanation(
+      input({
+        labSession: {
+          instrumentId: "inst-1",
+          strategyPresetKey: "sma_crossover",
+          diaD: "2026-09-29",
+        },
+      }),
+    );
+    expect(view.lab.active).toBe(false);
+    expect(view.lab.label).toContain("no vinculada");
   });
 
   it("sin sesión, el hueco se declara", () => {
     const view = buildAutoStrategyDiaDExplanation(input());
     expect(view.lab.active).toBe(false);
     expect(view.lab.diaD).toBeNull();
+    expect(view.lab.label).toContain("Sin sesión LAB");
   });
 });
 
