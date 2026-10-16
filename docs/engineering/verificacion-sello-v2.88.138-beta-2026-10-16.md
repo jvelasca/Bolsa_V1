@@ -334,3 +334,35 @@ la causa (`claimed='0'` ⇒ "otro consumidor del outbox se adelantó; la suite e
 
 El fix de auth toca `apps/` ⇒ el árbol congelado se mueve y `window:freeze` abortaría con
 `TREE_MOVED`. Como la ventana sigue con **0 días `MEDIDO`**, re-anclar no invalida nada (ver §7.2).
+
+## 8. Decisión de sellado (2026-10-16): **NO elevar todavía**
+
+Los fixes anteriores viven en `main` (POST-TAG del sello auditado): `60d02446`→`1318707e` (causa raíz
+del bloqueador + instrumentos de operación, ya en `origin`) y `6f04f5b2`/`e51cdf48` (fix de auth
+hermético + re-anclaje del pin). **No se abre un sello nuevo todavía** y el tag `v2.88.138-beta`
+(`f79484d1`) **no se mueve**.
+
+**Razón (falsable).** El único gate que falta es la **ventana PAPER** (≥4 días de calendario con LONG
+permitida), que va `0/4 · 0/2 · 0/32` ⇒ `INCONCLUSIVE` (días `14/15/16` = `NO_MEDIDO_REGIMEN` por
+veto `BEAR_TREND`). Un sello nuevo daría el **mismo veredicto** que `.138`: no hay **delta funcional**
+que certificar (los nuestros son `test-only` + `ops` + `docs`), y ya tenemos garantías de delta cero
+(`Δ motor = 0`, sin migración — head `055`, `Δ contrato = 0`). Además, `apps/` debe quedar
+**congelado** mientras la ventana mida (el `appsHash` cubre hasta los tests), así que un bump en
+plena ventana obligaría a otro re-anclaje: se ancla **una vez**, al cerrar.
+
+**Cuándo elevar.** Al alcanzar `4/2/32`, **o antes** si aparece un delta funcional que lo justifique.
+
+**Alcance acordado del sello de cierre (`bump13`).** Verificado hoy; **14 literales en 13 ficheros**:
+
+1. `package.json` → `"version"` al nuevo semver (`2.11.139-beta` si es el siguiente).
+2. `meta.bump` en `v2_87` (L1191), `v2_89`, `v2_90`, `v2_91`, `v2_92`, `v2_93`, `v2_94`, `v2_95`,
+   `v2_96`, `v2_97`, `v2_98`, `v2_99` y `v2_100` (**dos** literales: L307 y L339).
+3. **NO tocar** el `"bump": "2.11.0-beta"` de `v2_87` (L1326): es el replay CONGELADO; bumpearlo
+   rompe el job `replay-repro` (tripwire: `test_v2_87_frozen_replay_bump_stays_pinned`).
+4. `apps/` se mueve ⇒ **re-anclaje** del pin + `pnpm run window:freeze` **OK**.
+5. Tag anotado + `Release tag CI` + extensión de este dictamen al nuevo tag.
+
+**Mientras tanto (para no perder días medibles).** La cadencia diaria **NO está instalada**
+(`schtasks /query /tn "BolsaV1_WindowForward"` → no existe; se corrió `run-day` a mano). El primer día
+medible exige LONG permitida y la **API levantada desde el árbol pineado** (ya lo está: `ready` en
+`e51cdf48`); a partir del primer día medido, `apps/` queda congelado.
