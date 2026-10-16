@@ -373,9 +373,17 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-16 — pin del arbol re-anclado a `7ac1d999`
+ * (`apps` `d706f132375acd54ae4839bb1ade979568a07dfd` / `packages` `1909964634b0f7eec3b56ac76c4848cf107e33dd`).
+ * Motivo: sello v2.88.137 - fix del fixture del sello BY_FILL: el seed del test exige llenado TOTAL (el parcial deja la reserva viva en OPEN); re-anclaje del arbol del fix para portar el tag
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'c6c2d677',
-  appsHash: '958e0b5350cfd5d7294e1eb9c74e35a8c6f5b715',
+  commit: '7ac1d999',
+  appsHash: 'd706f132375acd54ae4839bb1ade979568a07dfd',
   packagesHash: '1909964634b0f7eec3b56ac76c4848cf107e33dd',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
