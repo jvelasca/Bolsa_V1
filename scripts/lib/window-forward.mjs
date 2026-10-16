@@ -357,10 +357,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-16 — pin del arbol re-anclado a `fc0808aa`
+ * (`apps` `934dc7625895a988e3642726a3e3d1e9422a623d` / `packages` `c1fde00965eb337201768cbc10f83dbca97999bb`).
+ * Motivo: remediacion AUDITORIA2: SSRF por DNS rebinding (conexion fijada a la IP validada) + huecos DIA-D instrument_id/symbol nullable (migracion 055) — commit fc0808aa; el ledger PAPER sigue en 0 dias MEDIDO (re-anclar no deja ningun dia STALE)
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'c3bccf88',
-  appsHash: '6df2725fef9cda9e3fbad43d7bd074b96fea1dbb',
-  packagesHash: '471af9f08ddf64c94b05725ce7601abe60518676',
+  commit: 'fc0808aa',
+  appsHash: '934dc7625895a988e3642726a3e3d1e9422a623d',
+  packagesHash: 'c1fde00965eb337201768cbc10f83dbca97999bb',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
