@@ -278,3 +278,59 @@ correrse DESPUÉS de este re-anclaje.
 **Pendiente del OPERADOR para el primer día operable** (no afecta a los días vetados): reiniciar la
 API **desde el árbol pineado** (el readiness es *schema-aware*; una API vieja contra la BD migrada
 responde `503` y `run-day` abortaría con `API_NOT_READY`, que **no** es veto).
+
+### 7.3 Los 3 fallos de la suite: causa raíz y cierre (2026-10-16)
+
+Los `3 failed` de la suite completa se han abordado por separado. Ninguno era del blindaje de la
+ventana; los dos de auth eran un **bug real de aislamiento** (no del sello) y el de caos era
+**ambiental**.
+
+#### 7.3.1 `test_auth.py` — dos flaky con `401` (causa raíz encontrada y arreglada)
+
+**Síntoma.** `test_login_sets_session_cookie_and_omits_token` y `test_jwt_login_with_bootstrap_user`
+(`login` con `APP_PASSWORD=s3cret`) devolvían `401` bajo la suite completa pero `200` aislados.
+
+**Causa raíz (reproducida, no inferida).** El seed de infra
+[`ensure_bootstrap_user`](../packages/py/infrastructure/src/bolsa_infrastructure/database/user_bootstrap.py)
+es **one-shot** (`if count_users() > 0: return`) y la tabla `users` **persiste entre corridas**. La
+secuencia —`test_login_without_user_row_returns_401` (borra **todos** los usuarios) seguido de un
+test posterior que arranca la app con **otro** `APP_PASSWORD` (los goldens de lifecycle:
+`lifecycle-golden-*`)— deja al usuario `app` sembrado con un password **ajeno**. La siguiente corrida
+fallaba en el login porque `ensure_bootstrap_user` ya **no** re-siembra (la tabla no está vacía).
+Evidencia: el hash de `app` en la BD **cambió** entre corridas (`$2b$12$aVVsS…` → `$2b$12$f1Uhy…`) y
+el prefijo completo hasta `test_auth.py` **pasó** (`149 passed`) una vez la BD quedó con el hash
+correcto.
+
+**Prueba controlada (falsable).** Se fijó el hash de `app` a un password ajeno
+(`UPDATE users SET password_hash = hash_password('foreign-lifecycle-password') WHERE id='app'`) y se
+corrió el test **aislado**: **falla** con `401`. Confirma que el resultado dependía del estado
+persistido, no del test.
+
+**Remedio (test-only, fail-safe).** En [`test_auth.py`](../apps/api-python/tests/test_auth.py) se
+añade el helper `_ensure_bootstrap_user_with_password` + el fixture `hermetic_bootstrap_user`
+(**upsert** del hash: crea `app` si falta; si existe con hash ajeno o `disabled_at`, lo repara) y se
+pide en los **4** tests que exigen un login **exitoso** (`s3cret`). No se toca la semántica de
+producción (`ensure_bootstrap_user` sigue siendo one-shot: **nunca** rota el password real).
+
+**Verificación.** Con el hash **aún envenenado**, `pytest apps/api-python/tests/test_auth.py` ⇒
+**`23 passed`** (antes `1 failed`/`2 failed`).
+
+#### 7.3.2 Caos `test_c3a_…` — `claim 0` por worker competidor (ambiental)
+
+**Causa raíz (reproducida).** `claim_unknown_batch` es una barrida **GLOBAL** de `status='UNKNOWN'`
+(sin filtro de cuenta, correcto en producción). Con el **servidor dev vivo** (terminal 3: `uvicorn` +
+`bolsa_api.workers.*`), su worker **consume** la fila que el test siembra antes de que el proceso
+*crasher* la reclame ⇒ `claimed='0'`. La suite exige **acceso EXCLUSIVO a la BD**, cosa que el
+`conftest` del paquete no puede garantizar (solo purga residuos, no frena consumidores externos).
+
+**Prueba controlada (falsable).** Con el servidor dev **parado**, el test **aislado** ⇒ **`1 passed`
+(2.8 s)**; con el servidor vivo fallaba **incluso aislado**.
+
+**Remedio.** Se para el **stack dev completo** (`run-dev.mjs` + `uvicorn` + workers `scheduler`/
+`queue_poll`) antes de correr la suite/ventana, y se mejora el mensaje de la aserción para declarar
+la causa (`claimed='0'` ⇒ "otro consumidor del outbox se adelantó; la suite exige exclusividad").
+
+#### 7.3.3 Re-anclaje del pin (tras el fix de auth)
+
+El fix de auth toca `apps/` ⇒ el árbol congelado se mueve y `window:freeze` abortaría con
+`TREE_MOVED`. Como la ventana sigue con **0 días `MEDIDO`**, re-anclar no invalida nada (ver §7.2).

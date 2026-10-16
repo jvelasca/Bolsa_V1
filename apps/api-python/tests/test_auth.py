@@ -3,6 +3,7 @@ import time
 
 import jwt as pyjwt
 import pytest
+import pytest_asyncio
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
@@ -12,9 +13,54 @@ from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_api.auth.roles import require_role
 from bolsa_api.auth.session import SESSION_COOKIE_NAME, cookie_secure
 from bolsa_api.main import create_app, lifespan
+from bolsa_infrastructure.auth.passwords import hash_password, verify_password
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.models import UserRow
 from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
+from bolsa_infrastructure.database.session import create_engine, create_session_factory
+
+#: Password que usan TODOS los tests auth-ON de este fichero (``monkeypatch`` ``APP_PASSWORD``).
+_AUTH_TEST_PASSWORD = "s3cret"
+
+
+async def _ensure_bootstrap_user_with_password(password: str = _AUTH_TEST_PASSWORD) -> None:
+    """Garantiza el usuario bootstrap ``app`` con un password CONOCIDO (upsert del hash).
+
+    CAUSA RAÍZ (2026-10-16, reproducida con el hash envenenado): el seed de infra
+    ``ensure_bootstrap_user`` es ONE-SHOT (``count_users() > 0 → return``) y la tabla ``users``
+    PERSISTE entre corridas de pytest. La secuencia —un test que borra TODOS los usuarios
+    (``test_login_without_user_row_returns_401``, aquí abajo) y otro posterior que arranca la
+    app con OTRO ``APP_PASSWORD`` (los goldens de lifecycle: ``lifecycle-golden-*``)— deja el
+    usuario ``app`` sembrado con un password AJENO. La siguiente corrida fallaba en el login
+    con ``401`` (no por el test, sino por el estado de la BD). Este helper lo REPARA antes de
+    cada test de login, de modo que el resultado no depende del historial de la BD.
+    """
+    get_settings.cache_clear()
+    engine = create_engine(get_settings())
+    try:
+        factory = create_session_factory(engine)
+        async with factory() as session:
+            row = await session.get(UserRow, "app")
+            if row is None:
+                await SqlAlchemyUserRepository(session).create_bootstrap_user(
+                    user_id="app",
+                    login="app",
+                    password_hash=hash_password(password),
+                    role="admin",
+                )
+                return
+            if row.disabled_at is not None or not verify_password(password, row.password_hash):
+                row.password_hash = hash_password(password)
+                row.disabled_at = None
+                await session.commit()
+    finally:
+        await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def hermetic_bootstrap_user() -> None:
+    """Hermetiza el login de los tests auth-ON (ver ``_ensure_bootstrap_user_with_password``)."""
+    await _ensure_bootstrap_user_with_password()
 
 
 async def _jwt_for_app_user(app) -> str:
@@ -24,9 +70,7 @@ async def _jwt_for_app_user(app) -> str:
         repo = SqlAlchemyUserRepository(session)
         user = await repo.get_by_id("app")
         assert user is not None
-        return encode_access_token(
-            settings, sub=user.id, sv=user.session_version, role=user.role
-        )
+        return encode_access_token(settings, sub=user.id, sv=user.session_version, role=user.role)
 
 
 @pytest.mark.asyncio
@@ -55,7 +99,9 @@ async def test_login_when_auth_disabled() -> None:
 
 
 @pytest.mark.asyncio
-async def test_login_sets_session_cookie_and_omits_token(monkeypatch) -> None:
+async def test_login_sets_session_cookie_and_omits_token(
+    hermetic_bootstrap_user, monkeypatch
+) -> None:
     monkeypatch.setenv("APP_PASSWORD", "s3cret")
     monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
     get_settings.cache_clear()
@@ -262,7 +308,9 @@ def test_cookie_secure_only_in_production() -> None:
 
 
 @pytest.mark.asyncio
-async def test_jwt_login_with_bootstrap_user(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_jwt_login_with_bootstrap_user(
+    hermetic_bootstrap_user, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("APP_PASSWORD", "s3cret")
     monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
     monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
@@ -411,7 +459,9 @@ def test_get_request_principal_reads_request_state() -> None:
 
 
 @pytest.mark.asyncio
-async def test_refresh_reissues_jwt_with_new_exp(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_refresh_reissues_jwt_with_new_exp(
+    hermetic_bootstrap_user, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("APP_PASSWORD", "s3cret")
     monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
     monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
@@ -444,6 +494,7 @@ async def test_refresh_reissues_jwt_with_new_exp(monkeypatch: pytest.MonkeyPatch
 
 @pytest.mark.asyncio
 async def test_logout_bumps_session_version_and_invalidates_jwt(
+    hermetic_bootstrap_user,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("APP_PASSWORD", "s3cret")

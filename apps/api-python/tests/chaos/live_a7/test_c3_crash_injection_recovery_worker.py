@@ -305,7 +305,11 @@ async def test_c3a_crash_after_recovery_claim_then_second_is_exact_once(
         text_a = wait_sentinel_text(sentinel_a, timeout=40.0)
         assert "claimed=" in text_a, f"crasher no reclamó nada: {text_a!r}"
         claimed = text_a.split("claimed=", 1)[1]
-        assert order_id in claimed, f"crasher reclamó otras filas: {claimed!r}"
+        assert order_id in claimed, (
+            f"el crasher no reclamó la fila sembrada (claimed={claimed!r}). Si claimed='0', "
+            "otro consumidor del outbox (un servidor dev/worker vivo) se adelantó: esta suite "
+            "exige acceso EXCLUSIVO a la BD — para el servidor dev antes de correrla."
+        )
 
         # Mientras el proceso A vive nada quedó durable: la orden sigue UNKNOWN.
         mid = await fetch_order(factory, order_id)
