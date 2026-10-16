@@ -397,9 +397,21 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-16 — pin del arbol re-anclado a `b03f09e6`
+ * (`apps` `5e33b63701b7b69b2f1ad28671fbbb24aad40151` / `packages` `6d006d6c50dc3cddda8731add272db0ee8833e0e`).
+ * Motivo: cierre de la CAUSA RAIZ del bloqueador de entorno de la ventana PAPER — la purga de
+ * residuos de los tests (`apps/api-python/tests/conftest.py`, fixture autouse de sesion) borraba
+ * toda cuenta con `id <> 'default-account-seed'`, incluida la cuenta operativa de la ventana; como
+ * ADR-046 exige que sobreviva >=4 dias de CALENDARIO, cualquier `pytest` local devolvia la ventana
+ * a 0/4. Se protege la cuenta con el id de la FUENTE UNICA + tripwire. Toca `apps/` (conftest +
+ * test nuevo) y `scripts/` (ops); `packages/` NO cambia.
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`, que NO participa del
+ * freeze. La ventana sigue con 0 dias MEDIDO => re-anclar NO invalida ningun dia medido.
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '723048e4',
-  appsHash: '0b2df883c20130e13468839d9d1af30897b7f2f7',
+  commit: 'b03f09e6',
+  appsHash: '5e33b63701b7b69b2f1ad28671fbbb24aad40151',
   packagesHash: '6d006d6c50dc3cddda8731add272db0ee8833e0e',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',

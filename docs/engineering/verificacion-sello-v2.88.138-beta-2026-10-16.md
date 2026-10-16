@@ -259,7 +259,21 @@ dos tests inertes (`pytest apps/api-python/tests/test_dia_d_bump_guard.py`, `2 p
 **Verificación end-to-end.** Con la ventana sembrada se corrieron los tests sensibles al conteo de
 cuentas (`test_account_isolation`, `integration/test_accounts`, `test_workspaces`, `test_workspaces_isolation`,
 `test_schemas_accounts`, `test_account_summary_dto_realized_pnl`): **`75 passed`** y la cuenta
-**sobrevivió** a la sesión (`investment_accounts` = 2 filas).
+**sobrevivió** a la sesión (`investment_accounts` = 2 filas). Después, la **suite completa**
+(`apps/api-python/tests`, 1191 recogidos): **`1188 passed`**, `3 failed`, y la cuenta **volvió a
+sobrevivir**. Los 3 fallos son **preexistentes / ambientales**, no del cambio: los dos de
+`test_auth.py` (401 en `login`) **pasan aislados** (flaky de orden), y el de caos
+`test_c3a_crash_after_recovery_claim_then_second_is_exact_once` **también falla aislado** porque hay
+un **servidor dev en marcha** (terminal 3: `uvicorn` + `alert_delivery_worker`) cuyo worker compite
+por las filas del outbox que el test siembra (`claim 0`); ese mismo worker aplicó la cuota de
+custodia `custody-2026` a la cuenta de la ventana (idéntica a la de la demo), lo que confirma que es
+actividad de dominio, no contaminación de tests.
+
+**Re-anclaje del pin (obligatorio).** El blindaje toca `apps/` (conftest + tripwire) ⇒ el árbol
+congelado se mueve y `window:freeze` habría abortado con `TREE_MOVED`. Como la ventana sigue con
+**0 días `MEDIDO`**, re-anclar NO invalida nada: `WINDOW_CONFIG` pasa al commit `b03f09e6`
+(`apps` `5e33b637…` / `packages` `6d006d6c…`, sin cambio). Los días que CERTIFICAN la ventana deben
+correrse DESPUÉS de este re-anclaje.
 
 **Pendiente del OPERADOR para el primer día operable** (no afecta a los días vetados): reiniciar la
 API **desde el árbol pineado** (el readiness es *schema-aware*; una API vieja contra la BD migrada
