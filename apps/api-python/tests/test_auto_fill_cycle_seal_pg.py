@@ -108,11 +108,21 @@ def _filling_seed(
     *,
     side: str = "buy",
     quantity: Decimal = _QTY,
+    require_full: bool = False,
 ) -> int:
     """Seed determinista cuya orden LLEGA A LLENAR (barrido puro, sin BD ni proceso).
 
     El ruido del venue depende SOLO de ``(seed, side, instrument_id)``: buscar aquí el seed
     es la MISMA aritmética que corre ``submit_simulated_order``, no una copia de la fórmula.
+
+    ``require_full=True`` exige llenado **TOTAL** (``status == "filled"``). Es lo que necesita
+    una aserción de ``status == "RELEASED_BY_FILL"``: con un fill **PARCIAL**
+    ``ReservationLedger.release`` escala las dimensiones y deja la reserva **VIVA** (el
+    ``status`` sigue ``OPEN`` y la cola sigue siendo capital comprometido) — así que asertar
+    la liberación total sobre un fill parcial prueba otro escenario, exactamente el mismo
+    motivo por el que ``_filling_symbol_for_tick`` exige que el símbolo llene completo.
+    El ``instrument_id`` es ALEATORIO por corrida, de modo que sin esta exigencia el test es
+    un volado (≈12% de los prefijos ``inst-sealpos-`` dan un fill parcial ⇒ rojo intermitente).
     """
     from bolsa_application.simulated_broker import simulated_fill_schedule
 
@@ -126,10 +136,14 @@ def _filling_seed(
             fill_chunks=_FILL_CHUNKS,
             base_mid=float(_ENTRY),
         )
-        if result.fills:
-            return seed
+        if not result.fills:
+            continue
+        if require_full and result.status != "filled":
+            continue
+        return seed
     raise AssertionError(
-        f"ningún seed <500 llena {instrument_id!r} ({side}); revisar draw_queue_noise"
+        f"ningún seed <500 llena {'COMPLETO ' if require_full else ''}{instrument_id!r} "
+        f"({side}); revisar draw_queue_noise"
     )
 
 
@@ -358,7 +372,9 @@ async def test_by_fill_release_is_driven_by_the_persisted_cycle_context(
     instrument_id = f"inst-sealpos-{uuid.uuid4().hex[:10]}"
     cycle_id = f"cyc-{uuid.uuid4().hex[:16]}"
     reservation_id = f"RES-sealpos-{uuid.uuid4().hex[:10]}"
-    seed = _filling_seed(instrument_id)
+    # Llenado TOTAL: solo entonces la liberación cierra la reserva (``RELEASED_BY_FILL``);
+    # con un fill parcial la fila queda viva en ``OPEN`` por diseño (cola comprometida).
+    seed = _filling_seed(instrument_id, require_full=True)
     execution_ids: tuple[str, ...] = ()
     try:
         async with seal_pg_factory() as session:
@@ -383,8 +399,15 @@ async def test_by_fill_release_is_driven_by_the_persisted_cycle_context(
                 cycle_id=cycle_id,
             )
             assert result.fills, "la fixture debe producir al menos un fill"
+            # El discriminador del assert final es el llenado TOTAL: un parcial libera su lote
+            # y CONSERVA la reserva viva (``OPEN``), que es comportamiento declarado.
+            assert result.status == "filled", (
+                f"la liberación BY_FILL cierra la reserva solo con llenado TOTAL "
+                f"(real={result.status!r}); usar un seed de llenado completo"
+            )
             execution_ids = tuple(f.execution_id for f in result.fills)
             filled_total = sum((abs(f.qty_delta) for f in result.fills), Decimal("0"))
+            assert filled_total == _QTY, "un llenado total cubre la cantidad pedida entera"
             await PostgresReservationStore(session).save(
                 _reservation(
                     reservation_id,
