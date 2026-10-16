@@ -422,6 +422,7 @@ describe("buildAutoOperationStory", () => {
           cycleId: "cyc-1",
           instrument: "AAA",
           strategyVersion: "strat-3",
+          strategyPresetKey: null,
           direction: "long",
           entryDay: "2026-09-29",
           timeframe: null,
@@ -442,6 +443,12 @@ describe("buildAutoOperationStory", () => {
       measurement: "COMPLETE",
     });
     expect(byLabel.get("estrategia")?.value).toBe("strat-3");
+    // Sin clave exacta declarada, la atribución por estrategia se declara NO MEDIDA.
+    expect(byLabel.get("estrategia (clave)")).toEqual({
+      label: "estrategia (clave)",
+      value: null,
+      measurement: "UNKNOWN",
+    });
     expect(byLabel.get("día entrada")?.value).toBe("2026-09-29");
     // Ejes que el artefacto DÍA-D no materializa ⇒ NO MEDIDO (null + UNKNOWN), nunca inventados.
     expect(byLabel.get("timeframe")).toEqual({
@@ -464,6 +471,7 @@ describe("buildAutoOperationStory", () => {
           cycleId: "cyc-1",
           instrument: "AAA",
           strategyVersion: "strat-3",
+          strategyPresetKey: "sma_crossover",
           direction: "long",
           entryDay: "2026-09-29",
           timeframe: null,
@@ -482,7 +490,50 @@ describe("buildAutoOperationStory", () => {
       value: "por ciclo (cycleId)",
       measurement: "COMPLETE",
     });
+    // Con la clave EXACTA, la evidencia se ata a la estrategia del ciclo (medida, no hueco).
+    expect(byLabel.get("estrategia (clave)")).toEqual({
+      label: "estrategia (clave)",
+      value: "sma_crossover",
+      measurement: "COMPLETE",
+    });
     expect(explanation?.note).toContain("resuelta por cycleId");
+    expect(explanation?.note).toContain("presetKey");
+  });
+
+  it("declara la identidad exacta como NO MEDIDA cuando el artefacto no trae la clave", () => {
+    const story = buildAutoOperationStory({
+      cycle: cycle(),
+      explanation: {
+        verdict: "OOS_SUPPORTED",
+        evidenceQuality: "PRELIMINARY",
+        resolution: "cycleId",
+        identity: {
+          cycleId: "cyc-1",
+          instrument: "AAA",
+          strategyVersion: "strat-3",
+          strategyPresetKey: "   ",
+          direction: "long",
+          entryDay: "2026-09-29",
+          timeframe: null,
+          regime: null,
+        },
+      },
+    });
+    const explanation = story.stages.find(
+      (stage) => stage.id === "EXPLANATION",
+    );
+    const byLabel = new Map(
+      (explanation?.facts ?? []).map((fact) => [fact.label, fact]),
+    );
+    // Una clave en blanco es un hueco declarado: NUNCA se imprime "   " como identidad.
+    expect(byLabel.get("estrategia (clave)")).toEqual({
+      label: "estrategia (clave)",
+      value: null,
+      measurement: "UNKNOWN",
+    });
+    // Y la nota declara que la evidencia es del instrumento, no de una estrategia.
+    expect(explanation?.note).toContain("SIN clave de estrategia");
+    expect(explanation?.note).toContain("no atribuible a una estrategia");
   });
 
   it("declara la resolución por instrumento como PARCIAL (fallback honesto)", () => {
@@ -496,6 +547,7 @@ describe("buildAutoOperationStory", () => {
           cycleId: "cyc-1",
           instrument: "AAA",
           strategyVersion: "strat-3",
+          strategyPresetKey: null,
           direction: "long",
           entryDay: "2026-09-29",
           timeframe: null,

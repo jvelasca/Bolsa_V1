@@ -123,11 +123,22 @@ export type AutoOperationStoryStage = {
  * `instrument`, así que `cycleId` y los demás ejes se copian del ciclo y los que el artefacto no
  * expone (`timeframe`, `regime`) se declaran `null` (⇒ `NO MEDIDO`). La clave primaria objetivo es
  * `cycleId` + ejes de desambiguación (spec §6); migrar el contrato es deuda declarada.
+ *
+ * `strategyPresetKey` es la clave EXACTA con la que se puede afirmar que la estrategia de la
+ * explicación es la MISMA que declara el ciclo (mismo espacio de claves que el TOP de
+ * Finalistas). Sin ella, la evidencia DÍA-D es del VALOR y no de la estrategia: se declara.
  */
 export type AutoOperationStoryExplanationIdentity = {
   cycleId: string | null;
   instrument: string | null;
+  /** Sello OPACO del motor (`ActiveStrategy.version_id`). */
   strategyVersion: string | null;
+  /**
+   * Clave EXACTA declarada por el ciclo (`strategyPresetKey`, el mismo espacio de claves que el
+   * TOP de Finalistas). Es la identidad con la que se puede afirmar coincidencia; `null` = el
+   * artefacto no la declara y el hueco se declara `NO MEDIDO` (nunca se finge una identidad).
+   */
+  strategyPresetKey: string | null;
   direction: string | null;
   entryDay: string | null;
   timeframe: string | null;
@@ -406,10 +417,15 @@ function buildExplanationIdentityFacts(
   identity: AutoOperationStoryExplanationIdentity | null | undefined,
 ): AutoOperationStoryFact[] {
   if (!identity) return [];
+  // Una clave en blanco NO es una identidad: se normaliza a hueco (nunca se imprime `"   "`).
+  const exactKey = identity.strategyPresetKey?.trim() || null;
   return [
     measuredFact("cycleId", identity.cycleId),
     measuredFact("instrumento", identity.instrument),
     measuredFact("estrategia", identity.strategyVersion),
+    // Identidad EXACTA (clave `presetKey`): el único término con el que se puede afirmar que la
+    // estrategia de la explicación es la misma que declara el ciclo. Sin ella, hueco declarado.
+    measuredFact("estrategia (clave)", exactKey),
     measuredFact("dirección", identity.direction),
     measuredFact("día entrada", identity.entryDay),
     measuredFact("timeframe", identity.timeframe),
@@ -434,11 +450,16 @@ function explanationResolutionLabel(
 function explanationResolutionNote(
   explanation: AutoOperationStoryExplanationInput,
 ): string | null {
+  // Identidad EXACTA: sólo con la clave `presetKey` se puede afirmar a QUÉ estrategia responde
+  // la evidencia. Sin ella, la atribución por estrategia queda declarada como hueco.
+  const exactKey = explanation.identity?.strategyPresetKey?.trim() || null;
   if (explanation.resolution === "cycleId") {
-    return "resuelta por cycleId (DÍA-D); el veredicto OOS es del instrumento en la ventana";
+    return exactKey
+      ? "resuelta por cycleId (DÍA-D) y ligada a la estrategia EXACTA del ciclo (presetKey); el veredicto OOS es del instrumento en la ventana"
+      : "resuelta por cycleId (DÍA-D) pero SIN clave de estrategia del ciclo: la evidencia es del instrumento, no atribuible a una estrategia";
   }
   if (explanation.resolution === "instrument") {
-    return "resuelta por instrumento (DÍA-D) — sin clave de ciclo en el artefacto; resolución PARCIAL";
+    return "resuelta por instrumento (DÍA-D) — sin clave de ciclo en el artefacto; resolución PARCIAL; el veredicto es del VALOR, no de la estrategia";
   }
   return explanation.identity
     ? "resuelta por instrumento (DÍA-D); ejes no materiales por ciclo = NO MEDIDO"

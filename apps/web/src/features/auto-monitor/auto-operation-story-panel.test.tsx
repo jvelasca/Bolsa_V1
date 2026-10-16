@@ -180,6 +180,16 @@ vi.mock("@/lib/api", () => ({
         },
       },
     })),
+    // P2 — registro DURAble que enlaza la verificación D→hoy con el ciclo.
+    listDiaDCycleVerifications: vi.fn(
+      async (): Promise<
+        import("@bolsa/shared").DiaDCycleVerificationListV1Dto
+      > => ({
+        data: [],
+        total: 0,
+        notes: [],
+      }),
+    ),
   },
 }));
 
@@ -541,6 +551,106 @@ describe("AutoOperationStoryPanel", () => {
     // El índice `cycles[]` ata el ciclo a su valor: resolución EXACTA por cycleId (no por símbolo).
     expect(explanation.textContent).toContain("resolución");
     expect(explanation.textContent).toContain("por ciclo (cycleId)");
+  });
+
+  it("la clave EXACTA del ciclo llega a la fila EXPLANATION (no solo el sello opaco)", async () => {
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen
+          .getByTestId("auto-operation-story-explanation")
+          .getAttribute("data-state"),
+      ).toBe("REACHED"),
+    );
+
+    // `strategyPresetKey` viaja en la identidad: es el único término con el que se puede afirmar
+    // que la estrategia de la explicación es la MISMA que declara el ciclo.
+    const explanation = screen.getByTestId("auto-operation-story-explanation");
+    expect(explanation.textContent).toContain("estrategia (clave)");
+    expect(explanation.textContent).toContain("sma_crossover");
+  });
+
+  it("el bloque P4 declara la evidencia del VALOR, la verificación y las cuatro capas", async () => {
+    renderPanel();
+    // La atribución se resuelve de forma asíncrona (ticker → UUID → TOP): se espera a que la
+    // clave EXACTA del ciclo empareje con el TOP antes de asertar sobre el bloque.
+    await waitFor(() =>
+      expect(
+        screen
+          .getByTestId("auto-strategy-dia-d")
+          .getAttribute("data-strategy-declared"),
+      ).toBe("true"),
+    );
+    const block = screen.getByTestId("auto-strategy-dia-d");
+    // El bloque declara el alcance del valor con su propia nota de atribución.
+    expect(
+      screen.getByTestId("auto-strategy-dia-d-attribution").textContent,
+    ).toContain("NO es atribuible a una estrategia");
+    // La evidencia agregada es del VALOR: nunca se presenta como de la estrategia.
+    expect(
+      screen.getByTestId("auto-strategy-dia-d-scope").textContent,
+    ).toContain("Del valor (no de la estrategia)");
+    expect(
+      screen.getByTestId("auto-strategy-dia-d-strategy").textContent,
+    ).toContain("sma_crossover");
+    // El bloque se identifica como el de la explicación P3→P4 (no confunde tarjeta con bloque).
+    expect(block.getAttribute("data-verified")).toBe("not-verified");
+    // Cuatro capas, sin promoción: PAPER es hueco por contrato.
+    const layers = screen.getAllByTestId("auto-strategy-dia-d-layer");
+    expect(layers.map((layer) => layer.getAttribute("data-layer"))).toEqual([
+      "window",
+      "reconciliation",
+      "oos",
+      "paper",
+    ]);
+    expect(
+      layers
+        .find((layer) => layer.getAttribute("data-layer") === "paper")
+        ?.getAttribute("data-state"),
+    ).toBe("gap");
+    // La muestra del valor y sus suelos declarados se pintan (o su hueco, nunca un 0).
+    expect(
+      screen.getByTestId("auto-strategy-dia-d-counts").textContent,
+    ).toContain("ciclos");
+    // La sesión LAB se declara LOCAL (no durable) y sin sesión abierta.
+    const lab = screen.getByTestId("auto-strategy-dia-d-lab");
+    expect(lab.getAttribute("data-lab-active")).toBe("false");
+    expect(lab.textContent).toContain("no es evidencia durable");
+  });
+
+  it("rotula «Verificación vinculada» cuando existe el registro durable del ciclo (P2)", async () => {
+    vi.mocked(api.listDiaDCycleVerifications).mockResolvedValueOnce({
+      data: [
+        {
+          id: "ver-1",
+          cycleId: "cyc-1",
+          accountId: "acc-1",
+          instrumentId: "uuid-aaa",
+          symbol: "AAA",
+          diaD: "2026-09-29",
+          endDate: "2026-09-30",
+          mode: "auto",
+          createdAt: "2026-09-30T16:00:00Z",
+          strategyPresetKey: "sma_crossover",
+          strategyVersion: "sv-1",
+          strategyDefinitionId: null,
+          band: null,
+          result: null,
+          researchEvidenceId: null,
+        },
+      ],
+      total: 1,
+      notes: [],
+    });
+
+    renderPanel();
+    const block = await screen.findByTestId("auto-strategy-dia-d");
+    await waitFor(() =>
+      expect(block.getAttribute("data-verified")).toBe("linked"),
+    );
+    const verification = screen.getByTestId("auto-strategy-dia-d-verification");
+    expect(verification.textContent).toContain("Verificación vinculada");
+    expect(verification.textContent).toContain("2026-09-30T16:00:00Z");
   });
 
   it("enlaza la EXPLICACIÓN al heatmap DÍA-D canónico (workspace AUTO) con símbolo y ventana", async () => {

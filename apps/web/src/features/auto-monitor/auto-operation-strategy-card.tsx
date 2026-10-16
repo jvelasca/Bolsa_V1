@@ -22,6 +22,8 @@ import {
   AUTO_OPERATION_STRATEGY_VERIFY_EXECUTED_LABEL,
   type AutoOperationStrategyViewV1,
 } from "@/features/auto/auto-operation-strategy";
+import { AutoStrategyDiaDEvidence } from "@/features/auto-monitor/auto-strategy-dia-d-evidence";
+import type { AutoStrategyDiaDExplanationV1 } from "@/features/auto/auto-strategy-dia-d-explanation";
 import { VERIFY_DIA_D_CTA } from "@/features/platform/product-universe";
 
 /** Máximo de razones pintadas (la lista completa puede ser larga; se acota por legibilidad). */
@@ -29,11 +31,18 @@ const MAX_REASON_ROWS = 5;
 
 export function AutoOperationStrategyCard({
   view,
+  explanation = null,
   onVerify,
   disabled = false,
   loading = false,
 }: {
   view: AutoOperationStrategyViewV1;
+  /**
+   * P4 — explicación DÍA-D de la estrategia seleccionada (evidencia del valor + verificación
+   * durable + sesión LAB). `null` = sin explicación que pintar (no se declara ausencia: el
+   * llamante decide; el hueco se declara dentro de la vista).
+   */
+  explanation?: AutoStrategyDiaDExplanationV1 | null;
   onVerify: () => void;
   disabled?: boolean;
   loading?: boolean;
@@ -221,6 +230,9 @@ export function AutoOperationStrategyCard({
         >
           {VERIFY_DIA_D_CTA}
         </Button>
+        {explanation ? (
+          <AutoStrategyDiaDEvidence view={explanation} loading={loading} />
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -15,6 +15,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AutoOperationStrategyCard } from "@/features/auto-monitor/auto-operation-strategy-card";
+import { buildAutoStrategyDiaDExplanation } from "@/features/auto/auto-strategy-dia-d-explanation";
 import {
   AUTO_OPERATION_STRATEGY_BEST_AVAILABLE_LABEL,
   AUTO_OPERATION_STRATEGY_DECLARED_LABEL,
@@ -60,6 +61,7 @@ function renderCard(
   render(
     <AutoOperationStrategyCard
       view={props.view ?? view()}
+      explanation={props.explanation ?? null}
       onVerify={onVerify}
       disabled={props.disabled}
       loading={props.loading}
@@ -71,6 +73,87 @@ function renderCard(
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+});
+
+describe("AutoOperationStrategyCard · explicación P3→P4", () => {
+  const explanation = () =>
+    buildAutoStrategyDiaDExplanation({
+      strategy: view(),
+      cycle: {
+        cycleId: "cyc-1",
+        strategyPresetKey: "sma_crossover",
+        strategyVersion: "sv-1",
+      },
+      artifact: {
+        available: true,
+        matrixBasis: "entryDay",
+        readOnly: true,
+        serving: "PRECOMPUTED_ARTIFACT",
+        gate: { verdict: "READY", days: 4, episodes: 2, cycles: 32 },
+        summary: {
+          measuredValues: 1,
+          mixed: 0,
+          notMeasured: 0,
+          oosSupported: 1,
+          refuted: 0,
+          values: 1,
+        },
+        values: [
+          {
+            symbol: "AAA",
+            verdict: "OOS_SUPPORTED",
+            evidenceQuality: "PRELIMINARY",
+            expectancyR: 0.5,
+            hitRate: 0.67,
+            measuredCycles: 6,
+            daysCovered: 4,
+            windowDays: 6,
+            errorTotal: 0,
+            limits: {
+              minCycles: 5,
+              minHitRate: 0.5,
+              supportedMinCycles: 20,
+              strongMinCycles: 32,
+            },
+          },
+        ],
+        cycles: [{ cycleId: "cyc-1", symbol: "AAA", realizedR: 1.2 }],
+      },
+    });
+
+  it("sin explicación no pinta el bloque (no declara un falso hueco)", () => {
+    renderCard();
+    expect(screen.queryByTestId("auto-strategy-dia-d")).toBeNull();
+  });
+
+  it("con explicación pinta el alcance del VALOR y conserva los testids de la tarjeta", () => {
+    renderCard({ explanation: explanation() });
+
+    expect(screen.getByTestId("auto-operation-strategy")).toBeTruthy();
+    expect(screen.getByTestId("auto-operation-strategy-chain")).toBeTruthy();
+    const block = screen.getByTestId("auto-strategy-dia-d");
+    expect(block.getAttribute("data-strategy-declared")).toBe("true");
+    expect(
+      screen.getByTestId("auto-strategy-dia-d-scope").textContent,
+    ).toContain("no de la estrategia");
+    // Los suelos de muestra se declaran, no se relajan.
+    expect(
+      screen.getByTestId("auto-strategy-dia-d-floors").textContent,
+    ).toContain("32");
+  });
+
+  it("en carga declara el hueco como TRANSITORIO (no como ausencia)", () => {
+    const empty = buildAutoStrategyDiaDExplanation({
+      strategy: view({ instrumentId: null }),
+      cycle: null,
+      artifact: null,
+      loading: true,
+    });
+    renderCard({ explanation: empty });
+
+    expect(screen.getByTestId("auto-strategy-dia-d-loading")).toBeTruthy();
+    expect(screen.queryByTestId("auto-strategy-dia-d-gap")).toBeNull();
+  });
 });
 
 describe("AutoOperationStrategyCard", () => {

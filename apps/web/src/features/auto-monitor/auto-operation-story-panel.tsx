@@ -38,7 +38,10 @@ import {
   type AutoOperationStoryStage,
 } from "@bolsa/shared";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
-import { useAutoDiaDFeedbackList } from "@/features/auto-monitor/use-auto-dia-d-feedback";
+import {
+  useAutoDiaDFeedbackList,
+  useDiaDCycleVerifications,
+} from "@/features/auto-monitor/use-auto-dia-d-feedback";
 import { AutoOperationStrategyCard } from "@/features/auto-monitor/auto-operation-strategy-card";
 import { buildOperationIdentity } from "@/features/auto/auto-operation-identity";
 import {
@@ -50,8 +53,10 @@ import {
   autoTechnicalDetailHref,
 } from "@/features/auto/auto-nav";
 import { useAutoOperationStrategy } from "@/features/auto/use-auto-operation-strategy";
+import { buildAutoStrategyDiaDExplanation } from "@/features/auto/auto-strategy-dia-d-explanation";
 import { AUTO_OPERATION_STRATEGY_NO_DATA } from "@/features/auto/auto-operation-strategy";
 import { useDiaDVerifyLaunch } from "@/features/trading/use-dia-d-verify-launch";
+import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
 
 type DiaDFeedbackValueDto = components["schemas"]["DiaDFeedbackValueDto"];
 type DiaDFeedbackCycleDto = components["schemas"]["DiaDFeedbackCycleDto"];
@@ -71,6 +76,7 @@ export function resolveExplanationForCycle(input: {
     cycleId: string;
     instrumentId: string | null;
     strategyVersion?: string | null;
+    strategyPresetKey?: string | null;
     direction?: string | null;
     entryDay: string | null;
   } | null;
@@ -92,6 +98,10 @@ export function resolveExplanationForCycle(input: {
     cycleId: cycle.cycleId,
     instrument: symbol,
     strategyVersion: cycleRef?.strategyVersion ?? cycle.strategyVersion ?? null,
+    // Clave EXACTA declarada por el ciclo (misma que el TOP de Finalistas): sin ella la
+    // evidencia es del VALOR y no se puede atar a una estrategia (se declara el hueco).
+    strategyPresetKey:
+      cycleRef?.strategyPresetKey ?? cycle.strategyPresetKey ?? null,
     direction: cycle.direction ?? null,
     entryDay: cycleRef?.entryDay ?? cycle.entryDay ?? null,
     timeframe: null,
@@ -266,6 +276,7 @@ export function AutoOperationStoryPanel({
         cycleId: selected.cycleId,
         instrumentId: selected.instrumentId ?? null,
         strategyVersion: selected.strategyVersion ?? null,
+        strategyPresetKey: selected.strategyPresetKey ?? null,
         direction: selected.direction ?? null,
         entryDay: signalAt ? signalAt.slice(0, 10) : null,
       },
@@ -318,6 +329,51 @@ export function AutoOperationStoryPanel({
       strategyVersion: selected?.strategyVersion ?? null,
     });
   };
+
+  // P4 — explicación DÍA-D de la ESTRATEGIA seleccionada: une la vista P3 (estrategia ejecutada +
+  // indicadores + razones) con la evidencia medida del VALOR, la verificación DURAble del ciclo y
+  // la sesión LAB local. Read-only y fail-closed: no recalcula el motor ni promociona capas.
+  const verifications = useDiaDCycleVerifications(selected?.cycleId ?? null, {
+    enabled: Boolean(selected?.cycleId),
+  });
+  const labSession = useDiaDTradingSessionStore((state) => state.session);
+  const strategyExplanation = useMemo(() => {
+    if (!strategy.view) return null;
+    return buildAutoStrategyDiaDExplanation({
+      strategy: strategy.view,
+      cycle: selected
+        ? {
+            cycleId: selected.cycleId,
+            strategyPresetKey: selected.strategyPresetKey ?? null,
+            strategyVersion: selected.strategyVersion ?? null,
+          }
+        : null,
+      artifact: feedbackList.data?.artifact ?? null,
+      verifications: verifications.data?.data ?? null,
+      labSession: labSession
+        ? {
+            instrumentId: labSession.instrumentId,
+            strategyPresetKey: labSession.strategyPresetKey ?? null,
+            diaD: labSession.diaD,
+            endDate: labSession.endDate,
+            mode: labSession.mode,
+          }
+        : null,
+      artifactError: feedbackList.isError,
+      verificationsError: verifications.isError,
+      loading: feedbackList.isLoading || verifications.isLoading,
+    });
+  }, [
+    strategy.view,
+    selected,
+    feedbackList.data,
+    feedbackList.isError,
+    feedbackList.isLoading,
+    verifications.data,
+    verifications.isError,
+    verifications.isLoading,
+    labSession,
+  ]);
 
   const story = useMemo(
     () => buildAutoOperationStory({ cycle: selected, explanation }),
@@ -467,6 +523,7 @@ export function AutoOperationStoryPanel({
       {selected && strategy.view ? (
         <AutoOperationStrategyCard
           view={strategy.view}
+          explanation={strategyExplanation}
           onVerify={startDiaDVerification}
           disabled={!canVerifyDiaD}
           loading={strategy.view.loading}
