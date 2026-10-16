@@ -63,6 +63,7 @@ El gate existía en el runner local pero **no** se ejecutaba en el CI de release
 - `test_alert_delivery_worker` + `test_scheduler_worker` + `test_health` **verdes**; `test_dia_d_bump_guard` **1 passed**.
 - `pnpm --filter @bolsa/web typecheck` **OK** · `contract:check` **OK**.
 - `pnpm run window:freeze` → **`freeze OK`**.
+- **CI de etiqueta:** `Release tag CI` [run **`38871657998`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/38871657998) **VERDE** (~14m30s; **13 jobs `success` + `certify` `success`**; `playwright (integrated E2E, opt-in)` `skipped`) con el job `shared` (**gate `window:freeze`**) **verde**, `lifecycle-pg` **verde** (step #8 + 10 compuertas anti-skip) y `replay-repro` **REPRODUCIDO** (`sha256 1E3ADAC2…929A37E7`, idéntico al de `v2.88.136` ⇒ `Δ decisión = 0` **medido**). El tag se **movió** a `0303cd47` (commit con el pin re-anclado) tras remediar un **falso rojo** del sello `BY_FILL` del primer intento ([run `38865153082`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38865153082)): su fixture aceptaba un fill **parcial** (~**12%** de las corridas, porque el `instrument_id` es **aleatorio**) y una reserva parcial **sigue viva** (`OPEN`) por diseño ⇒ el helper ahora exige **llenado TOTAL** (`7ac1d999`). **No** se relajó ningún umbral ni se tocaron `timeouts`/`retries`/`ADR-046`.
 
 ---
 

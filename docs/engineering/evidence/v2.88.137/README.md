@@ -88,36 +88,92 @@ El hallazgo auto-declarado era que `pnpm window:freeze` **no** estaba cableado e
 
 ## 7. Cierre POST-TAG — tag `v2.88.137-beta` y su CI de etiqueta
 
-El tag (**anotado, unsigned**) se publicó sobre **`736c0bf3`** —el commit con el pin PAPER ya
-re-anclado a `c6c2d677` (`apps` `958e0b53` / `packages` `19099646`)—, **no** sobre el commit del
-sello. Motivo (fail-closed): el gate `pnpm window:freeze` del job `shared` compara los **dos tree
-hashes** del pin con `HEAD:apps`/`HEAD:packages`; en el commit del sello el pin aún cita el árbol
-**previo** ⇒ taggearlo habría dejado el CI en `TREE_MOVED`.
+El tag (**anotado, unsigned**) se publica sobre el commit cuyo **pin PAPER casa con su árbol** —no
+sobre el commit del sello—. Motivo (fail-closed): el gate `pnpm window:freeze` del job `shared`
+compara los **dos tree hashes** del pin con `HEAD:apps`/`HEAD:packages`; en el commit del sello el pin
+aún cita el árbol **previo** ⇒ taggearlo deja su propio CI en `TREE_MOVED` (runbook P1-P4 §4).
 
-**`Release tag CI` — run [`38865153082`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38865153082):**
+### 7.1 Primer intento (`736c0bf3`) — `lifecycle-pg` ROJO por el fixture del sello `BY_FILL`
 
-- Job `shared`: **VERDE** — `window:test` + `window:freeze` (**`freeze OK`**) ⇒ el pin casa con el
+`Release tag CI` — run [`38865153082`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38865153082):
+
+- Job `shared`: **VERDE** — `window:test` + `window:freeze` (**`freeze OK`**) ⇒ el pin casaba con el
   árbol del tag (el objetivo de comprobación del plan).
-- Job `lifecycle-pg`: **ROJO** por
+- Job `lifecycle-pg`: **ROJO** en
   [`test_auto_fill_cycle_seal_pg.py`](../../../../apps/api-python/tests/test_auto_fill_cycle_seal_pg.py)
-  `::test_by_fill_release_is_driven_by_the_persisted_cycle_context`
-  (`AssertionError: con contexto persistido la liberación debe ser BY_FILL (real=OPEN)`).
+  `::test_by_fill_release_is_driven_by_the_persisted_cycle_context`, en el step **#8** del job
+  (`Pytest lifecycle PG + auth + golden …`; `1 failed, 221 passed`), con
+  `AssertionError: con contexto persistido la liberación debe ser BY_FILL (real=OPEN)`.
 - Resto **VERDE**: `frontend`, `python` (ruff/imports/mypy/pytest offline), `security (gitleaks)`,
   `dr-verify`, `a7-gate`, `decision-spine`, `replay-repro`, `playwright` (mock E2E, integrated axe,
-  integrated AUTO S5); `playwright (integrated E2E, opt-in)` **skipped** por diseño.
+  integrated AUTO S5); `playwright (integrated E2E, opt-in)` **skipped** por diseño. El job
+  `certify` falló **como consecuencia** (`Fail if any required job failed`), no por un hallazgo
+  propio: al abortar el step #8 los pasos posteriores del job `lifecycle-pg` quedaron `skipped` y sus
+  guardas anti-skip (`Fail on skipped …`) se declararon en fallo.
 
-**El rojo es un FLAKE, no una regresión de `v2.88.137`.** El MISMO SHA `736c0bf3` **pasó** el job
-hermano `auto-v2-durable-pg` en el `Python CI` del tag (run
-[`38865153142`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38865153142), **success**) y lo
-**falló** en el `Python CI` del push a `main` (run
-[`38865113468`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38865113468)): mismo commit,
-mismo test, **dos desenlaces** ⇒ no determinista. Además, el diff de `v2.88.137` **no toca** el
-camino de reservas/fills (`_v2_reconcile_reservations`, `read_applied_fill_facts`,
-`simulated_settlement`), y el README de `v2.88.136` (OBS-19) ya declaraba ese test **inestable** con
-esta MISMA firma (`OPEN` en vez de `RELEASED_BY_FILL`).
+**Causa raíz (medida; NO es contaminación entre tests ni ruido del runner).** El `instrument_id` del
+test es **aleatorio por corrida** (`inst-sealpos-<hex10>`) y el ruido del venue depende solo de
+`(seed, side, instrument_id)`: `_filling_seed` devolvía el **primer** seed con fill, que es **PARCIAL**
+en ~**12%** de los prefijos medidos (200 muestras ⇒ 24 parciales; lotes de **50.0** y **73.5** sobre
+100). Con un fill **parcial**, `ReservationLedger.release` **escala** las dimensiones y **conserva** la
+reserva **VIVA** (`status` sigue `OPEN`, la cola es capital comprometido), que es el comportamiento
+**declarado** del camino caliente
+(`AutoSimulationWorker._v2_release_reservations_for_fill`); por tanto el assert
+`status == "RELEASED_BY_FILL"` **no aplica** a un llenado parcial.
 
-**No se certifica** un `Release tag CI` verde: el sello queda con el rojo **declarado** (job
-`lifecycle-pg`) hasta re-ejecución o remediación, **sin** rebajar umbrales, sin tocar
-`timeout`/`retries` y sin ocultar el fallo con reintentos. La ventana PAPER real (ADR-046) sigue
+La instrumentación **provisional** del reconciliador (revertida antes del commit) lo dejó por escrito
+en el caso que falló: `live=1 mine=True aged=True measurable=True facts=2 meas=COMPLETE
+in_flight_len=0 fill_qty=73.5 resremaining=100.0` ⇒ la decisión era liberar y **liberó**… pero
+**parcialmente**. La lista **exacta** de tests del mismo step **#8** del job, ejecutada en local
+**por sí sola**, reproduce el rojo sobre BD fresca (`1 failed, 217 passed, 4 errors` — los errores,
+por migración ausente sin el paso `alembic upgrade head`), así que no hacía falta ninguna
+contaminación de orden ni la suite completa para verlo.
+
+### 7.2 Remedio y re-sello — el tag se mueve al commit re-anclado
+
+| paso | commit | contenido |
+| --- | --- | --- |
+| fix del fixture | `7ac1d999` | `_filling_seed(require_full=True)` exige `status == "filled"` (llenado **TOTAL**) + assert explícito del discriminador y `filled_total == _QTY` |
+| re-anclaje del pin | `0303cd47` | `pnpm run window:pin -- --note …` ⇒ `apps d706f132` / `packages 19099646`, `freeze OK` (`scripts/` no participa del freeze) |
+
+**Medido localmente:** **300/300** instrumentos aleatorios tienen seed de llenado **COMPLETO** en el
+barrido `<500` y la suma del schedule es **exacta** (`100`); el fichero del sello **25/25 verde**
+(antes ~12% de rojo por corrida); la lista **exacta** del step **#8** del job `lifecycle-pg` queda
+**`222 passed / 0 failed`** sobre BD fresca migrada (`055_dia_d_identity_nullable`) — el mismo step
+que en CI daba `1 failed / 221 passed`.
+
+El tag `v2.88.137-beta` (anotado, **unsigned**; objeto de tag `cb592357`, commit `0303cd47`) se
+**movió** de `736c0bf3` al commit re-anclado `0303cd47` —precedente idéntico del sello `v2.88.136`
+(`71d366e5` fix → `c3bccf88` POST-TAG con el tag movido)—, que pasa el gate fail-closed
+`window:freeze`.
+
+**`Release tag CI` — run [`38871657998`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38871657998)
+(tag movido a `0303cd47`): VERDE** — `2026-10-16T08:07:57Z` → `08:22:27Z` (~**14m30s**);
+**13 jobs `success` + `certify` `success`** y `playwright (integrated E2E, opt-in)` **`skipped`**
+(declarado). Evidencia decisiva del re-sello:
+
+- **El job que fallaba, ahora VERDE:** `lifecycle-pg` **`success`** (`08:08:43Z` → `08:14:59Z`) con
+  el step **#8** (`Pytest lifecycle PG + auth + golden …`) **`success`** y **las 10 compuertas
+  anti-skip posteriores** (`Golden Day 2.0`, `account-isolation gate V2.15.4`, `AUTO universe
+  coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window + ESTUDIO chain`, `Crash/Recovery Day`,
+  `Concurrent AUTO`, `HardKill recovery`, `crash injection matrix`, `multiprocess AUTO`) **`success`**
+  — ya **no** quedan `skipped` colgando del aborto del step #8.
+- **El gate fail-closed, VERDE:** en `shared` (`08:08:01Z` → `08:08:33Z`) pasan `window:test`,
+  **`Window freeze gate (pin == HEAD:apps/packages)`** y los guardas del runner de ventana ⇒ `freeze
+  OK` sobre el árbol del tag movido (era el objetivo de comprobación del plan).
+- **`replay-repro` REPRODUCIDO:** `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`
+  (`3 340 728` bytes, sello en CRLF, veredicto `REPRODUCIDO (mismo CONTENIDO)`) — **idéntico** al del
+  `Release tag CI` verde de `v2.88.136`: el remedio del fixture y el re-anclaje del pin **no** movieron
+  el artefacto congelado ⇒ **`Δ decisión = 0`** medido, no declarado.
+- **`python`** (ruff/imports/mypy/pytest offline), **`frontend`** (`contract:check` incluido),
+  **`security (gitleaks)`**, **`dr-verify`**, **`a7-gate`**, **`decision-spine`**, `playwright`
+  (**mock E2E**, **integrated axe**, **integrated AUTO S5**) y `certify` **`success`**.
+- **Sigue ABIERTA y declarada** la intermitencia del arranque en frío de `S5-04`: intento 0
+  **`failed` en `63.80s`** (los `60.00s` son de espera de la evidencia de la sesión LAB) e intento 1
+  **`passed` en `6.04s`** (`delta primero-retry 57.76s`) — **el mismo fenómeno ya declarado en
+  `v2.88.136`** (allí `64.96s` → `7.33s`), con `timeouts`/`retries`/`ADR-046` **sin tocar**.
+
+**Δ producto del remedio = 0.** Solo cambian el **fixture del test** y el pin (`scripts/`): no se toca
+motor, umbrales ADR-046, contrato HTTP ni migración; la ventana PAPER real (ADR-046) sigue
 **`INCONCLUSIVE`** (`0/4 días`, `0/2 regímenes`, `0/32 ciclos`; ledger: `medidos=0`, `veto=2` por
 `BEAR_TREND` ⇒ `NO_MEDIDO_REGIMEN`).

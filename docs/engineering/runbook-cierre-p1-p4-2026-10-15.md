@@ -192,6 +192,24 @@ re-anclado** (el commit del re-anclaje), no sobre el commit del sello. El re-anc
 commit **POST-TAG** en cuanto a *contenido*, pero es el que **porta el tag** publicado; si se
 taggea antes el commit del sello, el gate es rojo por diseño.
 
+**Remedio de un `Release tag CI` rojo del sello (precedente `v2.88.136` y `v2.88.137`).** Un rojo en
+un job de certificación (con el gate `shared` ya VERDE) **no** se «pasa» reintentando ni subiendo
+`timeout`/`retries`:
+
+1. se identifica la **causa** y se arregla en un commit nuevo (`<sello> fix (...)`);
+2. se **re-ancla** el pin a ese árbol (`pnpm run window:pin -- --note "<motivo>"`, freeze-neutral por
+   vivir en `scripts/`) y se verifica `freeze OK`;
+3. el **tag se mueve** al commit del re-anclaje (`git tag -a -f` + `git push --force origin <tag>`);
+4. el rojo, su causa raíz **medida** y el remedio quedan escritos en la evidencia del sello.
+
+Un rojo **intermitente** se trata igual que uno determinista: sin causa medida no se certifica. En
+`v2.88.137` el rojo de `lifecycle-pg` no era contaminación entre tests ni ruido del runner: el
+**fixture** del sello `BY_FILL` garantizaba «algún fill», pero un llenado **PARCIAL** deja la reserva
+**viva** en `OPEN` por diseño (`ReservationLedger.release` escala dimensiones y conserva la cola
+comprometida), así que el assert de liberación **total** no aplicaba; con `instrument_id` **aleatorio**
+por corrida, ~12% de los prefijos caían ahí (evidencia:
+[`evidence/v2.88.137/README.md`](./evidence/v2.88.137/README.md) §7).
+
 ---
 
 ## 5. Qué queda ABIERTO al terminar el runbook
