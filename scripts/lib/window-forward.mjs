@@ -433,9 +433,17 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-16 — pin del arbol re-anclado a `af5aa08e`
+ * (`apps` `e151cd4329591c24835256082882dfe478107e63` / `packages` `e96a12b80a1606523f422750493274894ff07ef4`).
+ * Motivo: sello v2.88.141-beta: sello corrector del Ruff del CI del .140 (paridad local<->CI: lint:py/imports:py/types:py); 0 dias MEDIDO, re-anclar no invalida nada
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'e3a5f864',
-  appsHash: 'd38dc7ae804a766231b6b2173082210dfc3904bd',
+  commit: 'af5aa08e',
+  appsHash: 'e151cd4329591c24835256082882dfe478107e63',
   packagesHash: 'e96a12b80a1606523f422750493274894ff07ef4',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
