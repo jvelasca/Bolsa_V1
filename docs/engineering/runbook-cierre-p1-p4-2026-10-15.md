@@ -21,6 +21,28 @@
 - **API** arriba: `GET /api/health/ready` → `status: ready` (el scheduler de barras vive en el API).
 - **Universe ESTUDIO sembrado** (~35 valores): si `resolve_daily_watch` devuelve `empty`/`unavailable`,
   el watch de la ventana queda vacío y el día **no se opera** (fail-closed). Siémbralo **antes** de empezar.
+
+### 0.1 Re-sembrar el entorno si la BD se recreó (prerrequisito NO obvio)
+
+Recrear la BD de desarrollo (drop + create + `upgrade head`, p. ej. para esquivar el tope de columnas
+de `sim_fill_finance_context`) **borra el entorno operativo**, no solo el esquema: el catálogo de
+instrumentos, las barras, la lista ESTUDIO y la cuenta de la ventana. Con la BD vacía el `preflight`
+**no** declara un veto de régimen: falla **duro** con
+`watch ESTUDIO vacío y fail-closed (status='empty')` — que **no** es un día no operable.
+
+1. **Catálogo + barras + universo ESTUDIO** (con los casos de uso del producto, no a mano):
+   `SubscribeMarketIndex.execute('IBEX35', sync_bars=True, years_back=2)` importa los 35
+   constitutivos y sus barras diarias y crea la lista de catálogo `ibex35`; después se publica la
+   lista ESTUDIO con `SqlAlchemyListRepository.update('estudio', instrument_ids=<catálogo>)`
+   (`ensure_estudio_list()` antes). Medido el `2026-10-16`: 35 instrumentos, 17 854 barras `1d`.
+2. **Cuenta + par A/B de la ventana:** `uv run --no-sync python apps/api-python/scripts/ops_seed_window_pair.py
+   --account-id <cuenta> --version-a v283-window-a --version-b v283-window-b` (idempotente; **exige**
+   que la cuenta exista: sin ella devuelve `exit 2`, no la acuña con ese id).
+3. **API** arriba **desde el árbol pineado**: `GET /api/health/ready` → `ready`. Ojo: el readiness es
+   *schema-aware*, así que una API vieja corriendo contra una BD ya migrada responde **`503`** y el
+   `run-day` aborta con `API_NOT_READY` (no es veto).
+
+
 - **Flags de motor OFF** (SIM-only): `AUTO_ORCHESTRATOR_ENABLED` / `AUTO_SIMULATION_WORKER_ENABLED`
   no se activan para medir la ventana PAPER (la ventana usa el harness `v2_76`).
 - **Defaults de aislamiento INTACTOS:** `BROKER_VENUE=paper` y **sin** `LIVE_EXECUTION_UNLOCKED` ni

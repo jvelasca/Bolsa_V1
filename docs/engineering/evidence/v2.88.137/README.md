@@ -84,6 +84,35 @@ El hallazgo auto-declarado era que `pnpm window:freeze` **no** estaba cableado e
 - La métrica del OUTBOX es **observabilidad** (logs + `/health`), **no** Prometheus.
 - Tag **unsigned**. Este sello **no demuestra rentabilidad**.
 
+### 6.1 Ventana PAPER — estado medido al cerrar el sello (2026-10-16)
+
+Ledger local (`operability_runs/window-runs/ledger.jsonl`, artefacto **no** versionado):
+
+| día | estado | régimen |
+| --- | --- | --- |
+| `20261014` | `NO_MEDIDO_REGIMEN` | `BEAR_TREND` |
+| `20261015` | `NO_MEDIDO_REGIMEN` | `BEAR_TREND` |
+| `20261016` | `NO_MEDIDO_REGIMEN` | `BEAR_TREND` |
+
+`medidos=0 · veto=3 · declarados=0 · duros=0` ⇒ gate **`NO_MEDIDO`**: la ventana sigue
+**`0/4 días`, `0/2 episodios`, `0/32 ciclos` ⇒ `INCONCLUSIVE`**. No es un fallo: el mercado veta LONG
+(23 `trend_down` / 7 `range` / 5 `trend_up` sobre los 35 valores del ESTUDIO el `2026-10-16`) y el
+eje operativo es el **más conservador** del watch. **No** se fuerza el régimen ni se toca ADR-046.
+
+Bundle `v2_100` del día (`operability_runs/daily-evidence/20261016/`): `P1 INCONCLUSIVE (0/0/0)` ·
+`P2 0/35` · `P3 0` · **`P4 CERRADO`** (`venue paper`, envs LIVE ausentes, `0` trazas LIVE).
+
+**Continuidad del entorno (medida, no supuesta).** La BD de desarrollo se recreó durante la
+remediación de `v2.88.136` (drop + create para esquivar el tope de columnas de
+`sim_fill_finance_context`), así que el `preflight` de la ventana fallaba **duro**
+(`watch ESTUDIO vacío (status='empty')`), **no** como veto. El catálogo y el universo ESTUDIO se
+re-sembraron con los **casos de uso del producto** (`SubscribeMarketIndex('IBEX35', sync_bars=True)`:
+**35** instrumentos y **17 854** barras `1d` reales de Yahoo + `estudio = ibex35`), quedando el
+`preflight` de nuevo funcional (`watchSource: estudio`, `barsLoaded: 35`). La **cuenta** de la ventana
+(`1484e253d2d54645945a6b1d7`) y su par A/B **siguen sin restaurar** (el sembrador exige que la cuenta
+exista y no la acuña con ese id): se declara como **pendiente del operador** para el primer día
+**operable**, y no afecta a ningún día vetado (un veto se registra sin forward ni API).
+
 ---
 
 ## 7. Cierre POST-TAG — tag `v2.88.137-beta` y su CI de etiqueta
