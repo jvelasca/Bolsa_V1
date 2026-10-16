@@ -5,9 +5,11 @@ Todas tienen ``user_id='app'`` (el owner de la app), por lo que aparecen mezclad
 datos reales en la UI y, además, rompen el worker de custodia (no tienen cartera legacy
 válida, y una sola cuenta mala abortaba el job entero).
 
-Criterio de borrado (lista BLANCA, no lista negra): sobrevive únicamente la cuenta demo
-sembrada. Se comprobó que las 89 restantes tienen cartera legacy, así que discriminar
-por "no tiene cartera" NO sirve; el único criterio seguro es la identidad de la demo.
+Criterio de borrado (lista BLANCA, no lista negra): sobrevive la cuenta demo sembrada **y la
+cuenta operativa de la ventana PAPER** (`WINDOW_CONFIG.account` en `scripts/lib/window-forward.mjs`,
+fuente única). Se comprobó que las 89 restantes tienen cartera legacy, así que discriminar
+por "no tiene cartera" NO sirve; el único criterio seguro es la identidad de las protegidas.
+La cuenta de la ventana es estado OPERATIVO de ADR-046 (≥4 días de calendario), no residuo.
 
 Uso:
     python scripts/ops/cleanup_residual_accounts.py            # dry-run
@@ -21,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import re
 import sys
 from pathlib import Path
 
@@ -28,13 +31,38 @@ if sys.platform == "win32":
     # Psycopg async no funciona con ProactorEventLoop (default en Windows).
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "packages" / "py" / "infrastructure" / "src"))
+sys.path.insert(
+    0, str(Path(__file__).resolve().parents[2] / "packages" / "py" / "infrastructure" / "src")
+)
 
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
-# La ÚNICA cuenta que debe sobrevivir. La siembra el bootstrap de la app.
+# La ÚNICA cuenta DEMO que debe sobrevivir. La siembra el bootstrap de la app.
 DEMO_ACCOUNT_ID = "default-account-seed"
+
+#: Fuente ÚNICA (JS) de la identidad de la cuenta operativa de la ventana PAPER (ADR-046).
+_WINDOW_FORWARD_MJS = Path(__file__).resolve().parents[2] / "scripts" / "lib" / "window-forward.mjs"
+_WINDOW_ACCOUNT_FIELD = re.compile(r"\baccount:\s*'([^']+)'")
+
+
+def _window_account_id() -> str:
+    """Id de la cuenta PAPER leído de ``WINDOW_CONFIG`` en el runner JS (fuente única)."""
+    try:
+        source = _WINDOW_FORWARD_MJS.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    start = source.find("export const WINDOW_CONFIG")
+    if start < 0:
+        return ""
+    match = _WINDOW_ACCOUNT_FIELD.search(source, start)
+    return match.group(1).strip() if match else ""
+
+
+#: Ids que esta limpieza NUNCA debe borrar. La cuenta de la ventana PAPER es estado OPERATIVO
+#: de ADR-046 (debe sobrevivir ≥4 días de calendario), no residuo de test: el criterio
+#: "todo lo que no sea la demo" la destruía y devolvía la ventana a ``0/4``.
+PROTECTED_ACCOUNT_IDS = frozenset({DEMO_ACCOUNT_ID, _window_account_id()} - {""})
 
 # Tablas con FK a investment_accounts que hay que vaciar por cuenta (hijas primero).
 ACCOUNT_CHILD_TABLES = (
@@ -61,13 +89,12 @@ def _load_env() -> None:
 
 
 async def _residual_account_ids(session: AsyncSession) -> list[tuple[str, str]]:
-    """(id, name) de todas las cuentas salvo la demo."""
+    """(id, name) de todas las cuentas salvo las PROTEGIDAS (demo + ventana PAPER)."""
     rows = await session.execute(
         text(
-            "SELECT id, name FROM investment_accounts "
-            "WHERE id <> :demo ORDER BY created_at"
+            "SELECT id, name FROM investment_accounts WHERE id <> ALL(:protected) ORDER BY created_at"
         ),
-        {"demo": DEMO_ACCOUNT_ID},
+        {"protected": list(PROTECTED_ACCOUNT_IDS)},
     )
     return [(str(r[0]), str(r[1])) for r in rows]
 
@@ -76,10 +103,7 @@ async def _delete_account_graph(session: AsyncSession, account_id: str) -> None:
     """Borra el grafo completo de una cuenta respetando el orden de FKs."""
     # Portfolios de la cuenta (y sus legacy_portfolio_id) antes que la cuenta.
     portfolio_rows = await session.execute(
-        text(
-            "SELECT id, legacy_portfolio_id FROM investment_portfolios "
-            "WHERE account_id = :aid"
-        ),
+        text("SELECT id, legacy_portfolio_id FROM investment_portfolios WHERE account_id = :aid"),
         {"aid": account_id},
     )
     portfolios = [(str(r[0]), r[1]) for r in portfolio_rows]
@@ -130,14 +154,16 @@ async def _delete_orphan_legacy_portfolios(session: AsyncSession) -> int:
         ")"
     )
     await session.execute(
-        text(f"DELETE FROM positions WHERE portfolio_id IN (SELECT p.id FROM portfolios p WHERE {orphan_filter})")
+        text(
+            f"DELETE FROM positions WHERE portfolio_id IN (SELECT p.id FROM portfolios p WHERE {orphan_filter})"
+        )
     )
     await session.execute(
-        text(f"DELETE FROM transactions WHERE portfolio_id IN (SELECT p.id FROM portfolios p WHERE {orphan_filter})")
+        text(
+            f"DELETE FROM transactions WHERE portfolio_id IN (SELECT p.id FROM portfolios p WHERE {orphan_filter})"
+        )
     )
-    result = await session.execute(
-        text(f"DELETE FROM portfolios p WHERE {orphan_filter}")
-    )
+    result = await session.execute(text(f"DELETE FROM portfolios p WHERE {orphan_filter}"))
     return int(result.rowcount or 0)
 
 
@@ -162,6 +188,16 @@ async def main() -> int:
     )
     args = parser.parse_args()
 
+    # Fail-closed: la limpieza es DESTRUCTIVA e irreversible. Si no se puede resolver el id de la
+    # cuenta de la ventana desde la fuente única, NO se aplica (borrarla devolvería la ventana a 0/4).
+    if not _window_account_id():
+        print(
+            "\nABORTADO: no se pudo resolver el id de la cuenta de la ventana PAPER desde "
+            "scripts/lib/window-forward.mjs; sin él la limpieza podría borrarla (fail-closed).",
+            file=sys.stderr,
+        )
+        return 1
+
     _load_env()
     from bolsa_infrastructure.config import get_settings
     from bolsa_infrastructure.database.session import create_engine, create_session_factory
@@ -180,7 +216,7 @@ async def main() -> int:
 
             print(f"Cuentas totales: {before}")
             print(f"Residuales a borrar: {len(rows)}")
-            print(f"Sobrevive: {DEMO_ACCOUNT_ID}")
+            print(f"Sobreviven (protegidas): {', '.join(sorted(PROTECTED_ACCOUNT_IDS))}")
             print("-" * 60)
             for account_id, name in rows:
                 print(f"  {account_id}  {name}")

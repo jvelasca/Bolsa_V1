@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import sys
 import warnings
 from collections.abc import Iterator
@@ -46,6 +47,56 @@ _load_root_env()
 # La ÚNICA cuenta que los tests NUNCA deben borrar (la siembra el bootstrap de la app).
 DEMO_ACCOUNT_ID = "default-account-seed"
 
+#: Fuente ÚNICA (JS) de la identidad de la cuenta operativa de la ventana PAPER (ADR-046).
+_WINDOW_FORWARD_MJS = Path(__file__).resolve().parents[3] / "scripts" / "lib" / "window-forward.mjs"
+_WINDOW_ACCOUNT_FIELD = re.compile(r"\baccount:\s*'([^']+)'")
+
+
+def _window_account_id() -> str:
+    """Id de la cuenta PAPER leído de ``WINDOW_CONFIG`` en el runner JS (fuente única).
+
+    Fail-soft a ``""`` si el módulo no se puede leer: así la suíte sigue siendo hermética. El
+    hueco no queda silencioso porque ``test_window_account_purge_guard.py`` (tripwire) exige que
+    el id se resuelva y que coincida con el del JS.
+    """
+    try:
+        source = _WINDOW_FORWARD_MJS.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    start = source.find("export const WINDOW_CONFIG")
+    if start < 0:
+        return ""
+    match = _WINDOW_ACCOUNT_FIELD.search(source, start)
+    return match.group(1).strip() if match else ""
+
+
+#: Ids que la suíte NUNCA debe borrar: la demo del bootstrap y la cuenta operativa de la
+#: ventana PAPER.
+#:
+#: CAUSA RAÍZ (2026-10-16, medida con testigo controlado): la purga borraba TODA cuenta salvo la
+#: demo. Como ADR-046 exige que la cuenta de la ventana sobreviva ≥4 días de calendario,
+#: **cualquier `pytest` local sobre la BD compartida destruía la ventana** (volvía a `0/4` y
+#: `v2_98` a `INCONCLUSIVE`). Es estado OPERATIVO, no residuo de test: se conserva.
+PROTECTED_ACCOUNT_IDS = frozenset({DEMO_ACCOUNT_ID, _window_account_id()} - {""})
+
+
+def residual_targets(
+    all_ids: list[str],
+    *,
+    protected: frozenset[str] | set[str] = PROTECTED_ACCOUNT_IDS,
+) -> list[str]:
+    """Ids que la purga PUEDE borrar: todo lo que no sea la demo ni la cuenta de la ventana.
+
+    Regla en UN solo sitio (la usan ``purge_accounts`` y ``purge_all_residuals``) para que no
+    vuelva a divergir. Deduplica conservando el orden y descarta ids vacíos/``None``.
+    """
+    return [
+        account_id
+        for account_id in dict.fromkeys(all_ids)
+        if account_id and account_id not in protected
+    ]
+
+
 # Tablas con FK a ``investment_accounts`` que hay que vaciar por cuenta (hijas primero).
 _ACCOUNT_CHILD_TABLES = (
     "core_r_account_state",
@@ -74,14 +125,15 @@ async def purge_accounts(session_factory, account_ids: list[str]) -> None:
     ``investment_portfolios`` y sus portfolios legacy asociados, y por último la cuenta.
 
     Salvaguardas:
-    - Ignora explícitamente ``default-account-seed``: un test nunca debe borrar la demo.
+    - Ignora las cuentas de ``PROTECTED_ACCOUNT_IDS`` (la demo del bootstrap y la cuenta
+      operativa de la ventana PAPER): un test nunca debe borrarlas.
     - Ignora IDs vacíos/duplicados.
     - Además limpia los portfolios legacy que queden huérfanos (los tests los crean en la
       tabla ``portfolios`` y el vínculo puede quedar NULL, de modo que no se arrastran solos).
     """
     from sqlalchemy import text
 
-    targets = [aid for aid in dict.fromkeys(account_ids) if aid and aid != DEMO_ACCOUNT_ID]
+    targets = residual_targets(account_ids)
     if not targets:
         return
 
@@ -177,6 +229,8 @@ async def purge_all_residuals() -> None:
 
     Sobrevive únicamente lo que siembra el bootstrap/seed:
     - ``default-account-seed`` y su ``default-portfolio-seed``.
+    - La cuenta operativa de la ventana PAPER (``PROTECTED_ACCOUNT_IDS``): es estado de
+      OPERACIÓN de ADR-046, no residuo de test, y debe sobrevivir ≥4 días de calendario.
     - El workspace marcado ``is_default`` (los demás se purgan: ver más abajo).
     - Los instrumentos del catálogo IBEX (los que tienen ``yahoo_symbol`` real, ``*.MC``).
 
@@ -205,22 +259,16 @@ async def purge_all_residuals() -> None:
             raise ResidualsUnavailable(type(exc).__name__) from exc
 
         async with factory() as session:
-            residual_accounts = (
-                (
-                    await session.execute(
-                        text(
-                            "SELECT id FROM investment_accounts WHERE id <> :demo"
-                        ),
-                        {"demo": DEMO_ACCOUNT_ID},
-                    )
-                )
-                .scalars()
-                .all()
+            all_accounts = (
+                (await session.execute(text("SELECT id FROM investment_accounts"))).scalars().all()
             )
+            # La protección (demo + ventana PAPER) se aplica en Python con la MISMA regla que
+            # usa `purge_accounts` (una sola fuente de verdad: `residual_targets`).
+            residual_accounts = residual_targets([str(row) for row in all_accounts])
             await session.commit()
 
         if residual_accounts:
-            await purge_accounts(factory, [str(a) for a in residual_accounts])
+            await purge_accounts(factory, residual_accounts)
 
         async with factory() as session:
             # Instrumentos sintéticos + sus barras.

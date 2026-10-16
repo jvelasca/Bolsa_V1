@@ -25,6 +25,8 @@
 | 6 | `pnpm contract:check` no ejecutable desde la raíz (la evidencia lo citaba así) | **HALLAZGO NUEVO — CORREGIDO** | §5 |
 | 7 | Ventana PAPER certificada | **NO** — `INCONCLUSIVE` (0/4 · 0/2 · 0/32) | §6 |
 | 8 | Bloqueador de entorno (cuenta de la ventana ausente) | **DETECTADO Y RESUELTO** (re-siembra con el id fijo) | §7.2 |
+| 9 | **Causa raíz** de la desaparición de la cuenta de la ventana | **CONFIRMADA** — la purga de residuos de los tests borraba toda cuenta salvo la demo | §7.2 |
+| 10 | Blindaje contra la recaída (purga de tests + limpieza manual + tripwire) | **APLICADO** (fail-safe) | §7.2 |
 
 Los dos hallazgos de auditoría del incremento `9f0ae3ad` **quedan cerrados**, con una salvedad
 formal (tag unsigned) y un **bloqueador de OPERACIÓN** para la ventana (§7).
@@ -217,10 +219,47 @@ Con la cuenta ausente, `run-day` **no puede medir**: es un **bloqueador**, no un
 | Preflight de hoy | `exit 2` **con payload** ⇒ veto legítimo `BEAR_TREND` (**no** es fallo duro) |
 | Ledger | `medidos=0 · veto=3 · duros=0` ⇒ gate `NO_MEDIDO` |
 
-El entorno queda **listo para medir** en el próximo día de mercado con LONG permitida. **Causa de la
-desaparición: NO MEDIDA** (la cuenta existía tras la re-siembra de `v2.88.137` a las `12:33` y faltaba
-a las `16:2x`); conviene confirmar que ningún proceso recrea/limpia la BD entre sesiones, porque si lo
-hace el bloqueador **reaparecerá**.
+El entorno queda **listo para medir** en el próximo día de mercado con LONG permitida.
+
+**Causa de la desaparición: CONFIRMADA — era determinista, no deriva.** La purga de residuos de los
+tests de la API borra **toda** cuenta con `id <> 'default-account-seed'`
+([`apps/api-python/tests/conftest.py`](../apps/api-python/tests/conftest.py), fixture autouse de
+sesión `_cleanup_residuals_around_session` → `purge_all_residuals`). Como ADR-046 exige que la cuenta
+de la ventana sobreviva **≥4 días de CALENDARIO**, **cualquier `pytest` local sobre la BD compartida
+`bolsa_v1` devolvía la ventana a `0/4`** y `v2_98` a `INCONCLUSIVE`. Explica las dos desapariciones:
+la de `12:33 → 16:2x` (sesión de tests del propio audit) y la de la re-siembra posterior. `CI` **no**
+es el destructor: corre en contenedor con su propia `DATABASE_URL`.
+
+**Prueba controlada (falsable).** Se sembró un testigo `SENTINEL-CONTROL` y se corrió una sesión de
+dos tests inertes (`pytest apps/api-python/tests/test_dia_d_bump_guard.py`, `2 passed`):
+
+| Momento | `SENTINEL-CONTROL` presente |
+| --- | --- |
+| Antes de `pytest` | **sí** |
+| Después de `pytest` | **NO** |
+
+**Remedio aplicado (fail-safe, no fail-open).**
+
+1. La purga pasa a respetar `PROTECTED_ACCOUNT_IDS` = **demo + cuenta de la ventana**, y el id se lee
+   de la **fuente única** JS (`WINDOW_CONFIG.account`), no de un literal duplicado. La regla vive en
+   un solo sitio (`residual_targets`, usada por `purge_accounts` y `purge_all_residuals`).
+2. Tripwire [`test_window_account_purge_guard.py`](../apps/api-python/tests/test_window_account_purge_guard.py):
+   exige que la fuente única aporte el id y que la regla de purga nunca lo devuelva.
+3. Blindado el **segundo destructor**: [`scripts/ops/cleanup_residual_accounts.py`](../scripts/ops/cleanup_residual_accounts.py)
+   (lista blanca "todo menos la demo") también protegía la demo y no la ventana; su dry-run ya declara
+   `Sobreviven (protegidas): 1484e253…, default-account-seed`.
+   ([`scripts/verify/cleanup_dev_test_residues.py`](../scripts/verify/cleanup_dev_test_residues.py)
+   **no** se toca: borra por `close_account`→`delete_simulated_account`, que exige estado `closed` y
+   por tanto no alcanza una cuenta `active`.)
+4. Instrumento de re-siembra con id fijo:
+   [`scripts/ops/seed_window_account_fixed_id.py`](../scripts/ops/seed_window_account_fixed_id.py)
+   (dry-run por defecto; crea por el camino canónico y re-etiqueta el id reparentando las FK leídas de
+   `information_schema`).
+
+**Verificación end-to-end.** Con la ventana sembrada se corrieron los tests sensibles al conteo de
+cuentas (`test_account_isolation`, `integration/test_accounts`, `test_workspaces`, `test_workspaces_isolation`,
+`test_schemas_accounts`, `test_account_summary_dto_realized_pnl`): **`75 passed`** y la cuenta
+**sobrevivió** a la sesión (`investment_accounts` = 2 filas).
 
 **Pendiente del OPERADOR para el primer día operable** (no afecta a los días vetados): reiniciar la
 API **desde el árbol pineado** (el readiness es *schema-aware*; una API vieja contra la BD migrada
