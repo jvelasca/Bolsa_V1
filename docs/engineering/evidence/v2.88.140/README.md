@@ -112,7 +112,17 @@ dos *tree hashes* del pin con `HEAD`. Por eso `window:pin` re-ancla el pin al á
 commit del **re-anclaje**), **no** sobre el commit del sello de contenido. Como la ventana seguía con
 **0 días `MEDIDO`**, re-anclar **no** invalida ningún día medido.
 
-### 4.1 Cita POST-TAG — CI del sello
+### 4.1 Cita POST-TAG — CI del sello (resultado MEDIDO)
 
-_Pendiente de la corrida del `Release tag CI` de `v2.88.140-beta` (se citará aquí el run y la tabla de
-jobs al completarse)._
+> **ROJO — corregido en [`v2.88.141-beta`](../v2.88.141/README.md).** El run
+> [38939275316](https://github.com/jvelasca/Bolsa_V1/actions/runs/38939275316) dejó el job
+> `python (ruff/imports/mypy/pytest offline)` en **`X Ruff`** (14s): `I001` (imports sin ordenar) en
+> `apps/api-python/tests/test_window_day_watch.py:7`, de modo que el resto del job
+> (import-linter/mypy/pytest) **no llegó a correr**. El **mismo** contenido dejó **`Python CI` rojo en
+> `main`** ([38939270481](https://github.com/jvelasca/Bolsa_V1/actions/runs/38939270481), 1m1s) y en el
+> tag ([38939275569](https://github.com/jvelasca/Bolsa_V1/actions/runs/38939275569), 1m11s). **Todo lo
+> demás quedó verde**: `a7-gate`, `shared` (gate `window:freeze` ⇒ **OK**), `dr-verify`, `frontend`,
+> `decision-spine`, `playwright` (mock E2E / integrated axe / AUTO S5), `replay-repro` y `lifecycle-pg`.
+> Causa raíz (lint local ≠ lint del CI) y **cierre estructural** (comandos de paridad `lint:py` /
+> `lint:py:fix` / `imports:py` / `types:py`): [evidencia `v2.88.141`](../v2.88.141/README.md). El tag
+> `.140` **no se mueve** (un tag publicado no se reescribe): la corrección viaja como **sello nuevo**.

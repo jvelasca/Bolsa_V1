@@ -1,6 +1,6 @@
 {
   "name": "bolsa-v1",
-  "version": "2.11.140-beta",
+  "version": "2.11.141-beta",
   "private": true,
   "description": "Plataforma personal de gestión bursátil — IBEX, Europa, acciones",
   "scripts": {
@@ -78,6 +78,10 @@
     "ci:s5:cold": "node scripts/ci/s5-cold-repro.mjs",
     "window:task:install": "node scripts/window-forward-runner.mjs task:install",
     "window:task:remove": "node scripts/window-forward-runner.mjs task:remove",
+    "lint:py": "uv run ruff check packages/py apps/api-python --config pyproject.toml",
+    "lint:py:fix": "uv run ruff check packages/py apps/api-python --config pyproject.toml --fix",
+    "imports:py": "uv run lint-imports --config packages/py/.importlinter",
+    "types:py": "uv run mypy packages/py/domain/src packages/py/market/src packages/py/infrastructure/src packages/py/application/src apps/api-python/src --follow-imports=silent",
     "format": "prettier --write \"**/*.{ts,tsx,js,json}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json}\"",
     "prepare": "husky"

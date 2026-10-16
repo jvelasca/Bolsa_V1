@@ -12,7 +12,6 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import pytest
-from bolsa_infrastructure.config import get_settings
 
 from bolsa_api.background.window_day_watch_worker import (
     alert_recipient,
@@ -21,6 +20,7 @@ from bolsa_api.background.window_day_watch_worker import (
     read_ledger_rows,
     start_window_day_watch,
 )
+from bolsa_infrastructure.config import get_settings
 
 MADRID = ZoneInfo("Europe/Madrid")
 DUE_HOUR = 20
