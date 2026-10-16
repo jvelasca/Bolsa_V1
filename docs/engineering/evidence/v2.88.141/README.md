@@ -116,7 +116,53 @@ mueve** `appsHash` (`d38dc7ae…` → **`e151cd43…`**) porque el árbol pinado
 sello de contenido (mismo patrón que `.139` y `.140`). Como la ventana sigue con **0 días `MEDIDO`**,
 re-anclar **no** invalida ningún día medido.
 
-### 4.1 Cita POST-TAG — CI del sello
+### 4.1 Cita POST-TAG — CI del sello (resultado MEDIDO)
 
-_Pendiente de la corrida del `Release tag CI` de `v2.88.141-beta` (se citará aquí el run y la tabla de
-jobs al completarse)._
+**`Release tag CI` [38940800920](https://github.com/jvelasca/Bolsa_V1/actions/runs/38940800920) ⇒
+`conclusion: success`** (tag `v2.88.141-beta`, 39 min). Tabla de jobs **todos verdes**:
+
+| Job | Resultado |
+| --- | --- |
+| `python (ruff/imports/mypy/pytest offline)` — **el que mató al `.140`** | **✓ 2m32s** (Ruff + import-linter + mypy + pytest offline) |
+| `shared (build/typecheck/test)` — incluye el gate `window:freeze` | ✓ 42s |
+| `replay-repro` (regenera el artefacto del sello desde el fixture) | ✓ 5m18s (**`Δ decisión = 0` medido**) |
+| `frontend (typecheck/lint/test/build + contract:check)` | ✓ 3m54s (**`Δ contrato HTTP = 0`**) |
+| `a7-gate` · `dr-verify` · `decision-spine` · `security (gitleaks)` | ✓ 53s / 50s / 29s / 8s |
+| `playwright` (mock E2E · integrated axe · AUTO S5) | ✓ 13m46s / 4m6s / 3m19s |
+| `lifecycle-pg (Alembic + auth + golden restart)` | ✓ 5m48s |
+| `playwright (integrated E2E, opt-in)` | skipped (opt-in) |
+
+`Python CI` del tag [38940801032](https://github.com/jvelasca/Bolsa_V1/actions/runs/38940801032) ⇒
+**success** (jobs `auto-v2-durable-pg`, `paper-forward-pg`, `lifecycle-pg`, `grammar-discovery-pg`,
+`quality`).
+
+---
+
+## 5. Hallazgo NUEVO declarado (medido la misma noche): la vigilancia **no** estaba activa en el
+proceso vivo
+
+**Hecho medido (falsable, con control positivo).** En el arranque del stack de desarrollo de la noche
+del `2026-10-16` **no consta** el vigía:
+
+- El proceso `bolsa_api.workers.scheduler_worker` vivo (arranques **19:22:51** y **19:42:57** locales,
+  ambos **posteriores** al fichero del vigía — `mtime` `19:18:13`) registra
+  `INFO:__main__:Scheduler worker iniciado (crons only; R12-SCHED)` y **ninguna** línea del vigía.
+- **Búsqueda exhaustiva:** `WindowDayWatch` aparece en **0** de los ficheros de `logs/` (2 514) en toda
+  la jornada. Sonda en segundo plano 19:41:42 → 20:14:25: **«SIN RASTRO»** ⇒ **las 20:00 de hoy NO
+  hubo vigilancia**.
+- **Control positivo:** ejecutado el arranque en aislado (`WINDOW_DAY_WATCH_ENABLED=True`), el vigía
+  **sí** emite `INFO:...window_day_watch_worker:WindowDayWatch iniciado (tick=…; hora=20:00
+  Europe/Madrid)` y devuelve la tarea. El código **funciona**; lo que falla es que **el proceso vivo no
+  lo está ejecutando** ⇒ requiere **reinicio limpio del stack** (y, estructuralmente, **no debería
+  depender de él**).
+
+**Por qué importa.** Es exactamente el modo de fallo que el vigía existe para cazar (hoy se cumplió:
+un día de ventana sin vigilancia). La **dependencia declarada** (§3) pasa de «el API caído a esa hora»
+a **«el proceso vivo debe ejecutar el código del vigía»**: reiniciar el stack tras un sello que toca el
+vigía es **obligatorio**, no opcional.
+
+**Siguiente incremento propuesto (no incluido aquí, sin fabricar).** Un **vigía batch independiente del
+API** (CLI que reutilice `evaluate_day_watch` + el canal SMTP) + **segunda tarea programada de
+Windows** (p. ej. `20:05`), de modo que la vigilancia funcione aunque el stack esté apagado o
+desincronizado —igual que la tarea de `run-day` ya corre en batch—. Requiere bump + evidencia + CI
+propios.
