@@ -365,10 +365,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-16 — pin del arbol re-anclado a `c6c2d677`
+ * (`apps` `958e0b5350cfd5d7294e1eb9c74e35a8c6f5b715` / `packages` `1909964634b0f7eec3b56ac76c4848cf107e33dd`).
+ * Motivo: v2.88.137-beta (AUDITORIA3): worker del OUTBOX + observabilidad /health + gate window:freeze; bump 2.11.137-beta
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'fc0808aa',
-  appsHash: '934dc7625895a988e3642726a3e3d1e9422a623d',
-  packagesHash: 'c1fde00965eb337201768cbc10f83dbca97999bb',
+  commit: 'c6c2d677',
+  appsHash: '958e0b5350cfd5d7294e1eb9c74e35a8c6f5b715',
+  packagesHash: '1909964634b0f7eec3b56ac76c4848cf107e33dd',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
