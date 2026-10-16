@@ -24,6 +24,7 @@
 | 5 | Cobertura del guardián de bump (`v2_87` fuera) | **HALLAZGO NUEVO — CORREGIDO** (test-only) | §4 |
 | 6 | `pnpm contract:check` no ejecutable desde la raíz (la evidencia lo citaba así) | **HALLAZGO NUEVO — CORREGIDO** | §5 |
 | 7 | Ventana PAPER certificada | **NO** — `INCONCLUSIVE` (0/4 · 0/2 · 0/32) | §6 |
+| 8 | Bloqueador de entorno (cuenta de la ventana ausente) | **DETECTADO Y RESUELTO** (re-siembra con el id fijo) | §7.2 |
 
 Los dos hallazgos de auditoría del incremento `9f0ae3ad` **quedan cerrados**, con una salvedad
 formal (tag unsigned) y un **bloqueador de OPERACIÓN** para la ventana (§7).
@@ -184,9 +185,10 @@ régimen se registra `NO_MEDIDO_REGIMEN` y **no lanza el forward**.
 
 `medidos=0 · veto=3` ⇒ gate **`NO_MEDIDO`**. El mercado veta LONG; **no se fuerza el régimen**.
 
-### 7.2 BLOQUEADOR del entorno (medido) — la cuenta de la ventana no existe
+### 7.2 BLOQUEADOR del entorno — detectado y **RESUELTO** (re-siembra)
 
-Sonda read-only (`investment_accounts` / `strategy_versions` / `strategy_promotions`):
+**Antes (medido).** Sonda read-only (`investment_accounts` / `strategy_versions` /
+`strategy_promotions`):
 
 | Comprobación | Resultado |
 | --- | --- |
@@ -195,9 +197,31 @@ Sonda read-only (`investment_accounts` / `strategy_versions` / `strategy_promoti
 | `v283-window-b` (fila + localizador `promoted` por cuenta) | presentes, pero **huérfanos** de la cuenta |
 | Barras `1d` | `17 854` **OK** (universo ESTUDIO sembrado) |
 
-Con la cuenta ausente, `run-day` **no puede medir**: es un **bloqueador**, no un veto. Remedio
-documentado ([runbook §0.1](./runbook-cierre-p1-p4-2026-10-15.md)): re-sembrar la cuenta con el
-**MISMO id** forzado (`create_simulated_account(initial_deposit=100000.0)`) y después
+Con la cuenta ausente, `run-day` **no puede medir**: es un **bloqueador**, no un veto.
+
+**Remedio aplicado** ([runbook §0.1](./runbook-cierre-p1-p4-2026-10-15.md), mismo precedente de
+`2026-10-02` / `v2.88.137`): re-sembrar la cuenta con el **MISMO id** forzado
+(`create_simulated_account(initial_deposit=100000.0)`, forzando **solo** el id) y después
 `ops_seed_window_pair.py --account-id 1484e253d2d54645945a6b1d7 --version-a v283-window-a
---version-b v283-window-b`. **Causa de la desaparición: NO MEDIDA** (la cuenta existía tras la
-re-siembra de `v2.88.137` a las `12:33`; conviene confirmar que ningún proceso recrea la BD).
+--version-b v283-window-b`.
+
+**Después (verificado read-only).**
+
+| Comprobación | Resultado |
+| --- | --- |
+| Cuenta de la ventana | `('1484e253d2d54645945a6b1d7', 'PAPER-VENTANA-a9c515', 'simulated', 'active')` |
+| Cartera de inversión + asiento de depósito | **1 + 1** |
+| `v283-window-b` | fila + localizador `promoted` + `EdgeReport` (1/1/1) |
+| `EdgeReport` de A | **1** |
+| `.env` | `PAPER_D_ACCOUNT_ID=1484e253d2d54645945a6b1d7` · `BROKER_VENUE=paper` **ya declarados** |
+| Preflight de hoy | `exit 2` **con payload** ⇒ veto legítimo `BEAR_TREND` (**no** es fallo duro) |
+| Ledger | `medidos=0 · veto=3 · duros=0` ⇒ gate `NO_MEDIDO` |
+
+El entorno queda **listo para medir** en el próximo día de mercado con LONG permitida. **Causa de la
+desaparición: NO MEDIDA** (la cuenta existía tras la re-siembra de `v2.88.137` a las `12:33` y faltaba
+a las `16:2x`); conviene confirmar que ningún proceso recrea/limpia la BD entre sesiones, porque si lo
+hace el bloqueador **reaparecerá**.
+
+**Pendiente del OPERADOR para el primer día operable** (no afecta a los días vetados): reiniciar la
+API **desde el árbol pineado** (el readiness es *schema-aware*; una API vieja contra la BD migrada
+responde `503` y `run-day` abortaría con `API_NOT_READY`, que **no** es veto).
