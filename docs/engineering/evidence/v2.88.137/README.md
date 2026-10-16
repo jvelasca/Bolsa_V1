@@ -83,3 +83,41 @@ El hallazgo auto-declarado era que `pnpm window:freeze` **no** estaba cableado e
 - El worker **reintenta** entregas encoladas; no decide, no crea señales, no altera umbrales ⇒ **`Δ motor = 0`**.
 - La métrica del OUTBOX es **observabilidad** (logs + `/health`), **no** Prometheus.
 - Tag **unsigned**. Este sello **no demuestra rentabilidad**.
+
+---
+
+## 7. Cierre POST-TAG — tag `v2.88.137-beta` y su CI de etiqueta
+
+El tag (**anotado, unsigned**) se publicó sobre **`736c0bf3`** —el commit con el pin PAPER ya
+re-anclado a `c6c2d677` (`apps` `958e0b53` / `packages` `19099646`)—, **no** sobre el commit del
+sello. Motivo (fail-closed): el gate `pnpm window:freeze` del job `shared` compara los **dos tree
+hashes** del pin con `HEAD:apps`/`HEAD:packages`; en el commit del sello el pin aún cita el árbol
+**previo** ⇒ taggearlo habría dejado el CI en `TREE_MOVED`.
+
+**`Release tag CI` — run [`38865153082`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38865153082):**
+
+- Job `shared`: **VERDE** — `window:test` + `window:freeze` (**`freeze OK`**) ⇒ el pin casa con el
+  árbol del tag (el objetivo de comprobación del plan).
+- Job `lifecycle-pg`: **ROJO** por
+  [`test_auto_fill_cycle_seal_pg.py`](../../../../apps/api-python/tests/test_auto_fill_cycle_seal_pg.py)
+  `::test_by_fill_release_is_driven_by_the_persisted_cycle_context`
+  (`AssertionError: con contexto persistido la liberación debe ser BY_FILL (real=OPEN)`).
+- Resto **VERDE**: `frontend`, `python` (ruff/imports/mypy/pytest offline), `security (gitleaks)`,
+  `dr-verify`, `a7-gate`, `decision-spine`, `replay-repro`, `playwright` (mock E2E, integrated axe,
+  integrated AUTO S5); `playwright (integrated E2E, opt-in)` **skipped** por diseño.
+
+**El rojo es un FLAKE, no una regresión de `v2.88.137`.** El MISMO SHA `736c0bf3` **pasó** el job
+hermano `auto-v2-durable-pg` en el `Python CI` del tag (run
+[`38865153142`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38865153142), **success**) y lo
+**falló** en el `Python CI` del push a `main` (run
+[`38865113468`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38865113468)): mismo commit,
+mismo test, **dos desenlaces** ⇒ no determinista. Además, el diff de `v2.88.137` **no toca** el
+camino de reservas/fills (`_v2_reconcile_reservations`, `read_applied_fill_facts`,
+`simulated_settlement`), y el README de `v2.88.136` (OBS-19) ya declaraba ese test **inestable** con
+esta MISMA firma (`OPEN` en vez de `RELEASED_BY_FILL`).
+
+**No se certifica** un `Release tag CI` verde: el sello queda con el rojo **declarado** (job
+`lifecycle-pg`) hasta re-ejecución o remediación, **sin** rebajar umbrales, sin tocar
+`timeout`/`retries` y sin ocultar el fallo con reintentos. La ventana PAPER real (ADR-046) sigue
+**`INCONCLUSIVE`** (`0/4 días`, `0/2 regímenes`, `0/32 ciclos`; ledger: `medidos=0`, `veto=2` por
+`BEAR_TREND` ⇒ `NO_MEDIDO_REGIMEN`).

@@ -16,7 +16,8 @@
 
 ## 0. Preparación (una vez)
 
-- **PostgreSQL** arriba y migrado (head `054_dia_d_verified_and_alerts`).
+- **PostgreSQL** arriba y migrado (head `055_dia_d_identity_nullable`, de la remediación AUDITORIA2
+  incluida en `v2.88.137`; la `054_dia_d_verified_and_alerts` es su predecesora en la cadena).
 - **API** arriba: `GET /api/health/ready` → `status: ready` (el scheduler de barras vive en el API).
 - **Universe ESTUDIO sembrado** (~35 valores): si `resolve_daily_watch` devuelve `empty`/`unavailable`,
   el watch de la ventana queda vacío y el día **no se opera** (fail-closed). Siémbralo **antes** de empezar.
@@ -41,6 +42,10 @@ pnpm run window:freeze
 - Si imprime **`TREE_MOVED`**: el árbol commiteado cambió. **No operes**: re-ancla con
   `pnpm run window:pin -- --note "<motivo>"` (solo si el avance del árbol es legítimo) y revisa el
   commit. Un `run-day` sobre un árbol movido **no** certifica.
+- **El mismo gate corre en el CI de release** (`pnpm window:freeze` en el job `shared` de
+  [`release-tag-ci.yml`](../../.github/workflows/release-tag-ci.yml), fail-closed). Consecuencia: el
+  **tag debe apuntar al commit con el pin ya re-anclado**; en el commit del sello el pin cita el
+  árbol previo y el CI quedaría `TREE_MOVED` (ver §4).
 
 ### Paso 2 — Preflight (¿el mercado admite LONG hoy?)
 
@@ -170,13 +175,22 @@ WHERE account_id = '1484e253d2d54645945a6b1d7'
 
 ```bash
 pnpm run window:freeze                                   # ¿freeze OK o TREE_MOVED?
-pnpm run window:pin -- --note "sello v2.88.136"          # re-ancla commit/appsHash/packagesHash
+pnpm run window:pin -- --note "sello v2.88.137"          # re-ancla commit/appsHash/packagesHash
 pnpm run window:freeze                                   # debe volver a freeze OK
 ```
 
 `window-pin.mjs` vive en `scripts/` (no participa del freeze), así que re-anclar **no** mueve a su vez
-el árbol. El commit de re-anclaje es el **POST-TAG** (después del sello/tag), como en los sellos
-previos.
+el árbol.
+
+**Regla del tag (fail-closed, desde `v2.88.137`).** El job `shared` de
+[`release-tag-ci.yml`](../../.github/workflows/release-tag-ci.yml) ejecuta `pnpm window:freeze` y
+compara **solo** los dos tree hashes del pin con `HEAD:apps`/`HEAD:packages`
+([`window-pin.mjs`](../../scripts/window-pin.mjs), `freezeStatus`). En el *commit del sello* el pin
+todavía cita el árbol **previo**, así que taggear ese commit haría **fallar** su propio CI con
+`TREE_MOVED`. Por tanto, el **tag de release debe crearse sobre el commit cuyo pin ya está
+re-anclado** (el commit del re-anclaje), no sobre el commit del sello. El re-anclaje sigue siendo el
+commit **POST-TAG** en cuanto a *contenido*, pero es el que **porta el tag** publicado; si se
+taggea antes el commit del sello, el gate es rojo por diseño.
 
 ---
 
