@@ -6,7 +6,7 @@
  *
  *   1. la estrategia EJECUTADA del ciclo (lo que se verifica),
  *   2. el alcance REAL de la evidencia (el VALOR, no la estrategia),
- *   3. la verificación DURAble enlazada a esta operación (o su hueco declarado).
+ *   3. la verificación durable enlazada a esta operación (o su hueco declarado).
  *
  * Honestidad: un hueco se rotula con el vocabulario de `absent-data` (`UNKNOWN ≠ 0`); mientras la
  * vista está `loading`, el hueco es TRANSITORIO y no se declara ausencia.

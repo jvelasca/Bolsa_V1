@@ -180,7 +180,7 @@ vi.mock("@/lib/api", () => ({
         },
       },
     })),
-    // P2 — registro DURAble que enlaza la verificación D→hoy con el ciclo.
+    // P2 — registro durable que enlaza la verificación D→hoy con el ciclo.
     listDiaDCycleVerifications: vi.fn(
       async (): Promise<
         import("@bolsa/shared").DiaDCycleVerificationListV1Dto

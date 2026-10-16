@@ -86,7 +86,7 @@ flowchart LR
   E --> I["Indicadores + razones del coach"]
   I --> D["Evidencia DÍA-D del VALOR<br/>4 capas, sin promoción"]
   D --> C["Fila del ciclo en el artefacto<br/>(único eje con identidad de estrategia)"]
-  C --> Vd["Verificación DURAble por ciclo<br/>dia_d_cycle_verifications"]
+  C --> Vd["Verificación DURABLE por ciclo<br/>dia_d_cycle_verifications"]
   Vd --> L["Sesión LAB local<br/>(no durable)"]
 ```
 
@@ -194,7 +194,7 @@ E2E_RUN=1 pnpm --filter @bolsa/web exec playwright test gp-e2e-s5
 | --- | --- |
 | `playwright-mock` ([`release-tag-ci.yml`](../../.github/workflows/release-tag-ci.yml)) | `pnpm e2e -- "gp-e2e\|gp-e2e-s5\|…"` ⇒ el puente S5 **mock**: [`gp-e2e-s5-auto-dia-d-bridge-mock.spec.ts`](../../apps/web/e2e/gp-e2e-s5-auto-dia-d-bridge-mock.spec.ts) (P3 + CTA + hueco declarado sin caer al #1) |
 | `playwright-integrated-auto-s5` ([`release-tag-ci.yml`](../../.github/workflows/release-tag-ci.yml)) | `playwright test gp-v288-s5` ⇒ `GP-V288-S5-01..04` sobre **stack real**: [`gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts`](../../apps/web/e2e/gp-v288-s5-auto-dia-d-bridge-integrated.spec.ts) |
-| `auto-v2-durable-pg` ([`python-ci.yml`](../../.github/workflows/python-ci.yml)) | `test_dia_d_cycle_verification_pg.py` ⇒ la verificación **DURAble** por ciclo (upsert atómico, ownership) |
+| `auto-v2-durable-pg` ([`python-ci.yml`](../../.github/workflows/python-ci.yml)) | `test_dia_d_cycle_verification_pg.py` ⇒ la verificación **durable** por ciclo (upsert atómico, ownership) |
 | `lifecycle-pg` (tag) | `test_auto_dia_d_trace_pg.py` ⇒ el ciclo CERRADO por el **proceso scheduler** |
 
 No se añaden ficheros `test_*.py` nuevos: el censo de [`scripts/ci/test_selection.py`](../../scripts/ci/test_selection.py)

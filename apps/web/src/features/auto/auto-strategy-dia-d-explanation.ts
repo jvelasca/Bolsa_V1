@@ -6,7 +6,7 @@
  *   P3 (estrategia)  → la EJECUTADA del ciclo resuelta en el TOP del valor (`presetKey` EXACTO),
  *                      con sus indicadores y las razones del coach.
  *   P4 (DÍA-D)       → la evidencia medida del VALOR (cuatro capas, sin promoción) + los
- *                      contadores y suelos de muestra + la verificación DURAble por ciclo + la
+ *                      contadores y suelos de muestra + la verificación durable por ciclo + la
  *                      sesión LAB local.
  *
  * Invariantes (falsables):
@@ -155,7 +155,7 @@ export type AutoStrategyDiaDExplanationV1 = {
   cycleEvidence: AutoStrategyExplanationCycleEvidenceV1 | null;
   /** Las CUATRO capas sin promoción (reutiliza el agregado probado). */
   evidence: DiaDEvidenceAggregateV1;
-  /** Verificación DURAble enlazada al ciclo (tri-estado). */
+  /** Verificación durable enlazada al ciclo (tri-estado). */
   verification: AutoStrategyExplanationVerificationV1;
   /** Sesión LAB local vigente (no durable). */
   lab: AutoStrategyExplanationLabV1;

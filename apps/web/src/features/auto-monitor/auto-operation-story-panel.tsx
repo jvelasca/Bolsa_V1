@@ -331,7 +331,7 @@ export function AutoOperationStoryPanel({
   };
 
   // P4 — explicación DÍA-D de la ESTRATEGIA seleccionada: une la vista P3 (estrategia ejecutada +
-  // indicadores + razones) con la evidencia medida del VALOR, la verificación DURAble del ciclo y
+  // indicadores + razones) con la evidencia medida del VALOR, la verificación durable del ciclo y
   // la sesión LAB local. Read-only y fail-closed: no recalcula el motor ni promociona capas.
   const verifications = useDiaDCycleVerifications(selected?.cycleId ?? null, {
     enabled: Boolean(selected?.cycleId),
