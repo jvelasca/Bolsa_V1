@@ -111,7 +111,29 @@ aún cita el árbol **previo** ⇒ taggearlo deja su propio CI en `TREE_MOVED` (
 
 | paso | commit | contenido |
 | --- | --- | --- |
-| sello (contenido) | _pendiente_ | bump `2.11.138-beta` + `meta.bump` (13 CLIs) + CHANGELOG + `CURRENT_SYSTEM`/`PROJECT_STATE` + evidencia |
-| re-anclaje del pin | _pendiente_ | `pnpm run window:pin -- --note "sello v2.88.138"` ⇒ `apps`/`packages` del árbol del sello, `freeze OK` (`scripts/` no participa del freeze) |
+| sello (contenido) | `bf606d69` | bump `2.11.138-beta` + `meta.bump` (13 CLIs) + CHANGELOG + `CURRENT_SYSTEM`/`PROJECT_STATE` + evidencia |
+| re-anclaje del pin | `f79484d1` | `pnpm run window:pin -- --note "sello v2.88.138"` ⇒ `apps 4a36b7b1` / `packages 6d006d6c`, `freeze OK` (`scripts/` no participa del freeze) |
 
-**`Release tag CI` — run [`_pendiente_`]:** _pendiente de publicar el tag y observar el CI._
+**El tag porta el commit del re-anclaje** (`f79484d1`; objeto de tag `v2.88.138-beta`).
+
+**`Release tag CI` — run [`38911216158`](https://github.com/jvelasca/Bolsa_V1/actions/runs/38911216158): VERDE** —
+`2026-10-16T13:52:18Z` → `14:04:48Z` (~**12m30s**); **13 jobs `success` + `certify` `success`** y
+`playwright (integrated E2E, opt-in)` **`skipped`** (declarado). Evidencia decisiva:
+
+- **El gate fail-closed, VERDE:** en `shared` pasa **`Window freeze gate`** ⇒ `[window-pin] freeze OK
+  (f79484d1)` sobre el árbol del tag (era el objetivo de comprobación del plan).
+- **`replay-repro` REPRODUCIDO:** `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`
+  (`3 340 728` bytes) — **idéntico** al de `v2.88.136`/`v2.88.137`: el sello (UI only) **no** movió el
+  artefacto congelado ⇒ **`Δ decisión = 0`** medido, no declarado.
+- **`lifecycle-pg`**, **`python`**, **`frontend`** (`contract:check` incluido), **`security (gitleaks)`**,
+  **`dr-verify`**, **`a7-gate`**, **`decision-spine`**, **`playwright`** (**mock E2E**, **integrated axe**,
+  **integrated AUTO S5**) y **`certify`** **`success`**.
+- **Sigue ABIERTA y declarada** la intermitencia del arranque en frío de `S5-04`: intento 0 **`failed`
+  en `64.92s`** (`60.01s` de espera de la evidencia de la sesión LAB) e intento 1 **`passed` en `7.45s`**
+  (`1 flaky` ⇒ job `success`); los otros 3 tests pasan en **ambos** intentos. Mismo fenómeno declarado en
+  `v2.88.136` y `v2.88.137`, con `timeouts`/`retries`/`ADR-046` **sin tocar**.
+
+**`Δ producto` = 0.** El sello es **UI/read-model puro + documentación** (solo `apps/web` +
+`packages/shared` + `docs/` + bumps de versión): no toca motor, umbrales ADR-046, contrato HTTP ni
+migración; la ventana PAPER real (ADR-046) sigue **`INCONCLUSIVE`** (`0/4 días`, `0/2 regímenes`,
+`0/32 ciclos`; ledger: `medidos=0`, `veto=3` por `BEAR_TREND` ⇒ `NO_MEDIDO_REGIMEN`).
