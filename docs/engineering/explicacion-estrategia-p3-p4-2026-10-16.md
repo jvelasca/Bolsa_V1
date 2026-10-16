@@ -1,7 +1,7 @@
 # Explicación P3→P4 de la estrategia seleccionada y qué es un «día operable»
 
-> **AsOf:** 2026-10-16 · **package** `2.11.137-beta` · **Alembic head** `055_dia_d_identity_nullable` (**sin migración**) ·
-> **`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0`** · **sin tag nuevo**.
+> **AsOf:** 2026-10-16 · **package** `2.11.138-beta` · **Alembic head** `055_dia_d_identity_nullable` (**sin migración**) ·
+> **`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0`** · **sellado en `v2.88.138-beta`** (cerró los dos hallazgos de auditoría del incremento `9f0ae3ad`).
 > **Naturaleza:** read-model puro de UI (`apps/web`) + identidad de la etapa `EXPLANATION` en `@bolsa/shared` + documentación.
 > **Este incremento NO demuestra rentabilidad** y **no** cierra la ventana PAPER (ADR-046), que sigue `INCONCLUSIVE`.
 
