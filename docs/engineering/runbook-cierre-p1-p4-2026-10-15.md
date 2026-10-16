@@ -35,12 +35,20 @@ instrumentos, las barras, la lista ESTUDIO y la cuenta de la ventana. Con la BD 
    constitutivos y sus barras diarias y crea la lista de catálogo `ibex35`; después se publica la
    lista ESTUDIO con `SqlAlchemyListRepository.update('estudio', instrument_ids=<catálogo>)`
    (`ensure_estudio_list()` antes). Medido el `2026-10-16`: 35 instrumentos, 17 854 barras `1d`.
-2. **Cuenta + par A/B de la ventana:** `uv run --no-sync python apps/api-python/scripts/ops_seed_window_pair.py
-   --account-id <cuenta> --version-a v283-window-a --version-b v283-window-b` (idempotente; **exige**
-   que la cuenta exista: sin ella devuelve `exit 2`, no la acuña con ese id).
+2. **Cuenta + par A/B de la ventana.** La cuenta fija `1484e253d2d54645945a6b1d7`
+   (`PAPER-VENTANA-a9c515`) se re-siembra con el **MISMO id documentado** usando el constructor del
+   repo (`create_simulated_account(initial_deposit=100000.0)`) **forzando solo el id de la cuenta**
+   —precedente del `2026-10-02`, [`arranque-ventana-paper-operativa-2026-09-27.md`](./arranque-ventana-paper-operativa-2026-09-27.md)
+   §0.2—; después, el par A/B:
+   `uv run --no-sync python apps/api-python/scripts/ops_seed_window_pair.py --account-id <cuenta>
+   --version-a v283-window-a --version-b v283-window-b` (idempotente; **exige** que la cuenta exista:
+   sin ella devuelve `exit 2`, **no** la acuña con ese id). `pairActive=true` significa «par
+   **sembrado**», **no** promoción gate-certificada.
 3. **API** arriba **desde el árbol pineado**: `GET /api/health/ready` → `ready`. Ojo: el readiness es
    *schema-aware*, así que una API vieja corriendo contra una BD ya migrada responde **`503`** y el
-   `run-day` aborta con `API_NOT_READY` (no es veto).
+   `run-day` aborta con `API_NOT_READY` (no es veto). Declara además `PAPER_D_ACCOUNT_ID=<cuenta>` y
+   `BROKER_VENUE=paper` en `.env` y reinicia la API para releerlo (el runner de la ventana ya inyecta
+   `BROKER_VENUE=paper` en el proceso hijo).
 
 
 - **Flags de motor OFF** (SIM-only): `AUTO_ORCHESTRATOR_ENABLED` / `AUTO_SIMULATION_WORKER_ENABLED`

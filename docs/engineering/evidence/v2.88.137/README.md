@@ -105,13 +105,33 @@ Bundle `v2_100` del día (`operability_runs/daily-evidence/20261016/`): `P1 INCO
 **Continuidad del entorno (medida, no supuesta).** La BD de desarrollo se recreó durante la
 remediación de `v2.88.136` (drop + create para esquivar el tope de columnas de
 `sim_fill_finance_context`), así que el `preflight` de la ventana fallaba **duro**
-(`watch ESTUDIO vacío (status='empty')`), **no** como veto. El catálogo y el universo ESTUDIO se
-re-sembraron con los **casos de uso del producto** (`SubscribeMarketIndex('IBEX35', sync_bars=True)`:
-**35** instrumentos y **17 854** barras `1d` reales de Yahoo + `estudio = ibex35`), quedando el
-`preflight` de nuevo funcional (`watchSource: estudio`, `barsLoaded: 35`). La **cuenta** de la ventana
-(`1484e253d2d54645945a6b1d7`) y su par A/B **siguen sin restaurar** (el sembrador exige que la cuenta
-exista y no la acuña con ese id): se declara como **pendiente del operador** para el primer día
-**operable**, y no afecta a ningún día vetado (un veto se registra sin forward ni API).
+(`watch ESTUDIO vacío (status='empty')`), **no** como veto. El entorno se re-sembró con los **casos de
+uso del producto**, no a mano:
+
+- **Catálogo + barras + ESTUDIO:** `SubscribeMarketIndex('IBEX35', sync_bars=True, years_back=2)` ⇒
+  **35** instrumentos y **17 854** barras `1d` reales de Yahoo (+ lista de catálogo `ibex35`), y
+  `estudio = ibex35` con `SqlAlchemyListRepository.update`. El `preflight` vuelve a funcionar
+  (`watchSource: estudio`, `barsLoaded: 35`).
+- **Cuenta fija de la ventana** `1484e253d2d54645945a6b1d7` (`PAPER-VENTANA-a9c515`, `simulated`,
+  `active`): re-sembrada con **el MISMO id documentado** —precedente idéntico del `2026-10-02`,
+  [`arranque-ventana-paper-operativa-2026-09-27.md`](./arranque-ventana-paper-operativa-2026-09-27.md)
+  §0.2— usando el constructor del repo (`create_simulated_account`, `initial_deposit=100000.0`) y
+  forzando **solo** el id de la cuenta ⇒ **1** cartera de inversión + **1** asiento de depósito.
+- **Par A/B:** `ops_seed_window_pair.py --account-id … --version-a v283-window-a --version-b
+  v283-window-b` ⇒ `v283-window-b` creada (`PAPER-WINDOW sma_crossover`), `EdgeReport` de **A** y de
+  **B** y el localizador de promoción por cuenta (`promoted=true`, **no** gate-certificada:
+  `pairActive` ⇒ «par **sembrado**»), con watch derivado de **20** símbolos del catálogo.
+
+**Verificación read-only tras la re-siembra:** `estudio: ok · 35` valores · **35** instrumentos con
+**17 854** barras `1d` · cuenta `('1484e253d2d54645945a6b1d7', 'PAPER-VENTANA-a9c515', 'simulated',
+'active')` con **1** cartera y **1** asiento · `v283-window-b = PAPER-WINDOW sma_crossover` · **1**
+localizador de promoción · **2** `edge_reports`.
+
+**Pendiente del operador para el primer día OPERABLE** (no afecta a ningún día vetado: un veto se
+registra sin forward ni API): (1) reiniciar la API **desde el árbol pineado** —el readiness es
+schema-aware, así que la API vieja contra la BD ya migrada responde `503` y el `run-day` aborta con
+`API_NOT_READY`, que **no** es veto—; y (2) declarar en `.env` `PAPER_D_ACCOUNT_ID=1484e253d2d54645945a6b1d7`
+y `BROKER_VENUE=paper` (el runner de la ventana ya inyecta `BROKER_VENUE=paper` en el hijo).
 
 ---
 
