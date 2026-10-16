@@ -24,8 +24,8 @@
  * Docs: docs/engineering/runbook-ventana-forward-v2.78-2026-09-27.md
  *       docs/engineering/arranque-ventana-paper-operativa-2026-09-27.md
  */
-import { spawn, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   appendFileSync,
   copyFileSync,
@@ -35,15 +35,16 @@ import {
   readFileSync,
   rmSync,
   writeFileSync,
-} from 'node:fs';
-import { hostname } from 'node:os';
-import { dirname, join } from 'node:path';
-import { loadEnvFile } from './lib/load-env.mjs';
-import { ROOT, logError, logInfo, logWarn } from './lib/logger.mjs';
+} from "node:fs";
+import { hostname } from "node:os";
+import { dirname, join } from "node:path";
+import { loadEnvFile } from "./lib/load-env.mjs";
+import { ROOT, logError, logInfo, logWarn } from "./lib/logger.mjs";
 import {
   AUDIT_JSON,
   FORWARD_GLOB,
   LEDGER_PATH,
+  RUNS_DIR,
   WINDOW_HTML,
   WINDOW_JSON,
   WINDOW_MIN_CYCLES,
@@ -69,17 +70,19 @@ import {
   unlockDecision,
   verifyWindowProvenance,
   windowConfig,
-} from './lib/window-forward.mjs';
+} from "./lib/window-forward.mjs";
 
-const SCRIPT_FORWARD = 'apps/api-python/scripts/v2_76_forward_market_material.py';
-const SCRIPT_JOURNAL = 'apps/api-python/scripts/v2_77_market_operability.py';
-const SCRIPT_WINDOW = 'apps/api-python/scripts/v2_80_market_window.py';
-const SCRIPT_AUDIT = 'apps/api-python/scripts/v2_83_window_audit.py';
-const SCRIPT_EVIDENCE = 'apps/api-python/scripts/v2_100_operational_certification_evidence.py';
+const SCRIPT_FORWARD =
+  "apps/api-python/scripts/v2_76_forward_market_material.py";
+const SCRIPT_JOURNAL = "apps/api-python/scripts/v2_77_market_operability.py";
+const SCRIPT_WINDOW = "apps/api-python/scripts/v2_80_market_window.py";
+const SCRIPT_AUDIT = "apps/api-python/scripts/v2_83_window_audit.py";
+const SCRIPT_EVIDENCE =
+  "apps/api-python/scripts/v2_100_operational_certification_evidence.py";
 
-const TASK_NAME = 'BolsaV1_WindowForward';
-const DEFAULT_TASK_TIME = '18:00';
-const SCOPE = 'window';
+const TASK_NAME = "BolsaV1_WindowForward";
+const DEFAULT_TASK_TIME = "18:00";
+const SCOPE = "window";
 
 // ---------------------------------------------------------------------------
 // CLI
@@ -98,19 +101,20 @@ function parseArgs(argv) {
   const unknown = [];
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--force') flags.force = true;
-    else if (arg === '--dry-run') flags.dryRun = true;
-    else if (arg === '--skip-api-check') flags.skipApiCheck = true;
-    else if (arg === '--unsafe-override-window-config') flags.unsafeOverride = true;
-    else if (arg === '--help' || arg === '-h') flags.help = true;
-    else if (arg === '--at') {
+    if (arg === "--force") flags.force = true;
+    else if (arg === "--dry-run") flags.dryRun = true;
+    else if (arg === "--skip-api-check") flags.skipApiCheck = true;
+    else if (arg === "--unsafe-override-window-config")
+      flags.unsafeOverride = true;
+    else if (arg === "--help" || arg === "-h") flags.help = true;
+    else if (arg === "--at") {
       flags.at = argv[i + 1] ?? null;
       i += 1;
-    } else if (arg.startsWith('--at=')) flags.at = arg.slice('--at='.length);
-    else if (arg.startsWith('--')) unknown.push(arg);
+    } else if (arg.startsWith("--at=")) flags.at = arg.slice("--at=".length);
+    else if (arg.startsWith("--")) unknown.push(arg);
     else positionals.push(arg);
   }
-  return { command: positionals[0] ?? 'help', positionals, flags, unknown };
+  return { command: positionals[0] ?? "help", positionals, flags, unknown };
 }
 
 function printHelp() {
@@ -150,7 +154,7 @@ function childEnv(config) {
 }
 
 function uvBin() {
-  return process.env.WINDOW_UV || 'uv';
+  return process.env.WINDOW_UV || "uv";
 }
 
 let LAUNCHER = null;
@@ -165,23 +169,35 @@ let LAUNCHER = null;
 async function resolveLauncher() {
   if (LAUNCHER) return LAUNCHER;
   if (process.env.WINDOW_PY) {
-    LAUNCHER = { bin: process.env.WINDOW_PY, prefix: [], label: process.env.WINDOW_PY };
+    LAUNCHER = {
+      bin: process.env.WINDOW_PY,
+      prefix: [],
+      label: process.env.WINDOW_PY,
+    };
     return LAUNCHER;
   }
   const uv = uvBin();
-  const probe = await runProcess(uv, ['run', '--no-sync', 'python', '-c', 'print(0)'], {
-    echo: false,
-  });
+  const probe = await runProcess(
+    uv,
+    ["run", "--no-sync", "python", "-c", "print(0)"],
+    {
+      echo: false,
+    },
+  );
   if (probe.code === 0) {
-    LAUNCHER = { bin: uv, prefix: ['run', '--no-sync', 'python'], label: `${uv} run --no-sync python` };
+    LAUNCHER = {
+      bin: uv,
+      prefix: ["run", "--no-sync", "python"],
+      label: `${uv} run --no-sync python`,
+    };
     return LAUNCHER;
   }
-  const detail = (probe.err || '').trim().split(/\r?\n/).pop() || 'fallo';
+  const detail = (probe.err || "").trim().split(/\r?\n/).pop() || "fallo";
   logWarn(
     SCOPE,
     `uv no puede lanzar python (${detail}); se usa 'python' directo (override con WINDOW_PY)`,
   );
-  LAUNCHER = { bin: 'python', prefix: [], label: 'python' };
+  LAUNCHER = { bin: "python", prefix: [], label: "python" };
   return LAUNCHER;
 }
 
@@ -190,38 +206,45 @@ async function resolveLauncher() {
  * volcado incremental a `logBase.out.txt` / `logBase.err.txt`.
  */
 function runProcess(bin, args, options = {}) {
-  const { cwd = ROOT, env = process.env, logBase = null, echo = true } = options;
+  const {
+    cwd = ROOT,
+    env = process.env,
+    logBase = null,
+    echo = true,
+  } = options;
   return new Promise((resolve) => {
     let child;
     try {
       child = spawn(bin, args, { cwd, env, shell: false, windowsHide: true });
     } catch (error) {
-      resolve({ code: null, out: '', err: '', spawnError: error });
+      resolve({ code: null, out: "", err: "", spawnError: error });
       return;
     }
     const outLog = logBase ? `${logBase}.out.txt` : null;
     const errLog = logBase ? `${logBase}.err.txt` : null;
     if (logBase) {
       mkdirSync(dirname(logBase), { recursive: true });
-      writeFileSync(outLog, '', 'utf8');
-      writeFileSync(errLog, '', 'utf8');
+      writeFileSync(outLog, "", "utf8");
+      writeFileSync(errLog, "", "utf8");
     }
-    let out = '';
-    let err = '';
-    child.stdout.on('data', (chunk) => {
+    let out = "";
+    let err = "";
+    child.stdout.on("data", (chunk) => {
       const text = chunk.toString();
       out += text;
       if (echo) process.stdout.write(text);
-      if (outLog) appendFileSync(outLog, text, 'utf8');
+      if (outLog) appendFileSync(outLog, text, "utf8");
     });
-    child.stderr.on('data', (chunk) => {
+    child.stderr.on("data", (chunk) => {
       const text = chunk.toString();
       err += text;
       if (echo) process.stderr.write(text);
-      if (errLog) appendFileSync(errLog, text, 'utf8');
+      if (errLog) appendFileSync(errLog, text, "utf8");
     });
-    child.on('error', (error) => resolve({ code: null, out, err, spawnError: error }));
-    child.on('close', (code) => resolve({ code, out, err }));
+    child.on("error", (error) =>
+      resolve({ code: null, out, err, spawnError: error }),
+    );
+    child.on("close", (code) => resolve({ code, out, err }));
   });
 }
 
@@ -236,9 +259,13 @@ async function runPython(script, args, options = {}) {
 
 /** `git rev-parse "HEAD:apps" "HEAD:packages"` + contraste con el sello. */
 async function gitFreeze(config) {
-  const res = await runProcess('git', ['rev-parse', 'HEAD:apps', 'HEAD:packages'], {
-    echo: false,
-  });
+  const res = await runProcess(
+    "git",
+    ["rev-parse", "HEAD:apps", "HEAD:packages"],
+    {
+      echo: false,
+    },
+  );
   const revisions = parseRevParse(res.out);
   if (res.code !== 0) {
     return {
@@ -249,7 +276,7 @@ async function gitFreeze(config) {
       expectedPackages: config.packagesHash,
       appsOk: false,
       packagesOk: false,
-      error: res.err.trim() || 'git rev-parse fallo',
+      error: res.err.trim() || "git rev-parse fallo",
     };
   }
   return { ...freezeCheck(revisions, config), error: null };
@@ -257,11 +284,19 @@ async function gitFreeze(config) {
 
 /** Precondicion dura: PostgreSQL listo (`db-ensure --ping`, read-only). */
 async function pgPing() {
-  const res = await runProcess(process.execPath, [join(ROOT, 'scripts', 'db-ensure.mjs'), '--ping'], {
-    echo: false,
-  });
+  const res = await runProcess(
+    process.execPath,
+    [join(ROOT, "scripts", "db-ensure.mjs"), "--ping"],
+    {
+      echo: false,
+    },
+  );
   const lines = `${res.out}\n${res.err}`.trim().split(/\r?\n/);
-  return { ok: res.code === 0, code: res.code, message: lines[lines.length - 1] ?? '' };
+  return {
+    ok: res.code === 0,
+    code: res.code,
+    message: lines[lines.length - 1] ?? "",
+  };
 }
 
 /**
@@ -269,9 +304,10 @@ async function pgPing() {
  * proceso; sin barras frescas el preflight cae en UNKNOWN).
  */
 async function apiReady() {
-  const port = process.env.API_PYTHON_PORT || process.env.API_PORT || '8000';
+  const port = process.env.API_PYTHON_PORT || process.env.API_PORT || "8000";
   const url =
-    process.env.WINDOW_API_READY_URL || `http://127.0.0.1:${port}/api/health/ready`;
+    process.env.WINDOW_API_READY_URL ||
+    `http://127.0.0.1:${port}/api/health/ready`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
@@ -295,7 +331,7 @@ async function apiReady() {
 
 function readJson(path) {
   try {
-    return JSON.parse(readFileSync(path, 'utf8'));
+    return JSON.parse(readFileSync(path, "utf8"));
   } catch {
     return null;
   }
@@ -303,7 +339,7 @@ function readJson(path) {
 
 /** sha256 de un fichero (para sellar y re-verificar el `window.json` del run). */
 function sha256File(path) {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
 /** ¿El PID existe en ESTE host? (`EPERM` = existe pero no es nuestro). */
@@ -314,12 +350,12 @@ function pidAlive(pid) {
     process.kill(value, 0);
     return true;
   } catch (error) {
-    return error?.code === 'EPERM';
+    return error?.code === "EPERM";
   }
 }
 
 function readLock(day) {
-  return readJson(join(ROOT, runLockDir(day), 'lock.json'));
+  return readJson(join(ROOT, runLockDir(day), "lock.json"));
 }
 
 /**
@@ -340,26 +376,29 @@ function acquireDayLock(day, iso, command, config, flags) {
       isProcessAlive: pidAlive,
       force: flags.force,
     });
-    if (decision.action === 'blocked') {
+    if (decision.action === "blocked") {
       logError(
         SCOPE,
         `RUN_ALREADY_IN_PROGRESS (${decision.reason}): el dia ${day} ya tiene un run en curso ` +
-          `(pid ${existing?.pid ?? 'n/d'} · host ${existing?.host ?? 'n/d'} · ${existing?.startedAt ?? 'n/d'})`,
+          `(pid ${existing?.pid ?? "n/d"} · host ${existing?.host ?? "n/d"} · ${existing?.startedAt ?? "n/d"})`,
       );
       return null;
     }
-    if (decision.action === 'reclaim') {
-      logWarn(SCOPE, `lock huerfano (${decision.reason}); se reclama el lock del dia ${day}`);
+    if (decision.action === "reclaim") {
+      logWarn(
+        SCOPE,
+        `lock huerfano (${decision.reason}); se reclama el lock del dia ${day}`,
+      );
       rmSync(lockPath, { recursive: true, force: true });
     }
     try {
       mkdirSync(lockPath);
     } catch (error) {
-      if (error?.code === 'EEXIST') continue; // otra instancia gano la carrera: se reevalua.
+      if (error?.code === "EEXIST") continue; // otra instancia gano la carrera: se reevalua.
       throw error;
     }
     writeFileSync(
-      join(lockPath, 'lock.json'),
+      join(lockPath, "lock.json"),
       `${JSON.stringify(
         {
           day,
@@ -373,24 +412,27 @@ function acquireDayLock(day, iso, command, config, flags) {
         null,
         2,
       )}\n`,
-      'utf8',
+      "utf8",
     );
     return () => rmSync(lockPath, { recursive: true, force: true });
   }
-  logError(SCOPE, `no se pudo adquirir el lock del dia ${day} (contencion tras 3 intentos)`);
+  logError(
+    SCOPE,
+    `no se pudo adquirir el lock del dia ${day} (contencion tras 3 intentos)`,
+  );
   return null;
 }
 
 /** Dias (bajo `window-runs/`) con un lock vivo en este host; solo para avisar en `status`. */
 function activeLockDays() {
-  const runsRoot = dirname(join(ROOT, runDir('x')));
+  const runsRoot = dirname(join(ROOT, runDir("x")));
   if (!existsSync(runsRoot)) return [];
   const host = hostname();
   const days = [];
   for (const entry of readdirSync(runsRoot, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const lock = readLock(entry.name);
-    if (lock && String(lock.host ?? '') === host && pidAlive(lock.pid)) {
+    if (lock && String(lock.host ?? "") === host && pidAlive(lock.pid)) {
       days.push({ day: entry.name, ...lock });
     }
   }
@@ -401,7 +443,7 @@ function readLedger() {
   const path = join(ROOT, LEDGER_PATH);
   if (!existsSync(path)) return [];
   const rows = [];
-  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+  for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
@@ -416,7 +458,7 @@ function readLedger() {
 function appendLedger(entry) {
   const path = join(ROOT, LEDGER_PATH);
   mkdirSync(dirname(path), { recursive: true });
-  appendFileSync(path, `${JSON.stringify(entry)}\n`, 'utf8');
+  appendFileSync(path, `${JSON.stringify(entry)}\n`, "utf8");
 }
 
 function ledgerEntry(manifest) {
@@ -429,12 +471,16 @@ function ledgerEntry(manifest) {
     account: manifest.account,
     versionA: manifest.versionA,
     watchSize: manifest.watchSize,
-    configMode: manifest.configMode ?? 'FROZEN',
+    configMode: manifest.configMode ?? "FROZEN",
     configOverrides: manifest.configOverrides ?? [],
     regime: manifest.regime ?? null,
     gate: manifest.gate ?? null,
     freeze: manifest.freeze
-      ? { ok: manifest.freeze.ok, apps: manifest.freeze.apps, packages: manifest.freeze.packages }
+      ? {
+          ok: manifest.freeze.ok,
+          apps: manifest.freeze.apps,
+          packages: manifest.freeze.packages,
+        }
       : null,
     steps: manifest.steps ?? {},
     startedAt: manifest.startedAt,
@@ -448,13 +494,14 @@ function finishDay(manifest, steps, artifacts) {
   manifest.steps = steps;
   manifest.artifacts = artifacts;
   manifest.finishedAt = new Date().toISOString();
-  manifest.durationMs = Date.parse(manifest.finishedAt) - Date.parse(manifest.startedAt);
+  manifest.durationMs =
+    Date.parse(manifest.finishedAt) - Date.parse(manifest.startedAt);
   const dir = join(ROOT, runDir(manifest.day));
   mkdirSync(dir, { recursive: true });
   writeFileSync(
-    join(dir, 'manifest.json'),
+    join(dir, "manifest.json"),
     `${JSON.stringify(manifest, null, 2)}\n`,
-    'utf8',
+    "utf8",
   );
   appendLedger(ledgerEntry(manifest));
   printDaySummary(manifest);
@@ -466,8 +513,10 @@ function printDaySummary(manifest) {
   logInfo(
     SCOPE,
     `dia ${manifest.day} · ${manifest.status}` +
-      (manifest.reason ? ` (${manifest.reason})` : '') +
-      (manifest.regime ? ` · regimen ${manifest.regime.operationalRegime}` : ''),
+      (manifest.reason ? ` (${manifest.reason})` : "") +
+      (manifest.regime
+        ? ` · regimen ${manifest.regime.operationalRegime}`
+        : ""),
   );
   if (gate) {
     logInfo(
@@ -483,31 +532,36 @@ function printDaySummary(manifest) {
 // ---------------------------------------------------------------------------
 
 function preflightArgs(config) {
-  const args = ['--preflight-only', '--watch-size', String(config.watchSize), '--json'];
-  if (config.watchFromEstudio) args.push('--watch-from-estudio');
+  const args = [
+    "--preflight-only",
+    "--watch-size",
+    String(config.watchSize),
+    "--json",
+  ];
+  if (config.watchFromEstudio) args.push("--watch-from-estudio");
   return args;
 }
 
 function forwardArgs(config, day) {
   const args = [
-    '--account-id',
+    "--account-id",
     config.account,
-    '--version-a',
+    "--version-a",
     config.versionA,
-    '--watch-size',
+    "--watch-size",
     String(config.watchSize),
-    '--interval-seconds',
-    '60',
-    '--max-ticks',
-    '400',
-    '--stop-when-ready',
-    '--level',
-    'evidence',
-    '--json',
-    '--out',
+    "--interval-seconds",
+    "60",
+    "--max-ticks",
+    "400",
+    "--stop-when-ready",
+    "--level",
+    "evidence",
+    "--json",
+    "--out",
     forwardPath(day),
   ];
-  if (config.watchFromEstudio) args.push('--watch-from-estudio');
+  if (config.watchFromEstudio) args.push("--watch-from-estudio");
   return args;
 }
 
@@ -516,11 +570,13 @@ async function cmdPreflight(config, flags) {
   if (flags.dryRun) {
     logInfo(
       SCOPE,
-      `--dry-run · preflight: ${launcher.label} ${SCRIPT_FORWARD} ${preflightArgs(config).join(' ')}`,
+      `--dry-run · preflight: ${launcher.label} ${SCRIPT_FORWARD} ${preflightArgs(config).join(" ")}`,
     );
     return 0;
   }
-  const res = await runPython(SCRIPT_FORWARD, preflightArgs(config), { env: childEnv(config) });
+  const res = await runPython(SCRIPT_FORWARD, preflightArgs(config), {
+    env: childEnv(config),
+  });
   const classification = classifyPreflight(res.code);
   const prePayload = parseJsonLoose(res.out);
   const payloadOk = isPreflightPayload(prePayload);
@@ -528,7 +584,7 @@ async function cmdPreflight(config, flags) {
   if (regime) {
     logInfo(
       SCOPE,
-      `preflight: eje ${regime.operationalRegime} · LONG ${regime.entriesAllowedLong ? 'PERMITIDAS' : 'VETADAS'} (exit ${res.code})`,
+      `preflight: eje ${regime.operationalRegime} · LONG ${regime.entriesAllowedLong ? "PERMITIDAS" : "VETADAS"} (exit ${res.code})`,
     );
   }
   // Un `exit 2` SIN payload de preflight es un fallo duro (p. ej. el interprete
@@ -541,7 +597,10 @@ async function cmdPreflight(config, flags) {
     return 1;
   }
   if (classification.veto) {
-    logWarn(SCOPE, 'veto de regimen legitimo: se DECLARA NO_MEDIDO_REGIMEN; no se fuerza el gobernador');
+    logWarn(
+      SCOPE,
+      "veto de regimen legitimo: se DECLARA NO_MEDIDO_REGIMEN; no se fuerza el gobernador",
+    );
   } else if (classification.hard) {
     logError(SCOPE, `preflight fallo de forma dura (exit ${res.code})`);
   }
@@ -559,7 +618,7 @@ async function cmdRunDay(config, flags) {
 
   // Lock diario atomico ANTES de la idempotencia y del freeze: dos `run-day`
   // simultaneos del mismo dia no pueden coexistir (un `--force` no salta el lock vivo).
-  const release = acquireDayLock(day, iso, 'run-day', config, flags);
+  const release = acquireDayLock(day, iso, "run-day", config, flags);
   if (!release) return 1;
   try {
     return await runDayBody(config, flags, { day, iso, startedAt });
@@ -592,7 +651,7 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
   mkdirSync(dir, { recursive: true });
 
   // Idempotencia: un dia terminal no se re-ejecuta salvo `--force`.
-  const manifestPath = join(dir, 'manifest.json');
+  const manifestPath = join(dir, "manifest.json");
   if (existsSync(manifestPath) && !flags.force) {
     const previous = readJson(manifestPath);
     if (previous && isTerminalStatus(previous.status)) {
@@ -600,15 +659,15 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
         SCOPE,
         `dia ${day} ya registrado como ${previous.status} — se omite (usa --force para repetir)`,
       );
-      return previous.status === 'HARD_ERROR' ? 1 : 0;
+      return previous.status === "HARD_ERROR" ? 1 : 0;
     }
   }
 
   // Freeze: si el arbol de codigo se movio, la ventana deja de ser de un solo arbol.
   manifest.freeze = await gitFreeze(config);
   if (!manifest.freeze.ok) {
-    manifest.status = 'HARD_ERROR';
-    manifest.reason = 'TREE_MOVED';
+    manifest.status = "HARD_ERROR";
+    manifest.reason = "TREE_MOVED";
     logError(
       SCOPE,
       `arbol de codigo movido (apps=${manifest.freeze.apps} esperado ${manifest.freeze.expectedApps}; ` +
@@ -621,23 +680,30 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
   // Precondiciones duras: no son veto de mercado.
   const pg = await pgPing();
   if (!pg.ok) {
-    manifest.status = 'HARD_ERROR';
-    manifest.reason = 'POSTGRES_DOWN';
-    logError(SCOPE, `PostgreSQL no responde (${pg.message}) — aborta; NO es veto`);
+    manifest.status = "HARD_ERROR";
+    manifest.reason = "POSTGRES_DOWN";
+    logError(
+      SCOPE,
+      `PostgreSQL no responde (${pg.message}) — aborta; NO es veto`,
+    );
     finishDay(manifest, steps, artifacts);
     return 1;
   }
   // 1) Preflight
   const pre = await runPython(SCRIPT_FORWARD, preflightArgs(config), {
     env: childEnv(config),
-    logBase: join(dir, 'preflight'),
+    logBase: join(dir, "preflight"),
   });
   steps.preflight = { exit: pre.code, ...classifyPreflight(pre.code) };
   const prePayload = parseJsonLoose(pre.out);
   const payloadOk = isPreflightPayload(prePayload);
   if (payloadOk) {
-    writeFileSync(join(dir, 'preflight.json'), `${JSON.stringify(prePayload, null, 2)}\n`, 'utf8');
-    artifacts.preflight = 'preflight.json';
+    writeFileSync(
+      join(dir, "preflight.json"),
+      `${JSON.stringify(prePayload, null, 2)}\n`,
+      "utf8",
+    );
+    artifacts.preflight = "preflight.json";
   }
   // Un `exit 2` SIN payload de preflight es un fallo duro (interprete que no
   // arranca), NO un veto de regimen: no se declara NO_MEDIDO por un fallo.
@@ -646,30 +712,33 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
       ...steps.preflight,
       veto: false,
       hard: true,
-      kind: 'error',
-      reason: 'preflight_sin_payload',
+      kind: "error",
+      reason: "preflight_sin_payload",
     };
-    logError(SCOPE, `preflight exit ${pre.code} sin payload valido: FALLO DURO, no veto`);
+    logError(
+      SCOPE,
+      `preflight exit ${pre.code} sin payload valido: FALLO DURO, no veto`,
+    );
   }
   manifest.regime = payloadOk ? parsePreflight(prePayload) : null;
   if (manifest.regime) {
     logInfo(
       SCOPE,
       `preflight: eje ${manifest.regime.operationalRegime} · LONG ` +
-        `${manifest.regime.entriesAllowedLong ? 'PERMITIDAS' : 'VETADAS'} (exit ${pre.code})`,
+        `${manifest.regime.entriesAllowedLong ? "PERMITIDAS" : "VETADAS"} (exit ${pre.code})`,
     );
   }
   if (steps.preflight.hard) {
-    manifest.status = 'HARD_ERROR';
-    manifest.reason = 'PREFLIGHT_ERROR';
+    manifest.status = "HARD_ERROR";
+    manifest.reason = "PREFLIGHT_ERROR";
     finishDay(manifest, steps, artifacts);
     return 1;
   }
   if (steps.preflight.veto) {
-    manifest.status = 'NO_MEDIDO_REGIMEN';
+    manifest.status = "NO_MEDIDO_REGIMEN";
     manifest.veto = true;
-    manifest.reason = 'regime_invalid';
-    logWarn(SCOPE, 'veto de regimen: dia NO computable; no se lanza forward');
+    manifest.reason = "regime_invalid";
+    logWarn(SCOPE, "veto de regimen: dia NO computable; no se lanza forward");
     finishDay(manifest, steps, artifacts);
     return 0;
   }
@@ -680,12 +749,12 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
     const api = await apiReady();
     manifest.api = { ok: api.ok, url: api.url, status: api.status };
     if (!api.ok) {
-      manifest.status = 'HARD_ERROR';
-      manifest.reason = 'API_NOT_READY';
+      manifest.status = "HARD_ERROR";
+      manifest.reason = "API_NOT_READY";
       logError(
         SCOPE,
         `API no lista en ${api.url} (${api.error ?? `HTTP ${api.status}`}) — aborta; ` +
-          'el scheduler de barras vive en el API (usa --skip-api-check para omitir la comprobacion)',
+          "el scheduler de barras vive en el API (usa --skip-api-check para omitir la comprobacion)",
       );
       finishDay(manifest, steps, artifacts);
       return 1;
@@ -695,17 +764,17 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
   // 2) Forward del dia (reloj REAL; los cubos salen de created_at = now).
   const fwd = await runPython(SCRIPT_FORWARD, forwardArgs(config, day), {
     env: childEnv(config),
-    logBase: join(dir, 'forward'),
+    logBase: join(dir, "forward"),
   });
   steps.forward = { exit: fwd.code, ...classifyExit(fwd.code) };
   const canonicalForward = join(ROOT, forwardPath(day));
   if (existsSync(canonicalForward)) {
-    copyFileSync(canonicalForward, join(dir, 'forward.json'));
-    artifacts.forward = 'forward.json';
+    copyFileSync(canonicalForward, join(dir, "forward.json"));
+    artifacts.forward = "forward.json";
   }
   if (steps.forward.hard) {
-    manifest.status = 'HARD_ERROR';
-    manifest.reason = 'FORWARD_ERROR';
+    manifest.status = "HARD_ERROR";
+    manifest.reason = "FORWARD_ERROR";
     logError(SCOPE, `forward fallo de forma dura (exit ${fwd.code})`);
     finishDay(manifest, steps, artifacts);
     return 1;
@@ -715,48 +784,50 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
   if (existsSync(canonicalForward)) {
     const journal = await runPython(
       SCRIPT_JOURNAL,
-      ['--forward', forwardPath(day), '--render'],
-      { env: childEnv(config), logBase: join(dir, 'journal') },
+      ["--forward", forwardPath(day), "--render"],
+      { env: childEnv(config), logBase: join(dir, "journal") },
     );
     steps.journal = { exit: journal.code, ...classifyExit(journal.code) };
   } else {
-    steps.journal = { exit: null, kind: 'skipped', reason: 'sin forward json' };
+    steps.journal = { exit: null, kind: "skipped", reason: "sin forward json" };
   }
 
   // 4) Ventana (v2_80): lee el journal DURABLE y enriquece con el forward.
   const win = await runPython(
     SCRIPT_WINDOW,
     [
-      '--account-id',
+      "--account-id",
       config.account,
-      '--strategy-version',
+      "--strategy-version",
       config.versionA,
-      '--days',
+      "--days",
       String(config.days),
-      '--forward',
+      "--forward",
       FORWARD_GLOB,
-      '--json',
-      '--out',
+      "--json",
+      "--out",
       WINDOW_JSON,
-      '--html',
+      "--html",
       WINDOW_HTML,
     ],
-    { env: childEnv(config), logBase: join(dir, 'window') },
+    { env: childEnv(config), logBase: join(dir, "window") },
   );
   steps.window = { exit: win.code, ...classifyExit(win.code) };
   const windowJsonPath = join(ROOT, WINDOW_JSON);
   if (existsSync(windowJsonPath)) {
-    copyFileSync(windowJsonPath, join(dir, 'window.json'));
-    artifacts.window = 'window.json';
+    copyFileSync(windowJsonPath, join(dir, "window.json"));
+    artifacts.window = "window.json";
     if (existsSync(join(ROOT, WINDOW_HTML))) {
-      copyFileSync(join(ROOT, WINDOW_HTML), join(dir, 'window.html'));
-      artifacts.windowHtml = 'window.html';
+      copyFileSync(join(ROOT, WINDOW_HTML), join(dir, "window.html"));
+      artifacts.windowHtml = "window.html";
     }
-    manifest.gate = parseGate(parseJsonLoose(win.out) ?? readJson(windowJsonPath));
+    manifest.gate = parseGate(
+      parseJsonLoose(win.out) ?? readJson(windowJsonPath),
+    );
   }
   if (steps.window.hard) {
-    manifest.status = 'HARD_ERROR';
-    manifest.reason = 'WINDOW_ERROR';
+    manifest.status = "HARD_ERROR";
+    manifest.reason = "WINDOW_ERROR";
     finishDay(manifest, steps, artifacts);
     return 1;
   }
@@ -765,25 +836,38 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
   if (existsSync(windowJsonPath)) {
     const audit = await runPython(
       SCRIPT_AUDIT,
-      ['--window', WINDOW_JSON, '--forward', FORWARD_GLOB, '--json', '--out', AUDIT_JSON],
-      { env: childEnv(config), logBase: join(dir, 'audit') },
+      [
+        "--window",
+        WINDOW_JSON,
+        "--forward",
+        FORWARD_GLOB,
+        "--json",
+        "--out",
+        AUDIT_JSON,
+      ],
+      { env: childEnv(config), logBase: join(dir, "audit") },
     );
     steps.audit = { exit: audit.code, ...classifyExit(audit.code) };
     if (existsSync(join(ROOT, AUDIT_JSON))) {
-      copyFileSync(join(ROOT, AUDIT_JSON), join(dir, 'audit.json'));
-      artifacts.audit = 'audit.json';
+      copyFileSync(join(ROOT, AUDIT_JSON), join(dir, "audit.json"));
+      artifacts.audit = "audit.json";
     }
   } else {
-    steps.audit = { exit: null, kind: 'skipped', reason: 'sin ventana json' };
+    steps.audit = { exit: null, kind: "skipped", reason: "sin ventana json" };
   }
 
   const hard = Object.values(steps).some((step) => step.hard);
-  manifest.status = resolveDayStatus({ preflight: steps.preflight, window: steps.window, hard });
+  manifest.status = resolveDayStatus({
+    preflight: steps.preflight,
+    window: steps.window,
+    hard,
+  });
   manifest.veto = Boolean(steps.preflight.veto);
-  if (manifest.status === 'NO_MEDIDO_REGIMEN') manifest.reason = 'regime_invalid';
+  if (manifest.status === "NO_MEDIDO_REGIMEN")
+    manifest.reason = "regime_invalid";
 
   // Provenance: liga el gate al run (dia/cuenta/version + freeze + sha256 del window.json).
-  const runWindowPath = join(dir, 'window.json');
+  const runWindowPath = join(dir, "window.json");
   if (existsSync(runWindowPath)) {
     const windowPayload = parseJsonLoose(win.out) ?? readJson(windowJsonPath);
     manifest.windowProvenance = {
@@ -802,7 +886,7 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
   }
 
   finishDay(manifest, steps, artifacts);
-  return manifest.status === 'HARD_ERROR' ? 1 : 0;
+  return manifest.status === "HARD_ERROR" ? 1 : 0;
 }
 
 async function dryRunDay(config, day) {
@@ -810,12 +894,18 @@ async function dryRunDay(config, day) {
     SCOPE,
     `--dry-run · dia ${day} · cuenta ${config.account} · versionA ${config.versionA} · watch ${config.watchSize} · config ${config.configMode}`,
   );
-  if (config.configMode === 'UNSAFE') {
-    logWarn(SCOPE, `CONFIG_OVERRIDE = UNSAFE · overrides ${config.configOverrides.join(', ') || 'ninguno'}`);
+  if (config.configMode === "UNSAFE") {
+    logWarn(
+      SCOPE,
+      `CONFIG_OVERRIDE = UNSAFE · overrides ${config.configOverrides.join(", ") || "ninguno"}`,
+    );
   }
   const freeze = await gitFreeze(config);
   if (freeze.ok) {
-    logInfo(SCOPE, `freeze OK · apps ${freeze.apps} · packages ${freeze.packages}`);
+    logInfo(
+      SCOPE,
+      `freeze OK · apps ${freeze.apps} · packages ${freeze.packages}`,
+    );
   } else {
     logError(
       SCOPE,
@@ -826,19 +916,31 @@ async function dryRunDay(config, day) {
   const scripts = [SCRIPT_FORWARD, SCRIPT_JOURNAL, SCRIPT_WINDOW, SCRIPT_AUDIT];
   const missing = scripts.filter((script) => !existsSync(join(ROOT, script)));
   if (missing.length > 0) {
-    logError(SCOPE, `faltan scripts del pipeline: ${missing.join(', ')}`);
+    logError(SCOPE, `faltan scripts del pipeline: ${missing.join(", ")}`);
     return 1;
   }
   const launcher = await resolveLauncher();
   const py = launcher.label;
-  console.log('Cadena que se ejecutaria:');
-  console.log(`  1. ${py} ${SCRIPT_FORWARD} ${preflightArgs(config).join(' ')}`);
-  console.log(`  2. ${py} ${SCRIPT_FORWARD} ${forwardArgs(config, day).join(' ')}`);
-  console.log(`  3. ${py} ${SCRIPT_JOURNAL} --forward ${forwardPath(day)} --render`);
-  console.log(`  4. ${py} ${SCRIPT_WINDOW} --account-id ${config.account} --strategy-version ${config.versionA} --days ${config.days} --forward ${FORWARD_GLOB} --json --out ${WINDOW_JSON} --html ${WINDOW_HTML}`);
-  console.log(`  5. ${py} ${SCRIPT_AUDIT} --window ${WINDOW_JSON} --forward ${FORWARD_GLOB} --json --out ${AUDIT_JSON}`);
+  console.log("Cadena que se ejecutaria:");
+  console.log(
+    `  1. ${py} ${SCRIPT_FORWARD} ${preflightArgs(config).join(" ")}`,
+  );
+  console.log(
+    `  2. ${py} ${SCRIPT_FORWARD} ${forwardArgs(config, day).join(" ")}`,
+  );
+  console.log(
+    `  3. ${py} ${SCRIPT_JOURNAL} --forward ${forwardPath(day)} --render`,
+  );
+  console.log(
+    `  4. ${py} ${SCRIPT_WINDOW} --account-id ${config.account} --strategy-version ${config.versionA} --days ${config.days} --forward ${FORWARD_GLOB} --json --out ${WINDOW_JSON} --html ${WINDOW_HTML}`,
+  );
+  console.log(
+    `  5. ${py} ${SCRIPT_AUDIT} --window ${WINDOW_JSON} --forward ${FORWARD_GLOB} --json --out ${AUDIT_JSON}`,
+  );
   console.log(`Artefactos: ${runDir(day)}/`);
-  console.log(`Flags de operacion (solo en el hijo): ${JSON.stringify(config.operatorEnv)}`);
+  console.log(
+    `Flags de operacion (solo en el hijo): ${JSON.stringify(config.operatorEnv)}`,
+  );
   return freeze.ok ? 0 : 1;
 }
 
@@ -853,13 +955,17 @@ function resolveVerifiedGate(days) {
   let lastProblems = null;
   let sawMeasured = false;
   for (const row of [...days].reverse()) {
-    if (row.status !== 'MEDIDO') continue;
+    if (row.status !== "MEDIDO") continue;
     sawMeasured = true;
-    const runWindowPath = join(ROOT, runDir(row.day), 'window.json');
-    const manifest = readJson(join(ROOT, runDir(row.day), 'manifest.json'));
-    const windowPayload = existsSync(runWindowPath) ? readJson(runWindowPath) : null;
+    const runWindowPath = join(ROOT, runDir(row.day), "window.json");
+    const manifest = readJson(join(ROOT, runDir(row.day), "manifest.json"));
+    const windowPayload = existsSync(runWindowPath)
+      ? readJson(runWindowPath)
+      : null;
     const windowGate = parseGate(windowPayload);
-    const windowJsonSha256 = existsSync(runWindowPath) ? sha256File(runWindowPath) : null;
+    const windowJsonSha256 = existsSync(runWindowPath)
+      ? sha256File(runWindowPath)
+      : null;
     const verdict = verifyWindowProvenance({
       ledgerRow: row,
       manifest,
@@ -867,10 +973,17 @@ function resolveVerifiedGate(days) {
       windowJsonSha256,
       windowHeader: windowPayload?.meta?.header ?? null,
     });
-    if (verdict.ok) return { gate: windowGate, day: row.day, problems: [], sawMeasured };
-    if (!lastProblems) lastProblems = { day: row.day, problems: verdict.problems };
+    if (verdict.ok)
+      return { gate: windowGate, day: row.day, problems: [], sawMeasured };
+    if (!lastProblems)
+      lastProblems = { day: row.day, problems: verdict.problems };
   }
-  return { gate: null, day: null, problems: lastProblems?.problems ?? [], sawMeasured };
+  return {
+    gate: null,
+    day: null,
+    problems: lastProblems?.problems ?? [],
+    sawMeasured,
+  };
 }
 
 function cmdStatus() {
@@ -890,11 +1003,16 @@ function cmdStatus() {
     );
   }
   if (summary.total === 0) {
-    logWarn(SCOPE, 'ledger vacio: aun no hay ningun dia registrado (NO MEDIDO, nunca 0)');
+    logWarn(
+      SCOPE,
+      "ledger vacio: aun no hay ningun dia registrado (NO MEDIDO, nunca 0)",
+    );
   } else {
     for (const row of summary.days) {
-      const regime = row.regime?.operationalRegime ?? 'n/d';
-      console.log(`  ${row.day}  ${String(row.status).padEnd(18)} regimen=${regime}`);
+      const regime = row.regime?.operationalRegime ?? "n/d";
+      console.log(
+        `  ${row.day}  ${String(row.status).padEnd(18)} regimen=${regime}`,
+      );
     }
   }
   console.log(
@@ -907,10 +1025,10 @@ function cmdStatus() {
     );
   } else if (verified.sawMeasured) {
     console.log(
-      `  gate: STALE (ningun run MEDIDO con provenance valida${verified.problems.length ? `: ${verified.problems.join(', ')}` : ''})`,
+      `  gate: STALE (ningun run MEDIDO con provenance valida${verified.problems.length ? `: ${verified.problems.join(", ")}` : ""})`,
     );
   } else {
-    console.log('  gate: NO_MEDIDO (sin dias medidos)');
+    console.log("  gate: NO_MEDIDO (sin dias medidos)");
   }
   console.log(`  ledger: ${LEDGER_PATH}`);
   return 0;
@@ -925,14 +1043,14 @@ function cmdStatus() {
  */
 function evidenceArgs(config) {
   const args = [
-    '--account-id',
+    "--account-id",
     config.account,
-    '--strategy-version',
+    "--strategy-version",
     config.versionA,
-    '--strategy-version',
+    "--strategy-version",
     config.versionB,
-    '--engine-id',
-    'auto-sim',
+    "--engine-id",
+    "auto-sim",
   ];
   return args;
 }
@@ -942,15 +1060,23 @@ async function cmdEvidence(config, flags) {
   if (flags.dryRun) {
     logInfo(
       SCOPE,
-      `--dry-run · evidence: ${launcher.label} ${SCRIPT_EVIDENCE} ${evidenceArgs(config).join(' ')}`,
+      `--dry-run · evidence: ${launcher.label} ${SCRIPT_EVIDENCE} ${evidenceArgs(config).join(" ")}`,
     );
     return 0;
   }
-  const res = await runPython(SCRIPT_EVIDENCE, evidenceArgs(config), { env: childEnv(config) });
+  const res = await runPython(SCRIPT_EVIDENCE, evidenceArgs(config), {
+    env: childEnv(config),
+  });
   if (res.code !== 0) {
-    logError(SCOPE, `evidencia: v2_100 salio con codigo ${res.code} (material no leido)`);
+    logError(
+      SCOPE,
+      `evidencia: v2_100 salio con codigo ${res.code} (material no leido)`,
+    );
   } else {
-    logInfo(SCOPE, 'evidencia: bundle P1-P4 escrito en operability_runs/daily-evidence/<DIA>/');
+    logInfo(
+      SCOPE,
+      "evidencia: bundle P1-P4 escrito en operability_runs/daily-evidence/<DIA>/",
+    );
   }
   return res.code ?? 1;
 }
@@ -975,21 +1101,21 @@ function cmdUnlock(flags) {
     isProcessAlive: pidAlive,
     force: flags.force,
   });
-  if (decision.action === 'nothing') {
+  if (decision.action === "nothing") {
     logInfo(SCOPE, `no hay lock para el dia ${day}`);
     return 0;
   }
-  if (decision.action === 'deny') {
+  if (decision.action === "deny") {
     const owner =
-      existing && typeof existing === 'object'
-        ? `(pid ${existing.pid ?? 'n/d'} · host ${existing.host ?? 'n/d'} · ${existing.startedAt ?? 'n/d'})`
-        : '(lock ilegible: sin lock.json)';
+      existing && typeof existing === "object"
+        ? `(pid ${existing.pid ?? "n/d"} · host ${existing.host ?? "n/d"} · ${existing.startedAt ?? "n/d"})`
+        : "(lock ilegible: sin lock.json)";
     logError(
       SCOPE,
       `unlock DENEGADO (${decision.reason}): el lock del dia ${day} ${owner} no es reclamable por defecto` +
-        (decision.reason === 'pid_vivo'
-          ? '; hay un run en curso: no lances otro run-day'
-          : '; si estas seguro de que es un resto administrativo, usa --force'),
+        (decision.reason === "pid_vivo"
+          ? "; hay un run en curso: no lances otro run-day"
+          : "; si estas seguro de que es un resto administrativo, usa --force"),
     );
     return 1;
   }
@@ -1006,39 +1132,74 @@ function cmdUnlock(flags) {
 // Tareas programadas (Windows)
 // ---------------------------------------------------------------------------
 
-function schtasksCreateCommand(name, time) {
-  const root = ROOT.replace(/[\\/]+$/, '').replace(/\//g, '\\');
-  const pnpm = `"${root}\\node_modules\\.bin\\pnpm.cmd"`;
-  const inner = `cd /d "${root}" && ${pnpm} window:run-day`;
-  const escapedInner = inner.replace(/"/g, '\\"');
-  return `schtasks /create /tn "${name}" /tr "cmd /c \\"${escapedInner}\\"" /sc daily /st ${time} /f`;
+/** Ruta del wrapper `.cmd` que ejecuta la tarea programada (generado, no versionado). */
+function taskWrapperPath() {
+  return join(ROOT, RUNS_DIR, "window-forward-task.cmd");
+}
+
+/**
+ * Escribe (o reescribe) el wrapper `.cmd` que la tarea de Windows ejecuta.
+ *
+ * Motivo (fix 2.11.140): registrar `schtasks /tr "cmd /c \"cd ... && ...\""` con comillas
+ * ANIDADAS rompe el parseo de `schtasks` en Windows («Falta la opcion obligatoria "sc"»):
+ * las comillas internas se consumen y `/sc` deja de ser un flag. Un wrapper con una ruta
+ * SIN comillas anidadas elimina el problema: `/tr "<ruta-wrapper.cmd>"` es un unico token.
+ */
+function writeTaskWrapper() {
+  const root = ROOT.replace(/[\\/]+$/, "").replace(/\//g, "\\");
+  const pnpm = `${root}\\node_modules\\.bin\\pnpm.cmd`;
+  const content =
+    "@echo off\r\n" + `cd /d "${root}"\r\n` + `"${pnpm}" window:run-day\r\n`;
+  const wrapper = taskWrapperPath();
+  mkdirSync(dirname(wrapper), { recursive: true });
+  writeFileSync(wrapper, content, "utf8");
+  return wrapper;
+}
+
+function schtasksCreateCommand(name, time, wrapper) {
+  return `schtasks /create /tn "${name}" /tr "${wrapper}" /sc daily /st ${time} /f`;
 }
 
 function cmdTaskInstall(flags) {
-  if (process.platform !== 'win32') {
-    logInfo(SCOPE, 'task:install solo aplica a Windows (schtasks). En otro SO usa cron/systemd-timer.');
+  if (process.platform !== "win32") {
+    logInfo(
+      SCOPE,
+      "task:install solo aplica a Windows (schtasks). En otro SO usa cron/systemd-timer.",
+    );
     return 0;
   }
   const time = flags.at || DEFAULT_TASK_TIME;
-  const command = schtasksCreateCommand(TASK_NAME, time);
   if (flags.dryRun) {
-    console.log(command);
+    console.log(schtasksCreateCommand(TASK_NAME, time, taskWrapperPath()));
     return 0;
   }
+  const wrapper = writeTaskWrapper();
+  logInfo(SCOPE, `wrapper de la tarea escrito en ${wrapper}`);
+  const command = schtasksCreateCommand(TASK_NAME, time, wrapper);
   logInfo(SCOPE, `registrando tarea diaria "${TASK_NAME}" a las ${time}...`);
-  const result = spawnSync(command, [], { shell: true, encoding: 'utf8', stdio: 'inherit' });
+  const result = spawnSync(command, [], {
+    shell: true,
+    encoding: "utf8",
+    stdio: "inherit",
+  });
   if (result.status !== 0) {
-    logError(SCOPE, 'schtasks devolvio error; revisa permisos (terminal como administrador).');
+    logError(
+      SCOPE,
+      "schtasks devolvio error; revisa permisos (terminal como administrador).",
+    );
     return 1;
   }
   logInfo(SCOPE, `tarea "${TASK_NAME}" registrada.`);
-  logInfo(SCOPE, `consulta/elimina: schtasks /query /tn "${TASK_NAME}" · schtasks /delete /tn "${TASK_NAME}" /f`);
+  logInfo(
+    SCOPE,
+    `consulta/elimina: schtasks /query /tn "${TASK_NAME}" · schtasks /delete /tn "${TASK_NAME}" /f`,
+  );
   return 0;
 }
 
 function cmdTaskRemove(flags) {
-  if (process.platform !== 'win32') {
-    logInfo(SCOPE, 'task:remove solo aplica a Windows (schtasks).');
+  if (process.platform !== "win32") {
+    logInfo(SCOPE, "task:remove solo aplica a Windows (schtasks).");
     return 0;
   }
   const command = `schtasks /delete /tn "${TASK_NAME}" /f`;
@@ -1046,7 +1207,11 @@ function cmdTaskRemove(flags) {
     console.log(command);
     return 0;
   }
-  const result = spawnSync(command, [], { shell: true, encoding: 'utf8', stdio: 'inherit' });
+  const result = spawnSync(command, [], {
+    shell: true,
+    encoding: "utf8",
+    stdio: "inherit",
+  });
   if (result.status !== 0) {
     logError(SCOPE, `no se pudo eliminar la tarea "${TASK_NAME}".`);
     return 1;
@@ -1062,38 +1227,39 @@ function cmdTaskRemove(flags) {
 async function main() {
   loadEnvFile();
   const { command, flags, unknown } = parseArgs(process.argv.slice(2));
-  const unsafeOverride = flags.unsafeOverride || process.env.WINDOW_UNSAFE_CONFIG_OVERRIDE === '1';
+  const unsafeOverride =
+    flags.unsafeOverride || process.env.WINDOW_UNSAFE_CONFIG_OVERRIDE === "1";
   const config = windowConfig(process.env, { unsafeOverride });
 
-  if (flags.help || command === 'help') {
+  if (flags.help || command === "help") {
     printHelp();
     return 0;
   }
   if (unknown.length > 0) {
-    logWarn(SCOPE, `flags desconocidos ignorados: ${unknown.join(', ')}`);
+    logWarn(SCOPE, `flags desconocidos ignorados: ${unknown.join(", ")}`);
   }
-  if (config.configMode === 'UNSAFE') {
+  if (config.configMode === "UNSAFE") {
     logWarn(
       SCOPE,
       `CONFIG_OVERRIDE = UNSAFE: la config certificada NO aplica ` +
-        `(overrides: ${config.configOverrides.join(', ') || 'ninguno'}); el gate de estos dias no es valido`,
+        `(overrides: ${config.configOverrides.join(", ") || "ninguno"}); el gate de estos dias no es valido`,
     );
   }
 
   switch (command) {
-    case 'preflight':
+    case "preflight":
       return cmdPreflight(config, flags);
-    case 'run-day':
+    case "run-day":
       return cmdRunDay(config, flags);
-    case 'status':
+    case "status":
       return cmdStatus();
-    case 'evidence':
+    case "evidence":
       return cmdEvidence(config, flags);
-    case 'unlock':
+    case "unlock":
       return cmdUnlock(flags);
-    case 'task:install':
+    case "task:install":
       return cmdTaskInstall(flags);
-    case 'task:remove':
+    case "task:remove":
       return cmdTaskRemove(flags);
     default:
       logError(SCOPE, `comando desconocido: ${command}`);
@@ -1107,6 +1273,9 @@ main()
     process.exit(code ?? 0);
   })
   .catch((error) => {
-    logError(SCOPE, error instanceof Error ? error.stack ?? error.message : String(error));
+    logError(
+      SCOPE,
+      error instanceof Error ? (error.stack ?? error.message) : String(error),
+    );
     process.exit(1);
   });

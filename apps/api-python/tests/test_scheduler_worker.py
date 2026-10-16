@@ -67,6 +67,9 @@ from bolsa_api.background.signal_alert_evaluator import (  # type: ignore[import
 from bolsa_api.background.tracker_schedule_worker import (  # type: ignore[import-untyped]
     start_tracker_schedule_worker,
 )
+from bolsa_api.background.window_day_watch_worker import (  # type: ignore[import-untyped]
+    start_window_day_watch,
+)
 from bolsa_api.workers import scheduler_worker  # type: ignore[import-untyped]
 
 
@@ -98,6 +101,8 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
         # V2.26/A10: orquestador del Strategy Lifecycle (env-gated, default OFF,
         # SIM-only). Promociona solo por Promotion Gate + hold-out estricto.
         start_auto_orchestrator,
+        # v2.88.140: vigía diario de la ventana PAPER (alerta de "día perdido"), ON.
+        start_window_day_watch,
     }
     assert set(starters) == expected
 

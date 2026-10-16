@@ -52,6 +52,7 @@ from bolsa_api.background.paper_evidence_snapshot_worker import (
 )
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
+from bolsa_api.background.window_day_watch_worker import start_window_day_watch
 from bolsa_api.logging_redact import install_log_redact
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.migrations import database_bootstrap
@@ -89,6 +90,9 @@ def _event_loop_starters() -> list[Any]:
         # V2.26/A10: orquestador del Strategy Lifecycle (env-gated, default OFF,
         # SIM-only). Promociona solo por Promotion Gate + shadow.
         start_auto_orchestrator,
+        # v2.88.140: vigía diario de la ventana PAPER (alerta de "día perdido"),
+        # ON por defecto. Read-only sobre el ledger del runner; no toca la ventana.
+        start_window_day_watch,
     ]
 
 

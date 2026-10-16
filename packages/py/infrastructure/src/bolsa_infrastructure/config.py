@@ -96,6 +96,19 @@ class Settings(BaseSettings):
         default=20.0,
         validation_alias="SIGNAL_ALERT_EVAL_INTERVAL_SECONDS",
     )
+    # v2.88.140 — vigía diario de la ventana PAPER (alerta de "día perdido"), ON por defecto.
+    # Evalúa una vez al día (laborable) tras la hora del run-day y avisa si el día no se
+    # ejecutó (no consta en el ledger) o quedó en HARD_ERROR. Nunca toca la ventana.
+    window_day_watch_enabled: bool = Field(
+        default=True, validation_alias="WINDOW_DAY_WATCH_ENABLED"
+    )
+    window_day_watch_hour: int = Field(default=20, validation_alias="WINDOW_DAY_WATCH_HOUR")
+    window_day_watch_minute: int = Field(
+        default=0, validation_alias="WINDOW_DAY_WATCH_MINUTE"
+    )
+    window_day_watch_email_to: str | None = Field(
+        default=None, validation_alias="WINDOW_DAY_WATCH_EMAIL_TO"
+    )
     scan_arq_max_jobs: int = Field(default=4, validation_alias="SCAN_ARQ_MAX_JOBS")
     scan_arq_job_timeout_seconds: int = Field(
         default=600,
