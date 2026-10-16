@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -329,6 +329,15 @@ class SqlAlchemySignalAlertRepository:
         stmt = stmt.limit(limit)
         result = await self._session.execute(stmt)
         return [self._to_delivery(row) for row in result.scalars().all()]
+
+    async def count_deliveries_by_status(self) -> dict[str, int]:
+        """Recuento del OUTBOX por estado (observabilidad: ``RETRYABLE_FAILED``/``DEAD_LETTER``).
+
+        Read-only y sin ámbito de cuenta (el estado del OUTBOX es global); lo consume ``/health``.
+        """
+        stmt = select(AlertDeliveryRow.status, func.count()).group_by(AlertDeliveryRow.status)
+        result = await self._session.execute(stmt)
+        return {str(status): int(count) for status, count in result.all()}
 
     async def claim_due_deliveries(
         self,

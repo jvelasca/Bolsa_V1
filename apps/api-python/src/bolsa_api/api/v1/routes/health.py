@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_infrastructure.alerts.estudio_opinion_email import smtp_ready
 from bolsa_infrastructure.config import get_settings
@@ -218,6 +219,57 @@ async def _worker_heartbeat_component() -> ComponentHealthDto:
     )
 
 
+async def _alert_outbox_component(
+    session_factory: async_sessionmaker[AsyncSession] | None,
+) -> ComponentHealthDto:
+    """v2.88.137 (AUDITORIA3) — OUTBOX de alertas: recuento por estado.
+
+    Observabilidad del worker de entregas: expone ``retryableFailed`` (métrica del hallazgo) y
+    ``deadLetter``. Una entrega en ``DEAD_LETTER`` es un fallo que agotó su presupuesto ⇒ el
+    componente se declara ``degraded`` (alerta). Sin DSN ni excepción cruda en el mensaje.
+    """
+    if session_factory is None:
+        return ComponentHealthDto(
+            status="disabled",
+            message="session factory no disponible",
+        )
+    from bolsa_infrastructure.database.repositories.signal_alert_repository import (
+        DELIVERY_DEAD_LETTER,
+        DELIVERY_DELIVERED,
+        DELIVERY_PENDING,
+        DELIVERY_RETRYABLE_FAILED,
+        SqlAlchemySignalAlertRepository,
+    )
+
+    try:
+        async with session_factory() as session:
+            counts = await SqlAlchemySignalAlertRepository(session).count_deliveries_by_status()
+    except Exception:  # noqa: BLE001 — degraded informativo; nunca filtra el detalle interno.
+        return ComponentHealthDto(
+            status="degraded",
+            message="OUTBOX de alertas no consultable",
+        )
+
+    dead_letter = int(counts.get(DELIVERY_DEAD_LETTER, 0))
+    details: dict[str, object] = {
+        "pending": counts.get(DELIVERY_PENDING, 0),
+        "retryableFailed": counts.get(DELIVERY_RETRYABLE_FAILED, 0),
+        "deadLetter": dead_letter,
+        "delivered": counts.get(DELIVERY_DELIVERED, 0),
+    }
+    if dead_letter > 0:
+        return ComponentHealthDto(
+            status="degraded",
+            message=f"OUTBOX de alertas con {dead_letter} entrega(s) en DEAD_LETTER",
+            details=details,
+        )
+    return ComponentHealthDto(
+        status="ok",
+        message="OUTBOX de alertas sin entregas muertas",
+        details=details,
+    )
+
+
 async def _risk_component() -> ComponentHealthDto:
     """A3: estado kill switch + PAPER_D_EXECUTE (siempre default off en prod)."""
     from bolsa_application.paper_d_propose import paper_d_execute_allowed
@@ -294,6 +346,9 @@ async def health_check(request: Request) -> HealthResponseDto:
         "redis": await _redis_component(),
         "auth": _auth_component(),
         "worker_arq": await _worker_heartbeat_component(),
+        "alert_outbox": await _alert_outbox_component(
+            getattr(request.app.state, "session_factory", None)
+        ),
         "risk": await _risk_component(),
         "smtp": _smtp_component(),
     }

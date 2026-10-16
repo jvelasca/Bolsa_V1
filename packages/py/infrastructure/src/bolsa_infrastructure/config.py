@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     alert_delivery_base_backoff_seconds: float = Field(
         default=30.0, validation_alias="ALERT_DELIVERY_BASE_BACKOFF_SECONDS"
     )
+    #: v2.88.137 (AUDITORIA3) — worker periódico del OUTBOX de alertas (reintentos garantizados).
+    alert_delivery_worker_interval_seconds: float = Field(
+        default=15.0, validation_alias="ALERT_DELIVERY_WORKER_INTERVAL_SECONDS"
+    )
     signal_alert_eval_interval_seconds: float = Field(
         default=20.0,
         validation_alias="SIGNAL_ALERT_EVAL_INTERVAL_SECONDS",

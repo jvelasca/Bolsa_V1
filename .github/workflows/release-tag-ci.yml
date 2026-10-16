@@ -61,6 +61,11 @@ jobs:
       - name: Window runner guards (lock/config/provenance)
         run: pnpm window:test
 
+      # v2.88.137 (AUDITORIA3): el pin PAPER debe casar con el arbol del tag. Fail-closed:
+      # si `HEAD:apps`/`HEAD:packages` != WINDOW_CONFIG, el sello NO certifica (TREE_MOVED).
+      - name: Window freeze gate (pin == HEAD:apps/packages)
+        run: pnpm window:freeze
+
       - name: CI helper guards (playwright attempt timings)
         run: pnpm ci:timings:test
 

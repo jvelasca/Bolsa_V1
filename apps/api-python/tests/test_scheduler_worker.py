@@ -7,6 +7,9 @@ loops periódicos y que **nunca** embeba scan/optimize (autoridad de colas:
 
 from __future__ import annotations
 
+from bolsa_api.background.alert_delivery_worker import (  # type: ignore[import-untyped]
+    start_alert_delivery_worker,
+)
 from bolsa_api.background.auto_orchestrator_worker import (  # type: ignore[import-untyped]
     start_auto_orchestrator,
 )
@@ -72,6 +75,8 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
     expected = {
         start_daily_alert_evaluator,
         start_signal_alert_evaluator,
+        # v2.88.137 (AUDITORIA3): drena el OUTBOX de alertas (reintentos + DEAD_LETTER).
+        start_alert_delivery_worker,
         start_tracker_schedule_worker,
         start_fa_weekly_worker,
         start_core_r_cron_worker,

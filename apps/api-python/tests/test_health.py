@@ -23,6 +23,7 @@ async def test_health_returns_json(app) -> None:
     assert "database" in body
     assert "yahoo" in body["components"]
     assert "redis" in body["components"]
+    assert "alert_outbox" in body["components"]
     assert "circuit" in body["components"]["yahoo"].get("details", {})
 
 
@@ -198,4 +199,66 @@ async def test_health_ready_503_when_db_not_migrated(app, monkeypatch) -> None:
     body = response.json()
     assert body["status"] == "not_ready"
     assert body["schema_status"]["status"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_health_alert_outbox_component_degraded_on_dead_letter(monkeypatch) -> None:
+    """v2.88.137 — ``alert_outbox`` alerta (degraded) si hay entregas en DEAD_LETTER."""
+    import bolsa_api.api.v1.routes.health as health_mod
+    from bolsa_infrastructure.database.repositories.signal_alert_repository import (
+        SqlAlchemySignalAlertRepository,
+    )
+
+    async def fake_counts(_self) -> dict[str, int]:
+        return {"pending": 1, "retryable_failed": 2, "dead_letter": 3, "delivered": 4}
+
+    monkeypatch.setattr(
+        SqlAlchemySignalAlertRepository, "count_deliveries_by_status", fake_counts
+    )
+
+    class _Factory:
+        def __call__(self) -> "_Factory":
+            return self
+
+        async def __aenter__(self) -> object:
+            return object()
+
+        async def __aexit__(self, *_exc: object) -> bool:
+            return False
+
+    component = await health_mod._alert_outbox_component(_Factory())
+    assert component.status == "degraded"
+    assert component.details["deadLetter"] == 3
+    assert component.details["retryableFailed"] == 2
+
+
+@pytest.mark.asyncio
+async def test_health_alert_outbox_component_ok_without_dead_letter(monkeypatch) -> None:
+    import bolsa_api.api.v1.routes.health as health_mod
+    from bolsa_infrastructure.database.repositories.signal_alert_repository import (
+        SqlAlchemySignalAlertRepository,
+    )
+
+    async def fake_counts(_self) -> dict[str, int]:
+        return {"pending": 0, "retryable_failed": 1, "dead_letter": 0, "delivered": 9}
+
+    monkeypatch.setattr(
+        SqlAlchemySignalAlertRepository, "count_deliveries_by_status", fake_counts
+    )
+
+    class _Factory:
+        def __call__(self) -> "_Factory":
+            return self
+
+        async def __aenter__(self) -> object:
+            return object()
+
+        async def __aexit__(self, *_exc: object) -> bool:
+            return False
+
+    component = await health_mod._alert_outbox_component(_Factory())
+    assert component.status == "ok"
+    assert component.details["deadLetter"] == 0
+    assert component.details["delivered"] == 9
+
 

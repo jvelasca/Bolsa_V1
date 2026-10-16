@@ -26,6 +26,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from bolsa_api.background.alert_delivery_worker import start_alert_delivery_worker
 from bolsa_api.background.auto_orchestrator_worker import start_auto_orchestrator
 from bolsa_api.background.auto_simulation_worker import start_auto_sim_worker
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
@@ -64,6 +65,8 @@ def _event_loop_starters() -> list[Any]:
     return [
         start_daily_alert_evaluator,
         start_signal_alert_evaluator,
+        # v2.88.137 (AUDITORIA3): drena el OUTBOX de alertas (reintentos + DEAD_LETTER).
+        start_alert_delivery_worker,
         start_tracker_schedule_worker,
         start_fa_weekly_worker,
         start_core_r_cron_worker,
