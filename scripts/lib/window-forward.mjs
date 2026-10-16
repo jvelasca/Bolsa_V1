@@ -425,10 +425,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-16 — pin del arbol re-anclado a `e3a5f864`
+ * (`apps` `d38dc7ae804a766231b6b2173082210dfc3904bd` / `packages` `e96a12b80a1606523f422750493274894ff07ef4`).
+ * Motivo: sello v2.88.140-beta: vigia diario de la ventana PAPER (window_day_watch, alerta de dia perdido) + instalador de la cadencia diaria arreglado (wrapper .cmd); 0 dias MEDIDO, re-anclar no deja dias STALE
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'fddd7a85',
-  appsHash: '552e1ddd7466c703325413544358223dcf8db4a7',
-  packagesHash: '6d006d6c50dc3cddda8731add272db0ee8833e0e',
+  commit: 'e3a5f864',
+  appsHash: 'd38dc7ae804a766231b6b2173082210dfc3904bd',
+  packagesHash: 'e96a12b80a1606523f422750493274894ff07ef4',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
