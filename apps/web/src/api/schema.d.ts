@@ -6479,7 +6479,7 @@ export interface components {
             /** Id */
             id: string;
             /** Instrumentid */
-            instrumentId: string;
+            instrumentId?: string | null;
             /** Mode */
             mode: string;
             /** Researchevidenceid */
@@ -6495,7 +6495,7 @@ export interface components {
             /** Strategyversion */
             strategyVersion?: string | null;
             /** Symbol */
-            symbol: string;
+            symbol?: string | null;
             /** Verifiedby */
             verifiedBy?: string | null;
         };

@@ -6563,8 +6563,15 @@
             "type": "string"
           },
           "instrumentId": {
-            "title": "Instrumentid",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentid"
           },
           "mode": {
             "title": "Mode",
@@ -6627,8 +6634,15 @@
             "title": "Strategyversion"
           },
           "symbol": {
-            "title": "Symbol",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
           },
           "verifiedBy": {
             "anyOf": [
@@ -6645,8 +6659,6 @@
         "required": [
           "id",
           "cycleId",
-          "instrumentId",
-          "symbol",
           "diaD",
           "endDate",
           "mode",

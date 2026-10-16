@@ -136,7 +136,7 @@ async def test_dispatch_webhook_success() -> None:
     mock_response.content = b"{}"
 
     mock_client = MagicMock()
-    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.request = AsyncMock(return_value=mock_response)
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=None)
 
@@ -149,7 +149,7 @@ async def test_dispatch_webhook_success() -> None:
     assert len(results) == 1
     assert results[0].ok is True
     assert results[0].channel == "webhook"
-    mock_client.post.assert_awaited_once()
+    mock_client.request.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -158,7 +158,7 @@ async def test_dispatch_webhook_failure() -> None:
     dispatcher = SignalAlertChannelDispatcher(settings)
 
     mock_client = MagicMock()
-    mock_client.post = AsyncMock(side_effect=httpx.HTTPError("timeout"))
+    mock_client.request = AsyncMock(side_effect=httpx.HTTPError("timeout"))
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=None)
 

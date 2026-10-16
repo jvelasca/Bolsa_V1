@@ -185,8 +185,8 @@ class _DiaDCycleVerificationRepo(Protocol):
         self,
         *,
         cycle_id: str,
-        instrument_id: str,
-        symbol: str,
+        instrument_id: str | None,
+        symbol: str | None,
         dia_d: str,
         end_date: str,
         mode: str,
@@ -262,8 +262,9 @@ class ResolveDiaDCycleVerification:
             cycle_id=cycle_id,
             account_id=account_id,
             # Identidad del ciclo: DERIVADA del hecho durable (hueco declarado si falta).
-            instrument_id=facts.instrument_id or "",
-            symbol=facts.symbol or "",
+            # `None` (el ciclo no sella esa identidad) viaja tal cual: NUNCA se colapsa a `""`.
+            instrument_id=facts.instrument_id,
+            symbol=facts.symbol,
             dia_d=dia_d,
             end_date=end_date,
             mode=mode,

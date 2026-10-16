@@ -25,8 +25,8 @@ export type DiaDCycleVerificationV1Dto = {
   id: string;
   cycleId: string;
   accountId: string | null;
-  instrumentId: string;
-  symbol: string;
+  instrumentId: string | null;
+  symbol: string | null;
   diaD: string;
   endDate: string;
   mode: string;

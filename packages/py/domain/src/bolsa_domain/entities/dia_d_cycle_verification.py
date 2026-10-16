@@ -10,8 +10,9 @@ NO la declara el navegador: se DERIVA de los hechos durables AUTO antes de persi
 ``facts_hash`` sella QUÉ snapshot de hechos respaldó la verificación, de modo que un
 ciclo sin identidad declarada viaja como hueco (``None``) y nunca se fabrica.
 
-Doctrina «Sin dato todavía» (``UNKNOWN != 0``): las claves de estrategia son
-``None`` cuando el ciclo no las declara; un hueco NUNCA se rellena con ``""``/``0``.
+Doctrina «Sin dato todavía» (``UNKNOWN != 0``): la identidad (``instrument_id``/``symbol``) y las
+claves de estrategia son ``None`` cuando el ciclo no las sella; un hueco NUNCA se rellena con
+``""``/``0`` (la columna durable es ``nullable`` desde la migración ``055``).
 """
 
 from dataclasses import dataclass
@@ -23,8 +24,8 @@ class DiaDCycleVerification:
     id: str
     cycle_id: str
     account_id: str | None
-    instrument_id: str
-    symbol: str
+    instrument_id: str | None
+    symbol: str | None
     dia_d: str
     end_date: str
     mode: str

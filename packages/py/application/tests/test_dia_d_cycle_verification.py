@@ -166,6 +166,15 @@ _GOOD_FACTS = DiaDCycleFacts(
 )
 
 
+_GAP_FACTS = DiaDCycleFacts(
+    cycle_id="cyc-11",
+    instrument_id=None,
+    symbol=None,
+    strategy_preset_key=None,
+    strategy_version=None,
+)
+
+
 @pytest.mark.asyncio
 async def test_resolve_use_case_derives_identity_and_passes_account_scope() -> None:
     repo = _FakeRepo()
@@ -190,6 +199,28 @@ async def test_resolve_use_case_derives_identity_and_passes_account_scope() -> N
     assert call["strategy_version"] == "ver-1"
     assert call["facts_hash"] is not None
     assert resolver.calls[0] == {"account_id": "acc-1", "cycle_id": "cyc-9"}
+
+
+@pytest.mark.asyncio
+async def test_resolve_use_case_declares_identity_gaps_as_none() -> None:
+    """Un ciclo que no sella la identidad persiste ``None`` (hueco), nunca ``""``.
+
+    Falsable: con la coerción ``facts.instrument_id or ""`` el repositorio recibiría ``""``.
+    """
+    repo = _FakeRepo()
+    resolver = _FakeFactsResolver(_GAP_FACTS)
+    row = await ResolveDiaDCycleVerification(repo, resolver).execute(
+        {"cycleId": "cyc-11", "diaD": "2026-06-01", "endDate": "2026-06-02", "mode": "auto"},
+        account_id="acc-1",
+    )
+    assert row is not None
+    call = repo.calls[0]
+    assert call["instrument_id"] is None
+    assert call["symbol"] is None
+    assert call["strategy_preset_key"] is None
+    assert call["strategy_version"] is None
+    # El hash de hechos sigue sellándose (documenta el snapshot, aunque sea con huecos).
+    assert call["facts_hash"] is not None
 
 
 @pytest.mark.asyncio

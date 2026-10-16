@@ -5,6 +5,7 @@ from bolsa_infrastructure.alerts.alert_channels import (
     SignalAlertChannelDispatcher,
     assert_public_webhook_target,
     resolve_host_ips,
+    resolve_public_webhook_target,
     validate_alert_channel_config,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "SignalAlertChannelDispatcher",
     "assert_public_webhook_target",
     "resolve_host_ips",
+    "resolve_public_webhook_target",
     "validate_alert_channel_config",
 ]

@@ -90,8 +90,9 @@ class DiaDCycleVerificationDto(BaseModel):
     id: str
     cycle_id: str = Field(alias="cycleId")
     account_id: str | None = Field(default=None, alias="accountId")
-    instrument_id: str = Field(alias="instrumentId")
-    symbol: str
+    #: Identidad derivada del ciclo; `None` = hueco declarado (nunca cadena vacía).
+    instrument_id: str | None = Field(default=None, alias="instrumentId")
+    symbol: str | None = None
     dia_d: str = Field(alias="diaD")
     end_date: str = Field(alias="endDate")
     mode: str

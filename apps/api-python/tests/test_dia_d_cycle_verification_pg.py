@@ -2,12 +2,12 @@
 
 Cubre la tabla aditiva ``dia_d_cycle_verifications`` y su repositorio:
 
-* la tabla/índices están en head y la head es ``054_dia_d_verified_and_alerts``;
+* la tabla/índices están en head y la head es ``055_dia_d_identity_nullable``;
 * ``upsert`` es idempotente y ATÓMICO por ``(account_id, cycle_id, dia_d, end_date, mode)``;
 * ``list_verifications`` acota por cuenta y por ciclo;
 * el ciclo ya verificado por OTRA cuenta se RECHAZA (nunca se reasigna ni se duplica);
 * los huecos de identidad se persisten como ``NULL`` («Sin dato todavía»), nunca ``""``;
-* el ``downgrade``/``upgrade`` de la 054 deja el esquema como estaba (roundtrip).
+* el ``downgrade``/``upgrade`` de la 054 y de la 055 dejan el esquema como estaba (roundtrip).
 
 Requiere PostgreSQL. Es GATE cuando ``DIA_D_CYCLE_VERIFICATION_PG_REQUIRED=1``; si no, ``pytest.skip``.
 """
@@ -34,7 +34,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 _REQUIRED = "DIA_D_CYCLE_VERIFICATION_PG_REQUIRED"
-_ALEMBIC_HEAD = "054_dia_d_verified_and_alerts"
+_ALEMBIC_HEAD = "055_dia_d_identity_nullable"
 _TABLE = "dia_d_cycle_verifications"
 _CYCLE_PREFIX = "itest-p2-"
 
@@ -155,6 +155,51 @@ async def test_upsert_declares_gaps_as_null(pg_session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
+async def test_upsert_persists_identity_gap_as_null(pg_session: AsyncSession) -> None:
+    """Instrumento/símbolo ausentes viajan como ``NULL`` (hueco declarado), nunca ``""``.
+
+    Falsable: con la coerción ``facts.instrument_id or ""`` el repositorio recibía ``""`` y la
+    fila guardaba cadena vacía — indistinguible de «se resolvió y está vacío».
+    """
+    repo = SqlAlchemyDiaDCycleVerificationRepository(pg_session)
+    cycle = f"{_CYCLE_PREFIX}gap-identity"
+    row = await repo.upsert(
+        cycle_id=cycle,
+        instrument_id=None,
+        symbol=None,
+        dia_d="2026-08-01",
+        end_date="2026-08-02",
+        mode="auto",
+        account_id="acc-p2",
+    )
+    await pg_session.flush()
+    assert row.instrument_id is None
+    assert row.symbol is None
+    stored = (
+        await pg_session.execute(
+            text(
+                "SELECT instrument_id, symbol FROM dia_d_cycle_verifications "
+                "WHERE cycle_id=:c AND account_id=:a"
+            ),
+            {"c": cycle, "a": "acc-p2"},
+        )
+    ).one()
+    assert stored == (None, None)
+    # La columna es NULLABLE en head (migración 055).
+    nullable = (
+        await pg_session.execute(
+            text(
+                "SELECT column_name, is_nullable FROM information_schema.columns "
+                "WHERE table_schema='public' AND table_name=:t "
+                "AND column_name IN ('instrument_id','symbol')"
+            ),
+            {"t": _TABLE},
+        )
+    ).all()
+    assert sorted(nullable) == [("instrument_id", "YES"), ("symbol", "YES")]
+
+
+@pytest.mark.asyncio
 async def test_list_scopes_by_account_and_cycle(pg_session: AsyncSession) -> None:
     repo = SqlAlchemyDiaDCycleVerificationRepository(pg_session)
     cycle_a = f"{_CYCLE_PREFIX}a"
@@ -269,6 +314,59 @@ async def test_migration_054_roundtrip(pg_session: AsyncSession) -> None:
             cfg.attributes.pop("connection", None)
         with engine.connect() as connection:
             assert _has_facts_hash(connection) is True
+        assert alembic_head() == _ALEMBIC_HEAD
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_migration_055_identity_nullable_roundtrip(pg_session: AsyncSession) -> None:
+    """``downgrade``/``upgrade`` de la 055 conmutan la nulabilidad de la identidad."""
+    pytest.importorskip("alembic")
+    from alembic import command
+    from sqlalchemy import create_engine
+
+    from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.migrations import _alembic_config, alembic_head
+
+    settings = get_settings()
+    url = settings.database_url
+    assert url is not None
+    url = url.replace("postgresql://", "postgresql+psycopg://", 1).split("?", 1)[0]
+    engine = create_engine(url)
+    cfg = _alembic_config()
+
+    def _identity_nullable(connection: object) -> dict[str, str]:
+        rows = connection.execute(  # type: ignore[attr-defined]
+            text(
+                "SELECT column_name, is_nullable FROM information_schema.columns "
+                "WHERE table_schema='public' AND table_name=:t "
+                "AND column_name IN ('instrument_id','symbol')"
+            ),
+            {"t": _TABLE},
+        ).all()
+        return {name: nullable for name, nullable in rows}
+
+    try:
+        with engine.connect() as connection:
+            cfg.attributes["connection"] = connection
+            command.downgrade(cfg, "054_dia_d_verified_and_alerts")
+            cfg.attributes.pop("connection", None)
+        with engine.connect() as connection:
+            assert _identity_nullable(connection) == {
+                "instrument_id": "NO",
+                "symbol": "NO",
+            }
+
+        with engine.connect() as connection:
+            cfg.attributes["connection"] = connection
+            command.upgrade(cfg, "head")
+            cfg.attributes.pop("connection", None)
+        with engine.connect() as connection:
+            assert _identity_nullable(connection) == {
+                "instrument_id": "YES",
+                "symbol": "YES",
+            }
         assert alembic_head() == _ALEMBIC_HEAD
     finally:
         engine.dispose()

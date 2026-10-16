@@ -1139,7 +1139,10 @@ class DiaDCycleVerificationRow(Base):
     Una fila por ``(cycle_id, dia_d, end_date, mode)``: registra que la verificación
     D→hoy se lanzó DESDE un ciclo y con qué identidad EXACTA de estrategia. Las claves
     de estrategia son ``nullable`` a propósito (un ciclo histórico no las declara ⇒
-    «Sin dato todavía»; jamás se fabrica).
+    «Sin dato todavía»; jamás se fabrica). La identidad del instrumento
+    (``instrument_id``/``symbol``) también puede ser un hueco declarado (``NULL`` desde
+    la migración ``055``): un ciclo que aún no sella esa identidad viaja como ``None``,
+    nunca como ``""``.
     """
 
     __tablename__ = "dia_d_cycle_verifications"
@@ -1158,8 +1161,8 @@ class DiaDCycleVerificationRow(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     cycle_id: Mapped[str] = mapped_column("cycle_id", String)
     account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
-    instrument_id: Mapped[str] = mapped_column("instrument_id", String)
-    symbol: Mapped[str] = mapped_column("symbol", String)
+    instrument_id: Mapped[str | None] = mapped_column("instrument_id", String, nullable=True)
+    symbol: Mapped[str | None] = mapped_column("symbol", String, nullable=True)
     strategy_preset_key: Mapped[str | None] = mapped_column(
         "strategy_preset_key", String, nullable=True
     )
