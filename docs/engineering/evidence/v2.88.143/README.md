@@ -61,6 +61,32 @@ pnpm window:status                   # dias_de_ventana / no_mercado separados
 pnpm window:freeze                   # freeze OK (scripts/ está fuera del árbol pinado)
 ```
 
-## 6. Cita POST-TAG
+## 6. Cita POST-TAG — CI del sello
 
-Pendiente: se monitoriza el `Release tag CI` de `v2.88.143-beta` y su run **se cita aquí** (con `conclusion`). Si algún job queda rojo, el sello **no** se da por bueno.
+**Tag publicado:** `v2.88.143-beta` (**anotado, unsigned**; objeto `b64fea69` → commit **`348eda85`**), empujado junto a `main` (`ee7a06b8..348eda85`).
+
+**`Release tag CI` [run `39072715683`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39072715683) — VERDE** (`2026-10-17T21:51:57Z` → `22:03:22Z`, ~**11m25s**; **13 jobs `success` + `certify` `success`**; `playwright (integrated E2E, opt-in)` `skipped`, declarado):
+
+| Job | `conclusion` |
+| --- | --- |
+| `security (gitleaks)` | **success** |
+| `decision-spine` | **success** |
+| `python (ruff/imports/mypy/pytest offline)` | **success** |
+| `lifecycle-pg (Alembic + auth + golden restart)` | **success** |
+| `replay-repro (regenera el artefacto del sello desde el fixture)` | **success** |
+| `shared (build/typecheck/test)` | **success** |
+| `frontend (typecheck/lint/test/build + contract:check)` | **success** |
+| `playwright (integrated axe)` | **success** |
+| `playwright (integrated AUTO S5)` | **success** |
+| `playwright (mock E2E)` | **success** |
+| `a7-gate (A7 C3 chaos live_a7 · dedicated real-PG)` | **success** |
+| `dr-verify (battery DB_DR / TCP CI)` | **success** |
+| `playwright (integrated E2E, opt-in)` | `skipped` (opt-in, declarado) |
+| `certify (aggregate + artifact)` | **success** |
+
+**Los dos gates que importan, medidos en el log del CI:**
+
+- **Gate `window:freeze` (job `shared`) — verde:** `> node scripts/window-pin.mjs --check` ⇒ **`[window-pin] freeze OK (348eda85)`** ⇒ el pin (`apps` `fe9798e3` / `packages` `6377a7a2`) **casa** con el árbol del commit del tag.
+- **`replay-repro` — `REPRODUCIDO`:** `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` — **idéntico** al de `.136`…`.142` ⇒ **`Δ decisión = 0` medido por el CI**, no afirmado (el `meta.bump` de los 13 CLIs no entra en el artefacto del sello).
+
+**Nota de honestidad sobre el orden:** esta cita se escribe **después** del tag (commit POST-TAG sobre `main`), de modo que **dentro** del tag el §6 decía «pendiente». Es el patrón declarado en los sellos anteriores; la medida (los `conclusion` de arriba) es **falsable desde GitHub** por cualquiera.
