@@ -157,3 +157,42 @@ Get-Content operability_runs/window-runs/day-watch.json # instrumento: ¿vigiló
 **`main` en el mismo commit `5241eb65` — VERDE también:** `Python CI` [39011455233](https://github.com/jvelasca/Bolsa_V1/actions/runs/39011455233) · `Frontend CI` [39011455139](https://github.com/jvelasca/Bolsa_V1/actions/runs/39011455139) · `Fase 2 scientific` [39011455133](https://github.com/jvelasca/Bolsa_V1/actions/runs/39011455133) · `Optimize lab` [39011455185](https://github.com/jvelasca/Bolsa_V1/actions/runs/39011455185) — todas **`success`**.
 
 **Nota de honestidad sobre el orden:** esta cita se escribe **después** del tag (commit POST-TAG sobre `main`), de modo que **dentro** del tag el §6 decía «pendiente». Es el mismo patrón declarado en los sellos anteriores; la medida (los `conclusion` de arriba) es **falsable desde GitHub** por cualquiera.
+
+---
+
+## 7. Prueba EN VIVO — la cadencia se ejecutó **sola** (17/10/2026)
+
+Todo lo anterior se midió **a mano**. Esta sección mide lo único que importa de verdad para el requisito («siempre vigilando»): **que el Programador de tareas lo haga sin que nadie lo lance**.
+
+### 7.1 La tarea de las 18:00 se ejecutó sola (y el fix del wrapper es real)
+
+| Medición | Comando | Resultado |
+| --- | --- | --- |
+| ¿Se ejecutó? | `schtasks /query /tn "BolsaV1_WindowForward" /fo LIST /v` | `Estado: Listo` · **`Último resultado: 0`** · próxima `18/10/2026 18:00:00` |
+| ¿Escribió su corrida? | `dir operability_runs\window-runs\20261017` | `manifest.json`, `preflight.json`, `preflight.out.txt`, `preflight.err.txt` — **todos con hora `18:00`** |
+| ¿Quedó en el ledger? | `operability_runs/window-runs/ledger.jsonl` | fila **nueva** `20261017` · `NO_MEDIDO_REGIMEN` · `reason=regime_invalid` · `startedAt 16:00:00.885Z` (= **18:00:00.885** Europe/Madrid) · `durationMs 6034` |
+| ¿Con qué árbol corrió? | `manifest.json` → `freeze` | **`apps 446f198b…` / `packages 6377a7a2…`**, `appsOk: true`, `packagesOk: true`, `configMode: FROZEN` |
+
+**Lectura honesta de lo que esto prueba:** antes del fix del §2.5 esta tarea **no habría hecho nada** (el wrapper apuntaba a un `pnpm.cmd` inexistente) y `schtasks` habría seguido diciendo «Listo». Hoy **ejecutó sola, arrancó el runner, leyó el freeze, corrió el preflight y escribió su corrida**: la cadena completa **en el contexto del Programador de tareas** (sin sesión de shell, sin PATH de pnpm).
+
+**Sobre `manifest.commit = b02c90b2`** (no es el `HEAD` actual, `1f80d236`): ese campo es la **etiqueta del pin**, es decir, *el commit cuyo árbol de `apps/`+`packages/` se está ejecutando*. Los commits posteriores (`c71057dc`, `5241eb65`, `0536593e`, `1f80d236`) sólo tocan `scripts/` y `docs/`, que están **fuera** del árbol pinado ⇒ la etiqueta sigue siendo cierta y por eso el run real da `appsOk/packagesOk = true`. El gate no se apoya en la etiqueta, sino en los **dos tree hashes**.
+
+### 7.2 El veredicto del día es un VETO de régimen, no un fallo
+
+`20261017` = `NO_MEDIDO_REGIMEN` (`veto: true`, `reason: regime_invalid`, `operationalRegime: BEAR_TREND`, `entriesAllowedLong: false`). Es el **cuarto** día consecutivo con el mismo veto (`20261014/15/16/17`) ⇒ `window:status` = `medidos=0 · veto=4 · duros=0`, `gate: NO_MEDIDO`. **No es un fallo del software**: es la falta de **OPERACIÓN** que el sello declara (la ventana sigue `0/4` días).
+
+### 7.3 La vigilancia de las 20:20 — disparó sola, y el latido lo demuestra por **dos** vías
+
+| Medición | Comando | Resultado |
+| --- | --- | --- |
+| ¿Se ejecutó la tarea del vigía? | `schtasks /query /tn "BolsaV1_WindowWatch" /fo LIST /v` | `Estado: Listo` · **`Último resultado: 0`** · próxima `18/10/2026 20:20:00` |
+| ¿Dejó latido? | `Get-Content operability_runs/window-runs/day-watch.json` | `at 21:04:50` (**vivo**) · `verdict NON_MARKET_DAY` · `lookbackDays 7` · `alerts []` |
+| ¿Con qué instrumento? | `day-watch.jsonl` (fuentes) | **`20:20:01` → `source: cli`** (el de la **tarea**, sin stack) **y** `19:49:50 · 20:04:50 · 20:19:50 · 20:34:50 · 20:49:50 · 21:04:50` → **`source: worker`** (el de **dentro** del stack, cada **900 s**) |
+
+**El latido `cli` de las `20:20:01` es la prueba que faltaba:** lo escribió la **tarea programada**, sola, con el stack o sin él. `Último resultado: 0` ⇒ sin aviso (correcto: sábado, y los laborables `14/15/16` sí constan en el ledger ⇒ el **arrastre no inventó días perdidos**: `alerts: []` con el ledger real, que es el falso positivo que había que descartar).
+
+**Y la vigilancia DENTRO del stack también quedó medida, con el instrumento correcto.** El stack se reinició a las **`19:49:48`** (procesos `python` con `StartTime 19:49:44/48`, cargando ya el código del `.142`) y desde el **primer tick** (`19:49:50`) escribe latido **cada 15 min** (`source: worker`). Esto es lo que el log ciego del `.141` **no podía** demostrar y ahora sí: **el vigía corre en el proceso vivo**, y su prueba de vida es un fichero, no una línea de log.
+
+**Corolario (por qué antes no había latido `worker`):** el proceso anterior se había arrancado el `16/10` a las `23:57:48` — **antes** de que existiera el código del `.142` — así que en memoria tenía el vigía **viejo** (sólo log). Reiniciar el stack fue lo que hizo aparecer los latidos `worker`. **Declarado:** el vigía **nuevo** exige **reinicio** tras actualizar; no hay hot-reload de workers.
+
+**Recuento del journal al cerrar esta sección:** `13` líneas — **`6` `worker`** + **`7` `cli`** — con `alerts: []` en todas. Dos instrumentos independientes escribiendo el **mismo** veredicto del mismo día: es la propiedad que se quería.
