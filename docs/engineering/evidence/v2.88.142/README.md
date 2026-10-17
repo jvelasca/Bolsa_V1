@@ -118,7 +118,7 @@ Los ficheros de test del vigía **ya se recogen por directorio** en el job offli
 
 ```powershell
 pnpm lint:py ; pnpm imports:py ; pnpm types:py          # paridad con el CI
-pnpm window:test                                        # 28 (runner JS)
+pnpm window:test                                        # 34 (runner JS + wrapper de la tarea)
 cd apps/api-python ; python -m pytest tests/test_window_day_watch.py tests/test_dia_d_bump_guard.py tests/test_scheduler_worker.py -q
 pnpm window:watch                                       # evaluación real + latido (exit 0/3)
 pnpm window:task:install                                # verifica el wrapper ANTES de registrar (2 tareas)
@@ -128,4 +128,32 @@ Get-Content operability_runs/window-runs/day-watch.json # instrumento: ¿vigiló
 
 ## 6. Cita POST-TAG — CI del sello
 
-Pendiente de cierre: el `Release tag CI` del tag `v2.88.142-beta` se monitoriza tras publicarlo y su run **se cita aquí** (con `conclusion`) junto al `Python CI` de `main`. Si algún job queda **rojo**, este sello **no** se da por bueno (disciplina: el CI es la medida, no la opinión).
+**Tag publicado:** `v2.88.142-beta` (**anotado, unsigned**; objeto `99f68ef8` → commit **`5241eb65`**), empujado junto a `main` (`3485493f..5241eb65`).
+
+**`Release tag CI` [run `39011455127`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39011455127) — VERDE** (`2026-10-17T06:51:27Z` → `07:05:26Z`, ~**13m59s**; **13 jobs `success` + `certify` `success`**; `playwright (integrated E2E, opt-in)` `skipped`, declarado):
+
+| Job | `conclusion` |
+| --- | --- |
+| `security (gitleaks)` | **success** |
+| `decision-spine` | **success** |
+| `python (ruff/imports/mypy/pytest offline)` | **success** |
+| `lifecycle-pg (Alembic + auth + golden restart)` | **success** |
+| `replay-repro (regenera el artefacto del sello desde el fixture)` | **success** |
+| `shared (build/typecheck/test)` | **success** |
+| `frontend (typecheck/lint/test/build + contract:check)` | **success** |
+| `playwright (integrated axe)` | **success** |
+| `playwright (integrated AUTO S5)` | **success** |
+| `playwright (mock E2E)` | **success** |
+| `a7-gate (A7 C3 chaos live_a7 · dedicated real-PG)` | **success** |
+| `dr-verify (battery DB_DR / TCP CI)` | **success** |
+| `playwright (integrated E2E, opt-in)` | `skipped` (opt-in, declarado) |
+| `certify (aggregate + artifact)` | **success** |
+
+**Los dos gates que importan, medidos en el log del CI:**
+
+- **Gate `window:freeze` (job `shared`) — verde:** `> node scripts/window-pin.mjs --check` ⇒ **`[window-pin] freeze OK (5241eb65)`** ⇒ el pin (`apps` `446f198b` / `packages` `6377a7a2`) **casa** con el árbol del commit del tag.
+- **`replay-repro` — `REPRODUCIDO`:** `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` — **idéntico** al de `.136`/`.137`/`.138`/`.139`/`.140`/`.141` ⇒ **`Δ decisión = 0` medido por el CI**, no afirmado.
+
+**`main` en el mismo commit `5241eb65` — VERDE también:** `Python CI` [39011455233](https://github.com/jvelasca/Bolsa_V1/actions/runs/39011455233) · `Frontend CI` [39011455139](https://github.com/jvelasca/Bolsa_V1/actions/runs/39011455139) · `Fase 2 scientific` [39011455133](https://github.com/jvelasca/Bolsa_V1/actions/runs/39011455133) · `Optimize lab` [39011455185](https://github.com/jvelasca/Bolsa_V1/actions/runs/39011455185) — todas **`success`**.
+
+**Nota de honestidad sobre el orden:** esta cita se escribe **después** del tag (commit POST-TAG sobre `main`), de modo que **dentro** del tag el §6 decía «pendiente». Es el mismo patrón declarado en los sellos anteriores; la medida (los `conclusion` de arriba) es **falsable desde GitHub** por cualquiera.
