@@ -1212,7 +1212,7 @@ async function cmdWatch(flags) {
   if (result.code === WATCH_ALERT_EXIT) {
     logWarn(
       SCOPE,
-      `vigia: HAY aviso (latido en ${WATCH_STATUS_PATH}); revisa el log/email y, si procede, ` +
+      `vigia: HAY aviso${flags.noPersist ? " (sin latido: --no-persist)" : ` (latido en ${WATCH_STATUS_PATH})`}; revisa el log/email y, si procede, ` +
         "`pnpm window:status` + `pnpm window:run-day`",
     );
     return WATCH_ALERT_EXIT;
@@ -1221,7 +1221,12 @@ async function cmdWatch(flags) {
     logError(SCOPE, `el vigia termino con codigo ${result.code ?? "n/d"}`);
     return result.code ?? 1;
   }
-  logInfo(SCOPE, `vigia: sin aviso (latido en ${WATCH_STATUS_PATH})`);
+  logInfo(
+    SCOPE,
+    flags.noPersist
+      ? "vigia: sin aviso (sin latido: --no-persist)"
+      : `vigia: sin aviso (latido en ${WATCH_STATUS_PATH})`,
+  );
   return 0;
 }
 
