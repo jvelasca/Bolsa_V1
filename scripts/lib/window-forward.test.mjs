@@ -15,14 +15,18 @@ import assert from 'node:assert/strict';
 
 import {
   LOCK_TTL_MS,
+  NON_MARKET_DAY_STATUS,
   WINDOW_CONFIG,
   classifyPreflight,
   cmdWrapperContent,
+  isMarketDay,
   isPreflightPayload,
+  isTerminalStatus,
   lockDecision,
   parseGate,
   parseRevParse,
   resolveDayStatus,
+  summarizeLedger,
   unlockDecision,
   verifyWindowProvenance,
   windowConfig,
@@ -515,5 +519,67 @@ test('cmdWrapperContent rechaza piezas ausentes y un node no absoluto', () => {
   assert.throws(() => cmdWrapperContent({ ...wrapperParts, command: '  ' }), /faltan/);
   assert.throws(() => cmdWrapperContent({ ...wrapperParts, root: '' }), /faltan/);
   assert.throws(() => cmdWrapperContent({ ...wrapperParts, node: 'node.exe' }), /absoluta/);
+});
+
+// ---------------------------------------------------------------------------
+// Dia sin sesion (v2.88.143)
+//
+// Falsacion del defecto medido el 17/10 (sabado): la tarea `/sc daily` corrio y
+// escribio una fila de VETO DE REGIMEN, de modo que un sabado parecia «un dia de
+// ventana intentado y vetado». Un dia sin sesion no es ninguna de las dos cosas.
+// ---------------------------------------------------------------------------
+
+test('isMarketDay descarta sabado y domingo', () => {
+  // 17/10/2026 fue sabado y 18/10/2026 domingo (los dos dias reales del defecto).
+  assert.equal(isMarketDay(new Date('2026-10-17T18:00:00')), false);
+  assert.equal(isMarketDay(new Date('2026-10-18T18:00:00')), false);
+});
+
+test('isMarketDay acepta los laborables de la ventana (14/15/16 y lunes 19)', () => {
+  assert.equal(isMarketDay(new Date('2026-10-14T18:00:00')), true);
+  assert.equal(isMarketDay(new Date('2026-10-15T18:00:00')), true);
+  assert.equal(isMarketDay(new Date('2026-10-16T18:00:00')), true);
+  assert.equal(isMarketDay(new Date('2026-10-19T18:00:00')), true);
+});
+
+test('NON_MARKET_DAY es terminal: una re-ejecucion del dia se omite', () => {
+  assert.equal(isTerminalStatus(NON_MARKET_DAY_STATUS), true);
+  assert.equal(NON_MARKET_DAY_STATUS, 'NON_MARKET_DAY');
+});
+
+test('summarizeLedger NO cuenta los dias sin sesion como dias de ventana', () => {
+  const rows = [
+    { day: '20261014', status: 'NO_MEDIDO_REGIMEN' },
+    { day: '20261015', status: 'NO_MEDIDO_REGIMEN' },
+    { day: '20261016', status: 'NO_MEDIDO_REGIMEN' },
+    { day: '20261017', status: 'NON_MARKET_DAY' },
+  ];
+  const summary = summarizeLedger(rows, null);
+  assert.equal(summary.rows, 4); // filas del ledger
+  assert.equal(summary.total, 3); // dias DE VENTANA (14/15/16)
+  assert.equal(summary.nonMarket, 1);
+  assert.deepEqual(summary.nonMarketDays, ['20261017']);
+  assert.equal(summary.vetoed, 3); // el sabado NO se cuenta como veto
+  assert.equal(summary.measured, 0);
+});
+
+test('summarizeLedger con el dia corregido por --force usa la ULTIMA fila del dia', () => {
+  const rows = [
+    { day: '20261017', status: 'NO_MEDIDO_REGIMEN' }, // fila vieja (antes del fix)
+    { day: '20261017', status: 'NON_MARKET_DAY' }, // fila nueva
+  ];
+  const summary = summarizeLedger(rows, null);
+  assert.equal(summary.rows, 1);
+  assert.equal(summary.total, 0);
+  assert.equal(summary.nonMarket, 1);
+  assert.equal(summary.vetoed, 0);
+});
+
+test('summarizeLedger sin filas no fabrica ceros: total 0 y nonMarket 0', () => {
+  const summary = summarizeLedger([], null);
+  assert.equal(summary.rows, 0);
+  assert.equal(summary.total, 0);
+  assert.equal(summary.nonMarket, 0);
+  assert.equal(summary.gate, null);
 });
 

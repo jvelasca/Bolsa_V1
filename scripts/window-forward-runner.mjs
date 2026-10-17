@@ -57,9 +57,11 @@ import {
   dayStamp,
   forwardPath,
   freezeCheck,
+  isMarketDay,
   isPreflightPayload,
   isTerminalStatus,
   lockDecision,
+  NON_MARKET_DAY_STATUS,
   parseGate,
   parseJsonLoose,
   parsePreflight,
@@ -667,6 +669,15 @@ async function cmdRunDay(config, flags) {
     return dryRunDay(config, day);
   }
 
+  // v2.88.143 — un dia SIN sesion no es un dia de ventana. La tarea corre `/sc daily`
+  // tambien sabados y domingos: antes eso escribia una fila de VETO DE REGIMEN y un
+  // sabado parecia «un dia intentado y vetado». Aqui se registra NON_MARKET_DAY y NO se
+  // ejecuta preflight (no hay sesion que medir). `--force` NO convierte un sabado en
+  // dia de mercado: la condicion es del calendario, no del operador.
+  if (!isMarketDay(startedAt)) {
+    return recordNonMarketDay(config, flags, { day, iso, startedAt });
+  }
+
   // Lock diario atomico ANTES de la idempotencia y del freeze: dos `run-day`
   // simultaneos del mismo dia no pueden coexistir (un `--force` no salta el lock vivo).
   const release = acquireDayLock(day, iso, "run-day", config, flags);
@@ -676,6 +687,52 @@ async function cmdRunDay(config, flags) {
   } finally {
     release();
   }
+}
+
+/**
+ * Registra un dia **sin sesion** (fin de semana) sin tocar el motor ni el preflight.
+ *
+ * Escribe `manifest.json` y anexa al ledger con `status: NON_MARKET_DAY`, `veto: false`
+ * y `reason: non_market_day`; `regime`/`freeze` quedan en `null` porque **no se ejecuto
+ * nada** (un freeze roto no puede declarar HARD_ERROR un dia en el que no hubo run).
+ * Idempotente: si el dia ya esta en estado terminal y no hay `--force`, se omite.
+ */
+function recordNonMarketDay(config, flags, { day, iso, startedAt }) {
+  const dir = join(ROOT, runDir(day));
+  const manifestPath = join(dir, "manifest.json");
+  if (existsSync(manifestPath) && !flags.force) {
+    const previous = readJson(manifestPath);
+    if (previous && isTerminalStatus(previous.status)) {
+      logInfo(
+        SCOPE,
+        `dia ${day} ya registrado como ${previous.status} — se omite (usa --force para repetir)`,
+      );
+      return previous.status === "HARD_ERROR" ? 1 : 0;
+    }
+  }
+  const manifest = {
+    day,
+    dayIso: iso,
+    status: NON_MARKET_DAY_STATUS,
+    veto: false,
+    reason: "non_market_day",
+    account: config.account,
+    versionA: config.versionA,
+    versionB: config.versionB,
+    watchSize: config.watchSize,
+    commit: config.commit,
+    configMode: config.configMode,
+    configOverrides: config.configOverrides,
+    regime: null,
+    freeze: null,
+    startedAt: startedAt.toISOString(),
+  };
+  logInfo(
+    SCOPE,
+    `dia ${day} (${iso}) sin sesion de mercado: se registra ${NON_MARKET_DAY_STATUS} y NO se ejecuta preflight`,
+  );
+  finishDay(manifest, {}, {});
+  return 0;
 }
 
 async function runDayBody(config, flags, { day, iso, startedAt }) {
@@ -945,6 +1002,15 @@ async function dryRunDay(config, day) {
     SCOPE,
     `--dry-run · dia ${day} · cuenta ${config.account} · versionA ${config.versionA} · watch ${config.watchSize} · config ${config.configMode}`,
   );
+  // v2.88.143: en un dia sin sesion el plan NO es la cadena de preflight: se registraria
+  // NON_MARKET_DAY y no se abriria el motor. Decirlo es mas honesto que listar pasos.
+  if (!isMarketDay(new Date())) {
+    logWarn(
+      SCOPE,
+      `--dry-run · fin de semana: el run-day real solo registraria ${NON_MARKET_DAY_STATUS} (sin preflight, sin motor)`,
+    );
+    return 0;
+  }
   if (config.configMode === "UNSAFE") {
     logWarn(
       SCOPE,
@@ -1053,7 +1119,7 @@ function cmdStatus() {
       `RUN EN CURSO: dia ${lock.day} (pid ${lock.pid} · ${lock.startedAt}) — no lances otro run-day`,
     );
   }
-  if (summary.total === 0) {
+  if (summary.rows === 0) {
     logWarn(
       SCOPE,
       "ledger vacio: aun no hay ningun dia registrado (NO MEDIDO, nunca 0)",
@@ -1067,7 +1133,7 @@ function cmdStatus() {
     }
   }
   console.log(
-    `  resumen: medidos=${summary.measured} veto=${summary.vetoed} declarados=${summary.declared} duros=${summary.hardErrors}`,
+    `  resumen: dias_de_ventana=${summary.total} medidos=${summary.measured} veto=${summary.vetoed} declarados=${summary.declared} duros=${summary.hardErrors} no_mercado=${summary.nonMarket}`,
   );
   if (gate) {
     console.log(

@@ -820,7 +820,37 @@ export const TERMINAL_STATUSES = Object.freeze([
   'MEDIDO',
   'DECLARADO',
   'HARD_ERROR',
+  // v2.88.143: un fin de semana NO es un dia de ventana. Se registra como terminal
+  // para que una re-ejecucion del mismo dia se omita (y para no contarlo como veto).
+  'NON_MARKET_DAY',
 ]);
+
+/**
+ * Estado del dia cuando NO hay sesion de mercado (v2.88.143).
+ *
+ * Motivo: la tarea diaria corre `/sc daily` **tambien sabados y domingos** y el runner
+ * escribia una fila de **veto de regimen** en el ledger, de modo que un sabado parecia
+ * «un dia de ventana intentado y vetado». Un dia sin sesion no es ninguna de las dos
+ * cosas: se registra `NON_MARKET_DAY` y **no se ejecuta el preflight**.
+ */
+export const NON_MARKET_DAY_STATUS = 'NON_MARKET_DAY';
+
+/**
+ * ¿Es dia de mercado? **Puro.** Solo descarta **fin de semana** (sabado/domingo).
+ *
+ * **Limite declarado:** NO cubre **festivos** de bolsa. Se usa la misma regla que el
+ * vigia (`window_day_watch_worker.evaluate_day_watch`, `weekday() >= 5`) para que los dos
+ * instrumentos no puedan discrepar sobre si el dia era de mercado.
+ *
+ * @param {Date} [date] instante en hora local del proceso (Europe/Madrid en el runner)
+ * @returns {boolean}
+ */
+export function isMarketDay(date = new Date()) {
+  const value = date instanceof Date ? date : new Date(date);
+  const weekday = value.getDay(); // 0 = domingo … 6 = sabado
+  return weekday !== 0 && weekday !== 6;
+}
+
 
 /** @param {unknown} status */
 export function isTerminalStatus(status) {
@@ -863,9 +893,18 @@ export function latestByDay(rows) {
 export function summarizeLedger(rows, gate = null) {
   const days = latestByDay(rows);
   const count = (status) => days.filter((row) => row.status === status).length;
+  // v2.88.143: los dias SIN sesion (fin de semana) no son dias de ventana. Se cuentan
+  // aparte y NO entran en `total`, para que «N dias» siga significando lo que parece.
+  const nonMarketDays = days
+    .filter((row) => row.status === NON_MARKET_DAY_STATUS)
+    .map((row) => row.day);
+  const marketDays = days.filter((row) => row.status !== NON_MARKET_DAY_STATUS);
   return {
     days,
-    total: days.length,
+    total: marketDays.length,
+    rows: days.length,
+    nonMarket: nonMarketDays.length,
+    nonMarketDays,
     measured: count('MEDIDO'),
     vetoed: count('NO_MEDIDO_REGIMEN'),
     declared: count('DECLARADO'),
