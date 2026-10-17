@@ -109,6 +109,12 @@ class Settings(BaseSettings):
     window_day_watch_email_to: str | None = Field(
         default=None, validation_alias="WINDOW_DAY_WATCH_EMAIL_TO"
     )
+    # v2.88.142 — «vigía 2.0»: arrastre de días laborables ANTERIORES sin fila en el ledger
+    # (equipo apagado / stack caído). 0 lo desactiva; no alerta del pasado anterior a la
+    # primera fila del ledger (baseline).
+    window_day_watch_lookback_days: int = Field(
+        default=7, validation_alias="WINDOW_DAY_WATCH_LOOKBACK_DAYS"
+    )
     scan_arq_max_jobs: int = Field(default=4, validation_alias="SCAN_ARQ_MAX_JOBS")
     scan_arq_job_timeout_seconds: int = Field(
         default=600,

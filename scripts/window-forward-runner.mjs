@@ -82,6 +82,12 @@ const SCRIPT_EVIDENCE =
 
 const TASK_NAME = "BolsaV1_WindowForward";
 const DEFAULT_TASK_TIME = "18:00";
+//: v2.88.142 — vigía diario: tarea INDEPENDIENTE del stack dev, después del run-day.
+const WATCH_TASK_NAME = "BolsaV1_WindowWatch";
+const DEFAULT_WATCH_TIME = "20:20";
+const WATCH_MODULE = "bolsa_api.background.window_day_watch_worker";
+/** Exit code del CLI del vigía cuando hay día perdido/HARD_ERROR (queda en `LastTaskResult`). */
+const WATCH_ALERT_EXIT = 3;
 const SCOPE = "window";
 
 // ---------------------------------------------------------------------------
@@ -94,7 +100,12 @@ function parseArgs(argv) {
     dryRun: false,
     skipApiCheck: false,
     unsafeOverride: false,
+    json: false,
+    noPersist: false,
+    noWatch: false,
     at: null,
+    watchAt: null,
+    lookbackDays: null,
     help: false,
   };
   const positionals = [];
@@ -106,11 +117,24 @@ function parseArgs(argv) {
     else if (arg === "--skip-api-check") flags.skipApiCheck = true;
     else if (arg === "--unsafe-override-window-config")
       flags.unsafeOverride = true;
+    else if (arg === "--json") flags.json = true;
+    else if (arg === "--no-persist") flags.noPersist = true;
+    else if (arg === "--no-watch") flags.noWatch = true;
     else if (arg === "--help" || arg === "-h") flags.help = true;
     else if (arg === "--at") {
       flags.at = argv[i + 1] ?? null;
       i += 1;
     } else if (arg.startsWith("--at=")) flags.at = arg.slice("--at=".length);
+    else if (arg === "--watch-at") {
+      flags.watchAt = argv[i + 1] ?? null;
+      i += 1;
+    } else if (arg.startsWith("--watch-at="))
+      flags.watchAt = arg.slice("--watch-at=".length);
+    else if (arg === "--lookback-days") {
+      flags.lookbackDays = argv[i + 1] ?? null;
+      i += 1;
+    } else if (arg.startsWith("--lookback-days="))
+      flags.lookbackDays = arg.slice("--lookback-days=".length);
     else if (arg.startsWith("--")) unknown.push(arg);
     else positionals.push(arg);
   }
@@ -130,13 +154,21 @@ Comandos:
                             ownership que run-day). Nunca borra un PID vivo de este host: si hay un
                             run en curso, deniega (exit 1). --force solo fuerza un lock ajeno con TTL
                             fresco o un lock ilegible; para un PID vivo, mata el proceso.
-  task:install [--at HH:MM] Registra la tarea diaria de Windows (schtasks). Opcional.
-  task:remove               Elimina la tarea diaria de Windows.
+  watch [--lookback-days N] Vigia diario (v2.88.142): evalua el dia + arrastre de dias perdidos y
+                            AVISA (log + email). NO toca la ventana; deja latido en
+                            operability_runs/window-runs/day-watch.json. Exit 0 sin aviso, 3 con aviso.
+                            Corre sin el stack dev (su tarea programada es independiente).
+  task:install [--at HH:MM] [--watch-at HH:MM]
+                            Registra las tareas diarias de Windows (schtasks): run-day (18:00) y
+                            vigia (20:20). --no-watch registra solo el run-day. Opcional.
+  task:remove               Elimina las tareas diarias de Windows.
 
 Flags:
   --dry-run                 Valida config/freeze/cadena sin abrir el motor.
   --force                   Re-ejecuta un dia ya terminal; NO salta un lock vivo (solo un lock huerfano de otro host/TTL). En unlock, reclama un lock ajeno con TTL fresco o ilegible.
   --skip-api-check          No exige /api/health/ready (el scheduler de barras vive en el API).
+  --json                    (watch) Imprime el latido por stdout.
+  --no-persist              (watch) No escribe el latido (dry-run).
   --unsafe-override-window-config
                             Permite que WINDOW_APPS_HASH/WINDOW_PACKAGES_HASH/WINDOW_ACCOUNT/
                             WINDOW_VERSION_A/WINDOW_VERSION_B/WINDOW_WATCH_SIZE sustituyan la config
@@ -254,6 +286,24 @@ async function runPython(script, args, options = {}) {
     launcher.bin,
     [...launcher.prefix, join(ROOT, script), ...args],
     options,
+  );
+}
+
+/**
+ * Ejecuta un **módulo** del paquete Python (p. ej. el CLI del vigía) desde `apps/api-python`
+ * con su `src` en `PYTHONPATH`, igual que hace el stack dev con sus workers.
+ */
+async function runPythonModule(moduleName, args, options = {}) {
+  const launcher = await resolveLauncher();
+  const apiDir = join(ROOT, "apps", "api-python");
+  return runProcess(
+    launcher.bin,
+    [...launcher.prefix, "-m", moduleName, ...args],
+    {
+      cwd: apiDir,
+      env: { ...process.env, PYTHONPATH: join(apiDir, "src") },
+      ...options,
+    },
   );
 }
 
@@ -1129,12 +1179,63 @@ function cmdUnlock(flags) {
 }
 
 // ---------------------------------------------------------------------------
+// Vigia diario (v2.88.142) — vigilancia verificable e independiente del stack
+// ---------------------------------------------------------------------------
+
+const WATCH_STATUS_PATH = "operability_runs/window-runs/day-watch.json";
+
+/**
+ * `watch`: evalua el dia de hoy + el arrastre de dias perdidos y AVISA (log + email).
+ *
+ * Read-only sobre la ventana (solo lee el ledger y el lock) y escribe su **latido** en
+ * `day-watch.json`, que es el instrumento que permite comprobar desde fuera que el vigia
+ * corrio. Corre SIN el stack dev: por eso tiene su propia tarea programada (`20:20`).
+ *
+ * Exit: `0` sin aviso · `3` con dia perdido/HARD_ERROR (queda en `LastTaskResult`) · `1` error.
+ */
+async function cmdWatch(flags) {
+  const args = ["--once"];
+  if (flags.lookbackDays) args.push("--lookback-days", String(flags.lookbackDays));
+  if (flags.json) args.push("--json");
+  if (flags.noPersist) args.push("--no-persist");
+
+  logInfo(SCOPE, "vigia diario: evaluando el ledger de la ventana (read-only)...");
+  const result = await runPythonModule(WATCH_MODULE, args);
+  if (result.spawnError) {
+    logError(
+      SCOPE,
+      `no se pudo lanzar el vigia: ${result.spawnError.message ?? String(result.spawnError)}`,
+    );
+    return 1;
+  }
+  if (result.code === WATCH_ALERT_EXIT) {
+    logWarn(
+      SCOPE,
+      `vigia: HAY aviso (latido en ${WATCH_STATUS_PATH}); revisa el log/email y, si procede, ` +
+        "`pnpm window:status` + `pnpm window:run-day`",
+    );
+    return WATCH_ALERT_EXIT;
+  }
+  if (result.code !== 0) {
+    logError(SCOPE, `el vigia termino con codigo ${result.code ?? "n/d"}`);
+    return result.code ?? 1;
+  }
+  logInfo(SCOPE, `vigia: sin aviso (latido en ${WATCH_STATUS_PATH})`);
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // Tareas programadas (Windows)
 // ---------------------------------------------------------------------------
 
 /** Ruta del wrapper `.cmd` que ejecuta la tarea programada (generado, no versionado). */
 function taskWrapperPath() {
   return join(ROOT, RUNS_DIR, "window-forward-task.cmd");
+}
+
+/** Ruta del wrapper `.cmd` del vigía diario (generado, no versionado). */
+function watchWrapperPath() {
+  return join(ROOT, RUNS_DIR, "window-watch-task.cmd");
 }
 
 /**
@@ -1145,19 +1246,51 @@ function taskWrapperPath() {
  * las comillas internas se consumen y `/sc` deja de ser un flag. Un wrapper con una ruta
  * SIN comillas anidadas elimina el problema: `/tr "<ruta-wrapper.cmd>"` es un unico token.
  */
-function writeTaskWrapper() {
+function writeCmdWrapper(wrapper, pnpmScript) {
   const root = ROOT.replace(/[\\/]+$/, "").replace(/\//g, "\\");
   const pnpm = `${root}\\node_modules\\.bin\\pnpm.cmd`;
   const content =
-    "@echo off\r\n" + `cd /d "${root}"\r\n` + `"${pnpm}" window:run-day\r\n`;
-  const wrapper = taskWrapperPath();
+    "@echo off\r\n" + `cd /d "${root}"\r\n` + `"${pnpm}" ${pnpmScript}\r\n`;
   mkdirSync(dirname(wrapper), { recursive: true });
   writeFileSync(wrapper, content, "utf8");
   return wrapper;
 }
 
+function writeTaskWrapper() {
+  return writeCmdWrapper(taskWrapperPath(), "window:run-day");
+}
+
+/** v2.88.142: wrapper de la tarea del vigía (independiente del stack dev). */
+function writeWatchWrapper() {
+  return writeCmdWrapper(watchWrapperPath(), "window:watch");
+}
+
 function schtasksCreateCommand(name, time, wrapper) {
   return `schtasks /create /tn "${name}" /tr "${wrapper}" /sc daily /st ${time} /f`;
+}
+
+/** Registra una tarea diaria y devuelve `true` si `schtasks` salió bien. */
+function registerTask(name, time, wrapper) {
+  const command = schtasksCreateCommand(name, time, wrapper);
+  logInfo(SCOPE, `registrando tarea diaria "${name}" a las ${time}...`);
+  const result = spawnSync(command, [], {
+    shell: true,
+    encoding: "utf8",
+    stdio: "inherit",
+  });
+  if (result.status !== 0) {
+    logError(
+      SCOPE,
+      "schtasks devolvio error; revisa permisos (terminal como administrador).",
+    );
+    return false;
+  }
+  logInfo(SCOPE, `tarea "${name}" registrada.`);
+  logInfo(
+    SCOPE,
+    `consulta/elimina: schtasks /query /tn "${name}" · schtasks /delete /tn "${name}" /f`,
+  );
+  return true;
 }
 
 function cmdTaskInstall(flags) {
@@ -1169,32 +1302,27 @@ function cmdTaskInstall(flags) {
     return 0;
   }
   const time = flags.at || DEFAULT_TASK_TIME;
+  const watchTime = flags.watchAt || DEFAULT_WATCH_TIME;
+  const installWatch = !flags.noWatch;
   if (flags.dryRun) {
     console.log(schtasksCreateCommand(TASK_NAME, time, taskWrapperPath()));
+    if (installWatch) {
+      console.log(
+        schtasksCreateCommand(WATCH_TASK_NAME, watchTime, watchWrapperPath()),
+      );
+    }
     return 0;
   }
   const wrapper = writeTaskWrapper();
   logInfo(SCOPE, `wrapper de la tarea escrito en ${wrapper}`);
-  const command = schtasksCreateCommand(TASK_NAME, time, wrapper);
-  logInfo(SCOPE, `registrando tarea diaria "${TASK_NAME}" a las ${time}...`);
-  const result = spawnSync(command, [], {
-    shell: true,
-    encoding: "utf8",
-    stdio: "inherit",
-  });
-  if (result.status !== 0) {
-    logError(
-      SCOPE,
-      "schtasks devolvio error; revisa permisos (terminal como administrador).",
-    );
-    return 1;
-  }
-  logInfo(SCOPE, `tarea "${TASK_NAME}" registrada.`);
-  logInfo(
-    SCOPE,
-    `consulta/elimina: schtasks /query /tn "${TASK_NAME}" · schtasks /delete /tn "${TASK_NAME}" /f`,
-  );
-  return 0;
+  if (!registerTask(TASK_NAME, time, wrapper)) return 1;
+  if (!installWatch) return 0;
+
+  // v2.88.142: el vigía tiene su PROPIA tarea diaria (20:20), de modo que avisa aunque el
+  // equipo/stack no esté levantado a la hora del run-day.
+  const watchWrapper = writeWatchWrapper();
+  logInfo(SCOPE, `wrapper del vigia escrito en ${watchWrapper}`);
+  return registerTask(WATCH_TASK_NAME, watchTime, watchWrapper) ? 0 : 1;
 }
 
 function cmdTaskRemove(flags) {
@@ -1202,22 +1330,26 @@ function cmdTaskRemove(flags) {
     logInfo(SCOPE, "task:remove solo aplica a Windows (schtasks).");
     return 0;
   }
-  const command = `schtasks /delete /tn "${TASK_NAME}" /f`;
-  if (flags.dryRun) {
-    console.log(command);
-    return 0;
+  let ok = true;
+  for (const name of [TASK_NAME, WATCH_TASK_NAME]) {
+    const command = `schtasks /delete /tn "${name}" /f`;
+    if (flags.dryRun) {
+      console.log(command);
+      continue;
+    }
+    const result = spawnSync(command, [], {
+      shell: true,
+      encoding: "utf8",
+      stdio: "inherit",
+    });
+    if (result.status !== 0) {
+      logError(SCOPE, `no se pudo eliminar la tarea "${name}".`);
+      ok = false;
+      continue;
+    }
+    logInfo(SCOPE, `tarea "${name}" eliminada.`);
   }
-  const result = spawnSync(command, [], {
-    shell: true,
-    encoding: "utf8",
-    stdio: "inherit",
-  });
-  if (result.status !== 0) {
-    logError(SCOPE, `no se pudo eliminar la tarea "${TASK_NAME}".`);
-    return 1;
-  }
-  logInfo(SCOPE, `tarea "${TASK_NAME}" eliminada.`);
-  return 0;
+  return ok ? 0 : 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -1257,6 +1389,8 @@ async function main() {
       return cmdEvidence(config, flags);
     case "unlock":
       return cmdUnlock(flags);
+    case "watch":
+      return cmdWatch(flags);
     case "task:install":
       return cmdTaskInstall(flags);
     case "task:remove":

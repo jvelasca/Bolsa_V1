@@ -15,21 +15,42 @@ si el día se ejecutó. Si **no** consta (``MISSED``) o quedó en ``HARD_ERROR``
 log estructurado ``ALERTA`` **siempre** y email por el canal SMTP ya existente cuando
 está configurado (nunca en silencio).
 
+V2.88.142 — **«vigía 2.0»: vigilancia VERIFICABLE e independiente del stack** (hallazgo
+declarado en ``v2.88.140``: el vigía sólo emitía log —y el log del stack dev NO captura los
+loggers ``bolsa_api.*``—, de modo que su vigilancia era **indemostrable desde fuera**; además
+sólo miraba el día de HOY, así que un día perdido con el equipo apagado no se avisaba nunca).
+
+Tres piezas nuevas, sin tocar la ventana:
+
+* **Latido durable** (``operability_runs/window-runs/day-watch.json`` + ``day-watch.jsonl``):
+  cada tick deja por escrito el veredicto del día, los días comprobados y las alertas. Es el
+  **instrumento** que hace falsable «está vigilando» sin depender de logs ni de emails.
+* **Arrastre de días perdidos** (``WINDOW_DAY_WATCH_LOOKBACK_DAYS``, default ``7``): además de
+  hoy, revisa los días laborables **anteriores** al último día del ledger y avisa de los que
+  faltan (equipo apagado, stack caído, tarea no disparada).
+* **CLI autónomo** (``python -m bolsa_api.background.window_day_watch_worker --once`` →
+  ``pnpm window:watch`` + tarea programada ``BolsaV1_WindowWatch``): evalúa y avisa **sin el
+  stack dev**, de modo que la vigilancia no depende de que el API esté levantado.
+
 Reglas duras:
 
 * **On-by-default** (``WINDOW_DAY_WATCH_ENABLED``; se apaga con ``0/false/no/off``): un
   aviso de día perdido no puede depender de una variable ausente.
 * **No toca la ventana.** Sólo LEE el ledger y el lock del día; jamás escribe en el
-  journal, ni lanza ``run-day``, ni fuerza el régimen, ni cambia umbrales ni pesos A/B.
-  ``Δ motor = 0``; ``Δ decisión = 0``.
+  journal ni en el ledger, ni lanza ``run-day``, ni fuerza el régimen, ni cambia umbrales ni
+  pesos A/B. Su única escritura es su **propio** fichero de latido. ``Δ motor = 0``;
+  ``Δ decisión = 0``.
 * **Un veto NO es una alerta.** ``NO_MEDIDO_REGIMEN`` (p. ej. ``BEAR_TREND``) es una
   declaración **legítima** de mercado: se registra como INFO, no dispara aviso.
 * **Honestidad de hueco.** Un día sin fila en el ledger es ``MISSED`` (alerta), nunca un
-  ``OK`` fabricado; un ledger ilegible/ausente no se inventa.
+  ``OK`` fabricado; un ledger ilegible/ausente no se inventa, y el arrastre **no alerta del
+  pasado anterior a la primera fila** (baseline): en un ledger vacío no hay días perdidos que
+  declarar.
 * **Fail-safe por tick**: un error del tick se registra y NO mata el bucle.
-* **Idempotente por día**: una única evaluación por fecha local (guard en proceso).
+* **Idempotente por aviso**: cada par ``(día, veredicto)`` se anuncia **una sola vez** por
+  proceso (el latido sí se reescribe en cada tick, para poder probar que el vigía vive).
 
-@see scripts/window-forward-runner.mjs (ledger del día + lock ``.run.lock``)
+@see scripts/window-forward-runner.mjs (ledger del día + lock ``.run.lock`` + ``--watch``)
 @see docs/engineering/runbook-ventana-forward-v2.78-2026-09-27.md
 """
 
@@ -39,9 +60,10 @@ import asyncio
 import json
 import logging
 import os
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any, Literal
@@ -56,6 +78,17 @@ MADRID = ZoneInfo("Europe/Madrid")
 CHECK_INTERVAL_SECONDS = 15 * 60
 _ENV_ENABLED = "WINDOW_DAY_WATCH_ENABLED"
 _ENV_LEDGER_PATH = "WINDOW_LEDGER_PATH"
+_ENV_LOOKBACK_DAYS = "WINDOW_DAY_WATCH_LOOKBACK_DAYS"
+
+#: Arrastre por defecto (días naturales hacia atrás). ``0`` desactiva el arrastre.
+DEFAULT_LOOKBACK_DAYS = 7
+#: Tope defensivo del arrastre (no tiene sentido revisar más atrás que la ventana).
+MAX_LOOKBACK_DAYS = 90
+#: Latido durable (instrumento de vigilancia): último veredicto + journal de latidos.
+STATUS_FILE = "day-watch.json"
+STATUS_JOURNAL = "day-watch.jsonl"
+#: Código de salida del CLI cuando el día (o un día del arrastre) requiere atención.
+ALERT_EXIT_CODE = 3
 
 WindowDayVerdict = Literal[
     "NOT_DUE",
@@ -172,6 +205,58 @@ def evaluate_day_watch(
     return make(kind, severity, status=status, reason=reason, message=f"día {iso} · {detail}")
 
 
+def evaluate_backfill(
+    *,
+    now: datetime,
+    rows: Sequence[Mapping[str, Any]],
+    lookback_days: int,
+) -> list[WindowDayWatch]:
+    """Días laborables **anteriores** sin fila en el ledger (PURA; ``lookback_days`` atrás).
+
+    Cubre el hueco que el vigía de hoy no ve: si a las 20:00 el equipo estaba apagado o el
+    stack caído, al día siguiente el veredicto de HOY ya no mira el día perdido. El arrastre
+    lo declara ``MISSED`` igual que el día corriente.
+
+    **Baseline (anti-falso-positivo):** sólo se miran días **posteriores a la primera fila**
+    del ledger; con el ledger vacío no se declara ningún día perdido (no se inventa pasado
+    anterior a la puesta en marcha de la ventana). Fin de semana nunca es día perdido.
+    """
+    span = max(0, min(int(lookback_days), MAX_LOOKBACK_DAYS))
+    if span <= 0:
+        return []
+    known = {str(row.get("day") or "").strip() for row in rows}
+    known.discard("")
+    if not known:
+        return []
+    baseline = min(known)
+
+    today = now.date()
+    missed: list[WindowDayWatch] = []
+    for offset in range(1, span + 1):
+        day_date = today - timedelta(days=offset)
+        if day_date.weekday() >= 5:
+            continue
+        day = day_date.strftime("%Y%m%d")
+        if day <= baseline or day in known:
+            continue
+        iso = day_date.isoformat()
+        missed.append(
+            WindowDayWatch(
+                verdict="MISSED",
+                severity="alert",
+                day=day,
+                day_iso=iso,
+                status=None,
+                reason="ledger_sin_dia_previo",
+                message=(
+                    f"el día {iso} NO se ejecutó: no consta en el ledger del runner "
+                    "(¿la cadencia diaria no corrió, el equipo estaba apagado o el stack caído?)"
+                ),
+            )
+        )
+    return sorted(missed, key=lambda watch: watch.day)
+
+
 # ---------------------------------------------------------------------------
 # Lectura del ledger y del lock del día (I/O, read-only)
 # ---------------------------------------------------------------------------
@@ -234,6 +319,116 @@ def day_is_running(day: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Latido durable (instrumento de vigilancia: probar que el vigía está vivo)
+# ---------------------------------------------------------------------------
+
+
+def runs_dir() -> Path | None:
+    """Carpeta de la ventana (``operability_runs/window-runs``) o ``None``."""
+    root = repo_root()
+    return None if root is None else root / "operability_runs" / "window-runs"
+
+
+def status_path(directory: Path | None = None) -> Path | None:
+    """Ruta del latido (``day-watch.json``) o ``None`` si no hay repo."""
+    base = directory or runs_dir()
+    return None if base is None else base / STATUS_FILE
+
+
+def status_journal_path(directory: Path | None = None) -> Path | None:
+    """Ruta del journal de latidos (``day-watch.jsonl``) o ``None`` si no hay repo."""
+    base = directory or runs_dir()
+    return None if base is None else base / STATUS_JOURNAL
+
+
+def default_lookback_days(settings: Settings | None = None) -> int:
+    """Días de arrastre (``WINDOW_DAY_WATCH_LOOKBACK_DAYS`` → settings → 7), acotado."""
+    raw = (os.getenv(_ENV_LOOKBACK_DAYS) or "").strip()
+    value: int | None = None
+    if raw:
+        try:
+            value = int(raw)
+        except ValueError:
+            logger.warning(
+                "ventana PAPER: %s=%r no es un entero; se usa %s",
+                _ENV_LOOKBACK_DAYS,
+                raw,
+                DEFAULT_LOOKBACK_DAYS,
+            )
+    if value is None:
+        fallback = getattr(settings, "window_day_watch_lookback_days", DEFAULT_LOOKBACK_DAYS)
+        value = int(fallback or 0)
+    return max(0, min(value, MAX_LOOKBACK_DAYS))
+
+
+def status_payload(
+    checks: Sequence[WindowDayWatch],
+    *,
+    now: datetime,
+    lookback_days: int,
+    source: str,
+) -> dict[str, Any]:
+    """Payload del latido (falsable y estable para leer desde fuera)."""
+    today = next((check for check in checks if check.day == day_stamp(now)), None)
+    return {
+        "at": now.isoformat(),
+        "day": day_stamp(now),
+        "dayIso": now.strftime("%Y-%m-%d"),
+        "verdict": today.verdict if today is not None else "SIN_EVALUAR",
+        "severity": today.severity if today is not None else "info",
+        "status": today.status if today is not None else None,
+        "reason": today.reason if today is not None else None,
+        "message": today.message if today is not None else "",
+        "alerts": [f"{check.day}:{check.verdict}" for check in checks if check.severity == "alert"],
+        "checks": [
+            {
+                "day": check.day,
+                "verdict": check.verdict,
+                "severity": check.severity,
+                "reason": check.reason,
+            }
+            for check in checks
+        ],
+        "lookbackDays": int(lookback_days),
+        "source": source,
+    }
+
+
+def write_status(
+    checks: Sequence[WindowDayWatch],
+    *,
+    now: datetime,
+    lookback_days: int = 0,
+    source: str = "worker",
+    directory: Path | None = None,
+) -> Path | None:
+    """Escribe el latido (``day-watch.json`` + línea en ``day-watch.jsonl``).
+
+    Best-effort: un fallo de escritura se registra y NO tumba al vigía (el aviso por log y
+    email es independiente). Devuelve la ruta escrita o ``None``.
+    """
+    path = status_path(directory)
+    journal = status_journal_path(directory)
+    if path is None or journal is None:
+        logger.warning("ventana PAPER: sin raíz de repo; no se pudo escribir el latido")
+        return None
+    body = json.dumps(
+        status_payload(checks, now=now, lookback_days=lookback_days, source=source),
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"{body}\n", encoding="utf-8")
+        with journal.open("a", encoding="utf-8") as handle:
+            handle.write(f"{body}\n")
+    except OSError:
+        logger.exception("ventana PAPER: no se pudo escribir el latido en %s", path)
+        return None
+    return path
+
+
+# ---------------------------------------------------------------------------
 # Aviso (log + email por el canal SMTP existente)
 # ---------------------------------------------------------------------------
 
@@ -288,76 +483,159 @@ def _worker_enabled() -> bool:
     return raw not in {"0", "false", "no", "off"}
 
 
+async def _announce(settings: Settings, watch: WindowDayWatch) -> None:
+    """Avisa de un veredicto: log SIEMPRE; email sólo si es alerta y hay canal."""
+    if watch.severity != "alert":
+        logger.info("vigía ventana PAPER · %s: %s", watch.verdict, watch.message)
+        return
+    logger.error(
+        "ALERTA VENTANA PAPER · %s (%s): %s",
+        watch.verdict,
+        watch.reason or "n/d",
+        watch.message,
+    )
+    sent = False
+    try:
+        sent = await asyncio.to_thread(send_alert_email, settings, watch)
+    except Exception:
+        logger.exception("ventana PAPER: fallo enviando el aviso por email")
+    if not sent:
+        logger.warning(
+            "ventana PAPER: aviso %s sin email (SMTP/destinatario no configurado); "
+            "el aviso queda registrado en el log",
+            watch.verdict,
+        )
+
+
+async def evaluate_all(
+    *,
+    now: datetime | None = None,
+    settings: Settings | None = None,
+    rows: Sequence[Mapping[str, Any]] | None = None,
+    running: bool | None = None,
+    lookback_days: int | None = None,
+    persist: bool = False,
+    directory: Path | None = None,
+    source: str = "worker",
+    announce: bool = True,
+) -> list[WindowDayWatch]:
+    """Evalúa HOY + el arrastre de días perdidos y AVISA de cada veredicto.
+
+    Devuelve los veredictos (hoy primero). ``persist=True`` escribe el latido durable;
+    ``announce=False`` deja el veredicto en el latido sin volver a avisar (idempotencia
+    por día/veredicto del bucle), de modo que un ``MISSED`` no se repita cada tick.
+    """
+    cfg = settings or get_settings()
+    moment = now or datetime.now(MADRID)
+    due_hour = int(getattr(cfg, "window_day_watch_hour", 20))
+    due_minute = int(getattr(cfg, "window_day_watch_minute", 0))
+    ledger = read_ledger_rows(ledger_path()) if rows is None else rows
+    span = default_lookback_days(cfg) if lookback_days is None else int(lookback_days)
+
+    today = evaluate_day_watch(
+        now=moment,
+        due_hour=due_hour,
+        due_minute=due_minute,
+        rows=ledger,
+        running=day_is_running(day_stamp(moment)) if running is None else running,
+    )
+    checks: list[WindowDayWatch] = [
+        today,
+        *evaluate_backfill(now=moment, rows=ledger, lookback_days=span),
+    ]
+    if announce:
+        for watch in checks:
+            await _announce(cfg, watch)
+    if persist:
+        write_status(checks, now=moment, lookback_days=span, source=source, directory=directory)
+    return checks
+
+
 async def evaluate_once(
     *,
     now: datetime | None = None,
     settings: Settings | None = None,
     rows: Sequence[Mapping[str, Any]] | None = None,
     running: bool | None = None,
+    lookback_days: int | None = None,
+    persist: bool = False,
+    directory: Path | None = None,
+    source: str = "worker",
+    announce: bool = True,
 ) -> WindowDayWatch:
-    """Evalúa el día y, si procede, AVISA (log siempre; email si está configurado)."""
-    cfg = settings or get_settings()
-    moment = now or datetime.now(MADRID)
-    watch = evaluate_day_watch(
-        now=moment,
-        due_hour=int(getattr(cfg, "window_day_watch_hour", 20)),
-        due_minute=int(getattr(cfg, "window_day_watch_minute", 0)),
-        rows=read_ledger_rows(ledger_path()) if rows is None else rows,
-        running=day_is_running(day_stamp(moment)) if running is None else running,
+    """Veredicto de HOY (y aviso del arrastre). Compatibilidad con el contrato previo."""
+    checks = await evaluate_all(
+        now=now,
+        settings=settings,
+        rows=rows,
+        running=running,
+        lookback_days=lookback_days,
+        persist=persist,
+        directory=directory,
+        source=source,
+        announce=announce,
     )
-
-    if watch.severity == "alert":
-        logger.error(
-            "ALERTA VENTANA PAPER · %s (%s): %s",
-            watch.verdict,
-            watch.reason or "n/d",
-            watch.message,
-        )
-        sent = False
-        try:
-            sent = await asyncio.to_thread(send_alert_email, cfg, watch)
-        except Exception:
-            logger.exception("ventana PAPER: fallo enviando el aviso por email")
-        if not sent:
-            logger.warning(
-                "ventana PAPER: aviso %s sin email (SMTP/destinatario no configurado); "
-                "el aviso queda registrado en el log",
-                watch.verdict,
-            )
-    else:
-        logger.info("vigía ventana PAPER · %s: %s", watch.verdict, watch.message)
-    return watch
+    return checks[0]
 
 
-_last_eval_day: str | None = None
+#: Avisos ya emitidos en este proceso: ``{día:veredicto}`` (no se repite el mismo aviso).
+_announced: set[str] = set()
+
+
+async def _tick(
+    cfg: Settings,
+    *,
+    lookback_days: int,
+    directory: Path | None = None,
+    now: datetime | None = None,
+) -> WindowDayWatch:
+    """Un tick: evalúa hoy + arrastre, escribe el latido y avisa (una vez por veredicto)."""
+    moment = now or datetime.now(MADRID)
+    day = day_stamp(moment)
+    checks = await evaluate_all(
+        now=moment,
+        settings=cfg,
+        lookback_days=lookback_days,
+        persist=True,
+        directory=directory,
+        source="worker",
+        announce=False,
+    )
+    for watch in checks:
+        key = f"{day}:{watch.day}:{watch.verdict}"
+        if watch.verdict == "NOT_DUE" or key in _announced:
+            continue
+        _announced.add(key)
+        await _announce(cfg, watch)
+    return checks[0]
 
 
 async def window_day_watch_loop(
-    *, tick_seconds: float | None = None, settings: Settings | None = None
+    *,
+    tick_seconds: float | None = None,
+    settings: Settings | None = None,
+    lookback_days: int | None = None,
+    directory: Path | None = None,
 ) -> None:
-    global _last_eval_day
-
     cfg = settings or get_settings()
     interval = float(tick_seconds) if tick_seconds is not None else float(CHECK_INTERVAL_SECONDS)
+    span = default_lookback_days(cfg) if lookback_days is None else int(lookback_days)
     logger.info(
-        "WindowDayWatch iniciado (tick=%ss; hora=%02d:%02d Europe/Madrid)",
+        "WindowDayWatch iniciado (tick=%ss; hora=%02d:%02d Europe/Madrid; arrastre=%sd)",
         interval,
         int(getattr(cfg, "window_day_watch_hour", 20)),
         int(getattr(cfg, "window_day_watch_minute", 0)),
+        span,
     )
     while True:
+        if _worker_enabled():
+            # Primero evalúa y deja el latido, DESPUÉS duerme: al arrancar el stack ya hay
+            # veredicto escrito (vigilancia comprobable desde el primer segundo).
+            try:
+                await _tick(cfg, lookback_days=span, directory=directory)
+            except Exception:
+                logger.exception("vigía ventana PAPER: tick falló (se reintenta el siguiente)")
         await asyncio.sleep(interval)
-        if not _worker_enabled():
-            continue
-        now = datetime.now(MADRID)
-        if _last_eval_day == day_stamp(now):
-            continue
-        try:
-            watch = await evaluate_once(now=now, settings=cfg)
-            if watch.verdict != "NOT_DUE":
-                _last_eval_day = day_stamp(now)
-        except Exception:
-            logger.exception("vigía ventana PAPER: tick falló (se reintenta el siguiente)")
 
 
 def start_window_day_watch(
@@ -365,26 +643,135 @@ def start_window_day_watch(
     *,
     tick_seconds: float | None = None,
     settings: Settings | None = None,
+    lookback_days: int | None = None,
+    directory: Path | None = None,
 ) -> asyncio.Task[None] | None:
     """Arranca el vigía (``session_factory`` ignorado: el vigía no usa BD). Default ON."""
     if not _worker_enabled():
         logger.info("WindowDayWatch desactivado (%s=false)", _ENV_ENABLED)
         return None
-    return asyncio.create_task(window_day_watch_loop(tick_seconds=tick_seconds, settings=settings))
+    return asyncio.create_task(
+        window_day_watch_loop(
+            tick_seconds=tick_seconds,
+            settings=settings,
+            lookback_days=lookback_days,
+            directory=directory,
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
+# CLI autónomo (`pnpm window:watch`): vigila SIN el stack dev
+# ---------------------------------------------------------------------------
+
+_CLI_HELP = """Vigía diario de la ventana PAPER (ADR-046) — evaluación y aviso.
+
+Uso:
+  python -m bolsa_api.background.window_day_watch_worker [opciones]
+
+Evalúa el día de hoy y arrastra los días laborables anteriores sin fila en el ledger,
+deja el latido en `operability_runs/window-runs/day-watch.json` y AVISA (log + email si
+hay SMTP). No toca la ventana: sólo lee el ledger y escribe su propio latido.
+
+Opciones:
+  --once               (implícito) una única evaluación y salir
+  --lookback-days N    días naturales de arrastre (0 desactiva; default 7)
+  --now ISO            evalúa como si fuera esa fecha (revisar un día pasado)
+  --json               imprime el latido por stdout
+  --no-persist         no escribe el latido (dry-run)
+  -h, --help           esta ayuda
+
+Salida: 0 = sin alerta (OK/VETO/DECLARADO/...); 3 = hay día perdido/HARD_ERROR.
+"""
+
+
+def _int_flag(args: Sequence[str], name: str, default: int) -> int:
+    if name not in args:
+        return default
+    index = args.index(name)
+    raw = args[index + 1] if index + 1 < len(args) else ""
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning("window:watch: %s=%r no es un entero; se usa %s", name, raw, default)
+        return default
+
+
+def _now_flag(args: Sequence[str]) -> datetime | None:
+    """``--now ISO`` (opcional): fecha de referencia para revisar un día pasado."""
+    if "--now" not in args:
+        return None
+    index = args.index("--now")
+    raw = args[index + 1] if index + 1 < len(args) else ""
+    try:
+        moment = datetime.fromisoformat(raw)
+    except ValueError:
+        logger.warning("window:watch: --now=%r no es ISO; se usa la hora actual", raw)
+        return None
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=MADRID)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """CLI del vigía: evalúa una vez y sale (0 sin alerta; 3 con alerta)."""
+    args = list(sys.argv[1:] if argv is None else argv)
+    if any(arg in {"-h", "--help"} for arg in args):
+        print(_CLI_HELP)
+        return 0
+    if not _worker_enabled():
+        print(f"vigía desactivado ({_ENV_ENABLED}=false)")
+        return 0
+
+    from bolsa_api.logging_redact import install_log_redact
+
+    logging.basicConfig(level=logging.INFO)
+    install_log_redact()
+
+    span = _int_flag(args, "--lookback-days", default_lookback_days())
+    persist = "--no-persist" not in args
+    moment = _now_flag(args) or datetime.now(MADRID)
+    checks = asyncio.run(
+        evaluate_all(now=moment, lookback_days=span, persist=persist, source="cli"),
+    )
+    alerts = [check for check in checks if check.severity == "alert"]
+    if "--json" in args:
+        payload = status_payload(checks, now=moment, lookback_days=span, source="cli")
+        print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+    else:
+        for check in checks:
+            print(f"[window:watch] {check.day_iso} · {check.verdict} · {check.message}")
+    return ALERT_EXIT_CODE if alerts else 0
+
+
+if __name__ == "__main__":  # pragma: no cover — entrada del CLI/tarea programada
+    raise SystemExit(main())
 
 
 __all__ = [
+    "ALERT_EXIT_CODE",
     "CHECK_INTERVAL_SECONDS",
+    "DEFAULT_LOOKBACK_DAYS",
+    "MAX_LOOKBACK_DAYS",
+    "STATUS_FILE",
+    "STATUS_JOURNAL",
     "WindowDayWatch",
     "alert_recipient",
     "day_is_running",
     "day_stamp",
+    "default_lookback_days",
+    "evaluate_all",
+    "evaluate_backfill",
     "evaluate_day_watch",
     "evaluate_once",
     "ledger_path",
+    "main",
     "read_ledger_rows",
     "repo_root",
+    "runs_dir",
     "send_alert_email",
     "start_window_day_watch",
+    "status_journal_path",
+    "status_path",
+    "status_payload",
     "window_day_watch_loop",
+    "write_status",
 ]
