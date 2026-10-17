@@ -465,10 +465,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-17 — pin del arbol re-anclado a `b02c90b2`
+ * (`apps` `446f198b99d4bca36df0ca55560102627bfd0a84` / `packages` `6377a7a24d6c279c84c3b36096c44d8afae82285`).
+ * Motivo: re-anclaje del sello v2.88.142-beta (vigia 2.0: latido durable + arrastre + CLI/tarea window:watch); 0 dias MEDIDO
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '3485493f',
-  appsHash: 'e151cd4329591c24835256082882dfe478107e63',
-  packagesHash: 'e96a12b80a1606523f422750493274894ff07ef4',
+  commit: 'b02c90b2',
+  appsHash: '446f198b99d4bca36df0ca55560102627bfd0a84',
+  packagesHash: '6377a7a24d6c279c84c3b36096c44d8afae82285',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',

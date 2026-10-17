@@ -74,7 +74,7 @@ El bucle **evalúa y escribe el latido ANTES de dormir** (antes: `sleep 900 s` �
 | Ruff (paridad CI) | `pnpm lint:py` | **`All checks passed!`** |
 | Import-linter (paridad CI) | `pnpm imports:py` | **`Contracts: 4 kept, 0 broken.`** |
 | Mypy (paridad CI) | `pnpm types:py` | **`Success: no issues found in 557 source files`** |
-| Congelación | `pnpm window:freeze` | **OK** (tras re-anclaje; `apps` `e151cd43…`, `packages` `e96a12b8…`) |
+| Congelación | `pnpm window:freeze` | **OK** tras el re-anclaje del sello — `apps` `446f198b…` (**movido**: el árbol pinado de `apps/` incluye `apps/api-python/src` **y** `apps/api-python/tests`) / `packages` `6377a7a2…` (**movido** por el campo nuevo de `config.py`) |
 | Vigía **real** (end-to-end, sin stack) | `pnpm window:watch` | `2026-10-17 · NON_MARKET_DAY` (sábado) + **latido escrito** (`source: cli`), exit **0** |
 | Dry-run de la cadencia | `pnpm window:task:install --dry-run` | 2 líneas: `BolsaV1_WindowForward … /st 18:00` y `BolsaV1_WindowWatch … /st 20:20` |
 
