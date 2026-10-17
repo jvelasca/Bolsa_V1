@@ -473,9 +473,17 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-17 — pin del arbol re-anclado a `dad93f99`
+ * (`apps` `fe9798e31683e349c853b836f44e56009e0cc261` / `packages` `6377a7a24d6c279c84c3b36096c44d8afae82285`).
+ * Motivo: v2.88.143: bump 2.11.143-beta de los 13 CLIs (apps/api-python/scripts) -- 0 dias MEDIDO, el cambio de fondo vive en scripts/ (freeze-neutral)
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'b02c90b2',
-  appsHash: '446f198b99d4bca36df0ca55560102627bfd0a84',
+  commit: 'dad93f99',
+  appsHash: 'fe9798e31683e349c853b836f44e56009e0cc261',
   packagesHash: '6377a7a24d6c279c84c3b36096c44d8afae82285',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
