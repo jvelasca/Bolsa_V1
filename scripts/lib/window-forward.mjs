@@ -940,3 +940,54 @@ export function verifyWindowProvenance({
   }
   return { ok: problems.length === 0, problems };
 }
+
+// ---------------------------------------------------------------------------
+// Wrapper `.cmd` de la tarea programada (v2.88.142)
+// ---------------------------------------------------------------------------
+
+/**
+ * Contenido del wrapper `.cmd` que ejecuta la tarea diaria de Windows.
+ *
+ * **Puro** (sin FS ni `process`): se prueba en `window-forward.test.mjs`.
+ *
+ * Dos defectos REALES cerrados aqui, ambos medidos:
+ * 1. `2.11.140` — `/tr "cmd /c \"cd ... && ...\""` con comillas ANIDADAS rompia
+ *    `schtasks` («Falta la opcion obligatoria "sc"»): el wrapper usa una ruta SIN
+ *    comillas anidadas, de modo que `/tr "<ruta>"` es un unico token.
+ * 2. `2.11.142` — el wrapper invocaba `<root>\node_modules\.bin\pnpm.cmd`, que **no
+ *    existe** en este repo (pnpm es instalacion GLOBAL, no dependencia del arbol) y que
+ *    tampoco esta en el PATH del Programador de tareas => las dos tareas quedaban
+ *    `Estado: Listo` y **no ejecutaban nada** («no se reconoce como un comando interno
+ *    o externo»). Ahora se invoca **node por ruta absoluta** sobre el runner: cero
+ *    dependencia de pnpm/PATH. `exit /b %ERRORLEVEL%` propaga el codigo (3 = hubo aviso).
+ *
+ * @param {{root: string, node: string, runner: string, command: string}} parts
+ *   Rutas absolutas (se normalizan a `\`) y el subcomando del runner (`run-day`/`watch`).
+ * @returns {string}
+ */
+export function cmdWrapperContent({ root, node, runner, command }) {
+  const norm = (value) =>
+    String(value ?? '')
+      .trim()
+      .replace(/[\\/]+$/, '')
+      .replace(/\//g, '\\');
+  const dir = norm(root);
+  const exe = norm(node);
+  const script = norm(runner);
+  const cmd = String(command ?? '').trim();
+  if (!dir || !exe || !script || !cmd) {
+    throw new Error('cmdWrapperContent: faltan root/node/runner/command');
+  }
+  if (!/^[A-Za-z]:\\/.test(exe)) {
+    throw new Error('cmdWrapperContent: `node` debe ser una ruta absoluta de Windows');
+  }
+  return (
+    '@echo off\r\n' +
+    'setlocal\r\n' +
+    `cd /d "${dir}"\r\n` +
+    'if errorlevel 1 exit /b 1\r\n' +
+    `"${exe}" "${script}" ${cmd}\r\n` +
+    'exit /b %ERRORLEVEL%\r\n'
+  );
+}
+

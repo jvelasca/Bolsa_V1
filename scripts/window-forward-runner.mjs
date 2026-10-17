@@ -52,6 +52,7 @@ import {
   WINDOW_MIN_EPISODES,
   classifyExit,
   classifyPreflight,
+  cmdWrapperContent,
   dayIso,
   dayStamp,
   forwardPath,
@@ -1245,24 +1246,79 @@ function watchWrapperPath() {
  * ANIDADAS rompe el parseo de `schtasks` en Windows («Falta la opcion obligatoria "sc"»):
  * las comillas internas se consumen y `/sc` deja de ser un flag. Un wrapper con una ruta
  * SIN comillas anidadas elimina el problema: `/tr "<ruta-wrapper.cmd>"` es un unico token.
+ *
+ * Motivo (fix 2.11.142): el wrapper llamaba a `<root>\node_modules\.bin\pnpm.cmd`, que en
+ * este repo **no existe** (pnpm es una instalacion GLOBAL, no una dependencia del arbol) y
+ * que ademas no esta en el PATH con el que arranca el Programador de tareas. Medido: el
+ * wrapper fallaba con «no se reconoce como un comando interno o externo» => las DOS tareas
+ * quedaban registradas y **no ejecutaban nada**. Ahora se invoca **node por ruta absoluta**
+ * (`process.execPath`, el mismo interprete con el que se instala) sobre el runner: cero
+ * dependencia de pnpm/PATH. `exit /b %ERRORLEVEL%` propaga el codigo (3 = hubo aviso).
  */
-function writeCmdWrapper(wrapper, pnpmScript) {
-  const root = ROOT.replace(/[\\/]+$/, "").replace(/\//g, "\\");
-  const pnpm = `${root}\\node_modules\\.bin\\pnpm.cmd`;
-  const content =
-    "@echo off\r\n" + `cd /d "${root}"\r\n` + `"${pnpm}" ${pnpmScript}\r\n`;
+function writeCmdWrapper(wrapper, runnerCommand) {
+  const content = cmdWrapperContent({
+    root: ROOT,
+    node: process.execPath,
+    runner: join(ROOT, "scripts", "window-forward-runner.mjs"),
+    command: runnerCommand,
+  });
   mkdirSync(dirname(wrapper), { recursive: true });
   writeFileSync(wrapper, content, "utf8");
   return wrapper;
 }
 
 function writeTaskWrapper() {
-  return writeCmdWrapper(taskWrapperPath(), "window:run-day");
+  return writeCmdWrapper(taskWrapperPath(), "run-day");
 }
 
 /** v2.88.142: wrapper de la tarea del vigía (independiente del stack dev). */
 function writeWatchWrapper() {
-  return writeCmdWrapper(watchWrapperPath(), "window:watch");
+  return writeCmdWrapper(watchWrapperPath(), "watch");
+}
+
+/**
+ * v2.88.142 — verificacion END-TO-END del wrapper ANTES de registrar la tarea.
+ *
+ * El `.140` registraba la tarea y daba por buena la cadencia mirando solo
+ * `schtasks /query` (Estado: Listo): «Listo» dice que el Programador la acepto, NO que
+ * el comando exista. Aqui se escribe un wrapper **temporal** con la MISMA forma
+ * (`node` absoluto + runner + `status`, que es read-only y barato), se ejecuta con
+ * `cmd /c` y se exige exit 0; si falla, NO se registra ninguna tarea (fail-closed).
+ */
+function verifyWrapperShape() {
+  const probe = join(ROOT, RUNS_DIR, "window-task-probe.cmd");
+  writeCmdWrapper(probe, "status");
+  try {
+    const res = spawnSync("cmd", ["/c", probe], {
+      cwd: ROOT,
+      encoding: "utf8",
+      timeout: 120_000,
+    });
+    if (res.error) {
+      logError(SCOPE, `no se pudo ejecutar el wrapper de prueba: ${res.error.message}`);
+      return false;
+    }
+    if (res.status !== 0) {
+      const detail = (res.stderr || res.stdout || "")
+        .trim()
+        .split(/\r?\n/)
+        .slice(-4)
+        .join(" | ");
+      logError(
+        SCOPE,
+        `el wrapper de la tarea NO se ejecuta (exit ${res.status})${detail ? `: ${detail}` : ""}`,
+      );
+      return false;
+    }
+    logInfo(SCOPE, "wrapper verificado end-to-end (node absoluto + runner, exit 0)");
+    return true;
+  } finally {
+    try {
+      rmSync(probe, { force: true });
+    } catch {
+      /* la sonda es efimera: si no se puede borrar, no invalida la verificacion */
+    }
+  }
 }
 
 function schtasksCreateCommand(name, time, wrapper) {
@@ -1315,6 +1371,8 @@ function cmdTaskInstall(flags) {
   }
   const wrapper = writeTaskWrapper();
   logInfo(SCOPE, `wrapper de la tarea escrito en ${wrapper}`);
+  // v2.88.142 — fail-closed: si el wrapper NO se ejecuta, no se registra nada.
+  if (!verifyWrapperShape()) return 1;
   if (!registerTask(TASK_NAME, time, wrapper)) return 1;
   if (!installWatch) return 0;
 

@@ -17,6 +17,7 @@ import {
   LOCK_TTL_MS,
   WINDOW_CONFIG,
   classifyPreflight,
+  cmdWrapperContent,
   isPreflightPayload,
   lockDecision,
   parseGate,
@@ -459,5 +460,60 @@ test('applyPin reescribe los tres campos y es idempotente', () => {
   });
   assert.equal(again.changed, false);
   assert.equal(again.text, next.text);
+});
+
+// ---------------------------------------------------------------------------
+// Wrapper `.cmd` de la tarea programada (v2.88.142)
+//
+// Falsacion del defecto medido: el wrapper del `.140` invocaba
+// `<root>\node_modules\.bin\pnpm.cmd`, que NO existe en este repo => las dos tareas
+// quedaban «Estado: Listo» y no ejecutaban nada.
+// ---------------------------------------------------------------------------
+
+const wrapperParts = {
+  root: 'C:/repo/Bolsa_V1',
+  node: 'C:\\Program Files\\nodejs\\node.exe',
+  runner: 'C:/repo/Bolsa_V1/scripts/window-forward-runner.mjs',
+  command: 'watch',
+};
+
+test('cmdWrapperContent invoca node ABSOLUTO + runner (no pnpm ni PATH)', () => {
+  const content = cmdWrapperContent(wrapperParts);
+  assert.match(content, /"C:\\Program Files\\nodejs\\node\.exe"/);
+  assert.match(content, /"C:\\repo\\Bolsa_V1\\scripts\\window-forward-runner\.mjs" watch/);
+  assert.doesNotMatch(content, /pnpm/);
+  assert.doesNotMatch(content, /node_modules/);
+});
+
+test('cmdWrapperContent fija el cwd al repo y es idempotente para el mismo comando', () => {
+  const content = cmdWrapperContent(wrapperParts);
+  assert.match(content, /cd \/d "C:\\repo\\Bolsa_V1"/);
+  assert.equal(content, cmdWrapperContent({ ...wrapperParts }));
+});
+
+test('cmdWrapperContent NO mete comillas anidadas (fix .140 de schtasks)', () => {
+  const content = cmdWrapperContent(wrapperParts);
+  assert.doesNotMatch(content, /""/);
+  // Cada linea tiene un numero PAR de comillas (apertura y cierre).
+  const quotesPerLine = content.split(/\r?\n/).map((line) => (line.match(/"/g) ?? []).length);
+  for (const count of quotesPerLine) assert.equal(count % 2, 0);
+});
+
+test('cmdWrapperContent propaga el codigo de salida (LastTaskResult: 3 = hubo aviso)', () => {
+  const content = cmdWrapperContent(wrapperParts);
+  assert.match(content, /exit \/b %ERRORLEVEL%/);
+  assert.match(content, /if errorlevel 1 exit \/b 1/);
+});
+
+test('cmdWrapperContent distingue run-day de watch', () => {
+  assert.match(cmdWrapperContent({ ...wrapperParts, command: 'run-day' }), /run-day/);
+  assert.match(cmdWrapperContent({ ...wrapperParts, command: 'watch' }), /watch/);
+});
+
+test('cmdWrapperContent rechaza piezas ausentes y un node no absoluto', () => {
+  assert.throws(() => cmdWrapperContent({ ...wrapperParts, node: '' }), /faltan/);
+  assert.throws(() => cmdWrapperContent({ ...wrapperParts, command: '  ' }), /faltan/);
+  assert.throws(() => cmdWrapperContent({ ...wrapperParts, root: '' }), /faltan/);
+  assert.throws(() => cmdWrapperContent({ ...wrapperParts, node: 'node.exe' }), /absoluta/);
 });
 

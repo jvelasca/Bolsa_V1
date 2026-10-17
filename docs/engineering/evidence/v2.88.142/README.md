@@ -6,7 +6,7 @@
 >
 > **Base:** `v2.88.141-beta`.
 
-**Qué es este sello.** Cierra el hueco declarado el `16/10` a las 20:00 («debe estar siempre vigilando la operativa diaria»): el vigía del `.140` **sólo emitía log** (y el log del stack dev **no captura** los loggers `bolsa_api.*`) y **sólo miraba el día de HOY**, de modo que su vigilancia era **indemostrable desde fuera** y **ciega a los días perdidos con el equipo apagado**. Aquí se le dan **tres instrumentos** (latido durable, arrastre, CLI+tarea propia) y se **corrige** el hallazgo del `.141`, que se había medido con un instrumento ciego.
+**Qué es este sello.** Cierra el hueco declarado el `16/10` a las 20:00 («debe estar siempre vigilando la operativa diaria»): el vigía del `.140` **sólo emitía log** (y el log del stack dev **no captura** los loggers `bolsa_api.*`) y **sólo miraba el día de HOY**, de modo que su vigilancia era **indemostrable desde fuera** y **ciega a los días perdidos con el equipo apagado**. Aquí se le dan **tres instrumentos** (latido durable, arrastre, CLI+tarea propia) y se **corrige** el hallazgo del `.141`, que se había medido con un instrumento ciego. **Además**, al verificar la cadencia **ejecutándola** (§2.5) apareció un defecto que invalidaba la vigilancia entera: **las dos tareas estaban registradas y no ejecutaban nada** (el wrapper apuntaba a un `pnpm.cmd` que no existe) — cerrado con `node` absoluto + verificación **fail-closed** antes de registrar.
 
 ---
 
@@ -63,6 +63,20 @@
 
 El bucle **evalúa y escribe el latido ANTES de dormir** (antes: `sleep 900 s` → evaluar). Al arrancar el stack **ya hay veredicto escrito** ⇒ el arranque es comprobable de inmediato. La idempotencia pasa a ser **por aviso** (`{día}:{día-vigía}:{veredicto}` anunciado **una vez**): un `MISSED` **no** se repite cada tick (**sin spam de email**) mientras el **latido** sí se reescribe (**prueba de vida**).
 
+### 2.5 HALLAZGO NUEVO durante la verificación: las tareas estaban registradas y **no ejecutaban nada**
+
+Al probar el wrapper recién instalado (en vez de fiarse de `schtasks /query`), salió el defecto:
+
+```
+""C:\...\Bolsa_V1\node_modules\.bin\pnpm.cmd"" no se reconoce como un comando interno o externo
+```
+
+- **Causa raíz:** el wrapper generado invocaba `node_modules\.bin\pnpm.cmd`. Ese fichero **no existe** (`Test-Path` ⇒ **`False`**; `node_modules/.bin` no tiene `pnpm`): en este repo **pnpm es una instalación GLOBAL** (`C:\Users\josea\AppData\Roaming\npm\pnpm.cmd`), no una dependencia del árbol. Y el PATH con el que arranca el **Programador de tareas** tampoco lo resuelve.
+- **Alcance medido:** afectaba a **las dos** tareas ⇒ `BolsaV1_WindowForward` (18:00) y `BolsaV1_WindowWatch` (20:20) **habrían fallado en silencio**; `schtasks /query` seguía diciendo **`Estado: Listo`** (el Programador acepta el registro, **no** comprueba el comando). El `.140` sólo verificó el **registro**, no la **ejecución**.
+- **Fix (cerrado y falsado):** el wrapper invoca **`node` por ruta absoluta** (`process.execPath`) sobre el runner ⇒ **cero dependencia de pnpm/PATH**; `exit /b %ERRORLEVEL%` **propaga** el código (3 = hubo aviso). El contenido se extrae a la función **pura** `cmdWrapperContent(...)` en [`window-forward.mjs`](../../../../scripts/lib/window-forward.mjs) con **6 tests** (node absoluto, sin `pnpm`/`node_modules`, **sin comillas anidadas**, cwd, propaga código, rechaza piezas ausentes/`node` no absoluto).
+- **Guardia fail-closed en `task:install`:** antes de registrar **nada**, `verifyWrapperShape()` escribe un wrapper **temporal** con la **misma** forma (`status`, read-only), lo ejecuta con `cmd /c` y exige **exit 0**; si falla, **no** se registra ninguna tarea. **Medido:** `wrapper verificado end-to-end (node absoluto + runner, exit 0)`.
+- **Ejecución real del wrapper instalado:** `window-watch-task.cmd` ⇒ `NON_MARKET_DAY` (sábado) + latido escrito, **exit 0**.
+
 ---
 
 ## 3. Verificación (medida, con los comandos del CI)
@@ -70,13 +84,16 @@ El bucle **evalúa y escribe el latido ANTES de dormir** (antes: `sleep 900 s` �
 | Comprobación | Comando | Resultado |
 | --- | --- | --- |
 | Vigía + guardián + scheduler | `pytest tests/test_window_day_watch.py tests/test_dia_d_bump_guard.py tests/test_scheduler_worker.py -q` | **40 passed** |
-| Runner de la ventana (JS) | `pnpm window:test` | **28 passed** |
+| Runner de la ventana (JS) | `pnpm window:test` | **34 passed** (28 + 6 del wrapper) |
 | Ruff (paridad CI) | `pnpm lint:py` | **`All checks passed!`** |
 | Import-linter (paridad CI) | `pnpm imports:py` | **`Contracts: 4 kept, 0 broken.`** |
 | Mypy (paridad CI) | `pnpm types:py` | **`Success: no issues found in 557 source files`** |
 | Congelación | `pnpm window:freeze` | **OK** tras el re-anclaje del sello — `apps` `446f198b…` (**movido**: el árbol pinado de `apps/` incluye `apps/api-python/src` **y** `apps/api-python/tests`) / `packages` `6377a7a2…` (**movido** por el campo nuevo de `config.py`) |
 | Vigía **real** (end-to-end, sin stack) | `pnpm window:watch` | `2026-10-17 · NON_MARKET_DAY` (sábado) + **latido escrito** (`source: cli`), exit **0** |
 | Dry-run de la cadencia | `pnpm window:task:install --dry-run` | 2 líneas: `BolsaV1_WindowForward … /st 18:00` y `BolsaV1_WindowWatch … /st 20:20` |
+| **Instalación real + guardia** | `pnpm window:task:install` | `wrapper verificado end-to-end (node absoluto + runner, exit 0)` + las 2 tareas registradas |
+| **Ejecución del wrapper instalado** | `& .\operability_runs\window-runs\window-watch-task.cmd` | `NON_MARKET_DAY` (sábado) + latido, **exit 0** |
+| Registro en el Programador de tareas | `schtasks /query /tn … /fo LIST` | `BolsaV1_WindowForward` → `17/10/2026 18:00:00`, `estado Listo` · `BolsaV1_WindowWatch` → `17/10/2026 20:20:00`, `estado Listo` |
 
 **Tests nuevos (20 → 36 en el fichero del vigía):** arrastre (previos laborables, fin de semana fuera, **baseline**, ledger vacío, `0` apagado, fila presente y hoy excluidos), arrastre **también** avisa por email, latido (`day-watch.json` + `journal` + `alerts[]`), parseo/clamp de `WINDOW_DAY_WATCH_LOOKBACK_DAYS`, `_tick` (**latido sí / aviso no repetido**) y CLI (`--help`, desactivado, `MISSED` ⇒ **3**, `VETO` ⇒ **0**, `--no-persist`, `--json`).
 
@@ -90,6 +107,8 @@ Los ficheros de test del vigía **ya se recogen por directorio** en el job offli
 - **El vigía NO mide la ventana:** no lanza `run-day`, no baja umbrales, no fuerza régimen, no escribe en el journal/ledger. **Δ motor = 0 · Δ decisión = 0.**
 - **El email** depende de SMTP + destinatario configurados; si faltan, el aviso queda en el **log** y en el **latido** (nunca en silencio).
 - **El latido vive bajo `operability_runs/`** (ignorado por git): su **ausencia no se ve** en `git status`; hay que mirarlo con `Get-Content operability_runs/window-runs/day-watch.json`.
+- **Las tareas son «Solo interactivo»** (`schtasks /query /fo LIST`): se ejecutan con la **sesión del usuario iniciada**. Con el equipo **apagado o la sesión cerrada** a las 18:00/20:20 **no corren**; eso lo cubre el **arrastre** (`WINDOW_DAY_WATCH_LOOKBACK_DAYS`, default 7) en la siguiente ejecución — el día perdido se avisa **después**, no en el instante.
+- **`Estado: Listo` no prueba nada**: el Programador acepta registros de comandos **inexistentes** (fue el defecto del §2.5). La prueba es **ejecutar** el wrapper, y eso es lo que ahora hace `task:install` **antes** de registrar (+ `LastTaskResult`).
 - El arrastre **no inventa pasado**: sólo alerta de días **posteriores a la primera fila** del ledger.
 - La ventana avanza **un día de pared por corrida**; el vigía no lo cambia. Tag **unsigned**.
 
@@ -102,7 +121,8 @@ pnpm lint:py ; pnpm imports:py ; pnpm types:py          # paridad con el CI
 pnpm window:test                                        # 28 (runner JS)
 cd apps/api-python ; python -m pytest tests/test_window_day_watch.py tests/test_dia_d_bump_guard.py tests/test_scheduler_worker.py -q
 pnpm window:watch                                       # evaluación real + latido (exit 0/3)
-pnpm window:task:install --dry-run                      # 2 tareas (18:00 + 20:20)
+pnpm window:task:install                                # verifica el wrapper ANTES de registrar (2 tareas)
+& .\operability_runs\window-runs\window-watch-task.cmd  # ejecuta lo que ejecutará el Programador
 Get-Content operability_runs/window-runs/day-watch.json # instrumento: ¿vigiló?
 ```
 
