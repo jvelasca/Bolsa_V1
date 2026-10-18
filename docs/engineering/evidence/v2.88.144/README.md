@@ -72,6 +72,34 @@ Get-ScheduledTask -TaskName BolsaV1_WindowForward | Select -Expand Settings |
 schtasks /query /tn "BolsaV1_WindowForward" /xml ONE | Select-String StartWhenAvailable
 ```
 
-## 7. Cita POST-TAG
+## 7. Cita POST-TAG — CI del sello
 
-Pendiente: se monitoriza el `Release tag CI` de `v2.88.144-beta` y su run **se cita aquí** con los `conclusion`. Si algún job queda rojo, el sello **no** se da por bueno.
+**Tag publicado:** `v2.88.144-beta` (**anotado, unsigned**; objeto `9ba08f6c` → commit **`114396ff`**), empujado junto a `main` (`75054d2d..114396ff`).
+
+**`Release tag CI` [run `39157219505`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39157219505) — VERDE** (`2026-10-18T19:06:17Z` → `19:20:15Z`, ~**13m58s**; **13 jobs `success` + `certify` `success`**; `playwright (integrated E2E, opt-in)` `skipped`, declarado):
+
+| Job | `conclusion` |
+| --- | --- |
+| `security (gitleaks)` | **success** |
+| `decision-spine` | **success** |
+| `python (ruff/imports/mypy/pytest offline)` | **success** |
+| `lifecycle-pg (Alembic + auth + golden restart)` | **success** |
+| `replay-repro (regenera el artefacto del sello desde el fixture)` | **success** |
+| `shared (build/typecheck/test)` | **success** |
+| `frontend (typecheck/lint/test/build + contract:check)` | **success** |
+| `playwright (integrated axe)` | **success** |
+| `playwright (integrated AUTO S5)` | **success** |
+| `playwright (mock E2E)` | **success** |
+| `a7-gate (A7 C3 chaos live_a7 · dedicated real-PG)` | **success** |
+| `dr-verify (battery DB_DR / TCP CI)` | **success** |
+| `playwright (integrated E2E, opt-in)` | `skipped` (opt-in, declarado) |
+| `certify (aggregate + artifact)` | **success** |
+
+**Los dos gates que importan, medidos en el log del CI:**
+
+- **Gate `window:freeze` (job `shared`) — verde:** `> node scripts/window-pin.mjs --check` ⇒ **`[window-pin] freeze OK (114396ff)`** ⇒ el pin (`apps` `e1c5e825` / `packages` `6377a7a2`) **casa** con el árbol del commit del tag.
+- **`replay-repro` — `REPRODUCIDO`:** `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (fichero `3340728` bytes) — **idéntico** al de `.136`…`.143`, y **también** en la 2ª corrida (determinismo) ⇒ **`Δ decisión = 0` medido por el CI**, no afirmado.
+
+**`main` en el mismo commit `114396ff` — VERDE también:** `Python CI` [39157216893](https://github.com/jvelasca/Bolsa_V1/actions/runs/39157216893) · `Frontend CI` [39157216878](https://github.com/jvelasca/Bolsa_V1/actions/runs/39157216878) · `Optimize lab` [39157216884](https://github.com/jvelasca/Bolsa_V1/actions/runs/39157216884) · `Gitleaks` [39157216891](https://github.com/jvelasca/Bolsa_V1/actions/runs/39157216891) — **`success`**.
+
+**Nota de honestidad sobre el orden:** esta cita se escribe **después** del tag (commit POST-TAG sobre `main`), de modo que **dentro** del tag el §7 decía «pendiente». Es el patrón declarado en los sellos anteriores; la medida es **falsable desde GitHub** por cualquiera.
