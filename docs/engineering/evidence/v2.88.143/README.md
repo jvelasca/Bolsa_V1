@@ -90,3 +90,31 @@ pnpm window:freeze                   # freeze OK (scripts/ está fuera del árbo
 - **`replay-repro` — `REPRODUCIDO`:** `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` — **idéntico** al de `.136`…`.142` ⇒ **`Δ decisión = 0` medido por el CI**, no afirmado (el `meta.bump` de los 13 CLIs no entra en el artefacto del sello).
 
 **Nota de honestidad sobre el orden:** esta cita se escribe **después** del tag (commit POST-TAG sobre `main`), de modo que **dentro** del tag el §6 decía «pendiente». Es el patrón declarado en los sellos anteriores; la medida (los `conclusion` de arriba) es **falsable desde GitHub** por cualquiera.
+
+---
+
+## 7. Prueba EN VIVO de la corrección — domingo `18/10/2026` (la lanzó el Programador, no yo)
+
+Se dejó un **vigilante independiente** (proceso aparte, ajeno al chat) esperando a que la tarea escribiera su corrida, para que la prueba no dependiera de que hubiera alguien mirando.
+
+| Medición | Comando | Resultado |
+| --- | --- | --- |
+| ¿Se ejecutó sola? | `Get-ScheduledTaskInfo -TaskName BolsaV1_WindowForward` | `LastRunTime = 18/10/2026 18:39:13` · **`LastTaskResult = 0`** · `NextRunTime = 19/10/2026 18:00` |
+| ¿Qué registró? | `operability_runs/window-runs/ledger.jsonl` | fila **nueva** `20261018` · **`status: NON_MARKET_DAY`** · **`veto: false`** · `reason: non_market_day` |
+| ¿Ejecutó el preflight? | `20261018/manifest.json` | **`steps: {}`** · `artifacts: {}` · `regime: null` · `freeze: null` · **`durationMs: 8`** ⇒ **no abrió el motor**, exactamente lo diseñado |
+| ¿Contaminó el veto? | `pnpm window:status` | `dias_de_ventana=3 medidos=0 veto=3 declarados=0 duros=0 **no_mercado=2**` (`20261017` y `20261018`) |
+| Vigía | `day-watch.json` | `18:39:12` · `source: worker` · `NON_MARKET_DAY` · `alerts: []` |
+
+**Conclusión medida:** el defecto del §1 **está corregido en producción**, no sólo en tests: un día sin sesión se registra como `NON_MARKET_DAY` **sin preflight y sin tocar la estadística de veto**.
+
+### 7.1 HALLAZGO NUEVO (medido, no supuesto): la tarea se ejecutó a las **18:39**, no a las 18:00
+
+`LastRunTime = 18:39:13` — **39 minutos tarde**. Causa raíz medida en el registro de energía (`Microsoft-Windows-Kernel-Power`):
+
+- El equipo entra en **modern standby** (`506`) y despierta (`507`) **cada ~60 min**: `16:39:14` (wake) → `17:39:14` (sleep) → `18:39:12` (wake). **A las 18:00 el equipo estaba dormido.**
+- La tarea corrió **en el primer despertar** (`18:39:13`), es decir, **no hay garantía de puntualidad**.
+- Ajustes registrados hoy: **`StartWhenAvailable = False`** · **`WakeToRun = False`** · `DisallowStartIfOnBatteries = True` · `MultipleInstances = IgnoreNew` (los dos últimos son coherentes: no interesa que el día se dispare con batería ni duplicado).
+
+**Por qué importa:** en un día de **mercado**, un retraso así no invalida la corrida (el runner sella el día del reloj al arrancar y sigue siendo el mismo día), pero **sí** puede convertir «18:00» en «cuando el equipo despierte» — y si el equipo no despierta en todo el día, el día **se pierde** (lo cubriría el **arrastre** del vigía en la siguiente ejecución, no el run-day). Es un límite de **la máquina**, no del software, y estaba **sin declarar**.
+
+**No se ha tocado nada:** cambiar `StartWhenAvailable`/`WakeToRun` es una decisión de operación (despertar el equipo a diario tiene coste real y `WakeToRun` depende de hardware/BIOS), y va en su propio incremento.
