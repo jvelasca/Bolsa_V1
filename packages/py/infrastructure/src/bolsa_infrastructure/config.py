@@ -212,12 +212,28 @@ class Settings(BaseSettings):
     )
     # VS-1 — venue Paper | Live (default paper; live = XTB bridge).
     broker_venue: str = Field(default="paper", validation_alias="BROKER_VENUE")
-    # D2 — batch EOD dictámenes Estudio. Off-by-default (ADR-022 / triage).
+    # D2 — batch EOD dictámenes Estudio. ON por defecto desde v2.89 (opt-out con
+    # ``ESTUDIO_EOD_OPINION_ENABLED=false``); una vez al día encola el job ``estudio_daily``.
     estudio_eod_opinion_enabled: bool = Field(
-        default=False, validation_alias="ESTUDIO_EOD_OPINION_ENABLED"
+        default=True, validation_alias="ESTUDIO_EOD_OPINION_ENABLED"
     )
     estudio_eod_opinion_interval_seconds: float = Field(
         default=3600.0, validation_alias="ESTUDIO_EOD_OPINION_INTERVAL_SECONDS"
+    )
+    # v2.89 — cola durable de trabajos operativos AUTO (``auto_ops_jobs``).
+    auto_ops_job_worker_enabled: bool = Field(
+        default=True, validation_alias="AUTO_OPS_JOB_WORKER_ENABLED"
+    )
+    auto_ops_job_interval_seconds: float = Field(
+        default=3.0, validation_alias="AUTO_OPS_JOB_INTERVAL_SECONDS"
+    )
+    #: Segundos sin latido tras los que un job ``running`` se considera abandonado.
+    auto_ops_job_stale_seconds: float = Field(
+        default=900.0, validation_alias="AUTO_OPS_JOB_STALE_SECONDS"
+    )
+    #: Timeout del subproceso de replay DÍA-D (segundos).
+    auto_ops_dia_d_timeout_seconds: float = Field(
+        default=1800.0, validation_alias="AUTO_OPS_DIA_D_TIMEOUT_SECONDS"
     )
     # V1.19 — Opportunity daily scan (opt-in). Off-by-default; never execute.
     opportunity_daily_scan_enabled: bool = Field(

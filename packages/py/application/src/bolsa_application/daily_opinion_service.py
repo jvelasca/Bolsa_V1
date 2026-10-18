@@ -147,14 +147,20 @@ class DailyOpinionService:
         as_of_bar_date: date | None = None,
         account_id: str | None = None,
         force: bool = True,
+        hints: list[OpinionHint] | None = None,
     ) -> list[InstrumentDailyOpinionRecord]:
-        """Batch post-cierre (source=eod_batch). Siempre force_refresh salvo force=False."""
+        """Batch post-cierre (source=eod_batch). Siempre force_refresh salvo force=False.
+
+        ``hints`` permite que el job de servidor aporte los chips (IO/FA/TA) y las
+        posiciones de la cuenta ya resueltos; si se omiten, el servicio los resuelve
+        como hoy (nunca se fabrica ``hasEodBar``: se valida barra a barra).
+        """
         return await self.query(
             instrument_ids=instrument_ids,
             as_of_bar_date=as_of_bar_date,
             account_id=account_id,
             force_refresh=force,
-            hints=[],
+            hints=hints,
             source=SOURCE_EOD_BATCH,
         )
     async def history(

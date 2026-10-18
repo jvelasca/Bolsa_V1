@@ -1,22 +1,29 @@
 /**
- * AUTO — selector de vista del monitor (`Ventana actual` / `Operación` / `DÍA-D AUTO`).
+ * AUTO — selector de vista del monitor (`Ventana actual` / `Operación` / `DÍA-D AUTO` /
+ * `Operativa diaria`).
  *
  * El modo por defecto es `Operación` (la historia única es la vista de trabajo); `current` queda
- * como crudo/experto y `DÍA-D AUTO` como sandbox, que solo consulta artefactos cuando el usuario
- * lo abre (no añade trabajo al monitor de producción).
+ * como crudo/experto, `DÍA-D AUTO` como sandbox y `daily` como operativa diaria por valor. Las
+ * vistas que solo leen artefactos/jobs no añaden trabajo al monitor de producción.
  */
 
 import { type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type AutoMonitorMode = "current" | "operation" | "dia-d";
+export type AutoMonitorMode = "current" | "operation" | "dia-d" | "daily";
 
-const AUTO_MONITOR_MODES: readonly AutoMonitorMode[] = [
+/** Fuente ÚNICA del orden de las pestañas (la página la importa, no la duplica). */
+export const AUTO_MONITOR_MODES: readonly AutoMonitorMode[] = [
   "current",
   "operation",
   "dia-d",
+  "daily",
 ];
+
+/** Modos que no deben sondear `/auto/operational-monitor` cada 20 s. */
+export const AUTO_MONITOR_MODES_WITHOUT_MONITOR_POLL: readonly AutoMonitorMode[] =
+  ["dia-d", "daily"];
 
 export function AutoMonitorModeToolbar({
   mode,
@@ -56,6 +63,7 @@ export function AutoMonitorModeToolbar({
           { id: "current", label: "Ventana actual" },
           { id: "operation", label: "Operación" },
           { id: "dia-d", label: "DÍA-D AUTO" },
+          { id: "daily", label: "Operativa diaria" },
         ] as const
       ).map((option) => (
         <Button

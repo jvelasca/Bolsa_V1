@@ -27,6 +27,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from bolsa_api.background.alert_delivery_worker import start_alert_delivery_worker
+from bolsa_api.background.auto_ops_job_worker import start_auto_ops_job_worker
 from bolsa_api.background.auto_orchestrator_worker import start_auto_orchestrator
 from bolsa_api.background.auto_simulation_worker import start_auto_sim_worker
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
@@ -73,6 +74,9 @@ def _event_loop_starters() -> list[Any]:
         start_core_r_cron_worker,
         start_custody_job_worker,
         start_estudio_eod_opinion_worker,
+        # v2.89 — ejecuta la cola durable ``auto_ops_jobs`` (estudio_daily · dia_d_replay).
+        # El encolado diario sale de ESTUDIO_EOD_OPINION (arriba); la UI encola manual.
+        start_auto_ops_job_worker,
         start_opportunity_daily_scan_worker,
         start_auto_sync_worker,
         start_index_subscribe_worker,

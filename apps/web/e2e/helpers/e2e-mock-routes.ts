@@ -168,6 +168,11 @@ export type E2eMockRouteOpts = {
    */
   auto?: boolean;
   /**
+   * E5 — recorrido completo de la operativa diaria: parte con valores, job manual y
+   * un artefacto DÍA-D disponible para lanzar/observar el replay desde la UI.
+   */
+  autoDaily?: boolean;
+  /**
    * S5/H6 — `presetKey` que DECLARA el ciclo AUTO del mock. Por defecto
    * `E2E_AUTO_PRESET_KEY` (casa con el `strategyType` del TOP ⇒ CTA habilitado). Un valor que
    * NO esté en el TOP ejercita el fail-closed de H6 (CTA deshabilitado + hueco declarado).
@@ -345,6 +350,241 @@ function autoOperationalMonitorMock(cyclePresetKey: string | null) {
       lastConflict: null,
       lastConflictMeasurement: "COMPLETE",
     },
+    notes: [],
+  };
+}
+
+/**
+ * AUTO · Operativa diaria por valor — parte durable de un día (mock E2E).
+ *
+ * Cuatro estados con un valor completo (`ok` + plan `TRIGGERED`), uno sin plan
+ * (`whyNot`) y los huecos explícitos: ningún `0` de relleno.
+ */
+function autoEstudioDailyMock(asOf: string) {
+  return {
+    asOf,
+    accountId: E2E_ACCOUNT_ID,
+    job: null,
+    latestJob: null,
+    report: {
+      asOf,
+      accountId: E2E_ACCOUNT_ID,
+      status: "ok",
+      scannedCount: 2,
+      counts: { ok: 1, no_signal: 0, no_plan: 1, error: 0 },
+      values: [
+        {
+          instrumentId: E2E_INSTRUMENT_ID,
+          symbol: E2E_SYMBOL,
+          status: "ok",
+          reason: null,
+          asOfBarDate: asOf,
+          computedAt: `${asOf}T20:00:00+00:00`,
+          opinion: {
+            stance: "buy",
+            dictamenStars: 4,
+            channel: "alarma",
+            autoSource: "estudio",
+            reasons: ["momentum", "tendencia"],
+            gateStatus: "PASS",
+            engineVersion: "opinion_e2e",
+          },
+          indicators: {
+            io: 72,
+            fa: 55,
+            ta: 61,
+            confidence: "HIGH",
+            regime: "neutral",
+          },
+          plan: {
+            status: "TRIGGERED",
+            direction: "long",
+            entry: 192.4,
+            structuralStop: 191.4,
+            target1: 194,
+            target2: null,
+            riskAmount: 25,
+            expectedRR: 2,
+            whyNot: [],
+          },
+          whyNot: [],
+          strategy: {
+            presetKey: E2E_AUTO_PRESET_KEY,
+            strategyDefinitionId: null,
+            strategyVersion: 1,
+            planId: "plan-e2e-1",
+          },
+        },
+        {
+          instrumentId: "e2e-estudio-gap",
+          symbol: "GAP",
+          status: "no_plan",
+          reason: "no_tradeplan",
+          asOfBarDate: asOf,
+          computedAt: `${asOf}T20:00:00+00:00`,
+          opinion: {
+            stance: "hold_watch",
+            dictamenStars: 2,
+            channel: "none",
+            autoSource: "estudio",
+            reasons: [],
+            gateStatus: "PASS",
+            engineVersion: "opinion_e2e",
+          },
+          indicators: {
+            io: 51,
+            fa: null,
+            ta: null,
+            confidence: null,
+            regime: null,
+          },
+          plan: null,
+          whyNot: ["gap_risk", "liquidity"],
+          strategy: null,
+        },
+      ],
+      notes: [],
+      generatedAt: `${asOf}T20:00:01+00:00`,
+      truncated: false,
+      countsConsistent: true,
+    },
+    notes: [],
+  };
+}
+
+/** Auditoría por valor (ventana con artefacto) — valida el valor `E2E_SYMBOL`. */
+function autoEstudioAuditMock() {
+  return {
+    available: true,
+    readOnly: true,
+    serving: "PRECOMPUTED_ARTIFACT",
+    window: "D0_D1",
+    audit: {
+      kind: "estudio_audit_v1",
+      readOnly: true,
+      pointCitable: false,
+      pointCitableReason: "paper_window_not_closed",
+      summary: {
+        values: 1,
+        measured: 1,
+        unmeasured: 0,
+        withPresetKey: 1,
+        withoutPresetKey: 0,
+      },
+      values: [
+        {
+          symbol: E2E_SYMBOL,
+          strategy: { presetKey: E2E_AUTO_PRESET_KEY, version: "1" },
+          why: { indicatorSpecs: null, recommendations: null },
+          signal: {
+            cycles: 1,
+            linkedCycles: 1,
+            unlinkedCycles: 0,
+            duplicateCycles: 0,
+            measuredCycles: 1,
+            daysCovered: 1,
+          },
+          cycles: [
+            {
+              cycleId: E2E_AUTO_CYCLE_A,
+              entryDay: "2026-09-29",
+              exitDay: "2026-09-30",
+              strategyPresetKey: E2E_AUTO_PRESET_KEY,
+              strategyVersion: "1",
+              realizedR: 0.4,
+            },
+          ],
+          resultR: {
+            verdict: "MIXED",
+            verdictReason: null,
+            evidenceQuality: "INSUFFICIENT_SAMPLE",
+            expectancyR: 0.4,
+            hitRate: 0.6,
+            realizedRTotal: 0.4,
+            measuredCycles: 8,
+            daysCovered: 4,
+            measured: true,
+            sampleFloor: 10,
+          },
+          money: {
+            trades: 1,
+            netReturnPct: 2.5,
+            netReturnPctAtStress: null,
+            maxDrawdownPct: 3,
+            hitRate: 0.6,
+            committedCapital: null,
+            measured: true,
+            sampleFloor: 10,
+          },
+          measured: true,
+          unmeasured: [],
+        },
+      ],
+      notes: [],
+    },
+    notes: [],
+  };
+}
+
+/** Job operativo de la cola durable — encolado y progreso observables. */
+function autoOpsJobMock(input: {
+  id: string;
+  kind: string;
+  day: string;
+  status: string;
+  phase?: string;
+  percent?: number;
+}) {
+  return {
+    id: input.id,
+    kind: input.kind,
+    status: input.status,
+    day: input.day,
+    accountId: E2E_ACCOUNT_ID,
+    payload: {},
+    progress:
+      input.phase === undefined
+        ? {}
+        : {
+            phase: input.phase,
+            done: 1,
+            total: 2,
+            percent: input.percent ?? 50,
+          },
+    result: {},
+    error: null,
+    attempt: 1,
+    createdAt: `${input.day}T20:00:00+00:00`,
+    startedAt: `${input.day}T20:00:01+00:00`,
+    finishedAt: null,
+    heartbeatAt: `${input.day}T20:00:02+00:00`,
+  };
+}
+
+/** Artefacto DÍA-D mínimo y determinista para el recorrido manual del mock. */
+function autoDiaDReplayArtifactMock(day: string) {
+  return {
+    available: true,
+    readOnly: true,
+    day,
+    summary: { verdict: "PARTIAL", match: 1, divergent: 0, notMeasured: 0 },
+    steps: [
+      {
+        step: "signal",
+        declared: "buy",
+        executed: "buy",
+        verdict: "MATCH",
+        measurement: "COMPLETE",
+      },
+    ],
+    oos: null,
+    meta: {
+      account: E2E_ACCOUNT_ID,
+      versionA: "e2e",
+      replayStart: day,
+      replayEnd: day,
+    },
+    limits: [],
     notes: [],
   };
 }
@@ -666,10 +906,57 @@ export function routeBody(
       return autoDiaDFeedbackArtifact();
     }
     if (path === "/api/auto/dia-d-replay") {
-      return { readOnly: true, days: [], notes: [] };
+      return {
+        readOnly: true,
+        days: opts.autoDaily === true ? ["2026-09-30"] : [],
+        notes: [],
+      };
     }
     if (path.startsWith("/api/auto/dia-d-replay/")) {
+      if (opts.autoDaily === true) {
+        return autoDiaDReplayArtifactMock(
+          path.split("/").pop() ?? "2026-09-30",
+        );
+      }
       return { available: false, notes: ["artifact_not_found"] };
+    }
+    // E4/E5 — operativa diaria por valor + cola durable de jobs (mismo contrato que la API).
+    if (path === "/api/auto/estudio-daily") {
+      const asOf =
+        new URL(route.request().url()).searchParams.get("asOf") ?? "2026-10-18";
+      return autoEstudioDailyMock(asOf);
+    }
+    if (path === "/api/auto/estudio-audit") {
+      return autoEstudioAuditMock();
+    }
+    if (path === "/api/auto/ops-jobs") {
+      let body: Record<string, unknown> = {};
+      try {
+        const raw = route.request().postData();
+        body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+      } catch {
+        body = {};
+      }
+      const kind = typeof body.kind === "string" ? body.kind : "estudio_daily";
+      const day =
+        typeof body.day === "string" && body.day ? body.day : "2026-10-18";
+      return autoOpsJobMock({
+        id: kind === "dia_d_replay" ? "e2e-dia-d-job" : "e2e-estudio-daily-job",
+        kind,
+        day,
+        status: "running",
+        phase: kind === "dia_d_replay" ? "replay" : "opinions",
+        percent: 40,
+      });
+    }
+    if (path.startsWith("/api/auto/ops-jobs/")) {
+      const id = path.split("/").pop() ?? "e2e-job";
+      return autoOpsJobMock({
+        id,
+        kind: id.includes("dia-d") ? "dia_d_replay" : "estudio_daily",
+        day: "2026-10-18",
+        status: "completed",
+      });
     }
     // S5 — puente operación → estrategia/indicadores → verificación DÍA-D (UI-only).
     if (path === "/api/instruments") {

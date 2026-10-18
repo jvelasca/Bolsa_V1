@@ -1,0 +1,153 @@
+/**
+ * Operativa diaria AUTO por valor + cola de trabajos operativos — contrato compartido.
+ *
+ * Cuatro estados que la UI NUNCA mezcla, por valor:
+ *   1. señal calculada (opinión + indicadores);
+ *   2. decisión tomada (plan `TRIGGERED` o `whyNot`);
+ *   3. operación ejecutada (ciclos durables DÍA-D, se leen aparte);
+ *   4. operativa validada (veredicto/K/expectancy del audit, se lee aparte).
+ *
+ * Doctrina «Sin dato todavía»: cualquier hueco viaja `null`; nunca un `0` de relleno.
+ */
+
+export const ESTUDIO_DAILY_OPS_SCHEMA = "estudio_daily_ops_v1" as const;
+
+/** Estado del universo del parte diario (infra `unavailable` ≠ `empty`). */
+export type EstudioDailyReportStatusV1 = "ok" | "empty" | "unavailable";
+
+/** Estado por valor: el batch aísla fallos y nunca convierte un error en `ok`. */
+export type EstudioDailyValueStatusV1 =
+  | "ok"
+  | "no_signal"
+  | "no_plan"
+  | "error";
+
+export type AutoOpsJobKindV1 = "estudio_daily" | "dia_d_replay";
+
+export type AutoOpsJobStatusV1 = "queued" | "running" | "completed" | "failed";
+
+/** Estados que ocupan el hueco de idempotencia `(kind, cuenta, día)`. */
+export const AUTO_OPS_ACTIVE_STATUSES: readonly AutoOpsJobStatusV1[] = [
+  "queued",
+  "running",
+];
+
+export const isAutoOpsJobActive = (
+  status: string | null | undefined,
+): boolean => AUTO_OPS_ACTIVE_STATUSES.includes(status as AutoOpsJobStatusV1);
+
+/** Progreso observable del job. `percent` puede faltar: no se inventa un 0. */
+export type AutoOpsJobProgressV1 = {
+  phase?: string;
+  done?: number;
+  total?: number;
+  percent?: number | null;
+  updatedAt?: string;
+  [key: string]: unknown;
+};
+
+export type AutoOpsJobV1 = {
+  id: string;
+  kind: AutoOpsJobKindV1 | string;
+  status: AutoOpsJobStatusV1 | string;
+  day: string;
+  accountId: string | null;
+  payload: Record<string, unknown>;
+  progress: AutoOpsJobProgressV1;
+  result: Record<string, unknown>;
+  error: string | null;
+  attempt: number;
+  createdAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  heartbeatAt: string | null;
+};
+
+export type AutoOpsJobListV1 = {
+  jobs: AutoOpsJobV1[];
+  notes: string[];
+};
+
+export type AutoOpsJobCreateRequestV1 = {
+  kind: AutoOpsJobKindV1;
+  day?: string | null;
+  payload?: Record<string, unknown>;
+};
+
+/** Niveles EXCLUSIVAMENTE del `TradePlan`; un hueco es `null`, jamás `0`. */
+export type EstudioDailyPlanV1 = {
+  status: string | null;
+  direction: string | null;
+  entry: number | null;
+  structuralStop: number | null;
+  target1: number | null;
+  target2: number | null;
+  riskAmount: number | null;
+  expectedRR: number | null;
+  entryCondition?: string | null;
+  entrySetup?: string | null;
+  expiresAt?: string | null;
+  executionAllowed?: boolean | null;
+  whyNot: string[];
+};
+
+export type EstudioDailyIndicatorsV1 = {
+  io: number | null;
+  fa: number | null;
+  ta: number | null;
+  confidence: string | null;
+  regime: string | null;
+};
+
+export type EstudioDailyOpinionV1 = {
+  stance: string | null;
+  dictamenStars: number | null;
+  channel: string | null;
+  autoSource: string | null;
+  reasons: string[];
+  gateStatus: string | null;
+  engineVersion: string | null;
+};
+
+export type EstudioDailyStrategyV1 = {
+  presetKey: string | null;
+  strategyDefinitionId: string | null;
+  strategyVersion: number | null;
+  planId: string | null;
+};
+
+export type EstudioDailyValueV1 = {
+  instrumentId: string;
+  symbol: string | null;
+  status: EstudioDailyValueStatusV1 | string;
+  reason: string | null;
+  asOfBarDate: string | null;
+  computedAt: string | null;
+  opinion: EstudioDailyOpinionV1;
+  indicators: EstudioDailyIndicatorsV1;
+  plan: EstudioDailyPlanV1 | null;
+  whyNot: string[];
+  strategy: EstudioDailyStrategyV1 | null;
+};
+
+export type EstudioDailyReportV1 = {
+  asOf: string;
+  accountId: string;
+  status: EstudioDailyReportStatusV1 | string;
+  scannedCount: number;
+  counts: Record<EstudioDailyValueStatusV1, number>;
+  values: EstudioDailyValueV1[];
+  notes: string[];
+  generatedAt: string | null;
+  truncated: boolean;
+  countsConsistent: boolean;
+};
+
+export type EstudioDailyResponseV1 = {
+  asOf: string;
+  accountId: string | null;
+  job: AutoOpsJobV1 | null;
+  latestJob: AutoOpsJobV1 | null;
+  report: EstudioDailyReportV1 | null;
+  notes: string[];
+};

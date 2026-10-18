@@ -115,3 +115,13 @@ export async function installAutoWorkspaceMocks(page: Page): Promise<void> {
   resetE2eMockRuntimeFlags();
   await installApiMocks(page, { auto: true });
 }
+
+/**
+ * E5 — recorrido de la operativa diaria por valor: parte con valores, cola de jobs
+ * y un artefacto DÍA-D disponible para lanzar el replay manual desde la UI.
+ */
+export async function installAutoDailyFlowMocks(page: Page): Promise<void> {
+  setMercadoMockWorkspaceDocument(null);
+  resetE2eMockRuntimeFlags();
+  await installApiMocks(page, { auto: true, autoDaily: true });
+}

@@ -8,6 +8,7 @@ import { Bell, RotateCcw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { formatPrice } from "@/features/charts/chart-utils";
 import {
   Card,
@@ -35,6 +36,9 @@ type AlertFilter = "active" | "history" | "all";
 
 export function AlertsPage() {
   const queryClient = useQueryClient();
+  // Misma dimensión de cuenta que `AlertsMonitor`: una caché global serviría datos de la
+  // cuenta anterior bajo la cabecera `X-Account-Id` de la nueva hasta el siguiente refetch.
+  const { effectiveAccountId } = useActiveAccount();
   const [searchParams] = useSearchParams();
   const preselectedInstrumentId = searchParams.get("instrumentId") ?? "";
 
@@ -51,9 +55,15 @@ export function AlertsPage() {
     queryFn: api.getInstruments,
   });
 
+  const alertsKey = useMemo(
+    () => ["alerts", effectiveAccountId] as const,
+    [effectiveAccountId],
+  );
+
   const alertsQuery = useQuery({
-    queryKey: ["alerts"],
+    queryKey: alertsKey,
     queryFn: () => api.getAlerts(),
+    enabled: Boolean(effectiveAccountId),
     refetchInterval: 30_000,
   });
 
@@ -68,10 +78,13 @@ export function AlertsPage() {
   );
   const xtbReady = Boolean(xtbProvider?.enabled && xtbProvider.healthy);
 
+  const invalidateAlerts = () =>
+    queryClient.invalidateQueries({ queryKey: alertsKey });
+
   const createMutation = useMutation({
     mutationFn: api.createAlert,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      void invalidateAlerts();
       setTargetPrice("");
       setNote("");
     },
@@ -80,14 +93,14 @@ export function AlertsPage() {
   const deleteMutation = useMutation({
     mutationFn: api.deleteAlert,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      void invalidateAlerts();
     },
   });
 
   const reactivateMutation = useMutation({
     mutationFn: api.reactivateAlert,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      void invalidateAlerts();
     },
   });
 
@@ -123,6 +136,7 @@ export function AlertsPage() {
 
   function handleCreate(event: React.FormEvent) {
     event.preventDefault();
+    if (!effectiveAccountId) return;
     const price = Number.parseFloat(targetPrice.replace(",", "."));
     if (!instrumentId || !Number.isFinite(price) || price <= 0) {
       return;
@@ -236,13 +250,13 @@ export function AlertsPage() {
             <div className="flex items-end md:col-span-2 lg:col-span-5">
               <button
                 type="submit"
-                disabled={createMutation.isPending}
+                disabled={createMutation.isPending || !effectiveAccountId}
                 className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
               >
                 {createMutation.isPending ? "Creando…" : "Crear alerta"}
               </button>
               {createMutation.isError && (
-                <span className="ml-3 text-xs text-red-400">
+                <span className="ml-3 text-xs text-red-400" role="alert">
                   {(createMutation.error as Error).message}
                 </span>
               )}
@@ -285,14 +299,55 @@ export function AlertsPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {!effectiveAccountId && !alertsQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">
+              Sin cuenta activa: no se pueden cargar las alertas.
+            </p>
+          ) : null}
           {alertsQuery.isLoading && (
             <p className="text-sm text-muted-foreground">Cargando alertas…</p>
           )}
-          {!alertsQuery.isLoading && filteredAlerts.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              {filter === "history"
-                ? "No hay alertas disparadas."
-                : "No hay alertas en esta vista."}
+          {/* Un fallo de lectura NO es una lista vacía: se declara y se ofrece reintento. */}
+          {alertsQuery.isError ? (
+            <div
+              className="flex flex-wrap items-center gap-2 text-sm text-destructive"
+              role="alert"
+            >
+              <span>
+                No se pudieron cargar las alertas:{" "}
+                {alertsQuery.error instanceof Error
+                  ? alertsQuery.error.message
+                  : "error desconocido"}
+                .
+              </span>
+              <button
+                type="button"
+                onClick={() => void alertsQuery.refetch()}
+                className="rounded border border-border px-2 py-0.5 text-xs text-foreground hover:bg-accent"
+              >
+                Reintentar
+              </button>
+            </div>
+          ) : null}
+          {!alertsQuery.isLoading &&
+            !alertsQuery.isError &&
+            Boolean(effectiveAccountId) &&
+            filteredAlerts.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                {filter === "history"
+                  ? "No hay alertas disparadas."
+                  : "No hay alertas en esta vista."}
+              </p>
+            )}
+          {(deleteMutation.isError || reactivateMutation.isError) && (
+            <p className="text-sm text-destructive" role="alert">
+              No se pudo completar la acción:{" "}
+              {(deleteMutation.error ?? reactivateMutation.error) instanceof
+              Error
+                ? ((deleteMutation.error ?? reactivateMutation.error) as Error)
+                    .message
+                : "error desconocido"}
+              .
             </p>
           )}
           {filteredAlerts.length > 0 && (
@@ -316,8 +371,14 @@ export function AlertsPage() {
                       alert={alert}
                       onDelete={() => deleteMutation.mutate(alert.id)}
                       onReactivate={() => reactivateMutation.mutate(alert.id)}
-                      deleting={deleteMutation.isPending}
-                      reactivating={reactivateMutation.isPending}
+                      deleting={
+                        deleteMutation.isPending &&
+                        deleteMutation.variables === alert.id
+                      }
+                      reactivating={
+                        reactivateMutation.isPending &&
+                        reactivateMutation.variables === alert.id
+                      }
                     />
                   ))}
                 </tbody>

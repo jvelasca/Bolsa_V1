@@ -15,6 +15,7 @@ import {
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { formatPrice } from "@/features/charts/chart-utils";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
 import {
   Card,
   CardContent,
@@ -36,6 +37,9 @@ const channelOptions: AlertChannelType[] = ["toast", "webhook", "email"];
 
 export function SignalAlertsSection() {
   const queryClient = useQueryClient();
+  // El API aísla /signal-alerts por `X-Account-Id`; la caché debe aislarse igual o al cambiar
+  // de cuenta se sirven suscripciones (símbolo, nota, email, webhook) de la cuenta anterior.
+  const { effectiveAccountId } = useActiveAccount();
   const [instrumentId, setInstrumentId] = useState("");
   const [strategySource, setStrategySource] =
     useState<StrategySource>("preset");
@@ -60,16 +64,25 @@ export function SignalAlertsSection() {
     queryFn: api.getStrategies,
   });
 
+  const signalAlertsKey = useMemo(
+    () => ["signal-alerts", effectiveAccountId] as const,
+    [effectiveAccountId],
+  );
+
   const signalAlertsQuery = useQuery({
-    queryKey: ["signal-alerts"],
+    queryKey: signalAlertsKey,
     queryFn: () => api.getSignalAlerts(),
+    enabled: Boolean(effectiveAccountId),
     refetchInterval: 30_000,
   });
+
+  const invalidateSignalAlerts = () =>
+    queryClient.invalidateQueries({ queryKey: signalAlertsKey });
 
   const createMutation = useMutation({
     mutationFn: api.createSignalAlert,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["signal-alerts"] });
+      void invalidateSignalAlerts();
       setNote("");
     },
   });
@@ -77,14 +90,14 @@ export function SignalAlertsSection() {
   const deleteMutation = useMutation({
     mutationFn: api.deleteSignalAlert,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["signal-alerts"] });
+      void invalidateSignalAlerts();
     },
   });
 
   const resetMutation = useMutation({
     mutationFn: api.resetSignalAlertDedupe,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["signal-alerts"] });
+      void invalidateSignalAlerts();
     },
   });
 
@@ -126,6 +139,7 @@ export function SignalAlertsSection() {
 
   function handleCreate(event: React.FormEvent) {
     event.preventDefault();
+    if (!effectiveAccountId) return;
     if (!instrumentId || kinds.length === 0) return;
     if (strategySource === "saved" && !savedStrategyId) return;
     if (channels.includes("webhook") && !webhookUrl.trim()) return;
@@ -308,18 +322,28 @@ export function SignalAlertsSection() {
           <div className="md:col-span-2">
             <button
               type="submit"
-              disabled={createMutation.isPending || kinds.length === 0}
+              disabled={
+                createMutation.isPending ||
+                kinds.length === 0 ||
+                !effectiveAccountId
+              }
               className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
               {createMutation.isPending ? "Creando…" : "Suscribir alerta"}
             </button>
             {createMutation.isError && (
-              <span className="ml-3 text-xs text-red-400">
+              <span className="ml-3 text-xs text-red-400" role="alert">
                 {(createMutation.error as Error).message}
               </span>
             )}
           </div>
         </form>
+
+        {!effectiveAccountId && !signalAlertsQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">
+            Sin cuenta activa: no se pueden cargar las suscripciones.
+          </p>
+        ) : null}
 
         {signalAlertsQuery.isLoading && (
           <p className="text-sm text-muted-foreground">
@@ -327,9 +351,45 @@ export function SignalAlertsSection() {
           </p>
         )}
 
-        {!signalAlertsQuery.isLoading && subscriptions.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            No hay suscripciones activas.
+        {/* Un fallo de lectura NO es una lista vacía: se declara y se ofrece reintento. */}
+        {signalAlertsQuery.isError ? (
+          <div
+            className="flex flex-wrap items-center gap-2 text-sm text-destructive"
+            role="alert"
+          >
+            <span>
+              No se pudieron cargar las suscripciones:{" "}
+              {signalAlertsQuery.error instanceof Error
+                ? signalAlertsQuery.error.message
+                : "error desconocido"}
+              .
+            </span>
+            <button
+              type="button"
+              onClick={() => void signalAlertsQuery.refetch()}
+              className="rounded border border-border px-2 py-0.5 text-xs text-foreground hover:bg-accent"
+            >
+              Reintentar
+            </button>
+          </div>
+        ) : null}
+
+        {!signalAlertsQuery.isLoading &&
+          !signalAlertsQuery.isError &&
+          Boolean(effectiveAccountId) &&
+          subscriptions.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No hay suscripciones activas.
+            </p>
+          )}
+
+        {(deleteMutation.isError || resetMutation.isError) && (
+          <p className="text-sm text-destructive" role="alert">
+            No se pudo completar la acción:{" "}
+            {(deleteMutation.error ?? resetMutation.error) instanceof Error
+              ? ((deleteMutation.error ?? resetMutation.error) as Error).message
+              : "error desconocido"}
+            .
           </p>
         )}
 
@@ -353,8 +413,14 @@ export function SignalAlertsSection() {
                     subscription={sub}
                     onDelete={() => deleteMutation.mutate(sub.id)}
                     onReset={() => resetMutation.mutate(sub.id)}
-                    deleting={deleteMutation.isPending}
-                    resetting={resetMutation.isPending}
+                    deleting={
+                      deleteMutation.isPending &&
+                      deleteMutation.variables === sub.id
+                    }
+                    resetting={
+                      resetMutation.isPending &&
+                      resetMutation.variables === sub.id
+                    }
                   />
                 ))}
               </tbody>

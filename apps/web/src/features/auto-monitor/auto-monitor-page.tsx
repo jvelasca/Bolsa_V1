@@ -15,17 +15,14 @@ import { AutoMonitorHeader } from "@/features/auto-monitor/auto-monitor-header";
 import { AutoReservationPanel } from "@/features/auto-monitor/auto-reservation-panel";
 import { AutoOperationStoryPanel } from "@/features/auto-monitor/auto-operation-story-panel";
 import { DiaDAutoPanel } from "@/features/auto-monitor/dia-d-auto-panel";
+import { EstudioDailyOpsPanel } from "@/features/auto-monitor/estudio-daily-ops-panel";
 import {
+  AUTO_MONITOR_MODES,
+  AUTO_MONITOR_MODES_WITHOUT_MONITOR_POLL,
   AutoMonitorModeToolbar,
   type AutoMonitorMode,
 } from "@/features/auto-monitor/dia-d-auto-toolbar";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
-
-const AUTO_MONITOR_MODES: readonly AutoMonitorMode[] = [
-  "current",
-  "operation",
-  "dia-d",
-];
 
 /**
  * Lee el modo del monitor desde la URL. Por defecto `operation` (la historia única es la
@@ -61,10 +58,12 @@ export function AutoMonitorPage() {
       });
     }
   };
-  // La pestaña DÍA-D no debe seguir sondeando `/auto/operational-monitor` cada 20 s: el hook
-  // sólo se habilita fuera de DÍA-D (su `refetch` manual sigue disponible).
+  // Las pestañas DÍA-D y Operativa diaria no deben seguir sondeando
+  // `/auto/operational-monitor` cada 20 s: el hook sólo se habilita en las demás
+  // (su `refetch` manual sigue disponible).
+  const pollMonitor = !AUTO_MONITOR_MODES_WITHOUT_MONITOR_POLL.includes(mode);
   const { view, isLoading, isError, isFetching, refetch } =
-    useAutoOperationalMonitor({ enabled: mode !== "dia-d" });
+    useAutoOperationalMonitor({ enabled: pollMonitor });
 
   return (
     <div
@@ -113,6 +112,8 @@ export function AutoMonitorPage() {
         {mode === "operation" ? <AutoOperationStoryPanel /> : null}
 
         {mode === "dia-d" ? <DiaDAutoPanel /> : null}
+
+        {mode === "daily" ? <EstudioDailyOpsPanel /> : null}
 
         {mode === "current" && isLoading ? (
           <p

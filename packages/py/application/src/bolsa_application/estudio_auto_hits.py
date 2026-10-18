@@ -12,6 +12,7 @@ from datetime import UTC, date, datetime
 from typing import Any, Protocol
 from uuid import uuid4
 
+from bolsa_application.daily_opinion_service import SOURCE_ON_DEMAND, OpinionHint
 from bolsa_application.paper_d_propose import (
     PAPER_D_EXECUTE_ENV,
     paper_d_allowed_account_id,
@@ -54,7 +55,8 @@ class _OpinionQuery(Protocol):
         as_of_bar_date: date | None = None,
         account_id: str | None = None,
         force_refresh: bool = False,
-        hints: Any = None,
+        hints: list[OpinionHint] | None = None,
+        source: str = SOURCE_ON_DEMAND,
     ) -> list[Any]: ...
 
 
@@ -260,13 +262,18 @@ class ProposeEstudioAutoOpenings:
         policy_id = (payload.get("executionPolicyId") or "").strip() or None
         force_refresh = payload.get("forceRefresh") is True
         template_id = (payload.get("templateId") or "").strip() or None
+        # Server-side hints (`OpinionHint`) y fuente de la opinión: el job diario reutiliza
+        # las filas `eod_batch` recién calculadas en vez de recalcular con `hints=[]`.
+        hints = payload.get("hints")
+        opinion_source = str(payload.get("opinionSource") or "").strip() or None
 
         rows = await self._opinions.query(
             instrument_ids=instrument_ids,
             as_of_bar_date=as_of_date,
             account_id=account_id,
             force_refresh=force_refresh,
-            hints=[],
+            hints=hints if isinstance(hints, list) else [],
+            source=opinion_source or SOURCE_ON_DEMAND,
         )
         candidates = select_estudio_opening_candidates(
             rows, max_candidates=max_candidates

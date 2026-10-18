@@ -1214,6 +1214,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/estudio-daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Estudio Daily
+         * @description Operativa diaria por valor de ``asOf`` (por defecto hoy UTC) para la cuenta activa.
+         */
+        get: operations["get_estudio_daily_api_auto_estudio_daily_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/operational-monitor": {
         parameters: {
             query?: never;
@@ -1231,6 +1251,50 @@ export interface paths {
          *     valor: un ``instrumentId`` desconocido NO cae a una lectura global (``cycles == []``).
          */
         get: operations["get_auto_operational_monitor_api_auto_operational_monitor_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/ops-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Auto Ops Jobs
+         * @description Jobs de la cuenta activa, más recientes primero (opcionalmente de un día/tipo).
+         */
+        get: operations["list_auto_ops_jobs_api_auto_ops_jobs_get"];
+        put?: never;
+        /**
+         * Create Auto Ops Job
+         * @description Encola (o devuelve el activo) del job indicado para la cuenta activa.
+         */
+        post: operations["create_auto_ops_job_api_auto_ops_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/ops-jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Ops Job
+         * @description Job por id; el de otra cuenta es INDISTINGUIBLE de inexistente (404).
+         */
+        get: operations["get_auto_ops_job_api_auto_ops_jobs__job_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4811,6 +4875,67 @@ export interface components {
             /** Reservations */
             reservations?: components["schemas"]["AutoMonitorReservationDto"][];
         };
+        /** AutoOpsJobCreateDto */
+        AutoOpsJobCreateDto: {
+            /** Day */
+            day?: string | null;
+            /** Kind */
+            kind: string;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * AutoOpsJobDto
+         * @description Foto de un job (progreso y resultado son datos; un hueco queda vacío, nunca en 0).
+         */
+        AutoOpsJobDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /**
+             * Attempt
+             * @default 0
+             */
+            attempt: number;
+            /** Createdat */
+            createdAt?: string | null;
+            /** Day */
+            day: string;
+            /** Error */
+            error?: string | null;
+            /** Finishedat */
+            finishedAt?: string | null;
+            /** Heartbeatat */
+            heartbeatAt?: string | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            };
+            /** Progress */
+            progress?: {
+                [key: string]: unknown;
+            };
+            /** Result */
+            result?: {
+                [key: string]: unknown;
+            };
+            /** Startedat */
+            startedAt?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** AutoOpsJobListDto */
+        AutoOpsJobListDto: {
+            /** Jobs */
+            jobs?: components["schemas"]["AutoOpsJobDto"][];
+            /** Notes */
+            notes?: string[];
+        };
         /**
          * AutoPaperEvidenceDto
          * @description DTO canónico de la evidencia PAPER: siete criterios + conciliación + desglose.
@@ -6391,6 +6516,8 @@ export interface components {
          * @description Artefacto de un día. ``available = false`` cuando no existe (fail-closed).
          */
         DiaDAutoReplayDto: {
+            /** Artifactmodifiedat */
+            artifactModifiedAt?: string | null;
             /** Available */
             available: boolean;
             /** Day */
@@ -7313,6 +7440,24 @@ export interface components {
              * @default 25
              */
             maxCandidates: number;
+        };
+        /**
+         * EstudioDailyResponseDto
+         * @description Parte del día + estado del job que lo produjo (ambos pueden faltar).
+         */
+        EstudioDailyResponseDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Asof */
+            asOf: string;
+            job?: components["schemas"]["AutoOpsJobDto"] | null;
+            latestJob?: components["schemas"]["AutoOpsJobDto"] | null;
+            /** Notes */
+            notes?: string[];
+            /** Report */
+            report?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * EstudioEodDigestNotifyDto
@@ -14557,6 +14702,39 @@ export interface operations {
             };
         };
     };
+    get_estudio_daily_api_auto_estudio_daily_get: {
+        parameters: {
+            query?: {
+                asOf?: string | null;
+            };
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstudioDailyResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_auto_operational_monitor_api_auto_operational_monitor_get: {
         parameters: {
             query?: {
@@ -14579,6 +14757,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutoOperationalMonitorDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_auto_ops_jobs_api_auto_ops_jobs_get: {
+        parameters: {
+            query?: {
+                kind?: string | null;
+                day?: string | null;
+                limit?: number;
+            };
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoOpsJobListDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_auto_ops_job_api_auto_ops_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoOpsJobCreateDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoOpsJobDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_ops_job_api_auto_ops_jobs__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoOpsJobDto"];
                 };
             };
             /** @description Validation Error */

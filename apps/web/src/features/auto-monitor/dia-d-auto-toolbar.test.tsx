@@ -81,7 +81,19 @@ describe("AutoMonitorModeToolbar — patrón WAI-ARIA de tabs", () => {
     fireEvent.keyDown(screen.getByTestId("auto-monitor-mode-operation"), {
       key: "End",
     });
-    expect(onChange).toHaveBeenLastCalledWith("dia-d", true);
+    expect(onChange).toHaveBeenLastCalledWith("daily", true);
+
+    // La cuarta pestaña (operativa diaria) entra en el ciclo de flechas.
+    cleanup();
+    const daily = renderToolbar("daily");
+    fireEvent.keyDown(screen.getByTestId("auto-monitor-mode-daily"), {
+      key: "ArrowRight",
+    });
+    expect(daily.onChange).toHaveBeenLastCalledWith("current", true);
+    fireEvent.keyDown(screen.getByTestId("auto-monitor-mode-daily"), {
+      key: "ArrowLeft",
+    });
+    expect(daily.onChange).toHaveBeenLastCalledWith("dia-d", true);
   });
 
   it("ignora teclas que no son de navegación de tabs", () => {

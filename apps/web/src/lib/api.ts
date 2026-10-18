@@ -955,6 +955,55 @@ export const api = {
       client.GET("/api/auto/dia-d-replay", {}),
     ),
 
+  /**
+   * DÍA-D AUTO — encola la ejecución manual del replay para la cuenta activa.
+   * Idempotente mientras haya un job ACTIVO del mismo `(kind, cuenta, día)`.
+   */
+  createAutoDiaDReplayJob: (input: { day?: string | null }) =>
+    call<components["schemas"]["AutoOpsJobDto"]>(() =>
+      client.POST("/api/auto/ops-jobs", {
+        body: { kind: "dia_d_replay", day: input.day ?? null },
+      }),
+    ),
+
+  /** Ops jobs — foto de UN job (progreso y desenlace durables). */
+  getAutoOpsJob: (jobId: string) =>
+    call<components["schemas"]["AutoOpsJobDto"]>(() =>
+      client.GET("/api/auto/ops-jobs/{job_id}", {
+        params: { path: { job_id: jobId } },
+      }),
+    ),
+
+  /** Ops jobs — últimos jobs de la cuenta activa (más recientes primero). */
+  listAutoOpsJobs: (input?: { kind?: string; day?: string; limit?: number }) =>
+    call<components["schemas"]["AutoOpsJobListDto"]>(() =>
+      client.GET("/api/auto/ops-jobs", {
+        params: {
+          query: {
+            kind: input?.kind,
+            day: input?.day,
+            limit: input?.limit,
+          },
+        },
+      }),
+    ),
+
+  /** Operativa diaria AUTO por valor — parte durable del job `estudio_daily` del día. */
+  getAutoEstudioDaily: (asOf?: string) =>
+    call<import("@bolsa/shared").EstudioDailyResponseV1>(() =>
+      client.GET("/api/auto/estudio-daily", {
+        params: { query: asOf ? { asOf } : {} },
+      }),
+    ),
+
+  /** Operativa diaria AUTO por valor — encola el cálculo del día para la cuenta activa. */
+  createAutoEstudioDailyJob: (input?: { day?: string | null }) =>
+    call<components["schemas"]["AutoOpsJobDto"]>(() =>
+      client.POST("/api/auto/ops-jobs", {
+        body: { kind: "estudio_daily", day: input?.day ?? null },
+      }),
+    ),
+
   /** DÍA-D AUTO — comparación declarado vs ejecutado de un día (read-only, fail-closed). */
   getAutoDiaDReplay: (day: string) =>
     call<components["schemas"]["DiaDAutoReplayDto"]>(() =>

@@ -1630,6 +1630,170 @@
         "title": "AutoOperationalMonitorDto",
         "type": "object"
       },
+      "AutoOpsJobCreateDto": {
+        "properties": {
+          "day": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "AutoOpsJobCreateDto",
+        "type": "object"
+      },
+      "AutoOpsJobDto": {
+        "description": "Foto de un job (progreso y resultado son datos; un hueco queda vacío, nunca en 0).",
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "attempt": {
+            "default": 0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Createdat"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          },
+          "heartbeatAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heartbeatat"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "progress": {
+            "additionalProperties": true,
+            "title": "Progress",
+            "type": "object"
+          },
+          "result": {
+            "additionalProperties": true,
+            "title": "Result",
+            "type": "object"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "day"
+        ],
+        "title": "AutoOpsJobDto",
+        "type": "object"
+      },
+      "AutoOpsJobListDto": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/AutoOpsJobDto"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          }
+        },
+        "title": "AutoOpsJobListDto",
+        "type": "object"
+      },
       "AutoPaperEvidenceDto": {
         "description": "DTO canónico de la evidencia PAPER: siete criterios + conciliación + desglose.",
         "properties": {
@@ -6336,6 +6500,17 @@
       "DiaDAutoReplayDto": {
         "description": "Artefacto de un día. ``available = false`` cuando no existe (fail-closed).",
         "properties": {
+          "artifactModifiedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifactmodifiedat"
+          },
           "available": {
             "title": "Available",
             "type": "boolean"
@@ -8511,6 +8686,70 @@
           "instrumentIds"
         ],
         "title": "EstudioAutoProposeDto",
+        "type": "object"
+      },
+      "EstudioDailyResponseDto": {
+        "description": "Parte del día + estado del job que lo produjo (ambos pueden faltar).",
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "asOf": {
+            "title": "Asof",
+            "type": "string"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoOpsJobDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestJob": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoOpsJobDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report"
+          }
+        },
+        "required": [
+          "asOf"
+        ],
+        "title": "EstudioDailyResponseDto",
         "type": "object"
       },
       "EstudioEodDigestNotifyDto": {
@@ -27294,6 +27533,72 @@
         ]
       }
     },
+    "/api/auto/estudio-daily": {
+      "get": {
+        "description": "Operativa diaria por valor de ``asOf`` (por defecto hoy UTC) para la cuenta activa.",
+        "operationId": "get_estudio_daily_api_auto_estudio_daily_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "asOf",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Asof"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstudioDailyResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Estudio Daily",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
     "/api/auto/operational-monitor": {
       "get": {
         "description": "Proyección read-only de la cadena AUTO de una cuenta visible del principal.\n\nSin cuenta operativa visible la respuesta es un DTO vacío con ``no_account_scope``\n(fail-closed, nunca global). ``cycleId`` acota a un solo ciclo para el drill-down; si se pasa\njunto con ``instrumentId``, ``cycleId`` manda. ``instrumentId`` (H5) acota a los ciclos DE ESE\nvalor: un ``instrumentId`` desconocido NO cae a una lectura global (``cycles == []``).",
@@ -27385,6 +27690,217 @@
           }
         },
         "summary": "Get Auto Operational Monitor",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/ops-jobs": {
+      "get": {
+        "description": "Jobs de la cuenta activa, más recientes primero (opcionalmente de un día/tipo).",
+        "operationId": "list_auto_ops_jobs_api_auto_ops_jobs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "day",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoOpsJobListDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Auto Ops Jobs",
+        "tags": [
+          "auto"
+        ]
+      },
+      "post": {
+        "description": "Encola (o devuelve el activo) del job indicado para la cuenta activa.",
+        "operationId": "create_auto_ops_job_api_auto_ops_jobs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoOpsJobCreateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoOpsJobDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Auto Ops Job",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/ops-jobs/{job_id}": {
+      "get": {
+        "description": "Job por id; el de otra cuenta es INDISTINGUIBLE de inexistente (404).",
+        "operationId": "get_auto_ops_job_api_auto_ops_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoOpsJobDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Ops Job",
         "tags": [
           "auto"
         ]

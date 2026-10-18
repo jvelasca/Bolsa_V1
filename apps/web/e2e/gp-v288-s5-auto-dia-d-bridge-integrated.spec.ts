@@ -898,6 +898,131 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
       netTimings.flush();
     }
   });
+  test("GP-V288-S5-05: operativa diaria y DÍA-D manual por la cola durable (P5)", async ({
+    request,
+    baseURL,
+  }) => {
+    const accountId = state.accountId;
+    if (!accountId) throw new Error("fixture required");
+    if (!baseURL) throw new Error("baseURL required");
+    const headers = { "X-Account-Id": accountId };
+    const day = new Date().toISOString().slice(0, 10);
+
+    /** Espera el desenlace REAL del job (queued→running→completed|failed). */
+    const waitForJob = async (id: string) => {
+      let last: { status: string; error?: string | null } = {
+        status: "queued",
+      };
+      await expect
+        .poll(
+          async () => {
+            const res = await request.get(
+              new URL(`/api/auto/ops-jobs/${id}`, baseURL).toString(),
+              { headers },
+            );
+            if (!res.ok()) return `http_${res.status()}`;
+            last = await body<{ status: string; error?: string | null }>(res);
+            return last.status;
+          },
+          { timeout: 120_000, intervals: [500] },
+        )
+        .toMatch(/completed|failed/);
+      return last;
+    };
+
+    // 1) La UI y el scheduler encolan el MISMO job: se comprueba por la ruta real.
+    const dailyEnqueue = await request.post(
+      new URL("/api/auto/ops-jobs", baseURL).toString(),
+      {
+        headers,
+        data: { kind: "estudio_daily", day },
+      },
+    );
+    expect(dailyEnqueue.ok()).toBe(true);
+    const dailyJob = await body<{ id: string; kind: string; day: string }>(
+      dailyEnqueue,
+    );
+    expect(dailyJob.kind).toBe("estudio_daily");
+
+    const dailyFinal = await waitForJob(dailyJob.id);
+    if (dailyFinal.status === "failed") {
+      // Hueco de ENTORNO declarado (sin barras/universo ESTUDIO en la cuenta efímera).
+      declareGap(
+        `el job estudio_daily falló en el entorno integrado: ${dailyFinal.error ?? "sin detalle"}`,
+      );
+      return;
+    }
+
+    // 2) El parte durable es coherente: N valores y contadores que suman N.
+    const dailyRes = await request.get(
+      new URL(
+        `/api/auto/estudio-daily?asOf=${encodeURIComponent(dailyJob.day)}`,
+        baseURL,
+      ).toString(),
+      { headers },
+    );
+    expect(dailyRes.ok()).toBe(true);
+    const daily = await body<{
+      report: {
+        status: string;
+        scannedCount: number;
+        counts: Record<string, number>;
+        values: unknown[];
+        countsConsistent: boolean;
+      } | null;
+      notes: string[];
+    }>(dailyRes);
+    if (daily.report) {
+      const { counts, scannedCount, values } = daily.report;
+      expect(values.length).toBe(scannedCount);
+      if (daily.report.countsConsistent) {
+        expect(
+          Number(counts.ok ?? 0) +
+            Number(counts.no_signal ?? 0) +
+            Number(counts.no_plan ?? 0) +
+            Number(counts.error ?? 0),
+        ).toBe(scannedCount);
+      }
+      // Un universo vacío se declara; nunca se finge un parte con valores inventados.
+      if (daily.report.status === "empty") expect(values.length).toBe(0);
+    }
+
+    // 3) DÍA-D manual: encola el replay y su desenlace valida el artefacto por cuenta y día.
+    const replayEnqueue = await request.post(
+      new URL("/api/auto/ops-jobs", baseURL).toString(),
+      {
+        headers,
+        data: { kind: "dia_d_replay", day },
+      },
+    );
+    expect(replayEnqueue.ok()).toBe(true);
+    const replayJob = await body<{ id: string }>(replayEnqueue);
+    const replayFinal = await waitForJob(replayJob.id);
+    if (replayFinal.status === "failed") {
+      declareGap(
+        `el job dia_d_replay falló en el entorno integrado: ${replayFinal.error ?? "sin detalle"}`,
+      );
+      return;
+    }
+
+    const artifactRes = await request.get(
+      new URL(
+        `/api/auto/dia-d-replay/${encodeURIComponent(day)}`,
+        baseURL,
+      ).toString(),
+      { headers },
+    );
+    expect(artifactRes.ok()).toBe(true);
+    const artifact = await body<{
+      available: boolean;
+      day?: string;
+      meta?: { account?: string | null };
+    }>(artifactRes);
+    expect(artifact.available).toBe(true);
+    expect(artifact.day).toBe(day);
+    // Fail-closed por cuenta: el artefacto es de la cuenta que lo pidió.
+    expect(artifact.meta?.account).toBe(accountId);
+  });
 });
 
 /**

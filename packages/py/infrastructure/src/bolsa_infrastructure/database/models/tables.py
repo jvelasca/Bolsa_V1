@@ -2973,6 +2973,52 @@ class AutoExitOrderRow(Base):
 # instrumento (la migración 041 mantuvo la clave natural de instrument_strategy_tops).
 
 
+class AutoOpsJobRow(Base):
+    """Cola durable de trabajos operativos (``estudio_daily`` / ``dia_d_replay``).
+
+    ``status`` recorre ``queued → running → completed|failed``. El índice único
+    **parcial** ``auto_ops_jobs_active_job_key`` sobre
+    ``(kind, coalesce(account_id,''), day)`` impide dos jobs ACTIVOS del mismo trabajo:
+    un terminado libera el hueco para una reejecución manual declarada.
+    ``progress``/``result`` son JSONB; un hueco se declara vacío, nunca se rellena.
+    """
+
+    __tablename__ = "auto_ops_jobs"
+    __table_args__ = (
+        Index("auto_ops_jobs_kind_day_idx", "kind", "day"),
+        Index("auto_ops_jobs_account_created_idx", "account_id", "created_at"),
+        Index(
+            "auto_ops_jobs_active_job_key",
+            "kind",
+            text("coalesce(account_id, '')"),
+            "day",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    kind: Mapped[str] = mapped_column("kind", String, nullable=False)
+    status: Mapped[str] = mapped_column("status", String, nullable=False)
+    day: Mapped[str] = mapped_column("day", String, nullable=False)
+    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    progress: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    error: Mapped[str | None] = mapped_column("error", String, nullable=True)
+    attempt: Mapped[int] = mapped_column("attempt", Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(
+        "started_at", DateTime(timezone=True), nullable=True
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        "finished_at", DateTime(timezone=True), nullable=True
+    )
+    heartbeat_at: Mapped[datetime | None] = mapped_column(
+        "heartbeat_at", DateTime(timezone=True), nullable=True
+    )
+
+
 class Top3OpportunityRow(Base):
     """Un slot del TOP3 cross-asset (activo) con sus componentes explicables."""
 

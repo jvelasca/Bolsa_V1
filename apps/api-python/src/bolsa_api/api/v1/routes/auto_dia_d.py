@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -57,6 +58,15 @@ def _read_artifact(day: str) -> dict[str, Any] | None:
     except (OSError, ValueError):
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def _artifact_modified_at(day: str) -> str | None:
+    """Marca temporal del artefacto (para distinguir «artefacto anterior» de uno fresco)."""
+    try:
+        mtime = _artifact_path(day).stat().st_mtime
+    except OSError:
+        return None
+    return datetime.fromtimestamp(mtime, tz=UTC).isoformat()
 
 
 def _list_days() -> list[str]:
@@ -111,6 +121,8 @@ class DiaDAutoReplayDto(BaseModel):
     available: bool
     readOnly: bool = True
     day: str
+    #: mtime del artefacto: la UI etiqueta «artefacto anterior» si el último job falló.
+    artifactModifiedAt: str | None = None
     schemaVersion: str | None = None
     summary: DiaDAutoSummaryDto | None = None
     steps: list[DiaDAutoStepDto] = Field(default_factory=list)
@@ -182,6 +194,7 @@ async def get_auto_dia_d_replay(
         available=True,
         readOnly=bool(artifact.get("readOnly", True)),
         day=str(artifact.get("day") or day),
+        artifactModifiedAt=_artifact_modified_at(day),
         schemaVersion=artifact.get("schemaVersion"),
         summary=DiaDAutoSummaryDto(**artifact["summary"]) if artifact.get("summary") else None,
         steps=[DiaDAutoStepDto(**row) for row in artifact.get("comparison", [])],

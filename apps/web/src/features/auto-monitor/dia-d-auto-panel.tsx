@@ -21,6 +21,7 @@ import {
   useAutoDiaDReplay,
   useAutoDiaDReplayDays,
 } from "@/features/auto-monitor/use-auto-dia-d-replay";
+import { useDiaDReplayJob } from "@/features/auto-monitor/use-dia-d-replay-job";
 
 type DiaDAutoReplayDto = components["schemas"]["DiaDAutoReplayDto"];
 type DiaDAutoStepDto = components["schemas"]["DiaDAutoStepDto"];
@@ -91,7 +92,7 @@ function NotAvailable({ detail }: { detail: DiaDAutoReplayDto }) {
   const reason = detail.notes?.[0] ?? "artifact_not_found";
   const messages: Record<string, string> = {
     artifact_not_found:
-      "No hay artefacto para este día. Ejecuta el sandbox por CLI para generarlo.",
+      "No hay artefacto para este día. Ejecuta el sandbox con «Ejecutar DÍA-D ahora» o por CLI.",
     no_account_scope: "Sin cuenta activa: no se puede resolver el artefacto.",
     invalid_day: "Fecha inválida.",
   };
@@ -112,6 +113,121 @@ function NotAvailable({ detail }: { detail: DiaDAutoReplayDto }) {
         </p>
       </CardContent>
     </Card>
+  );
+}
+
+function DiaDReplayLaunch({
+  day,
+  hasArtifact,
+}: {
+  day: string | null;
+  hasArtifact: boolean;
+}) {
+  const { job, hasAccount, isRunning, isQueuing, run, runError, jobError } =
+    useDiaDReplayJob(day);
+  const phase = job?.progress?.phase ?? null;
+  const percent = job?.progress?.percent ?? null;
+  const failed = job?.status === "failed";
+  const completed = job?.status === "completed";
+  const transportError = runError ?? jobError;
+
+  return (
+    <div className="space-y-2" data-testid="dia-d-auto-launch">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          data-testid="dia-d-auto-run"
+          disabled={!day || !hasAccount || isRunning || isQueuing}
+          onClick={() => run()}
+        >
+          {isRunning || isQueuing
+            ? "Ejecutando DÍA-D…"
+            : "Ejecutar DÍA-D ahora"}
+        </Button>
+        {job ? (
+          <span
+            data-testid="dia-d-auto-job-status"
+            data-status={job.status}
+            className="text-[10px] uppercase tracking-wide text-muted-foreground"
+          >
+            job {job.status} · intento {job.attempt}
+          </span>
+        ) : null}
+        {!hasAccount ? (
+          <span
+            data-testid="dia-d-auto-run-no-account"
+            className="text-[10px] text-muted-foreground"
+          >
+            Sin cuenta activa: no se puede encolar.
+          </span>
+        ) : null}
+      </div>
+
+      {isRunning ? (
+        <div
+          data-testid="dia-d-auto-job-progress"
+          data-phase={phase ?? ""}
+          className="space-y-1"
+        >
+          <p className="text-[11px] tabular-nums text-muted-foreground">
+            {phase ? `Fase ${phase}` : "Progreso no declarado todavía"}
+            {percent != null ? ` · ${percent}%` : ""}
+          </p>
+          {percent != null ? (
+            <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
+              <div
+                className="h-full bg-primary transition-all"
+                style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {failed ? (
+        <p
+          role="alert"
+          data-testid="dia-d-auto-job-error"
+          className="text-xs text-destructive"
+        >
+          La última ejecución falló: {job?.error ?? "sin detalle"}
+        </p>
+      ) : null}
+
+      {failed && hasArtifact ? (
+        <p
+          data-testid="dia-d-auto-stale-artifact"
+          className="text-[11px] text-amber-600 dark:text-amber-400"
+        >
+          Se muestra el artefacto anterior de {day}; la ejecución fallida no lo
+          ha sustituido.
+        </p>
+      ) : null}
+
+      {completed ? (
+        <p
+          data-testid="dia-d-auto-job-completed"
+          className="text-[11px] text-emerald-600 dark:text-emerald-400"
+        >
+          Artefacto generado para {job?.day}.
+        </p>
+      ) : null}
+
+      {transportError ? (
+        <p
+          role="alert"
+          data-testid="dia-d-auto-job-transport-error"
+          className="text-xs text-destructive"
+        >
+          No se pudo consultar la ejecución:{" "}
+          {transportError instanceof Error
+            ? transportError.message
+            : "error desconocido"}
+          .
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -199,6 +315,11 @@ export function DiaDAutoSandbox() {
               ))}
             </div>
           ) : null}
+
+          <DiaDReplayLaunch
+            day={day}
+            hasArtifact={Boolean(detail?.available)}
+          />
         </CardContent>
       </Card>
 

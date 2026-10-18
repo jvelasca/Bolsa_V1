@@ -39,6 +39,7 @@ import logging
 import os
 import pathlib
 import sys
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -61,6 +62,49 @@ _DEFAULT_HORIZON_DAYS = 20
 _OUT_SUBDIR = pathlib.Path("operability_runs") / "dia-d-auto"
 
 logger = logging.getLogger("v2_89_dia_d_auto_replay")
+
+
+class _JsonlProgress:
+    """Progreso observable para la UI (una línea JSON por fase/tick).
+
+    El fichero se TRUNCA al arrancar: un progreso viejo no puede parecer el de esta
+    ejecución. Escribir es best-effort — un fallo de progreso no tumba el replay.
+    """
+
+    def __init__(self, path: str | None, *, truncate: bool = True) -> None:
+        self._path = pathlib.Path(path) if path else None
+        self._start = time.monotonic()
+        if self._path is not None and truncate:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                self._path.unlink()
+            except FileNotFoundError:
+                pass
+
+    def emit(
+        self,
+        phase: str,
+        *,
+        done: int = 0,
+        total: int = 0,
+        message: str | None = None,
+    ) -> None:
+        if self._path is None:
+            return
+        event = {
+            "phase": phase,
+            "done": int(done),
+            "total": int(total),
+            "message": message,
+            "at": datetime.now(UTC).isoformat(),
+            "elapsedSeconds": round(time.monotonic() - self._start, 2),
+        }
+        try:
+            with self._path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+                handle.flush()
+        except OSError:  # pragma: no cover — progreso best-effort
+            logger.debug("no se pudo escribir el progreso JSONL en %s", self._path)
 
 
 def _load_module(filename: str, name: str) -> Any:
@@ -278,6 +322,8 @@ def _cycle_closed_step(oos: dict[str, Any]) -> Any:
 async def _run(args: argparse.Namespace) -> dict[str, Any]:
     from dotenv import load_dotenv
 
+    progress = _JsonlProgress(getattr(args, "progress_jsonl", None))
+    progress.emit("starting", message=f"D={args.at}")
     load_dotenv(_DOTENV, override=False)
     from bolsa_application.dia_d_auto import (
         DEFAULT_LIMITS,
@@ -343,6 +389,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         os.environ["AUTO_ENGINE_SIM_REAL_PRICE"] = "0"
 
         bars_by_symbol = await v86._read_bars(factory, watch)  # noqa: SLF001
+        progress.emit("loading_bars", done=len(bars_by_symbol), total=len(watch))
         days = v86._trading_days(bars_by_symbol)  # noqa: SLF001
         if not days:
             raise RuntimeError("no hay barras D1 para simular")
@@ -357,6 +404,8 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         operable_flags = [row.entries_allowed_long for row in census.days]
         sectors = await v86._load_sectors(factory, watch)  # noqa: SLF001
 
+        total_ticks = max(0, end_index - start_index)
+        progress.emit("replay", done=0, total=total_ticks)
         replay = await v87._run_durable_replay(  # noqa: SLF001 — harness hermético.
             watch=watch,
             bars_by_symbol=bars_by_symbol,
@@ -370,6 +419,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             engine_id=f"dia-d-auto-{os.urandom(3).hex()}",
             operable_days=operable_flags,
             durable_cycle=True,
+            on_tick=lambda done, total: progress.emit(
+                "replay", done=done, total=total
+            ),
         )
 
         day_row = next((row for row in replay.get("perDay", []) if row.get("day") == day), None)
@@ -384,6 +436,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             if replay_end
             else None
         )
+        progress.emit("reading_facts", message="hechos durables de D")
         executed, executed_detail = await _read_executed_facts(
             factory,
             account_id=str(args.account_id),
@@ -420,7 +473,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             },
             executed_detail=executed_detail,
             meta={
-                "bump": "2.11.144-beta",
+                "bump": "2.11.145-beta",
                 "phase": "V2.89 DIA-D AUTO SANDBOX",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
@@ -439,6 +492,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             },
             limits=limits,
         )
+        progress.emit("writing_artifact", message="artefacto calculado")
         return artifact
     finally:
         await engine.dispose()
@@ -487,6 +541,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--venue", default="paper", choices=("paper", "simulated"))
     parser.add_argument("--json", action="store_true", help="emite el artefacto como JSON")
     parser.add_argument("--out", default=None, help="ruta del JSON de evidencia")
+    parser.add_argument(
+        "--progress-jsonl",
+        default=None,
+        help="fichero JSONL de progreso (fases starting/loading_bars/replay/…/done)",
+    )
     args = parser.parse_args(argv)
 
     if int(args.watch_size) <= 0 or int(args.min_bars) <= 0:
@@ -512,7 +571,20 @@ def main(argv: list[str] | None = None) -> int:
     payload = json.dumps(artifact, indent=2, sort_keys=True, ensure_ascii=False, default=str)
     out_path = pathlib.Path(args.out) if args.out else _REPO_ROOT / _OUT_SUBDIR / f"dia-d-auto-{artifact['day']}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(payload + "\n", encoding="utf-8")
+    # Escritura ATÓMICA: un fallo nunca deja un JSON parcial que la API lea como bueno.
+    tmp_path = out_path.with_name(f"{out_path.name}.tmp-{os.getpid()}")
+    try:
+        tmp_path.write_text(payload + "\n", encoding="utf-8")
+        os.replace(tmp_path, out_path)
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:  # pragma: no cover — limpieza best-effort
+                pass
+    _JsonlProgress(args.progress_jsonl, truncate=False).emit(
+        "done", done=1, total=1, message=str(out_path)
+    )
 
     if args.json:
         print(payload)

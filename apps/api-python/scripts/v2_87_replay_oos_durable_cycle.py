@@ -74,7 +74,7 @@ import pathlib
 import subprocess
 import sys
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -321,6 +321,7 @@ async def _run_durable_replay(
     durable_cycle: bool = True,
     capture_cycle_detail: bool = False,
     finance_report_path: str | None = None,
+    on_tick: Callable[[int, int], None] | None = None,
 ) -> dict[str, Any]:
     """Replay hermético con el ciclo durable de reservas CERRADO en cada tick.
 
@@ -435,7 +436,11 @@ async def _run_durable_replay(
     # un evento de gestión journalizado en ese tick pertenece a ese ciclo. Sólo se puebla con la
     # costura encendida; nunca se inventa un ciclo para un símbolo sin posición previa.
     cycle_by_symbol_day: dict[tuple[str, str], str] = {}
+    total_ticks = max(0, end - start_index)
     for index in range(start_index, end):
+        # Progreso de replay (opcional): ``v2_89`` lo publica como JSONL para la UI.
+        if on_tick is not None:
+            on_tick(index - start_index + 1, total_ticks)
         cursor.set_index(index)
         open_frames: dict[str, dict[str, Any]] = {}
         if capture_cycle_detail:
@@ -1188,7 +1193,7 @@ def _run_finance_band(args: argparse.Namespace) -> int:
             "k0Sha256Lf": k0_sha,
         },
         meta={
-            "bump": "2.11.144-beta",
+            "bump": "2.11.145-beta",
             "phase": "V2.88.114 OOS FINANCE BAND (§8-c)",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),
