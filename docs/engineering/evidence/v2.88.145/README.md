@@ -65,7 +65,7 @@
 | Import Linter | `pnpm imports:py` | **`Contracts: 4 kept, 0 broken`** |
 | Mypy | `pnpm types:py` | **`Success: no issues found in 565 source files`** |
 | Contrato | `pnpm --filter @bolsa/web contract:check` | **OK** |
-| Freeze | `pnpm window:freeze` | **OK** (`396bd205`; `apps` `e1c5e825` / `packages` `6377a7a2`) |
+| Freeze | `pnpm window:freeze` | **OK** (`22ba29e3`; `apps` `0a49a43b` / `packages` `5bc5c3eb`) |
 | Rango de migraciones | test de revisión/alembic | `056` con id ≤ 32 y linaje desde `055_dia_d_identity_nullable` |
 
 ### 6.1 E2E (medido)

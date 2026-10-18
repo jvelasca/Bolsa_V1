@@ -10,6 +10,9 @@ from __future__ import annotations
 from bolsa_api.background.alert_delivery_worker import (  # type: ignore[import-untyped]
     start_alert_delivery_worker,
 )
+from bolsa_api.background.auto_ops_job_worker import (  # type: ignore[import-untyped]
+    start_auto_ops_job_worker,
+)
 from bolsa_api.background.auto_orchestrator_worker import (  # type: ignore[import-untyped]
     start_auto_orchestrator,
 )
@@ -84,6 +87,8 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
         start_fa_weekly_worker,
         start_core_r_cron_worker,
         start_estudio_eod_opinion_worker,
+        # v2.88.145: cola durable de trabajos AUTO (estudio_daily | dia_d_replay).
+        start_auto_ops_job_worker,
         start_auto_sync_worker,
         start_index_subscribe_worker,
         start_custody_job_worker,
