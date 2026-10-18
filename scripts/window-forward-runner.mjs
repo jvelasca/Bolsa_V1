@@ -69,7 +69,9 @@ import {
   resolveDayStatus,
   runDir,
   runLockDir,
+  START_WHEN_AVAILABLE_MARKER,
   summarizeLedger,
+  taskXml,
   unlockDecision,
   verifyWindowProvenance,
   windowConfig,
@@ -1392,13 +1394,69 @@ function verifyWrapperShape() {
   }
 }
 
-function schtasksCreateCommand(name, time, wrapper) {
-  return `schtasks /create /tn "${name}" /tr "${wrapper}" /sc daily /st ${time} /f`;
+/**
+ * `2.11.144` — registro por **XML** (no `/tr`): `schtasks /create` no expone
+ * `StartWhenAvailable`; solo el XML lo lleva. Ver `taskXml` en el lib para las
+ * decisiones declaradas (bateria y `WakeToRun` NO se tocan).
+ */
+function schtasksCreateCommand(name, xmlPath) {
+  return `schtasks /create /tn "${name}" /xml "${xmlPath}" /f`;
 }
 
-/** Registra una tarea diaria y devuelve `true` si `schtasks` salió bien. */
+/**
+ * `2.11.144` — verifica DESPUES de registrar que la tarea quedo **de verdad** con
+ * `StartWhenAvailable = true`, leyendo el XML que devuelve el Programador.
+ *
+ * Mismo criterio que la sonda del wrapper en el `.142`: no basta con que `schtasks`
+ * diga «Listo»; hay que leer lo registrado. Si no casa, se **desregistra** la tarea
+ * (fail-closed: mejor ninguna tarea que una que se declara y no lo es).
+ */
+function verifyTaskXml(name) {
+  const result = spawnSync(`schtasks /query /tn "${name}" /xml ONE`, [], {
+    shell: true,
+    encoding: "utf8",
+  });
+  const xml = String(result.stdout ?? "");
+  if (result.status === 0 && xml.includes(START_WHEN_AVAILABLE_MARKER)) {
+    logInfo(
+      SCOPE,
+      `tarea "${name}" verificada: StartWhenAvailable = true (leido del registro)`,
+    );
+    return true;
+  }
+  logError(
+    SCOPE,
+    `la tarea "${name}" NO quedo con StartWhenAvailable = true — se desregistra (fail-closed)`,
+  );
+  spawnSync(`schtasks /delete /tn "${name}" /f`, [], { shell: true, encoding: "utf8" });
+  return false;
+}
+
+/** Registra una tarea diaria y devuelve `true` si `schtasks` salio bien Y se verifico. */
 function registerTask(name, time, wrapper) {
-  const command = schtasksCreateCommand(name, time, wrapper);
+  const xmlPath = wrapper.replace(/\.cmd$/i, ".xml");
+  let xml;
+  try {
+    xml = taskXml({
+      name,
+      time,
+      wrapper,
+      description:
+        "Bolsa V1 · cadencia de la ventana PAPER (freeze + preflight + run-day). " +
+        "StartWhenAvailable=true: si el equipo estaba dormido, la corrida se recupera al despertar.",
+    });
+  } catch (error) {
+    logError(
+      SCOPE,
+      `no se pudo construir el XML de la tarea "${name}": ${error.message}`,
+    );
+    return false;
+  }
+  // El Programador exige XML en UTF-16 con BOM; se conserva en el directorio de
+  // corridas para que el registro sea AUDITABLE (no un flag opaco en el registro).
+  writeFileSync(xmlPath, `\ufeff${xml}`, "utf16le");
+  logInfo(SCOPE, `XML de la tarea "${name}" escrito en ${xmlPath}`);
+  const command = schtasksCreateCommand(name, xmlPath);
   logInfo(SCOPE, `registrando tarea diaria "${name}" a las ${time}...`);
   const result = spawnSync(command, [], {
     shell: true,
@@ -1412,6 +1470,7 @@ function registerTask(name, time, wrapper) {
     );
     return false;
   }
+  if (!verifyTaskXml(name)) return false;
   logInfo(SCOPE, `tarea "${name}" registrada.`);
   logInfo(
     SCOPE,
@@ -1432,10 +1491,17 @@ function cmdTaskInstall(flags) {
   const watchTime = flags.watchAt || DEFAULT_WATCH_TIME;
   const installWatch = !flags.noWatch;
   if (flags.dryRun) {
-    console.log(schtasksCreateCommand(TASK_NAME, time, taskWrapperPath()));
-    if (installWatch) {
-      console.log(
-        schtasksCreateCommand(WATCH_TASK_NAME, watchTime, watchWrapperPath()),
+    const plans = [[TASK_NAME, time, taskWrapperPath()]];
+    if (installWatch) plans.push([WATCH_TASK_NAME, watchTime, watchWrapperPath()]);
+    for (const [name, at, wrapper] of plans) {
+      const xmlPath = wrapper.replace(/\.cmd$/i, ".xml");
+      logInfo(
+        SCOPE,
+        `--dry-run · ${name} ${at} · schtasks /create /tn "${name}" /xml "${xmlPath}" /f`,
+      );
+      logInfo(
+        SCOPE,
+        `--dry-run · ${name} · StartWhenAvailable=true · DisallowStartIfOnBatteries=true · WakeToRun=false`,
       );
     }
     return 0;

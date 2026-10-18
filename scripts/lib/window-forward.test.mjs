@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import {
   LOCK_TTL_MS,
   NON_MARKET_DAY_STATUS,
+  START_WHEN_AVAILABLE_MARKER,
   WINDOW_CONFIG,
   classifyPreflight,
   cmdWrapperContent,
@@ -27,6 +28,7 @@ import {
   parseRevParse,
   resolveDayStatus,
   summarizeLedger,
+  taskXml,
   unlockDecision,
   verifyWindowProvenance,
   windowConfig,
@@ -581,5 +583,78 @@ test('summarizeLedger sin filas no fabrica ceros: total 0 y nonMarket 0', () => 
   assert.equal(summary.total, 0);
   assert.equal(summary.nonMarket, 0);
   assert.equal(summary.gate, null);
+});
+
+// ---------------------------------------------------------------------------
+// Registro por XML (v2.88.144)
+//
+// Falsacion del defecto medido el 18/10/2026: `schtasks /create` registraba la tarea
+// con StartWhenAvailable = False y la corrida de las 18:00 se ejecuto a las 18:39
+// (primer despertar del modern standby). La opcion NO existe en `/create`: solo en el
+// XML. Estos tests fijan el XML para que no se degrade en silencio.
+// ---------------------------------------------------------------------------
+
+const TASK_PARTS = {
+  name: 'BolsaV1_WindowForward',
+  time: '18:00',
+  wrapper: 'C:\\repo\\operability_runs\\window-runs\\window-forward-task.cmd',
+  date: new Date('2026-10-18T10:00:00'),
+};
+
+test('taskXml: StartWhenAvailable queda en true (el defecto que se corrige)', () => {
+  const xml = taskXml(TASK_PARTS);
+  assert.ok(xml.includes(START_WHEN_AVAILABLE_MARKER), 'falta StartWhenAvailable=true');
+  assert.equal((xml.match(/<StartWhenAvailable>/g) ?? []).length, 1);
+});
+
+test('taskXml: disparador diario a la hora pedida y en el dia indicado', () => {
+  const xml = taskXml(TASK_PARTS);
+  assert.ok(xml.includes('<StartBoundary>2026-10-18T18:00:00</StartBoundary>'));
+  assert.ok(xml.includes('<DaysInterval>1</DaysInterval>'));
+  assert.equal((xml.match(/<CalendarTrigger>/g) ?? []).length, 1);
+});
+
+test('taskXml: la accion es el wrapper ABSOLUTO y sin comillas anidadas', () => {
+  const xml = taskXml(TASK_PARTS);
+  assert.ok(xml.includes(`<Command>${TASK_PARTS.wrapper}</Command>`));
+  assert.ok(!xml.includes('pnpm'), 'el XML no debe invocar pnpm');
+  assert.ok(!xml.includes('<Arguments>'), 'sin argumentos: el wrapper fija el subcomando');
+});
+
+test('taskXml: solo interactivo y sin duplicados (mismas garantias que antes)', () => {
+  const xml = taskXml(TASK_PARTS);
+  assert.ok(xml.includes('<LogonType>InteractiveToken</LogonType>'));
+  assert.ok(xml.includes('<MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>'));
+  assert.ok(xml.includes('<RunLevel>LeastPrivilege</RunLevel>'));
+});
+
+test('taskXml: NO se amplia alcance — bateria y WakeToRun quedan como estaban', () => {
+  const xml = taskXml(TASK_PARTS);
+  assert.ok(xml.includes('<DisallowStartIfOnBatteries>true</DisallowStartIfOnBatteries>'));
+  assert.ok(xml.includes('<StopIfGoingOnBatteries>true</StopIfGoingOnBatteries>'));
+  assert.ok(xml.includes('<WakeToRun>false</WakeToRun>'));
+  // PT72H es el limite por defecto de `schtasks /create`: el XML no lo recorta.
+  assert.ok(xml.includes('<ExecutionTimeLimit>PT72H</ExecutionTimeLimit>'));
+});
+
+test('taskXml: los flags son reales, no decorativos (false se escribe false)', () => {
+  const xml = taskXml({ ...TASK_PARTS, startWhenAvailable: false, wakeToRun: true });
+  assert.ok(!xml.includes(START_WHEN_AVAILABLE_MARKER));
+  assert.ok(xml.includes('<StartWhenAvailable>false</StartWhenAvailable>'));
+  assert.ok(xml.includes('<WakeToRun>true</WakeToRun>'));
+});
+
+test('taskXml: escapa el XML (una descripcion con & no rompe el registro)', () => {
+  const xml = taskXml({ ...TASK_PARTS, description: 'A & B <cadena>' });
+  assert.ok(xml.includes('A &amp; B &lt;cadena&gt;'));
+  assert.ok(!xml.includes('<cadena>'));
+});
+
+test('taskXml: rechaza entradas invalidas en vez de registrar algo opaco', () => {
+  assert.throws(() => taskXml({ ...TASK_PARTS, name: '  ' }), /name/);
+  assert.throws(() => taskXml({ ...TASK_PARTS, wrapper: '' }), /wrapper/);
+  assert.throws(() => taskXml({ ...TASK_PARTS, time: '25:00' }), /HH:MM/);
+  assert.throws(() => taskXml({ ...TASK_PARTS, time: '18:0' }), /HH:MM/);
+  assert.throws(() => taskXml({ ...TASK_PARTS, date: new Date('nope') }), /fecha/);
 });
 

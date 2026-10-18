@@ -1038,3 +1038,123 @@ export function cmdWrapperContent({ root, node, runner, command }) {
   );
 }
 
+/** Marca que `task:install` exige leer del XML registrado (verificacion POST-registro). */
+export const START_WHEN_AVAILABLE_MARKER =
+  '<StartWhenAvailable>true</StartWhenAvailable>';
+
+const TASK_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Escapa texto para XML (nombre/descripcion/ruta no son de fiar como literales). */
+function xmlEscape(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
+ * `2.11.144` — XML de una tarea diaria de Windows. Logica PURA.
+ *
+ * **Por que XML y no `/tr`:** `schtasks /create` **no** expone «Iniciar la tarea si se
+ * omitio el inicio programado» (`StartWhenAvailable`); esa opcion **solo existe en el
+ * XML** de la tarea (o via `Set-ScheduledTask`). Defecto medido el `18/10/2026`: el
+ * equipo estaba en **modern standby** a las `18:00` y la tarea se ejecuto a las
+ * `18:39` (primer despertar de mantenimiento), con `StartWhenAvailable = False`; si el
+ * equipo **no** despierta en todo el dia, el dia **se pierde**.
+ *
+ * **Decisiones declaradas (no se cambian de tapadillo):**
+ * - `StartWhenAvailable = true` ⇒ si el equipo estaba dormido/apagado, la corrida se
+ *   recupera **en cuanto haya sesion**; el runner sella **el dia del reloj al arrancar**,
+ *   asi que una recuperacion dentro del mismo dia sigue siendo ese dia.
+ * - `DisallowStartIfOnBatteries` / `StopIfGoingOnBatteries` quedan en **`true`** (el
+ *   valor medido antes de este cambio): se preserva el comportamiento, no se amplia el
+ *   alcance. Que la ventana no corra con bateria es un **limite declarado**, no un bug.
+ * - `WakeToRun = false`: despertar el equipo a diario tiene coste real y depende de
+ *   hardware/BIOS ⇒ **no** se activa sin decision explicita del operador.
+ * - `LogonType = InteractiveToken` (solo interactivo, igual que antes) y `IgnoreNew`.
+ *
+ * @param {{name: string, time: string, wrapper: string, description?: string,
+ *          date?: Date, startWhenAvailable?: boolean,
+ *          disallowStartIfOnBatteries?: boolean,
+ *          stopIfGoingOnBatteries?: boolean, wakeToRun?: boolean}} parts
+ * @returns {string} XML completo (se persiste como UTF-16 con BOM)
+ */
+export function taskXml({
+  name,
+  time,
+  wrapper,
+  description = '',
+  date = new Date(),
+  startWhenAvailable = true,
+  disallowStartIfOnBatteries = true,
+  stopIfGoingOnBatteries = true,
+  wakeToRun = false,
+}) {
+  const taskName = String(name ?? '').trim();
+  const stamp = String(time ?? '').trim();
+  const command = String(wrapper ?? '').trim();
+  if (!taskName) throw new Error('taskXml: falta `name`');
+  if (!command) throw new Error('taskXml: falta `wrapper`');
+  if (!TASK_TIME_RE.test(stamp)) {
+    throw new Error('taskXml: `time` debe ser HH:MM (00:00–23:59)');
+  }
+  const day = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(day.getTime())) throw new Error('taskXml: `date` no es una fecha');
+  const yyyy = String(day.getFullYear()).padStart(4, '0');
+  const mm = String(day.getMonth() + 1).padStart(2, '0');
+  const dd = String(day.getDate()).padStart(2, '0');
+  const bool = (value) => (value ? 'true' : 'false');
+  const note = String(description ?? '').trim() || `Bolsa V1 · ${taskName}`;
+  return (
+    '<?xml version="1.0" encoding="UTF-16"?>\r\n' +
+    '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">\r\n' +
+    '  <RegistrationInfo>\r\n' +
+    `    <Description>${xmlEscape(note)}</Description>\r\n` +
+    `    <URI>\\${xmlEscape(taskName)}</URI>\r\n` +
+    '  </RegistrationInfo>\r\n' +
+    '  <Triggers>\r\n' +
+    '    <CalendarTrigger>\r\n' +
+    `      <StartBoundary>${yyyy}-${mm}-${dd}T${stamp}:00</StartBoundary>\r\n` +
+    '      <Enabled>true</Enabled>\r\n' +
+    '      <ScheduleByDay>\r\n' +
+    '        <DaysInterval>1</DaysInterval>\r\n' +
+    '      </ScheduleByDay>\r\n' +
+    '    </CalendarTrigger>\r\n' +
+    '  </Triggers>\r\n' +
+    '  <Principals>\r\n' +
+    '    <Principal id="Author">\r\n' +
+    '      <LogonType>InteractiveToken</LogonType>\r\n' +
+    '      <RunLevel>LeastPrivilege</RunLevel>\r\n' +
+    '    </Principal>\r\n' +
+    '  </Principals>\r\n' +
+    '  <Settings>\r\n' +
+    '    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>\r\n' +
+    `    <DisallowStartIfOnBatteries>${bool(disallowStartIfOnBatteries)}</DisallowStartIfOnBatteries>\r\n` +
+    `    <StopIfGoingOnBatteries>${bool(stopIfGoingOnBatteries)}</StopIfGoingOnBatteries>\r\n` +
+    '    <AllowHardTerminate>true</AllowHardTerminate>\r\n' +
+    `    <StartWhenAvailable>${bool(startWhenAvailable)}</StartWhenAvailable>\r\n` +
+    '    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>\r\n' +
+    '    <IdleSettings>\r\n' +
+    '      <StopOnIdleEnd>true</StopOnIdleEnd>\r\n' +
+    '      <RestartOnIdle>false</RestartOnIdle>\r\n' +
+    '    </IdleSettings>\r\n' +
+    '    <AllowStartOnDemand>true</AllowStartOnDemand>\r\n' +
+    '    <Enabled>true</Enabled>\r\n' +
+    '    <Hidden>false</Hidden>\r\n' +
+    '    <RunOnlyIfIdle>false</RunOnlyIfIdle>\r\n' +
+    `    <WakeToRun>${bool(wakeToRun)}</WakeToRun>\r\n` +
+    // PT72H = el limite por defecto de `schtasks /create`: se preserva tal cual.
+    '    <ExecutionTimeLimit>PT72H</ExecutionTimeLimit>\r\n' +
+    '    <Priority>7</Priority>\r\n' +
+    '  </Settings>\r\n' +
+    '  <Actions Context="Author">\r\n' +
+    '    <Exec>\r\n' +
+    `      <Command>${xmlEscape(command)}</Command>\r\n` +
+    '    </Exec>\r\n' +
+    '  </Actions>\r\n' +
+    '</Task>\r\n'
+  );
+}
+
