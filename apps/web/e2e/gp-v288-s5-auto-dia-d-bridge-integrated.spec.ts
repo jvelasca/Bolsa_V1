@@ -1205,6 +1205,17 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
 
     // Si el parte trae valores, la ficha enlaza a DÍA-D con contexto DECLARADO (global).
     if (hasContextLink) {
+      // La ficha incorpora la evidencia durable (sección 5) sin pedir una query por valor.
+      await expect(
+        page.getByTestId("estudio-daily-value-chain").first(),
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(
+        page.getByTestId("estudio-chain-attribution").first(),
+      ).toContainText("Cadena histórica del valor");
+      await expect(
+        page.getByTestId("estudio-chain-dia-d-verify").first(),
+      ).toBeVisible();
+
       await contextLink.click();
       await expect(page).toHaveURL(/mode=dia-d/, { timeout: 20_000 });
       const url = new URL(page.url());
@@ -1325,6 +1336,165 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
         type: "hueco-entorno",
         description: `Sin dos artefactos DÍA-D que comparar (replay: ${replayOutcomes.join(", ")}); el aislamiento de ficheros ya lo mide la prueba integrada de Python.`,
       });
+    }
+  });
+
+  test("GP-V288-S5-08: evidencia por valor y DÍA-D del valor no heredan el artefacto del día", async ({
+    request,
+    baseURL,
+  }) => {
+    const accountA = state.accountId;
+    if (!accountA) throw new Error("fixture required");
+    if (!baseURL) throw new Error("baseURL required");
+    const day = new Date().toISOString().slice(0, 10);
+    const headersA = { "X-Account-Id": accountA };
+
+    const catalogRes = await request.get(
+      new URL("/api/instruments", baseURL).toString(),
+    );
+    expect(catalogRes.ok()).toBe(true);
+    const catalog = await body<{ data: Array<{ id: string; symbol: string }> }>(
+      catalogRes,
+    );
+    const target = (catalog.data ?? [])[0] ?? null;
+    if (!target) {
+      declareGap(NO_CATALOG_REASON);
+      return;
+    }
+    const symbol = target.symbol.trim().toUpperCase();
+
+    // 1) La cadena es read-only y NO emite CONFIRMED (eso es OPERACIÓN, no software).
+    const chainRes = await request.get(
+      new URL("/api/auto/estudio-chain?limit=200", baseURL).toString(),
+      { headers: headersA },
+    );
+    expect(chainRes.ok()).toBe(true);
+    const chainA = await body<{
+      available: boolean;
+      readOnly: boolean;
+      summary: { cycles: number; values: number } | null;
+      values: Array<{ cycles: unknown[] }>;
+      notes: string[];
+      limits: string[];
+    }>(chainRes);
+    expect(chainA.readOnly).toBe(true);
+    expect(JSON.stringify(chainA)).not.toContain("CONFIRMED");
+
+    // 2) Aislamiento por cuenta: C no ve el ciclo durable de A (ni al revés está obligado).
+    const accountC = await createEphemeralAccount(
+      request,
+      baseURL,
+      "iso-chain",
+    );
+    const chainCRes = await request.get(
+      new URL("/api/auto/estudio-chain?limit=200", baseURL).toString(),
+      { headers: { "X-Account-Id": accountC } },
+    );
+    expect(chainCRes.ok()).toBe(true);
+    const chainC = await body<{
+      available: boolean;
+      summary: { cycles: number } | null;
+      values: Array<{ cycles: unknown[] }>;
+    }>(chainCRes);
+    if ((chainA.summary?.cycles ?? 0) > 0) {
+      expect(chainC.summary?.cycles ?? 0).toBe(0);
+      expect(chainC.values.every((value) => value.cycles.length === 0)).toBe(
+        true,
+      );
+    } else {
+      test.info().annotations.push({
+        type: "hueco-entorno",
+        description:
+          "La cuenta A no declara ciclos durables (worker del motor no arrancado): el aislamiento positivo de ciclos no se puede medir aquí.",
+      });
+    }
+
+    // 3) El job por valor exige símbolo (fail-closed) y lo normaliza en el payload.
+    const missing = await request.post(
+      new URL(OPS_JOBS_PATH, baseURL).toString(),
+      { headers: headersA, data: { kind: "dia_d_value_replay", day } },
+    );
+    expect([400, 422]).toContain(missing.status());
+
+    const created = await request.post(
+      new URL(OPS_JOBS_PATH, baseURL).toString(),
+      {
+        headers: headersA,
+        data: {
+          kind: "dia_d_value_replay",
+          day,
+          payload: { symbol: symbol.toLowerCase() },
+        },
+      },
+    );
+    expect(created.ok()).toBe(true);
+    const valueJob = await body<{
+      id: string;
+      kind: string;
+      day: string;
+      payload: { symbol?: string };
+    }>(created);
+    expect(valueJob.kind).toBe("dia_d_value_replay");
+    expect(valueJob.payload.symbol).toBe(symbol);
+
+    // Serialización declarada del hueco (kind, cuenta, día): otro símbolo del mismo día
+    // devuelve el job ACTIVO del primero (o uno nuevo si ya terminó, que se declara).
+    const other = await request.post(
+      new URL(OPS_JOBS_PATH, baseURL).toString(),
+      {
+        headers: headersA,
+        data: {
+          kind: "dia_d_value_replay",
+          day,
+          payload: { symbol: "ZZE2E" },
+        },
+      },
+    );
+    expect(other.ok()).toBe(true);
+    const otherJob = await body<{ id: string; payload: { symbol?: string } }>(
+      other,
+    );
+    if (otherJob.id === valueJob.id) {
+      expect(otherJob.payload.symbol).toBe(symbol);
+    } else {
+      test.info().annotations.push({
+        type: "hueco-entorno",
+        description:
+          "El replay del primer valor ya había terminado: el segundo símbolo obtuvo su propio job (no hay serialización que observar).",
+      });
+    }
+
+    // 4) NUNCA se rellena la verificación del valor con el artefacto del día completo.
+    const dayArtifact = await readDiaDArtifact(request, baseURL, accountA, day);
+    const valueRes = await request.get(
+      new URL(
+        `${DIA_D_REPLAY_PATH}/${encodeURIComponent(day)}/value/${encodeURIComponent(symbol)}`,
+        baseURL,
+      ).toString(),
+      { headers: headersA },
+    );
+    expect(valueRes.ok()).toBe(true);
+    const valueArtifact = await body<{
+      available: boolean;
+      symbol: string | null;
+      meta: { account?: string | null; watch?: string[] };
+      notes: string[];
+    }>(valueRes);
+    if (valueArtifact.available) {
+      // Si existe, es SUYO: declara el símbolo y un watch de exactamente ese valor.
+      expect(valueArtifact.symbol).toBe(symbol);
+      expect(valueArtifact.meta.account).toBe(accountA);
+      expect(valueArtifact.meta.watch).toEqual([symbol]);
+    } else {
+      expect(valueArtifact.notes).toContain("artifact_not_found");
+      if (dayArtifact.available) {
+        // Con el artefacto del día DISPONIBLE, la ruta por valor sigue en hueco: no hay fallback.
+        test.info().annotations.push({
+          type: "no-fallback",
+          description:
+            "El artefacto del día existe y la verificación del valor sigue ausente: la ruta por valor no hereda la evidencia del watch completo.",
+        });
+      }
     }
   });
 });

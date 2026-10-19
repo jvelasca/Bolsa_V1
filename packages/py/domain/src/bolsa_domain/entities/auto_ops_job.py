@@ -1,8 +1,9 @@
 """Entidad de dominio — job operativo AUTO (cola durable de trabajos).
 
 Un job representa una unidad de trabajo **de servidor** con progreso y desenlace
-observables: la generación diaria del universo ESTUDIO (``estudio_daily``) y la
-ejecución manual del sandbox DÍA-D AUTO (``dia_d_replay``).
+observables: la generación diaria del universo ESTUDIO (``estudio_daily``), la
+ejecución manual del sandbox DÍA-D AUTO (``dia_d_replay``) y la verificación DÍA-D
+de **un valor** de ESTUDIO (``dia_d_value_replay``).
 
 Doctrina «Sin dato todavía» (``UNKNOWN != 0``): ``progress``/``result`` viajan como
 diccionarios posibles vacíos; un hueco NUNCA se rellena con ceros inventados. El
@@ -19,7 +20,14 @@ from typing import Any
 #: Tipos de job soportados.
 JOB_KIND_ESTUDIO_DAILY = "estudio_daily"
 JOB_KIND_DIA_D_REPLAY = "dia_d_replay"
-JOB_KINDS: tuple[str, ...] = (JOB_KIND_ESTUDIO_DAILY, JOB_KIND_DIA_D_REPLAY)
+#: Verificación DÍA-D del sandbox **acotada a un valor** (``payload.symbol`` obligatorio).
+#: Escribe en un artefacto propio (``…/values/<SYMBOL>/…``) y nunca pisa el del día.
+JOB_KIND_DIA_D_VALUE_REPLAY = "dia_d_value_replay"
+JOB_KINDS: tuple[str, ...] = (
+    JOB_KIND_ESTUDIO_DAILY,
+    JOB_KIND_DIA_D_REPLAY,
+    JOB_KIND_DIA_D_VALUE_REPLAY,
+)
 
 #: Estados del ciclo de vida.
 JOB_STATUS_QUEUED = "queued"

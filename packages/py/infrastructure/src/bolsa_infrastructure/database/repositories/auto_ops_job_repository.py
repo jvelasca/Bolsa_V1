@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bolsa_domain.entities.auto_ops_job import (
     JOB_ACTIVE_STATUSES,
     JOB_KIND_DIA_D_REPLAY,
+    JOB_KIND_DIA_D_VALUE_REPLAY,
     JOB_KIND_ESTUDIO_DAILY,
     JOB_KINDS,
     JOB_STATUS_COMPLETED,
@@ -317,4 +318,6 @@ def kind_label(kind: str) -> str:
         return "operativa diaria ESTUDIO"
     if kind == JOB_KIND_DIA_D_REPLAY:
         return "replay DÍA-D AUTO"
+    if kind == JOB_KIND_DIA_D_VALUE_REPLAY:
+        return "verificación DÍA-D de un valor"
     return kind

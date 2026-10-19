@@ -472,11 +472,15 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             },
             executed_detail=executed_detail,
             meta={
-                "bump": "2.11.151-beta",
+                "bump": "2.11.152-beta",
                 "phase": "V2.89 DIA-D AUTO SANDBOX",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
                 "versionA": str(args.version_a),
+                # Watch EFECTIVO del replay. Aditivo y sin efecto en la decisión: permite a
+                # quien consume el artefacto exigir que cubra EXACTAMENTE el valor pedido
+                # (verificación DÍA-D por valor) en vez de suponerlo por el tamaño del watch.
+                "watch": list(watch),
                 "venue": str(args.venue),
                 "watchSize": len(watch),
                 "watchSource": watch_source,

@@ -25,6 +25,11 @@ import {
   useEstudioDailyJob,
   useEstudioDailyOps,
 } from "@/features/auto-monitor/use-estudio-daily-ops";
+import {
+  indexChainValuesByInstrument,
+  useEstudioChain,
+} from "@/features/auto-monitor/use-estudio-chain";
+import { EstudioChainEvidence } from "@/features/auto-monitor/estudio-chain-evidence";
 import { useAutoEstudioAudit } from "@/features/auto-monitor/use-auto-dia-d-feedback";
 
 type AuditValue =
@@ -211,11 +216,19 @@ function ValueCard({
   audit,
   auditWindow,
   auditFailed,
+  chainValue,
+  chain,
+  chainLoading,
+  chainFailed,
 }: {
   value: EstudioDailyValueV1;
   audit: AuditValue | undefined;
   auditWindow: string | null;
   auditFailed: boolean;
+  chainValue: import("@bolsa/shared").EstudioChainValueV1 | undefined;
+  chain: import("@bolsa/shared").EstudioChainResponseV1 | null;
+  chainLoading: boolean;
+  chainFailed: boolean;
 }) {
   const plan = value.plan ?? null;
   const cycles = audit?.cycles ?? [];
@@ -411,6 +424,16 @@ function ValueCard({
           </h4>
           <ValidationBlock audit={audit} auditFailed={auditFailed} />
         </section>
+
+        <EstudioChainEvidence
+          value={value}
+          chainValue={chainValue}
+          chain={chain}
+          chainLoading={chainLoading}
+          chainFailed={chainFailed}
+          audit={audit}
+          auditWindow={auditWindow}
+        />
       </div>
     </li>
   );
@@ -427,9 +450,24 @@ export function EstudioDailyOpsPanel() {
     () => indexAuditValuesBySymbol(auditQuery.data),
     [auditQuery.data],
   );
-
   const response = opsQuery.data ?? null;
   const report = response?.report ?? null;
+
+  // Evidencia de cadena: UNA query por informe (no una por valor), habilitada cuando ya hay
+  // parte que leer. Se indexa por `instrumentId` para pintarla en cada ficha.
+  const chainQuery = useEstudioChain(report ? asOf : null);
+  const chainByInstrument = useMemo(
+    () => indexChainValuesByInstrument(chainQuery.data),
+    [chainQuery.data],
+  );
+  const chain = chainQuery.data ?? null;
+  const chainFailed = chainQuery.isError || Boolean(chain && !chain.available);
+  const chainError =
+    chain && !chain.available
+      ? (chain.error ?? chain.notes.join(", "))
+      : chainQuery.error instanceof Error
+        ? chainQuery.error.message
+        : null;
   const values = report?.values ?? [];
   const auditWindow = auditQuery.data?.window ?? null;
   // Un fallo de la auditoría NO es «este valor no existe»: se declara como error.
@@ -594,6 +632,14 @@ export function EstudioDailyOpsPanel() {
             </li>
             <li>4 · Operativa validada: veredicto, K y expectancy OOS.</li>
           </ol>
+          <p
+            className="mt-1 text-[10px] text-muted-foreground"
+            data-testid="estudio-daily-chain-legend"
+          >
+            5 · Cadena y resultado: evidencia durable de las nueve etapas y
+            DÍA-D del valor bajo demanda. No es una quinta validación ni emite{" "}
+            <code>CONFIRMED</code>.
+          </p>
         </CardContent>
       </Card>
 
@@ -645,6 +691,26 @@ export function EstudioDailyOpsPanel() {
             size="sm"
             variant="outline"
             onClick={() => void auditQuery.refetch()}
+          >
+            Reintentar
+          </Button>
+        </p>
+      ) : null}
+
+      {chainFailed ? (
+        <p
+          role="alert"
+          data-testid="estudio-chain-error"
+          className="text-sm text-destructive"
+        >
+          No se pudo leer la cadena durable por valor:{" "}
+          {chainError ?? "error desconocido"}. La ausencia de evidencia{" "}
+          <strong>no</strong> se declara como «sin dato».{" "}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void chainQuery.refetch()}
           >
             Reintentar
           </Button>
@@ -757,6 +823,10 @@ export function EstudioDailyOpsPanel() {
                     }
                     auditWindow={auditWindow}
                     auditFailed={auditFailed}
+                    chainValue={chainByInstrument.get(value.instrumentId)}
+                    chain={chain}
+                    chainLoading={chainQuery.isLoading}
+                    chainFailed={chainFailed}
                   />
                 ))}
               </ul>

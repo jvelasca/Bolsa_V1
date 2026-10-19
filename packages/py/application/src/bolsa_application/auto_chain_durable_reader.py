@@ -418,6 +418,25 @@ def pnl_reconciliation(cycle: Mapping[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def _day_of(instant: Any) -> str | None:
+    """Día ``YYYY-MM-DD`` de una marca temporal durable; ``None`` si no se puede afirmar."""
+    text = str(instant or "").strip()
+    if len(text) < 10:
+        return None
+    day = text[:10]
+    try:
+        _ = datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        return None
+    return day
+
+
+def _cycle_day(cycle: Mapping[str, Any] | None, step_id: str) -> str | None:
+    """Día del hecho durable de ``step_id`` (``at``); ``None`` si la etapa no lo declara."""
+    step = _steps_index(cycle).get(step_id)
+    return _day_of(step.get("at")) if isinstance(step, Mapping) else None
+
+
 def _cycle_view(
     cycle: Mapping[str, Any], *, best_scored: Mapping[str, Any] | None
 ) -> dict[str, Any]:
@@ -437,6 +456,14 @@ def _cycle_view(
         "direction": cycle.get("direction"),
         "closed": cycle.get("closed"),
         "opportunityId": cycle.get("opportunityId"),
+        # Día de ENTRADA durable (``at`` de la reserva) y de cierre (``closedAt`` del
+        # resultado). Son hechos: sin ellos la UI no inventa la fecha del DÍA-D del valor.
+        "entryDay": _cycle_day(cycle, "RESERVATION"),
+        "exitDay": _day_of(
+            (cycle.get("result") or {}).get("closedAt")
+            if isinstance(cycle.get("result"), Mapping)
+            else None
+        ),
         "executed": executed,
         "bestScored": dict(best_scored) if isinstance(best_scored, Mapping) else None,
         "executedVsBest": resolve_executed_vs_best(

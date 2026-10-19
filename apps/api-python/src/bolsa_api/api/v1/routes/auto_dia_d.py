@@ -34,7 +34,11 @@ from bolsa_api.api.dependencies import (
     get_account_id_header,
     resolve_account_scope_or_default,
 )
-from bolsa_application.dia_d_artifacts import account_segment, artifacts_root
+from bolsa_application.dia_d_artifacts import (
+    account_segment,
+    artifacts_root,
+    value_artifact_path_in,
+)
 
 router = APIRouter()
 
@@ -46,6 +50,8 @@ _DEFAULT_DIR = Path(__file__).resolve().parents[7] / "operability_runs" / "dia-d
 #: Nombre canónico del artefacto por día. El guion bajo/guiones se aceptan en la fecha.
 _ARTIFACT_RE = re.compile(r"^dia-d-auto-(\d{4}-\d{2}-\d{2})\.json$")
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+#: Símbolo admitido en la ruta (mismo alfabeto que el catálogo; se normaliza a mayúsculas).
+_SYMBOL_RE = re.compile(r"^[A-Za-z0-9._-]{1,32}$")
 
 
 def _artifacts_dir() -> Path:
@@ -56,6 +62,11 @@ def _artifacts_dir() -> Path:
 def _artifact_path(day: str, scope: str) -> Path:
     """Artefacto canónico de ``(cuenta, día)`` (aislado por cuenta)."""
     return _artifacts_dir() / account_segment(scope) / f"dia-d-auto-{day}.json"
+
+
+def _value_artifact_path(day: str, scope: str, symbol: str) -> Path:
+    """Artefacto DÍA-D de **un valor** (``…/<cuenta>/values/<SÍMBOLO>/…``) — otro fichero."""
+    return value_artifact_path_in(_artifacts_dir(), day, scope, symbol)
 
 
 def _legacy_artifact_path(day: str) -> Path:
@@ -179,6 +190,8 @@ class DiaDAutoReplayDto(BaseModel):
     available: bool
     readOnly: bool = True
     day: str
+    #: Símbolo cuando el artefacto es la verificación DÍA-D de UN valor (árbol ``values/``).
+    symbol: str | None = None
     #: mtime del artefacto: la UI etiqueta «artefacto anterior» si el último job falló.
     artifactModifiedAt: str | None = None
     schemaVersion: str | None = None
@@ -258,4 +271,75 @@ async def get_auto_dia_d_replay(
         executedDetail=dict(artifact.get("executedDetail") or {}),
         # Procedencia declarada: un artefacto leído de la ruta plana histórica se etiqueta.
         notes=["legacy_artifact"] if is_legacy else [],
+    )
+
+
+@router.get(
+    "/auto/dia-d-replay/{day}/value/{symbol}", response_model=DiaDAutoReplayDto
+)
+async def get_auto_dia_d_replay_value(
+    request: Request,
+    day: str,
+    symbol: str,
+    account_id: Annotated[str | None, Depends(get_account_id_header)] = None,
+) -> DiaDAutoReplayDto:
+    """Verificación DÍA-D de **un valor** (``values/<SÍMBOLO>``), read-only y fail-closed.
+
+    Es un artefacto DISTINTO del día completo: se sirve solo si declara la cuenta activa y
+    un watch que cubre **exactamente** ese símbolo. No se rellena desde el artefacto del día
+    (diría «verificado» con la evidencia del watch entero, que es justo la confusión a evitar).
+    """
+    wanted = (symbol or "").strip().upper()
+    if not _DAY_RE.match(day) or not _SYMBOL_RE.match(wanted):
+        return DiaDAutoReplayDto(
+            available=False, day=day, symbol=wanted or None, notes=["invalid_request"]
+        )
+    scope = await resolve_account_scope_or_default(request, account_id)
+    if scope is None:
+        return DiaDAutoReplayDto(
+            available=False, day=day, symbol=wanted, notes=["no_account_scope"]
+        )
+
+    path = _value_artifact_path(day, scope, wanted)
+    artifact = _parse_artifact(path)
+    if artifact is None or not _artifact_matches_scope(artifact, scope):
+        # Una cuenta distinta es INDISTINGUIBLE de inexistente.
+        return DiaDAutoReplayDto(
+            available=False, day=day, symbol=wanted, notes=["artifact_not_found"]
+        )
+    meta = artifact.get("meta") or {}
+    raw_watch = meta.get("watch")
+    watch = (
+        [str(item).strip().upper() for item in raw_watch if str(item).strip()]
+        if isinstance(raw_watch, list)
+        else []
+    )
+    if watch != [wanted]:
+        # El fichero existe pero no demuestra ESTE valor: se declara, no se sirve.
+        return DiaDAutoReplayDto(
+            available=False,
+            day=day,
+            symbol=wanted,
+            notes=["value_mismatch"],
+            meta=dict(meta),
+        )
+
+    try:
+        modified = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).isoformat()
+    except OSError:  # pragma: no cover — el fichero se acaba de leer
+        modified = None
+    return DiaDAutoReplayDto(
+        available=True,
+        readOnly=bool(artifact.get("readOnly", True)),
+        day=str(artifact.get("day") or day),
+        symbol=wanted,
+        artifactModifiedAt=modified,
+        schemaVersion=artifact.get("schemaVersion"),
+        summary=DiaDAutoSummaryDto(**artifact["summary"]) if artifact.get("summary") else None,
+        steps=[DiaDAutoStepDto(**row) for row in artifact.get("comparison", [])],
+        oos=DiaDAutoOosDto(**artifact["oos"]) if artifact.get("oos") else None,
+        meta=dict(meta),
+        limits=list(artifact.get("limits", [])),
+        executedDetail=dict(artifact.get("executedDetail") or {}),
+        notes=[],
     )

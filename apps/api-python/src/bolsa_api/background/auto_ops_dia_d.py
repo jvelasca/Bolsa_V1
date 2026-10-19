@@ -5,16 +5,24 @@ El motor de replay NO se refactoriza: se lanza el CLI existente
 del proceso de workers (``sys.executable``), ``cwd`` en la raíz del repo, timeout y
 lectura incremental del JSONL de progreso.
 
+Dos modos sobre el MISMO CLI:
+
+* **Día completo** (``dia_d_replay``): watch derivado por el CLI, artefacto del día.
+* **Un valor** (``dia_d_value_replay``): ``--watch <símbolo>`` y artefacto propio bajo
+  ``…/<cuenta>/values/<símbolo>/``. Nunca escribe en el artefacto del día, de modo que una
+  verificación por valor no puede degradar la evidencia del watch completo.
+
 Reglas duras:
 
-* **Un artefacto por ``(cuenta, día)``**: la ruta sale de
-  :func:`bolsa_application.dia_d_artifacts.artifact_relpath` y se pasa al CLI con ``--out``.
+* **Un artefacto por ``(cuenta, día)``** (y por ``(cuenta, día, símbolo)`` en el modo valor):
+  la ruta sale de :mod:`bolsa_application.dia_d_artifacts` y se pasa al CLI con ``--out``.
   Dos cuentas que replayen el mismo día escriben ficheros distintos y no se pisan
   (antes ambas competían por ``dia-d-auto-<D>.json``).
 * El artefacto se escribe de forma **atómica** en el script; un fallo nunca deja un JSON
   parcial que la API pueda leer como bueno.
 * Se valida al terminar: ``exit 0`` + artefacto existente + ``day`` solicitado +
-  ``meta.account`` de la cuenta. Cualquier desviación falla el job con motivo.
+  ``meta.account`` de la cuenta (+ ``meta.watch`` del valor, en el modo valor). Cualquier
+  desviación falla el job con motivo.
 * Si el job falla, el artefacto ANTERIOR (si existía) permanece intacto: la UI lo
   etiqueta como «artefacto anterior».
 """
@@ -39,6 +47,7 @@ from bolsa_application.dia_d_artifacts import (
     artifact_path_in,
     artifacts_root,
     progress_path_in,
+    value_artifact_path_in,
 )
 from bolsa_infrastructure.database.repositories.auto_ops_job_repository import (
     SqlAlchemyAutoOpsJobRepository,
@@ -50,6 +59,7 @@ __all__ = [
     "artifacts_dir_for_jobs",
     "progress_path",
     "run_dia_d_replay_job",
+    "value_artifact_path",
 ]
 
 logger = logging.getLogger(__name__)
@@ -81,6 +91,13 @@ def _repo_root() -> pathlib.Path:
 def artifact_path(root: pathlib.Path, day: str, account_id: str) -> pathlib.Path:
     """Artefacto de ``(cuenta, día)`` bajo la raíz del repo — **nunca** la ruta plana."""
     return artifact_path_in(root / DIA_D_ARTIFACT_DIR, day, account_id)
+
+
+def value_artifact_path(
+    root: pathlib.Path, day: str, account_id: str, symbol: str
+) -> pathlib.Path:
+    """Artefacto de ``(cuenta, día, símbolo)`` bajo la raíz del repo (árbol ``values``)."""
+    return value_artifact_path_in(root / DIA_D_ARTIFACT_DIR, day, account_id, symbol)
 
 
 def artifacts_dir_for_jobs() -> pathlib.Path:
@@ -251,18 +268,32 @@ async def run_dia_d_replay_job(
     session_factory: async_sessionmaker[AsyncSession],
     *,
     timeout_seconds: float = 1800.0,
+    symbol: str | None = None,
 ) -> dict[str, Any]:
-    """Ejecuta el replay del día del job y devuelve el parte para ``result``."""
+    """Ejecuta el replay del día del job y devuelve el parte para ``result``.
+
+    Con ``symbol`` la verificación se acota a **ese valor**: se pasa ``--watch`` al CLI y el
+    artefacto se escribe en el árbol ``values/<símbolo>/``, sin tocar el del día completo.
+    """
     day = str(job.day)
     account_id = str(job.account_id or "")
     if not account_id:
         raise DiaDReplayFailed("El replay DÍA-D requiere cuenta")
+    wanted_symbol = (symbol or "").strip().upper()
+    if symbol is not None and not wanted_symbol:
+        raise DiaDReplayFailed(
+            "La verificación DÍA-D de un valor requiere símbolo"
+        )
 
     root = _repo_root()
     script = root / _SCRIPT_REL
     # La carpeta de ESCRITURA honra `DIA_D_AUTO_DIR` igual que las rutas de lectura.
     artifacts_dir = artifacts_dir_for_jobs()
-    out_path = artifact_path_in(artifacts_dir, day, account_id)
+    out_path = (
+        value_artifact_path_in(artifacts_dir, day, account_id, wanted_symbol)
+        if wanted_symbol
+        else artifact_path_in(artifacts_dir, day, account_id)
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     progress_file = progress_path_in(artifacts_dir, job.id, account_id)
     progress_file.parent.mkdir(parents=True, exist_ok=True)
@@ -280,6 +311,9 @@ async def run_dia_d_replay_job(
         "--progress-jsonl",
         str(progress_file),
     ]
+    if wanted_symbol:
+        # Watch EXPLÍCITO de un solo valor: el CLI no deriva el universo completo.
+        cmd.extend(["--watch", wanted_symbol])
     env = dict(os.environ)
     env.pop("PYTHONINSPECT", None)
 
@@ -321,6 +355,8 @@ async def run_dia_d_replay_job(
         "elapsedSeconds": elapsed,
         "timedOut": timed_out,
     }
+    if wanted_symbol:
+        base_result["symbol"] = wanted_symbol
 
     if timed_out:
         raise DiaDReplayFailed(
@@ -333,7 +369,9 @@ async def run_dia_d_replay_job(
             result=base_result,
         )
 
-    artifact = _load_and_validate(out_path, day=day, account_id=account_id)
+    artifact = _load_and_validate(
+        out_path, day=day, account_id=account_id, symbol=wanted_symbol or None
+    )
     base_result.update(
         {
             "bump": (artifact.get("meta") or {}).get("bump"),
@@ -347,9 +385,18 @@ async def run_dia_d_replay_job(
 
 
 def _load_and_validate(
-    out_path: pathlib.Path, *, day: str, account_id: str
+    out_path: pathlib.Path,
+    *,
+    day: str,
+    account_id: str,
+    symbol: str | None = None,
 ) -> dict[str, Any]:
-    """Valida el artefacto final: existe, es JSON y pertenece al día/cuenta pedidos."""
+    """Valida el artefacto final: existe, es JSON y pertenece al día/cuenta pedidos.
+
+    En el modo valor exige además que el artefacto declare **exactamente** ese watch: un
+    replay que ignorase ``--watch`` habría corrido el universo completo y su evidencia no
+    sería la del valor.
+    """
     if not out_path.exists():
         raise DiaDReplayFailed(
             f"El replay terminó sin artefacto: {out_path.name}",
@@ -378,4 +425,16 @@ def _load_and_validate(
             "El artefacto pertenece a otra cuenta "
             f"({artifact_account or '(vacía)'} != {account_id}); no se publica"
         )
+    if symbol is not None:
+        raw_watch = meta.get("watch")
+        watch = (
+            [str(item).strip().upper() for item in raw_watch if str(item).strip()]
+            if isinstance(raw_watch, list)
+            else []
+        )
+        if watch != [symbol]:
+            raise DiaDReplayFailed(
+                "El artefacto no cubre el valor solicitado "
+                f"(watch {watch or '(vacío)'} != ['{symbol}']); no se publica"
+            )
     return artifact

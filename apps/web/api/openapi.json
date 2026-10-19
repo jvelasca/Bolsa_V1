@@ -6585,6 +6585,17 @@
                 "type": "null"
               }
             ]
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
           }
         },
         "required": [
@@ -8686,6 +8697,140 @@
           "instrumentIds"
         ],
         "title": "EstudioAutoProposeDto",
+        "type": "object"
+      },
+      "EstudioChainResponseDto": {
+        "description": "Evidencia de la cadena por valor. ``available = false`` declara el hueco o el error.",
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "asOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asof"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "bestScored": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bestscored"
+          },
+          "cyclesOutsideEstudio": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Cyclesoutsideestudio",
+            "type": "array"
+          },
+          "engineId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engineid"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "estudio": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estudio"
+          },
+          "limits": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limits",
+            "type": "array"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "title": "Meta",
+            "type": "object"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "readOnly": {
+            "default": true,
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "values": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "EstudioChainResponseDto",
         "type": "object"
       },
       "EstudioDailyResponseDto": {
@@ -27300,6 +27445,74 @@
         ]
       }
     },
+    "/api/auto/dia-d-replay/{day}/value/{symbol}": {
+      "get": {
+        "description": "Verificación DÍA-D de **un valor** (``values/<SÍMBOLO>``), read-only y fail-closed.\n\nEs un artefacto DISTINTO del día completo: se sirve solo si declara la cuenta activa y\nun watch que cubre **exactamente** ese símbolo. No se rellena desde el artefacto del día\n(diría «verificado» con la evidencia del watch entero, que es justo la confusión a evitar).",
+        "operationId": "get_auto_dia_d_replay_value_api_auto_dia_d_replay__day__value__symbol__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "title": "Day",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDAutoReplayDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Dia D Replay Value",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
     "/api/auto/dia-d-verifications": {
       "get": {
         "description": "Verificaciones del principal; con ``cycleId`` acota a un ciclo.\n\nFail-closed por cuenta: sin cuenta del principal se devuelve vacío (`no_account_scope`),\nnunca datos globales.",
@@ -27528,6 +27741,116 @@
           }
         },
         "summary": "Get Auto Estudio Audit Window",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/estudio-chain": {
+      "get": {
+        "description": "Cadena durable por valor de ESTUDIO para la cuenta activa (read-only, fail-closed).",
+        "operationId": "get_auto_estudio_chain_api_auto_estudio_chain_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cycleId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cycleid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instrumentId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instrumentid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "engineId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Engineid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstudioChainResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Estudio Chain",
         "tags": [
           "auto"
         ]

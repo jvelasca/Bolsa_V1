@@ -10,6 +10,10 @@ Esquema vigente::
 
     operability_runs/dia-d-auto/<segmento-cuenta>/dia-d-auto-<D>.json
     operability_runs/dia-d-auto/<segmento-cuenta>/progress/<job>.jsonl
+    operability_runs/dia-d-auto/<segmento-cuenta>/values/<símbolo>/dia-d-auto-<D>.json
+
+La tercera ruta es la **verificación DÍA-D de UN valor** (``dia_d_value_replay``): va en su
+propio árbol para que no pueda pisar el artefacto del día (que cubre el watch completo).
 
 Reglas:
 
@@ -17,6 +21,8 @@ Reglas:
   alfabeto esperado (``[A-Za-z0-9_-]``) se usa tal cual; cualquier otra se sustituye por un
   hash estable (``acct-<sha256>``). Nunca se interpola la cuenta sin sanear: una cuenta como
   ``../otra`` no puede escapar del árbol.
+* El **segmento de símbolo** sigue la misma política (alfabeto seguro o hash ``sym-<sha256>``):
+  un símbolo hostil no escapa del árbol.
 * El **artefacto legacy** (ruta plana, sin cuenta) se conserva solo para **lectura**: el
   fallback acepta ese fichero únicamente si su ``meta.account`` coincide con la cuenta activa.
   Nunca se escribe en la ruta plana.
@@ -35,6 +41,7 @@ __all__ = [
     "DIA_D_ARTIFACT_DIR",
     "DIA_D_ARTIFACTS_ENV",
     "DIA_D_PROGRESS_SUBDIR",
+    "DIA_D_VALUES_SUBDIR",
     "account_segment",
     "artifact_path",
     "artifact_path_in",
@@ -43,6 +50,9 @@ __all__ = [
     "legacy_artifact_path",
     "progress_path_in",
     "progress_relpath",
+    "symbol_segment",
+    "value_artifact_path_in",
+    "value_artifact_relpath",
 ]
 
 #: Carpeta raíz de artefactos, relativa a la raíz del repo.
@@ -54,11 +64,17 @@ DIA_D_ARTIFACTS_ENV = "DIA_D_AUTO_DIR"
 #: Subcarpeta del JSONL de progreso dentro del segmento de cuenta.
 DIA_D_PROGRESS_SUBDIR = "progress"
 
+#: Subcarpeta de las verificaciones DÍA-D **por valor** dentro del segmento de cuenta.
+DIA_D_VALUES_SUBDIR = "values"
+
 #: Alfabeto admitido para usar la cuenta tal cual (evita ``.``/``/``/``\\`` y rutas relativas).
 _SAFE_ACCOUNT = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 #: Prefijo del segmento derivado cuando la cuenta no es segura.
 _HASH_PREFIX = "acct-"
+
+#: Prefijo del segmento derivado cuando el símbolo no es seguro.
+_SYMBOL_HASH_PREFIX = "sym-"
 
 
 def account_segment(account_id: str) -> str:
@@ -73,6 +89,19 @@ def account_segment(account_id: str) -> str:
         return value
     digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:40]
     return f"{_HASH_PREFIX}{digest}"
+
+
+def symbol_segment(symbol: str) -> str:
+    """Segmento de ruta **seguro y estable** para un símbolo (``values/<segmento>``).
+
+    Normaliza a mayúsculas (el motor identifica los símbolos en mayúsculas) y aplica la misma
+    política que la cuenta: alfabeto seguro tal cual, cualquier otra cosa a ``sym-<sha256>``.
+    """
+    value = (symbol or "").strip().upper()
+    if _SAFE_ACCOUNT.fullmatch(value):
+        return value
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:40]
+    return f"{_SYMBOL_HASH_PREFIX}{digest}"
 
 
 def artifact_relpath(day: str, account_id: str) -> pathlib.Path:
@@ -111,6 +140,36 @@ def artifact_path(root: pathlib.Path, day: str, account_id: str) -> pathlib.Path
 def legacy_artifact_path(root: pathlib.Path, day: str) -> pathlib.Path:
     """Ruta plana histórica (sin cuenta). Solo para **lectura** con ``meta.account`` verificado."""
     return pathlib.Path(root) / DIA_D_ARTIFACT_DIR / f"dia-d-auto-{day}.json"
+
+
+def value_artifact_relpath(
+    day: str, account_id: str, symbol: str
+) -> pathlib.Path:
+    """Ruta **relativa** del artefacto DÍA-D de **un valor** dentro de la raíz del repo."""
+    return (
+        DIA_D_ARTIFACT_DIR
+        / account_segment(account_id)
+        / DIA_D_VALUES_SUBDIR
+        / symbol_segment(symbol)
+        / f"dia-d-auto-{day}.json"
+    )
+
+
+def value_artifact_path_in(
+    artifacts_dir: pathlib.Path, day: str, account_id: str, symbol: str
+) -> pathlib.Path:
+    """Artefacto DÍA-D de **un valor** bajo la carpeta de artefactos (``…/dia-d-auto``).
+
+    Es un fichero DISTINTO del artefacto del día: la verificación por valor no puede pisar el
+    watch completo del día, ni al revés.
+    """
+    return (
+        pathlib.Path(artifacts_dir)
+        / account_segment(account_id)
+        / DIA_D_VALUES_SUBDIR
+        / symbol_segment(symbol)
+        / f"dia-d-auto-{day}.json"
+    )
 
 
 def progress_relpath(job_id: str, account_id: str) -> pathlib.Path:

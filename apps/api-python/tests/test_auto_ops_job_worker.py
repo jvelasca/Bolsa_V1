@@ -17,6 +17,7 @@ import bolsa_api.background.auto_ops_job_worker as worker
 import bolsa_application.estudio_daily_ops as daily_ops
 from bolsa_domain.entities.auto_ops_job import (
     JOB_KIND_DIA_D_REPLAY,
+    JOB_KIND_DIA_D_VALUE_REPLAY,
     JOB_KIND_ESTUDIO_DAILY,
     JOB_STATUS_RUNNING,
     AutoOpsJob,
@@ -74,6 +75,18 @@ def _job(kind: str = JOB_KIND_ESTUDIO_DAILY, account: str | None = "acc-1") -> A
         day="2026-10-18",
         account_id=account,
         attempt=1,
+    )
+
+
+def _value_job(symbol: str | None = "SAN") -> AutoOpsJob:
+    return AutoOpsJob(
+        id="job-1",
+        kind=JOB_KIND_DIA_D_VALUE_REPLAY,
+        status=JOB_STATUS_RUNNING,
+        day="2026-10-18",
+        account_id="acc-1",
+        attempt=1,
+        payload={} if symbol is None else {"symbol": symbol, "instrumentId": symbol},
     )
 
 
@@ -196,6 +209,38 @@ async def test_dia_d_replay_is_dispatched_to_the_subprocess_handler(
 async def test_estudio_daily_without_account_fails_before_touching_the_universe() -> None:
     with pytest.raises(worker.AutoOpsJobFailed, match="requiere cuenta"):
         await worker.run_auto_ops_job(_job(account=None), _factory())
+
+
+@pytest.mark.asyncio
+async def test_value_replay_is_dispatched_with_its_symbol(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, Any] = {}
+
+    async def _run(
+        job: Any, _factory: Any, *, timeout_seconds: float, symbol: str | None = None
+    ) -> dict[str, Any]:
+        seen["job"] = job
+        seen["timeout"] = timeout_seconds
+        seen["symbol"] = symbol
+        return {"day": job.day, "symbol": symbol}
+
+    monkeypatch.setattr(worker, "run_dia_d_replay_job", _run)
+
+    result = await worker.run_auto_ops_job(
+        _value_job("san"), _factory(), dia_d_timeout_seconds=42.0
+    )
+
+    assert result == {"day": "2026-10-18", "symbol": "SAN"}
+    assert seen["symbol"] == "SAN"
+    assert seen["timeout"] == 42.0
+
+
+@pytest.mark.asyncio
+async def test_value_replay_without_symbol_fails_closed_instead_of_running_the_whole_day() -> None:
+    """Sin símbolo NO se cae al replay del día: escribiría otra evidencia (y pisaría la del día)."""
+    with pytest.raises(worker.AutoOpsJobFailed, match="requiere 'symbol'"):
+        await worker.run_auto_ops_job(_value_job(None), _factory())
 
 
 @pytest.mark.asyncio

@@ -347,3 +347,139 @@ async def test_no_depende_de_subprocesos_asyncio(
 
     assert result["verdict"] == "INCONCLUSIVE"
     assert result["accountId"] == "acc-1"
+
+
+# ── modo VALOR (``dia_d_value_replay``) ─────────────────────────────────────────
+
+
+def _write_value_artifact(
+    root: Path,
+    day: str,
+    account: str = "acc-1",
+    symbol: str = "SAN",
+    *,
+    watch: list[str] | None = None,
+) -> Path:
+    path = handler.value_artifact_path(root, day, account, symbol)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "day": day,
+                "meta": {
+                    "account": account,
+                    "bump": "v2.88.152",
+                    "watch": watch if watch is not None else [symbol],
+                    "watchSize": 1,
+                },
+                "summary": {"verdict": "PARTIAL"},
+                "limits": ["sandbox read-only"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_value_artifact_lives_in_its_own_tree_and_not_in_the_day_artifact(
+    tmp_path: Path,
+) -> None:
+    day = handler.artifact_path(tmp_path, "2026-10-17", "acc-1")
+    value = handler.value_artifact_path(tmp_path, "2026-10-17", "acc-1", "SAN")
+    assert value != day
+    assert value.parent.name == "SAN"
+    assert value.parent.parent.name == "values"
+    assert value.parent.parent.parent.name == "acc-1"
+
+
+def test_unsafe_symbol_cannot_escape_the_value_tree(tmp_path: Path) -> None:
+    path = handler.value_artifact_path(tmp_path, "2026-10-17", "acc-1", "../etc")
+    assert tmp_path in path.parents
+    assert ".." not in path.parts
+    assert path.parent.name.startswith("sym-")
+
+
+@pytest.mark.asyncio
+async def test_value_replay_passes_watch_and_writes_the_value_artifact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    job = _job()
+    # El artefacto del día NO debe existir antes ni después: el modo valor no lo crea.
+    assert not handler.artifact_path(root, job.day, job.account_id).exists()
+    spawned: dict[str, Any] = {}
+
+    def _spawn(cmd: list[str], **kwargs: Any) -> _FakeProc:  # noqa: ARG001 — firma Popen
+        spawned["cmd"] = list(cmd)
+        _write_value_artifact(root, job.day, job.account_id, "SAN")
+        return _FakeProc(code=0)
+
+    monkeypatch.setattr(handler, "_repo_root", lambda: root)
+    monkeypatch.setattr(handler, "SqlAlchemyAutoOpsJobRepository", _FakeJobRepo)
+    monkeypatch.setattr(handler, "_spawn_process", _spawn)
+
+    result = await handler.run_dia_d_replay_job(
+        job, _FakeFactory(), timeout_seconds=60, symbol="san"
+    )
+
+    cmd = spawned["cmd"]
+    assert cmd[cmd.index("--watch") + 1] == "SAN"
+    out_arg = Path(cmd[cmd.index("--out") + 1])
+    assert out_arg == handler.value_artifact_path(root, job.day, "acc-1", "SAN")
+    assert result["symbol"] == "SAN"
+    assert result["verdict"] == "PARTIAL"
+    # Ni se creó ni se pisó el artefacto del día completo.
+    assert not handler.artifact_path(root, job.day, job.account_id).exists()
+
+
+@pytest.mark.asyncio
+async def test_value_replay_without_symbol_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    monkeypatch.setattr(handler, "_repo_root", lambda: root)
+    with pytest.raises(handler.DiaDReplayFailed, match="requiere símbolo"):
+        await handler.run_dia_d_replay_job(_job(), _FakeFactory(), symbol="   ")
+
+
+def test_value_artifact_with_another_watch_is_fail_closed(tmp_path: Path) -> None:
+    """Un replay que ignorase ``--watch`` cubriría el universo: su evidencia no es la del valor."""
+    path = _write_value_artifact(
+        tmp_path, "2026-10-17", "acc-1", "SAN", watch=["SAN", "BBVA"]
+    )
+    with pytest.raises(handler.DiaDReplayFailed, match="no cubre el valor"):
+        handler._load_and_validate(
+            path, day="2026-10-17", account_id="acc-1", symbol="SAN"
+        )
+
+
+def test_value_artifact_without_watch_is_fail_closed(tmp_path: Path) -> None:
+    path = _write_value_artifact(tmp_path, "2026-10-17", "acc-1", "SAN")
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["meta"].pop("watch")
+    path.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(handler.DiaDReplayFailed, match="no cubre el valor"):
+        handler._load_and_validate(
+            path, day="2026-10-17", account_id="acc-1", symbol="SAN"
+        )
+
+
+@pytest.mark.asyncio
+async def test_value_replay_keeps_the_previous_value_artifact_on_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _root(tmp_path)
+    job = _job()
+    previous = _write_value_artifact(root, job.day, job.account_id, "SAN")
+    before = previous.read_text(encoding="utf-8")
+
+    holder = SimpleNamespace(root=root)
+    _install(monkeypatch, _FakeProc(code=2), holder)
+
+    with pytest.raises(handler.DiaDReplayFailed, match="exit 2"):
+        await handler.run_dia_d_replay_job(
+            job, _FakeFactory(), timeout_seconds=60, symbol="SAN"
+        )
+
+    assert previous.read_text(encoding="utf-8") == before

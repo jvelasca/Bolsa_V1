@@ -235,6 +235,173 @@ const AUDIT = {
   notes: [],
 };
 
+const CHAIN = {
+  available: true,
+  readOnly: true,
+  accountId: "acc-1",
+  asOf: "2026-10-18T20:00:00Z",
+  engineId: "auto-sim",
+  estudio: { status: "ok", values: 4 },
+  summary: {
+    values: 4,
+    measured: 1,
+    complete: 0,
+    cycles: 1,
+    cyclesComplete: 0,
+    bestScoredPresent: true,
+  },
+  bestScored: {
+    runId: "top3-acc-1-1",
+    assetId: "inst-1",
+    rank: 1,
+    combined: 0.81,
+    bestScoredPresetKey: null,
+    strategyMeasurement: "UNKNOWN",
+    rows: [
+      { assetId: "inst-1", rank: 1, combined: 0.81, components: { io: 0.7 } },
+      { assetId: "inst-2", rank: 2, combined: 0.62, components: {} },
+    ],
+  },
+  values: [
+    {
+      instrumentId: "inst-1",
+      measured: true,
+      complete: false,
+      unmeasured: [],
+      strategy: {
+        presetKey: "estudio_auto",
+        version: "v1",
+        presetKeyAmbiguous: false,
+        versionAmbiguous: false,
+      },
+      strategyDiaD: {
+        presetKey: null,
+        version: null,
+        presetKeyAmbiguous: false,
+        versionAmbiguous: false,
+        verifications: 0,
+      },
+      cycles: [
+        {
+          cycleId: "cyc-aaa-1",
+          instrumentId: "inst-1",
+          direction: "long",
+          closed: true,
+          opportunityId: "opp-1",
+          entryDay: "2026-10-16",
+          exitDay: "2026-10-17",
+          executed: {
+            strategyPresetKey: "estudio_auto",
+            strategyVersion: "v1",
+            rank: 1,
+            score: 0.71,
+            measurement: "COMPLETE",
+          },
+          bestScored: null,
+          executedVsBest: {
+            executedIsTopRanked: true,
+            executedIsBestScoredAsset: true,
+            executedRank: 1,
+            bestScoredAssetId: "inst-1",
+            bestScoredPresetKey: null,
+            presetMatch: null,
+            measurement: "COMPLETE",
+          },
+          steps: {
+            SIGNAL: 1,
+            TOP_N: 1,
+            RISK: 1,
+            RESERVATION: 1,
+            ORDER: 1,
+            FILL: 1,
+            PROTECTION: 1,
+            SETTLEMENT: null,
+            CYCLE_CLOSED: 1,
+          },
+          chain: {
+            reached: [
+              "SIGNAL",
+              "TOP_N",
+              "RISK",
+              "RESERVATION",
+              "ORDER",
+              "FILL",
+              "PROTECTION",
+              "CYCLE_CLOSED",
+            ],
+            notReached: { SETTLEMENT: "unknown" },
+            complete: false,
+            steps: 9,
+          },
+          pnl: {
+            cycleClosedPnl: "12.5",
+            settlementPnl: null,
+            reconciled: null,
+            measurement: "UNKNOWN",
+          },
+          diaD: null,
+          executedVsDiaD: {
+            matches: null,
+            cyclePresetKey: "estudio_auto",
+            diaDPresetKey: null,
+            measurement: "UNKNOWN",
+          },
+          diaDLink: { linkable: false, draft: null, measurement: "UNKNOWN" },
+          result: { pnl: "12.5", closedAt: "2026-10-17T15:00:00Z" },
+          notes: ["settlement_not_durable"],
+        },
+      ],
+    },
+    {
+      instrumentId: "inst-2",
+      measured: false,
+      complete: false,
+      unmeasured: ["no_cycles_for_value"],
+      strategy: {
+        presetKey: null,
+        version: null,
+        presetKeyAmbiguous: false,
+        versionAmbiguous: false,
+      },
+      strategyDiaD: {
+        presetKey: null,
+        version: null,
+        presetKeyAmbiguous: false,
+        versionAmbiguous: false,
+        verifications: 0,
+      },
+      cycles: [],
+    },
+  ],
+  cyclesOutsideEstudio: [],
+  meta: { engineId: "auto-sim", limit: 200 },
+  limits: ["Read-only"],
+  notes: [],
+  error: null,
+};
+
+const DIA_D_VALUE_ARTIFACT = {
+  available: true,
+  readOnly: true,
+  day: "2026-10-16",
+  symbol: "AAA",
+  artifactModifiedAt: "2026-10-19T09:00:00Z",
+  schemaVersion: "dia-d-auto-v1",
+  summary: {
+    verdict: "PARTIAL",
+    match: 1,
+    divergent: 0,
+    notMeasured: 1,
+    steps: 2,
+  },
+  steps: [],
+  oos: null,
+  meta: { account: "acc-1", watch: ["AAA"] },
+  limits: [],
+  executedDetail: {},
+  notes: [],
+};
+
 vi.mock("@/lib/api", () => ({
   api: {
     getAutoEstudioDaily: vi.fn(async () => ({
@@ -252,6 +419,16 @@ vi.mock("@/lib/api", () => ({
     getAutoOpsJob: vi.fn(),
     listAutoOpsJobs: vi.fn(async () => ({ jobs: [], notes: [] })),
     getAutoEstudioAudit: vi.fn(async () => AUDIT),
+    getAutoEstudioChain: vi.fn(async () => CHAIN),
+    createAutoDiaDValueReplayJob: vi.fn(async () => ({
+      id: "value-job-1",
+      kind: "dia_d_value_replay",
+      status: "queued",
+      day: "2026-10-16",
+      accountId: "acc-1",
+      payload: { symbol: "AAA" },
+    })),
+    getAutoDiaDReplayValue: vi.fn(async () => DIA_D_VALUE_ARTIFACT),
   },
 }));
 
@@ -588,5 +765,160 @@ describe("EstudioDailyOpsPanel", () => {
     const run = await screen.findByTestId("estudio-daily-run");
     expect((run as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId("estudio-daily-no-account")).toBeTruthy();
+  });
+
+  it("pinta la cadena durable: nueve etapas, huecos declarados y P&L sin inventar", async () => {
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    const chainSection = aaa?.querySelector(
+      '[data-testid="estudio-daily-value-chain"]',
+    );
+    expect(chainSection).toBeTruthy();
+    expect(chainSection?.getAttribute("data-chain-measured")).toBe("true");
+    expect(chainSection?.textContent).toContain("Cadena histórica del valor");
+    expect(chainSection?.textContent).toContain("plan-1");
+
+    // Las NUEVE etapas se enumeran siempre; la ausente viaja como hueco, nunca como 0.
+    const steps = aaa?.querySelectorAll('[data-testid="estudio-chain-step"]');
+    expect(steps).toHaveLength(9);
+    const settlement = aaa?.querySelector(
+      '[data-testid="estudio-chain-step"][data-step="SETTLEMENT"]',
+    );
+    expect(settlement?.getAttribute("data-reached")).toBe("false");
+    expect(settlement?.textContent).toContain("sin dato");
+
+    const operation = aaa?.querySelector(
+      '[data-testid="estudio-chain-operation"]',
+    );
+    expect(operation?.textContent).toContain("2026-10-16 → 2026-10-17");
+    // Sin liquidación no se puede afirmar la conciliación: «Sin dato», no «No».
+    expect(operation?.textContent).toContain("Sin dato (no se puede afirmar)");
+
+    // Un valor sin ciclos declara el hueco en vez de una cadena vacía «correcta».
+    const bbb = rows.find((row) => row.getAttribute("data-symbol") === "BBB");
+    expect(
+      bbb
+        ?.querySelector('[data-testid="estudio-daily-value-chain"]')
+        ?.getAttribute("data-chain-measured"),
+    ).toBe("false");
+    expect(
+      bbb?.querySelector('[data-testid="estudio-chain-absent"]'),
+    ).toBeNull();
+    expect(
+      bbb?.querySelector('[data-testid="estudio-chain-operation"]')
+        ?.textContent,
+    ).toContain("no_cycles_for_value");
+  });
+
+  it("declara que la foto cross-asset no sella la estrategia mejor puntuada", async () => {
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    const why = aaa?.querySelector('[data-testid="estudio-chain-why"]');
+
+    expect(why?.textContent).toContain("puesto 1");
+    expect(why?.textContent).toContain("top del ranking: Sí");
+    expect(why?.textContent).toContain("activo mejor puntuado: Sí");
+    // Nunca se supone que la #1 fue la ejecutada sin término de comparación.
+    expect(why?.textContent).toContain("no se empareja por estrategia");
+    expect(
+      aaa?.querySelector('[data-testid="estudio-chain-top3"]')?.textContent,
+    ).toContain("#1 inst-1");
+
+    const attribution = aaa?.querySelector(
+      '[data-testid="estudio-chain-attribution"]',
+    );
+    expect(attribution?.textContent).toBe(
+      "Cadena histórica del valor; no atribuida a esta señal",
+    );
+  });
+
+  it("el botón verifica el DÍA-D del valor y declara el día usado", async () => {
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    const verify = aaa?.querySelector<HTMLButtonElement>(
+      '[data-testid="estudio-chain-dia-d-verify"]',
+    );
+    expect(verify).toBeTruthy();
+    // Día = entryDay del ciclo (hecho durable), declarado como tal.
+    const block = aaa?.querySelector('[data-testid="estudio-chain-dia-d"]');
+    expect(block?.getAttribute("data-day")).toBe("2026-10-16");
+    expect(block?.getAttribute("data-day-source")).toBe("cycle");
+
+    fireEvent.click(verify as HTMLButtonElement);
+
+    await waitFor(() =>
+      expect(api.createAutoDiaDValueReplayJob).toHaveBeenCalledTimes(1),
+    );
+    expect(api.createAutoDiaDValueReplayJob).toHaveBeenCalledWith({
+      day: "2026-10-16",
+      symbol: "AAA",
+    });
+    // El artefacto por valor se lee aparte, con el símbolo exacto.
+    await waitFor(() =>
+      expect(api.getAutoDiaDReplayValue).toHaveBeenCalledWith(
+        "2026-10-16",
+        "AAA",
+      ),
+    );
+    const artifact = await screen.findByTestId("estudio-chain-dia-d-artifact");
+    expect(artifact.textContent).toContain("PARTIAL");
+    expect(artifact.textContent).toContain("AAA");
+  });
+
+  it("declara la verificación ocupada por otro valor del mismo día", async () => {
+    vi.mocked(api.createAutoDiaDValueReplayJob).mockResolvedValueOnce({
+      id: "value-job-other",
+      kind: "dia_d_value_replay",
+      status: "running",
+      day: "2026-10-16",
+      accountId: "acc-1",
+      payload: { symbol: "BBB" },
+    } as never);
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    fireEvent.click(
+      aaa?.querySelector(
+        '[data-testid="estudio-chain-dia-d-verify"]',
+      ) as HTMLButtonElement,
+    );
+
+    const occupied = await screen.findByTestId("estudio-chain-dia-d-occupied");
+    expect(occupied.textContent).toContain("BBB");
+    expect(
+      aaa?.querySelector('[data-testid="estudio-chain-dia-d-job"]'),
+    ).toBeNull();
+  });
+
+  it("un fallo de la cadena no se pinta como lista vacía", async () => {
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce({
+      ...CHAIN,
+      available: false,
+      summary: null,
+      values: [],
+      notes: ["read_failed"],
+      error: "RuntimeError: db caída",
+    } as never);
+    renderPanel();
+
+    const error = await screen.findByTestId("estudio-chain-error");
+    expect(error.getAttribute("role")).toBe("alert");
+    expect(error.textContent).toContain("db caída");
+  });
+
+  it("la cadena se consulta UNA vez por informe, no una por valor", async () => {
+    renderPanel();
+
+    await screen.findAllByTestId("estudio-daily-value");
+    await waitFor(() =>
+      expect(api.getAutoEstudioChain).toHaveBeenCalledTimes(1),
+    );
   });
 });

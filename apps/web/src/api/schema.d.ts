@@ -1144,6 +1144,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/dia-d-replay/{day}/value/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Dia D Replay Value
+         * @description Verificación DÍA-D de **un valor** (``values/<SÍMBOLO>``), read-only y fail-closed.
+         *
+         *     Es un artefacto DISTINTO del día completo: se sirve solo si declara la cuenta activa y
+         *     un watch que cubre **exactamente** ese símbolo. No se rellena desde el artefacto del día
+         *     (diría «verificado» con la evidencia del watch entero, que es justo la confusión a evitar).
+         */
+        get: operations["get_auto_dia_d_replay_value_api_auto_dia_d_replay__day__value__symbol__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/dia-d-verifications": {
         parameters: {
             query?: never;
@@ -1206,6 +1230,26 @@ export interface paths {
          * @description Auditoría por valor de una ventana concreta (``D0_D1``), read-only y fail-closed.
          */
         get: operations["get_auto_estudio_audit_window_api_auto_estudio_audit__window__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/estudio-chain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Estudio Chain
+         * @description Cadena durable por valor de ESTUDIO para la cuenta activa (read-only, fail-closed).
+         */
+        get: operations["get_auto_estudio_chain_api_auto_estudio_chain_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6545,6 +6589,8 @@ export interface components {
             /** Steps */
             steps?: components["schemas"]["DiaDAutoStepDto"][];
             summary?: components["schemas"]["DiaDAutoSummaryDto"] | null;
+            /** Symbol */
+            symbol?: string | null;
         };
         /** DiaDAutoReplayListDto */
         DiaDAutoReplayListDto: {
@@ -7440,6 +7486,55 @@ export interface components {
              * @default 25
              */
             maxCandidates: number;
+        };
+        /**
+         * EstudioChainResponseDto
+         * @description Evidencia de la cadena por valor. ``available = false`` declara el hueco o el error.
+         */
+        EstudioChainResponseDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Asof */
+            asOf?: string | null;
+            /** Available */
+            available: boolean;
+            /** Bestscored */
+            bestScored?: {
+                [key: string]: unknown;
+            } | null;
+            /** Cyclesoutsideestudio */
+            cyclesOutsideEstudio?: {
+                [key: string]: unknown;
+            }[];
+            /** Engineid */
+            engineId?: string | null;
+            /** Error */
+            error?: string | null;
+            /** Estudio */
+            estudio?: {
+                [key: string]: unknown;
+            } | null;
+            /** Limits */
+            limits?: string[];
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes?: string[];
+            /**
+             * Readonly
+             * @default true
+             */
+            readOnly: boolean;
+            /** Summary */
+            summary?: {
+                [key: string]: unknown;
+            } | null;
+            /** Values */
+            values?: {
+                [key: string]: unknown;
+            }[];
         };
         /**
          * EstudioDailyResponseDto
@@ -14570,6 +14665,40 @@ export interface operations {
             };
         };
     };
+    get_auto_dia_d_replay_value_api_auto_dia_d_replay__day__value__symbol__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path: {
+                day: string;
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDAutoReplayDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_auto_dia_d_verifications_api_auto_dia_d_verifications_get: {
         parameters: {
             query?: {
@@ -14689,6 +14818,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EstudioAuditDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_estudio_chain_api_auto_estudio_chain_get: {
+        parameters: {
+            query?: {
+                cycleId?: string | null;
+                instrumentId?: string | null;
+                engineId?: string | null;
+                limit?: number;
+            };
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EstudioChainResponseDto"];
                 };
             };
             /** @description Validation Error */

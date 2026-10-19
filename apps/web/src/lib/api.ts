@@ -996,6 +996,29 @@ export const api = {
       }),
     ),
 
+  /**
+   * Operativa diaria AUTO — evidencia de la CADENA durable por valor de ESTUDIO (read-only).
+   * Una sola query por informe, indexada por `instrumentId` en la UI (no 35 peticiones).
+   */
+  getAutoEstudioChain: (input?: {
+    cycleId?: string;
+    instrumentId?: string;
+    engineId?: string;
+    limit?: number;
+  }) =>
+    call<import("@bolsa/shared").EstudioChainResponseV1>(() =>
+      client.GET("/api/auto/estudio-chain", {
+        params: {
+          query: {
+            cycleId: input?.cycleId,
+            instrumentId: input?.instrumentId,
+            engineId: input?.engineId,
+            limit: input?.limit,
+          },
+        },
+      }),
+    ),
+
   /** Operativa diaria AUTO por valor — encola el cálculo del día para la cuenta activa. */
   createAutoEstudioDailyJob: (input?: { day?: string | null }) =>
     call<components["schemas"]["AutoOpsJobDto"]>(() =>
@@ -1009,6 +1032,37 @@ export const api = {
     call<components["schemas"]["DiaDAutoReplayDto"]>(() =>
       client.GET("/api/auto/dia-d-replay/{day}", {
         params: { path: { day } },
+      }),
+    ),
+
+  /**
+   * DÍA-D AUTO — verificación de UN valor (`values/<SÍMBOLO>`), read-only y fail-closed.
+   * `available=false` declara que ese valor no tiene artefacto propio; NUNCA se rellena con el
+   * artefacto del día completo (diría «verificado» con la evidencia del watch entero).
+   */
+  getAutoDiaDReplayValue: (day: string, symbol: string) =>
+    call<import("@bolsa/shared").DiaDValueReplayV1>(() =>
+      client.GET("/api/auto/dia-d-replay/{day}/value/{symbol}", {
+        params: { path: { day, symbol } },
+      }),
+    ),
+
+  /**
+   * DÍA-D AUTO — encola la verificación DÍA-D de UN valor para la cuenta activa.
+   * El índice único parcial serializa por `(kind, cuenta, día)`: si hay otra verificación
+   * activa del mismo día, la respuesta es ESE job (su `payload.symbol` lo declara).
+   */
+  createAutoDiaDValueReplayJob: (input: {
+    symbol: string;
+    day?: string | null;
+  }) =>
+    call<components["schemas"]["AutoOpsJobDto"]>(() =>
+      client.POST("/api/auto/ops-jobs", {
+        body: {
+          kind: "dia_d_value_replay",
+          day: input.day ?? null,
+          payload: { symbol: input.symbol },
+        },
       }),
     ),
 

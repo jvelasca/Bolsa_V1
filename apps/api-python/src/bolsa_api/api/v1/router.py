@@ -9,6 +9,7 @@ from bolsa_api.api.v1.routes import (
     auto_dia_d_feedback,
     auto_dia_d_verification,
     auto_estudio_audit,
+    auto_estudio_chain,
     auto_estudio_daily,
     auto_operational_monitor,
     auto_ops_jobs,
@@ -84,6 +85,7 @@ api_v1_router.include_router(auto_dia_d.router, tags=["auto"])
 api_v1_router.include_router(auto_dia_d_feedback.router, tags=["auto"])
 api_v1_router.include_router(auto_dia_d_verification.router, tags=["auto"])
 api_v1_router.include_router(auto_estudio_audit.router, tags=["auto"])
+api_v1_router.include_router(auto_estudio_chain.router, tags=["auto"])
 api_v1_router.include_router(auto_ops_jobs.router, tags=["auto"])
 api_v1_router.include_router(auto_estudio_daily.router, tags=["auto"])
 api_v1_router.include_router(top3_opportunities.router, tags=["auto"])

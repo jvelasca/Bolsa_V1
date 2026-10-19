@@ -21,6 +21,7 @@ from bolsa_application.auto_ops_jobs import (
 )
 from bolsa_domain.entities.auto_ops_job import (
     JOB_KIND_DIA_D_REPLAY,
+    JOB_KIND_DIA_D_VALUE_REPLAY,
     JOB_KIND_ESTUDIO_DAILY,
     JOB_STATUS_COMPLETED,
     JOB_STATUS_QUEUED,
@@ -172,3 +173,73 @@ async def test_listing_without_account_returns_nothing() -> None:
         account_id="acc-1", kind=JOB_KIND_ESTUDIO_DAILY
     )
     assert len(listed) == 1
+
+
+@pytest.mark.asyncio
+async def test_value_replay_requires_and_normalizes_the_symbol() -> None:
+    repo = _FakeJobRepo()
+    use_case = EnqueueAutoOpsJob(repo)
+
+    with pytest.raises(ValueError, match="symbol requerido"):
+        await use_case.execute(
+            kind=JOB_KIND_DIA_D_VALUE_REPLAY, account_id="acc-1", day="2026-10-18"
+        )
+    with pytest.raises(ValueError, match="symbol requerido"):
+        await use_case.execute(
+            kind=JOB_KIND_DIA_D_VALUE_REPLAY,
+            account_id="acc-1",
+            day="2026-10-18",
+            payload={"symbol": "   "},
+        )
+
+    job = await use_case.execute(
+        kind=JOB_KIND_DIA_D_VALUE_REPLAY,
+        account_id="acc-1",
+        day="2026-10-18",
+        payload={"symbol": " san "},
+    )
+
+    # El símbolo se normaliza (el motor identifica en mayúsculas) y se declara el instrumento.
+    assert job.payload["symbol"] == "SAN"
+    assert job.payload["instrumentId"] == "SAN"
+
+
+@pytest.mark.asyncio
+async def test_value_replay_rejects_a_future_day() -> None:
+    use_case = EnqueueAutoOpsJob(_FakeJobRepo())
+
+    with pytest.raises(ValueError, match="fecha futura"):
+        await use_case.execute(
+            kind=JOB_KIND_DIA_D_VALUE_REPLAY,
+            account_id="acc-1",
+            day="2999-01-01",
+            payload={"symbol": "SAN"},
+        )
+
+
+@pytest.mark.asyncio
+async def test_value_replay_of_another_symbol_returns_the_active_job_of_the_slot() -> None:
+    """El hueco de idempotencia es ``(kind, cuenta, día)``: el símbolo viaja en ``payload``.
+
+    La UI lo declara en vez de fingir que encoló el suyo: el segundo símbolo recibe el job
+    ACTIVO del primero y puede leer su ``payload.symbol``.
+    """
+    repo = _FakeJobRepo()
+    use_case = EnqueueAutoOpsJob(repo)
+
+    first = await use_case.execute(
+        kind=JOB_KIND_DIA_D_VALUE_REPLAY,
+        account_id="acc-1",
+        day="2026-10-18",
+        payload={"symbol": "SAN"},
+    )
+    second = await use_case.execute(
+        kind=JOB_KIND_DIA_D_VALUE_REPLAY,
+        account_id="acc-1",
+        day="2026-10-18",
+        payload={"symbol": "BBVA"},
+    )
+
+    assert second.id == first.id
+    assert second.payload["symbol"] == "SAN"
+    assert len(repo.jobs) == 1

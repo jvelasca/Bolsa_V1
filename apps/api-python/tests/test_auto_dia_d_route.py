@@ -303,3 +303,122 @@ def test_escritor_y_lector_resuelven_la_misma_raiz(tmp_path, monkeypatch) -> Non
     assert worker.artifacts_dir_for_jobs() == route._artifacts_dir()
     monkeypatch.setenv("DIA_D_AUTO_DIR", "   ")
     assert worker.artifacts_dir_for_jobs() == route._artifacts_dir()
+
+
+# ── verificación DÍA-D de UN valor (``values/<SÍMBOLO>``) ──────────────────────
+
+
+def _write_value(
+    tmp_path, day: str, account: str = "acc", symbol: str = "SAN", *, watch=None
+) -> None:
+    path = tmp_path / account / "values" / symbol / f"dia-d-auto-{day}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = _artifact(day, account)
+    payload["meta"]["watch"] = [symbol] if watch is None else watch
+    payload["meta"]["watchSize"] = len(payload["meta"]["watch"])
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_value_route_serves_its_own_artifact(app, tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    _write_value(tmp_path, "2026-09-30")
+
+    async def _scope(_request, _account_id):
+        return "acc"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
+    body = (await _get(app, "/api/auto/dia-d-replay/2026-09-30/value/san")).json()
+
+    assert body["available"] is True
+    assert body["symbol"] == "SAN"
+    assert body["day"] == "2026-09-30"
+    assert body["meta"]["watch"] == ["SAN"]
+    assert body["artifactModifiedAt"] is not None
+
+
+@pytest.mark.asyncio
+async def test_value_route_does_not_fall_back_to_the_day_artifact(
+    app, tmp_path, monkeypatch
+) -> None:
+    """El artefacto del día NO demuestra un valor: la ruta por valor queda en hueco."""
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    _write(tmp_path, "2026-09-30", account="acc")
+
+    async def _scope(_request, _account_id):
+        return "acc"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
+    body = (await _get(app, "/api/auto/dia-d-replay/2026-09-30/value/SAN")).json()
+
+    assert body["available"] is False
+    assert body["notes"] == ["artifact_not_found"]
+
+
+@pytest.mark.asyncio
+async def test_value_route_is_isolated_per_account(app, tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    _write_value(tmp_path, "2026-09-30", account="acc-1")
+    _write_value(tmp_path, "2026-09-30", account="acc-2")
+
+    async def _scope2(_request, _account_id):
+        return "acc-2"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope2)
+    body = (await _get(app, "/api/auto/dia-d-replay/2026-09-30/value/SAN")).json()
+    assert body["available"] is True
+    assert body["meta"]["account"] == "acc-2"
+
+    async def _scope3(_request, _account_id):
+        return "acc-3"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope3)
+    other = (await _get(app, "/api/auto/dia-d-replay/2026-09-30/value/SAN")).json()
+    assert other["available"] is False
+    assert other["notes"] == ["artifact_not_found"]
+
+
+@pytest.mark.asyncio
+async def test_value_route_declares_a_watch_that_does_not_cover_the_symbol(
+    app, tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    _write_value(tmp_path, "2026-09-30", symbol="SAN", watch=["SAN", "BBVA"])
+
+    async def _scope(_request, _account_id):
+        return "acc"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
+    body = (await _get(app, "/api/auto/dia-d-replay/2026-09-30/value/SAN")).json()
+
+    assert body["available"] is False
+    assert body["notes"] == ["value_mismatch"]
+
+
+@pytest.mark.asyncio
+async def test_value_route_rejects_an_invalid_symbol(app, tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+
+    async def _scope(_request, _account_id):
+        return "acc"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
+    body = (await _get(app, "/api/auto/dia-d-replay/2026-09-30/value/S@N")).json()
+
+    assert body["available"] is False
+    assert body["notes"] == ["invalid_request"]
+
+
+@pytest.mark.asyncio
+async def test_value_route_without_account_reads_nothing(app, tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    _write_value(tmp_path, "2026-09-30")
+
+    async def _no_scope(_request, _account_id):
+        return None
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _no_scope)
+    body = (await _get(app, "/api/auto/dia-d-replay/2026-09-30/value/SAN")).json()
+
+    assert body["available"] is False
+    assert body["notes"] == ["no_account_scope"]

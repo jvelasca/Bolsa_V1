@@ -1,15 +1,19 @@
 """Casos de uso — cola durable de trabajos operativos AUTO.
 
-La generación diaria del universo ESTUDIO y la ejecución manual del sandbox DÍA-D
-comparten la MISMA cola: el scheduler y el botón de la UI encolan un job y ambos
-observan el mismo estado (``queued``/``running``/``completed``/``failed``), el mismo
-progreso y el mismo registro de éxito o fallo.
+La generación diaria del universo ESTUDIO, la ejecución manual del sandbox DÍA-D y la
+verificación DÍA-D de **un valor** comparten la MISMA cola: el scheduler y el botón de la
+UI encolan un job y ambos observan el mismo estado
+(``queued``/``running``/``completed``/``failed``), el mismo progreso y el mismo registro de
+éxito o fallo.
 
 Reglas duras:
 
 * ``UNKNOWN != 0`` — el progreso y el resultado son datos; un hueco se declara vacío.
 * Fail-closed — sin cuenta no se puede leer un job de cuenta (se trata como inexistente).
 * Una sola corrida activa por ``(kind, cuenta, día)`` (índice único parcial, migración 056).
+  En la verificación **por valor** el símbolo viaja en ``payload``: dos símbolos del mismo
+  día se serializan (nunca se ejecutan dos replays a la vez) y el segundo recibe el job
+  activo del primero, cuyo ``payload.symbol`` permite declararlo en la UI.
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ from typing import Any, Protocol
 
 from bolsa_domain.entities.auto_ops_job import (
     JOB_KIND_DIA_D_REPLAY,
+    JOB_KIND_DIA_D_VALUE_REPLAY,
     JOB_KIND_ESTUDIO_DAILY,
     AutoOpsJob,
 )
@@ -81,15 +86,31 @@ class EnqueueAutoOpsJob:
         payload: dict[str, Any] | None = None,
     ) -> AutoOpsJob:
         job_kind = str(kind or "").strip()
-        if job_kind not in (JOB_KIND_ESTUDIO_DAILY, JOB_KIND_DIA_D_REPLAY):
+        if job_kind not in (
+            JOB_KIND_ESTUDIO_DAILY,
+            JOB_KIND_DIA_D_REPLAY,
+            JOB_KIND_DIA_D_VALUE_REPLAY,
+        ):
             raise ValueError(f"kind inválido: {job_kind or '(vacío)'}")
         job_day = normalize_day(day)
+        job_payload = dict(payload or {})
 
         # Ambas tareas son operativas de una cuenta concreta: sin cuenta no hay job.
         if not account_id:
             raise ValueError("account_id requerido para encolar un job operativo")
 
-        if job_kind == JOB_KIND_DIA_D_REPLAY:
+        if job_kind == JOB_KIND_DIA_D_VALUE_REPLAY:
+            # Fail-closed: la verificación por valor NO tiene sentido sin el valor.
+            symbol = str(job_payload.get("symbol") or "").strip().upper()
+            if not symbol:
+                raise ValueError("symbol requerido para la verificación DÍA-D de un valor")
+            job_payload["symbol"] = symbol
+            job_payload.setdefault("instrumentId", symbol)
+        else:
+            # El símbolo es exclusivo del job por valor: no se arrastra a otros tipos.
+            job_payload.pop("symbol", None)
+
+        if job_kind in (JOB_KIND_DIA_D_REPLAY, JOB_KIND_DIA_D_VALUE_REPLAY):
             if job_day > datetime.now(UTC).date().isoformat():
                 raise ValueError("El replay DÍA-D no admite una fecha futura")
 
@@ -97,7 +118,7 @@ class EnqueueAutoOpsJob:
             kind=job_kind,
             day=job_day,
             account_id=account_id,
-            payload=dict(payload or {}),
+            payload=job_payload,
         )
 
 

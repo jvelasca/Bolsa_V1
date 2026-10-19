@@ -7,6 +7,8 @@ scheduler diario o por la UI. El desenlace SIEMPRE queda durable: ``completed`` 
 * ``estudio_daily`` → ``RunEstudioDailyOps`` (universo ESTUDIO, opiniones ``eod_batch``,
   propuestas dry-run). El progreso se publica en sesiones cortas.
 * ``dia_d_replay`` → subproceso aislado (``auto_ops_dia_d``).
+* ``dia_d_value_replay`` → el MISMO subproceso con ``--watch <símbolo>`` y artefacto propio
+  bajo ``…/values/<símbolo>/`` (nunca pisa el del día).
 
 ``UNKNOWN != 0``: un job sin resultado deja ``result`` vacío; no se rellena con ceros.
 """
@@ -22,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from bolsa_api.background.auto_ops_dia_d import DiaDReplayFailed, run_dia_d_replay_job
 from bolsa_domain.entities.auto_ops_job import (
     JOB_KIND_DIA_D_REPLAY,
+    JOB_KIND_DIA_D_VALUE_REPLAY,
     JOB_KIND_ESTUDIO_DAILY,
     AutoOpsJob,
 )
@@ -115,6 +118,20 @@ async def run_auto_ops_job(
     if job.kind == JOB_KIND_DIA_D_REPLAY:
         return await run_dia_d_replay_job(
             job, session_factory, timeout_seconds=dia_d_timeout_seconds
+        )
+    if job.kind == JOB_KIND_DIA_D_VALUE_REPLAY:
+        # Fail-closed: sin símbolo no hay verificación por valor (no se cae al día completo,
+        # que escribiría OTRA evidencia y pisaría la del watch entero).
+        symbol = str((job.payload or {}).get("symbol") or "").strip().upper()
+        if not symbol:
+            raise AutoOpsJobFailed(
+                "El job dia_d_value_replay requiere 'symbol' en el payload"
+            )
+        return await run_dia_d_replay_job(
+            job,
+            session_factory,
+            timeout_seconds=dia_d_timeout_seconds,
+            symbol=symbol,
         )
     raise AutoOpsJobFailed(f"kind de job no soportado: {job.kind}")
 
