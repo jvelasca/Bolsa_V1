@@ -114,13 +114,18 @@ _SEALED_WATCH = (
 #:     con la banda de sensibilidad de la muestra, vive en
 #:     `docs/engineering/evidence/v2.88.16.2/README.md` y se re-verifica con
 #:     `apps/api-python/scripts/v2_88_16_2_oos_anchor_ablation.py`.
-_SEALED_ARTIFACT_SHA256 = "240662250347A2AAD0F8E9F0101185D8ACC80C1D4BD1B4BBFF02D4766D9F54F0"
-_SEALED_ARTIFACT_BYTES = 3_445_622
+#:   * `v2.88.150-beta` (ADR-047, gate direccional POR SÍMBOLO) **segmenta** el baseline: el censo
+#:     deja de vetar el día entero por un solo `trend_down` (`operableDays` 0 → 1 226/1 285), el
+#:     paso 2 del replay deja de saltarse y el artefacto cambia. El par anterior
+#:     (`24066225…6D9F54F0` / 3 445 622 B CRLF · `1E3ADAC2…929A37E7` / 3 340 728 B LF) queda como
+#:     **segmento PRE** (`.136`…`.149`); no se reescribe la historia.
+_SEALED_ARTIFACT_SHA256 = "01429BCC849F009DF47CB0FB11B34800BC8EB7A69071F88DC8FF032DD92B7476"
+_SEALED_ARTIFACT_BYTES = 3_488_758
 
 #: EL MISMO CONTENIDO con separador LF: lo que escribe cualquier SO que no traduzca `\n` (el
 #: runner de GitHub, sin ir más lejos). Es el par que el job `replay-repro` ve en Linux.
-_SEALED_ARTIFACT_SHA256_LF = "1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7"
-_SEALED_ARTIFACT_BYTES_LF = 3_340_728
+_SEALED_ARTIFACT_SHA256_LF = "E9B7376BFE885C86CA4E56C0F37D79129B1EF8ECD325F2CE043A2D1AEF7F5625"
+_SEALED_ARTIFACT_BYTES_LF = 3_383_461
 
 #: ``to_char`` de un ``timestamptz`` a ISO-8601 UTC con microsegundos y offset explícito.
 #: Se fija ``+00:00`` literal (``AT TIME ZONE 'UTC'`` ya normaliza) para no depender del
@@ -525,8 +530,8 @@ def _assert_artifact(args: argparse.Namespace) -> int:
     de estar «reproducido», y se declaran las dos en vez de esconder una (valores vigentes =
     los de `_SEALED_ARTIFACT_*`):
 
-    * **render del sello**: byte a byte == `24066225…6D9F54F0` / 3 445 622 B (fichero CRLF);
-    * **mismo contenido**: LF normalizado == `1E3ADAC2…929A37E7` / 3 340 728 B (fichero LF).
+    * **render del sello**: byte a byte == `01429BCC…92B7476` / 3 488 758 B (fichero CRLF);
+    * **mismo contenido**: LF normalizado == `E9B7376B…7F5625` / 3 383 461 B (fichero LF).
 
     Si se pasan `--sha256`/`--bytes` explícitos se exige ese render concreto: la vía
     normalizada solo se acepta contra los valores SELLADOS, no contra un valor suelto.

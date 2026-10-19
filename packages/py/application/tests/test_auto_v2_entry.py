@@ -1052,6 +1052,95 @@ async def test_discovery_regime_source_downtrend_is_exit_only() -> None:
     assert regime_exit_only(source()) is False, "bear trend permite gestionar, no bloquea cierres"
 
 
+# ── ADR-047 · gate direccional POR SÍMBOLO ─────────────────────────────────────
+
+
+def test_plan_v2_tick_per_symbol_gate_does_not_veto_others() -> None:
+    """Un ``trend_down`` NO veta a los demás: el agregado se declara, el gate es propio."""
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA"), _signal("BBB")],
+        # Agregado conservador (lo que antes vetaba TODA la cartera)…
+        regime="BEAR_TREND",
+        # …pero el régimen de barras de cada símbolo es distinto.
+        regime_by_symbol={"AAA": "range", "BBB": "trend_down"},
+    )
+    assert plan.regime == "BEAR_TREND", "el agregado sigue siendo la declaración del tick"
+    assert plan.approved_symbols == ("AAA",)
+
+    blocked = next(d for d in plan.decisions if d.instrument_id == "BBB")
+    assert "regime_invalid" in blocked.reason_codes
+
+    journal = {e.instrument_id: e.payload for e in plan.journal_entries}
+    assert journal["AAA"]["approved"] is True
+    # El payload conserva el AGREGADO histórico y añade la procedencia del gate.
+    assert journal["AAA"]["regime"] == "BEAR_TREND"
+    assert journal["AAA"]["entryRegime"] == "SIDEWAYS"
+    assert journal["AAA"]["entryRegimeScope"] == "per_symbol"
+    assert journal["BBB"]["approved"] is False
+    assert journal["BBB"]["entryRegime"] == "BEAR_TREND"
+
+
+def test_plan_v2_tick_per_symbol_gate_missing_symbol_is_unknown() -> None:
+    """Un símbolo sin régimen en el mapa cae en ``UNKNOWN`` (fail-closed SOLO de él)."""
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA"), _signal("BBB")],
+        regime="BULL_TREND",
+        regime_by_symbol={"AAA": "trend_up"},
+    )
+    assert plan.approved_symbols == ("AAA",)
+    blocked = next(d for d in plan.decisions if d.instrument_id == "BBB")
+    assert "regime_invalid" in blocked.reason_codes
+    payload = next(e.payload for e in plan.journal_entries if e.instrument_id == "BBB")
+    assert payload["entryRegime"] == "UNKNOWN"
+
+
+def test_plan_v2_tick_macro_risk_off_vetoes_every_symbol() -> None:
+    """ADR-047 §2.1: el macro ``risk_off``/``crisis`` sigue siendo veto GLOBAL."""
+    for macro in ("risk_off", "crisis"):
+        plan = plan_v2_tick(
+            snapshot=_snapshot(),
+            signals=[_signal("AAA"), _signal("BBB")],
+            regime=macro,
+            regime_by_symbol={"AAA": "trend_up", "BBB": "range"},
+        )
+        assert plan.approved_symbols == (), f"{macro}: el macro no puede aprobar entradas"
+        for entry in plan.journal_entries:
+            assert "regime_invalid" in entry.payload["reasonCodes"]
+            assert entry.payload["entryRegime"] == "RISK_OFF"
+
+
+def test_plan_v2_tick_without_symbol_map_keeps_historical_payload() -> None:
+    """Sin mapa, el payload es el histórico: no se inyectan claves ADR-047."""
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA")],
+        regime="BULL_TREND",
+    )
+    payload = plan.journal_entries[0].payload
+    assert payload["regime"] == "BULL_TREND"
+    assert "entryRegime" not in payload
+    assert "entryRegimeScope" not in payload
+
+
+@pytest.mark.asyncio
+async def test_discovery_regime_source_exposes_regime_by_symbol() -> None:
+    """``by_symbol``/``regime_for`` son la fuente del gate por símbolo (ADR-047)."""
+    from bolsa_application.auto_v2_entry import DiscoveryRegimeSource
+
+    async def provider() -> dict[str, list[dict[str, float]]]:
+        return {"AAA": _bars(0.6), "BBB": _bars(-0.6)}
+
+    source = DiscoveryRegimeSource(bars_provider=provider)
+    assert source.by_symbol() == {}, "antes del refresco no hay régimen por símbolo"
+    assert await source.refresh() == "trend_down", "el agregado sigue siendo conservador"
+    assert source.by_symbol() == {"AAA": "trend_up", "BBB": "trend_down"}
+    assert source.regime_for("AAA") == "BULL_TREND"
+    assert source.regime_for("BBB") == "BEAR_TREND"
+    assert source.regime_for("ZZZ") == "UNKNOWN", "un símbolo sin barras es UNKNOWN"
+
+
 # ── Identidad y frescura de señal (anti-repetición sobre la misma barra) ──────
 
 

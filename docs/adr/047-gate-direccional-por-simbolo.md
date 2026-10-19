@@ -1,9 +1,9 @@
 # ADR-047 — Gate direccional POR SÍMBOLO (el régimen agregado pasa a declaración de riesgo)
 
-**Estado:** **Proposed — docs-only.** Este ADR **no implementa nada**: el árbol de decisión queda
-**byte-idéntico** (`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración). La
-implementación exige **aceptación explícita del propietario** y un sello propio con
-**`Δ decisión ≠ 0`**.
+**Estado:** **Accepted — implementado en `v2.88.150-beta`.** La barrera de entrada evalúa el
+régimen del **propio símbolo**; el agregado se conserva como declaración (`marketRegime`) y dial del
+gobernador. **`Δ decisión ≠ 0`** (baseline de replay segmentado; ver §10) · `Δ contrato HTTP = 0` ·
+SIN migración.
 **Fecha:** 2026-10-19
 **Contexto:** [auditoría de alcanzabilidad del gate de régimen](../engineering/auditoria-alcanzabilidad-ventana-paper-2026-10-19.md) ·
 evidencia [`v2.88.149`](../engineering/evidence/v2.88.149/README.md) (tag `v2.88.149-beta` → `637a4433`).
@@ -237,7 +237,8 @@ que un símbolo bajista deja de vetar a los demás. Si en el futuro se quiere qu
 - Recortar el watch o elegir universo por régimen (look-ahead).
 - Promover evidencia o emitir `CONFIRMED` (sigue siendo humano, ADR-046).
 - Operar en real: la operativa es **100 % SIM** (`PAPER_D_EXECUTE` off).
-- Implementar nada en este incremento: **este ADR no toca código**.
+- Cambiar el **clasificador** (`discovery_market_regime_v0/v1`) o la prioridad conservadora del
+  agregado: se cambia **qué régimen consume la barrera**, no cómo se mide.
 
 ## 9. Referencias
 
@@ -248,3 +249,50 @@ que un símbolo bajista deja de vetar a los demás. Si en el futuro se quiere qu
   agregado y fuente: `packages/py/application/src/bolsa_application/auto_v2_entry.py` ·
   barrera: `packages/py/application/src/bolsa_application/portfolio_decision_engine.py` §3.
 - Protocolo de la ventana: [ADR-046](./046-protocolo-longitudinal-paper.md).
+
+---
+
+## 10. Registro de implementación (`v2.88.150-beta`, 2026-10-19)
+
+### 10.1 Qué se tocó
+
+| Pieza | Cambio |
+| --- | --- |
+| [`auto_v2_entry.py`](../../packages/py/application/src/bolsa_application/auto_v2_entry.py) | `DiscoveryRegimeSource` expone `by_symbol()`/`regime_for()`; `plan_v2_tick` acepta `regime_by_symbol` y resuelve `_entry_regime(símbolo)` para la barrera §3 y para la economía de candidatas del optimizador. **Guarda macro**: `risk_off`/`crisis` sobre la etiqueta CRUDA ⇒ `RISK_OFF` para **todos** (paso 1 de §2.1). |
+| Journal (`_journal_entry`) | Con mapa: `regime` = agregado del tick (`marketRegime`) + `entryRegime` (régimen del símbolo, **vocabulario operativo**: `SIDEWAYS`/`BEAR_TREND`/…) + `entryRegimeScope="per_symbol"`. **Sin mapa** no se inyectan claves: payload histórico byte-idéntico (llamantes antiguos intactos). |
+| [`auto_simulation_worker.py`](../../apps/api-python/src/bolsa_api/background/auto_simulation_worker.py) | `_v2_regime_by_symbol()` lee `by_symbol()`; `regime_override` o fuente sin lectura ⇒ `None` (eje global histórico). |
+| [`replay_oos.py`](../../packages/py/application/src/bolsa_application/replay_oos.py) | `entries_allowed_long = operable_symbols > 0`; `entries_allowed_long_global` conserva la lectura del agregado como **declaración**. |
+| Preflight `.149` (`v2_76` + [`window-forward.mjs`](../../scripts/lib/window-forward.mjs)) | Publica `entryGateScope`, `entriesAllowedLong` (por símbolo), `symbolsOperable`, `operableBySymbol` y `entriesAllowedLongGlobal`. |
+
+### 10.2 Medida POST (misma máquina, read-only)
+
+| Superficie | PRE (`.149`) | POST (`.150`) |
+| --- | --- | --- |
+| Preflight de hoy | `BEAR_TREND` ⇒ LONG **vetadas** (0 operables de facto) | `BEAR_TREND` (declaración) + **`entriesAllowedLong: true`** · `entryGateScope: per_symbol` · **8/20** símbolos operables |
+| Censo del replay (fixture congelado) | `operableDays = 0` ⇒ paso 2 **saltado** | **1 226/1 285** días operables (95,4 %) · `maxOperableStreak 1 226` |
+| Artefacto de replay | `1E3ADAC2…929A37E7` / 3 340 728 B (LF) | **`E9B7376B…7F5625`** / 3 383 461 B (LF) · CRLF `01429BCC…92B7476` / 3 488 758 B |
+
+El cambio de `sha256` **es la prueba** de que la decisión cambió (§4.2): no se actualizó un
+baseline sin medir. El par anterior queda como **segmento PRE** (`.136`…`.149`).
+
+### 10.3 Verificación (falsable, §5)
+
+- Un símbolo `trend_down` + resto `range` ⇒ los `range` entran y el bajista no: **verde**
+  (`test_plan_v2_tick_per_symbol_gate_does_not_veto_others`).
+- Símbolo ausente del mapa ⇒ `UNKNOWN` **solo** de él: **verde**
+  (`test_plan_v2_tick_per_symbol_gate_missing_symbol_is_unknown`).
+- Macro `risk_off`/`crisis` ⇒ todo vetado: **verde**
+  (`test_plan_v2_tick_macro_risk_off_vetoes_every_symbol`).
+- `replay_oos.entries_allowed_long` por símbolo y `entries_allowed_long_global` declarativo:
+  actualizado y verde (`test_census_files_the_day_when_one_symbol_trends_down`).
+- `replay-repro` debe quedar verde **con el hash nuevo**: se asserta localmente el artefacto
+  regenerado (`REPRODUCIDO`, render del sello byte a byte) y el CI del tag lo re-verifica.
+
+### 10.4 Límites declarados
+
+- La ventana PAPER **no** se re-mide aquí: las filas PRE siguen `NO_MEDIDO_REGIMEN` y **no** se
+  re-clasifican (§4); PRE y POST **no** son comparables en P&L.
+- El replay demuestra que el gate **se abre**; **no** demuestra rentabilidad (operativa 100 % SIM).
+- El agregado sigue **sin dimensionar**: `HIGH_VOLATILITY` no veta y `risk_scale`/gobernador no
+  cambian (§7).
+

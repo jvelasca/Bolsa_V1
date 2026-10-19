@@ -279,15 +279,20 @@ async def _market_regime_preflight(factory: Any, watch: Sequence[str]) -> dict[s
     """Diagnóstico READ-ONLY del régimen de MERCADO del watch (no escribe ni decide).
 
     Compone las MISMAS piezas que el tick (``make_bar_snapshot_loader`` → clasificador de
-    barras → agregado → eje operativo) y declara si el universo puede ENTRAR hoy. Existe por
-    un hallazgo MEDIDO de esta fase: el agregado es el veredicto **más conservador**
-    presente (``_REGIME_CONSERVATIVE_PRIORITY``), así que **un solo** ``trend_down`` en el
-    watch deja el eje operativo en ``BEAR_TREND`` y veta por ``regime_invalid`` TODAS las
-    entradas LONG del tick (el motor V2 es long-only). Sin este diagnóstico, el operador
-    descubre a los cuatro días que el universo no podía operar.
+    barras → agregado → eje operativo) y declara si el universo puede ENTRAR hoy.
 
-    No se inventa régimen: el símbolo sin barras cuenta como ``sin_regimen`` y el agregado
-    sigue siendo fail-closed (⇒ ``UNKNOWN`` ⇒ exit-only).
+    ADR-047: el veto de entrada es **por símbolo**, así que el preflight publica las DOS
+    lecturas y no las confunde:
+
+    * ``entriesAllowedLong`` — la de la BARRERA: ``true`` si **algún** símbolo del watch
+      pasa ``regime_allows_entry_for(long)``. Es la que decide el ``exit`` del preflight
+      (y por tanto si la ventana intenta el día).
+    * ``entriesAllowedLongGlobal`` — la del **agregado conservador** (``BEAR_TREND`` si
+      **algún** símbolo está ``trend_down``). Se conserva como DECLARACIÓN de contexto: ya
+      **no** veta, pero sigue explicando el estado del universo.
+
+    No se inventa régimen: el símbolo sin barras cuenta como ``sin_regimen`` y queda
+    inelegible (fail-closed de ESE símbolo), sin vetar a los demás.
     """
     from bolsa_analytics.cognitive.market_regime_gate import (  # noqa: PLC0415
         map_trial_regime,
@@ -319,13 +324,24 @@ async def _market_regime_preflight(factory: Any, watch: Sequence[str]) -> dict[s
         counts[key] = counts.get(key, 0) + 1
     aggregate = aggregate_trial_regime(by_symbol.values())
     operational = map_trial_regime(aggregate)
+    operable_by_symbol = {
+        symbol: bool(regime_allows_entry_for(map_trial_regime(label), "long"))
+        for symbol, label in by_symbol.items()
+    }
+    operable = [symbol for symbol, allowed in operable_by_symbol.items() if allowed]
     return {
         "barsLoaded": len(snapshot),
         "bySymbol": by_symbol,
         "counts": counts,
         "aggregateTrialRegime": aggregate,
         "operationalRegime": operational,
-        "entriesAllowedLong": bool(regime_allows_entry_for(operational, "long")),
+        # ADR-047 — la lectura que DECIDE (barrera por símbolo) y su detalle.
+        "entryGateScope": "per_symbol",
+        "entriesAllowedLong": bool(operable),
+        "symbolsOperable": len(operable),
+        "operableBySymbol": operable_by_symbol,
+        # La lectura del agregado conservador, conservada como DECLARACIÓN.
+        "entriesAllowedLongGlobal": bool(regime_allows_entry_for(operational, "long")),
     }
 
 
@@ -570,8 +586,16 @@ def _print_preflight(evidence: dict[str, Any]) -> None:
     print(f"agregado (más conservador)     {regime['aggregateTrialRegime']}")
     print(f"eje operativo                  {regime['operationalRegime']}")
     print(
-        f"entradas LONG                  "
-        f"{'PERMITIDAS' if regime['entriesAllowedLong'] else 'VETADAS (regime_invalid)'}"
+        f"símbolos operables (LONG)      {regime.get('symbolsOperable', 0)}/{evidence['watchSize']}"
+    )
+    print(
+        f"entradas LONG (por símbolo)    "
+        f"{'PERMITIDAS' if regime['entriesAllowedLong'] else 'VETADAS (ningún símbolo operable)'}"
+    )
+    print(
+        f"agregado global (declaración)  "
+        f"{'permite' if regime.get('entriesAllowedLongGlobal') else 'veta'} "
+        f"(ya NO es el veto de entrada)"
     )
 
 
@@ -918,10 +942,12 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if evidence.get("mode") == "preflight":
-        allowed = bool(evidence["marketRegime"]["entriesAllowedLong"])
+        regime = evidence["marketRegime"]
+        allowed = bool(regime["entriesAllowedLong"])
         print(
             f"# preflight: entradas LONG {'PERMITIDAS' if allowed else 'VETADAS'} "
-            f"(eje {evidence['marketRegime']['operationalRegime']}); no se escribió nada",
+            f"({regime.get('symbolsOperable', 0)}/{evidence['watchSize']} símbolos operables; "
+            f"agregado {regime['operationalRegime']}); no se escribió nada",
             file=sys.stderr,
         )
         return 0 if allowed else 2

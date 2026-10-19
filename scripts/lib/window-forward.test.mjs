@@ -25,6 +25,7 @@ import {
   isTerminalStatus,
   lockDecision,
   parseGate,
+  parsePreflight,
   parseRevParse,
   resolveDayStatus,
   summarizeLedger,
@@ -656,5 +657,45 @@ test('taskXml: rechaza entradas invalidas en vez de registrar algo opaco', () =>
   assert.throws(() => taskXml({ ...TASK_PARTS, time: '25:00' }), /HH:MM/);
   assert.throws(() => taskXml({ ...TASK_PARTS, time: '18:0' }), /HH:MM/);
   assert.throws(() => taskXml({ ...TASK_PARTS, date: new Date('nope') }), /fecha/);
+});
+
+// ---------------------------------------------------------------------------
+// ADR-047 · preflight con gate por simbolo
+// ---------------------------------------------------------------------------
+
+test('parsePreflight publica el alcance del gate y los simbolos operables', () => {
+  const parsed = parsePreflight({
+    mode: 'preflight',
+    marketRegime: {
+      operationalRegime: 'BEAR_TREND',
+      aggregateTrialRegime: 'trend_down',
+      entriesAllowedLong: true,
+      entryGateScope: 'per_symbol',
+      symbolsOperable: 22,
+      entriesAllowedLongGlobal: false,
+      bySymbol: { AAA: 'range', BBB: 'trend_down' },
+    },
+  });
+  assert.equal(parsed.operationalRegime, 'BEAR_TREND');
+  assert.equal(parsed.entriesAllowedLong, true, 'algun simbolo pasa ⇒ el dia es operable');
+  assert.equal(parsed.entryGateScope, 'per_symbol');
+  assert.equal(parsed.symbolsOperable, 22);
+  assert.equal(
+    parsed.entriesAllowedLongGlobal,
+    false,
+    'la lectura conservadora se conserva como declaracion, no como veto',
+  );
+  assert.equal(parsed.aggregate, 'trend_down');
+  assert.deepEqual(parsed.bySymbol, { AAA: 'range', BBB: 'trend_down' });
+});
+
+test('parsePreflight no inventa alcance si el preflight es historico', () => {
+  const parsed = parsePreflight({
+    mode: 'preflight',
+    marketRegime: { operationalRegime: 'BULL_TREND', entriesAllowedLong: true },
+  });
+  assert.equal(parsed.entryGateScope, null);
+  assert.equal(parsed.symbolsOperable, null);
+  assert.equal(parsed.entriesAllowedLongGlobal, null);
 });
 

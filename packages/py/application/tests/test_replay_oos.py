@@ -159,8 +159,13 @@ def test_regime_at_cutoff_does_not_change_when_future_bars_are_added() -> None:
 # ── Paso 0 · censo de días operables ──────────────────────────────────────────────
 
 
-def test_census_blocks_the_day_when_one_symbol_trends_down() -> None:
-    """Un solo ``trend_down`` de N deja el agregado en ``trend_down`` ⇒ long vetado."""
+def test_census_files_the_day_when_one_symbol_trends_down() -> None:
+    """ADR-047: un ``trend_down`` de N ya NO veta a los demás; el AGREGADO lo declara.
+
+    El día es operable porque ``AAA`` (``range``) pasa el gate por sí mismo; ``BBB`` sigue
+    vetado. ``entries_allowed_long_global`` conserva la lectura conservadora (``False``)
+    como declaración, no como veto.
+    """
     flat = _flat_series(80)
     falling = _declining_series(80)
     days = [bar_day(flat[-1])]
@@ -171,10 +176,15 @@ def test_census_blocks_the_day_when_one_symbol_trends_down() -> None:
     assert row.regimes == {"AAA": "range", "BBB": "trend_down"}
     assert row.aggregate == "trend_down"
     assert row.operational == "BEAR_TREND"
-    assert row.entries_allowed_long is False
+    assert row.entries_allowed_long is True
+    assert row.entries_allowed_long_global is False
     assert row.operable_symbols == 1
     assert row.measured_symbols == 2
-    assert report.operable_days == 0
+    assert report.operable_days == 1
+    # El payload declara el alcance del gate sin borrar la lectura histórica.
+    payload = row.to_dict()
+    assert payload["entryGateScope"] == "per_symbol"
+    assert payload["entriesAllowedLongGlobal"] is False
 
 
 def test_census_allows_the_day_when_no_symbol_trends_down() -> None:

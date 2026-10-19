@@ -58,11 +58,14 @@ def test_dia_d_scripts_seal_the_package_version() -> None:
 
 #: `v2_87` emite DOS artefactos con `bump`. El de la banda OOS financiera (`_run_finance_band`)
 #: sigue la versión del monorepo y lo cubre el guardián de arriba. El del REPLAY durable —el que
-#: `replay-repro` regenera y ASSERTA byte a byte (sha256 `1E3ADAC2…`, 3 340 728 bytes)— viaja
-#: CONGELADO en `2.11.0-beta` a propósito: bumpearlo cambiaría los bytes del artefacto y pondría
-#: ROJO el job `replay-repro` del CI del tag. Por eso el sello `v2.88.138-beta` NO lo tocó (dejó
-#: el sha idéntico al de `v2.88.136`/`v2.88.137`). Se declara aquí para que nadie lo «alinee» con
-#: la versión del paquete y rompa el sello congelado.
+#: `replay-repro` regenera y ASSERTA byte a byte— viaja CONGELADO en `2.11.0-beta` a propósito:
+#: bumpearlo cambiaría los bytes del artefacto y pondría ROJO el job `replay-repro` del CI del tag.
+#: Por eso los sellos de documentación/UI (`.136`…`.149`) NO lo tocaron. Se declara aquí para que
+#: nadie lo «alinee» con la versión del paquete y rompa el sello congelado.
+#:
+#: ADR-047 (`v2.88.150-beta`) SÍ movió el artefacto porque cambió la **decisión** (censo por
+#: símbolo): el baseline se segmentó (`E9B7376B…` LF / `01429BCC…` CRLF) y el par
+#: `1E3ADAC2…929A37E7` queda como segmento PRE. El literal congelado del `bump` sigue igual.
 _V2_87_FROZEN_REPLAY_BUMP = "2.11.0-beta"
 
 

@@ -830,7 +830,17 @@ export function parsePreflight(payload) {
   if (!regime || typeof regime !== 'object') return null;
   return {
     operationalRegime: String(regime.operationalRegime ?? 'UNKNOWN'),
+    // ADR-047: la barrera es por símbolo; `entriesAllowedLong` es «algún símbolo pasa».
     entriesAllowedLong: Boolean(regime.entriesAllowedLong),
+    entryGateScope:
+      typeof regime.entryGateScope === 'string' ? regime.entryGateScope : null,
+    symbolsOperable:
+      Number.isFinite(Number(regime.symbolsOperable)) ? Number(regime.symbolsOperable) : null,
+    // La lectura del agregado conservador, conservada como DECLARACIÓN (no veta).
+    entriesAllowedLongGlobal:
+      typeof regime.entriesAllowedLongGlobal === 'boolean'
+        ? regime.entriesAllowedLongGlobal
+        : null,
     aggregate: String(regime.aggregateTrialRegime ?? regime.aggregate ?? ''),
     bySymbol: regime.bySymbol && typeof regime.bySymbol === 'object' ? regime.bySymbol : {},
   };

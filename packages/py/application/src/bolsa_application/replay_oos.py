@@ -254,7 +254,12 @@ class ReplayCursor:
 
 @dataclass(frozen=True, slots=True)
 class CensusDay:
-    """Régimen del watch en un día ``D`` con barras ``timestamp <= D`` (sin lookahead)."""
+    """Régimen del watch en un día ``D`` con barras ``timestamp <= D`` (sin lookahead).
+
+    ADR-047: ``entries_allowed_long`` es la lectura de la BARRERA (``true`` si **algún**
+    símbolo pasa el gate por sí mismo). ``entries_allowed_long_global`` conserva la
+    lectura del agregado conservador como DECLARACIÓN (``None`` en fixtures históricos).
+    """
 
     day: str
     regimes: Mapping[str, str]
@@ -265,9 +270,10 @@ class CensusDay:
     operable_symbols: int
     measured_symbols: int
     watch: int
+    entries_allowed_long_global: bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "day": self.day,
             "regimes": dict(self.regimes),
             "counts": dict(self.counts),
@@ -278,6 +284,12 @@ class CensusDay:
             "measuredSymbols": int(self.measured_symbols),
             "watch": int(self.watch),
         }
+        if self.entries_allowed_long_global is not None:
+            # Aditivo: la declaración del agregado y el alcance del gate, sin tocar las
+            # claves históricas.
+            payload["entriesAllowedLongGlobal"] = bool(self.entries_allowed_long_global)
+            payload["entryGateScope"] = "per_symbol"
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -291,10 +303,10 @@ class CensusReport:
     watch: int
 
     def operable_by_operational(self) -> dict[str, int]:
-        """Días operables por eje operativo: evita leer ``318`` como si fuesen ``trend_up``.
+        """Días con **algún** símbolo operable, agrupados por el eje AGREGADO (declaración).
 
-        El gate de régimen NO veta ``HIGH_VOLATILITY``, así que un día ``high_vol`` cuenta
-        como operable por este eje. El desglose lo declara en vez de esconderlo.
+        El grupo es la etiqueta del agregado conservador del día, no la del símbolo que
+        operó: sirve para leer el contexto, nunca para inferir qué símbolo era elegible.
         """
         counts: dict[str, int] = {}
         for row in self.days:
@@ -334,9 +346,11 @@ def census_operable_days(
 
     ``bars_by_symbol`` son las barras COMPLETAS del símbolo (pasado y futuro); para cada día
     ``D`` de ``days`` se acotan a ``<= D`` antes de clasificar, de modo que un día nunca ve
-    una barra posterior. El agregado usa ``aggregate_trial_regime`` (el MISMO veredicto más
-    conservador que usa el motor) y la operabilidad se decide con
-    ``regime_allows_entry_for`` (el MISMO gate direccional del hot path).
+    una barra posterior. El agregado usa ``aggregate_trial_regime`` (el veredicto más
+    conservador, hoy **declaración**) y la operabilidad se decide con el MISMO gate
+    direccional del hot path, **por símbolo** (ADR-047): ``entries_allowed_long`` es
+    ``true`` si **al menos un** símbolo del watch pasa el gate. La lectura del agregado se
+    conserva en ``entries_allowed_long_global`` para no perder el contexto.
     """
     watch = tuple(str(s) for s in bars_by_symbol)
     ordered_days = tuple(str(d)[:10] for d in days if str(d or "").strip())
@@ -359,10 +373,14 @@ def census_operable_days(
                 counts=_regime_counts(regimes),
                 aggregate=aggregate,
                 operational=operational,
-                entries_allowed_long=bool(regime_allows_entry_for(operational, "long")),
+                # ADR-047: la barrera es por símbolo ⇒ el día es operable si ALGUNO pasa.
+                entries_allowed_long=operable > 0,
                 operable_symbols=operable,
                 measured_symbols=measured,
                 watch=len(watch),
+                entries_allowed_long_global=bool(
+                    regime_allows_entry_for(operational, "long")
+                ),
             )
         )
 

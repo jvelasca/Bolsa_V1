@@ -1914,6 +1914,10 @@ class AutoSimulationWorker:
 
         Sin régimen el pipeline V2 queda en UNKNOWN ⇒ exit-only (fail-closed): no se
         abren entradas nuevas si no se puede determinar el régimen.
+
+        ADR-047: este valor es el **agregado** del tick y se usa como DECLARACIÓN de
+        contexto (``marketRegime``) y como dial del gobernador; el veto de entrada usa
+        ``_v2_regime_by_symbol``.
         """
         override = self._v2_tunables.regime_override
         if override:
@@ -1925,6 +1929,26 @@ class AutoSimulationWorker:
         except Exception:  # noqa: BLE001 — sin régimen no se inventan entradas.
             logger.exception("auto_sim v2 regime_source failed")
             return None
+
+    def _v2_regime_by_symbol(self) -> dict[str, str] | None:
+        """Régimen de barras por símbolo del tick (ADR-047).
+
+        ``None`` deja el comportamiento histórico (un solo eje global): ocurre cuando la
+        fuente no expone ``by_symbol`` o cuando hay ``regime_override`` (dial de
+        entorno/test, no una medición por símbolo). Con mapa, un símbolo ausente será
+        ``UNKNOWN`` para la barrera: se declara el hueco, no se hereda un mercado benigno.
+        """
+        if self._v2_tunables.regime_override:
+            return None
+        reader = getattr(self._v2_regime_source, "by_symbol", None)
+        if reader is None or not callable(reader):
+            return None
+        try:
+            labels = reader() or {}
+        except Exception:  # noqa: BLE001 — sin mapa se conserva el eje global.
+            logger.exception("auto_sim v2 regime by_symbol failed")
+            return None
+        return {str(symbol): str(label or "") for symbol, label in dict(labels).items()}
 
     def _v2_equity(self) -> float:
         """Equity del tick.
@@ -4310,6 +4334,9 @@ class AutoSimulationWorker:
             snapshot=snapshot,
             signals=self._v2_signals(packages),
             regime=regime,
+            # ADR-047: el veto de entrada es POR SÍMBOLO; ``regime`` queda como
+            # declaración del tick (``marketRegime``) y dial del gobernador.
+            regime_by_symbol=self._v2_regime_by_symbol(),
             tunables=self._v2_tunables,
             as_of=self._time.strftime("%Y-%m-%dT%H:%M:%SZ"),
             consumed_signal_ids=self._v2_consumed_signals,

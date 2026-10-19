@@ -140,6 +140,11 @@ _OPERATIONAL_REGIMES: frozenset[str] = frozenset(
     }
 )
 
+#: ADR-047 §2.1 — hechos MACRO de riesgo: veto global, jamás por símbolo. Se comparan
+#: sobre la etiqueta CRUDA (``_coerce_operational_regime`` los colapsa a ``UNKNOWN`` y
+#: perdería el hecho de riesgo).
+_MACRO_ENTRY_VETO: frozenset[str] = frozenset({"RISK_OFF", "CRISIS"})
+
 
 def v2_engine_enabled() -> bool:
     """Env de habilitación del pipeline AUTO 2.0 (default OFF, fail-closed)."""
@@ -1016,7 +1021,7 @@ def _optimize_candidate_set(
     *,
     snapshot: Any,
     cfg: V2Tunables,
-    regime: str | None,
+    regime_for: Callable[[str], str],
     governor_blocks_new_risk: bool,
 ) -> tuple[OptimizerDecision, tuple[OptimizerCandidate, ...]]:
     """Corre el optimizador sobre el conjunto candidato (el TOP N del ranking).
@@ -1024,6 +1029,10 @@ def _optimize_candidate_set(
     ``available_cash``/``equity`` salen de la foto INICIAL del tick y el permiso de riesgo
     nuevo del gobernador (si veta aperturas, el conjunto vacío gana por construcción, no
     por un cero inventado).
+
+    ``regime_for`` (ADR-047) resuelve el régimen del PROPIO instrumento: la economía que
+    mide el optimizador tiene que salir de la MISMA barrera que decidirá después, o la
+    combinación elegida discreparía del motor.
 
     Devuelve también las candidatas: su ``expected_value`` es la economía YA medida del
     tick y el journal la publica tal cual (V2.47) en vez de recalcularla por segunda vez.
@@ -1040,7 +1049,7 @@ def _optimize_candidate_set(
             signal,
             snapshot=snapshot,
             cfg=cfg,
-            regime=regime,
+            regime=regime_for(signal.instrument_id),
             key=candidate_key(
                 signal, allow_distinct_strategies=cfg.allow_distinct_strategies
             ),
@@ -1055,6 +1064,7 @@ def plan_v2_tick(
     snapshot: Any,
     signals: list[V2Signal],
     regime: str | None = None,
+    regime_by_symbol: Mapping[str, str] | None = None,
     tunables: V2Tunables | None = None,
     as_of: str = "",
     actor: str = "auto-2.0",
@@ -1099,11 +1109,34 @@ def plan_v2_tick(
     aportan, el resto vale 0 (fail-closed, no se inventa evidencia). El lookup se indexa
     por instrumento (no por clave de candidata) porque la evidencia del campeón es una
     propiedad del ACTIVO, no de la versión concreta que dedupe la cartera.
+
+    ``regime_by_symbol`` (ADR-047) es el régimen de barras POR SÍMBOLO del tick. Con un
+    mapa presente, la barrera de cada candidata usa el régimen de SU instrumento y un
+    símbolo ausente cae en ``UNKNOWN`` (fail-closed de ese símbolo): un bajista deja de
+    vetar a los demás. El agregado ``regime`` se conserva como **declaración** del tick
+    (``marketRegime``) y el gobernador lo sigue usando como dial de riesgo. Con ``None``
+    (llamantes históricos) todo se decide con ``regime`` y el payload es byte-idéntico.
     """
     cfg = tunables if tunables is not None else V2Tunables()
-    resolved_regime = _coerce_operational_regime(
-        cfg.regime_override if cfg.regime_override is not None else regime
+    declared_regime = cfg.regime_override if cfg.regime_override is not None else regime
+    resolved_regime = _coerce_operational_regime(declared_regime)
+    symbol_regimes: dict[str, str] | None = (
+        None
+        if regime_by_symbol is None
+        else {str(symbol): str(label or "") for symbol, label in regime_by_symbol.items()}
     )
+    # ADR-047 §2.1 (paso 1): un hecho MACRO de riesgo (``risk_off``/``crisis``) sigue siendo
+    # un veto GLOBAL. ``_coerce_operational_regime`` lo colapsa a ``UNKNOWN``, de modo que
+    # sin esta guarda un mapa por símbolo podría aprobar una entrada con el macro apagado.
+    macro_veto = str(declared_regime or "").strip().upper() in _MACRO_ENTRY_VETO
+
+    def _entry_regime(instrument_id: str | None) -> str:
+        """Régimen que veta la entrada de UN instrumento (ADR-047)."""
+        if macro_veto:
+            return "RISK_OFF"
+        if symbol_regimes is None:
+            return resolved_regime
+        return _coerce_operational_regime(symbol_regimes.get(str(instrument_id or "")))
 
     entry_signals = [s for s in signals if str(s.action).upper() == "BUY"]
     # Una candidata por CLAVE, elegida de forma determinista. El antiguo ``setdefault``
@@ -1272,7 +1305,7 @@ def plan_v2_tick(
             ordered,
             snapshot=snapshot,
             cfg=cfg,
-            regime=resolved_regime,
+            regime_for=_entry_regime,
             # La parada DURA es del tick (no de la candidata) y es el único veto que el
             # optimizador puede aplicar como restricción de conjunto. Los vetos por
             # candidata del gobernador (EXIT_ONLY, listón de edge) siguen aplicándose
@@ -1402,7 +1435,7 @@ def plan_v2_tick(
             atr=atr,
             opportunity_score=entry_score,
             snapshot=working_snapshot,
-            regime=resolved_regime,
+            regime=_entry_regime(signal.instrument_id),
             trade_context=signal_ctx,
             config=decision_config,
             as_of=as_of,
@@ -1501,6 +1534,10 @@ def plan_v2_tick(
                 if decision.approved
                 else None,
                 adaptive=adaptive,
+                market_regime=resolved_regime,
+                entry_regime_scope=(
+                    None if symbol_regimes is None else "per_symbol"
+                ),
             )
         )
 
@@ -2321,6 +2358,8 @@ def _journal_entry(
     score: OpportunityScore | None = None,
     expected_value: ExpectedValue | None = None,
     adaptive: AdaptivePlan | None = None,
+    market_regime: str | None = None,
+    entry_regime_scope: str | None = None,
 ) -> DecisionJournalEntryRecord:
     from uuid import uuid4
 
@@ -2330,13 +2369,20 @@ def _journal_entry(
         "action": decision.action,
         "approved": decision.approved,
         "reasonCodes": list(decision.reason_codes),
-        "regime": decision.regime,
+        # ADR-047: con ``market_regime`` el campo histórico ``regime`` sigue siendo el
+        # AGREGADO del tick (declaración) y el régimen que vetó la entrada viaja aparte en
+        # ``entryRegime``. Sin ``market_regime`` el payload es el de siempre.
+        "regime": str(market_regime or decision.regime or ""),
         "sector": decision.sector,
         "tradePlan": None if decision.trade_plan is None else decision.trade_plan.to_dict(),
         "risk": decision.allocation,
         # V2.40.4 — violaciones de coherencia del TradePlan (vacío si fue válido).
         "planViolations": list(decision.plan_violations),
     }
+    if entry_regime_scope and str(decision.regime or "").strip():
+        # Procedencia EXACTA del veto de régimen: el régimen del PROPIO instrumento.
+        payload["entryRegime"] = str(decision.regime)
+        payload["entryRegimeScope"] = str(entry_regime_scope)
     # V2.45/AUTO-5 — identidad de estrategia ADITIVA (misma doctrina que el rechazo: la
     # clave se omite si no hay versión). Permite atribuir la decisión del día sin migración.
     if str(strategy_version or "").strip():
@@ -2483,33 +2529,57 @@ class DiscoveryRegimeSource:
     ``__call__()`` es la lectura síncrona que el hot path usa en el tick, de modo que
     decidir no depende de I/O. Un fallo al leer barras deja el régimen en ``NO_REGIME``
     (⇒ ``UNKNOWN`` ⇒ exit-only): nunca se asume un mercado operable por error.
+
+    ADR-047: ``refresh()`` conserva además la etiqueta POR SÍMBOLO. ``by_symbol()`` es la
+    lectura que la barrera usa para vetar cada entrada con el régimen de SU instrumento;
+    ``__call__()`` sigue devolviendo el agregado y se queda como **declaración** de
+    contexto (``marketRegime``), no como veto.
     """
 
     bars_provider: Callable[[], Awaitable[Mapping[str, Sequence[Any]]]]
     math_version: str = MATH_VERSION_MARKET_REGIME_V0
     _trial_regime: str = field(default=NO_REGIME, init=False, repr=False)
+    _by_symbol: dict[str, str] = field(default_factory=dict, init=False, repr=False)
 
     async def refresh(self) -> str:
-        """Recalcula el régimen agregado desde las barras del universo."""
+        """Recalcula el régimen agregado y el de cada símbolo desde las barras."""
         try:
             bars_by_symbol = await self.bars_provider() or {}
         except Exception:  # noqa: BLE001 — sin barras no hay régimen (fail-closed).
             logger.exception("auto_v2 regime refresh failed (regimen UNKNOWN)")
             self._trial_regime = NO_REGIME
+            self._by_symbol = {}
             return self._trial_regime
-        regimes = [
-            classify_market_regime(list(bars or []), math_version=self.math_version)
-            for bars in bars_by_symbol.values()
-        ]
-        self._trial_regime = aggregate_trial_regime(regimes)
+        labels = {
+            str(symbol): classify_market_regime(list(bars or []), math_version=self.math_version)
+            for symbol, bars in bars_by_symbol.items()
+        }
+        self._by_symbol = labels
+        self._trial_regime = aggregate_trial_regime(labels.values())
         return self._trial_regime
 
     def trial_regime(self) -> str:
         """Régimen de barras crudo (``trend_up``… o ``""``). Informativo/auditoría."""
         return self._trial_regime
 
+    def by_symbol(self) -> Mapping[str, str]:
+        """Etiqueta de barras POR SÍMBOLO del último ``refresh()`` (copia defensiva).
+
+        Un símbolo ausente del mapa no está clasificado: el llamante debe tratarlo como
+        ``UNKNOWN`` (fail-closed de ESE símbolo), nunca como un mercado benigno.
+        """
+        return dict(self._by_symbol)
+
+    def regime_for(self, symbol: str | None) -> str:
+        """Régimen operativo del símbolo (ADR-047); sin etiqueta ⇒ ``UNKNOWN``."""
+        return map_trial_regime(self._by_symbol.get(str(symbol or "")))
+
     def __call__(self) -> str:
-        """Régimen operativo cacheado (``BULL_TREND``… o ``UNKNOWN``)."""
+        """Régimen operativo AGREGADO cacheado (``BULL_TREND``… o ``UNKNOWN``).
+
+        Declaración de contexto del tick. Desde ADR-047 **no** es el veto de entrada: el
+        veto por instrumento lo resuelve ``regime_for``/``by_symbol``.
+        """
         return map_trial_regime(self._trial_regime)
 
 

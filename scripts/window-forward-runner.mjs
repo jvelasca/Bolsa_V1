@@ -639,7 +639,7 @@ async function cmdPreflight(config, flags) {
   if (regime) {
     logInfo(
       SCOPE,
-      `preflight: eje ${regime.operationalRegime} · LONG ${regime.entriesAllowedLong ? "PERMITIDAS" : "VETADAS"} (exit ${res.code})`,
+      `preflight: eje ${regime.operationalRegime} · LONG ${regime.entriesAllowedLong ? "PERMITIDAS" : "VETADAS"} · símbolos operables ${regime.symbolsOperable ?? "n/d"} (exit ${res.code})`,
     );
   }
   // Un `exit 2` SIN payload de preflight es un fallo duro (p. ej. el interprete
@@ -835,7 +835,8 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
     logInfo(
       SCOPE,
       `preflight: eje ${manifest.regime.operationalRegime} · LONG ` +
-        `${manifest.regime.entriesAllowedLong ? "PERMITIDAS" : "VETADAS"} (exit ${pre.code})`,
+        `${manifest.regime.entriesAllowedLong ? "PERMITIDAS" : "VETADAS"} · ` +
+        `símbolos operables ${manifest.regime.symbolsOperable ?? "n/d"} (exit ${pre.code})`,
     );
   }
   if (steps.preflight.hard) {
