@@ -21,6 +21,7 @@ import {
   BACKTESTING_IDEAS,
   BACKTESTING_NEXT,
   BACKTESTING_SCREENS,
+  BACKTESTING_STRATEGY_CHOICE_GUIDE,
   BACKTESTING_SUMMARY,
   BACKTESTING_SYNC,
   BACKTESTING_TRACKING,
@@ -103,6 +104,40 @@ export function BacktestingHelpSection({
           <p className="text-[11px] text-muted-foreground">
             {BACKTESTING_YOU_ARE_HERE.pause}
           </p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/70">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">
+            {BACKTESTING_STRATEGY_CHOICE_GUIDE.title}
+          </CardTitle>
+          <CardDescription>
+            Cómo se elige, se confirma y se entra o sale ·{" "}
+            <code className="text-[10px]">{BACKTESTING_SYNC.diaDPremises}</code>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p className="text-xs text-muted-foreground">
+            {BACKTESTING_STRATEGY_CHOICE_GUIDE.body}
+          </p>
+          {BACKTESTING_STRATEGY_CHOICE_GUIDE.sections.map((section) => (
+            <div key={section.title} className="space-y-1">
+              <h4 className="text-xs font-semibold text-foreground">
+                {section.title}
+              </h4>
+              <ul className="list-disc space-y-1 pl-4 text-xs text-foreground">
+                {section.bullets.map((bullet) => (
+                  <li key={bullet}>{bullet}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <ul className="list-disc space-y-1 pl-4 text-[11px] text-muted-foreground">
+            {BACKTESTING_STRATEGY_CHOICE_GUIDE.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
         </CardContent>
       </Card>
 

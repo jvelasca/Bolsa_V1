@@ -1,6 +1,6 @@
 # Ayuda en la app — coordinación con trackers y docs
 
-> **Sync:** `HELP_CONTENT_AS_OF` = **2026-09-07** (tip producto **v2.11-beta** · package `1.40.0-beta` · Confirm LIVE VIRTUAL (simulado) · `LIVE_EXECUTION_UNLOCKED` default off · camino usuario **«Del activo a la operación»** · UI ≠ settlement · `PAPER_D_EXECUTE` off · Accept estricto abierto · W+5 **0/5**)  
+> **Sync:** `HELP_CONTENT_AS_OF` = **2026-10-19** (tip producto **v2.11-beta** · package `1.40.0-beta` · Confirm LIVE VIRTUAL (simulado) · `LIVE_EXECUTION_UNLOCKED` default off · camino usuario **«Del activo a la operación»** · UI ≠ settlement · `PAPER_D_EXECUTE` off · Accept estricto abierto · W+5 **0/5** · ADR-047 Accepted: régimen **por valor** · guía nueva «cómo se elige la operativa de un valor»)  
 > Nav L1: **Hoy** · **Mercado** (terminal) · **Cartera** · **Asesor** · **Laboratorio**. Firma en Hoy → Confirmar (`/confirm`). Señales bajo Mercado. Consola / Decisiones / Journal no son puertas L1.  
 > Mesa diaria: **Hoy** = inbox por atención · **Mercado** = cockpit (verdad entrada/posición/salida) · **Confirmar** = única firma · misma CTA/frase/hint entre superficies · entradas bloqueadas fail-closed. Menús: **Laboratorio** (`/backtests`) · **Asesor**. **AUTO cuenta** = UI BETA-D (`ACTIVAR AUTO` + `PAPER_D_EXECUTE` opt-in, default off). SEMI: _La app propone operaciones sobre tu Universo. Tú las firmas aquí. Nunca se envían solas._ En Ayuda (Guía, **Flujo y módulos**, Trading) — **«Del activo a la operación»** + **«Hoy»** + «En pocas palabras» + «Cómo probar» + `<details>` experto. Tips «?» de mesa en Operativa / Confirmar. Confirm en **panel lateral** desde Operativa / chip F3.  
 > **Cierre etapa (auditoría):** [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md).  
@@ -158,6 +158,86 @@ Guía en Ayuda → Backtesting (`BACKTESTING_DIA_D_GUIDE`). Plan: [operativa-tes
 Si el hub «desapareció» (solo película): **Salir pantalla completa** o **Salir verificación**, o recarga (full-bleed no se persiste).
 
 Si no ves el CTA: la fecha DÍA D sigue en «hoy», o no hay Finalistas #1 con estrategia guardada.
+
+## Cómo se elige la operativa de un valor (usuario · DÍA D · sync 2026-10-19)
+
+**Pregunta que responde:** _¿qué estrategia y qué parámetros son los más adecuados para **este** valor, y cómo sé que aguantan?_
+
+**Idea en una frase:** la app no adivina el «mejor indicador»; prueba familias de estrategia,
+mide el campeón **fuera de muestra** y solo lo deja como Finalista si pasa los controles. Después
+**verifica** lo que el motor habría hecho contra lo que pasó. Elegir bien **no** garantiza
+ganancias y la app lo declara (`NO CONFIRMADO` / `INCONCLUSIVE`).
+
+Guía en Ayuda → Backtesting (`BACKTESTING_STRATEGY_CHOICE_GUIDE`). Docs:
+[explicación P3→P4](./engineering/explicacion-estrategia-p3-p4-2026-10-16.md) ·
+[ADR-021](./adr/021-dia-d-reconciliation.md) · [premisas DÍA D](./engineering/backtesting-dia-d-premises-2026-07-31.md).
+
+### 1) El embudo (de muchas reglas a una propuesta)
+
+| Etapa        | Qué pasa                                                                                                                                                              |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Probar**   | Se prueban las estrategias genéricas (tendencia, momentum, reversión, ruptura, combinadas) y las tuyas/Finalistas del valor sobre el histórico disponible.           |
+| **Coach**    | Ranking local y determinista → TOP ★ del valor (máx. 3, sin duplicar familia). La IA solo narra y puede **vetar con motivo**. Sin ACK¹ no se pasa al Lab.              |
+| **Lab**      | Por familia se busca la mejor combinación de parámetros **solo con la primera parte** del histórico (in-sample).                                                      |
+| **Revalidar**| El campeón se mide en lo que **no vio** (hold-out, walk-forward, CPCV) + PBO y DSR. Si no aguanta, no se graba.                                                       |
+| **Finalistas**| Solo se guarda con `runId`, `lab_validated` y **ACK final**. El **#1** es la operativa propuesta para ese valor, **no** una orden de compra.                         |
+
+### 2) Cómo se mide «mejor» (sin magia)
+
+- **Objetivo del Lab:** `score = retorno % − 0,25 × peor caída %`. Misma vara para todos; queda en el run.
+- **In-sample (IS):** primera parte del histórico. **Fuera de muestra (OOS):** tramo final que el campeón no usó para elegir parámetros (10–40 %, mínimo 50 barras IS / 30 OOS).
+- **Walk-forward:** 2–5 pliegues (por defecto 3); WFE = OOS/IS y % de pliegues positivos.
+- **CPCV:** 4–6 grupos, 2 de prueba, purga + embargo (5 barras por defecto).
+- **PBO:** probabilidad de overfitting (`<0,5` baja · `0,5–0,7` elevada · `≥0,7` alta). **DSR:** Sharpe deflactado por nº de pruebas (se exige **≥0,7**).
+- **Campeón OOS-aware:** se prefiere el OOS cuando todos los candidatos lo tienen; un OOS con **<2 operaciones** se penaliza.
+
+### 3) Cómo se confirma (puertas que no se saltan)
+
+| Puerta         | Qué exige                                                                 |
+| -------------- | ------------------------------------------------------------------------- |
+| `backtest`     | campeón IS con resultado positivo                                         |
+| `robustness`   | PBO medido **y** CPCV presente                                            |
+| `walk_forward` | WFE medido y por encima del umbral                                        |
+| `oos`          | resultado fuera de muestra por encima del umbral                          |
+| `risk`         | drawdown medido y válido                                                  |
+| `dsr`          | Sharpe deflactado ≥ 0,7                                                   |
+| `coach`        | lo aporta la fase Coach (el Lab no lo decide)                             |
+
+**Fail-closed:** si falta una métrica, la puerta queda `NOT_EVALUATED` (que **no** es PASS).
+
+- **Humano:** ACK¹ (Coach) + ACK final (Revalidar) antes de escribir Finalistas. El valor debe estar en **Estudio** (watchlist ≠ supervisión).
+- **DÍA D (fecha pasada):** el embudo usa solo datos `≤ D` y guarda un TOP experimento (**F-D**) sin pisar los Finalistas reales (**F-hoy**). «Verificar D→hoy» repite la operativa congelada F-D#1 (lookback 3 años + arrastre de posición) y la compara con F-hoy: **SAME / DRIFT / INCONCLUSIVE** (+ contrafactual si difieren).
+- **Evidencia DÍA-D del motor (4 capas):** ventana operativa (`READY`/`INCONCLUSIVE`), declarado vs ejecutado (`MATCH`/`PARTIAL`/`DIVERGENT`), evidencia fuera de muestra (`OOS_SUPPORTED`/`MIXED`/`REFUTED`) y ejecución real (**reservada**). El veredicto global es **siempre `NO CONFIRMED`**: `CONFIRMED` no existe en el código.
+- **Suelos de muestra:** 5 ciclos/valor · acierto ≥ 0,5 · 20 ciclos «soportado» · 32 «fuerte». `UNKNOWN ≠ 0`: un contador ausente viaja como hueco, nunca como cero.
+- **Ventana PAPER (ADR-046):** se construye con hechos durables (`fills ∪ cycles ∪ journal`), no con el permiso del día; sin operación suficiente sigue `INCONCLUSIVE`.
+
+### 4) Cómo se decide ENTRAR
+
+| Paso | Qué hace |
+| ---- | -------- |
+| Señal | La estrategia emite en el cierre de la barra diaria; se descarta duplicada/caducada con motivo en el journal. |
+| Ranking | Peso explicable: `edge` 30 % · `robustness` 20 % · `regime_fit` 15 % · `momentum` 10 % · `liquidity` 10 % · `risk_reward` 10 % · `execution_quality` 5 %. Componente ausente = 0 (no se inventa). |
+| TOP N | Por defecto se **evalúan** las 5 mejores; el edge mínimo es 0,30. Fuera del TOP = «no evaluada» (no «mala señal»). |
+| Régimen | **Por valor** (ADR-047): un LONG **no** se abre en `BEAR_TREND`; `RISK_OFF`/`CRISIS` vetos globales; `UNKNOWN` no opera (fail-closed). |
+| Geometría | Stop = entrada − 1,5 × ATR (o el stop propio de la estrategia); T1 = 1R, T2 = 2R si no hay objetivos propios. Sin stop ni ATR → **no entry** (`atr_unknown`). |
+| Tamaño | Por **riesgo**, no por caja: ≤1 % del patrimonio por operación · ≤20 % por posición · ≤40 % por sector · ≤6 % de riesgo abierto total. Comisión + spread + slippage entran en el presupuesto. |
+| Permiso | `TradePlan` → permiso de apertura → orden/reserva → fill (PAPER). En **SEMI** lo firma el humano en **Confirmar**; en **AUTO** solo se ejecuta en dinero virtual. |
+
+### 5) Cómo se decide SALIR
+
+Orden **único** de prioridad (el primero que dispara manda; el resto queda como motivo secundario):
+
+`KILL_SWITCH` > `REGIME_EXIT` > `RISK_EXIT` > `MANUAL` > `STRUCTURAL_STOP` > `THESIS_INVALIDATION` > `PORTFOLIO_RISK` > `TARGET_1` > `TARGET_2` > `TRAIL` > `TIME_STOP`.
+
+- **Stop estructural:** el precio toca el stop vigente → cierre.
+- **T1/T2:** plantilla por defecto `moderate` reduce **30 %** en T1 y otro **30 %** en T2; T2 no da por hecho T1.
+- **Trailing:** el stop solo se aprieta a favor (ratchet); nunca se aleja.
+- **Tiempo:** plazo del plan o techo de mantenimiento (**45 días** por defecto).
+- **Tesis invalidada:** el nivel se fijó al nacer la posición y se confirma con el **peor precio adverso persistido (MAE)**, no solo con el precio actual.
+- **Gobernador:** kill switch, modo solo-salidas y `RISK_OFF` pueden ordenar desriesgo. Las salidas **protectoras** no se bloquean por una reconciliación en `drift`; las demás esperan (`REVIEW`).
+- **Firma:** en SEMI, reducir/salir se firma en Confirmar. Los avisos del Lab o la columna «Salida» **no** ejecutan solos.
+
+> **Límite honesto:** la evidencia agregada DÍA-D es del **VALOR**; la identidad exacta de estrategia vive en la fila del **ciclo verificado**. Un backtest bueno puede fallar en el futuro: la app lo declara en vez de prometerlo.
 
 ## Mandato operativo (usuario · ADR-020 · M0–M3 + M1b)
 

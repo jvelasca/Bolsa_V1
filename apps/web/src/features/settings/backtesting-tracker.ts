@@ -77,6 +77,84 @@ export const BACKTESTING_YOU_ARE_HERE = {
     "Paper D (execute) es otra puerta — off por defecto (`PAPER_D_EXECUTE`). Primero entiende una prueba simple, Finalistas y el checklist.",
 } as const;
 
+/**
+ * Explicación usuario (sin jerga): cómo el Laboratorio elige la operativa y los
+ * parámetros de cada valor, cómo se confirma y cómo se decide entrar/salir.
+ *
+ * Es contenido de producto (Ayuda), no un doc de ingeniería: no promete rentabilidad
+ * y declara los límites (NO CONFIRMADO / INCONCLUSIVE / SIMULADO).
+ * Δ motor = 0 · Δ decisión = 0.
+ */
+export const BACKTESTING_STRATEGY_CHOICE_GUIDE = {
+  title: "Cómo se elige la operativa de un valor (DÍA D), en sencillo",
+  body: "La app no adivina el «mejor indicador»: prueba varias familias de estrategia con datos pasados, mide cada una en la parte del histórico que NO ha visto y solo deja como Finalista la que supera los controles. Después verifica, día a día, si lo que el motor habría hecho coincide con lo que de verdad pasó. Elegir bien no garantiza ganancias.",
+  sections: [
+    {
+      title: "1. El embudo: de muchas reglas a una propuesta",
+      bullets: [
+        "Probar: eliges un valor (o una lista) y un periodo. Se prueban las estrategias genéricas (tendencia, momentum, reversión a la media, ruptura, combinadas) y las tuyas o Finalistas del valor.",
+        "Coach: ordena las candidatas y deja el TOP ★ del valor (máximo 3, sin duplicar familia). El ranking es local y determinista; la IA solo narra y puede vetar con motivo. El Lab no empieza hasta que confirmas (ACK).",
+        "Lab: para cada familia se busca la mejor combinación de parámetros (p. ej. medias 10/20/30 × 50/100/150; RSI 7/14/21 × 20/30 × 70/80; MACD 12/26/9 y 8/21/5). Esa búsqueda usa solo la primera parte del histórico (in-sample, IS).",
+        "Revalidar: el campeón se mide en lo que no vio (hold-out, walk-forward y CPCV) y se calcula la probabilidad de que el buen resultado sea suerte (PBO) y el Sharpe deflactado (DSR). Si no aguanta, no se graba.",
+        "Finalistas: solo se guarda lo que tiene runId, evidencia lab_validated y tu ACK final. El #1 es la operativa propuesta para ese valor, no una orden de compra.",
+      ],
+    },
+    {
+      title: "2. Cómo se mide «mejor» (sin magia)",
+      bullets: [
+        "Objetivo del Lab: score = retorno % − 0,25 × peor caída %. La misma vara para todos los candidatos, y queda registrada en el run.",
+        "In-sample (IS): solo la primera parte del histórico. Fuera de muestra (OOS): el tramo final que el campeón no usó para elegir parámetros (10–40 %, con mínimo de 50 barras IS y 30 OOS).",
+        "Walk-forward: 2–5 pliegues (por defecto 3). Se entrena con lo antiguo y se prueba con lo siguiente; se resume WFE (OOS/IS) y el % de pliegues positivos.",
+        "CPCV: 4–6 grupos, 2 grupos de prueba, con purga y embargo (por defecto 5 barras) para no colar información del futuro.",
+        "PBO (probabilidad de overfitting): <0,5 baja · 0,5–0,7 elevada · ≥0,7 alta. DSR: Sharpe corregido por haber probado muchas variantes (se exige ≥0,7).",
+        "El campeón se elige pensando en OOS cuando todos los candidatos tienen OOS medido; un OOS con muy pocas operaciones (menos de 2) se penaliza, no se premia.",
+      ],
+    },
+    {
+      title: "3. Cómo se confirma (puertas que no se saltan)",
+      bullets: [
+        "Siete puertas del Lab: backtest (campeón con resultado positivo), robustness (PBO + CPCV), walk_forward (WFE medido), oos (resultado fuera de muestra), risk (drawdown medido), dsr (≥0,7) y coach (la aporta la fase Coach).",
+        "Fail-closed: si una métrica falta, la puerta queda NOT_EVALUATED, que NO es PASS. Sin runId y sin evidencia lab_validated no hay Finalista.",
+        "Confirmación humana: ACK en Coach y ACK final en Revalidar antes de escribir Finalistas. Watchlist no es supervisión: el valor debe estar en Estudio.",
+        "DÍA D (fecha pasada): el embudo usa solo datos ≤ D y guarda un TOP de experimento (F-D) sin pisar tus Finalistas reales (F-hoy). «Verificar D→hoy» repite la operativa congelada F-D#1 (lookback 3 años + arrastre de posición) y la compara con F-hoy: SAME / DRIFT / INCONCLUSIVE.",
+        "Evidencia DÍA-D del motor: 4 capas (ventana operativa; declarado vs ejecutado; evidencia fuera de muestra; ejecución real, reservada). El veredicto global siempre es NO CONFIRMADO: «CONFIRMED» no existe en el código.",
+        "Suelos de muestra declarados: 5 ciclos por valor, acierto ≥0,5, 20 ciclos para «soportado» y 32 para «fuerte». Un dato ausente se muestra como «sin dato»; nunca se rellena con 0.",
+        "La ventana PAPER se construye con hechos durables (fills, ciclos, journal), no con el permiso del día. Mientras no haya operación suficiente sigue INCONCLUSIVE: la app lo dice, no lo maquilla.",
+      ],
+    },
+    {
+      title: "4. Cómo se decide ENTRAR",
+      bullets: [
+        "Señal de la estrategia (barra diaria al cierre) → se descarta duplicada o caducada, con su motivo en el journal.",
+        "Ranking explicable: edge 30 %, robustez 20 %, encaje de régimen 15 %, momentum 10 %, liquidez 10 %, riesgo/recompensa 10 %, calidad de ejecución 5 %. Un componente ausente vale 0 (no se inventa).",
+        "Solo se evalúan las mejores del tick (TOP_N = 5 por defecto) y se exige un edge mínimo (0,30 por defecto). Quedar fuera del TOP no es «mala señal»: es «no evaluada».",
+        "Barrera de régimen POR VALOR: un LONG no se abre en tendencia bajista confirmada (BEAR_TREND); RISK_OFF/CRISIS son vetos globales; UNKNOWN no opera (fail-closed). Así un valor bajista no veta a los demás.",
+        "Geometría: stop = entrada − 1,5 × ATR (o el stop propio de la estrategia); T1 = 1R y T2 = 2R si la estrategia no aporta objetivos. Sin stop ni ATR verificable no hay entrada (atr_unknown).",
+        "Tamaño por riesgo, no por caja: máximo 1 % del patrimonio por operación, 20 % por posición, 40 % por sector y 6 % de riesgo abierto total; comisión, spread y slippage entran en el presupuesto.",
+        "El plan (TradePlan) pasa por el permiso de apertura y se convierte en orden/reserva; en SEMI lo firmas tú en Confirmar; en AUTO solo se ejecuta en PAPER (dinero virtual).",
+      ],
+    },
+    {
+      title: "5. Cómo se decide SALIR",
+      bullets: [
+        "Se revisa en cada tick contra la posición, con un orden único de prioridad: kill switch > salida por régimen > salida por riesgo > manual > stop estructural > tesis invalidada > riesgo de cartera > T1 > T2 > trailing > tiempo.",
+        "Stop estructural: si el precio toca el stop vigente, se cierra. T1/T2: con la plantilla por defecto (moderate) se reduce un 30 % en T1 y otro 30 % en T2; T2 no da por hecho T1.",
+        "Trailing: el stop solo se aprieta a favor (ratchet); nunca se aleja. Tiempo: si se agota el plazo del plan o el techo de mantenimiento (45 días por defecto), se plantea la salida.",
+        "Tesis invalidada: el nivel se fijó al nacer la posición y se confirma con el peor precio adverso registrado (MAE), no solo con el precio de ahora.",
+        "Gobernador: kill switch, modo solo-salidas y RISK_OFF pueden ordenar desriesgo; las salidas protectoras no se bloquean por una reconciliación en drift.",
+        "En SEMI, reducir o salir también se firma en Confirmar. Los avisos del Lab o la columna «Salida» no ejecutan solos; en AUTO el cierre se hace en PAPER.",
+      ],
+    },
+  ],
+  notes: [
+    "Esto explica el criterio, no promete rentabilidad: un backtest bueno puede fallar en el futuro y la app lo declara (NO CONFIRMADO / INCONCLUSIVE).",
+    "Toda la operativa es SIMULADA (PAPER / dinero virtual). No se envían órdenes reales a ningún bróker.",
+    "La evidencia agregada DÍA-D es del VALOR; lo exacto es la fila del ciclo verificado (con su identidad de estrategia).",
+    "Dónde verlo: Laboratorio → Finalistas (checklist) · Auto-monitor → tarjeta P3 «Estrategia que sustenta la señal» · panel DÍA-D.",
+    "Doc: docs/HELP.md · docs/engineering/explicacion-estrategia-p3-p4-2026-10-16.md · docs/adr/021-dia-d-reconciliation.md · ADR-046/047.",
+  ],
+} as const;
+
 /** Cómo arrancar Backtesting DÍA D (verificación D→hoy). */
 export const BACKTESTING_DIA_D_GUIDE = {
   title: "Backtesting DÍA D — cómo arrancar",

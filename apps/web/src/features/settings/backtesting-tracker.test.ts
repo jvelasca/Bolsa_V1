@@ -10,6 +10,7 @@ import {
   BACKTESTING_CORE_R_GUIDE,
   BACKTESTING_DIA_D_GUIDE,
   BACKTESTING_NEXT,
+  BACKTESTING_STRATEGY_CHOICE_GUIDE,
   BACKTESTING_SUMMARY,
   BACKTESTING_SYNC,
   BACKTESTING_TRACKING,
@@ -35,6 +36,40 @@ describe("backtesting-tracker help guides", () => {
     expect(blob).toMatch(/F-hoy|F-D|reconciliaci[oó]n|SAME|DRIFT|ADR-021/i);
     expect(blob).toMatch(/no se pisa|intact/i);
     expect(blob).toMatch(/test:operativa|021-dia-d/);
+  });
+
+  it("strategy choice guide explains funnel, confirmation and entry/exit", () => {
+    const sections = BACKTESTING_STRATEGY_CHOICE_GUIDE.sections;
+    expect(sections.length).toBe(5);
+    const blob = [
+      BACKTESTING_STRATEGY_CHOICE_GUIDE.body,
+      ...sections.flatMap((s) => [s.title, ...s.bullets]),
+      ...BACKTESTING_STRATEGY_CHOICE_GUIDE.notes,
+    ].join(" ");
+    // Embudo y parámetros por valor.
+    expect(blob).toMatch(/Probar/);
+    expect(blob).toMatch(/Coach/);
+    expect(blob).toMatch(/Lab/);
+    expect(blob).toMatch(/Revalidar/);
+    expect(blob).toMatch(/Finalistas/);
+    expect(blob).toMatch(/parámetros|parámetro/);
+    // Confirmación: puertas + ACK + runId + NO CONFIRMADO.
+    expect(blob).toMatch(/NOT_EVALUATED/);
+    expect(blob).toMatch(/ACK/);
+    expect(blob).toMatch(/runId/);
+    expect(blob).toMatch(/lab_validated/);
+    expect(blob).toMatch(/NO CONFIRMADO/);
+    expect(blob).toMatch(/SAME|DRIFT|F-D|F-hoy/);
+    // Entrada y salida.
+    expect(blob).toMatch(/TOP_N/);
+    expect(blob).toMatch(/BEAR_TREND|régimen/i);
+    expect(blob).toMatch(/1,5 × ATR|ATR/);
+    expect(blob).toMatch(/T1|T2/);
+    expect(blob).toMatch(/TRAIL|trailing/i);
+    expect(blob).toMatch(/TIME_STOP|tiempo|45 días/i);
+    // Límites declarados: no promete rentabilidad y es SIMULADO.
+    expect(blob).toMatch(/no promete rentabilidad/i);
+    expect(blob).toMatch(/SIMULADA|PAPER|dinero virtual/i);
   });
 
   it("CORE-R guide covers enqueue, narrate, shell cron", () => {

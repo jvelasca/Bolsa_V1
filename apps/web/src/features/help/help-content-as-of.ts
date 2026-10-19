@@ -153,6 +153,15 @@
  *
  * Verificar: `pnpm test:fa` · `pnpm test:operativa` · `pnpm test:coach`
  *
+ * **2026-10-19** — Ayuda → Backtesting: guía nueva **«Cómo se elige la operativa de un
+ * valor (DÍA D), en sencillo»** (`BACKTESTING_STRATEGY_CHOICE_GUIDE`): embudo
+ * Probar→Coach→Lab→Revalidar→Finalistas · métricas IS/OOS/WF/CPCV/PBO/DSR · 7 puertas
+ * fail-closed · confirmación (ACK + runId + `lab_validated`) · evidencia DÍA-D en 4 capas
+ * (`NO CONFIRMED`) y suelos de muestra · entrada (ranking, TOP_N, régimen por valor
+ * ADR-047, ATR 1,5, riesgo 1 %/20 %/40 %/6 %) · salida (precedencia, T1/T2 30 %, trail,
+ * tiempo 45 d, tesis por MAE, gobernador). Δ motor = 0 · Δ decisión = 0.
+ * `docs/HELP.md` § «Cómo se elige la operativa de un valor».
+ *
  * @see docs/adr/024-estudio-supervision-universe.md
  * @see docs/engineering/estudio-process-status-ui-2026-08-06.md
  * @see docs/engineering/session-handoff-2026-08-06-estudio-process-ui.md
@@ -162,4 +171,4 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = "2026-09-07" as const;
+export const HELP_CONTENT_AS_OF = "2026-10-19" as const;
