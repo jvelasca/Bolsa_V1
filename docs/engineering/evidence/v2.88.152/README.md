@@ -126,6 +126,17 @@ en `scripts/`. La **ventana PAPER** no se re-mide y sigue necesitando OPERACIÓN
 
 ## 7. Publicación (POST-TAG)
 
-Pendiente de la ejecución del `Release tag CI` sobre el tag `v2.88.152-beta`: se actualiza esta
-sección con el run, el resultado de `freeze` y el veredicto de `replay-repro`
-(`REPRODUCIDO` ⇒ `Δ decisión = 0`).
+`Release tag CI` [run **`39303586042`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/39303586042) ⇒
+**`conclusion: success`**: 13 jobs `success` + `certify` `success`
+(`playwright (integrated E2E, opt-in)` `skipped`, declarado). `playwright (mock E2E)` **verde** y
+`replay-repro` **`REPRODUCIDO`** («mismo CONTENIDO; el sello está en CRLF y este fichero en LF»)
+⇒ **`Δ decisión = 0`**. `pnpm window:freeze` **OK** sobre el árbol del sello (`4198a3a8`).
+
+El **primer** intento del tag ([`39300632203`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39300632203))
+salió **rojo sólo** en `playwright (mock E2E)`: la suite mock no servía
+`GET /api/auto/estudio-chain` y el fallback `{ data: [] }` llegaba al panel como si fuera la
+respuesta, rompiendo `chain.notes.join(...)`. Corrección en dos capas, sin tocar el contrato:
+el panel **normaliza** la respuesta (`normalizeEstudioChain`) y el mock E2E sirve la cadena y
+el artefacto `values/<SÍMBOLO>` con la forma de la API. El tag se **movió** al commit de
+corrección y el reenvío salió verde: la ventana PAPER sigue **`INCONCLUSIVE`** (es OPERACIÓN,
+no software).
