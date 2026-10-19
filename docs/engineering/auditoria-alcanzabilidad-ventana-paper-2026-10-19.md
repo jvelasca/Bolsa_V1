@@ -7,6 +7,14 @@
 >
 > **Pregunta:** el veto `BEAR_TREND` que mantiene la ventana PAPER en `NO_MEDIDO`, ¿es un **hecho
 > de MERCADO**, un **sesgo del detector**, o una **propiedad de construcción** del gate?
+>
+> **Cierre (2026-10-19, `v2.88.150-beta`):** la opción **A** está **implementada** y ADR-047 en
+> estado **Accepted**: el veto de entrada consume el régimen del **propio símbolo** y el agregado
+> del universo queda como **declaración** (`marketRegime`). El censo del replay pasa de **0** a
+> **1 226/1 285** días operables (95,4 %). Este documento se conserva como **diagnóstico PRE**;
+> las medidas POST, el baseline **segmentado** y el CI verde viven en
+> [`evidence/v2.88.150/README.md`](./evidence/v2.88.150/README.md) (`Release tag CI` run
+> `39248145274`). **`Δ motor ≠ 0` · `Δ decisión ≠ 0` · `Δ contrato HTTP = 0`**.
 
 ## 0. Veredicto
 
@@ -16,12 +24,13 @@
 | El detector usa **datos viejos** | **FALSA** | **120** barras por símbolo; última barra `2026-10-16` (34) / `2026-10-19` (1, parcial) |
 | El preflight es **más estricto** que el motor | **FALSA** | Misma composición (`make_bar_snapshot_loader` → clasificador → agregado → eje) y el motor aplica ese **único** eje global |
 | El veto de hoy es un **hecho de mercado** | **CIERTA** | 22 `down` / 5 `up` / 8 `range` ⇒ `BEAR_TREND` ⇒ LONG vetadas (motor long-only) |
-| **El gate de la ventana es alcanzable** | **FALSA** | **0/61** fechas as-of con LONG permitidas; el máximo no-bajista fue **30/35 (85,7 %)** y **también** se vetó |
+| **El gate de la ventana es alcanzable** | **FALSA** *(PRE: con el eje global; ver **Cierre**)* | **0/61** fechas as-of con LONG permitidas; el máximo no-bajista fue **30/35 (85,7 %)** y **también** se vetó |
 
-**Dictamen en una frase:** el detector está bien y el veto es correcto **respecto al motor**, pero
-el gate de la ventana exige que **los 35 símbolos** estén simultáneamente no-bajistas; eso no ha
-ocurrido en **ninguna** de las 61 fechas as-of medidas. `NO_MEDIDO` no es «paciencia operativa»:
-es una **propiedad de construcción** del agregado + la lane long-only.
+**Dictamen en una frase (PRE, `.148`):** el detector está bien y el veto es correcto **respecto al
+motor**, pero el gate de la ventana exige que **los 35 símbolos** estén simultáneamente no-bajistas;
+eso no ha ocurrido en **ninguna** de las 61 fechas as-of medidas. `NO_MEDIDO` no es «paciencia
+operativa»: es una **propiedad de construcción** del agregado + la lane long-only. **Esa construcción
+se sustituyó en `.150`** (gate por símbolo, ver **Cierre** arriba).
 
 ## 1. Método (reproducible, solo lectura)
 
@@ -166,11 +175,20 @@ ADR, nuevo baseline de replay y evidencia. Si no hay apetito para ese cambio, la
 correcta **si y sólo si** se declara el criterio de alcanzabilidad de forma explícita y se deja de
 presentar `NO_MEDIDO` como algo que se resolverá operando.
 
-**Decisión del propietario (2026-10-19):** se abre la opción **A** como
-[ADR-047](../adr/047-gate-direccional-por-simbolo.md) en estado **Proposed** y **docs-only**: fija el
-contrato (gate por símbolo, agregado como declaración), el plan de baseline de replay y la política
-de re-emisión de la evidencia `.136`…`.149` por segmentos. **No implementa nada**: el motor sigue
-byte-idéntico hasta que se acepte y se abra un sello propio con `Δ decisión ≠ 0`.
+**Decisión inicial del propietario (2026-10-19, histórica):** se abrió la opción **A** como
+[ADR-047](../adr/047-gate-direccional-por-simbolo.md) en estado **`Proposed`** y **docs-only**: fija
+el contrato (gate por símbolo, agregado como declaración), el plan de baseline de replay y la
+política de re-emisión de la evidencia `.136`…`.149` por segmentos. En ese momento **no
+implementaba nada**: el motor seguía byte-idéntico hasta aceptar la ADR en un sello propio con
+`Δ decisión ≠ 0`.
+
+**Resolución (mismo día, `v2.88.150-beta`):** ADR-047 **Accepted** e implementada. El agregado deja
+de vetar la cartera entera (`entryRegime` por símbolo · `entryRegimeScope="per_symbol"` ·
+`entriesAllowedLong = operable > 0`), la guarda macro `RISK_OFF`/`CRISIS` sigue vetando **global**,
+y el replay se **segmenta**: PRE `.136`…`.149` (`24066225…` / `1E3ADAC2…`) vs POST `.150`+
+(`01429BCC…` / `E9B7376B…`). Medida previa (techo read-only): **61/61** fechas con al menos un
+símbolo operable; medida POST en el replay real: **1 226/1 285** días. Sigue siendo **techo**
+(falta señal/ciclo): **no** es un veredicto de P&L.
 
 **Medida previa del POST (simulación read-only, 2026-10-19):** con el gate por símbolo, **61/61**
 fechas as-of tendrían al menos **un** símbolo operable (frente a **0/61** del eje global); mediana
@@ -189,5 +207,8 @@ símbolos nunca operables. Es un **techo** (falta señal/ciclo), no un veredicto
 - El instrumento **sólo hace SELECT**: no escribe ledger, journal, pin ni BD; no promociona
   evidencia ni emite `CONFIRMED`.
 - **No** se toca el motor, ni los umbrales, ni los pesos A/B, ni el contrato HTTP; **sin
-  migración**. `replay-repro` debe seguir reproduciendo el mismo `sha256` (Δ decisión = 0).
+  migración** *(alcance PRE de esta auditoría)*. Tras el cierre en `.150` el `sha256` del replay
+  cambia **por segmento**: PRE `.136`…`.149` conserva `1E3ADAC2…`/`24066225…` y POST `.150`+
+  usa `E9B7376B…`/`01429BCC…`; `replay-repro` reproduce **el hash de su segmento**
+  ([evidencia `.150`](./evidence/v2.88.150/README.md)).
 - La auditoría **no** demuestra rentabilidad ni mide la magnitud del P&L.
