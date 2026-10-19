@@ -2,6 +2,24 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.150-beta] — **ADR-047: gate direccional POR SÍMBOLO — el agregado deja de vetar la cartera entera y pasa a declaración de riesgo** (**`Δ motor ≠ 0` · `Δ decisión ≠ 0` · `Δ contrato HTTP = 0` · SIN migración**)
+
+**Naturaleza:** cambio de **contrato de decisión** (no un refactor): la barrera de régimen consume el régimen del **propio símbolo**. Contrato HTTP **sin diff** (`openapi.json`/`schema.d.ts` **sin cambio**); sin migración (head `056_auto_ops_jobs`). **Bump** `2.11.149-beta` → `2.11.150-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**). Tag **unsigned**.
+
+**El defecto (medido en `.149`).** El agregado conservador (`high_vol > trend_down > range > trend_up > low_vol`) hacía que **un solo** `trend_down` vetara LONG en **los 35** símbolos del watch ⇒ **0/61** fechas as-of con entradas permitidas. El detector no estaba sesgado: el cuello era el **eje global**.
+
+**La decisión (ADR-047 Accepted).** `plan_v2_tick` acepta `regime_by_symbol` y resuelve la barrera con `_entry_regime(símbolo)`; `DiscoveryRegimeSource` expone `by_symbol()`/`regime_for()`. El agregado **se sigue calculando y exponiendo** (`marketRegime`) y sigue siendo el dial del gobernador, pero **no veta** entradas de otros símbolos. **No** cambian `regime_allows_entry_for`, sus conjuntos bloqueados, el clasificador, la prioridad conservadora, el sizing ni las salidas. **Macro `risk_off`/`crisis` sigue siendo veto GLOBAL** (guarda sobre la etiqueta cruda) y un símbolo sin barras cae en `UNKNOWN` **sólo** para él (fail-closed por símbolo).
+
+**Procedencia en el journal.** Con mapa por símbolo, `regime` = agregado del tick y se añaden `entryRegime` (régimen del símbolo, vocabulario operativo) + `entryRegimeScope="per_symbol"`. **Sin mapa** no se inyectan claves: el payload de los llamantes históricos es byte-idéntico.
+
+**Una sola verdad para «entradas permitidas».** `replay_oos` pasa a `entries_allowed_long = operable_symbols > 0` y conserva `entries_allowed_long_global` como **declaración**; el preflight (`v2_76` + `window-forward.mjs`) publica `entryGateScope`, `entriesAllowedLong`, `symbolsOperable`, `operableBySymbol` y `entriesAllowedLongGlobal`.
+
+**Baseline de replay segmentado (medido).** Censo **0 → 1 226/1 285** días operables (95,4 %) y el paso 2 del replay deja de saltarse: artefacto LF **`E9B7376B…7F5625` / 3 383 461 B** (CRLF **`01429BCC…92B7476` / 3 488 758 B**). El par `1E3ADAC2…929A37E7` queda como **segmento PRE** (`.136`…`.149`) y **no** se reescribe ningún README histórico. Dos corridas idénticas y `assert-artifact` ⇒ **`REPRODUCIDO`**. El artefacto **no** cambia al bumpear el paquete (bump del replay congelado en `2.11.0-beta`; verificado).
+
+**Verificación (medida).** Suite Python **4068 passed** · `pnpm window:test` **50 passed** · `pnpm lint:py` **`All checks passed!`** · `pnpm imports:py` **`4 kept, 0 broken`** · `pnpm types:py` **`Success: no issues found in 566 source files`** · `contract:check` **OK** · guardián de bump **2 passed** · `pnpm window:freeze` **OK** tras re-anclaje. Casos falsables nuevos: contagio por símbolo, hueco de barras, macro global, payload histórico intacto, `by_symbol`/`regime_for` y censo por símbolo.
+
+**Límites declarados (sin fabricar).** La **ventana PAPER** no se re-mide: sus filas PRE siguen `NO_MEDIDO_REGIMEN` y **no** se re-clasifican; PRE y POST **no** son comparables en P&L (regla de decisión distinta). El replay prueba que el **gate se abre**, **no** que haya P&L (exige señal, edge y ciclo) ⇒ **no demuestra rentabilidad**. El agregado sigue **sin dimensionar** (`risk_scale`/gobernador sin cambio). El preflight local corrió con el watch del catálogo (**20**) del entorno de desarrollo. Operativa **100 % SIM** (`PAPER_D_EXECUTE` off); tag **unsigned**. Evidencia: [`docs/engineering/evidence/v2.88.150/README.md`](docs/engineering/evidence/v2.88.150/README.md) · ADR: [`docs/adr/047-gate-direccional-por-simbolo.md`](docs/adr/047-gate-direccional-por-simbolo.md).
+
 ## [2.11.149-beta] — **auditoría read-only: el gate de régimen de la ventana PAPER es inalcanzable por construcción** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración**)
 
 **Naturaleza:** incremento **solo de documentación + un instrumento read-only** — **no** toca el motor de decisión, ni umbrales, ni pesos A/B, ni el contrato HTTP, ni el esquema. Contrato HTTP **sin diff** (`openapi.json`/`schema.d.ts` **sin cambio**); sin migración (head `056_auto_ops_jobs`). **Bump** `2.11.148-beta` → `2.11.149-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**). Tag **unsigned**.
