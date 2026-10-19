@@ -94,3 +94,15 @@ E2E, opt-in)` `skipped`, declarado):
   (`mock E2E`, `integrated axe`, `integrated AUTO S5`) ⇒ **`success`**.
 - `main` (push, run `39231458362` `Python CI`, `39231458366` `Gitleaks`, `39231458412` `Optimize lab`)
   ⇒ **`success`**.
+
+## 8. Siguiente (decisión, no implementación)
+
+El propietario eligió **no** dejar la ventana sin horizonte: se abre la opción **A** de la auditoría
+como [ADR-047](../../../adr/047-gate-direccional-por-simbolo.md) en estado **Proposed** y
+**docs-only** — gate direccional **por símbolo**, con el agregado conservado como **declaración** de
+riesgo, plan de **baseline de replay nuevo** (`1E3ADAC2…929A37E7` queda como segmento PRE) y política
+de **re-emisión segmentada** de la evidencia `.136`…`.149`.
+
+**Lo que este sello NO hace:** no toca código, ni umbrales, ni el gate. El motor sigue byte-idéntico
+y la ventana sigue `NO_MEDIDO`; la implementación, si se acepta, será un sello propio con
+**`Δ decisión ≠ 0`**.

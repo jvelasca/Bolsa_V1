@@ -166,6 +166,12 @@ ADR, nuevo baseline de replay y evidencia. Si no hay apetito para ese cambio, la
 correcta **si y sólo si** se declara el criterio de alcanzabilidad de forma explícita y se deja de
 presentar `NO_MEDIDO` como algo que se resolverá operando.
 
+**Decisión del propietario (2026-10-19):** se abre la opción **A** como
+[ADR-047](../adr/047-gate-direccional-por-simbolo.md) en estado **Proposed** y **docs-only**: fija el
+contrato (gate por símbolo, agregado como declaración), el plan de baseline de replay y la política
+de re-emisión de la evidencia `.136`…`.149` por segmentos. **No implementa nada**: el motor sigue
+byte-idéntico hasta que se acepte y se abra un sello propio con `Δ decisión ≠ 0`.
+
 ## 7. Límites declarados (sin fabricar)
 
 - **5 filas** de ledger observadas; la del `14/10` se lee de sus etiquetas (watch de 20 símbolos
