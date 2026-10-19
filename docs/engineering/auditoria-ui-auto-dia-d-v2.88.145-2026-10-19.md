@@ -122,6 +122,12 @@ cuenta activa».
 completos). `scripts/ci/test_selection.py` colecciona un helper `test_files_under(directory)` como
 test y falla por fixture ausente: **preexistente** y fuera de las rutas del CI.
 
+**CI del sello publicado (`v2.88.146-beta`):** `Release tag CI`
+[run `39211944171`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39211944171) **VERDE**
+(~13m57s; **13 jobs `success` + `certify` `success`**; opt-in `skipped`, declarado), con
+`[window-pin] freeze OK (cbdf7b22)` en `shared` y `replay-repro` ⇒ **`REPRODUCIDO`**
+(`sha256 1E3ADAC2…929A37E7`, idéntico a `.136`…`.145` ⇒ **`Δ decisión = 0` medido por el CI**).
+
 ### 2.1 Prueba integrada (obligatoria, sin `skip`)
 
 [`test_auto_daily_dia_d_chain_integration.py`](../../apps/api-python/tests/test_auto_daily_dia_d_chain_integration.py)

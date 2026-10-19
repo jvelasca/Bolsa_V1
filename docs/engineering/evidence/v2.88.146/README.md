@@ -62,5 +62,9 @@
 
 ## 6. Publicación
 
-- El gate `window:freeze` es fail-closed contra los **tree hashes** de `HEAD:apps`/`HEAD:packages` ⇒ tras el commit funcional se re-ancla el pin (`pnpm window:pin --write`) y el tag apunta al commit **cuyo pin casa con su árbol**.
-- Tag `v2.88.146-beta` (**anotado, unsigned**) y `Release tag CI` — **resultado pendiente en el momento de escribir esta sección**; se cita abajo en el POST-TAG, con `freeze OK` y `replay-repro` como medidas del CI.
+- **Tag:** `v2.88.146-beta` (**anotado, unsigned**) sobre el commit **`cbdf7b22`** (re-anclaje del pin); árbol del sello en **`8f3a78e8`**.
+- **`Release tag CI` [run `39211944171`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39211944171) — VERDE** (`2026-10-19T06:47:20Z` → `07:01:17Z`, ~**13m57s**; **13 jobs `success` + `certify` `success`**; `playwright (integrated E2E, opt-in)` `skipped`, declarado):
+  - `shared` ⇒ **`[window-pin] freeze OK (cbdf7b22)`** (`apps` `1e1744bc` / `packages` `a37f7f75`).
+  - `replay-repro` ⇒ **`REPRODUCIDO`** (`sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7`, idéntico a `.136`…`.145` ⇒ **`Δ decisión = 0` medido por el CI**).
+- **`main` en `cbdf7b22` — VERDE:** `Python CI` [`39211942220`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39211942220) · `Frontend CI` [`39211942207`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39211942207) · `Gitleaks` [`39211942206`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39211942206) · `Fase 2 scientific` [`39211942210`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39211942210) · `Optimize lab` [`39211942213`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39211942213) — todos **`success`**.
+- **Nota de honestidad:** esta sección se escribe **después** del tag (commit POST-TAG); el tag no se mueve. Las cifras locales de §4 y las del CI son **independientes**: las primeras son la medición de la máquina, las segundas la del árbol publicado.
