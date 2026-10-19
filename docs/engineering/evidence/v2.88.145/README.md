@@ -65,7 +65,7 @@
 | Import Linter | `pnpm imports:py` | **`Contracts: 4 kept, 0 broken`** |
 | Mypy | `pnpm types:py` | **`Success: no issues found in 565 source files`** |
 | Contrato | `pnpm --filter @bolsa/web contract:check` | **OK** |
-| Freeze | `pnpm window:freeze` | **OK** (`22ba29e3`; `apps` `0a49a43b` / `packages` `5bc5c3eb`) |
+| Freeze | `pnpm window:freeze` | **OK** (`2fb3e18a`; `apps` `efac219e` / `packages` `5bc5c3eb`) |
 | Rango de migraciones | test de revisión/alembic | `056` con id ≤ 32 y linaje desde `055_dia_d_identity_nullable` |
 
 ### 6.1 E2E (medido)
@@ -110,4 +110,34 @@ $env:E2E_RUN="1"; pnpm --filter @bolsa/web e2e -- gp-e2e-v290-auto-estudio-daily
 
 ## 9. Cita POST-TAG — CI del sello
 
-**Pendiente al escribir esta evidencia:** el tag `v2.88.145-beta` **no se ha creado** en este entorno. La cita del `Release tag CI` (run, jobs y `conclusion`) se añadirá aquí **después** del tag, como en los sellos anteriores; hasta entonces este §9 **no** afirma ningún resultado de CI.
+**Tag publicado:** `v2.88.145-beta` (**anotado, unsigned**; objeto `361e8c6f` → commit **`2fb3e18a`**), empujado junto a `main` (`22ba29e3..2fb3e18a`).
+
+**El primer intento salió ROJO y las causas eran REALES** ([run `39170808433`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39170808433)): (a) `python` falló porque [`test_scheduler_worker`](../../../../apps/api-python/tests/test_scheduler_worker.py) no listaba el starter nuevo `start_auto_ops_job_worker`; (b) `lifecycle-pg` falló porque **5 guardias PG** seguían fijando la head en `055_dia_d_identity_nullable`; (c) `playwright (integrated AUTO S5)` falló porque S5-05 exigía el desenlace del job cuando el harness arranca **solo `uvicorn`** (sin `scheduler_worker`). Corregido en `ce42fa96` (starter + head **056** + S5-05 verifica la cola durable y declara el worker ausente como **anotación**, no skip) y re-anclado en `2fb3e18a`; el tag se **movió** (mismo patrón que `.136`/`.137`).
+
+**`Release tag CI` [run `39204841812`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39204841812) — VERDE** (`2026-10-19T05:29:40Z` → `05:44:50Z`, ~**15m10s**; **13 jobs `success` + `certify` `success`**; `playwright (integrated E2E, opt-in)` `skipped`, declarado):
+
+| Job | `conclusion` |
+| --- | --- |
+| `security (gitleaks)` | **success** |
+| `decision-spine` | **success** |
+| `python (ruff/imports/mypy/pytest offline)` | **success** |
+| `lifecycle-pg (Alembic + auth + golden restart)` | **success** |
+| `replay-repro (regenera el artefacto del sello desde el fixture)` | **success** |
+| `shared (build/typecheck/test)` | **success** |
+| `frontend (typecheck/lint/test/build + contract:check)` | **success** |
+| `playwright (integrated axe)` | **success** |
+| `playwright (integrated AUTO S5)` | **success** |
+| `playwright (mock E2E)` | **success** |
+| `a7-gate (A7 C3 chaos live_a7 · dedicated real-PG)` | **success** |
+| `dr-verify (battery DB_DR / TCP CI)` | **success** |
+| `playwright (integrated E2E, opt-in)` | `skipped` (opt-in, declarado) |
+| `certify (aggregate + artifact)` | **success** |
+
+**Los dos gates que importan, medidos en el log del CI:**
+
+- **Gate `window:freeze` (job `shared`) — verde:** `[window-pin] freeze OK (2fb3e18a)` ⇒ el pin (`apps` `efac219e` / `packages` `5bc5c3eb`) **casa** con el árbol del commit del tag.
+- **`replay-repro` — `REPRODUCIDO`:** `sha256 1E3ADAC26543FC7BFC7DA4CAA8733D3B24937A0E3E0E78650DC059FA929A37E7` (fichero `3340728` bytes) — **idéntico** al de `.136`…`.144` ⇒ **`Δ decisión = 0` medido por el CI**, no afirmado.
+
+**`main` en el mismo commit `2fb3e18a` — VERDE también:** `Python CI` [`39204839804`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39204839804) · `Frontend CI` [`39204839823`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39204839823) · `Gitleaks` [`39204839802`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39204839802) — **`success`**.
+
+**Nota de honestidad sobre el orden:** esta cita se escribe **después** del tag (commit POST-TAG sobre `main`), de modo que **dentro** del tag el §9 decía «pendiente». Es el patrón declarado en los sellos anteriores; la medida es **falsable desde GitHub** por cualquiera.
