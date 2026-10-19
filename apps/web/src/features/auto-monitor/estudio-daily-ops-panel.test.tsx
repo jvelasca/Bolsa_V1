@@ -250,6 +250,7 @@ vi.mock("@/lib/api", () => ({
       status: "queued",
     })),
     getAutoOpsJob: vi.fn(),
+    listAutoOpsJobs: vi.fn(async () => ({ jobs: [], notes: [] })),
     getAutoEstudioAudit: vi.fn(async () => AUDIT),
   },
 }));
@@ -301,6 +302,9 @@ describe("EstudioDailyOpsPanel", () => {
 
     const aaa = bySymbol("AAA");
     expect(aaa?.getAttribute("data-status")).toBe("ok");
+    // El plan es un dry-run: NUNCA se rotula como «disparado» ni «ejecutado».
+    expect(aaa?.textContent).toContain("Plan propuesto");
+    expect(aaa?.textContent).not.toContain("Plan disparado");
     expect(aaa?.textContent).toContain("100.00");
     expect(aaa?.textContent).toContain("95.00");
     expect(aaa?.textContent).toContain("110.00");
@@ -317,6 +321,21 @@ describe("EstudioDailyOpsPanel", () => {
 
     expect(bySymbol("CCC")?.textContent).toContain("Sin señal");
     expect(bySymbol("DDD")?.textContent).toContain("Error");
+
+    // La vela diaria se declara: verificada con su fecha, o «no verificada» (nunca supuesta).
+    expect(
+      aaa
+        ?.querySelector('[data-testid="estudio-daily-value-bar"]')
+        ?.getAttribute("data-bar-verified"),
+    ).toBe("true");
+    expect(aaa?.textContent).toContain("vela 2026-10-17");
+    const ddd = bySymbol("DDD");
+    expect(
+      ddd
+        ?.querySelector('[data-testid="estudio-daily-value-bar"]')
+        ?.getAttribute("data-bar-verified"),
+    ).toBe("false");
+    expect(ddd?.textContent).toContain("vela no verificada");
 
     expect(screen.getByTestId("estudio-daily-counts").textContent).toContain(
       "4 valores",
@@ -353,6 +372,85 @@ describe("EstudioDailyOpsPanel", () => {
     const global = screen.getByTestId("estudio-daily-global-validation");
     expect(global.textContent).toContain("INCONCLUSIVE");
     expect(global.textContent).not.toContain("CONFIRMED ");
+  });
+
+  it("declara la identidad real y no atribuye el histórico por ticker", async () => {
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+
+    const strategy = aaa?.querySelector(
+      '[data-testid="estudio-daily-value-strategy"]',
+    );
+    // `presetKey` es el preset de origen, no la identidad de la estrategia.
+    expect(strategy?.textContent).toContain("plan-1");
+    expect(strategy?.textContent).toContain("preset de origen estudio_auto");
+    expect(strategy?.textContent).toContain("Indicador ganador: no declarado");
+
+    const scope = aaa?.querySelector(
+      '[data-testid="estudio-daily-value-operation-scope"]',
+    );
+    expect(scope?.getAttribute("data-attributed")).toBe("false");
+    expect(scope?.textContent).toContain(
+      "Histórico del valor; no atribuido a esta señal",
+    );
+    // La ventana de la auditoría es visible: no se hace pasar por la del parte.
+    expect(scope?.textContent).toContain("2026-10-16_2026-10-17");
+
+    // Enlace contextual al DÍA-D con el día de la vela y el valor.
+    const link = aaa?.querySelector<HTMLAnchorElement>(
+      '[data-testid="estudio-daily-value-dia-d"]',
+    );
+    expect(link?.getAttribute("href")).toContain("mode=dia-d");
+    expect(link?.getAttribute("href")).toContain("day=2026-10-17");
+    expect(link?.getAttribute("href")).toContain("symbol=AAA");
+  });
+
+  it("un fallo de la auditoría no se declara como «sin dato»", async () => {
+    vi.mocked(api.getAutoEstudioAudit).mockRejectedValueOnce(
+      new Error("audit caída"),
+    );
+    renderPanel();
+
+    const error = await screen.findByTestId("estudio-daily-audit-error");
+    expect(error.getAttribute("role")).toBe("alert");
+    expect(error.textContent).toContain("audit caída");
+    expect(
+      screen.queryAllByTestId("estudio-daily-value-validation-absent"),
+    ).toHaveLength(0);
+    const failed = await screen.findAllByTestId(
+      "estudio-daily-value-validation-error",
+    );
+    expect(failed.length).toBeGreaterThan(0);
+  });
+
+  it("declara la cobertura cuando el universo está recortado", async () => {
+    vi.mocked(api.getAutoEstudioDaily).mockResolvedValueOnce({
+      asOf: "2026-10-18",
+      accountId: "acc-1",
+      job: null,
+      latestJob: null,
+      report: {
+        ...REPORT,
+        universeCount: 6,
+        truncated: true,
+        notes: ["Universo recortado a 4 valores (el ESTUDIO tiene más)"],
+      },
+      notes: [],
+    } as never);
+
+    renderPanel();
+
+    const coverage = await screen.findByTestId("estudio-daily-coverage");
+    expect(coverage.getAttribute("data-truncated")).toBe("true");
+    expect(coverage.textContent).toContain("4 de 6");
+    expect(
+      screen.getByTestId("estudio-daily-coverage-warning").textContent,
+    ).toContain("NO cubre todos los valores");
+    expect(
+      screen.getByTestId("estudio-daily-report-notes").textContent,
+    ).toContain("Universo recortado");
   });
 
   it("sin parte declara «Sin dato todavía» (no una tabla vacía)", async () => {
@@ -416,6 +514,54 @@ describe("EstudioDailyOpsPanel", () => {
     const progress = await screen.findByTestId("estudio-daily-job-progress");
     expect(progress.getAttribute("data-phase")).toBe("opinions");
     expect(progress.textContent).toContain("50%");
+  });
+
+  it("rehidrata el job durable del día al montar (sin volver a encolarlo)", async () => {
+    vi.mocked(api.listAutoOpsJobs).mockResolvedValueOnce({
+      jobs: [
+        {
+          id: "job-7",
+          kind: "estudio_daily",
+          status: "running",
+          day: "2026-10-18",
+          accountId: "acc-1",
+          payload: {},
+          progress: { phase: "opinions", done: 4, total: 10, percent: 40 },
+          result: {},
+          error: null,
+          attempt: 1,
+          createdAt: null,
+          startedAt: null,
+          finishedAt: null,
+          heartbeatAt: null,
+        },
+      ],
+      notes: [],
+    } as never);
+    vi.mocked(api.getAutoOpsJob).mockResolvedValue({
+      id: "job-7",
+      kind: "estudio_daily",
+      status: "running",
+      day: "2026-10-18",
+      accountId: "acc-1",
+      payload: {},
+      progress: { phase: "opinions", done: 4, total: 10, percent: 40 },
+      result: {},
+      error: null,
+      attempt: 1,
+      createdAt: null,
+      startedAt: null,
+      finishedAt: null,
+      heartbeatAt: null,
+    } as never);
+
+    renderPanel();
+
+    const progress = await screen.findByTestId("estudio-daily-job-progress");
+    expect(progress.getAttribute("data-phase")).toBe("opinions");
+    expect(progress.textContent).toContain("40%");
+    expect(api.createAutoEstudioDailyJob).not.toHaveBeenCalled();
+    expect(api.getAutoOpsJob).toHaveBeenCalledWith("job-7");
   });
 
   it("cambiar de cuenta no reutiliza el parte de la cuenta anterior", async () => {

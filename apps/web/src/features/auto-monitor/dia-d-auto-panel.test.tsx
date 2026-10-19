@@ -50,10 +50,12 @@ vi.mock("@/lib/api", () => ({
       days: ["2026-09-30", "2026-09-29"],
       notes: [],
     })),
+    listAutoOpsJobs: vi.fn(async () => ({ jobs: [], notes: [] })),
     getAutoDiaDReplay: vi.fn(async (day: string) => ({
       available: true,
       readOnly: true,
       day,
+      artifactModifiedAt: "2026-10-18T20:00:00+00:00",
       schemaVersion: "dia-d-auto-v1",
       summary: {
         verdict: "PARTIAL",
@@ -86,7 +88,14 @@ vi.mock("@/lib/api", () => ({
         realized: [],
         open: [],
       },
-      meta: { account: "acc-1", versionA: "v283-window-a" },
+      meta: {
+        account: "acc-1",
+        versionA: "v283-window-a",
+        watchSize: 12,
+        watchSource: "pit",
+        universeExcludedNoBars: 3,
+        horizonDays: 20,
+      },
       limits: ["Sandbox read-only: no escribe en la BD durable."],
       executedDetail: {},
       notes: [],
@@ -156,6 +165,45 @@ describe("DiaDAutoPanel", () => {
       "Sandbox read-only",
     );
     expect(api.getAutoDiaDReplay).toHaveBeenCalledWith("2026-09-30");
+  });
+
+  it("resume nivel 1 y no presenta como aprobación una muestra vacía", async () => {
+    renderPanel();
+
+    const summary = await screen.findByTestId("dia-d-auto-level1");
+    // closedCount = 0 ⇒ muestra insuficiente, aunque el veredicto sea PARTIAL.
+    expect(summary.getAttribute("data-insufficient")).toBe("true");
+    const headline = screen.getByTestId("dia-d-auto-level1-headline");
+    expect(headline.getAttribute("data-verdict")).toBe("INSUFFICIENT");
+    expect(headline.textContent).toContain("Evidencia insuficiente");
+    expect(summary.textContent).toContain("1/2 pasos medidos");
+    expect(summary.textContent).toContain("12 valores");
+    expect(summary.textContent).toContain("excluidos sin barras 3");
+    expect(summary.textContent).toContain("0 cerrados");
+  });
+
+  it("separa la última ejecución del último artefacto válido", async () => {
+    renderPanel();
+
+    const lastRun = await screen.findByTestId("dia-d-auto-last-run");
+    expect(lastRun.textContent).toContain("Sin job observado");
+
+    const artifact = screen.getByTestId("dia-d-auto-last-artifact");
+    await waitFor(() =>
+      expect(artifact.textContent).toContain("2026-10-18T20:00:00+00:00"),
+    );
+    expect(artifact.textContent).toContain("acc-1");
+    expect(artifact.textContent).toContain("v283-window-a");
+    expect(artifact.textContent).toContain("20 d");
+  });
+
+  it("declara que el enlace con symbol es contexto, no validación individual", async () => {
+    renderPanel("/auto-monitor?mode=dia-d&day=2026-09-30&symbol=AAA");
+
+    const context = await screen.findByTestId("dia-d-auto-symbol-context");
+    expect(context.textContent).toContain("AAA");
+    expect(context.textContent).toContain("global del día");
+    expect(context.textContent).toContain("no una validación individual");
   });
 
   it("lista los días disponibles y permite cambiar de fecha", async () => {

@@ -260,6 +260,21 @@ export function DiaDAutoFeedbackPanel() {
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              data-testid="dia-d-auto-feedback-refresh"
+              onClick={() => {
+                // Refresca lo que se VE: catálogo de ventanas + artefacto de la ventana.
+                void listQuery.refetch();
+                void detailQuery.refetch();
+              }}
+            >
+              Actualizar
+            </Button>
+          </div>
           {windows.length > 0 ? (
             <div
               className="flex flex-wrap gap-1.5"

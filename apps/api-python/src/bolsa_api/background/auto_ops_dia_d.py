@@ -7,6 +7,10 @@ lectura incremental del JSONL de progreso.
 
 Reglas duras:
 
+* **Un artefacto por ``(cuenta, día)``**: la ruta sale de
+  :func:`bolsa_application.dia_d_artifacts.artifact_relpath` y se pasa al CLI con ``--out``.
+  Dos cuentas que replayen el mismo día escriben ficheros distintos y no se pisan
+  (antes ambas competían por ``dia-d-auto-<D>.json``).
 * El artefacto se escribe de forma **atómica** en el script; un fallo nunca deja un JSON
   parcial que la API pueda leer como bueno.
 * Se valida al terminar: ``exit 0`` + artefacto existente + ``day`` solicitado +
@@ -28,17 +32,21 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from bolsa_application.dia_d_artifacts import artifact_relpath, progress_relpath
 from bolsa_infrastructure.database.repositories.auto_ops_job_repository import (
     SqlAlchemyAutoOpsJobRepository,
 )
 
-__all__ = ["DiaDReplayFailed", "run_dia_d_replay_job"]
+__all__ = [
+    "DiaDReplayFailed",
+    "artifact_path",
+    "progress_path",
+    "run_dia_d_replay_job",
+]
 
 logger = logging.getLogger(__name__)
 
 _SCRIPT_REL = pathlib.Path("apps") / "api-python" / "scripts" / "v2_89_dia_d_auto_replay.py"
-_OUT_SUBDIR = pathlib.Path("operability_runs") / "dia-d-auto"
-_PROGRESS_SUBDIR = _OUT_SUBDIR / "progress"
 _STDERR_TAIL_CHARS = 4000
 _POLL_SECONDS = 1.0
 
@@ -59,12 +67,14 @@ def _repo_root() -> pathlib.Path:
     raise DiaDReplayFailed("no se encontró la raíz del repo (marcador v2_89)")
 
 
-def artifact_path(root: pathlib.Path, day: str) -> pathlib.Path:
-    return root / _OUT_SUBDIR / f"dia-d-auto-{day}.json"
+def artifact_path(root: pathlib.Path, day: str, account_id: str) -> pathlib.Path:
+    """Artefacto de ``(cuenta, día)`` — **nunca** la ruta plana compartida."""
+    return root / artifact_relpath(day, account_id)
 
 
-def progress_path(root: pathlib.Path, job_id: str) -> pathlib.Path:
-    return root / _PROGRESS_SUBDIR / f"{job_id}.jsonl"
+def progress_path(root: pathlib.Path, job_id: str, account_id: str) -> pathlib.Path:
+    """JSONL de progreso del job, dentro del segmento de su cuenta."""
+    return root / progress_relpath(job_id, account_id)
 
 
 def _read_last_progress(path: pathlib.Path, offset: int) -> tuple[dict[str, Any] | None, int]:
@@ -159,8 +169,9 @@ async def run_dia_d_replay_job(
 
     root = _repo_root()
     script = root / _SCRIPT_REL
-    out_path = artifact_path(root, day)
-    progress_file = progress_path(root, job.id)
+    out_path = artifact_path(root, day, account_id)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    progress_file = progress_path(root, job.id, account_id)
     progress_file.parent.mkdir(parents=True, exist_ok=True)
 
     cmd = [
@@ -171,6 +182,8 @@ async def run_dia_d_replay_job(
         "--account-id",
         account_id,
         "--json",
+        "--out",
+        str(out_path),
         "--progress-jsonl",
         str(progress_file),
     ]

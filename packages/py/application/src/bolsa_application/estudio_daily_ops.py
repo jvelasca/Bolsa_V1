@@ -146,6 +146,9 @@ class EstudioDailyValue:
                 "reasons": list(self.opinion_reasons),
                 "gateStatus": self.gate_status,
                 "engineVersion": self.engine_version,
+                # Identidad del TOP que consumió la opinión (evidencia real, no un hueco).
+                "topId": self.top_id,
+                "topVersion": self.top_version,
             },
             "indicators": dict(self.indicators),
             "plan": self.plan,
@@ -165,6 +168,9 @@ class EstudioDailyReport:
     notes: list[str] = field(default_factory=list)
     generated_at: str | None = None
     truncated: bool = False
+    #: Tamaño del universo ESTUDIO **antes** del recorte (`_MAX_VALUES`). Permite declarar
+    #: cobertura («procesados de esperados») sin fabricar un dato: 0 = no medido.
+    universe_count: int = 0
 
     @property
     def counts(self) -> dict[str, int]:
@@ -185,6 +191,7 @@ class EstudioDailyReport:
             "notes": list(self.notes),
             "generatedAt": self.generated_at,
             "truncated": self.truncated,
+            "universeCount": self.universe_count,
             # Los contadores SIEMPRE suman el universo escaneado (criterio falsable).
             "countsConsistent": sum(counts.values()) == len(self.values),
         }
@@ -313,6 +320,7 @@ class RunEstudioDailyOps:
             )
 
         ids = list(dict.fromkeys(str(i) for i in resolution.instrument_ids if i))
+        universe_count = len(ids)
         truncated = len(ids) > _MAX_VALUES
         if truncated:
             ids = ids[:_MAX_VALUES]
@@ -367,6 +375,7 @@ class RunEstudioDailyOps:
             notes=notes,
             generated_at=datetime.now(UTC).isoformat(),
             truncated=truncated,
+            universe_count=universe_count,
         )
 
     # ── hints ────────────────────────────────────────────────────────────────
@@ -594,10 +603,13 @@ class RunEstudioDailyOps:
                         plan=plan,
                         why_not=list((plan or {}).get("whyNot") or []),
                         strategy={
+                            # `presetKey` aquí es el preset de ORIGEN del camino Estudio
+                            # (constante `estudio_auto`), no la identidad de la estrategia.
                             "presetKey": signal.get("presetKey"),
                             "strategyDefinitionId": signal.get("strategyDefinitionId"),
                             "strategyVersion": signal.get("strategyVersion"),
                             "planId": hit.get("planId") or hit.get("scanId"),
+                            "signalId": signal.get("id"),
                         },
                         **payload,
                     )

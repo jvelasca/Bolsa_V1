@@ -141,3 +141,32 @@ $env:E2E_RUN="1"; pnpm --filter @bolsa/web e2e -- gp-e2e-v290-auto-estudio-daily
 **`main` en el mismo commit `2fb3e18a` — VERDE también:** `Python CI` [`39204839804`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39204839804) · `Frontend CI` [`39204839823`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39204839823) · `Gitleaks` [`39204839802`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39204839802) — **`success`**.
 
 **Nota de honestidad sobre el orden:** esta cita se escribe **después** del tag (commit POST-TAG sobre `main`), de modo que **dentro** del tag el §9 decía «pendiente». Es el patrón declarado en los sellos anteriores; la medida es **falsable desde GitHub** por cualquiera.
+
+## 10. POST-TAG 2026-10-19 — auditoría de la UI de operativa diaria y DÍA-D (**sellada en `v2.88.146-beta`**)
+
+Cambios **posteriores a este tag** y **sellados en `v2.88.146-beta`** (`2.11.146-beta`), sin tocar
+motor ni decisión (**`Δ motor = 0` · `Δ decisión = 0`**; contrato **aditivo**, sin migración).
+Documento completo:
+[`auditoria-ui-auto-dia-d-v2.88.145-2026-10-19.md`](../../auditoria-ui-auto-dia-d-v2.88.145-2026-10-19.md) ·
+Evidencia del sello nuevo: [`evidence/v2.88.146/README.md`](../v2.88.146/README.md).
+
+| Hallazgo | Cierre (código) |
+| --- | --- |
+| **Premisa SIM no explícita** | §7 en [`PROJECT_PREMISES.md`](../../../PROJECT_PREMISES.md:291) («la operativa es SIEMPRE simulada; ninguna orden real a XTB ni a otro broker»), enlazada en §0 y anunciada en `README.md`/`HELP.md`. |
+| **D1 — artefacto DÍA-D por día (colisión entre cuentas)** | Ruta por `(cuenta, día)`: `operability_runs/dia-d-auto/<segmento-cuenta>/dia-d-auto-<D>.json` + `.../progress/<job>.jsonl`, en [`dia_d_artifacts.py`](../../../../packages/py/application/src/bolsa_application/dia_d_artifacts.py:56), worker (`--out`) y ruta read-only. Fallback legacy **solo** con `meta.account == cuenta`, declarado en `notes`. |
+| **H1 — «Plan disparado» era un dry-run** | `ok` → **«Plan propuesto»**. |
+| **H2 — atribución por ticker** | Se declara la ventana del audit y «Histórico del valor; no atribuido a esta señal»; solo `planId`/`signalId` atribuyen. |
+| **H3 — identidad de estrategia** | `strategyDefinitionId`/`planId`/`signalId` visibles; `presetKey` rotulado «preset de origen»; TOP real visible y «Indicador ganador: no declarado por el motor». |
+| **H4/H5 — vela y cobertura** | «vela `<fecha>`» o «vela no verificada»; `universeCount` aditivo, aviso de recorte/parcialidad, `notes` y `generatedAt`. |
+| **H6 — fallo de audit** | Error + **Reintentar**; nunca «no aparece en la ventana». |
+| **D2/D3/D4 — continuidad y procedencia** | Rehidratación del job durable por `(cuenta, día)`, reset al cambiar de contexto, invalidación del **día del job**, «Actualizar» por panel; «Última ejecución solicitada» vs «Último artefacto válido». |
+| **D5/D6 — lectura de DÍA-D** | Resumen nivel 1 con «Evidencia insuficiente» cuando la muestra no alcanza; enlace contextual ficha diaria → DÍA-D con `symbol` declarado como **contexto global**, no validación individual. |
+
+**Verificación medida:** `vitest src/features/auto-monitor` **20 ficheros / 154 passed** ·
+`tsc --noEmit` **OK** · `pytest` focalizado **25 passed** (incluye
+[`test_auto_daily_dia_d_chain_integration.py`](../../../../apps/api-python/tests/test_auto_daily_dia_d_chain_integration.py),
+dos cuentas concurrentes + HTTP por cuenta + recarga, sin `skip`) · `contract:gen`/`check` **OK**
+(solo aditivo).
+
+**Límite:** este POST-TAG **no** modifica el tag `v2.88.145-beta`: la corrección viaja como
+**sello nuevo** `v2.88.146-beta`. La operativa sigue siendo **100 % SIM**; `CONFIRMED` no se emite.

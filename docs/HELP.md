@@ -50,6 +50,8 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 
 LIVE capital **cerrado**. LIVE de estudio = **VIRTUAL** hasta APP 100% probada. Pasarela visual híbrida (telegrama + por qué) **en Confirm** cuando venue=live — respuesta **SIMULADA** · ≠ settlement real.
 
+**Alcance monetario (premisa §7, `docs/PROJECT_PREMISES.md`):** toda la operativa —manual, **AUTO** y en tiempo real— es **SIMULADA** contra un ledger virtual/PAPER. **No se envían órdenes reales a XTB ni a ningún broker.** La UI lo declara como `DINERO VIRTUAL` / `No envía órdenes a XTB`; un texto que sugiera órdenes reales es un defecto.
+
 ## Nomenclatura de producto
 
 | En la app (español) | Código / URL (interno)                      |

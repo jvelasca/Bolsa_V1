@@ -107,13 +107,22 @@ export type EstudioDailyOpinionV1 = {
   reasons: string[];
   gateStatus: string | null;
   engineVersion: string | null;
+  /** TOP que consumió la opinión (evidencia real). `null` ⇒ el motor no lo declaró. */
+  topId?: string | null;
+  topVersion?: number | null;
 };
 
 export type EstudioDailyStrategyV1 = {
+  /**
+   * Preset de **origen** del camino Estudio (constante `estudio_auto`). NO es la identidad
+   * de la estrategia ejecutada: para eso están `strategyDefinitionId` y `strategyVersion`.
+   */
   presetKey: string | null;
   strategyDefinitionId: string | null;
   strategyVersion: number | null;
   planId: string | null;
+  /** Identidad estable de la señal que originó el plan (`signal.id`). `null` si no existe. */
+  signalId?: string | null;
 };
 
 export type EstudioDailyValueV1 = {
@@ -141,6 +150,8 @@ export type EstudioDailyReportV1 = {
   generatedAt: string | null;
   truncated: boolean;
   countsConsistent: boolean;
+  /** Tamaño del universo ESTUDIO **antes** del recorte. `0`/ausente ⇒ no medido. */
+  universeCount?: number | null;
 };
 
 export type EstudioDailyResponseV1 = {

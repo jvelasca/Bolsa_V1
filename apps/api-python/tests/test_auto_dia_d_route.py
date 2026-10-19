@@ -58,10 +58,14 @@ def app():
     return create_app()
 
 
-def _write(tmp_path, day: str, account: str = "acc") -> None:
-    (tmp_path / f"dia-d-auto-{day}.json").write_text(
-        json.dumps(_artifact(day, account)), encoding="utf-8"
-    )
+def _write(tmp_path, day: str, account: str = "acc", *, legacy: bool = False) -> None:
+    """Escribe el artefacto en el esquema vigente (por cuenta) o en la ruta plana legacy."""
+    if legacy:
+        path = tmp_path / f"dia-d-auto-{day}.json"
+    else:
+        path = tmp_path / account / f"dia-d-auto-{day}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(_artifact(day, account)), encoding="utf-8")
 
 
 async def _get(app, path: str):
@@ -194,3 +198,83 @@ async def test_listing_only_returns_days_of_the_current_account(app, tmp_path, m
     monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
     body = (await _get(app, "/api/auto/dia-d-replay")).json()
     assert body["days"] == ["2026-09-29"]
+
+
+@pytest.mark.asyncio
+async def test_two_accounts_same_day_have_independent_artifacts(
+    app, tmp_path, monkeypatch
+) -> None:
+    """D1: dos cuentas el mismo día no compiten por el mismo fichero ni se ven entre sí."""
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    _write(tmp_path, "2026-09-30", account="acc-1")
+    _write(tmp_path, "2026-09-30", account="acc-2")
+
+    async def _scope_acc1(_request, _account_id):
+        return "acc-1"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope_acc1)
+    body = (
+        await _get(app, "/api/auto/dia-d-replay/2026-09-30")
+    ).json()
+    assert body["available"] is True
+    assert body["meta"]["account"] == "acc-1"
+
+    async def _scope_acc2(_request, _account_id):
+        return "acc-2"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope_acc2)
+    body = (
+        await _get(app, "/api/auto/dia-d-replay/2026-09-30")
+    ).json()
+    assert body["available"] is True
+    assert body["meta"]["account"] == "acc-2"
+
+
+@pytest.mark.asyncio
+async def test_legacy_flat_artifact_is_declared_and_owner_only(
+    app, tmp_path, monkeypatch
+) -> None:
+    """La ruta plana histórica solo se sirve a su dueño y se declara como legacy."""
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    _write(tmp_path, "2026-09-30", account="acc", legacy=True)
+
+    async def _scope(_request, _account_id):
+        return "acc"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
+    body = (await _get(app, "/api/auto/dia-d-replay/2026-09-30")).json()
+    assert body["available"] is True
+    assert body["notes"] == ["legacy_artifact"]
+    assert body["artifactModifiedAt"] is not None
+    assert (await _get(app, "/api/auto/dia-d-replay")).json()["days"] == [
+        "2026-09-30"
+    ]
+
+    async def _other(_request, _account_id):
+        return "otra-cuenta"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _other)
+    other = (await _get(app, "/api/auto/dia-d-replay/2026-09-30")).json()
+    assert other["available"] is False
+    assert other["notes"] == ["artifact_not_found"]
+
+
+@pytest.mark.asyncio
+async def test_canonical_artifact_wins_over_legacy(app, tmp_path, monkeypatch) -> None:
+    """Si existen ambos, se lee el de la cuenta y NO se etiqueta como legacy."""
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    _write(tmp_path, "2026-09-30", account="acc", legacy=True)
+    canonical = tmp_path / "acc" / "dia-d-auto-2026-09-30.json"
+    canonical.parent.mkdir(parents=True, exist_ok=True)
+    payload = _artifact("2026-09-30", "acc")
+    payload["summary"]["verdict"] = "MATCH"
+    canonical.write_text(json.dumps(payload), encoding="utf-8")
+
+    async def _scope(_request, _account_id):
+        return "acc"
+
+    monkeypatch.setattr(route, "resolve_account_scope_or_default", _scope)
+    body = (await _get(app, "/api/auto/dia-d-replay/2026-09-30")).json()
+    assert body["available"] is True
+    assert body["notes"] == []
+    assert body["summary"]["verdict"] == "MATCH"

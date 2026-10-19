@@ -9,7 +9,13 @@
  * monta la página real con el hook real y sólo se mockean la API y la cuenta activa.
  */
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
@@ -126,6 +132,20 @@ vi.mock("@/lib/api", () => ({
       readOnly: true,
       notes: ["artifact_not_found"],
     })),
+    getAutoEstudioDaily: vi.fn(async () => ({
+      asOf: "2026-10-18",
+      accountId: "acc-1",
+      job: null,
+      latestJob: null,
+      report: null,
+      notes: ["no_job_for_day"],
+    })),
+    getAutoEstudioAudit: vi.fn(async () => ({
+      available: false,
+      readOnly: true,
+      notes: ["artifact_not_found"],
+    })),
+    listAutoOpsJobs: vi.fn(async () => ({ jobs: [], notes: [] })),
   },
 }));
 
@@ -186,6 +206,25 @@ describe("AutoMonitorPage — consume el DTO directo del endpoint", () => {
     );
 
     expect(api.getAutoOperationalMonitor).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AutoMonitorPage — «Actualizar» refresca la vista activa", () => {
+  it("en Operativa diaria refresca el parte (no el monitor oculto)", async () => {
+    renderPage("/auto-monitor?mode=daily");
+
+    await waitFor(() =>
+      expect(api.getAutoEstudioDaily).toHaveBeenCalledTimes(1),
+    );
+    // El botón global no se pinta en esta pestaña: el panel trae el suyo.
+    expect(screen.queryByTestId("auto-monitor-refresh")).toBeNull();
+    fireEvent.click(await screen.findByTestId("estudio-daily-refresh"));
+
+    await waitFor(() =>
+      expect(api.getAutoEstudioDaily).toHaveBeenCalledTimes(2),
+    );
+    // El monitor oculto no es lo que se ve: no se refresca en esta pestaña.
+    expect(api.getAutoOperationalMonitor).not.toHaveBeenCalled();
   });
 });
 

@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { autoOperacionHref } from "@/features/auto/auto-nav";
 import {
+  auditAttributionForValue,
   indexAuditValuesBySymbol,
   useEstudioDailyJob,
   useEstudioDailyOps,
@@ -31,8 +32,13 @@ type AuditValue =
     ? V
     : never;
 
+/**
+ * `ok` = el motor **propone** un plan en dry-run (`execute: False`). No es una orden
+ * enviada ni una operación ejecutada: esas etiquetas se reservan para hechos durables de
+ * orden/fill.
+ */
 const STATUS_LABEL: Record<string, string> = {
-  ok: "Plan disparado",
+  ok: "Plan propuesto",
   no_signal: "Sin señal",
   no_plan: "Sin plan",
   error: "Error",
@@ -128,7 +134,25 @@ function PlanLevels({ plan }: { plan: EstudioDailyPlanV1 | null }) {
   );
 }
 
-function ValidationBlock({ audit }: { audit: AuditValue | undefined }) {
+function ValidationBlock({
+  audit,
+  auditFailed,
+}: {
+  audit: AuditValue | undefined;
+  auditFailed: boolean;
+}) {
+  if (auditFailed) {
+    return (
+      <p
+        role="alert"
+        className="text-[11px] text-destructive"
+        data-testid="estudio-daily-value-validation-error"
+      >
+        No se pudo leer la auditoría por valor: la evidencia no está disponible.
+        Esto <strong>no</strong> significa que no exista.
+      </p>
+    );
+  }
   if (!audit) {
     return (
       <p
@@ -169,16 +193,45 @@ function ValidationBlock({ audit }: { audit: AuditValue | undefined }) {
   );
 }
 
+/**
+ * Enlace contextual de la ficha diaria al sandbox DÍA-D.
+ *
+ * Lleva el día (la vela usada) y el valor **como contexto**, no como validación: el sandbox
+ * declara que es una comprobación global del día.
+ */
+function diaDContextHref(value: EstudioDailyValueV1): string {
+  const params = new URLSearchParams({ mode: "dia-d" });
+  if (value.asOfBarDate) params.set("day", value.asOfBarDate);
+  if (value.symbol) params.set("symbol", value.symbol);
+  return `/auto-monitor?${params.toString()}`;
+}
+
 function ValueCard({
   value,
   audit,
+  auditWindow,
+  auditFailed,
 }: {
   value: EstudioDailyValueV1;
   audit: AuditValue | undefined;
+  auditWindow: string | null;
+  auditFailed: boolean;
 }) {
   const plan = value.plan ?? null;
   const cycles = audit?.cycles ?? [];
   const whyNot = value.whyNot ?? [];
+  // El contrato actual de ciclos NO trae `planId`/`signalId`: se leen si el artefacto los
+  // añade en el futuro y, mientras tanto, la atribución es honestamente «no atribuido».
+  const attribution = auditAttributionForValue(
+    cycles.map((cycle) => ({
+      planId: (cycle as { planId?: string | null }).planId,
+      signalId: (cycle as { signalId?: string | null }).signalId,
+    })),
+    {
+      planId: value.strategy?.planId,
+      signalId: value.strategy?.signalId,
+    },
+  );
 
   return (
     <li
@@ -192,11 +245,30 @@ function ValueCard({
           <span className="font-mono text-sm font-semibold">
             {value.symbol ?? value.instrumentId}
           </span>
-          <span className="text-[10px] text-muted-foreground">
-            {textOrAbsent(value.asOfBarDate)} · {textOrAbsent(value.computedAt)}
+          <span
+            className="text-[10px] text-muted-foreground"
+            data-testid="estudio-daily-value-bar"
+            data-bar-verified={String(Boolean(value.asOfBarDate))}
+          >
+            {value.asOfBarDate
+              ? `vela ${value.asOfBarDate}`
+              : "vela no verificada"}{" "}
+            ·{" "}
+            {value.computedAt
+              ? `calculado ${value.computedAt}`
+              : "hora de cálculo sin dato"}
           </span>
         </div>
-        <StatusBadge status={value.status} />
+        <div className="flex items-center gap-2">
+          <Link
+            to={diaDContextHref(value)}
+            data-testid="estudio-daily-value-dia-d"
+            className="text-[10px] text-muted-foreground underline hover:text-primary"
+          >
+            Ver DÍA-D del día →
+          </Link>
+          <StatusBadge status={value.status} />
+        </div>
       </div>
 
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -222,11 +294,32 @@ function ValueCard({
           <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             Estrategia e indicadores
           </h4>
-          <p className="font-mono text-[11px]">
-            {textOrAbsent(value.strategy?.presetKey)} · v
+          <p
+            className="font-mono text-[11px]"
+            data-testid="estudio-daily-value-strategy-name"
+          >
+            {textOrAbsent(value.strategy?.strategyDefinitionId)} · v
             {isAbsent(value.strategy?.strategyVersion)
               ? absentDataLabel()
               : value.strategy?.strategyVersion}
+          </p>
+          <p
+            className="font-mono text-[10px] text-muted-foreground"
+            data-testid="estudio-daily-value-strategy-identity"
+          >
+            preset de origen {textOrAbsent(value.strategy?.presetKey)} · plan{" "}
+            {textOrAbsent(value.strategy?.planId)} · señal{" "}
+            {textOrAbsent(value.strategy?.signalId)}
+          </p>
+          <p
+            className="text-[10px] text-muted-foreground"
+            data-testid="estudio-daily-value-strategy-winner"
+          >
+            Indicador ganador: no declarado por el motor · TOP{" "}
+            {textOrAbsent(value.opinion?.topId)}
+            {isAbsent(value.opinion?.topVersion)
+              ? ""
+              : ` v${value.opinion?.topVersion}`}
           </p>
           <p className="text-[10px] text-muted-foreground">
             IO {fmtNumber(value.indicators?.io)} · FA{" "}
@@ -267,7 +360,19 @@ function ValueCard({
           <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             3 · Operación ejecutada
           </h4>
-          {cycles.length === 0 ? (
+          <p
+            className="text-[10px] text-muted-foreground"
+            data-testid="estudio-daily-value-operation-scope"
+            data-attributed={String(attribution.attributed)}
+          >
+            {attribution.label} · ventana {textOrAbsent(auditWindow)}
+          </p>
+          {auditFailed ? (
+            <p className="text-[11px] text-destructive">
+              No se pudo leer la evidencia de ejecución (no implica que no
+              exista).
+            </p>
+          ) : cycles.length === 0 ? (
             <p className="text-[11px] text-muted-foreground">
               {absentDataLabel()}: sin ciclos durables en la ventana de
               auditoría.
@@ -304,7 +409,7 @@ function ValueCard({
           <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
             4 · Operativa validada
           </h4>
-          <ValidationBlock audit={audit} />
+          <ValidationBlock audit={audit} auditFailed={auditFailed} />
         </section>
       </div>
     </li>
@@ -326,6 +431,14 @@ export function EstudioDailyOpsPanel() {
   const response = opsQuery.data ?? null;
   const report = response?.report ?? null;
   const values = report?.values ?? [];
+  const auditWindow = auditQuery.data?.window ?? null;
+  // Un fallo de la auditoría NO es «este valor no existe»: se declara como error.
+  const auditFailed = auditQuery.isError;
+  const universeCount = report?.universeCount ?? null;
+  const coverageGap =
+    typeof universeCount === "number" &&
+    universeCount > 0 &&
+    universeCount !== report?.scannedCount;
   const runLabel =
     isRunning || isQueuing
       ? "Calculando operativa…"
@@ -370,6 +483,20 @@ export function EstudioDailyOpsPanel() {
               onClick={() => run()}
             >
               {runLabel}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              data-testid="estudio-daily-refresh"
+              disabled={!hasAccount || !asOf}
+              onClick={() => {
+                // Refresca lo que se VE (parte + auditoría), no el monitor oculto.
+                void opsQuery.refetch();
+                void auditQuery.refetch();
+              }}
+            >
+              Actualizar
             </Button>
             {!hasAccount ? (
               <span
@@ -457,8 +584,14 @@ export function EstudioDailyOpsPanel() {
           </p>
           <ol className="mt-1 grid gap-1 text-[11px] text-muted-foreground sm:grid-cols-2">
             <li>1 · Señal calculada: opinión del día (stance y estrellas).</li>
-            <li>2 · Decisión tomada: plan disparado o motivo declarado.</li>
-            <li>3 · Operación ejecutada: ciclos durables DÍA-D.</li>
+            <li>
+              2 · Decisión propuesta: plan en dry-run (no es una orden) o motivo
+              declarado.
+            </li>
+            <li>
+              3 · Operación ejecutada: ciclos durables DÍA-D (histórico del
+              valor salvo identidad estable).
+            </li>
             <li>4 · Operativa validada: veredicto, K y expectancy OOS.</li>
           </ol>
         </CardContent>
@@ -495,7 +628,34 @@ export function EstudioDailyOpsPanel() {
         </p>
       ) : null}
 
-      {!opsQuery.isLoading && !opsQuery.isError && report === null ? (
+      {auditFailed ? (
+        <p
+          role="alert"
+          data-testid="estudio-daily-audit-error"
+          className="text-sm text-destructive"
+        >
+          No se pudo cargar la auditoría por valor:{" "}
+          {auditQuery.error instanceof Error
+            ? auditQuery.error.message
+            : "error desconocido"}
+          . La ausencia de evidencia <strong>no</strong> se declara como «sin
+          dato».{" "}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void auditQuery.refetch()}
+          >
+            Reintentar
+          </Button>
+        </p>
+      ) : null}
+
+      {/* Sin cuenta no se ofrece una acción bloqueada: el estado vacío sobra. */}
+      {!opsQuery.isLoading &&
+      !opsQuery.isError &&
+      report === null &&
+      hasAccount ? (
         <p
           className="text-sm text-muted-foreground"
           data-testid="estudio-daily-empty"
@@ -532,6 +692,51 @@ export function EstudioDailyOpsPanel() {
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
+            <p
+              className="text-[10px] tabular-nums text-muted-foreground"
+              data-testid="estudio-daily-coverage"
+              data-truncated={String(Boolean(report.truncated))}
+            >
+              Cobertura: {report.scannedCount}
+              {universeCount != null ? ` de ${universeCount}` : ""} valores
+              ESTUDIO procesados
+              {report.truncated ? " · universo recortado" : ""}
+              {coverageGap ? " · parte parcial" : ""}.
+            </p>
+            {report.truncated ||
+            coverageGap ||
+            report.countsConsistent === false ? (
+              <p
+                className="text-[11px] text-amber-600 dark:text-amber-400"
+                data-testid="estudio-daily-coverage-warning"
+              >
+                {report.truncated
+                  ? "El universo ESTUDIO se ha recortado: este parte NO cubre todos los valores."
+                  : coverageGap
+                    ? "El parte no cubre todos los valores del universo ESTUDIO."
+                    : "Los contadores no cuadran con los valores del parte."}
+              </p>
+            ) : null}
+            {report.notes && report.notes.length > 0 ? (
+              <ul
+                className="space-y-0.5 text-[10px] text-muted-foreground"
+                data-testid="estudio-daily-report-notes"
+              >
+                {report.notes.map((note) => (
+                  <li key={note} className="font-mono">
+                    {note}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {report.generatedAt ? (
+              <p
+                className="text-[10px] text-muted-foreground"
+                data-testid="estudio-daily-generated-at"
+              >
+                Generado {report.generatedAt}
+              </p>
+            ) : null}
             {values.length === 0 ? (
               <p
                 data-testid="estudio-daily-no-values"
@@ -550,6 +755,8 @@ export function EstudioDailyOpsPanel() {
                         ? auditBySymbol.get(value.symbol.toUpperCase())
                         : undefined
                     }
+                    auditWindow={auditWindow}
+                    auditFailed={auditFailed}
                   />
                 ))}
               </ul>

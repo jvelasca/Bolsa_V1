@@ -116,15 +116,20 @@ function NotAvailable({ detail }: { detail: DiaDAutoReplayDto }) {
   );
 }
 
+/** Estado del job DÍA-D de `(cuenta, día)`, compartido por lanzador y procedencia. */
+type DiaDReplayJobState = ReturnType<typeof useDiaDReplayJob>;
+
 function DiaDReplayLaunch({
   day,
   hasArtifact,
+  jobState,
 }: {
   day: string | null;
   hasArtifact: boolean;
+  jobState: DiaDReplayJobState;
 }) {
   const { job, hasAccount, isRunning, isQueuing, run, runError, jobError } =
-    useDiaDReplayJob(day);
+    jobState;
   const phase = job?.progress?.phase ?? null;
   const percent = job?.progress?.percent ?? null;
   const failed = job?.status === "failed";
@@ -231,11 +236,148 @@ function DiaDReplayLaunch({
   );
 }
 
+/**
+ * Nivel 1 de lectura: qué se midió, cuánto se desvía y **si la muestra alcanza**.
+ *
+ * Un día sin ciclos cerrados o sin pasos medidos NO se presenta con color de aprobación: el
+ * titular es «Evidencia insuficiente». El veredicto del artefacto se mantiene visible como
+ * dato, no como certificación.
+ */
+function DiaDLevelOneSummary({ detail }: { detail: DiaDAutoReplayDto }) {
+  const steps = detail.steps ?? [];
+  const measured = steps.filter((row) => row.measurement === "COMPLETE").length;
+  const closed = detail.oos?.closedCount ?? 0;
+  const open = detail.oos?.openCount ?? 0;
+  const insufficient = steps.length === 0 || measured === 0 || closed === 0;
+  const verdict = detail.summary?.verdict ?? "NOT_MEASURED";
+  const meta = detail.meta ?? {};
+
+  return (
+    <section
+      data-testid="dia-d-auto-level1"
+      data-insufficient={String(insufficient)}
+      className={cn(
+        "space-y-1 rounded-lg border px-3 py-2",
+        insufficient
+          ? "border-amber-500/30 bg-amber-500/5"
+          : "border-border bg-muted/30",
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          data-testid="dia-d-auto-level1-headline"
+          data-verdict={insufficient ? "INSUFFICIENT" : verdict}
+          className={cn(
+            "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+            insufficient
+              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+              : (VERDICT_STYLE[verdict] ?? "bg-muted text-muted-foreground"),
+          )}
+        >
+          {insufficient ? "Evidencia insuficiente" : verdict}
+        </span>
+        <span className="text-[11px] tabular-nums text-muted-foreground">
+          {measured}/{steps.length} pasos medidos ·{" "}
+          {detail.summary?.divergent ?? 0} divergencias ·{" "}
+          {detail.summary?.notMeasured ?? steps.length - measured} sin medir
+        </span>
+      </div>
+      <p className="text-[10px] text-muted-foreground">
+        cobertura del universo:{" "}
+        {meta.watchSize != null ? String(meta.watchSize) : "NO MEDIDO"} valores
+        ({String(meta.watchSource ?? "fuente no declarada")})
+        {meta.universeExcludedNoBars != null
+          ? ` · excluidos sin barras ${String(meta.universeExcludedNoBars)}`
+          : ""}
+        {meta.survivorBiasRisk === true
+          ? " · riesgo de sesgo de supervivencia declarado"
+          : ""}
+      </p>
+      <p className="text-[10px] tabular-nums text-muted-foreground">
+        muestra OOS: {closed} cerrados · {open} vivos · R{" "}
+        {formatDiaDValue(detail.oos?.realizedRTotal)} ·{" "}
+        {detail.oos?.unmeasuredCount ?? 0} sin medir ·{" "}
+        {detail.limits?.length ?? 0} límites declarados
+      </p>
+      {insufficient ? (
+        <p className="text-[10px] text-amber-600 dark:text-amber-400">
+          No es una aprobación: la muestra no alcanza para sostener el
+          veredicto.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * Separa dos hechos que la UI mezclaba: la **ejecución solicitada** (job durable, con su
+ * estado y marcas de tiempo) y el **artefacto válido** que se está leyendo (con su mtime y la
+ * identidad de su cabecera). Sin job observado se declara; nunca se infiere del artefacto.
+ */
+function DiaDArtifactProvenance({
+  job,
+  detail,
+}: {
+  job: DiaDReplayJobState["job"];
+  detail: DiaDAutoReplayDto | null;
+}) {
+  const available = Boolean(detail?.available);
+  const meta = detail?.meta ?? {};
+  return (
+    <Card className="rounded-xl border border-border bg-card">
+      <CardContent
+        className="grid gap-3 py-3 sm:grid-cols-2"
+        data-testid="dia-d-auto-provenance"
+      >
+        <div data-testid="dia-d-auto-last-run">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Última ejecución solicitada
+          </p>
+          {job ? (
+            <p className="text-[11px] text-muted-foreground">
+              job <span className="font-mono">{job.id}</span> · {job.status} ·
+              día {job.day} · creado {job.createdAt ?? absentDataLabel()} · fin{" "}
+              {job.finishedAt ?? absentDataLabel()}
+            </p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              Sin job observado para este día (puede haber artefacto de una
+              ejecución anterior).
+            </p>
+          )}
+        </div>
+        <div data-testid="dia-d-auto-last-artifact">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Último artefacto válido
+          </p>
+          {available ? (
+            <p className="text-[11px] text-muted-foreground">
+              {detail?.artifactModifiedAt ?? "sin marca de tiempo"} · cuenta{" "}
+              {String(meta.account ?? absentDataLabel())} · versión{" "}
+              {String(meta.versionA ?? absentDataLabel())} · horizonte{" "}
+              {meta.horizonDays != null
+                ? `${String(meta.horizonDays)} d`
+                : absentDataLabel()}
+            </p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              Sin artefacto válido para {detail?.day ?? "este día"}.
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function DiaDAutoSandbox() {
   const daysQuery = useAutoDiaDReplayDays();
   const [searchParams, setSearchParams] = useSearchParams();
   const [day, setDayState] = useState<string | null>(searchParams.get("day"));
   const days = useMemo(() => daysQuery.data?.days ?? [], [daysQuery.data]);
+  // Contexto de navegación desde la ficha diaria: NO convierte este sandbox (global) en una
+  // validación individual de la señal de ese valor.
+  const symbolContext = searchParams.get("symbol");
 
   useEffect(() => {
     if (!day && days.length > 0) {
@@ -259,6 +401,7 @@ export function DiaDAutoSandbox() {
 
   const detailQuery = useAutoDiaDReplay(day);
   const detail = detailQuery.data;
+  const jobState = useDiaDReplayJob(day);
 
   return (
     <div className="space-y-4" data-testid="dia-d-auto-panel">
@@ -294,6 +437,19 @@ export function DiaDAutoSandbox() {
                 {days.length} día(s) con artefacto
               </span>
             ) : null}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              data-testid="dia-d-auto-refresh"
+              onClick={() => {
+                // Refresca lo que se VE (días + artefacto del día), no el monitor oculto.
+                void daysQuery.refetch();
+                void detailQuery.refetch();
+              }}
+            >
+              Actualizar
+            </Button>
           </div>
 
           {days.length > 0 ? (
@@ -316,12 +472,26 @@ export function DiaDAutoSandbox() {
             </div>
           ) : null}
 
+          {symbolContext ? (
+            <p
+              className="rounded border border-border bg-muted/40 px-2 py-1 text-[10px] text-muted-foreground"
+              data-testid="dia-d-auto-symbol-context"
+            >
+              Contexto recibido: <strong>{symbolContext}</strong>. Este sandbox
+              es una comprobación <strong>global del día</strong>, no una
+              validación individual de esa señal.
+            </p>
+          ) : null}
+
           <DiaDReplayLaunch
             day={day}
             hasArtifact={Boolean(detail?.available)}
+            jobState={jobState}
           />
         </CardContent>
       </Card>
+
+      <DiaDArtifactProvenance job={jobState.job} detail={detail ?? null} />
 
       {daysQuery.isLoading ? (
         <p
@@ -401,7 +571,8 @@ export function DiaDAutoSandbox() {
                 {String(detail.meta?.replayEnd ?? absentDataLabel())}
               </p>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
+              <DiaDLevelOneSummary detail={detail} />
               <table className="w-full" data-testid="dia-d-auto-steps">
                 <thead>
                   <tr className="text-left text-[10px] uppercase tracking-wide text-muted-foreground">

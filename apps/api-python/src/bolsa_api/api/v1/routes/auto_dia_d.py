@@ -1,9 +1,17 @@
-"""API: DÍA-D AUTO (sandbox) — espejo read-only del artefacto `dia-d-auto-<D>.json`.
+"""API: DÍA-D AUTO (sandbox) — espejo read-only del artefacto por ``(cuenta, día)``.
 
 Expone el artefacto que produce ``apps/api-python/scripts/v2_89_dia_d_auto_replay.py``: la
 comparación, paso a paso de la cadena AUTO, entre lo que el motor **DECLARÓ** en la fecha
 pasada ``D`` (replay hermético con reloj/precio inyectados) y lo que la ventana PAPER
 **EJECUTÓ** de verdad (hechos durables de ``D``), más el OOS real del ciclo abierto en ``D``.
+
+Esquema de lectura (compartido con el worker, `bolsa_application.dia_d_artifacts`)::
+
+    <DIA_D_AUTO_DIR>/<segmento-cuenta>/dia-d-auto-<D>.json
+
+**Legacy declarado:** si la ruta nueva no existe, se acepta la ruta plana histórica
+(``<DIA_D_AUTO_DIR>/dia-d-auto-<D>.json``) **solo** cuando su ``meta.account`` coincide con la
+cuenta activa. Se devuelve la nota ``legacy_artifact`` para que la UI no confunda procedencia.
 
 Read-only: este router NO ejecuta el motor (eso vive en el CLI) y NO escribe nada. Sin cuenta
 visible del principal devuelve vacío con ``no_account_scope`` (fail-closed). Un día sin
@@ -26,6 +34,7 @@ from bolsa_api.api.dependencies import (
     get_account_id_header,
     resolve_account_scope_or_default,
 )
+from bolsa_application.dia_d_artifacts import account_segment
 
 router = APIRouter()
 
@@ -44,13 +53,18 @@ def _artifacts_dir() -> Path:
     return Path(override) if override else _DEFAULT_DIR
 
 
-def _artifact_path(day: str) -> Path:
+def _artifact_path(day: str, scope: str) -> Path:
+    """Artefacto canónico de ``(cuenta, día)`` (aislado por cuenta)."""
+    return _artifacts_dir() / account_segment(scope) / f"dia-d-auto-{day}.json"
+
+
+def _legacy_artifact_path(day: str) -> Path:
+    """Ruta plana histórica (sin cuenta). Solo lectura, con ``meta.account`` verificado."""
     return _artifacts_dir() / f"dia-d-auto-{day}.json"
 
 
-def _read_artifact(day: str) -> dict[str, Any] | None:
-    """Lee el artefacto JSON de ``day`` (read-only); ``None`` si no existe o no es legible."""
-    path = _artifact_path(day)
+def _parse_artifact(path: Path) -> dict[str, Any] | None:
+    """JSON legible de ``path``; ``None`` si no es fichero, no se puede leer o no es objeto."""
     if not path.is_file():
         return None
     try:
@@ -60,26 +74,70 @@ def _read_artifact(day: str) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def _artifact_modified_at(day: str) -> str | None:
-    """Marca temporal del artefacto (para distinguir «artefacto anterior» de uno fresco)."""
+def _resolve_artifact(
+    day: str, scope: str
+) -> tuple[Path | None, dict[str, Any] | None, bool]:
+    """Artefacto visible para ``scope``: ``(ruta, payload, es_legacy)``.
+
+    Orden: (1) ruta canónica por cuenta; (2) ruta plana histórica **solo** si su
+    ``meta.account`` coincide exactamente con la cuenta del principal. Nunca se sirve a otra
+    cuenta un artefacto plano (sería una fuga de contexto entre cuentas).
+    """
+    canonical = _artifact_path(day, scope)
+    payload = _parse_artifact(canonical)
+    if payload is not None:
+        return canonical, payload, False
+
+    legacy = _legacy_artifact_path(day)
+    legacy_payload = _parse_artifact(legacy)
+    if legacy_payload is not None and _artifact_matches_scope(legacy_payload, scope):
+        return legacy, legacy_payload, True
+    return None, None, False
+
+
+def _read_artifact(day: str, scope: str) -> dict[str, Any] | None:
+    """Lee el artefacto JSON de ``(cuenta, día)`` (read-only); ``None`` si no hay."""
+    return _resolve_artifact(day, scope)[1]
+
+
+def _artifact_modified_at(day: str, scope: str) -> str | None:
+    """Marca temporal del artefacto **leído** (distingue «artefacto anterior» de uno fresco)."""
+    path = _resolve_artifact(day, scope)[0]
+    if path is None:
+        return None
     try:
-        mtime = _artifact_path(day).stat().st_mtime
+        mtime = path.stat().st_mtime
     except OSError:
         return None
     return datetime.fromtimestamp(mtime, tz=UTC).isoformat()
 
 
-def _list_days() -> list[str]:
-    """Días con artefacto disponible, descendente (el más reciente primero)."""
+def _list_days(scope: str) -> list[str]:
+    """Días con artefacto disponible **para ``scope``**, descendente.
+
+    Se recorren el directorio de la cuenta (esquema vigente) y, para compatibilidad, la ruta
+    plana histórica; un artefacto plano de otra cuenta no se lista.
+    """
     directory = _artifacts_dir()
-    if not directory.is_dir():
-        return []
-    days: list[str] = []
-    for entry in directory.iterdir():
-        match = _ARTIFACT_RE.match(entry.name)
-        if match and entry.is_file():
-            days.append(match.group(1))
-    return sorted(set(days), reverse=True)
+    days: set[str] = set()
+
+    account_dir = directory / account_segment(scope)
+    if account_dir.is_dir():
+        for entry in account_dir.iterdir():
+            match = _ARTIFACT_RE.match(entry.name)
+            if match and entry.is_file():
+                days.add(match.group(1))
+
+    if directory.is_dir():
+        for entry in directory.iterdir():
+            match = _ARTIFACT_RE.match(entry.name)
+            if not (match and entry.is_file()):
+                continue
+            payload = _parse_artifact(entry)
+            if payload is not None and _artifact_matches_scope(payload, scope):
+                days.add(match.group(1))
+
+    return sorted(days, reverse=True)
 
 
 class DiaDAutoStepDto(BaseModel):
@@ -162,11 +220,7 @@ async def list_auto_dia_d_replay(
     scope = await resolve_account_scope_or_default(request, account_id)
     if scope is None:
         return DiaDAutoReplayListDto(days=[], notes=["no_account_scope"])
-    days: list[str] = []
-    for candidate in _list_days():
-        artifact = _read_artifact(candidate)
-        if artifact is not None and _artifact_matches_scope(artifact, scope):
-            days.append(candidate)
+    days = _list_days(scope)
     notes = [] if days else ["no_artifacts"]
     return DiaDAutoReplayListDto(days=days, notes=notes)
 
@@ -184,9 +238,9 @@ async def get_auto_dia_d_replay(
     if scope is None:
         return DiaDAutoReplayDto(available=False, day=day, notes=["no_account_scope"])
 
-    artifact = _read_artifact(day)
+    _path, artifact, is_legacy = _resolve_artifact(day, scope)
     # D34-06: una cuenta distinta es INDISTINGUIBLE de inexistente: no se revela que existe.
-    if artifact is None or not _artifact_matches_scope(artifact, scope):
+    if artifact is None:
         return DiaDAutoReplayDto(available=False, day=day, notes=["artifact_not_found"])
 
     meta = artifact.get("meta") or {}
@@ -194,7 +248,7 @@ async def get_auto_dia_d_replay(
         available=True,
         readOnly=bool(artifact.get("readOnly", True)),
         day=str(artifact.get("day") or day),
-        artifactModifiedAt=_artifact_modified_at(day),
+        artifactModifiedAt=_artifact_modified_at(day, scope),
         schemaVersion=artifact.get("schemaVersion"),
         summary=DiaDAutoSummaryDto(**artifact["summary"]) if artifact.get("summary") else None,
         steps=[DiaDAutoStepDto(**row) for row in artifact.get("comparison", [])],
@@ -202,5 +256,6 @@ async def get_auto_dia_d_replay(
         meta=dict(meta),
         limits=list(artifact.get("limits", [])),
         executedDetail=dict(artifact.get("executedDetail") or {}),
-        notes=[],
+        # Procedencia declarada: un artefacto leído de la ruta plana histórica se etiqueta.
+        notes=["legacy_artifact"] if is_legacy else [],
     )

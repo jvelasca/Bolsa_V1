@@ -1,6 +1,6 @@
 # Premisas de proyecto — Bolsa V1
 
-> **AsOf:** 2026-08-22 · **AsOf (operativa §5):** 2026-10-03 · **AsOf (prioridades de producto §6):** 2026-10-08  
+> **AsOf:** 2026-08-22 · **AsOf (operativa §5):** 2026-10-03 · **AsOf (prioridades de producto §6):** 2026-10-08 · **AsOf (alcance monetario §7):** 2026-10-19  
 > **Qué es:** reglas de producto y de ingeniería que aplican a **todo** el monorepo.  
 > **Para quién:** equipo, auditores externos, quien retome el código.  
 > No sustituye ADRs: las ADRs deciden arquitectura; estas premisas fijan _cómo se trabaja y se documenta_.
@@ -93,6 +93,7 @@ R-12 entregó Track A–C, R12-409, EXEC-B-CONC, R12-SCHED, R12-ACCOUNTS, R12-AU
 | Orquestación / relevo / anti-alucinación (R-8)        | §4 de este archivo · [plan R-8](./engineering/plan-r8-prevencion-riesgo-2026-08-20.md)                                                                  |
 | **Operativa AUTO/PAPER (ventana forward + `DÍA-D AUTO`)** | §5 de este archivo · [runbook de la ventana](./engineering/runbook-ventana-forward-v2.78-2026-09-27.md) · [criterio de salida `-beta`](./engineering/criterio-salida-beta-2026-10-01.md)                                                       |
 | **Prioridades de producto (operativa diaria · entrada/salida · estrategia/indicadores · DÍA-D)** | §6 de este archivo · [auditoría operativa diaria](./engineering/auditoria-operativa-auto-fase-2-2026-10-08.md)                                           |
+| **Alcance monetario: operativa SIEMPRE simulada (ninguna orden real a XTB ni a ningún broker)** | §7 de este archivo · [auditoría de aislamiento XTB](./engineering/auditoria-aislamiento-ejecucion-xtb-2026-10-14.md) · `apps/web/src/features/auto/auto-reality.ts` |
 | **Auditoría profundizada AUTO (H1 identidad de estrategia · blindaje SIM · DÍA-D · bucle diario)** | [auditoría profundizada AUTO](./engineering/auditoria-profundizada-auto-h1-sim-dia-d-2026-10-11.md)                                                     |
 | **Plan/ejecución `v2.88.107-beta` (H1 identidad EXACTA de la estrategia ejecutada = `presetKey`)** | [plan + pivote](./engineering/plan-v2-88-107-h1-identidad-estrategia-2026-10-11.md) · [evidencia](./engineering/evidence/v2.88.107/README.md) |
 | **Remediación `v2.88.108-beta` (H1: no se fabrica identidad en discovery + durabilidad real del sello en PG)** | [evidencia](./engineering/evidence/v2.88.108/README.md) |
@@ -284,6 +285,53 @@ sigue vigente y **no** la relajan estas prioridades.
   y P&L realizado agregado. El [plan de cierre de motor](./engineering/plan-cierre-operativa-auto-2026-10-08.md)
   queda **PARKED**; se retoma **solo si** un pilar P1–P4 lo exige.
 - **Regla dura:** ninguna prioridad se resuelve fabricando datos. Sin medición ⇒ «Sin dato todavía» (§5.1.4).
+
+---
+
+## 7. Premisa — Alcance monetario: la operativa es SIEMPRE simulada (2026-10-19)
+
+> **Ratificada 2026-10-19** (propietario). Fija el **alcance monetario** de todo el producto mientras
+> esta premisa no se revise. Complementa §5 (cómo se opera y se mide) y §6 (prioridades de producto);
+> **no** las sustituye y **no** las relaja.
+
+### 7.1 Regla dura (invariante de producto)
+
+**Ninguna ruta del producto envía órdenes reales a XTB ni a ningún otro broker.** Toda la operativa
+—manual, semiautomática, **AUTO**, en **tiempo real**, con cualquier cuenta y con cualquier apariencia
+de la UI— se ejecuta contra un **ledger virtual / PAPER**. El dinero es **simulado**.
+
+Esta regla aplica aunque la cuenta activa sea de tipo `live`: el **tipo de cuenta no cambia el modo de
+ejecución de AUTO** (§6.2 · `apps/web/src/features/auto/auto-reality.ts`).
+
+### 7.2 Qué la hace cumplir hoy (falsable, `file:line`)
+
+| Barrera | Estado por defecto | Ancla |
+| --- | --- | --- |
+| `LIVE_EXECUTION_UNLOCKED` / `LIVE_EXECUTION_AUTHORIZED` | **off** (doble llave humana) | `packages/py/application/src/bolsa_application/live_execution_runtime.py` |
+| `PAPER_D_EXECUTE` | **off** | §5.1.6 de este archivo |
+| `broker_venue` | **`paper`** (live es opt-in explícito) | `packages/py/infrastructure/src/bolsa_infrastructure/config.py` |
+| `SimOnlyScope` (permiso positivo SIM-only) | Exigido en el punto de movimiento de dinero | `packages/py/application/src/bolsa_application/simulated_finance.py` |
+| Dry-run de la propuesta diaria | `execute: False` ⇒ no hay orden | `packages/py/application/src/bolsa_application/estudio_daily_ops.py` |
+| Kill switch | Veta el submit | `packages/py/application/src/bolsa_application/risk_runtime.py` |
+| Banner de realidad en UI | `DINERO VIRTUAL` · `AUTO DEMO` · `No envía órdenes a XTB` | `apps/web/src/features/auto/auto-reality.ts` |
+
+Detalle y cierre de huecos: [auditoría de aislamiento de ejecución XTB](./engineering/auditoria-aislamiento-ejecucion-xtb-2026-10-14.md).
+
+### 7.3 Matiz de honestidad (lo que esta premisa NO afirma)
+
+- **No** es una imposibilidad estructural del código: es una **política ratificada** sostenida por
+  *defaults* fail-closed y barreras verificadas. Un cambio de `env` **no** basta (doble llave), pero la
+  frontera del **bridge** es externa al repo y no se certifica aquí.
+- Que la UI funcione **no** demuestra rentabilidad; que DÍA-D emita un veredicto **no** demuestra
+  ejecución real; que AUTO use un ledger virtual **no** certifica por sí solo que ningún camino del
+  despliegue pueda alcanzar dinero real.
+
+### 7.4 Cuándo y cómo se revisaría
+
+Habilitar dinero real es una **fase propia** (nunca colateral), y exige como mínimo: revisión de esta
+premisa por el propietario, doble desbloqueo humano, `broker_venue=live`, certificación específica y
+evidencia PAPER acorde al §5.2. Hasta entonces, **cualquier texto de UI o de documentación que sugiera
+órdenes reales es un defecto**, no una funcionalidad pendiente.
 
 ---
 

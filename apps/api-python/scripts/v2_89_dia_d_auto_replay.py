@@ -58,8 +58,7 @@ _DEFAULT_HISTORY_DAYS = 90
 #: Días posteriores a ``D`` que se simulan para medir el OOS real del ciclo abierto en ``D``.
 _DEFAULT_HORIZON_DAYS = 20
 
-#: Carpeta de artefactos (no versionada; mismos criterios que ``operability_runs/*``).
-_OUT_SUBDIR = pathlib.Path("operability_runs") / "dia-d-auto"
+#: La carpeta canónica vive en ``bolsa_application.dia_d_artifacts`` (por cuenta y día).
 
 logger = logging.getLogger("v2_89_dia_d_auto_replay")
 
@@ -473,7 +472,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             },
             executed_detail=executed_detail,
             meta={
-                "bump": "2.11.145-beta",
+                "bump": "2.11.146-beta",
                 "phase": "V2.89 DIA-D AUTO SANDBOX",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
@@ -569,7 +568,15 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     payload = json.dumps(artifact, indent=2, sort_keys=True, ensure_ascii=False, default=str)
-    out_path = pathlib.Path(args.out) if args.out else _REPO_ROOT / _OUT_SUBDIR / f"dia-d-auto-{artifact['day']}.json"
+    # Ruta por (cuenta, día): dos cuentas el mismo día NUNCA comparten fichero. El worker
+    # pasa `--out` explícito; el default mantiene el mismo esquema para ejecuciones manuales.
+    from bolsa_application.dia_d_artifacts import artifact_path as _artifact_path
+
+    out_path = (
+        pathlib.Path(args.out)
+        if args.out
+        else _artifact_path(_REPO_ROOT, str(artifact["day"]), str(args.account_id))
+    )
     out_path.parent.mkdir(parents=True, exist_ok=True)
     # Escritura ATÓMICA: un fallo nunca deja un JSON parcial que la API lea como bueno.
     tmp_path = out_path.with_name(f"{out_path.name}.tmp-{os.getpid()}")

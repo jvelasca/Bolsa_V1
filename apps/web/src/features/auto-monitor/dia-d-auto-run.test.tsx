@@ -63,6 +63,7 @@ vi.mock("@/lib/api", () => ({
       status: "queued",
     })),
     getAutoOpsJob: vi.fn(),
+    listAutoOpsJobs: vi.fn(async () => ({ jobs: [], notes: [] })),
   },
 }));
 
@@ -183,6 +184,115 @@ describe("DiaDAutoPanel — ejecutar DÍA-D ahora", () => {
     );
     expect(transport.getAttribute("role")).toBe("alert");
     expect(transport.textContent).toContain("api caída");
+  });
+
+  it("rehidrata un job durable ya lanzado (recarga / otra pestaña)", async () => {
+    vi.mocked(api.listAutoOpsJobs).mockResolvedValueOnce({
+      jobs: [
+        {
+          id: "job-9",
+          kind: "dia_d_replay",
+          status: "running",
+          day: "2026-09-30",
+          accountId: "acc-1",
+          payload: {},
+          progress: { phase: "loading_bars", percent: 20 },
+          result: {},
+          error: null,
+          attempt: 1,
+          createdAt: null,
+          startedAt: null,
+          finishedAt: null,
+          heartbeatAt: null,
+        },
+      ],
+      notes: [],
+    } as never);
+    vi.mocked(api.getAutoOpsJob).mockResolvedValue({
+      id: "job-9",
+      kind: "dia_d_replay",
+      status: "running",
+      day: "2026-09-30",
+      accountId: "acc-1",
+      payload: {},
+      progress: { phase: "loading_bars", percent: 20 },
+      result: {},
+      error: null,
+      attempt: 1,
+      createdAt: null,
+      startedAt: null,
+      finishedAt: null,
+      heartbeatAt: null,
+    } as never);
+
+    renderPanel();
+
+    // Sin pulsar el botón: el job ya existía y se observa su progreso.
+    const progress = await screen.findByTestId("dia-d-auto-job-progress");
+    expect(progress.getAttribute("data-phase")).toBe("loading_bars");
+    expect(progress.textContent).toContain("20%");
+    expect(api.createAutoDiaDReplayJob).not.toHaveBeenCalled();
+    expect(api.getAutoOpsJob).toHaveBeenCalledWith("job-9");
+  });
+
+  it("cambiar de cuenta no arrastra el job de la cuenta anterior", async () => {
+    vi.mocked(api.listAutoOpsJobs).mockResolvedValueOnce({
+      jobs: [
+        {
+          id: "job-acc-1",
+          kind: "dia_d_replay",
+          status: "running",
+          day: "2026-09-30",
+          accountId: "acc-1",
+          payload: {},
+          progress: { phase: "replay", percent: 30 },
+          result: {},
+          error: null,
+          attempt: 1,
+          createdAt: null,
+          startedAt: null,
+          finishedAt: null,
+          heartbeatAt: null,
+        },
+      ],
+      notes: [],
+    } as never);
+    vi.mocked(api.getAutoOpsJob).mockResolvedValue({
+      id: "job-acc-1",
+      kind: "dia_d_replay",
+      status: "running",
+      day: "2026-09-30",
+      accountId: "acc-1",
+      payload: {},
+      progress: { phase: "replay", percent: 30 },
+      result: {},
+      error: null,
+      attempt: 1,
+      createdAt: null,
+      startedAt: null,
+      finishedAt: null,
+      heartbeatAt: null,
+    } as never);
+
+    const view = renderPanel();
+    await screen.findByTestId("dia-d-auto-job-progress");
+
+    state.accountId = "acc-2";
+    view.rerender(
+      <QueryClientProvider
+        client={
+          new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        }
+      >
+        <MemoryRouter initialEntries={["/auto-monitor?mode=dia-d"]}>
+          <DiaDAutoPanel />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("dia-d-auto-job-progress")).toBeNull(),
+    );
   });
 
   it("sin cuenta activa no permite encolar", async () => {

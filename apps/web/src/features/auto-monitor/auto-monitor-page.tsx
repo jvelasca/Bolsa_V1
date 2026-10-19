@@ -90,16 +90,21 @@ export function AutoMonitorPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <AutoMonitorModeToolbar mode={mode} onChange={setMode} />
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => void refetch()}
-            disabled={isFetching}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Actualizar
-          </Button>
+          {/* En `daily`/`dia-d` cada panel trae su propio «Actualizar»: el botón global
+              refrescaría el monitor oculto, no los artefactos que se están viendo. */}
+          {pollMonitor ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              data-testid="auto-monitor-refresh"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Actualizar
+            </Button>
+          ) : null}
         </div>
       </div>
 

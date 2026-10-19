@@ -167,6 +167,7 @@ def _hit(iid: str) -> dict[str, Any]:
             "whyNot": [],
         },
         "signal": {
+            "id": f"sig-{iid}",
             "presetKey": "estudio_auto",
             "strategyDefinitionId": None,
             "strategyVersion": 1,
@@ -233,7 +234,14 @@ async def test_every_estudio_value_gets_a_part_and_counts_sum_to_the_universe() 
     assert by_id["inst-ok"]["plan"]["entry"] == 100.0
     assert by_id["inst-ok"]["plan"]["structuralStop"] == 95.0
     assert by_id["inst-ok"]["plan"]["target2"] is None
+    # `topId` viaja con la opinión (evidencia real del TOP, no un hueco inventado).
+    assert by_id["inst-ok"]["opinion"]["topId"] == "top-1"
     assert by_id["inst-ok"]["strategy"]["presetKey"] == "estudio_auto"
+    # Identidad estable para atribuir el histórico (plan/señal), no solo el ticker.
+    assert by_id["inst-ok"]["strategy"]["planId"] == "plan-1"
+    assert by_id["inst-ok"]["strategy"]["signalId"] == "sig-inst-ok"
+    # Cobertura declarada: el universo medido antes del recorte.
+    assert payload["universeCount"] == 3
 
     assert by_id["inst-noplan"]["status"] == STATUS_NO_PLAN
     assert by_id["inst-noplan"]["reason"] == "no_tradeplan"

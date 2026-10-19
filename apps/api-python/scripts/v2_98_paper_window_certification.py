@@ -115,7 +115,7 @@ def _build_artifact(
         # El certificador NO promociona la ventana: la corrida real ≥4 días es OPERACIÓN.
         "substitutesRealWindow": False,
         "meta": {
-            "bump": "2.11.145-beta",
+            "bump": "2.11.146-beta",
             "phase": "V2.98 PAPER WINDOW CERTIFICATION",
             "nature": "OPERACION",
             "account": account_id,
