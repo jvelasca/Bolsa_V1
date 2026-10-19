@@ -86,5 +86,31 @@ re-anclaje **no** edita código: solo `commit`/`appsHash`/`packagesHash` en `scr
 
 ## 7. Publicación (POST-TAG)
 
-_Pendiente de rellenar al publicar el tag `v2.88.151-beta`: run del `Release tag CI`, resultado de
-`window:freeze` sobre el commit del sello y estado del run forward de las 18:00._
+- Tag anotado **`v2.88.151-beta` → `8bef1757`** (bump `fae6d0d2` + re-anclaje `8bef1757`), `main`
+  publicada (`894637b4..8bef1757`).
+- `Release tag CI` [run `39282296257`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39282296257)
+  **VERDE** en el reintento (`7m44s`; `shared`, `python`, `playwright` ×3, `security`,
+  `decision-spine`, `frontend`, `lifecycle-pg`, `replay-repro`, `a7-gate`, `dr-verify` y `certify`
+  en `success`). `shared` ⇒ **`freeze OK`**; `replay-repro` ⇒ **`REPRODUCIDO`** (el artefacto del
+  sello `.150` no cambia: **`Δ decisión = 0`**).
+- **Incidencia declarada:** el primer intento (`29m24s`) quedó **rojo** en `frontend → Test web`
+  por `Test timed out in 5000ms` en
+  [`dia-d-auto-run.test.tsx:162`](../../../../apps/web/src/features/auto-monitor/dia-d-auto-run.test.tsx)
+  (los `waitFor` usan `SLOW_CI = 10 s` pero el timeout global de Vitest es `5 s`), coincidiendo con
+  el incidente de GitHub Actions (`15:49Z`–`16:0xZ`, impacto *critical*). El **mismo** test pasó en
+  `Frontend CI` de `main` y en el reintento ⇒ se declara **flaky por timeout**, no un fallo del
+  sello. Queda como hueco: alinear `testTimeout` con `SLOW_CI` en ese fichero.
+
+## 8. Operación del día (2026-10-19)
+
+El `run-day` programado de las `18:00` se ejecutó (`18:00:01–04`) pero terminó **`HARD_ERROR` /
+`API_NOT_READY`**: el runner cargó `.env` (`loadEnvFile`) y resolvió el puerto como
+`API_PYTHON_PORT → API_PORT → 8000`; el `.env` solo definía **`API_PORT=3001`** (puerto de la web)
+⇒ probó `http://127.0.0.1:3001/api/health/ready` mientras la API Python escuchaba en **`:8000`**.
+El preflight sí era correcto (`ALLOWED`, `per_symbol`, `15/35` operables) y el `freeze` estaba
+**OK**. Arreglo aplicado (local, `.env`): `API_PYTHON_PORT=8000`. El día se recuperó con
+`run-day --force`; el `forward` (35 símbolos) declara `PRODUCER_READY` pero **1 ciclo medible**
+⇒ el día se sella como **`DECLARADO`**, no `MEDIDO`: la ventana sigue necesitando operación real
+(≥32 ciclos) y este sello **no demuestra rentabilidad**. Hueco de código declarado: el runner no
+debería caer a `API_PORT` (puerto de la UI) para el health de la API Python.
+
