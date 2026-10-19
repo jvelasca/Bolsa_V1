@@ -98,5 +98,24 @@ Casos falsables añadidos (`packages/py/application/tests/`):
 
 ## 6. Publicación
 
-_(se completa POST-TAG con el run del `Release tag CI`, el `freeze OK` y el veredicto
-`replay-repro` con el hash NUEVO)_
+Commits: funcional **`c223b260`** + bump/evidencia **`dc8eb5bd`** + re-anclaje del pin
+**`991c7fb3`** (`window:freeze OK`). Tag anotado **`v2.88.150-beta`** (**unsigned**) →
+`991c7fb3`.
+
+**`Release tag CI` [run `39248145274`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39248145274) VERDE**
+(11:55:22Z → 12:09:56Z, ~**14m34s**; **13 jobs `success` + `certify` `success`**;
+`playwright (integrated E2E, opt-in)` `skipped`, declarado):
+
+- `shared` ⇒ **`[window-pin] freeze OK (991c7fb3)`**.
+- `replay-repro` ⇒ **`REPRODUCIDO`** con el hash **NUEVO**
+  `E9B7376BFE885C86CA4E56C0F37D79129B1EF8ECD325F2CE043A2D1AEF7F5625` / **3 383 461 B**
+  (la 2ª corrida es **idéntica**: `VEREDICTO 2ª corrida IDÉNTICA`) ⇒ el CI confirma que **la
+  decisión cambió** y que el artefacto es reproducible desde el fixture.
+- `python`, `frontend`, `lifecycle-pg`, `dr-verify`, `a7-gate`, `decision-spine` y las tres capas
+  de `playwright` (`mock E2E`, `integrated axe`, `integrated AUTO S5`) ⇒ **`success`**.
+- `main` en `991c7fb3`: `Python CI` [`39248131500`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39248131500) ·
+  `Frontend CI` [`39248131491`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39248131491) ·
+  `Fase 2 scientific` [`39248131645`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39248131645) ·
+  `Optimize lab` [`39248131649`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39248131649) ·
+  `Gitleaks` [`39248131672`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39248131672) ⇒ **`success`**.
+
