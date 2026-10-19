@@ -2,6 +2,20 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.151-beta] — **Ayuda: cómo se elige y se confirma la operativa de cada valor (DÍA D) y cómo se decide entrar/salir** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración**)
+
+**Naturaleza:** incremento **solo de UI/Ayuda + documentación** — **no** toca el motor de decisión, umbrales, pesos A/B, contrato HTTP ni esquema. `openapi.json`/`schema.d.ts` **sin diff**; sin migración (head `056_auto_ops_jobs`). **Bump** `2.11.150-beta` → `2.11.151-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**). Tag **unsigned**.
+
+**El hueco.** El usuario veía el embudo del Laboratorio y el estado `lab_validated`, pero no había una explicación legible de *por qué* se propone una operativa para **ese** valor, cómo se confirma y con qué reglas se decide entrar y salir. El conocimiento existía disperso en ADR-021/046/047 y en la evidencia de ingeniería, no en la Ayuda.
+
+**El cambio (UI + docs).** `BACKTESTING_STRATEGY_CHOICE_GUIDE` en **Ayuda → Backtesting**, con cinco secciones en lenguaje llano: **(1) embudo** Probar → Coach (TOP ★, ACK) → Lab (IS) → Revalidar (hold-out, walk-forward, CPCV, PBO, DSR) → Finalistas (`runId` + `lab_validated` + ACK final); **(2) «mejor» medido** — score `retorno % − 0,25 × peor caída %`, OOS 10–40 % con mínimos 50/30 barras, WFE, purga/embargo y DSR ≥ 0,7; **(3) cómo se confirma** — las 7 puertas fail-closed (`backtest`, `robustness`, `walk_forward`, `oos`, `risk`, `dsr`, `coach`), donde `NOT_EVALUATED` **no** es `PASS`, y el veredicto global siempre `NO CONFIRMADO`; **(4) entrada** — señal → ranking explicable (edge 30 %, robustez 20 %, régimen 15 %, momentum 10 %, liquidez 10 %, R/R 10 %, ejecución 5 %) → `TOP_N = 5` → barrera de régimen **por valor** (ADR-047) → stop `1,5 × ATR` → sizing por riesgo (**1 %** por operación, **20 %** por posición, **40 %** por sector, **6 %** abierto) → `TradePlan` → permiso de apertura; **(5) salida** — precedencia única `kill switch > régimen > riesgo > manual > stop estructural > tesis invalidada > riesgo de cartera > T1 > T2 > trailing > tiempo`, T1/T2 con reducción del 30 %, techo de 45 días, tesis por MAE y gobernador. Se añade la misma explicación a [`docs/HELP.md`](../docs/HELP.md) y ambas quedan sincronizadas por `HELP_CONTENT_AS_OF = 2026-10-19`.
+
+**Verificación (medida).** `backtesting-tracker` **7 passed** · `hoy-en-la-mesa` **4 passed** (11 en total) · `typecheck` **OK** · `eslint` **OK** · guardián de bump **2 passed** · `window:freeze` **OK** tras el re-anclaje del pin.
+
+**Límites declarados (sin fabricar).** La Ayuda explica el **criterio**, no promete rentabilidad: un backtest bueno puede fallar en el futuro (`NO CONFIRMADO` / `INCONCLUSIVE`). La evidencia agregada DÍA-D es del **valor**; lo exacto es la fila del ciclo verificado con su identidad de estrategia. La ventana PAPER no se re-mide en este sello y la operativa es **100 % SIM**.
+
+**Freeze.** El commit `ea3a1734` (Ayuda) movió el árbol `apps`; se re-ancla el pin PAPER al árbol del sello (`Δ motor = 0`) para que el run de las 18:00 no abortara con `TREE_MOVED`. Evidencia: [`evidence/v2.88.151/README.md`](../docs/engineering/evidence/v2.88.151/README.md).
+
 ## [2.11.150-beta] — **ADR-047: gate direccional POR SÍMBOLO — el agregado deja de vetar la cartera entera y pasa a declaración de riesgo** (**`Δ motor ≠ 0` · `Δ decisión ≠ 0` · `Δ contrato HTTP = 0` · SIN migración**)
 
 **Naturaleza:** cambio de **contrato de decisión** (no un refactor): la barrera de régimen consume el régimen del **propio símbolo**. Contrato HTTP **sin diff** (`openapi.json`/`schema.d.ts` **sin cambio**); sin migración (head `056_auto_ops_jobs`). **Bump** `2.11.149-beta` → `2.11.150-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**). Tag **unsigned**.
