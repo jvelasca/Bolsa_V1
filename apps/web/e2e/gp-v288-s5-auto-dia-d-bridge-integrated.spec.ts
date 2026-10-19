@@ -1218,12 +1218,20 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
       );
       await expect(page.getByTestId("dia-d-auto-provenance")).toBeVisible();
     } else {
-      // Sin valores no hay ficha que enlazar: se declara el hueco, no se finge el enlace.
-      await expect(page.getByTestId("estudio-daily-no-values")).toBeVisible();
+      // Sin valores no hay ficha que enlazar: se exige un estado DECLARADO (parte ausente,
+      // parte vacío o hueco de universo), nunca un panel en blanco.
+      const declaredAbsence = page
+        .locator(
+          '[data-testid="estudio-daily-empty"],' +
+            '[data-testid="estudio-daily-no-values"],' +
+            '[data-testid="estudio-daily-universe-gap"]',
+        )
+        .first();
+      await expect(declaredAbsence).toBeVisible({ timeout: 20_000 });
       test.info().annotations.push({
         type: "hueco-entorno",
         description:
-          "Sin valores en el parte (universo ESTUDIO/barras): no hay ficha para el enlace contextual.",
+          "Sin valores en el parte (worker no arrancado, sin barras o universo vacío): el panel declara el hueco y no hay ficha para el enlace contextual.",
       });
     }
   });
