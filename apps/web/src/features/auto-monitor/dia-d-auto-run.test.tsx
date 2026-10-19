@@ -90,13 +90,28 @@ afterEach(() => {
 });
 
 /**
+ * El runner de CI ejecuta 312 ficheros en paralelo sobre pocas vCPU: la cadena
+ * pulsar → encolar → observar el job → error puede tardar más de un segundo de reloj,
+ * aunque el invariante se cumpla. El timeout por defecto de testing-library (1 s) se
+ * queda corto y convierte una espera lenta de CI en un falso rojo.
+ */
+const SLOW_CI = { timeout: 10_000 };
+
+function findByTestIdSlow(testId: string) {
+  return screen.findByTestId(testId, {}, SLOW_CI);
+}
+
+/**
  * El botón arranca deshabilitado hasta que el día por defecto (el primero con
  * artefacto) se resuelve en un efecto. Pulsar antes no encola nada, así que
  * esperamos a que esté habilitado para probar el flujo real.
  */
 async function clickRunWhenReady() {
-  const run = await screen.findByTestId("dia-d-auto-run");
-  await waitFor(() => expect((run as HTMLButtonElement).disabled).toBe(false));
+  const run = await screen.findByTestId("dia-d-auto-run", {}, SLOW_CI);
+  await waitFor(
+    () => expect((run as HTMLButtonElement).disabled).toBe(false),
+    SLOW_CI,
+  );
   fireEvent.click(run);
 }
 
@@ -123,16 +138,19 @@ describe("DiaDAutoPanel — ejecutar DÍA-D ahora", () => {
 
     await clickRunWhenReady();
 
-    await waitFor(() =>
-      expect(api.createAutoDiaDReplayJob).toHaveBeenCalledWith({
-        day: "2026-09-30",
-      }),
+    await waitFor(
+      () =>
+        expect(api.createAutoDiaDReplayJob).toHaveBeenCalledWith({
+          day: "2026-09-30",
+        }),
+      SLOW_CI,
     );
-    await waitFor(() =>
-      expect(api.getAutoOpsJob).toHaveBeenCalledWith("job-1"),
+    await waitFor(
+      () => expect(api.getAutoOpsJob).toHaveBeenCalledWith("job-1"),
+      SLOW_CI,
     );
 
-    const progress = await screen.findByTestId("dia-d-auto-job-progress");
+    const progress = await findByTestIdSlow("dia-d-auto-job-progress");
     expect(progress.getAttribute("data-phase")).toBe("replay");
     expect(progress.textContent).toContain("Fase replay");
     expect(progress.textContent).toContain("50%");
@@ -163,11 +181,11 @@ describe("DiaDAutoPanel — ejecutar DÍA-D ahora", () => {
 
     await clickRunWhenReady();
 
-    const error = await screen.findByTestId("dia-d-auto-job-error");
+    const error = await findByTestIdSlow("dia-d-auto-job-error");
     expect(error.getAttribute("role")).toBe("alert");
     expect(error.textContent).toContain("exit 2");
 
-    const stale = await screen.findByTestId("dia-d-auto-stale-artifact");
+    const stale = await findByTestIdSlow("dia-d-auto-stale-artifact");
     expect(stale.textContent).toContain("2026-09-30");
     // El artefacto anterior sigue visible (no se sustituye por un vacío).
     expect(screen.getByTestId("dia-d-auto-steps")).toBeTruthy();
@@ -179,9 +197,18 @@ describe("DiaDAutoPanel — ejecutar DÍA-D ahora", () => {
     renderPanel();
     await clickRunWhenReady();
 
-    const transport = await screen.findByTestId(
-      "dia-d-auto-job-transport-error",
+    // Causa primero, efecto después: si el enqueue no ocurrió, el fallo señala el eslabón
+    // roto en vez de un genérico «no encuentro el aviso».
+    await waitFor(
+      () => expect(api.createAutoDiaDReplayJob).toHaveBeenCalledTimes(1),
+      SLOW_CI,
     );
+    await waitFor(
+      () => expect(api.getAutoOpsJob).toHaveBeenCalledWith("job-1"),
+      SLOW_CI,
+    );
+
+    const transport = await findByTestIdSlow("dia-d-auto-job-transport-error");
     expect(transport.getAttribute("role")).toBe("alert");
     expect(transport.textContent).toContain("api caída");
   });
@@ -228,7 +255,7 @@ describe("DiaDAutoPanel — ejecutar DÍA-D ahora", () => {
     renderPanel();
 
     // Sin pulsar el botón: el job ya existía y se observa su progreso.
-    const progress = await screen.findByTestId("dia-d-auto-job-progress");
+    const progress = await findByTestIdSlow("dia-d-auto-job-progress");
     expect(progress.getAttribute("data-phase")).toBe("loading_bars");
     expect(progress.textContent).toContain("20%");
     expect(api.createAutoDiaDReplayJob).not.toHaveBeenCalled();
@@ -275,7 +302,7 @@ describe("DiaDAutoPanel — ejecutar DÍA-D ahora", () => {
     } as never);
 
     const view = renderPanel();
-    await screen.findByTestId("dia-d-auto-job-progress");
+    await findByTestIdSlow("dia-d-auto-job-progress");
 
     state.accountId = "acc-2";
     view.rerender(
@@ -290,8 +317,9 @@ describe("DiaDAutoPanel — ejecutar DÍA-D ahora", () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("dia-d-auto-job-progress")).toBeNull(),
+    await waitFor(
+      () => expect(screen.queryByTestId("dia-d-auto-job-progress")).toBeNull(),
+      SLOW_CI,
     );
   });
 
