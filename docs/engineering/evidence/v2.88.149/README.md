@@ -78,5 +78,19 @@ día medible exige **unanimidad** no-bajista, y eso no ocurrió en **ninguna** d
 
 ## 7. Publicación
 
-Commit de la auditoría + bump y re-anclaje del pin (se completará en el POST-TAG con la cita del
-CI del tag).
+Commit de la auditoría + bump (`1cf7fb75`) y re-anclaje del pin (`637a4433`, `window:freeze OK`).
+Tag `v2.88.149-beta` (**anotado, unsigned**) publicado junto con `main`.
+
+**`Release tag CI` [run `39231461820`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39231461820) VERDE**
+(09:37:29Z → 09:49:27Z, ~**11m58s**; **13 jobs `success` + `certify` `success`**; `playwright (integrated
+E2E, opt-in)` `skipped`, declarado):
+
+- `shared` ⇒ **`[window-pin] freeze OK (1cf7fb75)`**.
+- `replay-repro` ⇒ **`REPRODUCIDO`** (`sha256 1E3ADAC2…929A37E7`, idéntico a `.136`…`.148` ⇒
+  **`Δ decisión = 0` medido por el CI**, coherente con que esta entrega sólo añade documentación y un
+  script de inspección).
+- `python` (ruff/imports/mypy/pytest offline), `frontend` (typecheck/lint/test/build + `contract:check`),
+  `lifecycle-pg`, `dr-verify`, `a7-gate`, `decision-spine` y las tres capas de `playwright`
+  (`mock E2E`, `integrated axe`, `integrated AUTO S5`) ⇒ **`success`**.
+- `main` (push, run `39231458362` `Python CI`, `39231458366` `Gitleaks`, `39231458412` `Optimize lab`)
+  ⇒ **`success`**.
