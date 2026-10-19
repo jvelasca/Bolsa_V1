@@ -112,5 +112,17 @@ Stack reiniciado con el código nuevo (`pnpm dev`; el proceso anterior era anter
 
 ## 7. Publicación
 
-Commit funcional + bump y re-anclaje del pin (`window:pin --write`) → `window:freeze OK`.
-Tag `v2.88.148-beta` (**anotado, unsigned**) y `Release tag CI`.
+Commit funcional + bump (`c6bcbacc`) y re-anclaje del pin (`a4c8de56`, `window:freeze OK`).
+Tag `v2.88.148-beta` (**anotado, unsigned**) publicado junto con `main`.
+
+**`Release tag CI` [run `39227751837`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39227751837) VERDE**
+(09:07:59Z → 09:22:22Z, ~**14m23s**; **13 jobs `success` + `certify` `success`**; `playwright (integrated
+E2E, opt-in)` `skipped`, declarado):
+
+- `shared` ⇒ **`[window-pin] freeze OK (a4c8de56)`**.
+- `replay-repro` ⇒ **`REPRODUCIDO`** (`sha256 1E3ADAC2…929A37E7`, idéntico a `.136`…`.147` ⇒
+  **`Δ decisión = 0` medido por el CI**).
+- `python` (ruff/imports/mypy/pytest offline), `frontend` (typecheck/lint/test/build +
+  `contract:check`), `playwright` (mock / axe integrado / **AUTO S5**), `lifecycle-pg`, `a7-gate`,
+  `dr-verify`, `decision-spine`, `security` ⇒ **`success`**.
+
