@@ -88,6 +88,19 @@ quedaba inservible en local, y el E2E `S5-07` no podía comparar dos artefactos.
 
 ## 7. Publicación
 
-- Commit funcional + bump y re-anclaje del pin (`window:pin --write`) → `window:freeze OK`.
-- Tag `v2.88.147-beta` (**anotado, unsigned**) y `Release tag CI` — pendiente de ejecución en este
-  documento; se citará el run al publicarse.
+Commit funcional + bump y re-anclaje del pin (`window:pin --write`) → `window:freeze OK`.
+Tag `v2.88.147-beta` (**anotado, unsigned**) y `Release tag CI`.
+
+### Iteraciones del CI hasta el verde (declaradas)
+
+| Run | Estado | Motivo | Corrección |
+| --- | --- | --- | --- |
+| [39217033911](https://github.com/jvelasca/Bolsa_V1/actions/runs/39217033911) | **rojo** | `playwright (integrated AUTO S5)` · `S5-06` exigía `estudio-daily-no-values`; sin barras/worker el panel declara `estudio-daily-empty` (ausencia distinta, mismo invariante) | `S5-06` acepta **cualquier** ausencia declarada: `estudio-daily-empty` \| `estudio-daily-no-values` \| `estudio-daily-universe-gap` (commit `a94c60fa`) |
+| [39218799384](https://github.com/jvelasca/Bolsa_V1/actions/runs/39218799384) | **rojo** | `frontend` · `Test web` **1/2299**: `dia-d-auto-run` «fallo de transporte» agotó el timeout por defecto (1 s) de testing-library con 312 ficheros en paralelo; el resto (incl. AUTO S5) verde | El test espera con margen (10 s) y verifica la **cadena** (encolar → observar el job) antes del aviso (commit `bb417791`) |
+| [39219816847](https://github.com/jvelasca/Bolsa_V1/actions/runs/39219816847) | **verde** | `Release tag CI` completo: `certify (aggregate + artifact)`, `frontend`, `python`, `playwright (mock E2E)`, `playwright (integrated axe)`, **`playwright (integrated AUTO S5)`**, `lifecycle-pg`, `a7-gate`, `dr-verify`, `decision-spine`, `security` | — |
+
+- Tag movido a `f4fa616c` (funcional `bb417791` + re-anclaje del pin). `Release tag CI` verde por
+  completo y `Frontend CI` [39219816856](https://github.com/jvelasca/Bolsa_V1/actions/runs/39219816856) verde.
+- **Lección retenida:** en CI, un `S5-06` no debe exigir *un* marcador concreto de ausencia (la
+  ausencia se declara con varios rótulos válidos) y una espera de testing-library con el timeout por
+  defecto no es fiable bajo contención: se espera por la **causa** observable, con margen.
