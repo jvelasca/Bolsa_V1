@@ -2,6 +2,20 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.148-beta] — **el artefacto DÍA-D se escribe y se lee en el MISMO sitio: un solo resolvedor honra `DIA_D_AUTO_DIR`** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración**)
+
+**Naturaleza:** corrección de **coherencia escritor↔lector** del artefacto DÍA-D + regresión falsable — **no** toca el motor de decisión, ni umbrales, ni pesos A/B. Contrato HTTP **sin diff** (`openapi.json`/`schema.d.ts` **sin cambio**); sin migración (head `056_auto_ops_jobs`). **Bump** `2.11.147-beta` → `2.11.148-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **en verde**). Tag **unsigned**.
+
+**El defecto (medido al verificar el `.147` con el worker real, no inferido).** `DIA_D_AUTO_DIR` lo honraban **sólo** las rutas de lectura (`auto_dia_d`, `auto_dia_d_feedback`); el worker escribía siempre bajo la raíz del repo (`_repo_root()`). Con la variable informada, el job terminaba **`completed`** con el artefacto en disco y la API respondía **`artifact_not_found`**: la UI declaraba «sin artefacto» **sin ningún error visible** (escritor y lector en árboles distintos).
+
+**El arreglo.** `dia_d_artifacts.artifacts_root(default, environ)` pasa a ser el **único** resolvedor (entorno explícito ⇒ el módulo sigue siendo puro; override vacío o en blanco = ausente) y `artifact_path_in`/`progress_path_in` construyen bajo la carpeta ya resuelta. El worker usa `artifacts_dir_for_jobs()` y **las dos** rutas usan el helper compartido. `_display_path` tolera que el override saque el artefacto del repo (antes `relative_to` habría reventado el job al formatear el resultado).
+
+**Regresión falsable.** NUEVO `test_escritor_y_lector_resuelven_la_misma_raiz`: con `DIA_D_AUTO_DIR` informada, la carpeta y la ruta del worker deben ser **idénticas** a las de la ruta HTTP; si el worker vuelve a ignorar el override, **rojo** (comprobado que la implementación anterior difería).
+
+**Verificación medida (local, worker real).** Stack reiniciado con el código nuevo y job `dia_d_replay` por la cola durable ⇒ **`completed` en 6,1 s**, `watchSize 20`, `verdict DIVERGENT` (dos corridas); artefacto `operability_runs/dia-d-auto/default-account-seed/dia-d-auto-2026-01-02.json` + `…/progress/<job>.jsonl`; lectura HTTP **`available=true`, 9 pasos, `notes=[]`**, `artifactModifiedAt` **avanza** con la segunda corrida, `days=[2026-01-02]`; **0** `NotImplementedError` en el log nuevo (cierra el límite de §5 de la evidencia `.147`). `pytest` focalizado DÍA-D **32 passed** · `pnpm lint:py` **`All checks passed!`** · `pnpm imports:py` **`4 kept, 0 broken`** (por `python -m`, bloqueo de Windows) · `pnpm types:py` **`Success: no issues found in 566 source files`**.
+
+**Límites declarados (sin fabricar).** El override **no** mueve el subproceso (el CLI sigue con `cwd` en la raíz del repo: necesita el script y los paquetes), sólo la **carpeta de artefactos**; la **ventana PAPER real** sigue con **`3` días de ventana y `0` medidos** (`NO_MEDIDO_REGIMEN` por `BEAR_TREND`, `2` no-mercado) ⇒ gate **`NO_MEDIDO`** ⇒ **no demuestra rentabilidad**; operativa **100 % SIM**. Evidencia: [`docs/engineering/evidence/v2.88.148/README.md`](docs/engineering/evidence/v2.88.148/README.md).
+
 ## [2.11.147-beta] — **el replay DÍA-D por cola ya funciona en Windows (Popen portable) y el E2E integrado cubre la UI diaria y el aislamiento por cuenta** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración**)
 
 **Naturaleza:** arreglo de **plumbing operativo** (worker) + pruebas integradas sobre `v2.88.146-beta` — **no** toca el motor de decisión, ni umbrales, ni pesos A/B, y **no** cambia ningún número de decisión. Contrato HTTP **sin diff** (`openapi.json`/`schema.d.ts` **sin cambio**); sin migración (head `056_auto_ops_jobs`). **Bump** `2.11.146-beta` → `2.11.147-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **en verde**). Tag **unsigned**.

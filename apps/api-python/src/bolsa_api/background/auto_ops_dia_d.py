@@ -34,7 +34,12 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from bolsa_application.dia_d_artifacts import artifact_relpath, progress_relpath
+from bolsa_application.dia_d_artifacts import (
+    DIA_D_ARTIFACT_DIR,
+    artifact_path_in,
+    artifacts_root,
+    progress_path_in,
+)
 from bolsa_infrastructure.database.repositories.auto_ops_job_repository import (
     SqlAlchemyAutoOpsJobRepository,
 )
@@ -42,6 +47,7 @@ from bolsa_infrastructure.database.repositories.auto_ops_job_repository import (
 __all__ = [
     "DiaDReplayFailed",
     "artifact_path",
+    "artifacts_dir_for_jobs",
     "progress_path",
     "run_dia_d_replay_job",
 ]
@@ -73,13 +79,33 @@ def _repo_root() -> pathlib.Path:
 
 
 def artifact_path(root: pathlib.Path, day: str, account_id: str) -> pathlib.Path:
-    """Artefacto de ``(cuenta, día)`` — **nunca** la ruta plana compartida."""
-    return root / artifact_relpath(day, account_id)
+    """Artefacto de ``(cuenta, día)`` bajo la raíz del repo — **nunca** la ruta plana."""
+    return artifact_path_in(root / DIA_D_ARTIFACT_DIR, day, account_id)
+
+
+def artifacts_dir_for_jobs() -> pathlib.Path:
+    """Carpeta ``…/dia-d-auto`` donde este worker ESCRIBE los artefactos.
+
+    Debe coincidir con la que resuelven las rutas HTTP de lectura (``auto_dia_d`` y
+    ``auto_dia_d_feedback``): ambas pasan por :func:`artifacts_root` con el mismo
+    ``DIA_D_AUTO_DIR``. Si el worker ignorase el override, escribiría en el árbol del repo
+    mientras la API lee del directorio redirigido y la UI diría «sin artefacto» con el
+    fichero en disco.
+    """
+    return artifacts_root(_repo_root() / DIA_D_ARTIFACT_DIR, os.environ)
 
 
 def progress_path(root: pathlib.Path, job_id: str, account_id: str) -> pathlib.Path:
-    """JSONL de progreso del job, dentro del segmento de su cuenta."""
-    return root / progress_relpath(job_id, account_id)
+    """JSONL de progreso del job bajo la raíz del repo, dentro del segmento de su cuenta."""
+    return progress_path_in(root / DIA_D_ARTIFACT_DIR, job_id, account_id)
+
+
+def _display_path(path: pathlib.Path, root: pathlib.Path) -> str:
+    """Ruta presentable: relativa al repo si vive dentro; absoluta si el override la saca."""
+    try:
+        return str(path.relative_to(root)).replace("\\", "/")
+    except ValueError:
+        return str(path).replace("\\", "/")
 
 
 def _read_last_progress(path: pathlib.Path, offset: int) -> tuple[dict[str, Any] | None, int]:
@@ -234,9 +260,11 @@ async def run_dia_d_replay_job(
 
     root = _repo_root()
     script = root / _SCRIPT_REL
-    out_path = artifact_path(root, day, account_id)
+    # La carpeta de ESCRITURA honra `DIA_D_AUTO_DIR` igual que las rutas de lectura.
+    artifacts_dir = artifacts_dir_for_jobs()
+    out_path = artifact_path_in(artifacts_dir, day, account_id)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    progress_file = progress_path(root, job.id, account_id)
+    progress_file = progress_path_in(artifacts_dir, job.id, account_id)
     progress_file.parent.mkdir(parents=True, exist_ok=True)
 
     cmd = [
@@ -286,8 +314,10 @@ async def run_dia_d_replay_job(
     base_result = {
         "day": day,
         "accountId": account_id,
-        "artifactPath": str(out_path.relative_to(root)).replace("\\", "/"),
-        "progressPath": str(progress_file.relative_to(root)).replace("\\", "/"),
+        # Con `DIA_D_AUTO_DIR` fuera del repo la ruta no es relativa a `root`: se declara
+        # absoluta en vez de reventar el job al formatear el resultado.
+        "artifactPath": _display_path(out_path, root),
+        "progressPath": _display_path(progress_file, root),
         "elapsedSeconds": elapsed,
         "timedOut": timed_out,
     }

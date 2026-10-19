@@ -14,6 +14,7 @@ from httpx import ASGITransport, AsyncClient
 
 import bolsa_api.api.v1.routes.auto_dia_d as route
 from bolsa_api.main import create_app
+from bolsa_application.dia_d_artifacts import artifact_path_in
 
 
 def _artifact(day: str, account: str = "acc") -> dict:
@@ -278,3 +279,27 @@ async def test_canonical_artifact_wins_over_legacy(app, tmp_path, monkeypatch) -
     assert body["available"] is True
     assert body["notes"] == []
     assert body["summary"]["verdict"] == "MATCH"
+
+
+def test_escritor_y_lector_resuelven_la_misma_raiz(tmp_path, monkeypatch) -> None:
+    """El worker que ESCRIBE y la ruta que LEE deben resolver el mismo directorio.
+
+    Falsable: si el worker vuelve a ``_repo_root()`` sin honrar ``DIA_D_AUTO_DIR``, escribe en
+    el árbol del repo mientras la API lee del directorio redirigido; el artefacto existe en
+    disco y la UI declara ``artifact_not_found`` sin ningún error visible.
+    """
+    import bolsa_api.background.auto_ops_dia_d as worker
+
+    monkeypatch.setenv("DIA_D_AUTO_DIR", str(tmp_path))
+    worker_dir = worker.artifacts_dir_for_jobs()
+    assert worker_dir == route._artifacts_dir()
+    assert (
+        artifact_path_in(worker_dir, "2026-09-30", "acc")
+        == route._artifact_path("2026-09-30", "acc")
+    )
+
+    # Sin override (y con override en blanco) ambos caen en la misma carpeta por defecto.
+    monkeypatch.delenv("DIA_D_AUTO_DIR", raising=False)
+    assert worker.artifacts_dir_for_jobs() == route._artifacts_dir()
+    monkeypatch.setenv("DIA_D_AUTO_DIR", "   ")
+    assert worker.artifacts_dir_for_jobs() == route._artifacts_dir()

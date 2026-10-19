@@ -34,7 +34,7 @@ from bolsa_api.api.dependencies import (
     get_account_id_header,
     resolve_account_scope_or_default,
 )
-from bolsa_application.dia_d_artifacts import account_segment
+from bolsa_application.dia_d_artifacts import account_segment, artifacts_root
 
 router = APIRouter()
 
@@ -49,8 +49,8 @@ _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _artifacts_dir() -> Path:
-    override = os.environ.get("DIA_D_AUTO_DIR")
-    return Path(override) if override else _DEFAULT_DIR
+    """Raíz de artefactos, resuelta por el MISMO helper que usa el worker que escribe."""
+    return artifacts_root(_DEFAULT_DIR, os.environ)
 
 
 def _artifact_path(day: str, scope: str) -> Path:

@@ -29,19 +29,27 @@ from __future__ import annotations
 import hashlib
 import pathlib
 import re
+from collections.abc import Mapping
 
 __all__ = [
     "DIA_D_ARTIFACT_DIR",
+    "DIA_D_ARTIFACTS_ENV",
     "DIA_D_PROGRESS_SUBDIR",
     "account_segment",
-    "artifact_relpath",
     "artifact_path",
+    "artifact_path_in",
+    "artifact_relpath",
+    "artifacts_root",
     "legacy_artifact_path",
+    "progress_path_in",
     "progress_relpath",
 ]
 
 #: Carpeta raíz de artefactos, relativa a la raíz del repo.
 DIA_D_ARTIFACT_DIR = pathlib.Path("operability_runs") / "dia-d-auto"
+
+#: Variable que redirige la raíz de artefactos (despliegues fuera del árbol de trabajo).
+DIA_D_ARTIFACTS_ENV = "DIA_D_AUTO_DIR"
 
 #: Subcarpeta del JSONL de progreso dentro del segmento de cuenta.
 DIA_D_PROGRESS_SUBDIR = "progress"
@@ -72,9 +80,32 @@ def artifact_relpath(day: str, account_id: str) -> pathlib.Path:
     return DIA_D_ARTIFACT_DIR / account_segment(account_id) / f"dia-d-auto-{day}.json"
 
 
+def artifacts_root(
+    default_root: pathlib.Path, environ: Mapping[str, str]
+) -> pathlib.Path:
+    """Raíz de artefactos: ``DIA_D_AUTO_DIR`` si viene informada; si no, ``default_root``.
+
+    Escritor (worker) y lectores (rutas HTTP) DEBEN resolver por aquí. Si sólo uno honra el
+    override, el artefacto se escribe en un árbol y se lee en otro: la UI declara
+    ``artifact_not_found`` con el fichero en disco, sin ningún error visible.
+
+    ``environ`` se pasa explícito para que este módulo siga siendo puro y la resolución sea
+    falseable en pruebas; una variable vacía o en blanco cuenta como ausente.
+    """
+    raw = (environ.get(DIA_D_ARTIFACTS_ENV) or "").strip()
+    return pathlib.Path(raw) if raw else pathlib.Path(default_root)
+
+
+def artifact_path_in(
+    artifacts_dir: pathlib.Path, day: str, account_id: str
+) -> pathlib.Path:
+    """Artefacto de ``(cuenta, día)`` bajo la carpeta de artefactos (``…/dia-d-auto``)."""
+    return pathlib.Path(artifacts_dir) / account_segment(account_id) / f"dia-d-auto-{day}.json"
+
+
 def artifact_path(root: pathlib.Path, day: str, account_id: str) -> pathlib.Path:
-    """Ruta **absoluta** del artefacto de ``(cuenta, día)`` bajo ``root``."""
-    return pathlib.Path(root) / artifact_relpath(day, account_id)
+    """Ruta **absoluta** del artefacto de ``(cuenta, día)`` bajo la raíz del repo."""
+    return artifact_path_in(pathlib.Path(root) / DIA_D_ARTIFACT_DIR, day, account_id)
 
 
 def legacy_artifact_path(root: pathlib.Path, day: str) -> pathlib.Path:
@@ -84,10 +115,27 @@ def legacy_artifact_path(root: pathlib.Path, day: str) -> pathlib.Path:
 
 def progress_relpath(job_id: str, account_id: str) -> pathlib.Path:
     """Ruta **relativa** del JSONL de progreso de un job (bajo el segmento de su cuenta)."""
-    safe_job = re.sub(r"[^A-Za-z0-9_-]", "_", job_id or "") or "job"
     return (
         DIA_D_ARTIFACT_DIR
         / account_segment(account_id)
         / DIA_D_PROGRESS_SUBDIR
-        / f"{safe_job}.jsonl"
+        / _progress_name(job_id)
     )
+
+
+def progress_path_in(
+    artifacts_dir: pathlib.Path, job_id: str, account_id: str
+) -> pathlib.Path:
+    """JSONL de progreso bajo la carpeta de artefactos (``…/dia-d-auto``)."""
+    return (
+        pathlib.Path(artifacts_dir)
+        / account_segment(account_id)
+        / DIA_D_PROGRESS_SUBDIR
+        / _progress_name(job_id)
+    )
+
+
+def _progress_name(job_id: str) -> str:
+    """Nombre saneado del JSONL de progreso (nunca puede escapar del directorio)."""
+    safe_job = re.sub(r"[^A-Za-z0-9_-]", "_", job_id or "") or "job"
+    return f"{safe_job}.jsonl"
