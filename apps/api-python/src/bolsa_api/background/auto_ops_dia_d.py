@@ -26,7 +26,9 @@ import json
 import logging
 import os
 import pathlib
+import subprocess
 import sys
+import tempfile
 from datetime import UTC, datetime
 from typing import Any
 
@@ -49,6 +51,9 @@ logger = logging.getLogger(__name__)
 _SCRIPT_REL = pathlib.Path("apps") / "api-python" / "scripts" / "v2_89_dia_d_auto_replay.py"
 _STDERR_TAIL_CHARS = 4000
 _POLL_SECONDS = 1.0
+#: Suelo del timeout (segundos). Constante para que una prueba pueda acortarlo.
+_MIN_TIMEOUT_SECONDS = 30.0
+_TAIL_BYTES = _STDERR_TAIL_CHARS * 2
 
 
 class DiaDReplayFailed(RuntimeError):
@@ -107,18 +112,78 @@ def _read_last_progress(path: pathlib.Path, offset: int) -> tuple[dict[str, Any]
     return last, new_offset
 
 
-async def _pump(stream: asyncio.StreamReader | None, sink: list[str]) -> None:
-    """Drena stdout/stderr para que el subproceso no se bloquee; guarda solo el tail."""
-    if stream is None:
-        return
+async def _spawn_process_async(
+    cmd: list[str],
+    *,
+    cwd: pathlib.Path,
+    env: dict[str, str],
+    stdout: Any,
+    stderr: Any,
+) -> Any:
+    """Lanza el CLI con ``subprocess.Popen`` (síncrono, en un hilo).
+
+    Windows fuerza ``SelectorEventLoop`` en el worker (psycopg async no funciona en
+    Proactor), y ese bucle **no** implementa ``asyncio.create_subprocess_*``: usarlo
+    hacía fallar todo replay con ``NotImplementedError``. ``Popen`` es portable y la
+    espera se hace desde el bucle con ``poll``/``kill`` (nunca bloquea al worker).
+    """
+    return await asyncio.to_thread(
+        _spawn_process, cmd, cwd=cwd, env=env, stdout=stdout, stderr=stderr
+    )
+
+
+def _spawn_process(
+    cmd: list[str],
+    *,
+    cwd: pathlib.Path,
+    env: dict[str, str],
+    stdout: Any,
+    stderr: Any,
+) -> Any:
+    """``subprocess.Popen`` puro (lo ejecuta :func:`_spawn_process_async` en un hilo)."""
+    return subprocess.Popen(  # noqa: S603 — comando interno, sin shell
+        cmd,
+        cwd=str(cwd),
+        env=env,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+
+def _read_tail(handle: Any) -> str:
+    """Últimos bytes de un fichero de salida (sin cargar todo el replay en memoria)."""
+    handle.seek(0, os.SEEK_END)
+    size = handle.tell()
+    handle.seek(max(0, size - _TAIL_BYTES))
+    data: bytes = handle.read()
+    return data.decode("utf-8", errors="replace")
+
+
+async def _wait_process(
+    process: Any,
+    *,
+    publisher: _ProgressPublisher,
+    timeout_seconds: float,
+) -> tuple[bool, int | None]:
+    """Espera al proceso publicando progreso; devuelve ``(timed_out, returncode)``."""
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + max(_MIN_TIMEOUT_SECONDS, float(timeout_seconds))
     while True:
-        chunk = await stream.readline()
-        if not chunk:
-            return
-        sink.append(chunk.decode("utf-8", errors="replace"))
-        # Evita crecer sin límite en replays largos.
-        while sum(len(part) for part in sink) > _STDERR_TAIL_CHARS * 2:
-            sink.pop(0)
+        returncode = await asyncio.to_thread(process.poll)
+        if returncode is not None:
+            return False, returncode
+        try:
+            await publisher.tick()
+        except Exception:  # noqa: BLE001 — progreso/latido best-effort
+            logger.debug("dia_d_replay: fallo publicando progreso", exc_info=True)
+        if loop.time() >= deadline:
+            await asyncio.to_thread(process.kill)
+            try:
+                await asyncio.to_thread(process.wait, 15)
+            except (subprocess.TimeoutExpired, OSError):  # pragma: no cover
+                pass
+            return True, None
+        await asyncio.sleep(_POLL_SECONDS)
 
 
 class _ProgressPublisher:
@@ -191,50 +256,32 @@ async def run_dia_d_replay_job(
     env.pop("PYTHONINSPECT", None)
 
     started = datetime.now(UTC)
-    stderr_tail: list[str] = []
-    stdout_tail: list[str] = []
-    try:
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=str(root),
-            env=env,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-    except OSError as exc:
-        raise DiaDReplayFailed(f"No se pudo lanzar el replay: {exc}") from exc
-
     publisher = _ProgressPublisher(session_factory, job.id, progress_file)
-
-    async def _poll() -> None:
-        while process.returncode is None:
-            try:
-                await publisher.tick()
-            except Exception:  # noqa: BLE001 — progreso/latido best-effort
-                logger.debug("dia_d_replay: fallo publicando progreso", exc_info=True)
-            await asyncio.sleep(_POLL_SECONDS)
-
-    pumps = [
-        asyncio.create_task(_pump(process.stdout, stdout_tail)),
-        asyncio.create_task(_pump(process.stderr, stderr_tail)),
-    ]
-    poller = asyncio.create_task(_poll())
-
-    timed_out = False
+    stdout_file = tempfile.TemporaryFile()
+    stderr_file = tempfile.TemporaryFile()
     try:
-        await asyncio.wait_for(process.wait(), timeout=max(30.0, float(timeout_seconds)))
-    except TimeoutError:
-        timed_out = True
-        process.kill()
         try:
-            await asyncio.wait_for(process.wait(), timeout=15)
-        except TimeoutError:  # pragma: no cover — kill no atendido
-            pass
-    finally:
-        poller.cancel()
-        await asyncio.gather(poller, *pumps, return_exceptions=True)
+            process = await _spawn_process_async(
+                cmd,
+                cwd=root,
+                env=env,
+                stdout=stdout_file,
+                stderr=stderr_file,
+            )
+        except OSError as exc:
+            raise DiaDReplayFailed(f"No se pudo lanzar el replay: {exc}") from exc
 
-    tail = "".join(stderr_tail).strip()[-_STDERR_TAIL_CHARS:]
+        timed_out, returncode = await _wait_process(
+            process, publisher=publisher, timeout_seconds=timeout_seconds
+        )
+        stderr_tail = _read_tail(stderr_file).strip()
+        stdout_tail = _read_tail(stdout_file)
+        returncode = process.returncode
+    finally:
+        stdout_file.close()
+        stderr_file.close()
+
+    tail = (stderr_tail or stdout_tail).strip()[-_STDERR_TAIL_CHARS:]
     elapsed = round((datetime.now(UTC) - started).total_seconds(), 1)
     base_result = {
         "day": day,
@@ -249,10 +296,10 @@ async def run_dia_d_replay_job(
         raise DiaDReplayFailed(
             f"Timeout del replay DÍA-D a los {elapsed}s", result=base_result
         )
-    if process.returncode != 0:
-        detail = tail or f"exit {process.returncode}"
+    if returncode != 0:
+        detail = tail or f"exit {returncode}"
         raise DiaDReplayFailed(
-            f"El replay DÍA-D falló (exit {process.returncode}): {detail}",
+            f"El replay DÍA-D falló (exit {returncode}): {detail}",
             result=base_result,
         )
 

@@ -179,3 +179,22 @@ uv run python -m pytest `
 
 pnpm window:freeze
 ```
+
+## 5. Addendum 2026-10-19 — hallazgo P1 al ejecutar el E2E integrado (`v2.88.147-beta`)
+
+Al ejecutar por primera vez el journey integrado (`gp-v288-s5`) con el **worker real** se midió un
+defecto **no cubierto** por esta auditoría (afecta a la operación, no a la UI):
+
+- **Síntoma:** todo job `dia_d_replay` terminaba `failed` con `error: "NotImplementedError: "`.
+- **Causa:** en Windows `scheduler_worker` fuerza `SelectorEventLoop` (psycopg async) y ese bucle
+  **no implementa** `asyncio.create_subprocess_*`; el handler lo usaba para lanzar `v2_89`.
+- **Arreglo (`v2.88.147-beta`):** `Popen` en hilo + `poll`/`kill` + ficheros temporales, con la misma
+  validación estricta del artefacto; regresión falsable en
+  [`test_auto_ops_dia_d.py`](../../apps/api-python/tests/test_auto_ops_dia_d.py).
+- **Pruebas nuevas en este journey:** `S5-06` (UI diaria real: semántica, job durable único,
+  «Actualizar» por panel, enlace contextual a DÍA-D) y `S5-07` (aislamiento por cuenta con control
+  negativo), **7/7 passed** en local. Evidencia:
+  [`evidence/v2.88.147/README.md`](./evidence/v2.88.147/README.md).
+
+Lo declarado en §2 (huecos) **no cambia**; lo que cambia es que el replay manual **ya puede**
+completar en Windows. La ventana PAPER sigue `NO MEDIDO` por operación/mercado.

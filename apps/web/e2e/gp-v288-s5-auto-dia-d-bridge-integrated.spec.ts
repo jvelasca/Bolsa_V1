@@ -79,6 +79,8 @@ const NO_CATALOG_REASON =
 
 const MONITOR_PATH = "/api/auto/operational-monitor";
 const RUN_PATH = "/api/backtests/run";
+const OPS_JOBS_PATH = "/api/auto/ops-jobs";
+const DIA_D_REPLAY_PATH = "/api/auto/dia-d-replay";
 const TOP_TIMEFRAME = "1d";
 const PRESET_KEY = "sma_crossover";
 const STRATEGY_LABEL = "E2E S5 · Cruce SMA 20/50";
@@ -312,6 +314,62 @@ function describeProbe(probe: AccountProbe): string {
   return probe.kind === "gone"
     ? "gone"
     : `status=${String(probe.status)}, type=${String(probe.type)}`;
+}
+
+/** Cuentas extra del S5-07 (se crean dentro del test y se limpian en el `afterAll`). */
+const extraAccounts: string[] = [];
+
+/** Crea una cuenta efímera y la registra para el teardown (mismo patrón que el fixture). */
+async function createEphemeralAccount(
+  request: APIRequestContext,
+  baseURL: string,
+  label: string,
+): Promise<string> {
+  const res = await request.post(new URL("/api/accounts", baseURL).toString(), {
+    data: {
+      name: `e2e-v288-s5-${label}-${randomUUID().slice(0, 8)}`,
+      currency: "EUR",
+      initialDeposit: 100_000,
+    },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `POST /api/accounts (${label}) falló (${res.status()}): ${await res.text()}`,
+    );
+  }
+  const id = (await body<{ data: { id: string } }>(res)).data.id;
+  extraAccounts.push(id);
+  return id;
+}
+
+type DiaDArtifact = {
+  available: boolean;
+  day?: string;
+  artifactModifiedAt?: string | null;
+  meta?: { account?: string | null };
+  notes?: string[];
+};
+
+/** Artefacto DÍA-D que la API sirve a UNA cuenta (nunca al de otra). */
+async function readDiaDArtifact(
+  request: APIRequestContext,
+  baseURL: string,
+  accountId: string,
+  day: string,
+): Promise<DiaDArtifact> {
+  const res = await request.get(
+    new URL(
+      `${DIA_D_REPLAY_PATH}/${encodeURIComponent(day)}`,
+      baseURL,
+    ).toString(),
+    { headers: { "X-Account-Id": accountId } },
+  );
+  if (!res.ok()) {
+    throw new Error(
+      `GET ${DIA_D_REPLAY_PATH}/${day} (${accountId}) falló (${res.status()}): ${await res.text()}`,
+    );
+  }
+  return body<DiaDArtifact>(res);
 }
 
 /**
@@ -678,6 +736,11 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
     //    para que un `400` no quede sin diagnóstico (un 400 con la cuenta ya borrada es OK).
     await disposeEphemeralAccount(request, baseURL, state.accountId, failures);
 
+    // 5) Cuentas EXTRA del S5-07: mismo cierre + borrado verificado (no-residuo).
+    for (const extra of extraAccounts.splice(0)) {
+      await disposeEphemeralAccount(request, baseURL, extra, failures);
+    }
+
     if (failures.length > 0) {
       throw new Error(
         `Teardown del S5 no completó la limpieza:\n- ${failures.join("\n- ")}`,
@@ -1040,6 +1103,220 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
     } else {
       // `completed` exige exit 0 + artefacto validado: sin artefacto no puede estar completed.
       expect(replayFinal.status).not.toBe("completed");
+    }
+  });
+
+  test("GP-V288-S5-06: la UI diaria encola el job durable y no vende un dry-run como orden (P5)", async ({
+    page,
+    request,
+    baseURL,
+  }) => {
+    const accountId = state.accountId;
+    if (!accountId) throw new Error("fixture required");
+    if (!baseURL) throw new Error("baseURL required");
+    const headers = { "X-Account-Id": accountId };
+
+    // Falsable: si el panel volviera a sondear el monitor oculto, esta lista no estaría vacía.
+    const monitorCalls: string[] = [];
+    page.on("request", (req) => {
+      try {
+        if (new URL(req.url()).pathname === MONITOR_PATH)
+          monitorCalls.push(req.url());
+      } catch {
+        /* URL no parseable: no es una petición del monitor */
+      }
+    });
+
+    await seedHoyBrowserState(page, { accountId });
+    await page.goto("/auto-monitor?mode=daily");
+    await expect(page.getByTestId("estudio-daily-ops-panel")).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // Semántica: el estado `ok` del parte es un PLAN PROPUESTO (dry-run), nunca «disparado».
+    await expect(page.getByTestId("estudio-daily-legend")).toContainText(
+      "Decisión propuesta",
+    );
+    await expect(page.getByTestId("estudio-daily-legend")).toContainText(
+      "no es una orden",
+    );
+    await expect(page.getByText(/Plan disparado/i)).toHaveCount(0);
+
+    // El «Actualizar» global no existe en `daily`: refrescaría el monitor oculto.
+    await expect(page.getByTestId("auto-monitor-refresh")).toHaveCount(0);
+
+    // Día fijo: no compite con el job de S5-05 (hoy) ni con el artefacto del día.
+    const asOf = "2026-01-02";
+    await page.getByTestId("estudio-daily-asof").fill(asOf);
+    const runButton = page.getByTestId("estudio-daily-run");
+    await expect(runButton).toBeEnabled();
+    await runButton.click();
+    await expect(page.getByTestId("estudio-daily-job-status")).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId("estudio-daily-job-status")).toContainText(
+      asOf,
+    );
+
+    // El botón de la UI encola EL MISMO job de la cola durable: se lee por la ruta real.
+    const jobsRes = await request.get(
+      new URL(
+        `${OPS_JOBS_PATH}?kind=estudio_daily&day=${encodeURIComponent(asOf)}&limit=5`,
+        baseURL,
+      ).toString(),
+      { headers },
+    );
+    expect(jobsRes.ok()).toBe(true);
+    const jobs = await body<{
+      jobs: Array<{
+        id: string;
+        kind: string;
+        day: string | null;
+        status: string;
+      }>;
+    }>(jobsRes);
+    const observed = jobs.jobs.find(
+      (job) => job.kind === "estudio_daily" && job.day === asOf,
+    );
+    expect(
+      observed,
+      "la UI debe encolar un job estudio_daily del día pedido",
+    ).toBeTruthy();
+
+    // «Actualizar» del panel refresca lo VISIBLE y no toca el monitor desactivado.
+    monitorCalls.length = 0;
+    await page.getByTestId("estudio-daily-refresh").click();
+    await expect(page.getByTestId("estudio-daily-refresh")).toBeEnabled({
+      timeout: 15_000,
+    });
+    expect(monitorCalls).toHaveLength(0);
+
+    // El refresco es asíncrono: se sondea el enlace contextual (hasta 20 s) en lugar de
+    // decidir sobre una lectura transitoria del parte.
+    const contextLink = page.getByTestId("estudio-daily-value-dia-d").first();
+    let hasContextLink = false;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      if ((await contextLink.count()) > 0) {
+        hasContextLink = true;
+        break;
+      }
+      await page.waitForTimeout(500);
+    }
+
+    // Si el parte trae valores, la ficha enlaza a DÍA-D con contexto DECLARADO (global).
+    if (hasContextLink) {
+      await contextLink.click();
+      await expect(page).toHaveURL(/mode=dia-d/, { timeout: 20_000 });
+      const url = new URL(page.url());
+      expect(url.searchParams.get("symbol")).toBeTruthy();
+      expect(url.searchParams.get("day")).toBe(asOf);
+      await expect(page.getByTestId("dia-d-auto-symbol-context")).toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(page.getByTestId("dia-d-auto-symbol-context")).toContainText(
+        "global del día",
+      );
+      await expect(page.getByTestId("dia-d-auto-provenance")).toBeVisible();
+    } else {
+      // Sin valores no hay ficha que enlazar: se declara el hueco, no se finge el enlace.
+      await expect(page.getByTestId("estudio-daily-no-values")).toBeVisible();
+      test.info().annotations.push({
+        type: "hueco-entorno",
+        description:
+          "Sin valores en el parte (universo ESTUDIO/barras): no hay ficha para el enlace contextual.",
+      });
+    }
+  });
+
+  test("GP-V288-S5-07: el artefacto DÍA-D de una cuenta NO se sirve a otra (P0)", async ({
+    request,
+    baseURL,
+  }) => {
+    const accountA = state.accountId;
+    if (!accountA) throw new Error("fixture required");
+    if (!baseURL) throw new Error("baseURL required");
+    const day = new Date().toISOString().slice(0, 10);
+
+    // C no encola nada: es el CONTROL NEGATIVO del aislamiento.
+    const accountB = await createEphemeralAccount(request, baseURL, "iso-b");
+    const accountC = await createEphemeralAccount(request, baseURL, "iso-c");
+
+    const replayJobs: Array<{ accountId: string; jobId: string }> = [];
+    for (const accountId of [accountA, accountB]) {
+      const res = await request.post(
+        new URL(OPS_JOBS_PATH, baseURL).toString(),
+        {
+          headers: { "X-Account-Id": accountId },
+          data: { kind: "dia_d_replay", day },
+        },
+      );
+      expect(res.ok()).toBe(true);
+      const job = await body<{ id: string }>(res);
+      replayJobs.push({ accountId, jobId: job.id });
+    }
+
+    // Desenlace ACOTADO del replay: sin worker el job queda en cola y se declara (no se finge
+    // el artefacto). El aislamiento de ficheros ya lo mide la prueba integrada de Python.
+    const settleReplay = async (
+      jobId: string,
+      accountId: string,
+    ): Promise<string> => {
+      const deadline = Date.now() + 10_000;
+      let status = "queued";
+      for (;;) {
+        const res = await request.get(
+          new URL(`${OPS_JOBS_PATH}/${jobId}`, baseURL).toString(),
+          { headers: { "X-Account-Id": accountId } },
+        );
+        if (!res.ok()) break;
+        const job = await body<{ status: string; error?: string | null }>(res);
+        status = job.status;
+        if (status !== "queued" && status !== "running") break;
+        if (Date.now() >= deadline) break;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      return status;
+    };
+    const replayOutcomes = await Promise.all(
+      replayJobs.map(({ jobId, accountId }) => settleReplay(jobId, accountId)),
+    );
+
+    const a = await readDiaDArtifact(request, baseURL, accountA, day);
+    const b = await readDiaDArtifact(request, baseURL, accountB, day);
+    const c = await readDiaDArtifact(request, baseURL, accountC, day);
+
+    // Cada artefacto declara SU cuenta y SU día; uno ajeno es indistinguible de inexistente.
+    for (const [account, artifact] of [
+      [accountA, a],
+      [accountB, b],
+    ] as const) {
+      if (!artifact.available) continue;
+      expect(artifact.day).toBe(day);
+      expect(artifact.meta?.account).toBe(account);
+    }
+
+    // Control negativo: C nunca encoló el día ⇒ no ve artefacto NI lo lista.
+    expect(c.available).toBe(false);
+    expect(c.notes ?? []).not.toContain("legacy_artifact");
+    const cListRes = await request.get(
+      new URL(DIA_D_REPLAY_PATH, baseURL).toString(),
+      { headers: { "X-Account-Id": accountC } },
+    );
+    expect(cListRes.ok()).toBe(true);
+    const cList = await body<{ days: string[] }>(cListRes);
+    expect(cList.days).not.toContain(day);
+
+    // Si A y B produjeron artefacto, son DOS artefactos: la cuenta sellada difiere
+    // (una colisión de fichero devolvería el mismo `meta.account` a las dos).
+    if (a.available && b.available) {
+      expect(a.meta?.account).toBe(accountA);
+      expect(b.meta?.account).toBe(accountB);
+      expect(a.meta?.account).not.toBe(b.meta?.account);
+    } else {
+      test.info().annotations.push({
+        type: "hueco-entorno",
+        description: `Sin dos artefactos DÍA-D que comparar (replay: ${replayOutcomes.join(", ")}); el aislamiento de ficheros ya lo mide la prueba integrada de Python.`,
+      });
     }
   });
 });

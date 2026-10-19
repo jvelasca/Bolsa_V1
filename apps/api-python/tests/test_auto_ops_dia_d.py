@@ -26,21 +26,31 @@ import bolsa_api.background.auto_ops_dia_d as handler
 
 
 class _FakeProc:
+    """Doble SÍNCRONO de ``subprocess.Popen`` (``poll``/``wait``/``kill``).
+
+    El handler ya no usa ``asyncio.create_subprocess_*``: Windows fuerza
+    ``SelectorEventLoop`` y ese bucle no implementa subprocesos asíncronos.
+    """
+
     def __init__(self, *, code: int = 0, hang: bool = False) -> None:
         self.returncode: int | None = None
         self._code = code
         self._hang = hang
         self.killed = False
-        self.stdout = None
-        self.stderr = None
 
-    async def wait(self) -> int:
+    def poll(self) -> int | None:
         if self._hang and not self.killed:
-            import asyncio
+            return None
+        if self.returncode is None:
+            self.returncode = self._code
+        return self.returncode
 
-            await asyncio.sleep(3600)
-        self.returncode = self._code
-        return self._code
+    def wait(self, timeout: float | None = None) -> int:  # noqa: ARG002 — firma Popen
+        if self._hang and not self.killed:
+            raise AssertionError("el handler debe matar el proceso antes de esperar")
+        if self.returncode is None:
+            self.returncode = self._code
+        return self.returncode
 
     def kill(self) -> None:
         self.killed = True
@@ -112,12 +122,12 @@ def _install(monkeypatch: pytest.MonkeyPatch, proc: _FakeProc, on_spawn: Any) ->
     monkeypatch.setattr(handler, "_repo_root", lambda: on_spawn.root)
     monkeypatch.setattr(handler, "SqlAlchemyAutoOpsJobRepository", _FakeJobRepo)
 
-    async def _spawn(*cmd: str, **kwargs: Any) -> _FakeProc:
+    def _spawn(cmd: list[str], **kwargs: Any) -> _FakeProc:
         on_spawn.cmd = list(cmd)
         on_spawn.kwargs = kwargs
         return proc
 
-    monkeypatch.setattr(handler.asyncio, "create_subprocess_exec", _spawn)
+    monkeypatch.setattr(handler, "_spawn_process", _spawn)
 
 
 @pytest.mark.asyncio
@@ -129,7 +139,7 @@ async def test_success_returns_the_artifact_summary(
 
     spawned: dict[str, Any] = {}
 
-    async def _spawn(*cmd: str, **kwargs: Any) -> _FakeProc:
+    def _spawn(cmd: list[str], **kwargs: Any) -> _FakeProc:
         spawned["cmd"] = list(cmd)
         _write_artifact(root, job.day, job.account_id)
         progress = handler.progress_path(root, job.id, job.account_id)
@@ -141,7 +151,7 @@ async def test_success_returns_the_artifact_summary(
 
     monkeypatch.setattr(handler, "_repo_root", lambda: root)
     monkeypatch.setattr(handler, "SqlAlchemyAutoOpsJobRepository", _FakeJobRepo)
-    monkeypatch.setattr(handler.asyncio, "create_subprocess_exec", _spawn)
+    monkeypatch.setattr(handler, "_spawn_process", _spawn)
 
     result = await handler.run_dia_d_replay_job(
         job, _FakeFactory(), timeout_seconds=60
@@ -194,22 +204,14 @@ async def test_timeout_kills_the_process_and_fails_declared(
     holder = SimpleNamespace(root=root)
     _install(monkeypatch, proc, holder)
 
-    real_wait_for = handler.asyncio.wait_for
-
-    async def _fast_timeout(awaitable: Any, timeout: float) -> Any:  # noqa: ARG001
-        import asyncio
-
-        if asyncio.iscoroutine(awaitable):
-            awaitable.close()
-        raise TimeoutError
-
-    monkeypatch.setattr(handler.asyncio, "wait_for", _fast_timeout)
+    # El suelo del timeout es una constante: la prueba lo acorta sin dormir 30 s.
+    monkeypatch.setattr(handler, "_MIN_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr(handler, "_POLL_SECONDS", 0.01)
 
     with pytest.raises(handler.DiaDReplayFailed, match="Timeout"):
         await handler.run_dia_d_replay_job(_job(), _FakeFactory(), timeout_seconds=1)
 
     assert proc.killed is True
-    monkeypatch.setattr(handler.asyncio, "wait_for", real_wait_for)
 
 
 def test_artifact_of_another_account_is_fail_closed(tmp_path: Path) -> None:
@@ -278,7 +280,7 @@ async def test_two_accounts_same_day_do_not_share_the_artifact(
         SimpleNamespace(id="job-2", day="2026-10-17", account_id="acc-2"),
     ]
 
-    async def _spawn(*cmd: str, **kwargs: Any) -> _FakeProc:
+    def _spawn(cmd: list[str], **kwargs: Any) -> _FakeProc:  # noqa: ARG001 — firma Popen
         account = cmd[list(cmd).index("--account-id") + 1]
         out = Path(cmd[list(cmd).index("--out") + 1])
         assert out == handler.artifact_path(root, "2026-10-17", account)
@@ -298,7 +300,7 @@ async def test_two_accounts_same_day_do_not_share_the_artifact(
 
     monkeypatch.setattr(handler, "_repo_root", lambda: root)
     monkeypatch.setattr(handler, "SqlAlchemyAutoOpsJobRepository", _FakeJobRepo)
-    monkeypatch.setattr(handler.asyncio, "create_subprocess_exec", _spawn)
+    monkeypatch.setattr(handler, "_spawn_process", _spawn)
 
     results = await asyncio.gather(
         *(handler.run_dia_d_replay_job(job, _FakeFactory(), timeout_seconds=60) for job in jobs)
@@ -311,3 +313,37 @@ async def test_two_accounts_same_day_do_not_share_the_artifact(
     assert [row["accountId"] for row in results] == ["acc-1", "acc-2"]
     # Ningún artefacto se escribió en la ruta plana compartida.
     assert not (root / "operability_runs" / "dia-d-auto" / "dia-d-auto-2026-10-17.json").exists()
+
+
+@pytest.mark.asyncio
+async def test_no_depende_de_subprocesos_asyncio(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regresión Windows: ``SelectorEventLoop`` no implementa ``create_subprocess_*``.
+
+    El worker fuerza ese bucle (psycopg async), así que el handler debe lanzar el CLI
+    con ``subprocess.Popen`` y esperar por ``poll``; si vuelve a ``asyncio`` subprocess,
+    todo replay DÍA-D falla con ``NotImplementedError`` en Windows.
+    """
+    root = _root(tmp_path)
+    job = _job()
+
+    def _spawn(cmd: list[str], **kwargs: Any) -> _FakeProc:  # noqa: ARG001 — firma Popen
+        _write_artifact(root, job.day, job.account_id)
+        return _FakeProc(code=0)
+
+    def _forbidden(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError(
+            "el handler no debe usar asyncio.create_subprocess_* (falla en Windows)"
+        )
+
+    monkeypatch.setattr(handler, "_repo_root", lambda: root)
+    monkeypatch.setattr(handler, "SqlAlchemyAutoOpsJobRepository", _FakeJobRepo)
+    monkeypatch.setattr(handler, "_spawn_process", _spawn)
+    monkeypatch.setattr(handler.asyncio, "create_subprocess_exec", _forbidden)
+    monkeypatch.setattr(handler.asyncio, "create_subprocess_shell", _forbidden)
+
+    result = await handler.run_dia_d_replay_job(job, _FakeFactory(), timeout_seconds=60)
+
+    assert result["verdict"] == "INCONCLUSIVE"
+    assert result["accountId"] == "acc-1"

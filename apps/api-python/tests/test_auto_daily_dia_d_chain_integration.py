@@ -124,10 +124,13 @@ async def _daily_report(account_id: str) -> dict[str, Any]:
 class _FakeProc:
     def __init__(self) -> None:
         self.returncode: int | None = None
-        self.stdout = None
-        self.stderr = None
 
-    async def wait(self) -> int:
+    def poll(self) -> int | None:
+        if self.returncode is None:
+            self.returncode = 0
+        return self.returncode
+
+    def wait(self, timeout: float | None = None) -> int:  # noqa: ARG002 — firma Popen
         self.returncode = 0
         return 0
 
@@ -172,7 +175,7 @@ def _install_fake_cli(monkeypatch: pytest.MonkeyPatch, root: Path) -> list[str]:
     script.parent.mkdir(parents=True, exist_ok=True)
     script.write_text("", encoding="utf-8")
 
-    async def _spawn(*cmd: str, **kwargs: Any) -> _FakeProc:
+    def _spawn(cmd: list[str], **kwargs: Any) -> _FakeProc:  # noqa: ARG001 — firma Popen
         args = list(cmd)
         account = args[args.index("--account-id") + 1]
         day = args[args.index("--at") + 1]
@@ -235,7 +238,7 @@ def _install_fake_cli(monkeypatch: pytest.MonkeyPatch, root: Path) -> list[str]:
 
     monkeypatch.setattr(worker, "_repo_root", lambda: root)
     monkeypatch.setattr(worker, "SqlAlchemyAutoOpsJobRepository", _JobRepo)
-    monkeypatch.setattr(worker.asyncio, "create_subprocess_exec", _spawn)
+    monkeypatch.setattr(worker, "_spawn_process", _spawn)
     return seen
 
 
