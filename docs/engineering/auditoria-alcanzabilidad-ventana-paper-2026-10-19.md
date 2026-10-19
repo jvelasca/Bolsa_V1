@@ -172,6 +172,11 @@ contrato (gate por símbolo, agregado como declaración), el plan de baseline de
 de re-emisión de la evidencia `.136`…`.149` por segmentos. **No implementa nada**: el motor sigue
 byte-idéntico hasta que se acepte y se abra un sello propio con `Δ decisión ≠ 0`.
 
+**Medida previa del POST (simulación read-only, 2026-10-19):** con el gate por símbolo, **61/61**
+fechas as-of tendrían al menos **un** símbolo operable (frente a **0/61** del eje global); mediana
+**22 de 35** operables por día, mínimo **10**, máximo **30**, **0** días de un solo símbolo y **0**
+símbolos nunca operables. Es un **techo** (falta señal/ciclo), no un veredicto de P&L.
+
 ## 7. Límites declarados (sin fabricar)
 
 - **5 filas** de ledger observadas; la del `14/10` se lee de sus etiquetas (watch de 20 símbolos

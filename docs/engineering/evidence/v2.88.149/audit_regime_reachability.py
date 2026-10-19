@@ -11,6 +11,10 @@ preguntas con las MISMAS piezas que el tick del motor:
 3. Si el gate es ALCANZABLE: backtest **as-of** (cada simbolo se clasifica solo con
    `bars[:t+1]`) y recuento de fechas en las que NINGUN simbolo esta bajista, que es
    la condicion necesaria para que el eje global permita LONG.
+4. Cuanto abriria el gate PROPUESTO por ADR-047 (gate **por simbolo**): por la MISMA
+   pasada as-of, cuantos simbolos serian operables cada dia. Es una **simulacion
+   read-only**: el motor no cambia y no se escribe nada; mide el techo del cambio, no
+   lo implementa.
 
 Uso (desde la raiz del repo)::
 
@@ -37,8 +41,9 @@ import asyncio
 import json
 import sys
 from collections import Counter
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _DEFAULT_WATCH_SIZE = 20
@@ -165,7 +170,7 @@ def _symbol_rows(snapshot: dict[str, list[Any]]) -> list[dict[str, Any]]:
 
 
 def _reachability(snapshot: dict[str, list[Any]]) -> dict[str, Any]:
-    """Backtest AS-OF: cuantas fechas dejarian el eje global con LONG permitidas."""
+    """Backtest AS-OF: eje global (hoy) y gate por simbolo (ADR-047, simulado)."""
     from bolsa_analytics.cognitive.market_regime_gate import (  # noqa: PLC0415
         map_trial_regime,
         regime_allows_entry_for,
@@ -183,6 +188,11 @@ def _reachability(snapshot: dict[str, list[Any]]) -> dict[str, Any]:
     best_share = 0.0
     best_index = -1
     total = 0
+    any_operable_days = 0
+    all_operable_days = 0
+    single_operable_days = 0
+    operable_per_day: list[int] = []
+    symbol_operable_days: Counter[str] = Counter()
     for index in range(MIN_REGIME_BARS - 1, length):
         labels = {
             symbol: classify_market_regime(list(bars or [])[: index + 1])
@@ -195,12 +205,45 @@ def _reachability(snapshot: dict[str, list[Any]]) -> dict[str, Any]:
         total += 1
         if regime_allows_entry_for(operational, "long"):
             open_days += 1
+        operable = [
+            symbol
+            for symbol, label in labels.items()
+            if regime_allows_entry_for(map_trial_regime(label), "long")
+        ]
+        operable_per_day.append(len(operable))
+        symbol_operable_days.update(operable)
+        if operable:
+            any_operable_days += 1
+        if len(operable) == len(labels):
+            all_operable_days += 1
+        if len(operable) == 1:
+            single_operable_days += 1
         non_down = sum(
             1 for value in labels.values() if value in ("trend_up", "range", "low_vol")
         )
         share = non_down / max(1, len(labels))
         if share > best_share:
             best_share, best_index = share, index
+
+    ordered = sorted(operable_per_day)
+    if ordered:
+        def _pct(fraction: float) -> int:
+            position = min(len(ordered) - 1, max(0, int(round(fraction * (len(ordered) - 1)))))
+            return ordered[position]
+
+        distribution = {
+            "min": ordered[0],
+            "p25": _pct(0.25),
+            "median": ordered[len(ordered) // 2] if len(ordered) % 2 else (
+                ordered[len(ordered) // 2 - 1] + ordered[len(ordered) // 2]
+            )
+            / 2,
+            "p75": _pct(0.75),
+            "max": ordered[-1],
+        }
+    else:
+        distribution = {"min": None, "p25": None, "median": None, "p75": None, "max": None}
+
     return {
         "asOfDays": total,
         "alignedBars": length,
@@ -209,6 +252,21 @@ def _reachability(snapshot: dict[str, list[Any]]) -> dict[str, Any]:
         "operationalCounts": dict(operational_counts),
         "maxNonDownShare": round(best_share, 4),
         "maxNonDownIndex": best_index,
+        "perSymbol": {
+            "hypothesis": "ADR-047 (gate direccional por simbolo) SIMULADO; el motor no cambia",
+            "daysWithAnyOperable": any_operable_days,
+            "daysWithAllOperable": all_operable_days,
+            "daysWithSingleOperable": single_operable_days,
+            "operablePerDay": distribution,
+            "symbolOperableDays": dict(sorted(symbol_operable_days.items())),
+            "symbolsNeverOperable": sorted(
+                symbol for symbol in snapshot if symbol_operable_days[symbol] == 0
+            ),
+            "criterion": (
+                "necesario, NO suficiente: un dia medible exige ademas senal/ciclo; "
+                "un simbolo operable es el que pasaria regime_allows_entry_for(long)"
+            ),
+        },
     }
 
 
@@ -265,6 +323,24 @@ def _print_report(payload: dict[str, Any]) -> None:
         f"as-of max no-bajista     {reach['maxNonDownShare']:.3f} "
         f"(indice {reach['maxNonDownIndex']})"
     )
+    post = reach.get("perSymbol") or {}
+    if post:
+        dist = post.get("operablePerDay") or {}
+        print()
+        print("as-of POST (ADR-047 simulado: gate por simbolo; el motor NO cambia)")
+        print(
+            f"dias con >=1 operable    {post['daysWithAnyOperable']}/{reach['asOfDays']} "
+            f"(hoy, eje global: {reach['daysLongAllowed']}/{reach['asOfDays']})"
+        )
+        print(f"dias con 1 solo operable {post['daysWithSingleOperable']} (fragiles)")
+        print(f"dias con TODOS operables {post['daysWithAllOperable']}")
+        print(
+            "operables por dia        "
+            f"min {dist.get('min')} · p25 {dist.get('p25')} · mediana {dist.get('median')} · "
+            f"p75 {dist.get('p75')} · max {dist.get('max')}"
+        )
+        never = post.get("symbolsNeverOperable") or []
+        print(f"simbolos nunca operables {len(never)}{(': ' + ','.join(never)) if never else ''}")
 
 
 async def _run(args: argparse.Namespace) -> dict[str, Any]:
@@ -305,6 +381,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             "solo SELECT: el instrumento no escribe ledger, journal, pin ni BD",
             "backtest as-of por indice desde el final de cada simbolo (no por calendario)",
             "usa el watch ACTUAL: mide ALCANZABILIDAD del gate, no el historico de la ventana",
+            "POST simulado (ADR-047): mide el TECHO del gate por simbolo; no implementa nada",
         ],
     }
 

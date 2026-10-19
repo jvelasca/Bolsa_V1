@@ -106,3 +106,29 @@ de **re-emisión segmentada** de la evidencia `.136`…`.149`.
 **Lo que este sello NO hace:** no toca código, ni umbrales, ni el gate. El motor sigue byte-idéntico
 y la ventana sigue `NO_MEDIDO`; la implementación, si se acepta, será un sello propio con
 **`Δ decisión ≠ 0`**.
+
+## 9. Medida previa del POST (simulación, POST-TAG)
+
+El instrumento de §3 se **extendió después del tag** (sólo añade una simulación; no escribe, no toca
+el motor y no cambia el `sha256` del sello) para medir el **techo** de ADR-047: en la **misma**
+pasada as-of, cuántos símbolos pasarían el gate **por sí mismos**.
+
+```text
+as-of hoy (eje global)     LONG permitida 0/61
+as-of POST (por símbolo)   días con >=1 operable 61/61
+                           días con 1 solo        0
+                           días con TODOS         0
+                           operables/día          min 10 · p25 16 · mediana 22 · p75 25 · máx 30
+                           símbolos nunca operables 0
+```
+
+Comando:
+
+```text
+uv run --no-sync python \
+  docs/engineering/evidence/v2.88.149/audit_regime_reachability.py --watch-from-estudio
+```
+
+**Límites:** es un **techo** (ser operable no es ser medido: falta señal, edge y ciclo) y hereda los
+límites del instrumento (alineación por índice, watch ACTUAL, sesgo de supervivencia). Prueba que el
+cuello es el **agregado**; **no** prueba P&L ni promociona evidencia.

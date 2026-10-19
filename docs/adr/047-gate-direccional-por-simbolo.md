@@ -186,6 +186,31 @@ Regla: **si dos superficies pueden declarar alcanzabilidad, tienen que dar el mi
 El último es el **criterio de éxito**: hoy es `0/61`; con el gate por símbolo debe ser **> 0** (y el
 instrumento `.149` ya sabe medirlo). Si sigue en `0`, el ADR no arregló la alcanzabilidad.
 
+### 5.1 Medida previa (simulación read-only, 2026-10-19)
+
+Antes de aceptar el ADR se midió el **techo** del cambio **sin tocar el motor**: la misma pasada
+as-of clasifica cada símbolo con `bars[:t+1]` y cuenta cuántos pasarían
+`regime_allows_entry_for(map_trial_regime(label), "long")` (extensión del instrumento `.149`;
+sólo `SELECT`).
+
+```text
+as-of hoy (eje global)     LONG permitida 0/61
+as-of POST (por símbolo)   días con >=1 operable 61/61
+                           días con 1 solo        0 (sin fragilidad de un único símbolo)
+                           días con TODOS         0
+                           operables/día          min 10 · p25 16 · mediana 22 · p75 25 · máx 30
+                           símbolos nunca operables 0
+```
+
+Lectura: el cuello **es** el agregado. Con el gate por símbolo, **las 61 fechas** tendrían al menos
+**10** símbolos elegibles (mediana **22 de 35**, 62,9 %), sin depender de un solo valor y sin ningún
+símbolo estructuralmente inelegible.
+
+**Límite declarado:** es un **techo**, no un veredicto. Un día medible exige además señal, edge y
+ciclo; y la simulación hereda los límites del instrumento (alineación por índice, watch ACTUAL,
+sesgo de supervivencia). Lo que prueba es que **el agregado es la causa** y que el cambio abre el
+gate; no que la ventana vaya a producir P&L.
+
 ## 6. Qué falsaría este ADR
 
 - Que con el gate por símbolo la alcanzabilidad as-of siga en **0/61** ⇒ el cuello no era el agregado
