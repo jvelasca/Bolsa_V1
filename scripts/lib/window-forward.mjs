@@ -569,10 +569,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-19 — pin del arbol re-anclado a `dc8eb5bd`
+ * (`apps` `c596721859ca40ecd833a13848c6828d51753b1a` / `packages` `4bf6673a3eb59f121f669cdba4c28ec844924be9`).
+ * Motivo: v2.88.150-beta: ADR-047 gate direccional por simbolo (delta decision != 0) + baseline de replay segmentado
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '1cf7fb75',
-  appsHash: 'e637ad27f3c0cc0fe05cca4c86c2ba6ed9d26e0a',
-  packagesHash: '963c7575168d2265ea83fa53d842696a07cd9a65',
+  commit: 'dc8eb5bd',
+  appsHash: 'c596721859ca40ecd833a13848c6828d51753b1a',
+  packagesHash: '4bf6673a3eb59f121f669cdba4c28ec844924be9',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
