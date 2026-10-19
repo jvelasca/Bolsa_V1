@@ -526,6 +526,202 @@ function autoEstudioAuditMock() {
   };
 }
 
+/**
+ * Cadena durable por valor (`GET /api/auto/estudio-chain`) — el valor del parte tiene un ciclo
+ * completo; el segundo valor del parte declara su hueco (`no_cycles_for_value`), no un cero.
+ */
+function autoEstudioChainMock(asOf: string) {
+  return {
+    available: true,
+    readOnly: true,
+    accountId: E2E_ACCOUNT_ID,
+    asOf,
+    engineId: "auto-sim-e2e",
+    estudio: { status: "ok", values: 2 },
+    summary: {
+      values: 2,
+      measured: 1,
+      complete: 1,
+      cycles: 1,
+      cyclesComplete: 1,
+      bestScoredPresent: true,
+    },
+    bestScored: {
+      asOf,
+      rows: [
+        { rank: 1, assetId: E2E_INSTRUMENT_ID, combined: 72.5 },
+        { rank: 2, assetId: "e2e-estudio-gap", combined: 51 },
+      ],
+    },
+    values: [
+      {
+        instrumentId: E2E_INSTRUMENT_ID,
+        measured: true,
+        complete: true,
+        unmeasured: [],
+        strategy: {
+          presetKey: E2E_AUTO_PRESET_KEY,
+          version: "1",
+          presetKeyAmbiguous: false,
+          versionAmbiguous: false,
+        },
+        strategyDiaD: {
+          presetKey: E2E_AUTO_PRESET_KEY,
+          version: "1",
+          presetKeyAmbiguous: false,
+          versionAmbiguous: false,
+        },
+        cycles: [
+          {
+            cycleId: E2E_AUTO_CYCLE_A,
+            instrumentId: E2E_INSTRUMENT_ID,
+            direction: "long",
+            closed: true,
+            opportunityId: "e2e-opportunity-1",
+            entryDay: "2026-09-29",
+            exitDay: "2026-09-30",
+            executed: {
+              strategyPresetKey: E2E_AUTO_PRESET_KEY,
+              strategyVersion: "1",
+              rank: 1,
+              score: 72.5,
+              measurement: "COMPLETE",
+            },
+            bestScored: { rank: 1, assetId: E2E_INSTRUMENT_ID },
+            executedVsBest: {
+              executedIsTopRanked: true,
+              executedIsBestScoredAsset: true,
+              executedRank: 1,
+              bestScoredAssetId: E2E_INSTRUMENT_ID,
+              bestScoredPresetKey: null,
+              presetMatch: null,
+              measurement: "COMPLETE",
+            },
+            steps: {
+              SIGNAL: 1,
+              TOP_N: 1,
+              RISK: 1,
+              RESERVATION: 1,
+              ORDER: 1,
+              FILL: 1,
+              PROTECTION: 1,
+              SETTLEMENT: 1,
+              CYCLE_CLOSED: 1,
+            },
+            chain: {
+              reached: [
+                "SIGNAL",
+                "TOP_N",
+                "RISK",
+                "RESERVATION",
+                "ORDER",
+                "FILL",
+                "PROTECTION",
+                "SETTLEMENT",
+                "CYCLE_CLOSED",
+              ],
+              notReached: {},
+              complete: true,
+              steps: 9,
+            },
+            pnl: {
+              cycleClosedPnl: "12.40",
+              settlementPnl: "12.40",
+              reconciled: true,
+              measurement: "COMPLETE",
+            },
+            diaD: { verdict: "PARTIAL" },
+            executedVsDiaD: {
+              matches: true,
+              cyclePresetKey: E2E_AUTO_PRESET_KEY,
+              diaDPresetKey: E2E_AUTO_PRESET_KEY,
+              measurement: "COMPLETE",
+            },
+            diaDLink: { linkable: true, draft: null, measurement: "COMPLETE" },
+            result: { realizedR: 0.4 },
+            notes: [],
+          },
+        ],
+      },
+      {
+        instrumentId: "e2e-estudio-gap",
+        measured: false,
+        complete: false,
+        unmeasured: ["no_cycles_for_value"],
+        strategy: {
+          presetKey: null,
+          version: null,
+          presetKeyAmbiguous: false,
+          versionAmbiguous: false,
+        },
+        strategyDiaD: {
+          presetKey: null,
+          version: null,
+          presetKeyAmbiguous: false,
+          versionAmbiguous: false,
+        },
+        cycles: [],
+      },
+    ],
+    cyclesOutsideEstudio: [],
+    meta: { schema: "auto-estudio-chain-v1", watch: [] },
+    limits: ["Una verificación DÍA-D por valor a la vez por (cuenta, día)."],
+    notes: [],
+    error: null,
+  };
+}
+
+/** DÍA-D propio del valor (`GET /api/auto/dia-d-replay/{day}/value/{symbol}`). */
+function autoDiaDReplayValueMock(day: string, symbol: string) {
+  const normalized = symbol.trim().toUpperCase();
+  if (normalized !== E2E_SYMBOL) {
+    return {
+      available: false,
+      readOnly: true,
+      day,
+      symbol: normalized,
+      artifactModifiedAt: null,
+      schemaVersion: null,
+      summary: null,
+      steps: [],
+      oos: null,
+      meta: {},
+      limits: [],
+      executedDetail: {},
+      notes: ["artifact_not_found"],
+    };
+  }
+  return {
+    available: true,
+    readOnly: true,
+    day,
+    symbol: normalized,
+    artifactModifiedAt: `${day}T21:00:00+00:00`,
+    schemaVersion: "dia-d-auto-v2",
+    summary: {
+      verdict: "PARTIAL",
+      match: 1,
+      divergent: 0,
+      notMeasured: 0,
+      steps: 1,
+    },
+    steps: [
+      {
+        step: "signal",
+        declared: "buy",
+        executed: "buy",
+        verdict: "MATCH",
+        measurement: "COMPLETE",
+      },
+    ],
+    oos: null,
+    meta: { account: E2E_ACCOUNT_ID, watch: [normalized] },
+    limits: [],
+    executedDetail: {},
+    notes: [],
+  };
+}
+
 /** Job operativo de la cola durable — encolado y progreso observables. */
 function autoOpsJobMock(input: {
   id: string;
@@ -534,6 +730,7 @@ function autoOpsJobMock(input: {
   status: string;
   phase?: string;
   percent?: number;
+  payload?: Record<string, unknown>;
 }) {
   return {
     id: input.id,
@@ -541,7 +738,7 @@ function autoOpsJobMock(input: {
     status: input.status,
     day: input.day,
     accountId: E2E_ACCOUNT_ID,
-    payload: {},
+    payload: input.payload ?? {},
     progress:
       input.phase === undefined
         ? {}
@@ -912,6 +1109,21 @@ export function routeBody(
         notes: [],
       };
     }
+    // Evidencia durable por valor (cadena de 9 etapas) — una lectura por informe.
+    if (path === "/api/auto/estudio-chain") {
+      const asOf =
+        new URL(route.request().url()).searchParams.get("asOf") ?? "2026-10-18";
+      return autoEstudioChainMock(asOf);
+    }
+    // Artefacto DÍA-D PROPIO del valor: nunca se rellena desde el del día completo.
+    const diaDValueMatch =
+      /^\/api\/auto\/dia-d-replay\/([^/]+)\/value\/([^/]+)$/.exec(path);
+    if (diaDValueMatch) {
+      return autoDiaDReplayValueMock(
+        diaDValueMatch[1] as string,
+        decodeURIComponent(diaDValueMatch[2] as string),
+      );
+    }
     if (path.startsWith("/api/auto/dia-d-replay/")) {
       if (opts.autoDaily === true) {
         return autoDiaDReplayArtifactMock(
@@ -940,13 +1152,26 @@ export function routeBody(
       const kind = typeof body.kind === "string" ? body.kind : "estudio_daily";
       const day =
         typeof body.day === "string" && body.day ? body.day : "2026-10-18";
+      const payload =
+        body.payload && typeof body.payload === "object"
+          ? (body.payload as Record<string, unknown>)
+          : {};
       return autoOpsJobMock({
-        id: kind === "dia_d_replay" ? "e2e-dia-d-job" : "e2e-estudio-daily-job",
+        id:
+          kind === "dia_d_replay"
+            ? "e2e-dia-d-job"
+            : kind === "dia_d_value_replay"
+              ? "e2e-dia-d-value-job"
+              : "e2e-estudio-daily-job",
         kind,
         day,
         status: "running",
-        phase: kind === "dia_d_replay" ? "replay" : "opinions",
+        phase:
+          kind === "dia_d_replay" || kind === "dia_d_value_replay"
+            ? "replay"
+            : "opinions",
         percent: 40,
+        payload,
       });
     }
     if (path.startsWith("/api/auto/ops-jobs/")) {

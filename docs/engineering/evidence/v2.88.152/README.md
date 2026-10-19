@@ -72,9 +72,10 @@ los 13 CLIs (etiqueta) y el `meta.watch` (campo aditivo del artefacto DÍA-D).
 | --- | --- |
 | `pytest apps/api-python/tests packages/py/application/tests -q` | **4094 passed / 1 failed** (`test_c3b_crash_after_resolve_put_no_double_on_relaunch`, caos **conocido**: un servidor dev vivo compite por el outbox) — **en aislamiento 1 passed** |
 | `pytest` focalizado nuevo (`test_auto_estudio_chain_route`, `test_auto_dia_d_route`, `test_auto_ops_dia_d`, `test_auto_ops_job_worker`, `test_auto_ops_jobs`, `test_auto_chain_durable_reader`, `test_dia_d_bump_guard`) | **78 passed** (ruta de cadena: **8 passed**) |
-| `vitest run src/features/auto-monitor` | **21 ficheros · 165 tests passed** |
+| `vitest run src/features/auto-monitor` | **21 ficheros · 166 tests passed** |
 | `vitest run` (suite web completa) | **312/313 ficheros · 2310 passed / 1 failed** (`auto-monitor.test.tsx` «compone header, notas y timeline», `Test timed out in 5000ms` con la suite en paralelo; **en aislamiento 11 passed**) |
-| `use-dia-d-value-replay` + `estudio-daily-ops-panel` | **5 + 17 = 22 passed** |
+| `use-dia-d-value-replay` + `estudio-daily-ops-panel` | **5 + 18 = 23 passed** |
+| `playwright (mock E2E)` local | **`gp-e2e-v290` 5 passed · `gp-e2e-s5-auto-dia-d-bridge` 3 passed** |
 | `typecheck` (monorepo) | **OK** (`4 successful / 4`) |
 | `lint` (monorepo) | **0 errores**, 23 avisos preexistentes |
 | `pnpm lint:py` | **`All checks passed!`** (15 `I001` corregidos con `lint:py:fix`) |
@@ -83,6 +84,14 @@ los 13 CLIs (etiqueta) y el `meta.watch` (campo aditivo del artefacto DÍA-D).
 | `contract:check` | **OK** (contrato regenerado; solo aditivo) |
 | `pnpm window:test` | **50 passed** |
 | `test_dia_d_bump_guard` | **2 passed** (`2.11.152-beta`) |
+
+**Corrección tras el primer `Release tag CI`.** `playwright (mock E2E)` falló porque la suite
+mock no servía `GET /api/auto/estudio-chain` y el fallback `{ data: [] }` llegaba al panel como
+si fuera la respuesta: `chain.notes.join(...)` tumbaba la ficha entera. Se corrige en dos
+capas, sin tocar el contrato: (1) el panel **normaliza** la respuesta
+(`normalizeEstudioChain`: un payload sin forma es hueco declarado, no una cadena vacía) y (2)
+el mock E2E sirve la cadena durable y el artefacto `values/<SÍMBOLO>` con la misma forma que la
+API. Guardián nuevo: «un payload sin forma no tumba la ficha: se declara el hueco».
 
 **E2E integrado.** `gp-v288-s5` gana **S5-08** (evidencia por valor + verificación DÍA-D del
 valor + no herencia del artefacto del día) y **S5-06** verifica la sección 5 en la UI diaria.

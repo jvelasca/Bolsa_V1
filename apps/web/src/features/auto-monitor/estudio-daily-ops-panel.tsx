@@ -27,6 +27,7 @@ import {
 } from "@/features/auto-monitor/use-estudio-daily-ops";
 import {
   indexChainValuesByInstrument,
+  normalizeEstudioChain,
   useEstudioChain,
 } from "@/features/auto-monitor/use-estudio-chain";
 import { EstudioChainEvidence } from "@/features/auto-monitor/estudio-chain-evidence";
@@ -456,15 +457,24 @@ export function EstudioDailyOpsPanel() {
   // Evidencia de cadena: UNA query por informe (no una por valor), habilitada cuando ya hay
   // parte que leer. Se indexa por `instrumentId` para pintarla en cada ficha.
   const chainQuery = useEstudioChain(report ? asOf : null);
-  const chainByInstrument = useMemo(
-    () => indexChainValuesByInstrument(chainQuery.data),
+  // Se NORMALIZA antes de leer: un payload sin forma (mock/proxy/versión antigua) es hueco
+  // declarado, no una respuesta válida con `available` ausente.
+  const chain = useMemo(
+    () => normalizeEstudioChain(chainQuery.data),
     [chainQuery.data],
   );
-  const chain = chainQuery.data ?? null;
-  const chainFailed = chainQuery.isError || Boolean(chain && !chain.available);
+  const chainByInstrument = useMemo(
+    () => indexChainValuesByInstrument(chain),
+    [chain],
+  );
+  const chainFailed = chainQuery.isError || chain?.available === false;
   const chainError =
-    chain && !chain.available
-      ? (chain.error ?? chain.notes.join(", "))
+    chain?.available === false
+      ? typeof chain.error === "string" && chain.error.trim()
+        ? chain.error
+        : Array.isArray(chain.notes) && chain.notes.length > 0
+          ? chain.notes.join(", ")
+          : null
       : chainQuery.error instanceof Error
         ? chainQuery.error.message
         : null;

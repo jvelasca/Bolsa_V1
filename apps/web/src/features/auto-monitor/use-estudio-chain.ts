@@ -55,6 +55,24 @@ export function indexChainValuesByInstrument(
 }
 
 /**
+ * Normaliza la respuesta del endpoint antes de leerla.
+ *
+ * Un `{ data: [] }` (fallback de un mock, un proxy o una versión antigua del servidor) NO es un
+ * `EstudioChainResponseV1`: si se usara tal cual, `chain.available` sería `undefined` y leer
+ * `chain.notes.join(...)` tumbaría la ficha entera. Aquí se declara el hueco (`null`) y se
+ * conserva el objeto sólo si tiene forma de respuesta.
+ */
+export function normalizeEstudioChain(
+  raw: EstudioChainResponseV1 | null | undefined,
+): EstudioChainResponseV1 | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const candidate = raw as EstudioChainResponseV1;
+  return Array.isArray(candidate.values)
+    ? candidate
+    : { ...candidate, values: [] };
+}
+
+/**
  * Día del DÍA-D del valor: `entryDay` del ciclo más reciente si existe; si no, la vela del
  * parte. Devuelve también de dónde salió para que la UI lo declare (no se adivina).
  */

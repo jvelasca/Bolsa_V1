@@ -921,4 +921,18 @@ describe("EstudioDailyOpsPanel", () => {
       expect(api.getAutoEstudioChain).toHaveBeenCalledTimes(1),
     );
   });
+
+  it("un payload sin forma (mock/proxy) no tumba la ficha: se declara el hueco", async () => {
+    // Un fallback `{ data: [] }` (mock E2E sin ruta, proxy o versión antigua) no es
+    // `EstudioChainResponseV1`: antes se leía como objeto y `notes.join` rompía el informe.
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce([] as never);
+    renderPanel();
+
+    const values = await screen.findAllByTestId("estudio-daily-value");
+    expect(values.length).toBeGreaterThan(0);
+    expect((await screen.findAllByTestId("estudio-chain-absent")).length).toBe(
+      values.length,
+    );
+    expect(screen.queryByTestId("estudio-chain-error")).toBeNull();
+  });
 });
