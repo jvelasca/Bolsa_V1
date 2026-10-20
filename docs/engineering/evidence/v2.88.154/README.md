@@ -112,9 +112,9 @@ BD), no una regresión de este sello.
 ## 6. Freeze
 
 El sello mueve `apps` —no solo `tests/`: el `meta.bump` de los 13 CLIs vive en
-`apps/api-python/scripts`— y `packages` ⇒ el pin PAPER se **re-ancla** al árbol del sello para
-que el run de las 18:00 no aborte con `TREE_MOVED`. La cita medida vive en el commit del
-re-anclaje.
+`apps/api-python/scripts`— y `packages` ⇒ el pin PAPER se **re-ancla** al árbol del sello
+(`apps e162746a…` / `packages be243531…`) para que el run de las 18:00 no aborte con
+`TREE_MOVED`; `pnpm window:freeze` ⇒ **`freeze OK`** y `pnpm window:test` **50 passed**.
 
 ## 7. Publicación
 
