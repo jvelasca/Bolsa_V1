@@ -19,6 +19,7 @@ from bolsa_application.auto_operational_monitor import (
     STEP_ABSENT,
     STEP_REACHED,
     STEP_UNKNOWN,
+    _entry_reservation,
     build_operational_monitor,
 )
 
@@ -1542,3 +1543,68 @@ def test_filter_instrument_is_declared_and_empty_is_flagged() -> None:
     assert dto_empty["cycles"] == []
     assert dto_empty["filterInstrumentId"] == "ZZZ"
     assert "filter_instrument_empty" in dto_empty["notes"]
+
+# ── H2/H3 de la auditoría del sello .154: la reserva de ENTRADA gobierna el ciclo ─────
+
+
+def _exit_reservation(**overrides: Any) -> Any:
+    """Reserva de SALIDA del ciclo tal y como la persiste el worker (V2.47)."""
+    base: dict[str, Any] = {
+        "reservation_id": "exit:ord-1",
+        "cycle_id": "cyc-1",
+        "side": "sell",
+        "quantity": 10.0,
+        "remaining_qty": 0.0,
+        "released_qty": 10.0,
+        "status": "RELEASED_BY_FILL",
+        "created_at": "2026-01-01T02:00:00Z",
+        "reserved_risk": 0.0,
+        "stop": None,
+        "entry": 110.0,
+        "instrument_id": "AAPL",
+        # La salida NO sella la identidad de estrategia: es el hueco que gobernaba el ciclo.
+        "strategy_version_id": None,
+        "release_reason": "fill",
+        "is_live": False,
+    }
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def test_entry_reservation_prefers_the_entry_when_the_exit_is_listed_first() -> None:
+    """El orden durable (DESC) pone la salida primero: no puede gobernar la identidad."""
+    entry = _reservation()
+    exit_row = _exit_reservation()
+    assert _entry_reservation([exit_row, entry]) is entry
+    # El orden inverso NO cambia la elección: la regla es el lado, no la posición.
+    assert _entry_reservation([entry, exit_row]) is entry
+
+
+def test_entry_reservation_falls_back_to_the_first_row_without_an_entry() -> None:
+    """Sin entrada se conserva el orden histórico: nunca se inventa una reserva."""
+    exit_row = _exit_reservation()
+    assert _entry_reservation([exit_row]) is exit_row
+
+
+def test_entry_reservation_is_none_without_rows() -> None:
+    assert _entry_reservation([]) is None
+
+
+def test_closed_cycle_reads_direction_and_version_from_the_entry_reservation() -> None:
+    """Falsable en el punto del hallazgo: un ciclo cerrado se publicaba ``short`` y sin versión.
+
+    La salida va PRIMERO (como en la ventana durable real) y declara ``side='sell'`` sin
+    ``strategy_version_id``. El ciclo debe leerse largo, con la versión de su entrada, y el
+    paso RESERVATION debe describir la ENTRADA.
+    """
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_exit_reservation(), _reservation()],
+        fills=[_fill(side="buy", qty=10, price=100), _fill(side="sell", qty=10, price=110)],
+    )
+    cycle = dto["cycles"][0]
+    assert cycle["direction"] == "long"
+    assert cycle["strategyVersion"] == "sv-1"
+    reservation_step = _step(cycle["steps"], "RESERVATION")
+    assert _fact(reservation_step, "side")["value"] == "buy"
+    assert _fact(reservation_step, "reservedRisk")["value"] == 50.0

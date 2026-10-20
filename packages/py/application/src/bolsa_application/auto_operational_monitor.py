@@ -848,11 +848,20 @@ def _entry_reservation(reservations: Sequence[Any]) -> Any | None:
     """Reserva de ENTRADA del ciclo (``side='buy'``); sin entrada, la primera durable.
 
     Desde V2.47 la SALIDA también declara ``cycle_id`` (para reconstruir el PnL
-    hacia atrás), así que un ciclo cerrado trae DOS reservas y el orden durable pone la
-    salida primero. La salida (``side='sell'``, sin ``strategy_version_id``) NO puede
-    gobernar la identidad del ciclo: publicaba ``direction='short'`` y
+    hacia atrás), así que un ciclo cerrado trae DOS reservas y el orden durable
+    (``list_recent_with_cycle``, DESC) pone la salida primero. La salida
+    (``reservation_id = 'exit:<orderId>'``, ``side='sell'``, sin ``strategy_version_id``)
+    NO puede gobernar la identidad del ciclo: publicaba ``direction='short'`` y
     ``strategyVersion=None`` pese a que ambos hechos existían en la entrada. Se prefiere
     la entrada; sin filas de entrada se conserva el orden histórico (nunca se inventa).
+
+    **Precondición declarada (sello .154):** AUTO 2.0 es **largo solamente** — abre con
+    ``BUY`` y reduce con ``SELL`` (``auto_simulation_worker``), así que la entrada SIEMPRE es
+    ``side='buy'``. Si algún día se abriesen cortos, la entrada sería ``sell`` y esta regla
+    elegiría la SALIDA (que sería ``buy``), invirtiendo ``direction``: el discriminador
+    correcto entonces sería la marca ``exit:<orderId>``, no el lado. No se cambia ahora
+    porque no hay ciclos cortos que leer y una regla sin caso que la ejerza sería una
+    segunda verdad sin prueba.
     """
     if not reservations:
         return None

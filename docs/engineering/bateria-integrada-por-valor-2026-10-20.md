@@ -1,6 +1,8 @@
 # Batería integrada POR VALOR — identidad ganadora → señal/plan → ciclo SIM → DÍA-D → P&L
 
-**Fecha:** 2026-10-20 · **Árbol:** `2.11.153-beta` (`[Unreleased]`) · **Sin sello nuevo**.
+**Fecha:** 2026-10-20 · **Árbol:** `2.11.154-beta` · **Sello:** `v2.88.154-beta` (evidencia en
+[`evidence/v2.88.154`](./evidence/v2.88.154/README.md) · auditoría en
+[`auditoria-sello-v2.88.154-2026-10-20.md`](./auditoria-sello-v2.88.154-2026-10-20.md)).
 
 **Naturaleza:** frente de **medición pura** (pytest + PostgreSQL real). **`Δ motor = 0`**,
 **`Δ decisión = 0`**, **`Δ contrato HTTP = 0`** (no se toca ningún DTO), **sin migración**
@@ -58,6 +60,20 @@ Corrección (`auto_operational_monitor._entry_reservation`): se prefiere la rese
 **entrada** (`side == 'buy'`) y, solo si no hay ninguna, se conserva el orden histórico. No
 se rellena nada: la salida sigue declarando lo que declara.
 
+**Precondición declarada.** AUTO 2.0 es **largo solamente** (abre con `BUY`, reduce con
+`SELL`), así que la entrada siempre es `side='buy'`. Si algún día se abrieran cortos, la entrada
+sería `sell` y esta regla elegiría la salida (que sería `buy`): el discriminador correcto sería
+entonces el prefijo `exit:` del `reservation_id`. No se cambia hoy porque no hay ciclos cortos
+que leer y una regla sin caso que la ejerza sería una segunda verdad sin prueba.
+
+**Radio de impacto (subdeclarado en la primera versión de este documento).** El defecto **no**
+era solo de lectura: la ruta productiva `POST /api/auto/dia-d-verifications` deriva la identidad
+del ciclo por `resolve_dia_d_cycle_facts`, que lee `read_operational_monitor`. Para un ciclo
+**cerrado** el hecho durable aportaba `strategy_version = None`, así que la verificación DÍA-D se
+persistía con un **hueco** donde la entrada declaraba la versión (sin `409` espurio: el contraste
+se omite cuando el hecho durable es `None`). La corrección repara también esa escritura; **no hay
+backfill**: las filas anteriores conservan su hueco y se leen como desconocidas. `Δ decisión = 0`.
+
 ## 4. Límites declarados (no se cierran aquí, y no se finge que sí)
 
 - **El parte diario ESTUDIO no comparte identidad.** `estudio_auto_hits` fija
@@ -114,8 +130,10 @@ En [`.github/workflows/release-tag-ci.yml`](../../.github/workflows/release-tag-
 
 | Comprobación | Resultado |
 |---|---|
-| `test_auto_identity_chain_battery_pg.py` (gate ON) | **2 passed in 2.91s** (objetivo `< 5 s`) |
-| `test_auto_estudio_chain_evidence_pg.py` (gate ON, proceso real) | **1 passed in 9.14s** |
+| `test_auto_identity_chain_battery_pg.py` (gate ON) | **2 passed in 2.83s** (objetivo `< 5 s`) |
+| `test_auto_estudio_chain_evidence_pg.py` (gate ON, proceso real) | **1 passed in 9.11s** |
+| `test_auto_operational_monitor.py` (puros; incluye los 4 de la auditoría `.154`) | **67 passed** |
+| `test_auto_chain_durable_reader.py` (tri-estado) | **17 passed** |
 | Lector/monitor/AUTO identity + ruta de cadena + DÍA-D (hermético) | **142 passed in 4.49s** |
 | `test_auto_operational_monitor_pg` + `test_auto_dia_d_trace_pg` + `test_auto_v2_durable_pg` | **20 passed in 20.86s** |
 | `pnpm lint:py` | **`All checks passed!`** |

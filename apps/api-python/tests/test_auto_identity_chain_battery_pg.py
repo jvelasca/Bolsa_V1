@@ -216,9 +216,10 @@ async def _drive_cycle(
     llamando a ``_teardown``). Borrar aquí las reservas y la foto TOP3 destruiría
     justamente los hechos que la batería certifica.
 
-    El cierre es una SALIDA determinista (``SELL`` de la cantidad viva tras reinicio), el
-    seam que ya usa ``test_auto_scheduler_real_pg_zero_human_intervention``: no toca
-    producción y deja los mismos hechos durables que un ``time_exit``.
+    El cierre es un ``time_exit`` REAL: se lleva el ``holdingDeadlineAt`` durable al pasado
+    (seam ``E1`` del Golden Day) y un tercer worker rehidrata el plan vencido. No se inyecta
+    ninguna ``SELL`` a mano ni se toca producción: los hechos durables son los del camino
+    productivo (``auto_cycle_settlement`` + ``CYCLE_CLOSED``).
     """
     from bolsa_api.background.auto_simulation_worker import (
         AutoSimRuntime,
@@ -538,6 +539,12 @@ async def _assert_complete_chain(
     cycle_row = monitor["cycles"][0]
     assert cycle_row["strategyPresetKey"] == _IDENTITY_PRESET
     assert cycle_row["strategyVersion"] == _IDENTITY_VERSION
+    # H2 de la auditoría del sello .154: ``direction`` se derivaba de la reserva elegida y
+    # publicaba ``short`` en TODO ciclo cerrado (la salida, ``side='sell'``, iba primero).
+    # Se fija aquí porque es el campo que el defecto deformaba y no tenía ninguna aserción.
+    assert cycle_row["direction"] == "long", (
+        f"un ciclo abierto con BUY debe publicarse como largo: {cycle_row['direction']}"
+    )
     # La decisión de cartera durable que produjo el ciclo está enlazada (no es un hueco).
     assert cycle_row["decision"] is not None, "el ciclo debe declarar su decisión de cartera"
 
@@ -689,6 +696,7 @@ async def _assert_partial_chain(
     cycle_row = monitor["cycles"][0]
     assert cycle_row["strategyPresetKey"] is None
     assert cycle_row["strategyVersion"] == _IDENTITY_VERSION
+    assert cycle_row["direction"] == "long", cycle_row["direction"]
 
     # La verificación DÍA-D se escribe COPIANDO el hueco: el contraste sigue sin afirmarse.
     async with factory() as session:
