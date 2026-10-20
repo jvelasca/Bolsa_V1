@@ -206,17 +206,28 @@ def _filling_instrument_id(prefix: str, *, side: str, round_trip: bool = False) 
     probe_sides = (side, "sell" if side == "buy" else "buy") if round_trip else (side,)
 
     def _fills(probe_side: str, candidate: str, tick: int) -> bool:
-        return bool(
-            simulated_fill_schedule(
-                instrument_id=candidate,
-                side=probe_side,
-                quantity=Decimal("100"),
-                venue_order_id=f"probe-{probe_side}-{candidate}-{tick}",
-                seed=fill_seed(tick, candidate),
-                fill_chunks=_CERT_FILL_CHUNKS,
-                base_mid=100.0,
-            ).fills
+        """El schedule debe llenar la orden COMPLETA (no solo emitir algún fill).
+
+        ``v2.88.153`` — el probe aceptaba cualquier schedule con ``fills`` no vacío, pero
+        ``simulated_fill_schedule`` parte la cantidad en chunks y **puede terminar en
+        parcial** (``cumulative_filled_quantity < quantity``: ``73.5`` de ``100``). Medido
+        el **2026-10-20 UTC** (barra ``20746``): el candidato ``inst-a9proc-0000000002``
+        llenaba el BUY entero y el SELL solo ``73.5`` ⇒ el libro quedaba con ``26.5`` y el
+        gate «día plano» caía **sin que nada hubiera cambiado en el motor** (el sweep
+        depende de ``bar_tick(now)``, así que el rojo aparecía al cambiar de día). Exigir
+        el llenado TOTAL elige un instrumento cuyo ciclo BUY→SELL cierra de verdad y no
+        relaja ninguna aserción: el día sigue teniendo que terminar plano.
+        """
+        result = simulated_fill_schedule(
+            instrument_id=candidate,
+            side=probe_side,
+            quantity=Decimal("100"),
+            venue_order_id=f"probe-{probe_side}-{candidate}-{tick}",
+            seed=fill_seed(tick, candidate),
+            fill_chunks=_CERT_FILL_CHUNKS,
+            base_mid=100.0,
         )
+        return bool(result.fills) and result.cumulative_filled_quantity == Decimal("100")
 
     for n in range(64):
         candidate = f"{prefix}{n:010d}"
