@@ -130,7 +130,7 @@ declarado: `playwright (integrated E2E, opt-in)`, que **no certifica**),
 | --- | --- |
 | `shared` | **`freeze OK (45e06852)`** — el pin re-anclado no declara `TREE_MOVED`; `window:test` **50 passed**. |
 | `replay-repro` | **`REPRODUCIDO`**: `sha256 E9B7376B…7F5625`, `3 383 461` bytes, `DIGEST` **igual en las dos corridas** (2ª corrida `16:12:34Z`) ⇒ **`Δ decisión = 0` medido por el CI**. El artefacto coincide con el de `.154`: el sello no mueve decisión. |
-| `lifecycle-pg` | Paso `Pytest AUTO universe coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window + ESTUDIO chain + identity battery (PG, fail if skipped)` ⇒ **21 passed in 39.44s** con `AUTO_IDENTITY_CHAIN_PG_REQUIRED=1` y guard anti-skip **verde** ⇒ la batería de identidad corrió **en el CI del tag**. En el mismo job: `W-G2/2` **176 passed in 59.12s**, lifecycle **222 passed in 75.88s**, Golden Day **2 passed in 10.12s** y `multiprocess AUTO` **1 passed in 113.23s**. |
+| `lifecycle-pg` | Paso `Pytest AUTO universe coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window + ESTUDIO chain + identity battery (PG, fail if skipped)` ⇒ **21 passed in 39.44s** con `AUTO_IDENTITY_CHAIN_PG_REQUIRED=1` y guard anti-skip **verde** ⇒ la batería de identidad corrió **en el CI del tag**. En el mismo job: `W-G2/2` **176 passed in 59.12s**, lifecycle **222 passed in 75.88s**, Golden Day **2 passed in 22.54s** y `multiprocess AUTO` **1 passed in 113.23s**. |
 | `playwright (integrated AUTO S5)` | **8 passed, todos al primer intento (`retry 0`)**; `S5-04` en **5.03s**. |
 | `python` · `frontend` (`contract:check`) · `playwright (mock E2E)` · `playwright (integrated axe)` · `a7-gate` · `dr-verify` · `decision-spine` · `security` · `certify` | **`success`**. |
 
