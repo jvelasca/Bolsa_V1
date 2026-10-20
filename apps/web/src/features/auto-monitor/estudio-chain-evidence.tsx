@@ -452,9 +452,12 @@ export function EstudioChainEvidence({
             <p className="text-[11px]">
               Ejecutada (ciclo):{" "}
               {cycle ? (
-                <span className="font-mono">
-                  {textOrAbsent(cycle.executed.strategyPresetKey)} · v
-                  {textOrAbsent(cycle.executed.strategyVersion)}
+                <span
+                  className="font-mono"
+                  data-testid="estudio-chain-executed-strategy"
+                >
+                  {textOrAbsent(cycle.executed.strategyPresetKey)} ·{" "}
+                  {versionLabel(cycle.executed.strategyVersion)}
                 </span>
               ) : (
                 <span className="text-muted-foreground">

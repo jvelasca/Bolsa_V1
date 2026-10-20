@@ -144,3 +144,60 @@ autosuficiente** —identidad inmutable, jobs y artefactos del run, límites dec
 **falsabilidad**— para auditar **sin credenciales**: basta clonar el tag o abrir la página del
 release. El release cuelga del **tag** (`e3bcbe86`), no de esta cita: el commit de la cita es
 `69e416c5`, **por delante** del tag, igual que este documento.
+
+## 8. Correcciones post-publicación (2026-10-20)
+
+Dos hallazgos de la auditoría externa sobre `.154`, ambos de **presentación/documentación**.
+Ninguno toca motor, decisión, contrato HTTP ni esquema: **`Δ motor = 0`** · **`Δ decisión = 0`** ·
+**`Δ contrato HTTP = 0`** · **sin migración**.
+
+### 8.1 `P2` — el rótulo de la estrategia EJECUTADA duplicaba el prefijo
+
+- **Defecto.** [`estudio-chain-evidence.tsx`](../../../../apps/web/src/features/auto-monitor/estudio-chain-evidence.tsx)
+  concatenaba `· v` a mano antes de la versión: con la versión declarada `v1` la ficha podía
+  mostrar `vv1`, y con el hueco `vSin dato todavía`. Las otras tres líneas de identidad del mismo
+  componente ya usaban `versionLabel(...)`, que evita duplicar el prefijo.
+- **Corrección.** La línea «Ejecutada (ciclo)» reutiliza `versionLabel(...)` y expone
+  `data-testid="estudio-chain-executed-strategy"` para poder asertarla sin que la satisfaga la
+  línea «Declarada por el valor».
+- **Regresión.** Test nuevo en
+  [`estudio-daily-ops-panel.test.tsx`](../../../../apps/web/src/features/auto-monitor/estudio-daily-ops-panel.test.tsx):
+  `v1` → `v1`, `1` → `v1` y `null` → `Sin dato todavía`; nunca `vv1`, `v1v1` ni `vSin`.
+  `vitest` del panel: **22 passed** (antes 21).
+- **Freeze.** El cambio vive en `apps/web` ⇒ mueve el árbol `apps`; el pin PAPER se **re-ancla**
+  (`pnpm window:pin`) y `pnpm window:freeze` vuelve a **`freeze OK`**.
+
+### 8.2 `P3` — SHA base del audit pack publicado
+
+- **Defecto.** El cuerpo del release declaraba `22290ca2` como base en §1 (tabla de identidad) y
+  en §7 (fila 1 de falsabilidad). Ese commit **no** es el de `v2.88.153-beta`.
+- **Valor real, medido.** `v2.88.153-beta` → objeto de tag
+  `5a724765422ba168c12c5c6d4f4978ee759e393f` → commit
+  `2af7f0d9dc3c93c1a80bbcf44cc3fc064c6c1a1a`; comparador `.153 → .154`: **0 por detrás /
+  7 por delante**.
+
+```bash
+git cat-file -p v2.88.153-beta                                        # objeto de tag 5a724765…
+git rev-parse v2.88.153-beta                                          # 5a724765422ba1…
+git rev-parse 'v2.88.153-beta^{}'                                     # 2af7f0d9dc3c…
+git rev-list --left-right --count 'v2.88.153-beta...v2.88.154-beta'   # 0	7
+```
+
+- **Corrección.** Se edita el **cuerpo del GitHub Release** (`gh release edit --prerelease`):
+  §1 pasa a `v2.88.153-beta` → tag `5a724765` → commit `2af7f0d9`; §7 pasa a
+  `(tag 5a724765, commit 2af7f0d9)`; y se añade en §1 una **nota visible de corrección fechada**
+  que declara el valor previo erróneo, para que el cambio sea auditable en vez de silencioso.
+  Verificado sobre el cuerpo publicado: `22290ca2` aparece **solo** en esa nota; el release sigue
+  `pre-release` y colgado del tag `170a79e8` → `e3bcbe86`.
+- **Sin efectos sobre el sello.** No se mueve el tag, no se tocan assets ni el run, y la evidencia
+  de `.153` no se reescribe.
+
+### 8.3 Qué NO cambia
+
+- El **tag** sigue en `e3bcbe86` y el run [`39424571552`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39424571552)
+  certifica ese commit; esta corrección es POST-TAG, como el resto de citas de `.154`.
+- **AUTO sigue OFF**, la ventana PAPER sigue **`INCONCLUSIVE`**, `CONFIRMED` no se emite, la
+  operativa es **100 % SIM** y la **rentabilidad no está certificada**.
+- Sigue **pendiente** el enlace funcional identidad del TOP3 ↔ parte diario ESTUDIO
+  (`decisionId`, `opportunityId`, `rank`) y el `planId`/`signalId` en el DTO del ciclo: este ciclo
+  de corrección **no** los aborda.

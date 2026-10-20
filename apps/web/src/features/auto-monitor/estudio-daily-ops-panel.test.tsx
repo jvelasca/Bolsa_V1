@@ -885,6 +885,42 @@ describe("EstudioDailyOpsPanel", () => {
     expect(top3).toContain("estudio_auto v1");
   });
 
+  it("no duplica el prefijo de versión en la estrategia EJECUTADA (v1 y 1)", async () => {
+    const executedLine = () =>
+      screen.getByTestId("estudio-chain-executed-strategy").textContent ?? "";
+
+    // El fixture ya declara `v1`: el rótulo no debe convertirlo en `vv1`.
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce(
+      structuredClone(CHAIN) as never,
+    );
+    renderPanel();
+    await screen.findAllByTestId("estudio-daily-value");
+    expect(executedLine()).toContain("estudio_auto · v1");
+    expect(executedLine()).not.toContain("vv1");
+    cleanup();
+
+    // Una versión desnuda (`1`) recibe UN prefijo, nunca dos.
+    const bare = structuredClone(CHAIN);
+    bare.values[0].cycles[0].executed.strategyVersion = "1";
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce(bare as never);
+    renderPanel();
+    await screen.findAllByTestId("estudio-daily-value");
+    expect(executedLine()).toContain("estudio_auto · v1");
+    expect(executedLine()).not.toContain("v1v1");
+    cleanup();
+
+    // Un hueco se rotula como tal: no se fabrica un `vSin dato todavía`.
+    const withoutVersion = structuredClone(CHAIN);
+    withoutVersion.values[0].cycles[0].executed.strategyVersion = null;
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce(
+      withoutVersion as never,
+    );
+    renderPanel();
+    await screen.findAllByTestId("estudio-daily-value");
+    expect(executedLine()).toContain("Sin dato todavía");
+    expect(executedLine()).not.toContain("vSin");
+  });
+
   it("declara un preset distinto como divergencia MEDIDA, no como hueco", async () => {
     const divergent = structuredClone(CHAIN);
     divergent.bestScored = {
