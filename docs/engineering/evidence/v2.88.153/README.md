@@ -85,7 +85,6 @@ la suite completa, repetida sin carga concurrente, volvió a pasar **313/313 fic
 2314/2314 tests**. No se tocó `testTimeout` ni `retries`.
 
 ## 5. S5-04: de la fragilidad al estado observable
-
 - El fixture exige, **antes** del journey, `POST /api/instruments/{id}/sync { yearsBack: 5 }`
   y `GET /api/instruments/{id}/ohlcv` con `meta.count > 0`; un fallo aquí es **fallo de
   fixture**, no un `skipped`.
@@ -101,7 +100,33 @@ la suite completa, repetida sin carga concurrente, volvió a pasar **313/313 fic
   declara `test.setTimeout(240_000)` porque el fixture (gate + seed + precalentamiento) excede
   el timeout por defecto de hook (30 s).
 
-## 6. Límites declarados (sin fabricar)
+## 6. `lifecycle-pg` en rojo el 2026-10-20: el sweep de `test_a9…` elegía un fill PARCIAL
+
+El `Release tag CI` del primer intento puso `lifecycle-pg (Alembic + auth + golden restart)`
+en **rojo** con `test_a9_scheduler_process_pg_zero_human`: «el día AUTO no deja el libro
+plano: quedan **26.500000** (`inst-a9proc-0000000002`)». **No era una regresión del sello**
+(el diff no toca motor, broker, scheduler ni sizing: `Δ motor = 0`), era un **defecto de
+determinismo del propio harness**, dependiente del día:
+
+- `_filling_instrument_id` elige el instrumento **puro y determinista** a partir de
+  `bar_tick(now, "1d")` y `bar_tick(now + 1d, "1d")`. Con el cambio de fecha, la barrida deja
+  de elegir el candidato de ayer.
+- El probe aceptaba cualquier `simulated_fill_schedule` con `fills` **no vacío**, pero ese
+  schedule parte la cantidad en chunks y **puede terminar en parcial**
+  (`cumulative_filled_quantity < quantity`). Medido para la barra `20746`:
+  `inst-a9proc-0000000002` llenaba el BUY **entero** y el SELL solo **73,5** de 100 ⇒ el libro
+  quedaba con **26,5** y el gate «día plano» caía **sin que el motor hubiera cambiado**.
+- **Arreglo (solo test, sin relajar ninguna aserción):** el probe exige **llenado TOTAL**
+  (`cumulative_filled_quantity == quantity`) en ambos lados y en las dos barras probadas — el
+  mismo criterio que el `require_full=True` de `test_auto_fill_cycle_seal_pg.py` (sello
+  `.137`). Con la barra de hoy elige `inst-a9proc-0000000003`, que llena BUY y SELL enteros.
+- **Medido:** `pytest test_a9_scheduler_process_pg_zero_human.py` ⇒ **2 passed en 32,0 s**
+  (antes: `1 failed` en **121,4 s**, agotando el presupuesto de 120 s).
+
+Este hallazgo se declara explícitamente porque **el sello anterior lo tenía latente**: el
+mismo árbol habría pasado en verde un día y en rojo al siguiente, sin código de por medio.
+
+## 7. Límites declarados (sin fabricar)
 
 - **AUTO sigue OFF**; no se enciende la cadencia ni el orquestador.
 - La prueba demuestra **trazabilidad**, **no** rentabilidad. Sin ciclos PAPER reales la
@@ -110,21 +135,23 @@ la suite completa, repetida sin carga concurrente, volvió a pasar **313/313 fic
   desconocida; no se rellena ni se deduce.
 - La migración es **aditiva y nullable**: el `downgrade` elimina las dos columnas y no toca
   filas históricas.
-- `test_a9_scheduler_process_pg_zero_human` sigue **rojo en esta máquina** (libro con `26.5`
-  tras el día AUTO). El diff no toca scheduler, ejecución, ledger ni sizing; se declara como
-  límite de verificación local y **no** se cita como certificado.
+- `test_a9_scheduler_process_pg_zero_human` quedó **rojo** en la primera corrida (local y CI)
+  por el defecto de determinismo del harness descrito en §6; **corregido** (probe de llenado
+  TOTAL) y verificado **2 passed en 32,0 s**. El motor no se tocó.
 - En la batería PG de migración/cadena apareció **1 deadlock** (`test_migration_038_roundtrip`)
   porque el servidor dev de la API estaba vivo (`AccessShareLock` sobre las tablas que el
   `downgrade` altera); **pasa en aislamiento**. No se mató el servidor del usuario para forzar
   un verde. La corrida completa posterior de `apps/api-python/tests` +
   `packages/py/application/tests` no volvió a reproducirlo (**4104 passed / 1 failed**, y el
-  único fallo es el `test_a9…` declarado).
+  único fallo es el `test_a9…` declarado). Tras la corrección de §6 el test pasa; la suite
+  completa no se repitió entera (13 min) porque el único rojo era ese test, ya verificado en
+  aislamiento.
 - `replay-repro` **sí se ejecutó en local**: se sembró el fixture congelado (20 instrumentos /
   25 700 barras) y el artefacto salió con el SHA-256 del sello. La 2ª corrida fue **idéntica**
   ⇒ **`Δ decisión = 0`**. El artefacto vive en `artifacts/` (ignorado por git).
 - Operativa **100 % SIM**; no se envían órdenes reales.
 
-## 7. Freeze y migración
+## 8. Freeze y migración
 
 - `alembic heads` = `057_top3_opportunity_identity`. `upgrade` y `downgrade` se ejercitan en
   los tests PG (`054 ↔ head`, y las rutas que bajan a 046/048/054 y vuelven a head).
@@ -133,7 +160,7 @@ la suite completa, repetida sin carga concurrente, volvió a pasar **313/313 fic
   valida.
 - No se re-mide la ventana PAPER: sigue necesitando **OPERACIÓN**, no software.
 
-## 8. Publicación
+## 9. Publicación
 
 **Bump y tag.** Este sello sí publica: `package.json` pasa a **`2.11.153-beta`**, los **13**
 CLIs DÍA-D sellan el mismo `meta.bump` (el literal congelado del replay de `v2_87` sigue en
@@ -150,13 +177,13 @@ se reescribe el sello): el `Release tag CI` cierra con **12 jobs `success` + `ce
 `playwright (integrated AUTO S5)` (verde con 1 flaky y reintento), distinto del job opt-in
 `playwright (integrated E2E, opt-in)`, que está `skipped` y no certifica.
 
-**CI del sello.** Ver la cita POST-TAG más abajo (§9): hasta que el run no cierre con
+**CI del sello.** Ver la cita POST-TAG más abajo (§10): hasta que el run no cierre con
 `certify: success`, este sello **no** está certificado.
 
 **Fuera de este sello.** Cualquier promoción a `CONFIRMED` o certificación de rentabilidad:
 la ventana PAPER sigue `INCONCLUSIVE` porque depende de OPERACIÓN, no de software.
 
-## 9. Cita POST-TAG
+## 10. Cita POST-TAG
 
 _Pendiente: se completa con el id del run, `conclusion`, recuento de jobs, resultado de
 `replay-repro` y comportamiento de S5-04 en CI cuando `Release tag CI` cierre._
