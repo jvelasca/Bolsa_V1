@@ -118,7 +118,21 @@ El sello mueve `apps` —no solo `tests/`: el `meta.bump` de los 13 CLIs vive en
 
 ## 7. Publicación
 
-Se publica como `v2.88.154-beta` (anotado, unsigned). La cita POST-TAG —`Release tag CI` con
-los jobs `shared` (`window:freeze`), `lifecycle-pg` (incluida la **batería de identidad**) y
-`replay-repro`— se añade en el commit de sello **solo** si el run sale **verde**; un `skipped`
-no certifica y **no** se da por bueno ningún intento rojo.
+Se publica como `v2.88.154-beta` (anotado, unsigned) sobre el commit **`e3bcbe86`**.
+
+**Cita POST-TAG — CI del sello VERDE.** `Release tag CI` [run **`39424571552`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/39424571552) ⇒
+**`conclusion: success`** (**13 jobs `success`**, `certify` incluido; **1 job `skipped`**
+declarado: `playwright (integrated E2E, opt-in)`, que **no certifica**), `2026-10-20T12:44:04Z`
+→ `12:58:58Z` (**14m54s**).
+
+| Job | Resultado medido |
+| --- | --- |
+| `shared` | **`freeze OK (e3bcbe86)`** — el pin re-anclado no declara `TREE_MOVED`. |
+| `replay-repro` | **`REPRODUCIDO`**: `sha256 E9B7376B…7F5625`, `3 383 461` bytes, `DIGEST` **igual en las dos corridas** ⇒ **`Δ decisión = 0` medido por el CI**. |
+| `lifecycle-pg` | Paso `Pytest AUTO universe coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window + ESTUDIO chain + identity battery (PG, fail if skipped)` ⇒ **21 passed in 35.88s** con `AUTO_IDENTITY_CHAIN_PG_REQUIRED=1` y guard anti-skip **verde** (log no vacío + **sin** `skipped`) — la batería de identidad corrió **en el CI del tag**; `multiprocess AUTO` **1 passed in 113.35s**. |
+| `playwright (integrated AUTO S5)` | **8 passed, todos al primer intento (`retry 0`)**; `S5-04` en **5.64s**. |
+| `python` · `frontend` (`contract:check`) · `playwright (mock E2E)` · `playwright (integrated axe)` · `a7-gate` · `dr-verify` · `decision-spine` · `security` · `certify` | **`success`**. |
+
+El run **no certifica rentabilidad**: **AUTO sigue OFF**, la ventana PAPER sigue
+**`INCONCLUSIVE`** y **`CONFIRMED` no se emite**. Tampoco se da por bueno ningún intento rojo:
+no lo hubo.
