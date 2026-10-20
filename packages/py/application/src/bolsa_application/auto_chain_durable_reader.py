@@ -35,7 +35,9 @@ from typing import Any
 
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
+    MEASUREMENT_PARTIAL,
     MEASUREMENT_UNKNOWN,
+    MeasurementStatus,
 )
 from bolsa_application.auto_operational_monitor import (
     OPERATIONAL_STEPS,
@@ -162,6 +164,22 @@ def _positive_int(value: Any) -> int | None:
     return number if number > 0 else None
 
 
+def _identity_measurement(*, preset_measured: bool, version_measured: bool) -> MeasurementStatus:
+    """Estado de medición de la IDENTIDAD ESTRATÉGICA (preset + versión) en tri-estado.
+
+    ``COMPLETE`` = se pudieron contrastar **los dos** términos de la identidad; ``PARTIAL`` =
+    solo uno; ``UNKNOWN`` = ninguno. La distinción no es cosmética: ``COMPLETE`` se lee como
+    «la identidad está medida», y declararlo con medio término afirmaría una cobertura que no
+    existe. Un valor ausente **nunca** se convierte en ``False`` ni en coincidencia; el hueco
+    se declara.
+    """
+    if preset_measured and version_measured:
+        return MEASUREMENT_COMPLETE
+    if preset_measured or version_measured:
+        return MEASUREMENT_PARTIAL
+    return MEASUREMENT_UNKNOWN
+
+
 def executed_rank(cycle: Mapping[str, Any] | None) -> int | None:
     """Puesto de la estrategia EJECUTADA en el ranking del valor, o ``None`` (hueco).
 
@@ -193,13 +211,21 @@ def executed_identity(cycle: Mapping[str, Any] | None) -> dict[str, Any]:
     version_text = str(version).strip() if version is not None else ""
     rank = executed_rank(cycle)
     score = _fact_value(_steps_index(cycle).get("TOP_N"), _SCORE_KEY)
-    measured = bool(preset_text) or bool(version_text) or rank is not None
+    # La identidad se mide sobre lo DECLARADO (preset/versión). El puesto es un hecho
+    # SEPARADO: medirlo no completa la identidad, pero sí la deja en ``PARTIAL`` porque el
+    # bloque publica algo medido y algo no medido. ``COMPLETE`` exige los dos términos.
+    measurement = _identity_measurement(
+        preset_measured=bool(preset_text),
+        version_measured=bool(version_text),
+    )
+    if measurement == MEASUREMENT_UNKNOWN and rank is not None:
+        measurement = MEASUREMENT_PARTIAL
     return {
         "strategyPresetKey": preset_text or None,
         "strategyVersion": version_text or None,
         "rank": rank,
         "score": score,
-        "measurement": MEASUREMENT_COMPLETE if measured else MEASUREMENT_UNKNOWN,
+        "measurement": measurement,
     }
 
 
@@ -304,10 +330,12 @@ def resolve_executed_vs_best(
         ),
         # Medición de la IDENTIDAD, separada del veredicto rank/activo: un hueco de identidad no
         # degrada una comparación de puesto que sí se pudo hacer, pero tampoco se disfraza.
-        "strategyMeasurement": (
-            MEASUREMENT_COMPLETE
-            if (preset_match is not None or version_match is not None)
-            else MEASUREMENT_UNKNOWN
+        # Tri-estado: ``COMPLETE`` solo con preset Y versión contrastados; ``PARTIAL`` con uno;
+        # ``UNKNOWN`` con ninguno. Declarar ``COMPLETE`` con medio término afirmaría una
+        # identidad completa que no se midió.
+        "strategyMeasurement": _identity_measurement(
+            preset_measured=preset_match is not None,
+            version_measured=version_match is not None,
         ),
     }
 
@@ -587,10 +615,12 @@ def build_chain_evidence_artifact(
             **dict(best_scored),
             "bestScoredPresetKey": best_preset or None,
             "bestScoredStrategyVersion": best_version or None,
-            "strategyMeasurement": (
-                MEASUREMENT_COMPLETE
-                if (best_preset or best_version)
-                else MEASUREMENT_UNKNOWN
+            # La foto se mide por lo que DECLARA: ``COMPLETE`` exige preset y versión;
+            # ``PARTIAL`` una sola; ``UNKNOWN`` ninguna (históricas pre-057). Es la misma
+            # regla que ``resolve_executed_vs_best``, no una segunda verdad.
+            "strategyMeasurement": _identity_measurement(
+                preset_measured=bool(best_preset),
+                version_measured=bool(best_version),
             ),
         }
     return {

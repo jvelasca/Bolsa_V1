@@ -126,6 +126,20 @@ def test_executed_identity_never_invents_a_strategy() -> None:
     assert empty["rank"] is None
     assert empty["measurement"] == "UNKNOWN"
 
+    # Solo preset: la identidad está PARCIAL, nunca COMPLETA (falta el otro término).
+    only_preset = executed_identity(_cycle(version=None))
+    assert only_preset["strategyPresetKey"] == "trend_v1"
+    assert only_preset["strategyVersion"] is None
+    assert only_preset["measurement"] == "PARTIAL"
+
+    # Sin identidad declarada pero con puesto medido: PARCIAL (el puesto NO completa la
+    # identidad, pero el bloque no queda sin ninguna medición).
+    rank_only = executed_identity(_cycle(preset=None, version=None))
+    assert rank_only["strategyPresetKey"] is None
+    assert rank_only["strategyVersion"] is None
+    assert rank_only["rank"] == 1
+    assert rank_only["measurement"] == "PARTIAL"
+
 
 def test_best_scored_asset_is_the_rank_one_row_or_none() -> None:
     snapshot = {
@@ -219,6 +233,62 @@ def test_identity_match_is_true_false_or_none_and_never_inferred() -> None:
     )
     assert same_preset_other_version["presetMatch"] is True
     assert same_preset_other_version["versionMatch"] is False
+
+
+def test_strategy_measurement_is_tri_state_and_never_complete_with_half_identity() -> None:
+    """``strategyMeasurement``: ``COMPLETE`` exige preset Y versión contrastados.
+
+    ``COMPLETE`` se lee como «la identidad está medida». Declararlo con medio término
+    afirmaría una cobertura que no existe: media identidad es ``PARTIAL``, y ningún término
+    es ``UNKNOWN``. El veredicto rank/activo (``measurement``) NO se degrada por el hueco.
+    """
+    base_executed = {"rank": 1, "instrumentId": "a"}
+    full_photo = {
+        "assetId": "a",
+        "rank": 1,
+        "strategyPresetKey": "trend_v1",
+        "strategyVersion": "v-42",
+    }
+
+    both = resolve_executed_vs_best(
+        executed={
+            **base_executed,
+            "strategyPresetKey": "trend_v1",
+            "strategyVersion": "v-42",
+        },
+        best_scored=full_photo,
+    )
+    assert both["presetMatch"] is True
+    assert both["versionMatch"] is True
+    assert both["strategyMeasurement"] == "COMPLETE"
+
+    # Solo preset: la comparación del preset SÍ se midió; la versión no se pudo afirmar.
+    only_preset = resolve_executed_vs_best(
+        executed={**base_executed, "strategyPresetKey": "trend_v1"},
+        best_scored=full_photo,
+    )
+    assert only_preset["presetMatch"] is True
+    assert only_preset["versionMatch"] is None
+    assert only_preset["strategyMeasurement"] == "PARTIAL"
+
+    # Solo versión: el simétrico. Ningún término se fabrica a partir del otro.
+    only_version = resolve_executed_vs_best(
+        executed={**base_executed, "strategyVersion": "v-42"},
+        best_scored=full_photo,
+    )
+    assert only_version["presetMatch"] is None
+    assert only_version["versionMatch"] is True
+    assert only_version["strategyMeasurement"] == "PARTIAL"
+
+    # Sin ningún término comparable: UNKNOWN, y el veredicto rank/activo sigue medido.
+    none = resolve_executed_vs_best(
+        executed=base_executed,
+        best_scored={"assetId": "a", "rank": 1},
+    )
+    assert none["presetMatch"] is None
+    assert none["versionMatch"] is None
+    assert none["strategyMeasurement"] == "UNKNOWN"
+    assert none["measurement"] == "COMPLETE"
 
 
 def test_artifact_groups_by_estudio_value_and_declares_missing_cycles() -> None:
@@ -417,3 +487,42 @@ def test_artifact_publishes_the_winning_identity_when_the_photo_declares_it() ->
     diff = divergent["values"][0]["cycles"][0]["executedVsBest"]
     assert diff["presetMatch"] is False
     assert diff["versionMatch"] is False
+
+
+def test_artifact_declares_partial_identity_when_the_photo_only_seals_the_preset() -> None:
+    """Media identidad en la foto NO es identidad completa: ``PARTIAL``, no ``COMPLETE``."""
+    cycle = _cycle(instrument_id="i-1", preset="trend_v1", version="v-42")
+    artifact = build_chain_evidence_artifact(
+        account_id="acc",
+        estudio={"status": "ok", "instrumentIds": ["i-1"]},
+        cycles=[cycle],
+        best_scored={
+            "assetId": "i-1",
+            "rank": 1,
+            "combined": 0.9,
+            "strategyPresetKey": "trend_v1",
+        },
+        as_of="2026-10-14T00:00:00Z",
+    )
+    block = artifact["bestScored"]
+    assert block["bestScoredPresetKey"] == "trend_v1"
+    assert block["bestScoredStrategyVersion"] is None
+    assert block["strategyMeasurement"] == "PARTIAL"
+    compare = artifact["values"][0]["cycles"][0]["executedVsBest"]
+    assert compare["presetMatch"] is True
+    assert compare["versionMatch"] is None
+    assert compare["strategyMeasurement"] == "PARTIAL"
+
+    # Y el simétrico: solo versión en la foto tampoco es identidad completa.
+    only_version = build_chain_evidence_artifact(
+        account_id="acc",
+        estudio={"status": "ok", "instrumentIds": ["i-1"]},
+        cycles=[cycle],
+        best_scored={
+            "assetId": "i-1",
+            "rank": 1,
+            "combined": 0.9,
+            "strategyVersion": "v-42",
+        },
+    )
+    assert only_version["bestScored"]["strategyMeasurement"] == "PARTIAL"

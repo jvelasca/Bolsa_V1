@@ -2,6 +2,18 @@
 
 All notable releases of Bolsa V1.
 
+## [Unreleased] — endurecimiento P2 de `2.11.153-beta` (**sin nuevo sello** · `Δ motor = 0` · `Δ decisión = 0` · contrato HTTP sin cambio · sin migración nueva)
+
+**Naturaleza:** cierre de dos hallazgos **P2** de las auditorías del sello `.153`. **No** mueve `package.json`, **no** crea tag y **no** reescribe la evidencia publicada; motor, umbrales, pesos A/B, `TOP_N`, régimen, sizing, entradas/salidas y replay OOS quedan intactos.
+
+**A · la migración `057` falla cerrado.** `upgrade()` hacía `return` si faltaba `top3_opportunities` (la crea la `052`): Alembic marcaba la revisión como **aplicada** sin crear las columnas y el lector durable fallaba después al seleccionarlas. Nueva guarda pura `assert_base_table_present(...)` que **aborta** con mensaje accionable; `downgrade` queda asimétrico a propósito (sin tabla no hay columnas que retirar) y documentado. La migración sigue aditiva, nullable, sin backfill y sin revisión nueva (`head` sigue `057`).
+
+**B · `strategyMeasurement` pasa a tri-estado.** `COMPLETE` se declaraba con **solo** preset o **solo** versión. Nueva regla única `_identity_measurement(...)`: `COMPLETE` solo con **ambos** términos contrastados, `PARTIAL` con uno y `UNKNOWN` con ninguno, aplicada en los tres puntos que publican identidad (`resolve_executed_vs_best`, `bestScored` del artefacto y `executed_identity`). `MeasurementV1` en `@bolsa/shared` admite `PARTIAL`; la ficha muestra «identidad: parcial» **solo** en ese caso. El `measurement` de rank/activo no cambia: un hueco de identidad no degrada una comparación de puesto que sí se pudo hacer.
+
+**Verificación (medida).** `pytest` de la migración **9 passed** · lector + ruta de cadena **27 passed** · `packages/py/infrastructure/tests` + `packages/py/application/tests` **3028 passed** (4m09s) · `vitest src/features/auto-monitor` **21 ficheros / 169 tests** · `pnpm typecheck` **4/4** · `pnpm lint` **0 errores** (23 avisos preexistentes) · `pnpm lint:py` **`All checks passed!`** · `pnpm imports:py` **4 kept/0 broken** · `pnpm types:py` **0 issues/567** · `contract:check` **OK** (sin diff de contrato).
+
+**Límites declarados.** No hay nuevo sello: la versión publicada sigue `v2.88.153-beta` y su cita POST-TAG sigue siendo el [run `39389152689`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39389152689). **AUTO sigue OFF**, la ventana PAPER sigue **`INCONCLUSIVE`** y la operativa es **100 % SIM**: esto demuestra trazabilidad y robustez de esquema, **no** rentabilidad. La batería integrada por valor (identidad ganadora → señal diaria → plan → ciclo SIM → DÍA-D → resultado conciliado) queda para un cambio **separado**. Detalle: [`docs/engineering/hardening-p2-v2.88.153-2026-10-20.md`](../docs/engineering/hardening-p2-v2.88.153-2026-10-20.md).
+
 ## [2.11.153-beta] — **identidad del indicador ganador: la cadena estrategia → señal → plan → ciclo → evidencia DÍA-D se puede contrastar, y S5-04 deja de ser frágil** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO · migración `057` nullable**)
 
 **Naturaleza:** sello **posterior y acotado** a `2.11.152-beta` — **no** toca el motor de decisión, umbrales, pesos A/B, `TOP_N`, régimen, sizing, entradas/salidas, orquestador ni el replay OOS. Contrato HTTP **aditivo** (`strategyPresetKey`/`strategyVersion` en el DTO de TOP3 y de la cadena; `openapi.json`/`schema.d.ts` regenerados, `contract:check` **OK**). **Migración** `057_top3_opportunity_identity`: dos columnas `String` `nullable=True`, **sin índice, sin default y sin backfill** (head `056_auto_ops_jobs` → `057`). **Bump** `2.11.152-beta` → `2.11.153-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**). Tag **anotado, unsigned**.

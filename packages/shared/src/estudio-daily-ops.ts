@@ -191,7 +191,13 @@ export const ESTUDIO_CHAIN_STEPS = [
 
 export type EstudioChainStepV1 = (typeof ESTUDIO_CHAIN_STEPS)[number];
 
-export type MeasurementV1 = "COMPLETE" | "UNKNOWN";
+/**
+ * Estado de medición de una magnitud del read-model, en tri-estado:
+ * - `COMPLETE`: se midió todo lo que la magnitud exige.
+ * - `PARTIAL`: se midió una parte (p. ej. solo el preset, no la versión).
+ * - `UNKNOWN`: no se pudo afirmar nada (hueco declarado, nunca un `0`).
+ */
+export type MeasurementV1 = "COMPLETE" | "PARTIAL" | "UNKNOWN";
 
 /** Conciliación al quantum del dinero: `null` cuando falta una de las dos cifras. */
 export type EstudioChainPnlV1 = {

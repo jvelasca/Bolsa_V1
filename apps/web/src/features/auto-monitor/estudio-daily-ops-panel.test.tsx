@@ -914,6 +914,31 @@ describe("EstudioDailyOpsPanel", () => {
     expect(why?.textContent).not.toContain("no se empareja por estrategia");
   });
 
+  it("declara identidad PARCIAL cuando solo se pudo contrastar uno de los dos términos", async () => {
+    const partial = structuredClone(CHAIN);
+    partial.bestScored = {
+      ...partial.bestScored,
+      bestScoredPresetKey: "estudio_auto",
+      strategyMeasurement: "PARTIAL",
+    };
+    const compare = partial.values[0].cycles[0].executedVsBest;
+    compare.bestScoredPresetKey = "estudio_auto";
+    compare.presetMatch = true;
+    compare.versionMatch = null;
+    compare.strategyMeasurement = "PARTIAL";
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce(partial as never);
+
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    const why = aaa?.querySelector('[data-testid="estudio-chain-why"]');
+    expect(why?.textContent).toContain("misma estrategia que la ejecutada: Sí");
+    // La media identidad se declara: no se disfraza de COMPLETE ni de hueco.
+    expect(why?.textContent).toContain("identidad: parcial");
+    expect(why?.textContent).not.toContain("no se empareja por estrategia");
+  });
+
   it("el botón verifica el DÍA-D del valor y declara el día usado", async () => {
     renderPanel();
 

@@ -517,6 +517,9 @@ export function EstudioChainEvidence({
                   cycle.executedVsBest.bestScoredStrategyVersion
                     ? ""
                     : " (la foto no declara identidad: no se empareja por estrategia)"}
+                  {cycle.executedVsBest.strategyMeasurement === "PARTIAL"
+                    ? " · identidad: parcial (solo se pudo contrastar uno de preset/versión)"
+                    : ""}
                 </p>
               </>
             ) : (
