@@ -115,11 +115,28 @@ cambio) para que el run de las 18:00 no aborte con `TREE_MOVED`; `pnpm window:fr
 ## 7. Publicación
 
 Se publica como `v2.88.155-beta` (anotado, unsigned) sobre el commit de **re-anclaje del pin**
-inmediatamente posterior al commit del sello, igual que en `.154`: el gate `window:freeze` del
-job `shared` es **fail-closed** y el tag no puede apuntar a un commit cuyo pin no case con su
-árbol.
+`45e06852` —inmediatamente posterior al commit del sello `79131c07`—, igual que en `.154`: el
+gate `window:freeze` del job `shared` es **fail-closed** y el tag no puede apuntar a un commit
+cuyo pin no case con su árbol. Objeto de tag **`27166281`** → commit **`45e06852`**.
 
-La **cita POST-TAG** con el run de `Release tag CI` se añade en un commit posterior sobre
-`main` (patrón del repo: el tag no se mueve después de publicado y la evidencia se publica
-encima). **Un CI verde no certifica rentabilidad**: AUTO sigue OFF y la ventana PAPER sigue
-`INCONCLUSIVE`.
+**Cita POST-TAG — CI del sello VERDE (medido).** `Release tag CI`
+[run **`39454490201`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/39454490201) ⇒
+**`conclusion: success`** (**13 jobs `success`**, `certify` incluido; **1 job `skipped`**
+declarado: `playwright (integrated E2E, opt-in)`, que **no certifica**),
+`2026-10-20T16:06:25Z` → `16:20:42Z` (**14m17s**), disparado por `push` de
+`refs/tags/v2.88.155-beta`.
+
+| Job | Resultado medido |
+| --- | --- |
+| `shared` | **`freeze OK (45e06852)`** — el pin re-anclado no declara `TREE_MOVED`; `window:test` **50 passed**. |
+| `replay-repro` | **`REPRODUCIDO`**: `sha256 E9B7376B…7F5625`, `3 383 461` bytes, `DIGEST` **igual en las dos corridas** (2ª corrida `16:12:34Z`) ⇒ **`Δ decisión = 0` medido por el CI**. El artefacto coincide con el de `.154`: el sello no mueve decisión. |
+| `lifecycle-pg` | Paso `Pytest AUTO universe coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window + ESTUDIO chain + identity battery (PG, fail if skipped)` ⇒ **21 passed in 39.44s** con `AUTO_IDENTITY_CHAIN_PG_REQUIRED=1` y guard anti-skip **verde** ⇒ la batería de identidad corrió **en el CI del tag**. En el mismo job: `W-G2/2` **176 passed in 59.12s**, lifecycle **222 passed in 75.88s**, Golden Day **2 passed in 10.12s** y `multiprocess AUTO` **1 passed in 113.23s**. |
+| `playwright (integrated AUTO S5)` | **8 passed, todos al primer intento (`retry 0`)**; `S5-04` en **5.03s**. |
+| `python` · `frontend` (`contract:check`) · `playwright (mock E2E)` · `playwright (integrated axe)` · `a7-gate` · `dr-verify` · `decision-spine` · `security` · `certify` | **`success`**. |
+
+`certify` publica el artefacto `release-tag-ci-summary` (434 B, id `12280617356`) con
+`"status": "GREEN"`, `"tag": "v2.88.155-beta"` y `"sha": "45e06852…"`.
+
+El run **no certifica rentabilidad**: **AUTO sigue OFF**, la ventana PAPER sigue
+**`INCONCLUSIVE`** y **`CONFIRMED` no se emite**. Tampoco se da por bueno ningún intento rojo:
+no lo hubo.
