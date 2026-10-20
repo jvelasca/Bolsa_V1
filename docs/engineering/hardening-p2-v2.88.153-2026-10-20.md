@@ -97,6 +97,11 @@ degradar una comparación de puesto que sí se pudo hacer.
 | `pnpm imports:py` | **`Contracts: 4 kept, 0 broken.`** |
 | `pnpm types:py` | **`Success: no issues found in 567 source files`** |
 | `contract:check` | **OK** (sin diff de contrato) |
+| `pnpm window:test` | **50 passed** |
+
+**Freeze.** El cambio mueve `apps` y `packages`, así que el pin PAPER se **re-ancla** al árbol
+nuevo (`apps 438e9bef…` / `packages b2792181…`) para que el run de las 18:00 no aborte con
+`TREE_MOVED`; tras el re-anclaje, `pnpm window:freeze` ⇒ **`freeze OK (b0d0f7b2)`**.
 
 ## 6. Límites declarados (sin fabricar)
 

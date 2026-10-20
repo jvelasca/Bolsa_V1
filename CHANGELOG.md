@@ -12,6 +12,8 @@ All notable releases of Bolsa V1.
 
 **Verificación (medida).** `pytest` de la migración **9 passed** · lector + ruta de cadena **27 passed** · `packages/py/infrastructure/tests` + `packages/py/application/tests` **3028 passed** (4m09s) · `vitest src/features/auto-monitor` **21 ficheros / 169 tests** · `pnpm typecheck` **4/4** · `pnpm lint` **0 errores** (23 avisos preexistentes) · `pnpm lint:py` **`All checks passed!`** · `pnpm imports:py` **4 kept/0 broken** · `pnpm types:py` **0 issues/567** · `contract:check` **OK** (sin diff de contrato).
 
+**Freeze.** Este cambio mueve `apps` y `packages` ⇒ el pin PAPER se **re-ancla** al árbol nuevo (`apps 438e9bef…` / `packages b2792181…`) para que el run de las 18:00 no aborte con `TREE_MOVED`; tras el re-anclaje, `pnpm window:freeze` ⇒ **`freeze OK (b0d0f7b2)`** y `pnpm window:test` **50 passed**.
+
 **Límites declarados.** No hay nuevo sello: la versión publicada sigue `v2.88.153-beta` y su cita POST-TAG sigue siendo el [run `39389152689`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39389152689). **AUTO sigue OFF**, la ventana PAPER sigue **`INCONCLUSIVE`** y la operativa es **100 % SIM**: esto demuestra trazabilidad y robustez de esquema, **no** rentabilidad. La batería integrada por valor (identidad ganadora → señal diaria → plan → ciclo SIM → DÍA-D → resultado conciliado) queda para un cambio **separado**. Detalle: [`docs/engineering/hardening-p2-v2.88.153-2026-10-20.md`](../docs/engineering/hardening-p2-v2.88.153-2026-10-20.md).
 
 ## [2.11.153-beta] — **identidad del indicador ganador: la cadena estrategia → señal → plan → ciclo → evidencia DÍA-D se puede contrastar, y S5-04 deja de ser frágil** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO · migración `057` nullable**)
