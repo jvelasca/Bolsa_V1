@@ -278,10 +278,15 @@ async def test_estudio_chain_evidence_covers_nine_steps_per_value_pg(
         # sin identidad), el hueco se declara. Jamás se rellena con la de la ejecutada.
         if artifact["bestScored"] is not None:
             best_block = artifact["bestScored"]
-            if best_block.get("bestScoredPresetKey") or best_block.get(
-                "bestScoredStrategyVersion"
-            ):
+            # V2.88.153 — la medición de identidad es TRI-ESTADO: ``COMPLETE`` exige preset Y
+            # versión; ``PARTIAL`` uno solo; ``UNKNOWN`` ninguno (fotos históricas pre-057).
+            # Declarar ``COMPLETE`` con medio término afirmaría una cobertura que no existe.
+            preset_declared = bool(best_block.get("bestScoredPresetKey"))
+            version_declared = bool(best_block.get("bestScoredStrategyVersion"))
+            if preset_declared and version_declared:
                 assert best_block["strategyMeasurement"] == "COMPLETE"
+            elif preset_declared or version_declared:
+                assert best_block["strategyMeasurement"] == "PARTIAL"
             else:
                 assert best_block["bestScoredPresetKey"] is None
                 assert best_block["strategyMeasurement"] == "UNKNOWN"
@@ -348,9 +353,21 @@ async def test_estudio_chain_evidence_covers_nine_steps_per_value_pg(
                 #    durable del hecho de decisión sí viaja. Se exige que la identidad aporte
                 #    AL MENOS el ``rank`` —la prueba de que NO se cae al #1 cuando no resuelve.
                 executed = cycle["executed"]
-                assert executed["measurement"] == "COMPLETE", (
-                    f"el ciclo {cycle_id} debe declarar su identidad ejecutada como medida; "
-                    f"executed={executed}"
+                # Tri-estado (V2.88.153): ``COMPLETE`` exige preset Y versión; ``PARTIAL``
+                # uno de los dos (o sólo el ``rank`` medido); ``UNKNOWN`` ninguno. El
+                # sandbox corre una estrategia SIN versión, así que aquí NUNCA se puede
+                # exigir ``COMPLETE``: exigirlo convertía la doctrina en una mentira.
+                preset = executed["strategyPresetKey"]
+                version = executed["strategyVersion"]
+                if preset and version:
+                    expected_measurement = "COMPLETE"
+                elif preset or version or executed["rank"] is not None:
+                    expected_measurement = "PARTIAL"
+                else:
+                    expected_measurement = "UNKNOWN"
+                assert executed["measurement"] == expected_measurement, (
+                    f"el ciclo {cycle_id} debe declarar su identidad en el estado que "
+                    f"corresponde a lo MEDIDO ({expected_measurement}); executed={executed}"
                 )
                 assert isinstance(executed["rank"], int) and executed["rank"] > 0, (
                     f"el ciclo {cycle_id} debe sellar el ``rank`` durable de su estrategia "
@@ -358,7 +375,6 @@ async def test_estudio_chain_evidence_covers_nine_steps_per_value_pg(
                 )
                 # Como el sandbox no versiona la estrategia, el preset/versión son huecos
                 # explícitos (None), nunca un relleno: es exactamente la doctrina ``UNKNOWN != 0``.
-                preset = executed["strategyPresetKey"]
                 assert preset is None or (
                     isinstance(preset, str) and preset.strip() == preset != ""
                 ), f"un preset declarado no puede ser vacío ni con espacios: {preset!r}"

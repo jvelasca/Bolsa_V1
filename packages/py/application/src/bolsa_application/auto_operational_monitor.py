@@ -844,6 +844,24 @@ def _protection_is_newer(candidate: Mapping[str, Any], current: Mapping[str, Any
     return candidate_at >= current_at
 
 
+def _entry_reservation(reservations: Sequence[Any]) -> Any | None:
+    """Reserva de ENTRADA del ciclo (``side='buy'``); sin entrada, la primera durable.
+
+    Desde V2.47 la SALIDA también declara ``cycle_id`` (para reconstruir el PnL
+    hacia atrás), así que un ciclo cerrado trae DOS reservas y el orden durable pone la
+    salida primero. La salida (``side='sell'``, sin ``strategy_version_id``) NO puede
+    gobernar la identidad del ciclo: publicaba ``direction='short'`` y
+    ``strategyVersion=None`` pese a que ambos hechos existían en la entrada. Se prefiere
+    la entrada; sin filas de entrada se conserva el orden histórico (nunca se inventa).
+    """
+    if not reservations:
+        return None
+    for row in reservations:
+        if str(_get(row, "side") or "").strip().lower() == "buy":
+            return row
+    return reservations[0]
+
+
 def _build_cycle(
     cycle_id: str,
     *,
@@ -858,7 +876,7 @@ def _build_cycle(
     window_truncated: bool = False,
     duplicate_settlement: bool = False,
 ) -> dict[str, Any]:
-    reservation = reservations[0] if reservations else None
+    reservation = _entry_reservation(reservations)
     cycle_journal = _journal_for_cycle(journal, cycle_id)
     cycle_fills = list(fills_by_cycle.get(cycle_id, ()))
     orders = list(orders_by_cycle.get(cycle_id, ()))
