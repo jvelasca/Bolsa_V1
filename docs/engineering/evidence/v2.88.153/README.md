@@ -185,5 +185,31 @@ la ventana PAPER sigue `INCONCLUSIVE` porque depende de OPERACIÓN, no de softwa
 
 ## 10. Cita POST-TAG
 
-_Pendiente: se completa con el id del run, `conclusion`, recuento de jobs, resultado de
-`replay-repro` y comportamiento de S5-04 en CI cuando `Release tag CI` cierre._
+**`Release tag CI` [run `39389152689`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39389152689)
+⇒ `conclusion: success`** (2026-10-20T07:50:07Z → 08:04:43Z, **14m36s**):
+
+| Job | Resultado |
+| --- | --- |
+| `security (gitleaks)` · `shared` · `decision-spine` · `frontend` · `python` · `playwright (mock E2E)` · `playwright (integrated AUTO S5)` · `playwright (integrated axe)` · `lifecycle-pg` · `replay-repro` · `dr-verify` · `a7-gate` | **`success`** (**12**) |
+| `certify (aggregate + artifact)` | **`success`** |
+| `playwright (integrated E2E, opt-in)` | `skipped` — **no certifica** |
+
+- `shared` ⇒ **`freeze OK (2af7f0d9)`** (pin `172aacf6`, tree hashes `apps feed7590d0…` /
+  `packages c6a6d9d9…`).
+- `replay-repro` ⇒ **`REPRODUCIDO`**: mismo contenido que el sello
+  (`sha256 E9B7376B…7F5625`, `3 383 461` bytes en LF; el sello está en CRLF, `3 488 758`), la
+  2ª corrida **IDÉNTICA** y `DIGEST` igual ⇒ **`Δ decisión = 0` medido por el CI**.
+- `playwright (integrated AUTO S5)` ⇒ **8 passed en 1,7 min, todos al primer intento
+  (`retry 0`)**; **`S5-04` en 6,58 s** (abrir 4,75 s · lanzar 0,75 s · guardar 0,54 s), frente
+  a los ~65 s del intento fallido que quedó abierto en `.136`…`.152`.
+- **Primer intento ROJO y tag movido:** `Release tag CI`
+  [run `39387238981`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39387238981) ⇒
+  `failure` por (a) `lifecycle-pg` → defecto de determinismo del harness de `test_a9…` (§6),
+  corregido; y (b) `playwright (integrated axe)` → **403 de `packages.microsoft.com`** al
+  instalar Chromium (infraestructura), verde en el reenvío. El tag se **movió** del objeto
+  `2e7b79c4` (commit `22a88066`) al objeto **`5a724765`** (commit **`2af7f0d9`**), con el pin
+  re-anclado y `window:freeze` OK antes de etiquetar.
+
+**Lo que este sello NO certifica:** **AUTO sigue OFF** (sin ciclos PAPER reales), la ventana
+PAPER sigue **`INCONCLUSIVE`**, la operativa es **100 % SIM** y el tag es **`unsigned`**. Un CI
+verde prueba **trazabilidad y reproducibilidad**, **no** rentabilidad.
