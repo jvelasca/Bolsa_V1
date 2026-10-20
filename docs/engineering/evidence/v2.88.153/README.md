@@ -75,7 +75,7 @@ orquestador ni el replay OOS. El cambio en `build_chain_evidence_artifact` es de
 | `contract:check` | **OK** (cambio aditivo; `openapi.json`/`schema.d.ts` coinciden) |
 | `alembic heads` (desde `packages/py/infrastructure`) | **`057_top3_opportunity_identity (head)`** |
 | `pnpm window:test` | **50 passed** |
-| `pnpm window:freeze` | **OK** (`appsHash f4646c1f…`, `packagesHash 5596a42f…`) |
+| `pnpm window:freeze` | **`freeze OK (0b2417bf)`** (`appsHash eb380c14…`, `packagesHash c6a6d9d9…`) |
 | `replay-repro` local (fixture congelado + PostgreSQL) | **`REPRODUCIDO (render del sello, byte a byte)`**: `sha256 01429BCC…B7476`, `3 488 758` bytes (mismo contenido LF `3 383 461`); 2ª corrida **idéntica** ⇒ **`Δ decisión = 0`** |
 
 **Flaky declarado en la suite de UI.** En una corrida de la suite web completa con la suite
