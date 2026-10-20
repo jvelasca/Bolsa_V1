@@ -147,6 +147,10 @@ release. El release cuelga del **tag** (`e3bcbe86`), no de esta cita: el commit 
 
 ## 8. Correcciones post-publicación (2026-10-20)
 
+> **Selladas en `v2.88.155-beta`.** Lo que sigue se publicó primero como cita POST-TAG sobre
+> este documento y después se selló con su propio tag: [`evidence/v2.88.155`](../v2.88.155/README.md).
+> Esta sección se conserva como registro de lo que se corrigió y cuándo.
+
 Dos hallazgos de la auditoría externa sobre `.154`, ambos de **presentación/documentación**.
 Ninguno toca motor, decisión, contrato HTTP ni esquema: **`Δ motor = 0`** · **`Δ decisión = 0`** ·
 **`Δ contrato HTTP = 0`** · **sin migración**.

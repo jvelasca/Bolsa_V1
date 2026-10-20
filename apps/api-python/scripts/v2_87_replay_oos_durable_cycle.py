@@ -1193,7 +1193,7 @@ def _run_finance_band(args: argparse.Namespace) -> int:
             "k0Sha256Lf": k0_sha,
         },
         meta={
-            "bump": "2.11.154-beta",
+            "bump": "2.11.155-beta",
             "phase": "V2.88.114 OOS FINANCE BAND (§8-c)",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),
