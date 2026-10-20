@@ -136,3 +136,11 @@ declarado: `playwright (integrated E2E, opt-in)`, que **no certifica**), `2026-1
 El run **no certifica rentabilidad**: **AUTO sigue OFF**, la ventana PAPER sigue
 **`INCONCLUSIVE`** y **`CONFIRMED` no se emite**. Tampoco se da por bueno ningún intento rojo:
 no lo hubo.
+
+**Entrada de auditoría en GitHub.** El sello se publica además como **GitHub Release**
+[`v2.88.154-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.154-beta)
+(**pre-release**, publicado `2026-10-20T15:29:20Z`), cuyo cuerpo es un **audit pack
+autosuficiente** —identidad inmutable, jobs y artefactos del run, límites declarados y tabla de
+**falsabilidad**— para auditar **sin credenciales**: basta clonar el tag o abrir la página del
+release. El release cuelga del **tag** (`e3bcbe86`), no de esta cita: el commit de la cita es
+`69e416c5`, **por delante** del tag, igual que este documento.
