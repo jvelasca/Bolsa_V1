@@ -343,3 +343,79 @@ def test_select_top3_assets_collapses_candidate_key_before_cut() -> None:
     # ``GOOG`` es el único excluido por corte; AAPL no aparece por partida doble.
     assert [o.instrument_id for o in selection.top_n_excluded] == ["GOOG#v1"]
     assert all(o.reason == "top_n_excluded" for o in selection.top_n_excluded)
+
+
+# ── Identidad del ganador (V2.88.153) ──────────────────────────────────────────
+
+
+def test_identity_is_preserved_through_selection_and_records() -> None:
+    """El preset/versión del score GANADOR llega al slot y a su registro durable."""
+    scores = [
+        OpportunityScore(
+            instrument_id="AAA",
+            components={"edge": 0.9},
+            combined=0.9,
+            rank=1,
+            strategy_preset_key="momentum_breakout",
+            strategy_version="2026.10.1",
+        ),
+        OpportunityScore(
+            instrument_id="BBB",
+            components={"edge": 0.6},
+            combined=0.6,
+            rank=2,
+            strategy_preset_key="trend_follow",
+            strategy_version="2026.9.3",
+        ),
+    ]
+    selection = select_top3_assets(scores, top_n=3, run_id="run-id")
+    assert selection.selected[0].strategy_preset_key == "momentum_breakout"
+    assert selection.selected[0].strategy_version == "2026.10.1"
+    assert selection.selected[1].strategy_preset_key == "trend_follow"
+
+    records = selection.to_records()
+    assert records[0].strategy_preset_key == "momentum_breakout"
+    assert records[0].strategy_version == "2026.10.1"
+    payload = records[0].to_dict()
+    assert payload["strategyPresetKey"] == "momentum_breakout"
+    assert payload["strategyVersion"] == "2026.10.1"
+
+
+def test_collapse_keeps_the_identity_of_the_winning_variant() -> None:
+    """El colapso conserva la variante ganadora: su identidad, no la de la perdedora."""
+    scores = [
+        OpportunityScore(
+            instrument_id="AAPL#slow",
+            components={"edge": 0.5},
+            combined=0.50,
+            rank=1,
+            strategy_preset_key="slow_trend",
+            strategy_version="v1",
+        ),
+        OpportunityScore(
+            instrument_id="AAPL#fast",
+            components={"edge": 0.9},
+            combined=0.90,
+            rank=2,
+            strategy_preset_key="fast_breakout",
+            strategy_version="v2",
+        ),
+    ]
+    selection = select_top3_assets(scores, top_n=1, run_id="r")
+    assert [o.instrument_id for o in selection.selected] == ["AAPL#fast"]
+    assert selection.selected[0].strategy_preset_key == "fast_breakout"
+    assert selection.selected[0].strategy_version == "v2"
+
+
+def test_identity_gap_is_never_filled_by_ticker_or_rank() -> None:
+    """Sin identidad declarada el slot viaja ``None`` y el dict la OMITE (hueco, no relleno)."""
+    scores = [
+        OpportunityScore(instrument_id="AAA", components={"edge": 0.9}, combined=0.9, rank=1),
+    ]
+    records = select_top3_records(scores, top_n=3, run_id="r")
+    assert records[0].instrument_id == "AAA"
+    assert records[0].strategy_preset_key is None
+    assert records[0].strategy_version is None
+    payload = records[0].to_dict()
+    assert "strategyPresetKey" not in payload
+    assert "strategyVersion" not in payload

@@ -875,17 +875,27 @@ def _score_from_signal(
     0 (el ranker no redistribuye pesos) y una liquidez desconocida también vale 0, en vez
     del antiguo ``1.0`` que convertía "no sé" en "liquidez perfecta". El motor, además,
     veta explícitamente por ``liquidity_unknown``/``edge_below_threshold``.
+
+    V2.88.153 — la IDENTIDAD de la estrategia viaja con el score (``presetKey`` +
+    ``version``) para que la foto durable del TOP3 pueda declarar quién ganó el ranking,
+    no solo con qué nota. Es metadato: no pesa en el combinado ni altera el orden, y
+    ``None`` cuando la señal no la declara (nunca se rellena).
     """
     liquidity = (
         None
         if signal.liquidity_notional is None
         else min(1.0, max(0.0, signal.liquidity_notional / 1_000_000.0))
     )
+    identity = {
+        "strategy_preset_key": signal.strategy_preset_key,
+        "strategy_version": signal.strategy_version,
+    }
     if components is None:
         return score_opportunity(
             key if key is not None else signal.instrument_id,
             edge=signal.edge,
             liquidity=liquidity,
+            **identity,
         )
     return score_opportunity(
         key if key is not None else signal.instrument_id,
@@ -896,6 +906,7 @@ def _score_from_signal(
         momentum=components.get("momentum", 0.0),
         risk_reward=components.get("risk_reward", 0.0),
         execution_quality=components.get("execution_quality", 0.0),
+        **identity,
     )
 
 

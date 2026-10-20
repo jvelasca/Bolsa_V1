@@ -98,7 +98,8 @@ valor + no herencia del artefacto del día) y **S5-06** verifica la sección 5 e
 **No ejecutado en local**: el spec integrado requiere API Python + PostgreSQL + worker +
 barras sembradas y en esta máquina no había stack escuchando (`:8000`/`:3001`/`:5432`
 cerrados). Un `skipped` **no** cuenta como prueba: se declara como hueco de verificación local
-y lo cubre el job opt-in del CI.
+y lo cubre el gate duro `playwright (integrated AUTO S5)` del CI (verde con 1 flaky y
+reintento); el job opt-in es distinto y está `skipped`. Un `skipped` sigue sin certificar.
 
 ## 5. Límites declarados (sin fabricar)
 
@@ -127,8 +128,8 @@ en `scripts/`. La **ventana PAPER** no se re-mide y sigue necesitando OPERACIÓN
 ## 7. Publicación (POST-TAG)
 
 `Release tag CI` [run **`39303586042`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/39303586042) ⇒
-**`conclusion: success`**: 13 jobs `success` + `certify` `success`
-(`playwright (integrated E2E, opt-in)` `skipped`, declarado). `playwright (mock E2E)` **verde** y
+**`conclusion: success`**: **12 jobs `success` + `certify` = 13 éxitos totales; 1 job
+`skipped`** (`playwright (integrated E2E, opt-in)`), declarado. `playwright (mock E2E)` **verde** y
 `replay-repro` **`REPRODUCIDO`** («mismo CONTENIDO; el sello está en CRLF y este fichero en LF»)
 ⇒ **`Δ decisión = 0`**. `pnpm window:freeze` **OK** sobre el árbol del sello (`4198a3a8`).
 
@@ -140,3 +141,9 @@ el panel **normaliza** la respuesta (`normalizeEstudioChain`) y el mock E2E sirv
 el artefacto `values/<SÍMBOLO>` con la forma de la API. El tag se **movió** al commit de
 corrección y el reenvío salió verde: la ventana PAPER sigue **`INCONCLUSIVE`** (es OPERACIÓN,
 no software).
+
+**Auditoría del sello (solo evidencia):**
+[`auditoria-ui-auto-dia-d-v2.88.152-2026-10-19.md`](../../auditoria-ui-auto-dia-d-v2.88.152-2026-10-19.md)
+— verifica la procedencia `6373bec0` → `4198a3a8`, el delta aditivo y el CI; resuelve el matiz
+del E2E integrado (gate duro S5 en verde con `1 flaky`/reintento, frente al job opt-in `skipped`)
+y deja abierto el hueco de identidad de la estrategia ganadora.

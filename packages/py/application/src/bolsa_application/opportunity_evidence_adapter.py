@@ -148,7 +148,7 @@ def evidence_components(
     momentum: Any = None,
     risk_reward: Any = None,
     execution_quality: Any = None,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """Mapea la evidencia de estrategia a los 7 componentes del ``OpportunityScore``.
 
     - ``edge``            ← score de borde robusto (OOS preferido, IS fallback).

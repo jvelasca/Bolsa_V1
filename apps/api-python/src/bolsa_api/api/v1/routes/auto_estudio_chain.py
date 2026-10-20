@@ -146,8 +146,9 @@ async def get_auto_estudio_chain(
             limits=[
                 "Read-only: solo SELECT; no escribe en la BD durable ni cambia el motor.",
                 "La cadena se LEE de hechos durables; una etapa sin traza declara None, nunca 0.",
-                "La foto TOP3 no sella identidad de estrategia: 'bestScoredPresetKey' es None "
-                "y el emparejamiento por preset es un hueco declarado.",
+                "La foto TOP3 sella la identidad (preset + versión) del candidato ganador desde "
+                "la migración 057; las fotos anteriores viajan sin identidad (hueco declarado) "
+                "y el emparejamiento por preset es entonces None, nunca una inferencia.",
                 "NO certifica la ventana PAPER real ni la rentabilidad: eso es OPERACIÓN.",
             ],
         )

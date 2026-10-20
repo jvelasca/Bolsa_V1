@@ -164,6 +164,63 @@ def test_resolve_executed_vs_best_never_asserts_false_without_comparison() -> No
     assert unknown["measurement"] == "UNKNOWN"
 
 
+def test_identity_match_is_true_false_or_none_and_never_inferred() -> None:
+    """V2.88.153 — ``presetMatch``/``versionMatch``: verdadero, falso y hueco."""
+    base_executed = {"rank": 1, "instrumentId": "a"}
+    matched = resolve_executed_vs_best(
+        executed={**base_executed, "strategyPresetKey": "trend_v1", "strategyVersion": "v-42"},
+        best_scored={
+            "assetId": "a",
+            "rank": 1,
+            "strategyPresetKey": "trend_v1",
+            "strategyVersion": "v-42",
+        },
+    )
+    assert matched["bestScoredPresetKey"] == "trend_v1"
+    assert matched["bestScoredStrategyVersion"] == "v-42"
+    assert matched["presetMatch"] is True
+    assert matched["versionMatch"] is True
+    assert matched["strategyMeasurement"] == "COMPLETE"
+
+    different = resolve_executed_vs_best(
+        executed={**base_executed, "strategyPresetKey": "trend_v1", "strategyVersion": "v-42"},
+        best_scored={
+            "assetId": "a",
+            "rank": 1,
+            "strategyPresetKey": "mean_reversion",
+            "strategyVersion": "v-7",
+        },
+    )
+    assert different["presetMatch"] is False
+    assert different["versionMatch"] is False
+
+    # La foto histórica (pre-057) no declara identidad: hueco declarado, nunca False.
+    historical = resolve_executed_vs_best(
+        executed={**base_executed, "strategyPresetKey": "trend_v1", "strategyVersion": "v-42"},
+        best_scored={"assetId": "a", "rank": 1},
+    )
+    assert historical["bestScoredPresetKey"] is None
+    assert historical["bestScoredStrategyVersion"] is None
+    assert historical["presetMatch"] is None
+    assert historical["versionMatch"] is None
+    # El veredicto rank/activo SÍ se pudo medir: no se degrada por el hueco de identidad.
+    assert historical["measurement"] == "COMPLETE"
+    assert historical["strategyMeasurement"] == "UNKNOWN"
+
+    # Una versión distinta con el mismo preset: coincide el preset, no la versión.
+    same_preset_other_version = resolve_executed_vs_best(
+        executed={**base_executed, "strategyPresetKey": "trend_v1", "strategyVersion": "v-1"},
+        best_scored={
+            "assetId": "a",
+            "rank": 1,
+            "strategyPresetKey": "trend_v1",
+            "strategyVersion": "v-2",
+        },
+    )
+    assert same_preset_other_version["presetMatch"] is True
+    assert same_preset_other_version["versionMatch"] is False
+
+
 def test_artifact_groups_by_estudio_value_and_declares_missing_cycles() -> None:
     cycles = [
         _cycle(cycle_id="cyc-1", instrument_id="i-1"),
@@ -320,3 +377,43 @@ def test_artifact_declares_best_scored_preset_gap_and_dia_d_cross_check() -> Non
     # Contraste independiente: el ciclo ejecutado y su verificación DÍA-D coinciden.
     assert view["cycles"][0]["executedVsDiaD"]["matches"] is True
     assert view["cycles"][0]["diaDLink"]["linkable"] is True
+
+
+def test_artifact_publishes_the_winning_identity_when_the_photo_declares_it() -> None:
+    """Desde la 057 la foto sella preset/versión: el artefacto los publica y contrasta."""
+    cycle = _cycle(instrument_id="i-1", preset="trend_v1", version="v-42")
+    artifact = build_chain_evidence_artifact(
+        account_id="acc",
+        estudio={"status": "ok", "instrumentIds": ["i-1"]},
+        cycles=[cycle],
+        best_scored={
+            "assetId": "i-1",
+            "rank": 1,
+            "combined": 0.9,
+            "strategyPresetKey": "trend_v1",
+            "strategyVersion": "v-42",
+        },
+        as_of="2026-10-14T00:00:00Z",
+    )
+    assert artifact["bestScored"]["bestScoredPresetKey"] == "trend_v1"
+    assert artifact["bestScored"]["bestScoredStrategyVersion"] == "v-42"
+    assert artifact["bestScored"]["strategyMeasurement"] == "COMPLETE"
+    compare = artifact["values"][0]["cycles"][0]["executedVsBest"]
+    assert compare["presetMatch"] is True
+    assert compare["versionMatch"] is True
+    # Una divergencia declarada por la foto es un False medido, no un hueco.
+    divergent = build_chain_evidence_artifact(
+        account_id="acc",
+        estudio={"status": "ok", "instrumentIds": ["i-1"]},
+        cycles=[cycle],
+        best_scored={
+            "assetId": "i-1",
+            "rank": 1,
+            "combined": 0.9,
+            "strategyPresetKey": "mean_reversion",
+            "strategyVersion": "v-9",
+        },
+    )
+    diff = divergent["values"][0]["cycles"][0]["executedVsBest"]
+    assert diff["presetMatch"] is False
+    assert diff["versionMatch"] is False

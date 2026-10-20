@@ -246,6 +246,64 @@ async def test_universe_unavailable_is_declared_with_evidence(monkeypatch) -> No
 
 
 @pytest.mark.asyncio
+async def test_best_scored_identity_is_published_and_contrasted(monkeypatch) -> None:
+    """V2.88.153 — el DTO publica la identidad de la foto y su veredicto (true/false)."""
+    cycle = _complete_cycle()
+    best = {
+        "assetId": "i-1",
+        "rank": 1,
+        "combined": 0.71,
+        "strategyPresetKey": "preset-alpha",
+        "strategyVersion": "v7",
+    }
+    app = _app(
+        monkeypatch,
+        estudio={"status": "ok", "instrumentIds": ["i-1"]},
+        read={"cycles": [cycle], "bestScored": best, "top3": best, "diaDByCycle": {}},
+    )
+    body = (await _get(app, "/auto/estudio-chain")).json()
+
+    assert body["bestScored"]["bestScoredPresetKey"] == "preset-alpha"
+    assert body["bestScored"]["bestScoredStrategyVersion"] == "v7"
+    assert body["bestScored"]["strategyMeasurement"] == "COMPLETE"
+    compare = body["values"][0]["cycles"][0]["executedVsBest"]
+    assert compare["presetMatch"] is True
+    assert compare["versionMatch"] is True
+    assert compare["bestScoredPresetKey"] == "preset-alpha"
+
+    divergent = dict(best)
+    divergent["strategyPresetKey"] = "preset-beta"
+    divergent["strategyVersion"] = "v9"
+    app = _app(
+        monkeypatch,
+        estudio={"status": "ok", "instrumentIds": ["i-1"]},
+        read={"cycles": [cycle], "bestScored": divergent, "top3": divergent, "diaDByCycle": {}},
+    )
+    body = (await _get(app, "/auto/estudio-chain")).json()
+    compare = body["values"][0]["cycles"][0]["executedVsBest"]
+    assert compare["presetMatch"] is False
+    assert compare["versionMatch"] is False
+
+
+@pytest.mark.asyncio
+async def test_best_scored_without_identity_is_a_declared_gap(monkeypatch) -> None:
+    """Una foto histórica (sin preset/versión) no se convertía en coincidencia."""
+    best = {"assetId": "i-1", "rank": 1, "combined": 0.71}
+    app = _app(
+        monkeypatch,
+        estudio={"status": "ok", "instrumentIds": ["i-1"]},
+        read={"cycles": [_complete_cycle()], "bestScored": best, "top3": best, "diaDByCycle": {}},
+    )
+    body = (await _get(app, "/auto/estudio-chain")).json()
+
+    assert body["bestScored"]["bestScoredPresetKey"] is None
+    assert body["bestScored"]["strategyMeasurement"] == "UNKNOWN"
+    compare = body["values"][0]["cycles"][0]["executedVsBest"]
+    assert compare["presetMatch"] is None
+    assert compare["versionMatch"] is None
+
+
+@pytest.mark.asyncio
 async def test_limit_is_bounded(monkeypatch) -> None:
     app = _app(monkeypatch)
     assert (await _get(app, "/auto/estudio-chain?limit=0")).status_code == 422

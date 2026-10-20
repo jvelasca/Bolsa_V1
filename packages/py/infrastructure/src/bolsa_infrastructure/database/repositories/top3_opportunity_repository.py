@@ -21,7 +21,11 @@ from bolsa_infrastructure.database.models.tables import Top3OpportunityRow
 
 @dataclass(slots=True)
 class Top3OpportunityInput:
-    """Entrada de escritura de un slot (lo que decide el motor)."""
+    """Entrada de escritura de un slot (lo que decide el motor).
+
+    ``strategy_preset_key``/``strategy_version`` (V2.88.153) son la identidad declarada
+    por la señal que ganó el slot. Opcionales: sin declaración se persiste ``None``.
+    """
 
     run_id: str
     rank: int
@@ -30,6 +34,8 @@ class Top3OpportunityInput:
     components: dict[str, Any]
     regime: str | None = None
     reasons: list[str] | None = None
+    strategy_preset_key: str | None = None
+    strategy_version: str | None = None
 
 
 @dataclass(slots=True)
@@ -45,6 +51,8 @@ class Top3OpportunityRowRecord:
     regime: str | None
     reasons: list[str]
     created_at: datetime
+    strategy_preset_key: str | None = None
+    strategy_version: str | None = None
 
 
 def _map(row: Top3OpportunityRow) -> Top3OpportunityRowRecord:
@@ -58,6 +66,8 @@ def _map(row: Top3OpportunityRow) -> Top3OpportunityRowRecord:
         regime=row.regime,
         reasons=[str(r) for r in (row.reasons or [])],
         created_at=row.created_at,
+        strategy_preset_key=row.strategy_preset_key,
+        strategy_version=row.strategy_version,
     )
 
 
@@ -82,6 +92,8 @@ class SqlAlchemyTop3OpportunityRepository:
                 regime=item.regime,
                 reasons=list(item.reasons or []),
                 created_at=now,
+                strategy_preset_key=item.strategy_preset_key,
+                strategy_version=item.strategy_version,
             )
             self._session.add(row)
             records.append(_map(row))

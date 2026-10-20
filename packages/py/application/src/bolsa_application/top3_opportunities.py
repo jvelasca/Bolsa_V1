@@ -42,13 +42,20 @@ HISTORICAL_SCORING_NO_CHAMPION = "scoring_historico_sin_campeon"
 
 @dataclass(frozen=True, slots=True)
 class Top3Opportunity:
-    """Un activo del TOP3 con su score y componentes explicables."""
+    """Un activo del TOP3 con su score y componentes explicables.
+
+    ``strategy_preset_key``/``strategy_version`` (V2.88.153) declaran QUIÉN ganó el slot.
+    Se copian del ``OpportunityScore`` ganador (incluido el colapso a activo base) y valen
+    ``None`` cuando la fuente no las declara: la foto no las infiere del ticker ni del rank.
+    """
 
     rank: int
     instrument_id: str
     combined: float
     components: dict[str, float] = field(default_factory=dict)
     reason: str | None = None
+    strategy_preset_key: str | None = None
+    strategy_version: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,9 +68,11 @@ class Top3OpportunityRecord:
     combined: float
     components: dict[str, float]
     reason: str | None = None
+    strategy_preset_key: str | None = None
+    strategy_version: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "runId": self.run_id,
             "rank": self.rank,
             "assetId": self.instrument_id,
@@ -71,6 +80,15 @@ class Top3OpportunityRecord:
             "components": dict(self.components),
             "reason": self.reason,
         }
+        # La identidad se publica solo si existe: un ``None`` explícito se leería como
+        # «identidad declarada vacía» y no hay que ensuciar la foto histórica.
+        preset = str(self.strategy_preset_key or "").strip()
+        if preset:
+            payload["strategyPresetKey"] = preset
+        version = str(self.strategy_version or "").strip()
+        if version:
+            payload["strategyVersion"] = version
+        return payload
 
 
 class Top3OpportunitySink(Protocol):
@@ -100,6 +118,8 @@ class Top3OpportunitySelection:
                     combined=opportunity.combined,
                     components=opportunity.components,
                     reason=opportunity.reason,
+                    strategy_preset_key=opportunity.strategy_preset_key,
+                    strategy_version=opportunity.strategy_version,
                 )
             )
         return records
@@ -134,6 +154,8 @@ def select_top3_assets(
             instrument_id=opportunity.instrument_id,
             combined=opportunity.combined,
             components=dict(opportunity.components),
+            strategy_preset_key=opportunity.strategy_preset_key,
+            strategy_version=opportunity.strategy_version,
         )
         for index, opportunity in enumerate(top)
     )
@@ -145,6 +167,8 @@ def select_top3_assets(
             combined=opportunity.combined,
             components=dict(opportunity.components),
             reason=TOP_N_EXCLUDED,
+            strategy_preset_key=opportunity.strategy_preset_key,
+            strategy_version=opportunity.strategy_version,
         )
         for opportunity in collapsed
         if opportunity.instrument_id not in selected_ids
@@ -223,6 +247,8 @@ def select_top3_records(
                 combined=opportunity.combined,
                 components=dict(opportunity.components),
                 reason=None if evidenced else HISTORICAL_SCORING_NO_CHAMPION,
+                strategy_preset_key=opportunity.strategy_preset_key,
+                strategy_version=opportunity.strategy_version,
             )
         )
     return records

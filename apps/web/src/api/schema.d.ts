@@ -11950,6 +11950,10 @@ export interface components {
             runId: string;
             /** Score */
             score: number;
+            /** Strategypresetkey */
+            strategyPresetKey?: string | null;
+            /** Strategyversion */
+            strategyVersion?: string | null;
         };
         /** TrackerDefinitionDetailDto */
         TrackerDefinitionDetailDto: {

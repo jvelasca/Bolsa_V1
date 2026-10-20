@@ -35,6 +35,11 @@ class Top3OpportunityDto(BaseModel):
     components: dict[str, Any] = Field(default_factory=dict)
     regime: str | None = None
     reasons: list[str] = Field(default_factory=list)
+    # V2.88.153 — identidad ADITIVA del candidato ganador. Opcionales: las fotos anteriores a
+    # la migración 057 no la declaran y se publican como ``null`` (la UI lo declara como hueco;
+    # nunca se infiere del ticker ni del rank).
+    strategyPresetKey: str | None = None
+    strategyVersion: str | None = None
     createdAt: str
 
 
@@ -54,6 +59,8 @@ def _to_dto(row: Top3OpportunityRowRecord) -> Top3OpportunityDto:
         components=dict(row.components),
         regime=row.regime,
         reasons=list(row.reasons),
+        strategyPresetKey=row.strategy_preset_key,
+        strategyVersion=row.strategy_version,
         createdAt=to_iso(row.created_at),
     )
 

@@ -82,3 +82,45 @@ def test_to_dict_shape() -> None:
     assert d["instrumentId"] == "AAPL"
     assert set(d["components"].keys()) == set(OPPORTUNITY_WEIGHTS.keys())
     assert d["combined"] == 0.24  # 0.8 * 0.30
+
+
+def test_identity_is_transported_and_never_affects_the_score() -> None:
+    """V2.88.153 — preset/versión viajan ADITIVOS: no pesan ni reordenan."""
+    with_identity = score_opportunity(
+        "AAPL",
+        edge=0.8,
+        strategy_preset_key="momentum_breakout",
+        strategy_version="2026.10.1",
+    )
+    without_identity = score_opportunity("AAPL", edge=0.8)
+    assert with_identity.combined == without_identity.combined
+    assert with_identity.strategy_preset_key == "momentum_breakout"
+    assert with_identity.strategy_version == "2026.10.1"
+    assert without_identity.strategy_preset_key is None
+    assert without_identity.strategy_version is None
+
+
+def test_rank_preserves_identity_on_every_copy() -> None:
+    ranked = rank_opportunities(
+        [
+            score_opportunity("B", edge=0.5, strategy_preset_key="p-b"),
+            score_opportunity("A", edge=0.9, strategy_preset_key="p-a", strategy_version="v1"),
+        ]
+    )
+    assert [(s.instrument_id, s.rank) for s in ranked] == [("A", 1), ("B", 2)]
+    assert ranked[0].strategy_preset_key == "p-a"
+    assert ranked[0].strategy_version == "v1"
+    assert ranked[1].strategy_preset_key == "p-b"
+    assert ranked[1].strategy_version is None
+
+
+def test_identity_is_omitted_from_to_dict_when_absent() -> None:
+    """Un hueco no se publica como clave vacía: se OMITE (misma doctrina que el journal)."""
+    payload = score_opportunity("AAPL", edge=0.8).to_dict()
+    assert "strategyPresetKey" not in payload
+    assert "strategyVersion" not in payload
+    full = score_opportunity(
+        "AAPL", edge=0.8, strategy_preset_key="p", strategy_version="v"
+    ).to_dict()
+    assert full["strategyPresetKey"] == "p"
+    assert full["strategyVersion"] == "v"

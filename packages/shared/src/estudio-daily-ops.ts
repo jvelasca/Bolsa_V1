@@ -227,10 +227,19 @@ export type EstudioChainCompareV1 = {
   executedIsBestScoredAsset: EstudioChainFlagV1;
   executedRank: number | null;
   bestScoredAssetId: string | null;
-  /** La foto cross-asset NO sella preset: siempre `null` (hueco declarado). */
-  bestScoredPresetKey: null;
+  /**
+   * Identidad de la estrategia MEJOR PUNTUADA, tal cual la declara la foto durable del TOP3
+   * (migración 057). `null` cuando la foto no la declara (históricas): hueco, no inferencia.
+   */
+  bestScoredPresetKey: string | null;
+  bestScoredStrategyVersion?: string | null;
+  executedPresetKey?: string | null;
+  executedStrategyVersion?: string | null;
   presetMatch: EstudioChainFlagV1;
+  versionMatch?: EstudioChainFlagV1;
   measurement: MeasurementV1 | string;
+  /** Medición de la IDENTIDAD (preset/versión), separada del veredicto rank/activo. */
+  strategyMeasurement?: MeasurementV1 | string;
 };
 
 export type EstudioChainExecutedVsDiaDV1 = {

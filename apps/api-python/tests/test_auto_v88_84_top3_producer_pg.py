@@ -244,7 +244,14 @@ async def test_persist_top3_writes_once_per_bar_and_declares_provenance(
     run_id = f"top3-sim-{bar}"
     plan = SimpleNamespace(
         ranked=(
-            OpportunityScore(instrument_id="AAA", components={"edge": 0.9}, combined=0.9, rank=1),
+            OpportunityScore(
+                instrument_id="AAA",
+                components={"edge": 0.9},
+                combined=0.9,
+                rank=1,
+                strategy_preset_key="momentum_breakout",
+                strategy_version="2026.10.1",
+            ),
             OpportunityScore(instrument_id="BBB", components={"edge": 0.5}, combined=0.5, rank=2),
         )
     )
@@ -267,6 +274,12 @@ async def test_persist_top3_writes_once_per_bar_and_declares_provenance(
             assert by_asset["AAA"].reasons == []
             assert by_asset["BBB"].reasons == [HISTORICAL_SCORING_NO_CHAMPION]
             assert all(r.regime == "trend_up" for r in rows)
+            # V2.88.153 — la identidad de la señal ganadora llega a la FILA durable y se relee;
+            # el slot sin identidad viaja como hueco declarado (None), nunca relleno.
+            assert by_asset["AAA"].strategy_preset_key == "momentum_breakout"
+            assert by_asset["AAA"].strategy_version == "2026.10.1"
+            assert by_asset["BBB"].strategy_preset_key is None
+            assert by_asset["BBB"].strategy_version is None
 
             # Segunda llamada dentro de la MISMA barra: no-op (una foto por barra).
             await worker._v2_persist_top3(

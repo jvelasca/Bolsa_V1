@@ -273,11 +273,18 @@ async def test_estudio_chain_evidence_covers_nine_steps_per_value_pg(
             study_instruments=instrument_ids,
         )
         assert artifact["readOnly"] is True
-        # La foto del selector no sella identidad: si viaja, el preset de la mejor puntuada es un
-        # hueco DECLARADO (``UNKNOWN ≠ 0``), nunca el de la estrategia ejecutada.
+        # V2.88.153 — la foto del selector sella la identidad del ganador desde la 057. Si la
+        # declara, el lector la publica y el veredicto es medible; si no (foto histórica o señal
+        # sin identidad), el hueco se declara. Jamás se rellena con la de la ejecutada.
         if artifact["bestScored"] is not None:
-            assert artifact["bestScored"]["bestScoredPresetKey"] is None
-            assert artifact["bestScored"]["strategyMeasurement"] == "UNKNOWN"
+            best_block = artifact["bestScored"]
+            if best_block.get("bestScoredPresetKey") or best_block.get(
+                "bestScoredStrategyVersion"
+            ):
+                assert best_block["strategyMeasurement"] == "COMPLETE"
+            else:
+                assert best_block["bestScoredPresetKey"] is None
+                assert best_block["strategyMeasurement"] == "UNKNOWN"
         by_id = {value["instrumentId"]: value for value in artifact["values"]}
         assert set(by_id) == set(instrument_ids), (
             f"la evidencia debe cubrir CADA valor de ESTUDIO; valores={sorted(by_id)}"
@@ -359,11 +366,15 @@ async def test_estudio_chain_evidence_covers_nine_steps_per_value_pg(
                 # 3) Contraste con la mejor puntuada: True/False/None (nunca fabricado).
                 assert "executedIsTopRanked" in cycle["executedVsBest"]
                 assert cycle["executedVsBest"]["executedIsTopRanked"] in (True, False, None)
-                # 3b) La foto cross-asset NO sella identidad de estrategia: el preset de la
-                #     MEJOR PUNTUADA es un hueco DECLARADO. Jamás se rellena con el de la
+                # 3b) La foto cross-asset sella la identidad del ganador desde la 057. Si la
+                #     declara, el emparejamiento es True/False medido; si no (foto histórica o
+                #     señal sin identidad), es un hueco DECLARADO. Jamás se rellena con el de la
                 #     ejecutada para fingir una coincidencia que la fuente no puede afirmar.
-                assert cycle["executedVsBest"]["bestScoredPresetKey"] is None
-                assert cycle["executedVsBest"]["presetMatch"] is None
+                compare = cycle["executedVsBest"]
+                if compare["bestScoredPresetKey"] is None:
+                    assert compare["presetMatch"] is None
+                else:
+                    assert compare["presetMatch"] in (True, False)
                 # 3c) El eslabón DÍA-D y su contraste INDEPENDIENTE con la identidad del ciclo:
                 #     sin verificación durable NO se fabrica un ``False`` con una sola parte.
                 assert isinstance(cycle["diaDLink"]["linkable"], bool)

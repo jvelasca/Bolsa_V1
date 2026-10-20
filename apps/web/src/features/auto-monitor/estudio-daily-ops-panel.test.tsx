@@ -812,7 +812,7 @@ describe("EstudioDailyOpsPanel", () => {
     ).toContain("no_cycles_for_value");
   });
 
-  it("declara que la foto cross-asset no sella la estrategia mejor puntuada", async () => {
+  it("declara el hueco cuando la foto no sella la identidad del ganador", async () => {
     renderPanel();
 
     const rows = await screen.findAllByTestId("estudio-daily-value");
@@ -824,6 +824,9 @@ describe("EstudioDailyOpsPanel", () => {
     expect(why?.textContent).toContain("activo mejor puntuado: Sí");
     // Nunca se supone que la #1 fue la ejecutada sin término de comparación.
     expect(why?.textContent).toContain("no se empareja por estrategia");
+    expect(why?.textContent).toContain(
+      "misma estrategia que la ejecutada: Sin dato (no se puede afirmar)",
+    );
     expect(
       aaa?.querySelector('[data-testid="estudio-chain-top3"]')?.textContent,
     ).toContain("#1 inst-1");
@@ -834,6 +837,81 @@ describe("EstudioDailyOpsPanel", () => {
     expect(attribution?.textContent).toBe(
       "Cadena histórica del valor; no atribuida a esta señal",
     );
+  });
+
+  it("publica la identidad del ganador y contrasta el preset (coincidencia)", async () => {
+    const withIdentity = structuredClone(CHAIN);
+    withIdentity.bestScored = {
+      ...withIdentity.bestScored,
+      bestScoredPresetKey: "estudio_auto",
+      bestScoredStrategyVersion: "v1",
+      strategyMeasurement: "COMPLETE",
+      rows: [
+        {
+          assetId: "inst-1",
+          rank: 1,
+          combined: 0.81,
+          components: { io: 0.7 },
+          strategyPresetKey: "estudio_auto",
+          strategyVersion: "v1",
+        },
+        { assetId: "inst-2", rank: 2, combined: 0.62, components: {} },
+      ],
+    };
+    const compare = withIdentity.values[0].cycles[0].executedVsBest;
+    compare.bestScoredPresetKey = "estudio_auto";
+    compare.bestScoredStrategyVersion = "v1";
+    compare.presetMatch = true;
+    compare.versionMatch = true;
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce(
+      withIdentity as never,
+    );
+
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    const why = aaa?.querySelector('[data-testid="estudio-chain-why"]');
+    expect(why?.textContent).toContain("preset estudio_auto");
+    expect(why?.textContent).toContain("estudio_auto v1");
+    expect(why?.textContent).not.toContain("vv1");
+    expect(why?.textContent).toContain("misma estrategia que la ejecutada: Sí");
+    expect(why?.textContent).toContain("misma versión: Sí");
+    // La línea TOP3 anexa la identidad SOLO si la foto la declara.
+    const top3 = aaa?.querySelector(
+      '[data-testid="estudio-chain-top3"]',
+    )?.textContent;
+    expect(top3).toContain("#1 inst-1");
+    expect(top3).toContain("estudio_auto v1");
+  });
+
+  it("declara un preset distinto como divergencia MEDIDA, no como hueco", async () => {
+    const divergent = structuredClone(CHAIN);
+    divergent.bestScored = {
+      ...divergent.bestScored,
+      bestScoredPresetKey: "trend_other",
+      bestScoredStrategyVersion: "v9",
+      strategyMeasurement: "COMPLETE",
+    };
+    const compare = divergent.values[0].cycles[0].executedVsBest;
+    compare.bestScoredPresetKey = "trend_other";
+    compare.bestScoredStrategyVersion = "v9";
+    compare.presetMatch = false;
+    compare.versionMatch = false;
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce(
+      divergent as never,
+    );
+
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    const why = aaa?.querySelector('[data-testid="estudio-chain-why"]');
+    expect(why?.textContent).toContain("preset trend_other");
+    expect(why?.textContent).toContain("misma estrategia que la ejecutada: No");
+    expect(why?.textContent).toContain("misma versión: No");
+    // Un False medido NO se disfraza de «no se empareja por estrategia».
+    expect(why?.textContent).not.toContain("no se empareja por estrategia");
   });
 
   it("el botón verifica el DÍA-D del valor y declara el día usado", async () => {

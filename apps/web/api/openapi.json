@@ -22289,6 +22289,28 @@
           "score": {
             "title": "Score",
             "type": "number"
+          },
+          "strategyPresetKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategypresetkey"
+          },
+          "strategyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategyversion"
           }
         },
         "required": [

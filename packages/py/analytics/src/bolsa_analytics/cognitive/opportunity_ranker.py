@@ -81,20 +81,37 @@ def _round4(value: float) -> float:
 
 @dataclass(frozen=True, slots=True)
 class OpportunityScore:
-    """Score explicable de una oportunidad (componentes visibles + combinado)."""
+    """Score explicable de una oportunidad (componentes visibles + combinado).
+
+    ``strategy_preset_key``/``strategy_version`` (V2.88.153) son la identidad EXACTA de
+    la estrategia que produjo el candidato. Viajan ADITIVAS con el score para que la foto
+    durable del TOP3 pueda declarar **quién** ganó, no solo con qué nota. ``None`` cuando
+    la fuente no la declara: la ausencia es información, jamás un relleno.
+    """
 
     instrument_id: str
     components: dict[str, float] = field(default_factory=dict)
     combined: float = 0.0
     rank: int | None = None
+    strategy_preset_key: str | None = None
+    strategy_version: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "instrumentId": self.instrument_id,
             "components": dict(self.components),
             "combined": self.combined,
             "rank": self.rank,
         }
+        # La identidad se OMITE si no existe: un ``None`` explícito aquí se leería como
+        # «declarada y vacía» y ensuciaría el payload histórico (misma doctrina que el journal).
+        preset = str(self.strategy_preset_key or "").strip()
+        if preset:
+            payload["strategyPresetKey"] = preset
+        version = str(self.strategy_version or "").strip()
+        if version:
+            payload["strategyVersion"] = version
+        return payload
 
 
 def score_opportunity(
@@ -107,12 +124,18 @@ def score_opportunity(
     liquidity: Any = None,
     risk_reward: Any = None,
     execution_quality: Any = None,
+    strategy_preset_key: str | None = None,
+    strategy_version: str | None = None,
 ) -> OpportunityScore:
     """Score ponderado y explicable de UNA oportunidad.
 
     Solo los componentes presentes y finitos aportan; los ausentes cuentan como 0 y
     además **no** redistribuyen su peso (el combinado baja, honestamente, en vez de
     inflar el resto).
+
+    ``strategy_preset_key``/``strategy_version`` (V2.88.153) son ADITIVOS: no pesan en
+    el combinado ni cambian el orden. Solo conservan la identidad de quien produjo la
+    oportunidad para que la foto durable del TOP3 pueda declararla.
     """
     raw: dict[str, Any] = {
         "edge": edge,
@@ -131,13 +154,22 @@ def score_opportunity(
         instrument_id=str(instrument_id).strip(),
         components=components,
         combined=combined,
+        strategy_preset_key=_clean_identity(strategy_preset_key),
+        strategy_version=_clean_identity(strategy_version),
     )
+
+
+def _clean_identity(value: Any) -> str | None:
+    """Identidad declarada normalizada; ``None`` cuando no hay nada que declarar."""
+    text = str(value or "").strip()
+    return text or None
 
 
 def rank_opportunities(scores: Iterable[OpportunityScore]) -> tuple[OpportunityScore, ...]:
     """Ordena descendente por ``combined`` y asigna ``rank`` (1-based).
 
-    Empate: desempate determinista por ``instrument_id`` (reproducible).
+    Empate: desempate determinista por ``instrument_id`` (reproducible). La identidad de
+    estrategia se PRESERVA en cada copia: el rank no la crea ni la borra.
     """
     ordered = sorted(
         scores,
@@ -149,6 +181,8 @@ def rank_opportunities(scores: Iterable[OpportunityScore]) -> tuple[OpportunityS
             components=dict(s.components),
             combined=s.combined,
             rank=index + 1,
+            strategy_preset_key=s.strategy_preset_key,
+            strategy_version=s.strategy_version,
         )
         for index, s in enumerate(ordered)
     )

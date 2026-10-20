@@ -42,6 +42,8 @@ class PostgresTop3OpportunitySink:
                 components=dict(record.components),
                 regime=self._regime,
                 reasons=[record.reason] if record.reason else [],
+                strategy_preset_key=record.strategy_preset_key,
+                strategy_version=record.strategy_version,
             )
             for record in records
         ]

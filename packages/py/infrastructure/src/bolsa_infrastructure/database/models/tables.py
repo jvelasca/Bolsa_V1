@@ -3034,6 +3034,15 @@ class Top3OpportunityRow(Base):
     asset_id: Mapped[str] = mapped_column("asset_id", String, nullable=False)
     combined: Mapped[float] = mapped_column(Float, nullable=False)
     components: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    # V2.88.153 — identidad ADITIVA y nullable de la estrategia que ganó el slot. Sin
+    # backfill: las fotos anteriores a la migración 057 quedan ``NULL`` y se leen como
+    # desconocidas (la UI lo declara). Nunca se deduce del ticker ni del rank.
+    strategy_preset_key: Mapped[str | None] = mapped_column(
+        "strategy_preset_key", String, nullable=True
+    )
+    strategy_version: Mapped[str | None] = mapped_column(
+        "strategy_version", String, nullable=True
+    )
     regime: Mapped[str | None] = mapped_column("regime", String, nullable=True)
     reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))

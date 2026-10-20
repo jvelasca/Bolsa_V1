@@ -74,6 +74,13 @@ function textOrAbsent(value: string | null | undefined): string {
   return value && value.trim() ? value : absentDataLabel();
 }
 
+/** La versión se publica como la declara la evidencia: ``v1`` no se convierte en ``vv1``. */
+function versionLabel(value: string | null | undefined): string {
+  const text = textOrAbsent(value);
+  if (!value || !value.trim()) return text;
+  return /^v/i.test(text) ? text : `v${text}`;
+}
+
 /** `null` no es «no»: no se puede afirmar con la evidencia disponible. */
 function flagLabel(
   value: boolean | null | undefined,
@@ -107,7 +114,7 @@ function StrategyLine({ strategy }: { strategy: StrategyLike | undefined }) {
   }
   return (
     <span className="font-mono">
-      {textOrAbsent(strategy?.presetKey)} · v{textOrAbsent(strategy?.version)}
+      {textOrAbsent(strategy?.presetKey)} · {versionLabel(strategy?.version)}
       {strategy?.presetKeyAmbiguous ? " · identidad AMBIGUA" : ""}
     </span>
   );
@@ -486,8 +493,30 @@ export function EstudioChainEvidence({
                   <span className="font-mono">
                     {textOrAbsent(cycle.executedVsBest.bestScoredAssetId)}
                   </span>{" "}
-                  · preset {absentDataLabel()} (la foto cross-asset no lo
-                  sella): no se empareja por estrategia.
+                  · preset{" "}
+                  <span className="font-mono">
+                    {cycle.executedVsBest.bestScoredPresetKey ||
+                    cycle.executedVsBest.bestScoredStrategyVersion ? (
+                      <>
+                        {textOrAbsent(cycle.executedVsBest.bestScoredPresetKey)}{" "}
+                        ·{" "}
+                        {versionLabel(
+                          cycle.executedVsBest.bestScoredStrategyVersion,
+                        )}
+                      </>
+                    ) : (
+                      absentDataLabel()
+                    )}
+                  </span>{" "}
+                  · misma estrategia que la ejecutada:{" "}
+                  {flagLabel(cycle.executedVsBest.presetMatch)}
+                  {cycle.executedVsBest.versionMatch !== undefined
+                    ? ` · misma versión: ${flagLabel(cycle.executedVsBest.versionMatch)}`
+                    : ""}
+                  {cycle.executedVsBest.bestScoredPresetKey ||
+                  cycle.executedVsBest.bestScoredStrategyVersion
+                    ? ""
+                    : " (la foto no declara identidad: no se empareja por estrategia)"}
                 </p>
               </>
             ) : (
@@ -503,14 +532,31 @@ export function EstudioChainEvidence({
               >
                 TOP3:{" "}
                 {top3Rows
-                  .map(
-                    (row) =>
-                      `#${String(row.rank ?? "?")} ${String(row.assetId ?? "?")}${
-                        row.combined != null
-                          ? ` (${Number(row.combined).toFixed(2)})`
-                          : ""
-                      }`,
-                  )
+                  .map((row) => {
+                    const preset =
+                      typeof row.strategyPresetKey === "string"
+                        ? row.strategyPresetKey.trim()
+                        : "";
+                    const version =
+                      typeof row.strategyVersion === "string"
+                        ? row.strategyVersion.trim()
+                        : "";
+                    // La identidad se ANEXA solo si la foto la declara; si no, se omite (la
+                    // línea no insinúa un ganador que la evidencia no sella).
+                    const identity =
+                      preset || version
+                        ? ` · ${preset || absentDataLabel()}${
+                            version ? ` ${version}` : ""
+                          }`
+                        : "";
+                    return `#${String(row.rank ?? "?")} ${String(
+                      row.assetId ?? "?",
+                    )}${
+                      row.combined != null
+                        ? ` (${Number(row.combined).toFixed(2)})`
+                        : ""
+                    }${identity}`;
+                  })
                   .join(" · ")}
               </p>
             ) : (

@@ -261,20 +261,52 @@ def resolve_executed_vs_best(
     else:
         executed_is_best_scored_asset = None
 
+    # V2.88.153 — identidad de la estrategia MEJOR PUNTUADA. Desde la migración 057 la foto
+    # durable del TOP3 sella el preset/versión del candidato ganador; antes era ``NULL``. El
+    # emparejamiento exige AMBOS términos: sin uno, el veredicto es un hueco declarado
+    # (``None``), nunca una coincidencia ni una divergencia inventadas.
+    best_preset = (
+        str(best_scored.get("strategyPresetKey") or "").strip()
+        if isinstance(best_scored, Mapping)
+        else ""
+    )
+    best_version = (
+        str(best_scored.get("strategyVersion") or "").strip()
+        if isinstance(best_scored, Mapping)
+        else ""
+    )
+    executed_preset = str(executed_map.get("strategyPresetKey") or "").strip()
+    executed_version = str(executed_map.get("strategyVersion") or "").strip()
+    preset_match: bool | None = (
+        executed_preset == best_preset if (executed_preset and best_preset) else None
+    )
+    version_match: bool | None = (
+        executed_version == best_version if (executed_version and best_version) else None
+    )
+
     return {
         "executedIsTopRanked": executed_is_top_ranked,
         "executedIsBestScoredAsset": executed_is_best_scored_asset,
         "executedRank": rank if isinstance(rank, int) else None,
         "bestScoredAssetId": best_text or None,
-        # La foto del selector cross-asset NO declara identidad de estrategia (solo `rank`,
-        # `assetId`, `combined`, `components`, `regime`): la mejor puntuada no puede aportar un
-        # `presetKey` y por tanto el emparejamiento por identidad EXACTA es un hueco DECLARADO
-        # (nunca se afirma coincidencia ni divergencia sin término de comparación).
-        "bestScoredPresetKey": None,
-        "presetMatch": None,
+        # La identidad se publica TAL CUAL la declara la foto (o ``None`` si no la declara): no
+        # se deduce del ticker ni del rank. Las fotos anteriores a la 057 viajan como hueco.
+        "bestScoredPresetKey": best_preset or None,
+        "bestScoredStrategyVersion": best_version or None,
+        "executedPresetKey": executed_preset or None,
+        "executedStrategyVersion": executed_version or None,
+        "presetMatch": preset_match,
+        "versionMatch": version_match,
         "measurement": (
             MEASUREMENT_COMPLETE
             if (executed_is_top_ranked is not None or executed_is_best_scored_asset is not None)
+            else MEASUREMENT_UNKNOWN
+        ),
+        # Medición de la IDENTIDAD, separada del veredicto rank/activo: un hueco de identidad no
+        # degrada una comparación de puesto que sí se pudo hacer, pero tampoco se disfraza.
+        "strategyMeasurement": (
+            MEASUREMENT_COMPLETE
+            if (preset_match is not None or version_match is not None)
             else MEASUREMENT_UNKNOWN
         ),
     }
@@ -546,12 +578,20 @@ def build_chain_evidence_artifact(
     all_cycles = [view for value in values for view in value["cycles"]] + outside
     best_scored_block: dict[str, Any] | None = None
     if isinstance(best_scored, Mapping):
+        # V2.88.153 — la foto cross-asset YA sella la identidad del candidato ganador desde la
+        # migración 057. Se publica lo que la fila declare; el hueco (``None``) solo significa
+        # «la foto no lo declara» (fotos históricas), nunca una identidad inferida.
+        best_preset = str(best_scored.get("strategyPresetKey") or "").strip()
+        best_version = str(best_scored.get("strategyVersion") or "").strip()
         best_scored_block = {
             **dict(best_scored),
-            # Declaración explícita: la foto cross-asset NO sella identidad de estrategia, así
-            # que la «mejor puntuada» no puede declarar su `presetKey` (hueco, nunca un relleno).
-            "bestScoredPresetKey": None,
-            "strategyMeasurement": MEASUREMENT_UNKNOWN,
+            "bestScoredPresetKey": best_preset or None,
+            "bestScoredStrategyVersion": best_version or None,
+            "strategyMeasurement": (
+                MEASUREMENT_COMPLETE
+                if (best_preset or best_version)
+                else MEASUREMENT_UNKNOWN
+            ),
         }
     return {
         "kind": "AUTO_ESTUDIO_CHAIN_EVIDENCE",
@@ -585,8 +625,10 @@ async def read_top3_snapshot(
 ) -> dict[str, Any] | None:
     """Lee (read-only) la foto durable MÁS RECIENTE del selector cross-asset del motor.
 
-    Devuelve ``{"runId", "rows":[{assetId, rank, combined, components, regime}]}`` o ``None`` si
-    no hay ninguna foto (hueco declarado, nunca una lista vacía disfrazada de medición).
+    Devolve ``{"runId", "rows":[{assetId, rank, combined, components, regime,
+    strategyPresetKey, strategyVersion}]}`` o ``None`` si no hay ninguna foto (hueco declarado,
+    nunca una lista vacía disfrazada de medición). ``strategyPresetKey``/``strategyVersion``
+    (V2.88.153) viajan desde la fila; ``None`` cuando la foto no los declara (históricas).
     """
     from sqlalchemy import select
 
@@ -602,6 +644,8 @@ async def read_top3_snapshot(
                     Top3OpportunityRow.combined,
                     Top3OpportunityRow.components,
                     Top3OpportunityRow.regime,
+                    Top3OpportunityRow.strategy_preset_key,
+                    Top3OpportunityRow.strategy_version,
                 )
                 .where(Top3OpportunityRow.run_id.like(f"top3-{account_id}-%"))
                 .order_by(Top3OpportunityRow.run_id.desc(), Top3OpportunityRow.rank.asc())
@@ -624,8 +668,10 @@ async def read_top3_snapshot(
                 if isinstance(components, Mapping)
                 else components,
                 "regime": regime,
+                "strategyPresetKey": str(preset).strip() if preset is not None else None,
+                "strategyVersion": str(version).strip() if version is not None else None,
             }
-            for _run, rank, asset_id, combined, components, regime in run_rows
+            for _run, rank, asset_id, combined, components, regime, preset, version in run_rows
         ],
     }
 

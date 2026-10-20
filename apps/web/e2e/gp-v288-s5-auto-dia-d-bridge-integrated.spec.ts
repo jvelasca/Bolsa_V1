@@ -48,6 +48,7 @@ import {
   test,
   expect,
   type APIRequestContext,
+  type Browser,
   type Page,
 } from "@playwright/test";
 import { e2eEnabled, E2E_SKIP_REASON } from "./fixtures";
@@ -453,6 +454,96 @@ async function disposeEphemeralAccount(
   }
 }
 
+/** Barras mínimas exigidas al fixture: un run sin barras devuelve 400 (no es flakiness). */
+const MIN_OHLCV_BARS = 1;
+
+/**
+ * Deja los datos de mercado LISTOS antes del journey (V2.88.153).
+ *
+ * En frío, el run D→hoy disparaba `POST /instruments/{id}/sync` (~9 s) y `POST /backtests/run`
+ * devolvía 400 porque el instrumento aún no tenía barras; el primer intento agotaba su espera
+ * por una precondición de DATOS, no por la UI. El fixture la resuelve AHORA: sincroniza y exige
+ * barras > 0. Un fallo aquí es un FALLO de fixture declarado (no un `skipped`).
+ */
+async function ensureMarketDataReady(
+  request: APIRequestContext,
+  baseURL: string,
+  instrumentId: string,
+): Promise<{ bars: number; status: string }> {
+  const syncUrl = new URL(
+    `/api/instruments/${encodeURIComponent(instrumentId)}/sync`,
+    baseURL,
+  ).toString();
+  const syncRes = await request.post(syncUrl, {
+    data: { yearsBack: 5 },
+    timeout: 180_000,
+  });
+  if (!syncRes.ok()) {
+    throw new Error(
+      `POST ${syncUrl} falló (${syncRes.status()}): ${await syncRes.text()}`,
+    );
+  }
+  const sync = await body<{
+    data?: { status?: string; error?: string | null };
+  }>(syncRes);
+  const status = sync.data?.status ?? "";
+  if (status === "failed") {
+    throw new Error(
+      `el sync de ${instrumentId} terminó en 'failed': ${sync.data?.error ?? "sin motivo declarado"}`,
+    );
+  }
+
+  const ohlcvUrl = new URL(
+    `/api/instruments/${encodeURIComponent(instrumentId)}/ohlcv?limit=365&timeframe=1d`,
+    baseURL,
+  ).toString();
+  const ohlcvRes = await request.get(ohlcvUrl, { timeout: 60_000 });
+  if (!ohlcvRes.ok()) {
+    throw new Error(
+      `GET ${ohlcvUrl} falló (${ohlcvRes.status()}): ${await ohlcvRes.text()}`,
+    );
+  }
+  const ohlcv = await body<{ meta?: { count?: number } }>(ohlcvRes);
+  const bars = Number(ohlcv.meta?.count ?? 0);
+  if (!(bars >= MIN_OHLCV_BARS)) {
+    throw new Error(
+      `el instrumento ${instrumentId} no declara barras tras el sync (count=${bars}); ` +
+        "el run D→hoy devolvería 400 por precondición de datos.",
+    );
+  }
+  return { bars, status: status || "unknown" };
+}
+
+/**
+ * Precalienta las rutas del journey (V2.88.153): la primera visita paga la transformación de
+ * módulos de Vite. Es SOLO latencia — se ejecuta en `beforeAll` y, si falla, se anota: las
+ * aserciones reales del test siguen siendo el gate (no se relajan timeouts ni reintentos).
+ */
+async function warmJourneyRoutes(
+  browser: Browser,
+  baseURL: string,
+  accountId: string,
+): Promise<string | null> {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  try {
+    await seedHoyBrowserState(page, { accountId });
+    await page.goto(new URL("/auto/operar", baseURL).toString());
+    await expect(page.getByTestId("auto-operar-page")).toBeVisible({
+      timeout: 120_000,
+    });
+    await page.goto(new URL("/backtests?tab=run", baseURL).toString());
+    await expect(page.getByTestId("backtests-keepalive-host")).toBeVisible({
+      timeout: 120_000,
+    });
+    return null;
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  } finally {
+    await context.close();
+  }
+}
+
 /**
  * Siembra la cadena completa registrando CADA recurso en cuanto existe:
  * cuenta efímera → catálogo → (snapshot del TOP) → ciclo AUTO durable → TOP real de Finalistas.
@@ -555,6 +646,10 @@ async function seedAutoBridge(
   }
   state.instrumentId = instrument.id;
 
+  // Datos de mercado ANTES del journey (V2.88.153): sin barras, el run real devuelve 400 y el
+  // primer intento se agota esperando una precondición de DATOS, no de UI.
+  await ensureMarketDataReady(request, baseURL, instrument.id);
+
   const strategyRes = await request.post(
     new URL("/api/strategies/from-preset", baseURL).toString(),
     {
@@ -636,7 +731,11 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
   let environmentSkip: string | null = null;
   const state: S5State = emptyState();
 
-  test.beforeAll(async ({ request, baseURL }) => {
+  test.beforeAll(async ({ request, baseURL, browser }) => {
+    // V2.88.153: el fixture (gate + seed durable + precalentamiento de Vite) excede el
+    // timeout por defecto de hook (30 s). Se declara explícitamente para que el
+    // precalentamiento no convierta el arranque en frío en un falso rojo.
+    test.setTimeout(240_000);
     environmentSkip = await gateIntegratedE2eEnvironment(request, baseURL, {
       e2eEnabled: e2eEnabled(),
       e2eSkipReason: E2E_SKIP_REASON,
@@ -648,6 +747,20 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
       // Fallo de producto: se DECLARA y propaga como FAIL, pero NO se pierde el registro de
       // recursos (la cuenta ya creada queda en `state` para que el `afterAll` la limpie).
       state.seedError = err instanceof Error ? err : new Error(String(err));
+    }
+    // Precalentamiento de Vite (solo latencia): no altera los gates del journey.
+    if (state.accountId && !state.seedError) {
+      const warmError = await warmJourneyRoutes(
+        browser,
+        baseURL,
+        state.accountId,
+      );
+      if (warmError) {
+        test.info().annotations.push({
+          type: "precalentamiento",
+          description: `el precalentamiento de rutas no completó: ${warmError}`,
+        });
+      }
     }
   });
 
@@ -920,13 +1033,70 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
         const cta = page.getByTestId("auto-operation-strategy-verify-dia-d");
         await expect(cta).toBeVisible({ timeout: 20_000 });
         await expect(cta).toBeEnabled();
+
+        // Se observa la RESPUESTA real del run (registrada ANTES del clic): un 4xx/5xx es un
+        // fallo declarado del run, no una espera que se agota sin diagnóstico.
+        const runResponse = page.waitForResponse(
+          (res) => {
+            if (res.request().method() !== "POST") return false;
+            try {
+              return new URL(res.url()).pathname === RUN_PATH;
+            } catch {
+              return false;
+            }
+          },
+          { timeout: 90_000 },
+        );
         await cta.click();
+        const response = await runResponse;
+        if (!response.ok()) {
+          throw new Error(
+            `POST ${RUN_PATH} respondió ${response.status()}: ${await response
+              .text()
+              .catch(() => "(cuerpo ilegible)")}`,
+          );
+        }
       });
 
       await test.step("S5-04 · esperar la evidencia de la sesión LAB", async () => {
-        // La sesión LAB arranca el run; cuando la evidencia de sesión está lista aparece el guardado.
-        await expect(save).toBeVisible({ timeout: 60_000 });
-        await expect(save).toBeEnabled({ timeout: 60_000 });
+        // Estado OBSERVABLE del host (V2.88.153): `ready | error` son hechos de la UI, no la
+        // aparición de un botón. Un `error` se propaga con su texto visible.
+        const host = page
+          .getByTestId("dia-d-replay-embedded")
+          .or(page.getByTestId("dia-d-replay-full-bleed"))
+          .first();
+        await expect(host).toBeVisible({ timeout: 60_000 });
+        await expect
+          .poll(async () => (await host.getAttribute("data-run-state")) ?? "", {
+            timeout: 60_000,
+            message: "el run D→hoy debe declarar un estado terminal",
+          })
+          .toMatch(/^(ready|error)$/);
+
+        const runState =
+          (await host.getAttribute("data-run-state")) ?? "unknown";
+        const runError = page.getByTestId("dia-d-run-error");
+        const runErrorText =
+          (await runError.count()) > 0
+            ? ((await runError.first().textContent()) ?? "").trim()
+            : "";
+        await testInfo.attach("s5-04-run-state", {
+          body: JSON.stringify({ runState, runError: runErrorText }, null, 2),
+          contentType: "application/json",
+        });
+        if (runState === "error") {
+          throw new Error(
+            `el run D→hoy terminó en error: ${runErrorText || "(sin texto visible)"}`,
+          );
+        }
+        await expect(host).toHaveAttribute("data-run-state", "ready");
+
+        // La evidencia de sesión aloja el botón de guardado; se exige explícitamente.
+        await expect(page.getByTestId("dia-d-session-evidence")).toBeVisible({
+          timeout: 30_000,
+        });
+        await expect(save).toBeVisible({ timeout: 30_000 });
+        await expect(save).toBeEnabled({ timeout: 30_000 });
       });
 
       await test.step("S5-04 · guardar y verificar el enlace durable", async () => {

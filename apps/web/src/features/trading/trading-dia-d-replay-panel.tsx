@@ -885,6 +885,17 @@ export function TradingDiaDReplayPanel() {
   const report = detail ?? autoDetail;
   const fullBleed = Boolean(session.fullBleedMovie);
 
+  // Estado OBSERVABLE del run D→hoy (V2.88.153): el journey integrado espera un estado
+  // explícito en vez de deducirlo de la aparición de un botón. `error` manda sobre todo
+  // (un fallo no se disfraza de «cargando»); `ready` exige report/evidencia reales.
+  const runState: "idle" | "running" | "ready" | "error" = err
+    ? "error"
+    : busy
+      ? "running"
+      : report || sessionEvidence
+        ? "ready"
+        : "idle";
+
   const sessionReportBody = report ? (
     <>
       <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 tabular-nums">
@@ -920,7 +931,10 @@ export function TradingDiaDReplayPanel() {
           : "Equity reescrita con fills Aceptar; Rechazar no ejecuta (buy rechazado anula su sell)."}
       </p>
       {sessionEvidence ? (
-        <div className="space-y-1.5 border-t border-border/50 pt-1.5">
+        <div
+          className="space-y-1.5 border-t border-border/50 pt-1.5"
+          data-testid="dia-d-session-evidence"
+        >
           <div className="flex flex-wrap items-center gap-1">
             <span className="font-semibold text-foreground">Evidence</span>
             <span
@@ -1189,6 +1203,7 @@ export function TradingDiaDReplayPanel() {
       data-testid={
         fullBleed ? "dia-d-replay-full-bleed" : "dia-d-replay-embedded"
       }
+      data-run-state={runState}
     >
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border/50 px-3 py-1.5 text-[11px]">
         <span className="font-semibold text-foreground">Película D→hoy</span>
@@ -1285,7 +1300,11 @@ export function TradingDiaDReplayPanel() {
               </p>
             ) : null}
             {err ? (
-              <p className="text-[11px] text-destructive" role="alert">
+              <p
+                className="text-[11px] text-destructive"
+                role="alert"
+                data-testid="dia-d-run-error"
+              >
                 {err}
               </p>
             ) : null}
