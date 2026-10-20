@@ -625,10 +625,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-20 — pin del arbol re-anclado a `1ac2dd72`
+ * (`apps` `ef0ca05ad416106a7053c5e114662122ecba1637` / `packages` `4a7a456b84bb358bc763c2f477e98da593df2894`).
+ * Motivo: bateria integrada por valor (2026-10-20): tests PG nuevos en apps/ + lector de identidad del ciclo en packages/
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'b0d0f7b2',
-  appsHash: '438e9bef25e6cc090d6539d53417a8c27123abb7',
-  packagesHash: 'b27921813bae331a7ef8d3a4a87178a5650ef1de',
+  commit: '1ac2dd72',
+  appsHash: 'ef0ca05ad416106a7053c5e114662122ecba1637',
+  packagesHash: '4a7a456b84bb358bc763c2f477e98da593df2894',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
