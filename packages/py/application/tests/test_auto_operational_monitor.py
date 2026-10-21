@@ -1580,10 +1580,85 @@ def test_entry_reservation_prefers_the_entry_when_the_exit_is_listed_first() -> 
     assert _entry_reservation([entry, exit_row]) is entry
 
 
-def test_entry_reservation_falls_back_to_the_first_row_without_an_entry() -> None:
-    """Sin entrada se conserva el orden histórico: nunca se inventa una reserva."""
+def test_entry_reservation_is_none_when_only_the_exit_is_in_the_window() -> None:
+    """N-155-1 — la salida NUNCA se usa como entrada: sin fila de entrada, ``None``.
+
+    Antes se caía a ``reservations[0]`` (la salida), que publicaba ``short`` y la versión
+    vacía: un valor confianzoso derivado de un hecho que contradice la entrada.
+    """
     exit_row = _exit_reservation()
-    assert _entry_reservation([exit_row]) is exit_row
+    assert _entry_reservation([exit_row]) is None
+
+
+def test_closed_cycle_with_only_the_exit_declares_unknown_direction_and_version() -> None:
+    """N-155-1 — falsable en el punto exacto: sin entrada, dirección y versión son huecos.
+
+    La salida está en la ventana y declara ``side='sell'``: NO puede gobernar la dirección del
+    ciclo. Se declara la nota ``entry_reservation_not_in_window`` y ``instrumentIdSource``
+    distingue que el valor viene de otra fila de la ventana, no del hecho de entrada.
+    """
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_exit_reservation()],
+        fills=[_fill(side="buy", qty=10, price=100), _fill(side="sell", qty=10, price=110)],
+    )
+    cycle = dto["cycles"][0]
+    assert cycle["direction"] is None
+    assert cycle["strategyVersion"] is None
+    assert cycle["instrumentId"] == "AAPL"
+    assert cycle["instrumentIdSource"] == "reservation_in_window"
+    assert "entry_reservation_not_in_window" in cycle["notes"]
+    reservation_step = _step(cycle["steps"], "RESERVATION")
+    assert reservation_step["state"] == "absent"
+    assert reservation_step["note"] == "entry_reservation_not_in_window"
+    # La UI no puede rotular «Largo» ni «Corto» desde un ternario: el hueco viaja como tal.
+    assert cycle["direction"] != "long"
+    assert cycle["direction"] != "short"
+
+
+def test_cycle_without_any_reservation_does_not_assume_long() -> None:
+    """N-155-1 — sin reservas tampoco se inventa ``long`` (antes el ternario lo hacía)."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        fills=[_fill(side="buy", qty=10, price=100)],
+    )
+    cycle = dto["cycles"][0]
+    assert cycle["direction"] is None
+    assert cycle["strategyVersion"] is None
+    assert cycle["instrumentIdSource"] is None
+
+
+def test_cycle_publishes_the_signal_to_plan_attribution_from_the_decision() -> None:
+    """Gap 2 — ``signalId`` y el id del plan salen del hecho durable, no de una inferencia."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        journal=[
+            _decision_entry(
+                signalId="sig-inst-1",
+                tradePlan={
+                    "decisionId": "tp-2026-01-01-aapl",
+                    "entry": 100.0,
+                    "structuralStop": 95.0,
+                },
+            )
+        ],
+    )
+    cycle = dto["cycles"][0]
+    assert cycle["signalId"] == "sig-inst-1"
+    assert cycle["planId"] == "tp-2026-01-01-aapl"
+    # Y viaja también como hecho de la etapa que la declara (aditivo: no cambia su estado).
+    assert _step(cycle["steps"], "SIGNAL")["state"] == "reached"
+    assert _fact(_step(cycle["steps"], "SIGNAL"), "signalId")["value"] == "sig-inst-1"
+    assert _fact(_step(cycle["steps"], "RISK"), "planId")["value"] == "tp-2026-01-01-aapl"
+
+
+def test_cycle_without_the_decision_declares_attribution_as_none() -> None:
+    """Sin hecho durable de decisión no hay atribución: ``None``, nunca el ``cycleId``."""
+    dto = build_operational_monitor(account_id="acc-1", reservations=[_reservation()])
+    cycle = dto["cycles"][0]
+    assert cycle["signalId"] is None
+    assert cycle["planId"] is None
 
 
 def test_entry_reservation_is_none_without_rows() -> None:

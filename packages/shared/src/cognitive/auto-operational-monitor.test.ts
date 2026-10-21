@@ -115,6 +115,26 @@ describe("buildAutoOperationalMonitorView", () => {
     expect(cycle.statusLabel).toBe(CYCLE_STATUS_UNMEASURED);
   });
 
+  it("trata la dirección como tri-estado: el hueco nunca se rotula «Largo»", () => {
+    const nullDirection = minimalDto();
+    nullDirection.cycles[0]!.direction = null;
+    expect(
+      buildAutoOperationalMonitorView(nullDirection).cycles[0]!.directionLabel,
+    ).toBe(CYCLE_STATUS_UNMEASURED);
+
+    const missing = minimalDto();
+    delete missing.cycles[0]!.direction;
+    expect(
+      buildAutoOperationalMonitorView(missing).cycles[0]!.directionLabel,
+    ).toBe(CYCLE_STATUS_UNMEASURED);
+
+    const long = minimalDto();
+    long.cycles[0]!.direction = "long";
+    expect(
+      buildAutoOperationalMonitorView(long).cycles[0]!.directionLabel,
+    ).toBe("Largo");
+  });
+
   it("no llama abierta a una reserva ni a una orden sin precio", () => {
     const reserved = minimalDto();
     reserved.cycles[0]!.closed = false;

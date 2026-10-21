@@ -129,6 +129,9 @@ class EstudioDailyValue:
     plan: dict[str, Any] | None = None
     why_not: list[str] = field(default_factory=list)
     strategy: dict[str, Any] | None = None
+    #: Tri-estado de posición abierta: ``None`` = no medido (la lectura falló). El motor de
+    #: dictamen sigue recibiendo ``False`` (Δ decisión = 0); esta bandera solo declara el hueco.
+    position_open: bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -138,6 +141,10 @@ class EstudioDailyValue:
             "reason": self.reason,
             "asOfBarDate": self.as_of_bar_date,
             "computedAt": self.computed_at,
+            # H-145-1 — ``positionOpen`` es TRI-ESTADO: ``True``/``False`` cuando la lectura de
+            # posiciones respondió y ``None`` cuando no se pudo medir (antes un fallo de lectura
+            # se publicaba como ``False``: «sin posición» sin evidencia).
+            "positionOpen": self.position_open,
             "opinion": {
                 "stance": self.stance,
                 "dictamenStars": self.dictamen_stars,
@@ -329,9 +336,10 @@ class RunEstudioDailyOps:
             )
 
         await self._emit(on_progress, phase="hints", done=0, total=len(ids))
-        hints, chip_by_id = await self._build_hints(
+        hints, chip_by_id, hint_notes, position_open_by_id = await self._build_hints(
             ids, account_id=account_id, day=day
         )
+        notes.extend(hint_notes)
 
         await self._emit(on_progress, phase="opinions", done=0, total=len(ids))
         rows, value_errors = await self._run_opinions(
@@ -362,6 +370,7 @@ class RunEstudioDailyOps:
             skipped_by_id=skipped_by_id,
             value_errors=value_errors,
             propose_error=propose_error,
+            position_open_by_id=position_open_by_id,
         )
         await self._emit(
             on_progress, phase="done", done=len(values), total=len(values)
@@ -386,10 +395,18 @@ class RunEstudioDailyOps:
         *,
         account_id: str,
         day: str,
-    ) -> tuple[list[OpinionHint], dict[str, dict[str, Any]]]:
+    ) -> tuple[list[OpinionHint], dict[str, dict[str, Any]], list[str], dict[str, bool | None]]:
+        """Hints por valor + notas de huecos declarados + posición abierta TRI-ESTADO.
+
+        Un fallo de chips se DECLARA en ``notes`` (cuántos ids quedaron sin ese indicador); un
+        fallo de la lectura de posiciones deja el valor a ``None`` (no medido) en el mapa de
+        posición, en vez de afirmar «sin posición».
+        """
         composite_chips: list[dict[str, Any]] = []
         fundamentals_chips: list[dict[str, Any]] = []
+        notes: list[str] = []
         if self._composite is not None:
+            failed = 0
             for chunk in _chunks(ids, _COMPOSITE_CHUNK):
                 try:
                     composite_chips.extend(
@@ -397,29 +414,37 @@ class RunEstudioDailyOps:
                             chunk, horizon="swing", regime="neutral", as_of=day
                         )
                     )
-                except Exception:
-                    continue
+                except Exception:  # noqa: BLE001 — el batch sigue, el hueco se declara.
+                    failed += len(chunk)
+            if failed:
+                notes.append(f"composite_chips_unavailable:{failed}_ids")
         if self._fundamentals is not None:
+            failed = 0
             for chunk in _chunks(ids, _FUNDAMENTALS_CHUNK):
                 try:
                     fundamentals_chips.extend(
                         await self._fundamentals.execute_chips(chunk, as_of=day)
                     )
-                except Exception:
-                    continue
+                except Exception:  # noqa: BLE001 — el batch sigue, el hueco se declara.
+                    failed += len(chunk)
+            if failed:
+                notes.append(f"fundamentals_chips_unavailable:{failed}_ids")
 
         chip_by_id = _chip_map(composite_chips)
         fund_by_id = _chip_map(fundamentals_chips)
 
         open_ids: set[str] = set()
+        positions_measured = True
         if self._positions is not None:
             try:
                 for position in await self._positions.list_open_for_account(account_id):
                     iid = str(getattr(position, "instrument_id", "") or "")
                     if iid:
                         open_ids.add(iid)
-            except Exception:
+            except Exception:  # noqa: BLE001 — se declara «no medido», no «sin posición».
                 open_ids = set()
+                positions_measured = False
+                notes.append("positions_unavailable")
 
         hints: list[OpinionHint] = []
         for iid in ids:
@@ -438,7 +463,9 @@ class RunEstudioDailyOps:
                     has_eod_bar=None,
                 )
             )
-        return hints, chip_by_id
+        return hints, chip_by_id, notes, {
+            iid: (iid in open_ids) if positions_measured else None for iid in ids
+        }
 
     # ── opiniones ────────────────────────────────────────────────────────────
 
@@ -532,6 +559,7 @@ class RunEstudioDailyOps:
         skipped_by_id: dict[str, dict[str, Any]],
         value_errors: dict[str, str],
         propose_error: str | None,
+        position_open_by_id: dict[str, bool | None],
     ) -> list[EstudioDailyValue]:
         values: list[EstudioDailyValue] = []
         for iid in ids:
@@ -540,6 +568,9 @@ class RunEstudioDailyOps:
             payload: dict[str, Any] = {
                 "instrument_id": iid,
                 "symbol": chip.get("ticker"),
+                # H-145-1 — ``None`` cuando la lectura de posiciones falló: el parte declara el
+                # hueco en vez de afirmar «sin posición» desde una lectura caída.
+                "position_open": position_open_by_id.get(iid),
                 "indicators": {
                     "io": _float_or_none(chip.get("indiceOperativo")),
                     "fa": _float_or_none(chip.get("scoreDisplay100")),

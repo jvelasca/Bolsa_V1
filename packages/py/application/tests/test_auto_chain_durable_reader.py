@@ -14,7 +14,10 @@ Invariantes que se fijan aquí (doctrina ``UNKNOWN ≠ 0``):
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
+
+import pytest
 
 from bolsa_application.auto_chain_durable_reader import (
     CANONICAL_STEPS,
@@ -27,7 +30,10 @@ from bolsa_application.auto_chain_durable_reader import (
     executed_vs_dia_d,
     pnl_reconciliation,
     project_cycle_steps,
+    read_top3_snapshot,
+    read_top3_snapshots,
     resolve_executed_vs_best,
+    snapshot_as_of,
     value_strategy,
 )
 
@@ -526,3 +532,157 @@ def test_artifact_declares_partial_identity_when_the_photo_only_seals_the_preset
         },
     )
     assert only_version["bestScored"]["strategyMeasurement"] == "PARTIAL"
+
+
+# ── N-155-2/N-155-3: anclaje temporal de la foto TOP3 e identidad vacía ─────────────
+
+
+class _FakeResult:
+    def __init__(self, rows: list[tuple[Any, ...]]) -> None:
+        self._rows = rows
+
+    def all(self) -> list[tuple[Any, ...]]:
+        return list(self._rows)
+
+
+class _FakeSession:
+    """Sesión mínima: el lector solo ejecuta un SELECT y consume ``.all()``."""
+
+    def __init__(self, rows: list[tuple[Any, ...]]) -> None:
+        self._rows = rows
+
+    async def execute(self, _statement: Any) -> _FakeResult:
+        return _FakeResult(self._rows)
+
+
+def _snapshot_row(
+    run_id: str,
+    *,
+    rank: int = 1,
+    asset_id: str = "i-1",
+    preset: Any = "trend_v1",
+    version: Any = "v-42",
+) -> tuple[Any, ...]:
+    return (run_id, rank, asset_id, 0.9, {}, "range", preset, version)
+
+
+@pytest.mark.asyncio
+async def test_read_top3_snapshot_returns_the_newest_photo_and_its_run_id() -> None:
+    """Se conserva el contrato histórico (la ÚLTIMA foto) pero cada fila declara su foto."""
+    rows = [
+        _snapshot_row("top3-acc-1-2026-01-02T10:00:00+00:00", asset_id="i-2"),
+        _snapshot_row("top3-acc-1-2026-01-01T10:00:00+00:00", asset_id="i-1"),
+    ]
+    snapshot = await read_top3_snapshot(_FakeSession(rows), "acc-1")
+    assert snapshot is not None
+    assert snapshot["runId"] == "top3-acc-1-2026-01-02T10:00:00+00:00"
+    assert [row["assetId"] for row in snapshot["rows"]] == ["i-2"]
+    assert snapshot["rows"][0]["runId"] == snapshot["runId"]
+
+
+@pytest.mark.asyncio
+async def test_blank_identity_in_the_photo_is_none_and_never_an_empty_string() -> None:
+    """N-155-3 — ``""``/blancos no son una identidad: el contrato dice ``None``."""
+    rows = [_snapshot_row("top3-acc-1-2026-01-01T10:00:00+00:00", preset="   ", version="")]
+    snapshot = await read_top3_snapshot(_FakeSession(rows), "acc-1")
+    assert snapshot is not None
+    row = snapshot["rows"][0]
+    assert row["strategyPresetKey"] is None
+    assert row["strategyVersion"] is None
+
+
+@pytest.mark.asyncio
+async def test_read_top3_snapshots_declares_no_photo_as_an_empty_list() -> None:
+    assert await read_top3_snapshots(_FakeSession([]), "acc-1") == []
+
+
+def _snapshot(run_bar: str, *, asset_id: str = "i-1") -> dict[str, Any]:
+    return {
+        "runId": f"top3-acc-1-{run_bar}",
+        "bar": datetime.fromisoformat(run_bar),
+        "rows": [{"assetId": asset_id, "rank": 1, "runId": f"top3-acc-1-{run_bar}"}],
+    }
+
+
+def test_snapshot_as_of_picks_the_photo_in_force_and_never_a_later_one() -> None:
+    """N-155-2 — la foto vigente en el instante del ciclo, no la última del día."""
+    snapshots = [
+        _snapshot("2026-01-02T10:00:00+00:00", asset_id="later"),
+        _snapshot("2026-01-01T10:00:00+00:00", asset_id="in_force"),
+    ]
+    chosen = snapshot_as_of(snapshots, "2026-01-01T12:30:00Z")
+    assert chosen is not None
+    assert chosen["rows"][0]["assetId"] == "in_force"
+    # Antes de la primera foto no había nada publicado: hueco, no la foto futura.
+    assert snapshot_as_of(snapshots, "2026-01-01T09:59:00Z") is None
+    # Sin instante de referencia no se puede afirmar contemporaneidad.
+    assert snapshot_as_of(snapshots, None) is None
+    # En la misma barra, la foto es la vigente (``bar <= at``).
+    assert snapshot_as_of(snapshots, "2026-01-02T10:00:00Z")["rows"][0]["assetId"] == "later"
+
+
+def test_artifact_publishes_the_anchor_of_the_photo_used_for_each_cycle() -> None:
+    """La evidencia declara CONTRA QUÉ foto se comparó cada ciclo (o por qué no hay)."""
+    cycle = _cycle()
+    signal = next(step for step in cycle["steps"] if step["id"] == "SIGNAL")
+    signal["at"] = "2026-01-01T10:30:00Z"
+    artifact = build_chain_evidence_artifact(
+        account_id="acc",
+        estudio={"status": "ok", "instrumentIds": ["inst-1"]},
+        cycles=[cycle],
+        best_scored_by_cycle={
+            "cyc-1": {
+                "bestScored": {
+                    "assetId": "inst-1",
+                    "rank": 1,
+                    "combined": 0.9,
+                    "strategyPresetKey": "trend_v1",
+                    "strategyVersion": "v-42",
+                },
+                "anchor": {
+                    "runId": "top3-acc-1-2026-01-01T10:00:00+00:00",
+                    "bar": "2026-01-01T10:00:00Z",
+                    "entryAt": "2026-01-01T10:30:00Z",
+                    "measurement": "COMPLETE",
+                    "reason": None,
+                },
+            }
+        },
+    )
+    view = artifact["values"][0]["cycles"][0]
+    assert view["bestScored"]["assetId"] == "inst-1"
+    assert view["executedVsBest"]["presetMatch"] is True
+    assert view["executedVsBest"]["anchor"]["runId"] == (
+        "top3-acc-1-2026-01-01T10:00:00+00:00"
+    )
+    assert view["executedVsBest"]["strategyMeasurement"] == "COMPLETE"
+
+
+def test_artifact_without_a_photo_before_the_entry_declares_the_gap() -> None:
+    """Sin foto anterior a la entrada la comparación es ``None`` con su motivo, nunca ``False``."""
+    cycle = _cycle()
+    signal = next(step for step in cycle["steps"] if step["id"] == "SIGNAL")
+    signal["at"] = "2026-01-01T10:30:00Z"
+    artifact = build_chain_evidence_artifact(
+        account_id="acc",
+        estudio={"status": "ok", "instrumentIds": ["inst-1"]},
+        cycles=[cycle],
+        best_scored_by_cycle={
+            "cyc-1": {
+                "bestScored": None,
+                "anchor": {
+                    "runId": None,
+                    "bar": None,
+                    "entryAt": "2026-01-01T10:30:00Z",
+                    "measurement": "UNKNOWN",
+                    "reason": "no_snapshot_at_or_before_entry",
+                },
+            }
+        },
+    )
+    compare = artifact["values"][0]["cycles"][0]["executedVsBest"]
+    assert compare["presetMatch"] is None
+    assert compare["versionMatch"] is None
+    assert compare["executedIsBestScoredAsset"] is None
+    assert compare["anchor"]["reason"] == "no_snapshot_at_or_before_entry"
+    assert compare["strategyMeasurement"] == "UNKNOWN"

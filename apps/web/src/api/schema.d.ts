@@ -4673,19 +4673,22 @@ export interface components {
             /** Cycleid */
             cycleId: string;
             decision?: components["schemas"]["AutoMonitorCycleDecisionDto"] | null;
-            /**
-             * Direction
-             * @default long
-             */
-            direction: string;
+            /** Direction */
+            direction?: string | null;
             /** Instrumentid */
             instrumentId?: string | null;
+            /** Instrumentidsource */
+            instrumentIdSource?: string | null;
             /** Notes */
             notes?: string[];
             /** Opportunityid */
             opportunityId?: string | null;
+            /** Planid */
+            planId?: string | null;
             position?: components["schemas"]["AutoMonitorCyclePositionDto"] | null;
             result?: components["schemas"]["AutoMonitorCycleResultDto"] | null;
+            /** Signalid */
+            signalId?: string | null;
             /** Steps */
             steps?: components["schemas"]["AutoMonitorStepDto"][];
             /** Strategypresetkey */
@@ -7243,8 +7246,12 @@ export interface components {
             entryDay?: string | null;
             /** Exitday */
             exitDay?: string | null;
+            /** Planid */
+            planId?: string | null;
             /** Realizedr */
             realizedR?: number | null;
+            /** Signalid */
+            signalId?: string | null;
             /** Strategypresetkey */
             strategyPresetKey?: string | null;
             /** Strategyversion */

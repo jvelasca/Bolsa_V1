@@ -92,6 +92,10 @@ class EstudioAuditCycleDto(BaseModel):
     exitDay: str | None = None
     strategyPresetKey: str | None = None
     strategyVersion: str | None = None
+    # Gap 2 — identidad estable de atribución señal → plan, tal como la declare el artefacto.
+    # ``None`` = no consta (el productor del replay todavía no la sella); nunca se rellena.
+    signalId: str | None = None
+    planId: str | None = None
     realizedR: float | None = None
 
 

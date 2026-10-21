@@ -62,6 +62,20 @@ const DOT_TONES: Record<AutoMonitorStepState, string> = {
 
 export const NO_MEASUREMENT_LABEL = "NO MEDIDO";
 
+/**
+ * N-155-1 — dirección de un ciclo en TRI-ESTADO. `long`/`short` solo con el hecho de la
+ * reserva de ENTRADA; `null`/ausente es un hueco declarado («Sin dato todavía»), nunca
+ * «Largo» por defecto: un ciclo sin entrada en la ventana no tiene dirección afirmable.
+ */
+export function directionLabelFor(
+  direction: string | null | undefined,
+): string {
+  const text = (direction ?? "").trim().toLowerCase();
+  if (text === "long") return "Largo";
+  if (text === "short") return "Corto";
+  return CYCLE_STATUS_UNMEASURED;
+}
+
 /** Estado visible de un ciclo. No afirma una etapa que los pasos no han alcanzado. */
 export const CYCLE_STATUS_UNMEASURED = "Sin dato todavía";
 export const CYCLE_STATUS_CLOSED = "Cerrada";
@@ -155,7 +169,13 @@ export type AutoMonitorCycleV1 = {
   // claves del TOP de Finalistas): la clave de la join exacta. `null` = el hecho durable no la
   // declaró (ausencia: se rotula, no se finge).
   strategyPresetKey?: string | null;
-  direction?: string;
+  direction?: string | null;
+  // Gap 2 — atribución señal → plan sellada por el ciclo. `null`/ausente = no consta.
+  signalId?: string | null;
+  planId?: string | null;
+  // N-155-1 — de dónde sale `instrumentId`: de la reserva de ENTRADA o de otra fila de la
+  // ventana (`reservation_in_window`). Con la entrada fuera de ventana no hay dirección.
+  instrumentIdSource?: string | null;
   // `closed` es nullable: `null` = la evidencia (ventana de fills) está truncada y NO se puede
   // afirmar el cierre. `closedMeasurement` acompaña (PARTIAL/UNKNOWN); la UI no adivina.
   closed?: boolean | null;
@@ -388,7 +408,7 @@ export function buildAutoOperationalMonitorView(
       return {
         ...cycle,
         steps,
-        directionLabel: cycle.direction === "short" ? "Corto" : "Largo",
+        directionLabel: directionLabelFor(cycle.direction),
         statusLabel: cycleStatusLabel(cycle),
         unmeasuredStepIds: steps
           .filter((step) => step.measurement === "UNKNOWN")

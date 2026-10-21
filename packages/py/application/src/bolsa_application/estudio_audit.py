@@ -165,7 +165,15 @@ def _cycle_row_signature(row: Mapping[str, Any]) -> str:
     """Firma textual determinista de una fila de ciclo (desempate estable en el dedup)."""
     return "|".join(
         "" if row.get(key) is None else str(row.get(key))
-        for key in ("entryDay", "exitDay", "strategyPresetKey", "strategyVersion", "realizedR")
+        for key in (
+            "entryDay",
+            "exitDay",
+            "strategyPresetKey",
+            "strategyVersion",
+            "signalId",
+            "planId",
+            "realizedR",
+        )
     )
 
 
@@ -200,6 +208,10 @@ def _cycles_for_symbol(
                     "exitDay": _text(cycle.get("exitDay")),
                     "strategyPresetKey": _text(cycle.get("strategyPresetKey")),
                     "strategyVersion": _text(cycle.get("strategyVersion")),
+                    # Gap 2 — la identidad estable de atribución se copia si el ciclo la
+                    # declara; ausente ⇒ ``None`` (hueco declarado). No se inventa.
+                    "signalId": _text(cycle.get("signalId")),
+                    "planId": _text(cycle.get("planId")),
                     "realizedR": _finite(cycle.get("realizedR")),
                 },
             )

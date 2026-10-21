@@ -483,3 +483,47 @@ async def test_value_replay_keeps_the_previous_value_artifact_on_failure(
         )
 
     assert previous.read_text(encoding="utf-8") == before
+
+
+# ── H-145-4: el latido se renueva aunque todavía no haya línea de progreso ─────────
+
+
+@pytest.mark.asyncio
+async def test_publisher_renews_the_heartbeat_before_the_first_progress_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Con el proceso recién arrancado no hay progreso, pero el job está VIVO.
+
+    Antes ``tick`` retornaba sin tocar ``heartbeat_at``: un arranque más largo que
+    ``stale_after_seconds`` permitía que otro worker reclamara el job y lo ejecutara dos veces.
+    """
+    touches: list[str] = []
+    progress: list[dict[str, Any]] = []
+
+    class _CountingRepo:
+        def __init__(self, _session: Any = None) -> None:
+            pass
+
+        async def touch(self, job_id: str) -> None:
+            touches.append(job_id)
+
+        async def set_progress(self, job_id: str, payload: dict[str, Any]) -> None:
+            progress.append(dict(payload))
+
+    monkeypatch.setattr(handler, "SqlAlchemyAutoOpsJobRepository", _CountingRepo)
+    publisher = handler._ProgressPublisher(
+        _FakeFactory(), "job-1", tmp_path / "progress.jsonl"
+    )
+
+    # Sin fichero (ni línea) todavía: el latido se renueva y NO se publica progreso falso.
+    await publisher.tick()
+    assert touches == ["job-1"]
+    assert progress == []
+
+    # Con una línea completa se publica el último evento (el latido va con ``set_progress``).
+    (tmp_path / "progress.jsonl").write_text(
+        '{"phase":"replay","done":1}\n', encoding="utf-8"
+    )
+    await publisher.tick()
+    assert progress == [{"phase": "replay", "done": 1}]
+    assert touches == ["job-1"]

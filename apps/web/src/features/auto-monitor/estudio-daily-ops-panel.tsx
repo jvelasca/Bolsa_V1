@@ -234,12 +234,12 @@ function ValueCard({
   const plan = value.plan ?? null;
   const cycles = audit?.cycles ?? [];
   const whyNot = value.whyNot ?? [];
-  // El contrato actual de ciclos NO trae `planId`/`signalId`: se leen si el artefacto los
-  // añade en el futuro y, mientras tanto, la atribución es honestamente «no atribuido».
+  // Desde el sello .156 el contrato de ciclos SÍ publica `planId`/`signalId` (gap 2): la
+  // atribución se resuelve con ellos; sin esos hechos sigue siendo «no atribuido».
   const attribution = auditAttributionForValue(
     cycles.map((cycle) => ({
-      planId: (cycle as { planId?: string | null }).planId,
-      signalId: (cycle as { signalId?: string | null }).signalId,
+      planId: cycle.planId,
+      signalId: cycle.signalId,
     })),
     {
       planId: value.strategy?.planId,

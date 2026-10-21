@@ -78,8 +78,10 @@ __all__ = [
     "read_dia_d_verifications",
     "read_estudio_chain_evidence",
     "read_top3_snapshot",
+    "read_top3_snapshots",
     "resolve_dia_d_cycle_facts",
     "resolve_executed_vs_best",
+    "snapshot_as_of",
     "value_strategy",
 ]
 
@@ -478,6 +480,12 @@ def pnl_reconciliation(cycle: Mapping[str, Any] | None) -> dict[str, Any]:
     }
 
 
+def _iso_instant(moment: Any) -> str | None:
+    """ISO-UTC (``...Z``) de un instante; ``None`` si no se puede afirmar."""
+    parsed = _parse_instant(moment)
+    return None if parsed is None else parsed.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
 def _day_of(instant: Any) -> str | None:
     """Día ``YYYY-MM-DD`` de una marca temporal durable; ``None`` si no se puede afirmar."""
     text = str(instant or "").strip()
@@ -497,10 +505,34 @@ def _cycle_day(cycle: Mapping[str, Any] | None, step_id: str) -> str | None:
     return _day_of(step.get("at")) if isinstance(step, Mapping) else None
 
 
+def _cycle_anchor_instant(cycle: Mapping[str, Any] | None) -> str | None:
+    """Instante con el que se ancla la foto TOP3 del ciclo: el de la SEÑAL, o el de la reserva.
+
+    Es el momento en que la decisión se tomó. Sin él no se puede afirmar qué foto estaba
+    vigente y la comparación con la mejor puntuada queda como hueco declarado.
+    """
+    index = _steps_index(cycle)
+    for step_id in ("SIGNAL", "RESERVATION"):
+        step = index.get(step_id)
+        at = step.get("at") if isinstance(step, Mapping) else None
+        text = str(at).strip() if at is not None else ""
+        if text:
+            return text
+    return None
+
+
 def _cycle_view(
-    cycle: Mapping[str, Any], *, best_scored: Mapping[str, Any] | None
+    cycle: Mapping[str, Any],
+    *,
+    best_scored: Mapping[str, Any] | None,
+    best_scored_anchor: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Fila de evidencia de UN ciclo: identidad + cadena + ejecutada vs mejor puntuada."""
+    """Fila de evidencia de UN ciclo: identidad + cadena + ejecutada vs mejor puntuada.
+
+    ``best_scored`` es la fila rank 1 de la foto VIGENTE EN EL INSTANTE DEL CICLO (no la última
+    del día): comparar contra una foto posterior a la entrada mezclaba dos momentos.
+    ``best_scored_anchor`` declara contra qué foto se comparó (o por qué no hay ninguna).
+    """
     steps = project_cycle_steps(cycle)
     executed = executed_identity(cycle)
     executed_with_instrument = {
@@ -510,12 +542,20 @@ def _cycle_view(
         "opportunityId": cycle.get("opportunityId"),
         "direction": cycle.get("direction"),
     }
+    compare = resolve_executed_vs_best(
+        executed=executed_with_instrument, best_scored=best_scored
+    )
+    if best_scored_anchor is not None:
+        compare = {**compare, "anchor": dict(best_scored_anchor)}
     return {
         "cycleId": cycle.get("cycleId"),
         "instrumentId": cycle.get("instrumentId"),
         "direction": cycle.get("direction"),
         "closed": cycle.get("closed"),
         "opportunityId": cycle.get("opportunityId"),
+        # Gap 2 — la atribución señal → plan que sella el ciclo (``None`` = no consta).
+        "signalId": cycle.get("signalId"),
+        "planId": cycle.get("planId"),
         # Día de ENTRADA durable (``at`` de la reserva) y de cierre (``closedAt`` del
         # resultado). Son hechos: sin ellos la UI no inventa la fecha del DÍA-D del valor.
         "entryDay": _cycle_day(cycle, "RESERVATION"),
@@ -526,9 +566,7 @@ def _cycle_view(
         ),
         "executed": executed,
         "bestScored": dict(best_scored) if isinstance(best_scored, Mapping) else None,
-        "executedVsBest": resolve_executed_vs_best(
-            executed=executed_with_instrument, best_scored=best_scored
-        ),
+        "executedVsBest": compare,
         "steps": steps,
         "chain": chain_gaps(cycle),
         "pnl": pnl_reconciliation(cycle),
@@ -546,6 +584,7 @@ def build_chain_evidence_artifact(
     estudio: Mapping[str, Any] | None,
     cycles: Sequence[Mapping[str, Any]],
     best_scored: Mapping[str, Any] | None = None,
+    best_scored_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
     as_of: str | None = None,
     meta: Mapping[str, Any] | None = None,
     limits: Sequence[str] | None = None,
@@ -555,12 +594,28 @@ def build_chain_evidence_artifact(
     Agrupa los ciclos por valor de ESTUDIO y, por ciclo, publica la cadena de 9 etapas, la
     identidad EJECUTADA y el veredicto contra la mejor puntuada. No rellena ceros: un valor sin
     ciclos declara ``cycles=[]`` y ``complete=False`` con su hueco.
+
+    ``best_scored_by_cycle`` (``cycleId -> {"bestScored", "anchor"}``) es la foto ANCLADA al
+    instante de cada ciclo. Sin anclaje para un ciclo se cae a ``best_scored`` (la última foto),
+    que es el comportamiento histórico: la ruta lo puebla siempre que puede fechar el ciclo.
     """
     estudio_ids: list[str] = []
     if isinstance(estudio, Mapping):
         raw_ids = estudio.get("instrumentIds")
         if isinstance(raw_ids, Sequence) and not isinstance(raw_ids, (str, bytes)):
             estudio_ids = [str(i) for i in raw_ids if i]
+
+    anchored = best_scored_by_cycle or {}
+
+    def _view(cycle: Mapping[str, Any]) -> dict[str, Any]:
+        entry = anchored.get(str(cycle.get("cycleId") or ""))
+        if isinstance(entry, Mapping):
+            return _cycle_view(
+                cycle,
+                best_scored=entry.get("bestScored"),
+                best_scored_anchor=entry.get("anchor"),
+            )
+        return _cycle_view(cycle, best_scored=best_scored)
 
     by_instrument: dict[str, list[Mapping[str, Any]]] = {}
     for cycle in cycles:
@@ -572,7 +627,7 @@ def build_chain_evidence_artifact(
     values: list[dict[str, Any]] = []
     for instrument_id in estudio_ids:
         raw_cycles = by_instrument.get(instrument_id, [])
-        cycle_views = [_cycle_view(cycle, best_scored=best_scored) for cycle in raw_cycles]
+        cycle_views = [_view(cycle) for cycle in raw_cycles]
         complete = bool(cycle_views) and all(view["chain"]["complete"] for view in cycle_views)
         values.append(
             {
@@ -595,7 +650,7 @@ def build_chain_evidence_artifact(
     # silencio; se declaran aparte como ciclos fuera del universo.
     estudio_set = set(estudio_ids)
     outside = [
-        _cycle_view(cycle, best_scored=best_scored)
+        _view(cycle)
         for instrument_id, raw in by_instrument.items()
         if instrument_id not in estudio_set
         for cycle in raw
@@ -649,16 +704,69 @@ def build_chain_evidence_artifact(
     }
 
 
-async def read_top3_snapshot(
+def _parse_instant(raw: Any) -> datetime | None:
+    """Instante tz-aware de una marca ISO (o ``None`` si no se puede afirmar)."""
+    if isinstance(raw, datetime):
+        return raw if raw.tzinfo is not None else raw.replace(tzinfo=UTC)
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _run_bar_instant(run_id: str, account_id: str) -> datetime | None:
+    """Instante de la barra que sella el ``run_id`` (``top3-<cuenta>-<barra ISO>``), o ``None``.
+
+    El productor ancla el ``run_id`` al inicio de la barra de decisión, así que el sufijo ES la
+    marca temporal de la foto. Si el id no declara una fecha legible, la foto no sirve de ancla
+    temporal y se declara como tal (``bar = None``).
+    """
+    prefix = f"top3-{account_id}-"
+    if not run_id.startswith(prefix):
+        return None
+    return _parse_instant(run_id[len(prefix) :])
+
+
+def _clean_identity_text(value: Any) -> str | None:
+    """Identidad declarada: texto sin blancos, o ``None`` (N-155-3: ``""`` no es identidad)."""
+    text = str(value).strip() if value is not None else ""
+    return text or None
+
+
+def _top3_row(row: Any, *, run_id: str) -> dict[str, Any]:
+    """Fila pública de una foto TOP3 (contrato estable + ``runId`` de su foto)."""
+    _run, rank, asset_id, combined, components, regime, preset, version = row
+    return {
+        "assetId": asset_id,
+        "rank": rank,
+        "combined": combined,
+        "components": dict(components or {}) if isinstance(components, Mapping) else components,
+        "regime": regime,
+        "strategyPresetKey": _clean_identity_text(preset),
+        "strategyVersion": _clean_identity_text(version),
+        # Foto de la que sale la fila: la UI puede decir CONTRA QUÉ foto se comparó.
+        "runId": run_id,
+    }
+
+
+async def read_top3_snapshots(
     session: Any,
     account_id: str,
-) -> dict[str, Any] | None:
-    """Lee (read-only) la foto durable MÁS RECIENTE del selector cross-asset del motor.
+) -> list[dict[str, Any]]:
+    """Lee (read-only) TODAS las fotos durables del selector cross-asset, la más nueva primero.
 
-    Devolve ``{"runId", "rows":[{assetId, rank, combined, components, regime,
-    strategyPresetKey, strategyVersion}]}`` o ``None`` si no hay ninguna foto (hueco declarado,
-    nunca una lista vacía disfrazada de medición). ``strategyPresetKey``/``strategyVersion``
-    (V2.88.153) viajan desde la fila; ``None`` cuando la foto no los declara (históricas).
+    Cada elemento es ``{"runId", "bar", "rows": [...]}`` donde ``bar`` es el instante de la
+    barra de decisión parseado del ``run_id`` (``top3-<cuenta>-<barra ISO>``) y ``rows`` las
+    filas de esa foto. Devuelve ``[]`` si no hay ninguna foto o si la lectura falla (el hueco se
+    declara aguas arriba; nunca una foto inventada).
+
+    Leer todas las fotos (y no solo la última) es lo que permite contrastar un ciclo con la
+    foto VIGENTE EN SU INSTANTE: comparar un ciclo antiguo con la última foto del día mezclaba
+    dos momentos y podía reportar una divergencia de estrategia que solo era de tiempo.
     """
     from sqlalchemy import select
 
@@ -682,28 +790,75 @@ async def read_top3_snapshot(
             )
         ).all()
     except Exception:  # noqa: BLE001 — sin foto el hueco se declara, nunca se finge.
-        return None
+        return []
     if not rows:
-        return None
-    newest_run = str(rows[0][0])
-    run_rows = [row for row in rows if str(row[0]) == newest_run]
-    return {
-        "runId": newest_run,
-        "rows": [
+        return []
+
+    grouped: dict[str, list[Any]] = {}
+    for row in rows:
+        grouped.setdefault(str(row[0]), []).append(row)
+
+    snapshots: list[dict[str, Any]] = []
+    for run_id, run_rows in grouped.items():
+        snapshots.append(
             {
-                "assetId": asset_id,
-                "rank": rank,
-                "combined": combined,
-                "components": dict(components or {})
-                if isinstance(components, Mapping)
-                else components,
-                "regime": regime,
-                "strategyPresetKey": str(preset).strip() if preset is not None else None,
-                "strategyVersion": str(version).strip() if version is not None else None,
+                "runId": run_id,
+                "bar": _run_bar_instant(run_id, account_id),
+                "rows": [_top3_row(row, run_id=run_id) for row in run_rows],
             }
-            for _run, rank, asset_id, combined, components, regime, preset, version in run_rows
-        ],
-    }
+        )
+    # Más nueva primero. Una foto cuyo ``run_id`` no se puede fechar va AL FINAL: no se puede
+    # afirmar que sea anterior a nada, así que no sirve de ancla temporal.
+    snapshots.sort(
+        key=lambda snap: (
+            snap["bar"] is not None,
+            snap["bar"] or datetime.min.replace(tzinfo=UTC),
+            snap["runId"],
+        ),
+        reverse=True,
+    )
+    return snapshots
+
+
+def snapshot_as_of(
+    snapshots: Sequence[Mapping[str, Any]] | None,
+    at: Any,
+) -> dict[str, Any] | None:
+    """(PURA) foto durable vigente en ``at``: la más reciente con ``bar <= at``, o ``None``.
+
+    ``None`` significa «no había ninguna foto publicada en ese instante» — un hueco declarado,
+    no una foto vacía. Sin instante de referencia tampoco se elige foto: no se puede afirmar
+    que la comparación sea contemporánea.
+    """
+    moment = _parse_instant(at)
+    if moment is None or not snapshots:
+        return None
+    for snap in snapshots:
+        if not isinstance(snap, Mapping):
+            continue
+        bar = snap.get("bar")
+        if isinstance(bar, datetime) and bar <= moment:
+            return dict(snap)
+    return None
+
+
+async def read_top3_snapshot(
+    session: Any,
+    account_id: str,
+) -> dict[str, Any] | None:
+    """Lee (read-only) la foto durable MÁS RECIENTE del selector cross-asset del motor.
+
+    Devolve ``{"runId", "rows":[{assetId, rank, combined, components, regime,
+    strategyPresetKey, strategyVersion, runId}]}`` o ``None`` si no hay ninguna foto (hueco
+    declarado, nunca una lista vacía disfrazada de medición). ``strategyPresetKey``/
+    ``strategyVersion`` (V2.88.153) viajan desde la fila; ``None`` cuando la foto no los declara
+    (históricas) o cuando la columna trae solo blancos (N-155-3: ``""`` no es una identidad).
+    """
+    snapshots = await read_top3_snapshots(session, account_id)
+    if not snapshots:
+        return None
+    newest = snapshots[0]
+    return {"runId": newest["runId"], "rows": [dict(row) for row in newest["rows"]]}
 
 
 async def read_dia_d_verifications(
@@ -888,9 +1043,15 @@ async def read_estudio_chain_evidence(
     """Lee la cadena durable completa por ciclo y la foto del selector (para ejecutada vs mejor).
 
     Reutiliza ``read_operational_monitor`` como fuente ÚNICA de los hechos durables (no hay un
-    segundo lector ni un segundo FIFO de P&L) y añade la foto ``top3_opportunities`` para
+    segundo lector ni un segundo FIFO de P&L) y añade las fotos ``top3_opportunities`` para
     contrastar con la mejor puntuada. Anota, además, la verificación DÍA-D de cada ciclo (el
     último eslabón). ``session`` es una ``AsyncSession`` de SQLAlchemy.
+
+    **Anclaje temporal (N-155-2).** Cada ciclo se compara con la foto VIGENTE EN SU INSTANTE
+    (la más reciente con barra ``<=`` la señal/entrada), no con la última del día: comparar dos
+    momentos distintos podía reportar una divergencia de estrategia que era solo de tiempo.
+    ``bestScoredByCycle`` publica la foto usada (o el motivo del hueco). La foto global se
+    conserva para la cabecera del artefacto.
     """
     monitor = await read_operational_monitor(
         session,
@@ -900,9 +1061,45 @@ async def read_estudio_chain_evidence(
         cycle_id=cycle_id,
         instrument_id=instrument_id,
     )
-    snapshot = None if cycle_id else await read_top3_snapshot(session, account_id)
+    snapshots = await read_top3_snapshots(session, account_id)
+    latest = snapshots[0] if snapshots else None
+    snapshot = (
+        None
+        if cycle_id
+        else ({"runId": latest["runId"], "rows": [dict(r) for r in latest["rows"]]} if latest else None)
+    )
 
     raw_cycles = monitor.get("cycles") or []
+    best_scored_by_cycle: dict[str, dict[str, Any]] = {}
+    for cycle in raw_cycles:
+        if not isinstance(cycle, Mapping):
+            continue
+        key = str(cycle.get("cycleId") or "")
+        if not key:
+            continue
+        entry_at = _cycle_anchor_instant(cycle)
+        anchored = snapshot_as_of(snapshots, entry_at)
+        best_scored_by_cycle[key] = {
+            "bestScored": best_scored_asset(anchored) if anchored is not None else None,
+            "anchor": {
+                "runId": anchored.get("runId") if anchored is not None else None,
+                "bar": _iso_instant(anchored.get("bar")) if anchored is not None else None,
+                "entryAt": entry_at,
+                "measurement": (
+                    MEASUREMENT_COMPLETE if anchored is not None else MEASUREMENT_UNKNOWN
+                ),
+                "reason": (
+                    None
+                    if anchored is not None
+                    else (
+                        "no_snapshot_at_or_before_entry"
+                        if entry_at is not None
+                        else "cycle_entry_at_not_durable"
+                    )
+                ),
+            },
+        }
+
     cycle_ids = [str(c.get("cycleId")) for c in raw_cycles if c.get("cycleId")]
     dia_d_by_cycle = await read_dia_d_verifications(
         session, account_id, cycle_ids=cycle_ids or None
@@ -918,6 +1115,7 @@ async def read_estudio_chain_evidence(
         "monitor": monitor,
         "cycles": cycles,
         "bestScored": best_scored_asset(snapshot),
+        "bestScoredByCycle": best_scored_by_cycle,
         "top3": snapshot,
         "diaDByCycle": dia_d_by_cycle,
     }

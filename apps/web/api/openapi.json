@@ -937,9 +937,15 @@
             ]
           },
           "direction": {
-            "default": "long",
-            "title": "Direction",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
           },
           "instrumentId": {
             "anyOf": [
@@ -951,6 +957,17 @@
               }
             ],
             "title": "Instrumentid"
+          },
+          "instrumentIdSource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentidsource"
           },
           "notes": {
             "items": {
@@ -969,6 +986,17 @@
               }
             ],
             "title": "Opportunityid"
+          },
+          "planId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planid"
           },
           "position": {
             "anyOf": [
@@ -989,6 +1017,17 @@
                 "type": "null"
               }
             ]
+          },
+          "signalId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signalid"
           },
           "steps": {
             "items": {
@@ -8156,6 +8195,17 @@
             ],
             "title": "Exitday"
           },
+          "planId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planid"
+          },
           "realizedR": {
             "anyOf": [
               {
@@ -8166,6 +8216,17 @@
               }
             ],
             "title": "Realizedr"
+          },
+          "signalId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signalid"
           },
           "strategyPresetKey": {
             "anyOf": [

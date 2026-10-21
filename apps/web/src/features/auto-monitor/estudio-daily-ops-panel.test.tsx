@@ -584,6 +584,27 @@ describe("EstudioDailyOpsPanel", () => {
     expect(link?.getAttribute("href")).toContain("symbol=AAA");
   });
 
+  it("atribuye el histórico por identidad cuando el ciclo publica planId/signalId", async () => {
+    const audit = structuredClone(AUDIT);
+    const cycle = audit.audit.values[0]!.cycles[0]!;
+    cycle.planId = "plan-1";
+    cycle.signalId = "sig-inst-1";
+    vi.mocked(api.getAutoEstudioAudit).mockResolvedValueOnce(audit as never);
+
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    const scope = aaa?.querySelector(
+      '[data-testid="estudio-daily-value-operation-scope"]',
+    );
+    // Gap 2: el contrato ya trae la identidad estable y la atribución deja de ser un hueco.
+    expect(scope?.getAttribute("data-attributed")).toBe("true");
+    expect(scope?.textContent).toContain(
+      "Vinculado por identidad (planId/signalId)",
+    );
+  });
+
   it("un fallo de la auditoría no se declara como «sin dato»", async () => {
     vi.mocked(api.getAutoEstudioAudit).mockRejectedValueOnce(
       new Error("audit caída"),

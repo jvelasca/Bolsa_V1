@@ -233,6 +233,45 @@ def _cycle_strategy_preset(entries: Sequence[Any]) -> str | None:
     return None
 
 
+def _cycle_signal_id(entries: Sequence[Any]) -> str | None:
+    """Gap 2 — ``signalId`` durable que originó la decisión del ciclo, o ``None``.
+
+    El productor ya lo sella en ``auto_entry_decision`` (``payload.signalId``); el read-model
+    lo descartaba y con ello la cadena ``señal → plan → ciclo → resultado`` no era seguible
+    desde la ejecución. Un valor ausente o en blanco se declara ``None`` (sin relleno).
+    """
+    for entry in entries:
+        if _get(entry, "event_type", "eventType") != AUTO_ENTRY_DECISION_EVENT:
+            continue
+        value = _entry_payload(entry).get("signalId")
+        text = str(value).strip() if value is not None else ""
+        if text:
+            return text
+    return None
+
+
+def _cycle_plan_id(entries: Sequence[Any]) -> str | None:
+    """Gap 2 — identidad del PLAN que originó el ciclo (``payload.tradePlan.decisionId``).
+
+    El ``TradePlan`` durable viaja anidado en la decisión y su ``decisionId`` es la identidad
+    estable del plan (``trade_plan.py``: ``decisionId``/``thesisId``). Se publica lo que el
+    hecho declara; si no hay plan o no trae id, el hueco es ``None``, nunca el ``decisionId``
+    de la decisión (que es OTRO eslabón, no el plan).
+    """
+    for entry in entries:
+        if _get(entry, "event_type", "eventType") != AUTO_ENTRY_DECISION_EVENT:
+            continue
+        payload = _entry_payload(entry)
+        plan = payload.get("tradePlan")
+        if not isinstance(plan, Mapping):
+            continue
+        value = plan.get("decisionId") or plan.get("decision_id")
+        text = str(value).strip() if value is not None else ""
+        if text:
+            return text
+    return None
+
+
 def _cycle_decision(entries: Sequence[Any]) -> dict[str, Any] | None:
     """F2-2 — DECISIÓN de cartera DURABLE del ciclo, o ``None`` si no hay hecho que la registre.
 
@@ -453,18 +492,30 @@ def _entry_decision_step(
                 facts.append(_fact("entry", plan.get("entry")))
             if plan.get("structuralStop") is not None:
                 facts.append(_fact("stop", plan.get("structuralStop")))
+    # Gap 2 — la identidad de atribución (``signalId``/``planId``) viaja ADITIVA en las etapas
+    # que la declaran. Se añade SOLO si la etapa ya tenía algún hecho, para no convertir un
+    # ``UNKNOWN`` en ``REACHED`` por un id: la atribución no es la prueba del paso.
+    if facts and step_id == "SIGNAL" and payload.get("signalId"):
+        facts.append(_fact("signalId", str(payload.get("signalId")).strip() or None))
+    if facts and step_id == "RISK":
+        plan_for_id = payload.get("tradePlan")
+        if isinstance(plan_for_id, Mapping):
+            raw_plan_id = plan_for_id.get("decisionId") or plan_for_id.get("decision_id")
+            plan_id_text = str(raw_plan_id).strip() if raw_plan_id is not None else ""
+            if plan_id_text:
+                facts.append(_fact("planId", plan_id_text))
     if not facts:
         return _step(step_id, state=STEP_UNKNOWN, measurement=MEASUREMENT_UNKNOWN, note=note_absent)
     return _step(step_id, state=STEP_REACHED, at=at, facts=facts)
 
 
-def _reservation_step(reservation: Any | None) -> dict[str, Any]:
+def _reservation_step(reservation: Any | None, *, note: str = "no_reservation_for_cycle") -> dict[str, Any]:
     if reservation is None:
         return _step(
             "RESERVATION",
             state=STEP_ABSENT,
             measurement=MEASUREMENT_UNKNOWN,
-            note="no_reservation_for_cycle",
+            note=note,
         )
     risk = _get(reservation, "reserved_risk", "reservedRisk")
     facts = [
@@ -844,31 +895,41 @@ def _protection_is_newer(candidate: Mapping[str, Any], current: Mapping[str, Any
     return candidate_at >= current_at
 
 
-def _entry_reservation(reservations: Sequence[Any]) -> Any | None:
-    """Reserva de ENTRADA del ciclo (``side='buy'``); sin entrada, la primera durable.
+def _is_exit_reservation(row: Any) -> bool:
+    """``True`` si la fila durable es la SALIDA del ciclo (``reservation_id='exit:<orderId>'``).
 
-    Desde V2.47 la SALIDA también declara ``cycle_id`` (para reconstruir el PnL
-    hacia atrás), así que un ciclo cerrado trae DOS reservas y el orden durable
-    (``list_recent_with_cycle``, DESC) pone la salida primero. La salida
-    (``reservation_id = 'exit:<orderId>'``, ``side='sell'``, sin ``strategy_version_id``)
-    NO puede gobernar la identidad del ciclo: publicaba ``direction='short'`` y
-    ``strategyVersion=None`` pese a que ambos hechos existían en la entrada. Se prefiere
-    la entrada; sin filas de entrada se conserva el orden histórico (nunca se inventa).
-
-    **Precondición declarada (sello .154):** AUTO 2.0 es **largo solamente** — abre con
-    ``BUY`` y reduce con ``SELL`` (``auto_simulation_worker``), así que la entrada SIEMPRE es
-    ``side='buy'``. Si algún día se abriesen cortos, la entrada sería ``sell`` y esta regla
-    elegiría la SALIDA (que sería ``buy``), invirtiendo ``direction``: el discriminador
-    correcto entonces sería la marca ``exit:<orderId>``, no el lado. No se cambia ahora
-    porque no hay ciclos cortos que leer y una regla sin caso que la ejerza sería una
-    segunda verdad sin prueba.
+    Desde V2.47 la salida también declara ``cycle_id``, así que un ciclo cerrado trae DOS
+    reservas. La marca del id es el discriminador ESTRUCTURAL (la pone el productor al
+    registrar la salida), independiente del lado: por eso se prefiere al ``side`` cuando hay
+    que decidir qué fila es la entrada.
     """
-    if not reservations:
-        return None
+    reservation_id = str(_get(row, "reservation_id", "reservationId") or "").strip()
+    return reservation_id.lower().startswith("exit:")
+
+
+def _entry_reservation(reservations: Sequence[Any]) -> Any | None:
+    """Reserva de ENTRADA del ciclo, o ``None`` si la ventana no trae ninguna.
+
+    La SALIDA (``reservation_id = 'exit:<orderId>'``, ``side='sell'``, sin
+    ``strategy_version_id``) NO puede gobernar la identidad del ciclo: con el fallback
+    histórico a ``reservations[0]`` un ciclo cuya entrada quedaba fuera de la ventana
+    publicaba ``direction='short'``, ``strategyVersion=None`` y el ``instrumentId`` de la
+    salida — un valor CONFIANZOSO derivado de un hecho que contradice la entrada.
+
+    Ahora sin fila de entrada se devuelve ``None``: la ausencia se declara (nota
+    ``entry_reservation_not_in_window``) y ``direction``/``strategyVersion`` viajan ``None``.
+    El discriminador es doble: la marca ``exit:<orderId>`` del id (estructural, la pone el
+    productor al registrar la salida) Y el lado ``buy`` — contrato del productor AUTO 2.0, que
+    es largo solamente (abre con ``BUY`` y reduce con ``SELL``). Es una precondición
+    DECLARADA: si algún día se abriesen cortos, la entrada sería ``sell`` y esta función
+    tendría que aprenderlo; no se implementa una regla sin caso que la ejerza.
+    """
     for row in reservations:
+        if _is_exit_reservation(row):
+            continue
         if str(_get(row, "side") or "").strip().lower() == "buy":
             return row
-    return reservations[0]
+    return None
 
 
 def _build_cycle(
@@ -886,6 +947,11 @@ def _build_cycle(
     duplicate_settlement: bool = False,
 ) -> dict[str, Any]:
     reservation = _entry_reservation(reservations)
+    # Primera fila durable de la ventana: fuente de ``instrumentId`` cuando la entrada no
+    # está en la ventana. Se declara de dónde sale (``instrumentIdSource``) para que el hueco
+    # de la reserva de entrada no quede disfrazado de hecho completo.
+    first_reservation = reservations[0] if reservations else None
+    entry_out_of_window = bool(reservations) and reservation is None
     cycle_journal = _journal_for_cycle(journal, cycle_id)
     cycle_fills = list(fills_by_cycle.get(cycle_id, ()))
     orders = list(orders_by_cycle.get(cycle_id, ()))
@@ -895,12 +961,22 @@ def _build_cycle(
     net, unclassified_fills = _net_open_qty(cycle_fills)
     is_open = net > 1e-9
     side = str(_get(reservation, "side") or "").strip().lower() if reservation else ""
+    # La DIRECCIÓN solo se afirma con el hecho de la reserva de ENTRADA. Sin ella (o con un
+    # lado no clasificable) viaja ``None``: nunca se deduce de la salida ni se asume ``long``.
+    direction = "long" if side == "buy" else ("short" if side == "sell" else None)
 
     steps = [
         _entry_decision_step("SIGNAL", cycle_journal, note_absent="signal_not_durable"),
         _entry_decision_step("TOP_N", cycle_journal, note_absent="top_n_not_durable"),
         _entry_decision_step("RISK", cycle_journal, note_absent="risk_not_durable"),
-        _reservation_step(reservation),
+        _reservation_step(
+            reservation,
+            note=(
+                "entry_reservation_not_in_window"
+                if entry_out_of_window
+                else "no_reservation_for_cycle"
+            ),
+        ),
         _order_step(orders, cycle_journal),
         _fill_step(cycle_fills, window_full=window_truncated),
         _protection_step(positions_by_cycle.get(cycle_id), protection),
@@ -921,6 +997,11 @@ def _build_cycle(
         # Se declara en el resumen del ciclo (no sólo en el paso): un settlement duplicado
         # es una CONTRADICCIÓN de la identidad del ciclo, no un detalle del paso.
         notes.append("duplicate_settlement_cycle")
+    if entry_out_of_window:
+        # El paso ``RESERVATION`` queda ``ABSENT`` (no ``UNKNOWN``), así que la nota no sube
+        # sola al resumen: se declara aquí que la ENTRADA no está en la ventana y que la
+        # dirección/versión del ciclo viajan ``None`` por ese hueco, no por no existir.
+        notes.append("entry_reservation_not_in_window")
     # ``closed`` deja de ser un booleano ciego: con la ventana truncada o un ``side`` no
     # clasificable no se puede AFIRMAR el cierre (el neto puede estar incompleto), así que
     # viaja ``None`` + ``PARTIAL``. Con la ventana completa se afirma True/False sin ambigüedad.
@@ -939,12 +1020,34 @@ def _build_cycle(
         # F2-1 — la traza durable de la POSICIÓN por operación (o ``None`` si el ciclo no la
         # materializó): la escalera no salta de un fill a «posición creada».
         "position": _cycle_position(cycle_journal, positions_by_cycle.get(cycle_id)),
-        "instrumentId": _get(reservation, "instrument_id", "instrumentId"),
-        "strategyVersion": _get(reservation, "strategy_version_id", "strategyVersionId"),
+        # ``instrumentId`` sale de la ENTRADA; sin ella se conserva el de la primera fila de la
+        # ventana para no perder el agrupamiento por valor, y ``instrumentIdSource`` declara
+        # que ese dato NO viene del hecho de entrada.
+        "instrumentId": _get(
+            reservation or first_reservation, "instrument_id", "instrumentId"
+        ),
+        "instrumentIdSource": (
+            "entry_reservation"
+            if reservation is not None
+            else ("reservation_in_window" if first_reservation is not None else None)
+        ),
+        # La versión de estrategia es un hecho de la ENTRADA: la salida no la declara y, si se
+        # leyera de ella, un ciclo con la entrada fuera de ventana publicaría ``None`` como si
+        # la estrategia no tuviera versión.
+        "strategyVersion": _get(
+            reservation, "strategy_version_id", "strategyVersionId"
+        ),
         # H1 — identidad EXACTA de la estrategia (preset), leída del hecho durable de la
         # decisión del ciclo (o ``None``): habilita la join exacta sin migración.
         "strategyPresetKey": _cycle_strategy_preset(cycle_journal),
-        "direction": "short" if side == "sell" else "long",
+        # N-155-1 — dirección: SOLO con la reserva de entrada. ``None`` es un hueco declarado
+        # (la UI lo rotula «Sin dato todavía»), nunca ``long`` por defecto.
+        "direction": direction,
+        # Gap 2 — atribución señal → plan: la identidad estable que el ciclo ya sella en el
+        # hecho durable de la decisión. Sin ella, la cadena desde la señal hasta el resultado
+        # no era seguible; ``None`` cuando el hecho no la declara (nunca se rellena).
+        "signalId": _cycle_signal_id(cycle_journal),
+        "planId": _cycle_plan_id(cycle_journal),
         "closed": closed_value,
         "closedMeasurement": closed_measurement,
         "steps": steps,

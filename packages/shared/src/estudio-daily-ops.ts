@@ -141,6 +141,11 @@ export type EstudioDailyValueV1 = {
   plan: EstudioDailyPlanV1 | null;
   whyNot: string[];
   strategy: EstudioDailyStrategyV1 | null;
+  /**
+   * H-145-1 — posición abierta en TRI-ESTADO. `true`/`false` con la lectura de posiciones
+   * respondida; `null`/ausente cuando no se pudo medir (NO es «sin posición»).
+   */
+  positionOpen?: boolean | null;
 };
 
 export type EstudioDailyReportV1 = {
@@ -246,6 +251,20 @@ export type EstudioChainCompareV1 = {
   measurement: MeasurementV1 | string;
   /** Medición de la IDENTIDAD (preset/versión), separada del veredicto rank/activo. */
   strategyMeasurement?: MeasurementV1 | string;
+  /**
+   * N-155-2 — foto TOP3 contra la que se comparó este ciclo (la vigente en su instante).
+   * `measurement=UNKNOWN` + `reason` declaran por qué no se pudo anclar; nunca se usa a ciegas
+   * la última foto del día.
+   */
+  anchor?: EstudioChainAnchorV1 | null;
+};
+
+export type EstudioChainAnchorV1 = {
+  runId: string | null;
+  bar: string | null;
+  entryAt: string | null;
+  measurement: MeasurementV1 | string;
+  reason: string | null;
 };
 
 export type EstudioChainExecutedVsDiaDV1 = {
@@ -268,6 +287,9 @@ export type EstudioChainCycleV1 = {
   direction: string | null;
   closed: boolean | null;
   opportunityId: string | null;
+  /** Gap 2 — atribución señal → plan que sella el ciclo (`null` = no consta). */
+  signalId?: string | null;
+  planId?: string | null;
   /** Día de ENTRADA durable (`at` de la reserva); `null` si la etapa no lo declara. */
   entryDay?: string | null;
   /** Día de cierre durable (`closedAt` del resultado); `null` si no se puede afirmar. */

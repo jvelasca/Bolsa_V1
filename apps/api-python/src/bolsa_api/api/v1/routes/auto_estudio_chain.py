@@ -136,6 +136,7 @@ async def get_auto_estudio_chain(
             estudio=estudio,
             cycles=read["cycles"],
             best_scored=read["bestScored"],
+            best_scored_by_cycle=read.get("bestScoredByCycle"),
             meta={
                 "engineId": resolved_engine,
                 "limit": int(limit),

@@ -318,3 +318,91 @@ async def test_propose_failure_marks_only_buy_values_as_error_and_never_as_ok() 
     assert by_id["inst-buy"].reason.startswith("propose_error:")
     assert by_id["inst-hold"].status == STATUS_NO_SIGNAL
     assert any("propose no disponible" in note for note in report.notes)
+
+
+# ── H-145-1/H-145-2: huecos de lectura DECLARADOS (nunca «sin posición») ─────────────
+
+
+class _BrokenPositions:
+    async def list_open_for_account(self, account_id: str) -> list[Any]:
+        raise RuntimeError("posiciones ilegibles")
+
+
+class _BrokenComposite:
+    async def execute_chips(self, instrument_ids: list[str], **_: Any) -> list[dict[str, Any]]:
+        raise RuntimeError("composite caído")
+
+
+class _BrokenFundamentals:
+    async def execute_chips(self, instrument_ids: list[str], **_: Any) -> list[dict[str, Any]]:
+        raise RuntimeError("fundamentales caídos")
+
+
+@pytest.mark.asyncio
+async def test_a_failed_positions_read_is_declared_unknown_not_closed() -> None:
+    """H-145-1 — un fallo de lectura publicaba ``position_open=False`` («sin posición»)."""
+    rows = {"inst-1": _Opinion("inst-1", "hold_watch", 2)}
+    service = RunEstudioDailyOps(
+        _FakeEstudioList(list(rows)),
+        _FakeOpinions(rows),
+        _FakePropose({"hits": [], "skipped": []}),
+        composite=_FakeComposite(),
+        fundamentals=_FakeFundamentals(),
+        positions=_BrokenPositions(),
+    )
+    report = await service.execute(account_id="acc-1", as_of=_DAY)
+    payload = report.to_dict()
+    value = payload["values"][0]
+    assert value["positionOpen"] is None
+    assert "positions_unavailable" in payload["notes"]
+    # Δ decisión = 0: el motor de dictamen sigue recibiendo ``False`` (no se toca el stance).
+    assert value["status"] == STATUS_NO_SIGNAL
+
+
+@pytest.mark.asyncio
+async def test_a_measured_positions_read_publishes_the_boolean() -> None:
+    """Con la lectura de posiciones respondida el tri-estado baja a booleano medido."""
+    rows = {
+        "inst-open": _Opinion("inst-open", "hold_watch", 2),
+        "inst-flat": _Opinion("inst-flat", "hold_watch", 2),
+    }
+    service = RunEstudioDailyOps(
+        _FakeEstudioList(list(rows)),
+        _FakeOpinions(rows),
+        _FakePropose({"hits": [], "skipped": []}),
+        composite=_FakeComposite(),
+        fundamentals=_FakeFundamentals(),
+        positions=_FakePositions(["inst-open"]),
+    )
+    report = await service.execute(account_id="acc-1", as_of=_DAY)
+    by_id = {value["instrumentId"]: value for value in report.to_dict()["values"]}
+    assert by_id["inst-open"]["positionOpen"] is True
+    assert by_id["inst-flat"]["positionOpen"] is False
+    assert "positions_unavailable" not in report.notes
+
+
+@pytest.mark.asyncio
+async def test_failed_chip_chunks_are_declared_instead_of_silenced() -> None:
+    """H-145-2 — los chips caídos se declaran con cuántos ids quedaron sin el indicador."""
+    rows = {
+        "inst-1": _Opinion("inst-1", "buy", 4),
+        "inst-2": _Opinion("inst-2", "hold_watch", 2),
+    }
+    service = RunEstudioDailyOps(
+        _FakeEstudioList(list(rows)),
+        _FakeOpinions(rows),
+        _FakePropose({"hits": [], "skipped": []}),
+        composite=_BrokenComposite(),
+        fundamentals=_BrokenFundamentals(),
+        positions=_FakePositions([]),
+    )
+    report = await service.execute(account_id="acc-1", as_of=_DAY)
+    # El batch NO se cae: los chips son hints, no la señal.
+    assert report.status == "ok"
+    assert len(report.values) == 2
+    assert "composite_chips_unavailable:2_ids" in report.notes
+    assert "fundamentals_chips_unavailable:2_ids" in report.notes
+    # El hueco del chip no se convierte en un 0 fabricado: los indicadores viajan None.
+    value = next(v for v in report.to_dict()["values"] if v["instrumentId"] == "inst-1")
+    assert value["indicators"]["io"] is None
+    assert value["indicators"]["fa"] is None

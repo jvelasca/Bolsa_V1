@@ -113,8 +113,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             estudio=estudio,
             cycles=read["cycles"],
             best_scored=read["bestScored"],
+            best_scored_by_cycle=read.get("bestScoredByCycle"),
             meta={
-                "bump": "2.11.155-beta",
+                "bump": "2.11.156-beta",
                 "phase": "V2.99 AUTO ESTUDIO CHAIN EVIDENCE",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),

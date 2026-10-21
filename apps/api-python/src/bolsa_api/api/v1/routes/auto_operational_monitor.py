@@ -93,11 +93,20 @@ class AutoMonitorCycleDto(BaseModel):
     decision: AutoMonitorCycleDecisionDto | None = None
     position: AutoMonitorCyclePositionDto | None = None
     instrumentId: str | None = None
+    # Declara de dónde sale ``instrumentId``: de la reserva de ENTRADA o, si esa no está en
+    # la ventana de lectura, de otra fila (``reservation_in_window``). No es decorativo: con
+    # la entrada fuera de ventana el ciclo ya no afirma dirección ni versión.
+    instrumentIdSource: str | None = None
     strategyVersion: str | None = None
     # H1 — identidad EXACTA de la estrategia (``preset_key``): la clave de la join exacta,
     # aditiva al read-model (``strategyPresetKey``), ``None`` cuando la fuente no la declara.
     strategyPresetKey: str | None = None
-    direction: str = "long"
+    # Gap 2 — atribución señal → plan sellada en la decisión durable (``None`` = no consta).
+    signalId: str | None = None
+    planId: str | None = None
+    # ``None`` cuando no hay reserva de ENTRADA en la ventana: la dirección NO se deduce de la
+    # salida ni se asume ``long`` (N-155-1). La UI lo rotula «Sin dato todavía».
+    direction: str | None = None
     # ``closed`` es nullable: con la ventana de fills truncada no se puede AFIRMAR el cierre.
     # ``None`` + ``closedMeasurement`` (PARTIAL/UNKNOWN) declara el hueco; la UI lo rotula.
     closed: bool | None = None

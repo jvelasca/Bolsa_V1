@@ -163,6 +163,8 @@ async def _read_evidence(
         estudio={"status": "ok", "instrumentIds": list(study_instruments)},
         cycles=read["cycles"],
         best_scored=read["bestScored"],
+        # N-155-2 — la foto ANCLADA al instante de cada ciclo (no la última del día).
+        best_scored_by_cycle=read.get("bestScoredByCycle"),
     )
 
 
@@ -515,6 +517,11 @@ async def _assert_complete_chain(
     assert str(payload.get("strategyVersion") or "") == _IDENTITY_VERSION
     assert str(payload.get("signalId") or "").strip(), f"la señal debe estar identificada: {payload}"
     assert str(payload.get("opportunityId") or "").strip(), payload
+    # Gap 2 — la atribución señal → plan llega al DTO del ciclo (no se queda en el journal).
+    assert cycle["signalId"] == str(payload.get("signalId") or "").strip(), cycle["signalId"]
+    trade_plan = payload.get("tradePlan")
+    if isinstance(trade_plan, dict) and trade_plan.get("decisionId"):
+        assert cycle["planId"] == str(trade_plan["decisionId"]), cycle["planId"]
     # El plan nace de la MISMA decisión (``thesis_id = decision_id`` en ``_build_trade_plan``).
     assert entry_rows[0].instrument_id == instrument_id
 
@@ -529,6 +536,12 @@ async def _assert_complete_chain(
     # no canoniza símbolos, pero aquí ambos lados son el id (la foto colapsa a ``_base_symbol``
     # del ``instrument_id``), así que la identidad de activo coincide sin ambigüedad.
     assert compare["executedIsBestScoredAsset"] is True, compare
+    # N-155-2 — la comparación se ancla a una foto VIGENTE y lo declara.
+    anchor = compare["anchor"]
+    assert anchor["measurement"] == "COMPLETE", anchor
+    assert anchor["runId"] == best["runId"], anchor
+    assert anchor["entryAt"] is not None, anchor
+    assert anchor["reason"] is None, anchor
 
     # 6) LECTURA DEL MONITOR — la identidad del ciclo es la de la foto (una sola verdad).
     async with factory() as session:
@@ -611,6 +624,84 @@ async def _assert_complete_chain(
     assert await _gross_notional(factory, account_id) > 0, (
         "el día debe mover notional bruto > 0; si no, la conciliación no dice nada"
     )
+
+
+# ── N-155-2 — la foto se ancla al instante del ciclo, no a la última del día ────────
+
+
+@pytest.mark.asyncio
+async def test_cycle_comparison_uses_the_photo_in_force_at_the_entry_pg(
+    identity_pg_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Una foto POSTERIOR a la entrada no puede reescribir el contraste del ciclo.
+
+    Se publica una segunda foto TOP3 con una barra futura (ganadora distinta): la cabecera
+    pasa a mostrar esa foto, pero el ciclo debe seguir comparándose con la que estaba
+    vigente cuando entró y declararlo en ``executedVsBest.anchor``.
+    """
+    from bolsa_application.auto_chain_durable_reader import read_top3_snapshots
+    from bolsa_infrastructure.database.repositories.top3_opportunity_repository import (
+        SqlAlchemyTop3OpportunityRepository,
+        Top3OpportunityInput,
+    )
+
+    state = await _drive_cycle(
+        identity_pg_factory,
+        monkeypatch,
+        source=_IDENTITY_SOURCE,
+        prefix="inst-idch-",
+    )
+    try:
+        account_id = state["accountId"]
+        instrument_id = state["instrumentId"]
+        before = await _read_evidence(
+            identity_pg_factory,
+            account_id=account_id,
+            engine_id=state["engineId"],
+            study_instruments=[instrument_id],
+        )
+        cycle_before = await _only_cycle(before, instrument_id)
+        initial_run = cycle_before["executedVsBest"]["anchor"]["runId"]
+        assert initial_run is not None
+        assert cycle_before["executedVsBest"]["bestScoredAssetId"] == instrument_id
+
+        # Foto POSTERIOR con otra ganadora: no puede gobernar la comparación del ciclo.
+        future_bar = "2099-01-01T00:00:00+00:00"
+        async with identity_pg_factory() as session:
+            await SqlAlchemyTop3OpportunityRepository(session).save(
+                [
+                    Top3OpportunityInput(
+                        run_id=f"top3-{account_id}-{future_bar}",
+                        rank=1,
+                        asset_id="future-winner",
+                        combined=0.99,
+                        components={},
+                        regime="range",
+                        strategy_preset_key="other_preset",
+                        strategy_version="v-future",
+                    )
+                ]
+            )
+            snapshots = await read_top3_snapshots(session, account_id)
+        assert snapshots[0]["runId"] == f"top3-{account_id}-{future_bar}"
+
+        after = await _read_evidence(
+            identity_pg_factory,
+            account_id=account_id,
+            engine_id=state["engineId"],
+            study_instruments=[instrument_id],
+        )
+        cycle_after = await _only_cycle(after, instrument_id)
+        comparison = cycle_after["executedVsBest"]
+        assert comparison["anchor"]["runId"] == initial_run, comparison["anchor"]
+        assert comparison["bestScoredAssetId"] == instrument_id, comparison
+        assert comparison["presetMatch"] is True, comparison
+        # La cabecera sí publica la foto más reciente (es la global, no la del ciclo).
+        assert after["bestScored"]["runId"] == f"top3-{account_id}-{future_bar}"
+        assert after["bestScored"]["assetId"] == "future-winner"
+    finally:
+        await _teardown(identity_pg_factory, state)
 
 
 # ── Control NEGATIVO — identidad a medias: PARTIAL, nunca COMPLETE ──────────────────

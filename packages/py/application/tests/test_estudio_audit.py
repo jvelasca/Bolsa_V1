@@ -236,8 +236,25 @@ def test_cycles_are_listed_per_value_ordered_by_cycle_id() -> None:
         "exitDay": "2026-04-02",
         "strategyPresetKey": "sma_crossover",
         "strategyVersion": "ver-1",
+        # Gap 2 — sin atribución declarada el hueco es ``None`` (nunca se inventa).
+        "signalId": None,
+        "planId": None,
         "realizedR": -0.3,
     }
+    # Gap 2 — cuando el ciclo de origen declara la identidad, se copia al artefacto.
+    with_ids = build_estudio_audit_report(
+        values=[_value("ACS")],
+        cycles=[
+            {
+                **_cycle("ACS", preset="sma_crossover", r=-0.3, cycle_id="cyc-a"),
+                "signalId": "sig-1",
+                "planId": "plan-1",
+            }
+        ],
+    )
+    cycle_row = with_ids.values[0]["cycles"][0]
+    assert cycle_row["signalId"] == "sig-1"
+    assert cycle_row["planId"] == "plan-1"
     # El orden es determinista bajo permutación de entrada (mismo estado ⇒ mismo payload).
     permuted = build_estudio_audit_report(
         values=[_value("ACS")],

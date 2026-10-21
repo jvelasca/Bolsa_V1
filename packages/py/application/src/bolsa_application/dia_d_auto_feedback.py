@@ -538,6 +538,8 @@ def _normalize_cycle_row(row: Mapping[str, Any]) -> dict[str, Any]:
     if preset is None:
         preset = row.get("presetKey")
     preset_text = None if preset is None else str(preset).strip() or None
+    signal_id = row.get("signalId")
+    plan_id = row.get("planId")
     return {
         "cycleId": cycle_id,
         "symbol": str(row.get("symbol") or "").strip(),
@@ -545,6 +547,10 @@ def _normalize_cycle_row(row: Mapping[str, Any]) -> dict[str, Any]:
         "exitDay": normalize_day(row.get("exitDay")) or None,
         "strategyVersion": str(version) if version is not None else None,
         "strategyPresetKey": preset_text,
+        # Gap 2 — atribución señal → plan: se COPIA si el ciclo de origen la declara; ausente
+        # ⇒ ``None`` (hueco declarado). No se re-deriva del símbolo ni del día.
+        "signalId": None if signal_id is None else str(signal_id).strip() or None,
+        "planId": None if plan_id is None else str(plan_id).strip() or None,
         "realizedR": finite_number(row.get("realizedR")),
     }
 

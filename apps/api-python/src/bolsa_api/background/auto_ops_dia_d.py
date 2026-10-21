@@ -247,6 +247,13 @@ class _ProgressPublisher:
     async def tick(self) -> None:
         last, offset = _read_last_progress(self._path, self._offset)
         if last is None:
+            # Sin línea de progreso todavía (arranque del proceso: imports, carga de barras) el
+            # job sigue VIVO y el latido DEBE renovarse igual. Antes se retornaba sin tocar
+            # ``heartbeat_at``: un arranque más largo que ``stale_after_seconds`` hacía que otro
+            # worker reclamara el job como obsoleto y lo ejecutara por segunda vez (H-145-4).
+            async with self._session_factory() as session:
+                await SqlAlchemyAutoOpsJobRepository(session).touch(self._job_id)
+                await session.commit()
             return
         self._offset = offset
         if last == self._last:

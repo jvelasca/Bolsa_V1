@@ -412,6 +412,26 @@ def test_cycle_index_is_sorted_deduped_and_keeps_only_rows_with_cycle_id() -> No
     assert [row["cycleId"] for row in index] == ["cyc-a", "cyc-b"]
     assert index[0]["symbol"] == "AAA"
     assert index[0]["realizedR"] == -0.5
+    # Gap 2 — sin atribución declarada el hueco es ``None`` (nunca se inventa).
+    assert index[0]["signalId"] is None
+    assert index[0]["planId"] is None
+
+
+def test_cycle_index_copies_the_signal_to_plan_attribution_when_declared() -> None:
+    """Gap 2 — la identidad estable se COPIA del ciclo de origen, no se re-deriva."""
+    index = build_cycle_index(
+        [
+            {
+                "cycleId": "cyc-a",
+                "symbol": "AAA",
+                "entryDay": "2026-09-30",
+                "signalId": " sig-1 ",
+                "planId": "plan-1",
+            }
+        ],
+    )
+    assert index[0]["signalId"] == "sig-1"
+    assert index[0]["planId"] == "plan-1"
 
 
 def test_cycle_index_drops_cycles_outside_the_window() -> None:
