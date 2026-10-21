@@ -16,7 +16,7 @@ All notable releases of Bolsa V1.
 
 **DÍA-D real · atribución sellada detrás de un flag.** `RoundTrip` gana `signal_id`/`plan_id` y `OpenPosition` gana `cycle_id`/`signal_id`/`plan_id`; `to_dict(include_attribution=False)` **no añade claves** (el artefacto de `replay-repro` no cambia) y con `True` publica `signalId`/`planId`. `v2_87` captura `cycleId → {signalId, planId}` al **nacer** la posición solo con `capture_cycle_attribution=True` (default `False`); `v2_89` lo enciende y `_oos_for_day` copia las filas al artefacto DÍA-D. Los artefactos históricos **no se backfillean**.
 
-**H-145-5 · tope de intentos.** `claim_next(max_attempts=5)` filtra `attempt < max_attempts` y `fail_exhausted` cierra los jobs abandonados con `attempt >= max_attempts` y `error="max_attempts_exceeded:<n>"`; un `running` con latido vivo no se toca. Configurable por `AUTO_OPS_JOB_MAX_ATTEMPTS` (default 5).
+**H-145-5 · tope de intentos.** `claim_next(max_attempts=5)` filtra `attempt < max_attempts` y `fail_exhausted` cierra los jobs abandonados con `attempt >= max_attempts` y `error="max_attempts_exceeded:<n>"`; un `running` con latido vivo no se toca. Configurable por `AUTO_OPS_JOB_MAX_ATTEMPTS` (default 5). El test PG (`test_auto_ops_job_attempt_cap_pg.py`) corre en el paso dedicado de `lifecycle-pg` con `AUTO_OPS_JOB_ATTEMPT_CAP_PG_REQUIRED=1` y guard anti-skip, y queda en el `--ignore` de los jobs sin PostgreSQL.
 
 **R-4 · `signalId` en blanco.** `clean_signal = str(payload.get("signalId") or "").strip()`: sin identidad real no se añade el hecho `SIGNAL` ni se publica `""` como identidad.
 

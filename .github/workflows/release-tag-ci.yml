@@ -1002,6 +1002,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py
           --ignore=apps/api-python/tests/test_auto_daily_coverage_pg.py
           --ignore=apps/api-python/tests/test_auto_dia_d_trace_pg.py
+          --ignore=apps/api-python/tests/test_auto_ops_job_attempt_cap_pg.py
           --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
           --ignore=apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
@@ -1197,6 +1198,12 @@ jobs:
       # de la medición con su control negativo (``PARTIAL``, nunca ``COMPLETE``). Un skip
       # mudo invalidaría la certificación; su paso dedicado lleva guard anti-skip.
       AUTO_IDENTITY_CHAIN_PG_REQUIRED: '1'
+      # H-145-5 (2026-10-21): el TOPE DE INTENTOS de ``auto_ops_jobs``
+      # (``test_auto_ops_job_attempt_cap_pg.py``) exige PG real para demostrar que un job
+      # abandonado se cierra ``failed`` con ``max_attempts_exceeded:<n>`` en vez de
+      # reclamarse para siempre, y que un ``running`` con latido VIVO no se toca (control
+      # negativo). Un skip mudo invalidaría la certificación; su paso lleva guard anti-skip.
+      AUTO_OPS_JOB_ATTEMPT_CAP_PG_REQUIRED: '1'
       # v111 (remediación de la auditoría): las ALERTAS DE SEÑAL se certifican sobre PG real —
       # el claim atómico por ``(suscripción, barra)`` (worker vs. evaluación manual no pueden
       # despachar dos veces), el OUTBOX ``alert_deliveries`` (PENDING → DELIVERED |
@@ -1522,7 +1529,11 @@ jobs:
       # DÍA-D copiada del ciclo → P&L conciliado contra el libro aplicado. Su control negativo
       # fija el TRI-ESTADO (``PARTIAL`` sin ``::preset``, ``presetMatch=None``, nunca un
       # ``False`` inventado). Al mismo paso dedicado con guard anti-skip.
-      - name: Pytest AUTO universe coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window + ESTUDIO chain + identity battery (PG, fail if skipped)
+      # H-145-5 (2026-10-21): el TOPE DE INTENTOS de ``auto_ops_jobs``
+      # (``test_auto_ops_job_attempt_cap_pg.py``) se certifica aquí: con PG real, N reclamos
+      # dejan el job en ``failed``/``max_attempts_exceeded:<n>`` y un ``running`` con latido
+      # vivo NO se toca. El guard anti-skip de este paso cubre también ese fichero.
+      - name: Pytest AUTO universe coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window + ESTUDIO chain + identity battery + attempt cap (PG, fail if skipped)
         run: |
           set -o pipefail
           uv run pytest \
@@ -1533,9 +1544,10 @@ jobs:
             apps/api-python/tests/test_paper_window_certification_pg.py \
             apps/api-python/tests/test_auto_estudio_chain_evidence_pg.py \
             apps/api-python/tests/test_auto_identity_chain_battery_pg.py \
+            apps/api-python/tests/test_auto_ops_job_attempt_cap_pg.py \
             -q --tb=short -rs | tee /tmp/auto-dia-d-pg.log
 
-      - name: Fail on skipped AUTO universe coverage / DÍA-D trace / daily watch / PAPER window / ESTUDIO chain / identity battery (no skip silencioso)
+      - name: Fail on skipped AUTO universe coverage / DÍA-D trace / daily watch / PAPER window / ESTUDIO chain / identity battery / attempt cap (no skip silencioso)
         if: always()
         run: |
           if [ ! -s /tmp/auto-dia-d-pg.log ]; then

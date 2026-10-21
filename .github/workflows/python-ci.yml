@@ -441,6 +441,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py
           --ignore=apps/api-python/tests/test_auto_daily_coverage_pg.py
           --ignore=apps/api-python/tests/test_auto_dia_d_trace_pg.py
+          --ignore=apps/api-python/tests/test_auto_ops_job_attempt_cap_pg.py
           --ignore=apps/api-python/tests/test_dia_d_cycle_verification_pg.py
           --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
           --ignore=apps/api-python/tests/test_auto_fill_cycle_seal_pg.py

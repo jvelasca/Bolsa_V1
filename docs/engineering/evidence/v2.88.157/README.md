@@ -152,7 +152,10 @@ El default sigue `False`, por lo que el replay congelado no cambia. `v2_89` lo e
 `claim_next(max_attempts=5)` filtra `attempt < max_attempts` y `fail_exhausted` cierra los
 `queued`/`running` abandonados con `attempt >= max_attempts` (`error="max_attempts_exceeded:<n>"`).
 Un `running` con latido vivo **no se toca**. [`config.py`](../../../../packages/py/infrastructure/src/bolsa_infrastructure/config.py)
-expone `AUTO_OPS_JOB_MAX_ATTEMPTS` (default 5) y el worker lo pasa.
+expone `AUTO_OPS_JOB_MAX_ATTEMPTS` (default 5) y el worker lo pasa. El test PG
+(`test_auto_ops_job_attempt_cap_pg.py`) está cableado al paso dedicado de `lifecycle-pg` con
+`AUTO_OPS_JOB_ATTEMPT_CAP_PG_REQUIRED=1` y el guard anti-skip del job; además queda en el
+`--ignore` de los jobs sin PostgreSQL para que no skipee en mudo.
 
 ## 8. R-4 — `signalId` en blanco no es identidad
 
