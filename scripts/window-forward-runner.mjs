@@ -17,7 +17,8 @@
  *   node scripts/window-forward-runner.mjs preflight
  *   node scripts/window-forward-runner.mjs run-day [--force] [--skip-api-check]
  *   node scripts/window-forward-runner.mjs status
- *   node scripts/window-forward-runner.mjs task:install [--at 18:00]
+ *   node scripts/window-forward-runner.mjs sync-bars
+ *   node scripts/window-forward-runner.mjs task:install [--at 18:30] [--bars-at 17:40]
  *   node scripts/window-forward-runner.mjs task:remove
  *   node scripts/window-forward-runner.mjs --dry-run run-day
  *
@@ -86,7 +87,18 @@ const SCRIPT_EVIDENCE =
   "apps/api-python/scripts/v2_100_operational_certification_evidence.py";
 
 const TASK_NAME = "BolsaV1_WindowForward";
-const DEFAULT_TASK_TIME = "18:00";
+//: V2.88.158 — la ventana se movio de 18:00 a 18:30. Motivo medido (2026-10-21): con
+//: `AUTO_ENGINE_SIM_REAL_PRICE=1` el productor exige la barra del dia B en `ohlcv_bars`;
+//: el cierre es a las 17:35 y el worker de auto-sync del API (scan cada 30 min, 1
+//: instrumento por tick ~18 s) tarda ~24 min en drenar 80 simbolos. A las 18:00 la
+//: cobertura era 1/80 ⇒ `OhlcvPriceSource.execution()` None ⇒ todo HOLD ⇒ 0 fills.
+const DEFAULT_TASK_TIME = "18:30";
+//: V2.88.158 — tarea de INGESTA previa: encola los instrumentos con diarias desfasadas
+//: (`POST /api/sync/queue/enqueue-stale`) y deja que el worker del API los drene antes
+//: del run-day. Sin esta pieza la cadencia dependia de que el escaneo de 30 min del API
+//: cayera justo entre el cierre y el run.
+const BARS_TASK_NAME = "BolsaV1_BarsSync";
+const DEFAULT_BARS_TIME = "17:40";
 //: v2.88.142 — vigía diario: tarea INDEPENDIENTE del stack dev, después del run-day.
 const WATCH_TASK_NAME = "BolsaV1_WindowWatch";
 const DEFAULT_WATCH_TIME = "20:20";
@@ -108,8 +120,10 @@ function parseArgs(argv) {
     json: false,
     noPersist: false,
     noWatch: false,
+    noBars: false,
     at: null,
     watchAt: null,
+    barsAt: null,
     lookbackDays: null,
     help: false,
   };
@@ -125,11 +139,17 @@ function parseArgs(argv) {
     else if (arg === "--json") flags.json = true;
     else if (arg === "--no-persist") flags.noPersist = true;
     else if (arg === "--no-watch") flags.noWatch = true;
+    else if (arg === "--no-bars") flags.noBars = true;
     else if (arg === "--help" || arg === "-h") flags.help = true;
     else if (arg === "--at") {
       flags.at = argv[i + 1] ?? null;
       i += 1;
     } else if (arg.startsWith("--at=")) flags.at = arg.slice("--at=".length);
+    else if (arg === "--bars-at") {
+      flags.barsAt = argv[i + 1] ?? null;
+      i += 1;
+    } else if (arg.startsWith("--bars-at="))
+      flags.barsAt = arg.slice("--bars-at=".length);
     else if (arg === "--watch-at") {
       flags.watchAt = argv[i + 1] ?? null;
       i += 1;
@@ -159,13 +179,19 @@ Comandos:
                             ownership que run-day). Nunca borra un PID vivo de este host: si hay un
                             run en curso, deniega (exit 1). --force solo fuerza un lock ajeno con TTL
                             fresco o un lock ilegible; para un PID vivo, mata el proceso.
+  sync-bars                 Encola en el API los instrumentos con diarias desfasadas
+                            (POST /api/sync/queue/enqueue-stale) y deja que el worker del API las
+                            drene. Existe porque con AUTO_ENGINE_SIM_REAL_PRICE=1 el forward marca
+                            con la APERTURA de la barra del dia: sin ella todo cae a HOLD y el dia
+                            se mide con 0 fills (medido 2026-10-21: 1/80 barras).
   watch [--lookback-days N] Vigia diario (v2.88.142): evalua el dia + arrastre de dias perdidos y
                             AVISA (log + email). NO toca la ventana; deja latido en
                             operability_runs/window-runs/day-watch.json. Exit 0 sin aviso, 3 con aviso.
                             Corre sin el stack dev (su tarea programada es independiente).
-  task:install [--at HH:MM] [--watch-at HH:MM]
-                            Registra las tareas diarias de Windows (schtasks): run-day (18:00) y
-                            vigia (20:20). --no-watch registra solo el run-day. Opcional.
+  task:install [--at HH:MM] [--bars-at HH:MM] [--watch-at HH:MM]
+                            Registra las tareas diarias de Windows (schtasks): ingesta (17:40),
+                            run-day (18:30) y vigia (20:20). --no-bars / --no-watch registran solo
+                            el resto. Opcional.
   task:remove               Elimina las tareas diarias de Windows.
 
 Flags:
@@ -375,6 +401,82 @@ async function apiReady() {
       url,
       error: error instanceof Error ? error.message : String(error),
     };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ingesta de barras (V2.88.158)
+// ---------------------------------------------------------------------------
+
+/**
+ * `sync-bars` — encola los instrumentos con diarias desfasadas en el API
+ * (`POST /api/sync/queue/enqueue-stale`). El worker de auto-sync del API
+ * (`bolsa_api.background.auto_sync_worker`, dentro de `scheduler_worker`) drena la cola a
+ * razon de 1 instrumento por tick (15 s) + `min_delay_seconds`, de modo que 80 simbolos
+ * rondan 24 min. Por eso esta tarea va a las 17:40 y el run-day a las 18:30.
+ *
+ * Motivo (medido 2026-10-21): con `AUTO_ENGINE_SIM_REAL_PRICE=1` el productor marca con la
+ * APERTURA de la barra del dia B. Si esa barra no esta en `ohlcv_bars`,
+ * `OhlcvPriceSource.execution()` devuelve `None`, el motor cae a HOLD fail-closed y el dia
+ * se mide con 0 fills/0 ciclos. A las 12:15 la cobertura era 1/80.
+ *
+ * Es idempotente: `enqueue-stale` solo encola lo que ya esta `stale`/`empty`/`error`.
+ * exit 0 = encolado (o nada que encolar); exit 1 = el API no respondio o respondio error.
+ */
+async function cmdSyncBars(flags) {
+  const port = process.env.API_PYTHON_PORT || process.env.API_PORT || "8000";
+  const url =
+    process.env.WINDOW_SYNC_ENQUEUE_URL ||
+    `http://127.0.0.1:${port}/api/sync/queue/enqueue-stale`;
+  if (flags.dryRun) {
+    console.log(`POST ${url}`);
+    return 0;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 60_000);
+  // Auth OFF en este entorno (`APP_PASSWORD` ausente ⇒ el middleware deja pasar). Si el
+  // operador enciende auth mas adelante, la tarea admite un JWT explicito por entorno; sin
+  // el, el API responde 401 y esto falla DECLARADO (exit 1), no en silencio.
+  const token = (process.env.WINDOW_SYNC_TOKEN || "").trim();
+  const headers = { accept: "application/json" };
+  if (token) headers.authorization = `Bearer ${token}`;
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers,
+    });
+    const text = (await response.text()).trim();
+    if (!response.ok) {
+      const hint =
+        response.status === 401
+          ? " (auth ON: define WINDOW_SYNC_TOKEN para la tarea)"
+          : "";
+      logError(
+        SCOPE,
+        `sync-bars: el API respondio ${response.status}${hint}: ${text.slice(0, 300)}`,
+      );
+      return 1;
+    }
+    logInfo(
+      SCOPE,
+      `sync-bars: encolado aceptado (${response.status})${text ? `: ${text.slice(0, 300)}` : ""}`,
+    );
+    logInfo(
+      SCOPE,
+      "sync-bars: el worker del API drena ~1 instrumento/tick; el run-day de las " +
+        `${DEFAULT_TASK_TIME} exige la barra del dia ya persistida`,
+    );
+    return 0;
+  } catch (error) {
+    logError(
+      SCOPE,
+      `sync-bars: no se pudo llamar al API (${url}): ` +
+        `${error instanceof Error ? error.message : String(error)}`,
+    );
+    return 1;
   } finally {
     clearTimeout(timer);
   }
@@ -1313,6 +1415,11 @@ function watchWrapperPath() {
   return join(ROOT, RUNS_DIR, "window-watch-task.cmd");
 }
 
+/** Ruta del wrapper `.cmd` de la ingesta previa (V2.88.158, generado, no versionado). */
+function barsWrapperPath() {
+  return join(ROOT, RUNS_DIR, "window-bars-task.cmd");
+}
+
 /**
  * Escribe (o reescribe) el wrapper `.cmd` que la tarea de Windows ejecuta.
  *
@@ -1348,6 +1455,11 @@ function writeTaskWrapper() {
 /** v2.88.142: wrapper de la tarea del vigía (independiente del stack dev). */
 function writeWatchWrapper() {
   return writeCmdWrapper(watchWrapperPath(), "watch");
+}
+
+/** V2.88.158: wrapper de la ingesta previa (encola barras desfasadas en el API). */
+function writeBarsWrapper() {
+  return writeCmdWrapper(barsWrapperPath(), "sync-bars");
 }
 
 /**
@@ -1434,7 +1546,7 @@ function verifyTaskXml(name) {
 }
 
 /** Registra una tarea diaria y devuelve `true` si `schtasks` salio bien Y se verifico. */
-function registerTask(name, time, wrapper) {
+function registerTask(name, time, wrapper, description) {
   const xmlPath = wrapper.replace(/\.cmd$/i, ".xml");
   let xml;
   try {
@@ -1443,8 +1555,9 @@ function registerTask(name, time, wrapper) {
       time,
       wrapper,
       description:
-        "Bolsa V1 · cadencia de la ventana PAPER (freeze + preflight + run-day). " +
-        "StartWhenAvailable=true: si el equipo estaba dormido, la corrida se recupera al despertar.",
+        description ??
+        ("Bolsa V1 · cadencia de la ventana PAPER (freeze + preflight + run-day). " +
+          "StartWhenAvailable=true: si el equipo estaba dormido, la corrida se recupera al despertar."),
     });
   } catch (error) {
     logError(
@@ -1490,9 +1603,13 @@ function cmdTaskInstall(flags) {
   }
   const time = flags.at || DEFAULT_TASK_TIME;
   const watchTime = flags.watchAt || DEFAULT_WATCH_TIME;
+  const barsTime = flags.barsAt || DEFAULT_BARS_TIME;
   const installWatch = !flags.noWatch;
+  const installBars = !flags.noBars;
   if (flags.dryRun) {
-    const plans = [[TASK_NAME, time, taskWrapperPath()]];
+    const plans = [];
+    if (installBars) plans.push([BARS_TASK_NAME, barsTime, barsWrapperPath()]);
+    plans.push([TASK_NAME, time, taskWrapperPath()]);
     if (installWatch) plans.push([WATCH_TASK_NAME, watchTime, watchWrapperPath()]);
     for (const [name, at, wrapper] of plans) {
       const xmlPath = wrapper.replace(/\.cmd$/i, ".xml");
@@ -1511,6 +1628,21 @@ function cmdTaskInstall(flags) {
   logInfo(SCOPE, `wrapper de la tarea escrito en ${wrapper}`);
   // v2.88.142 — fail-closed: si el wrapper NO se ejecuta, no se registra nada.
   if (!verifyWrapperShape()) return 1;
+  // V2.88.158: la ingesta va ANTES del run-day (17:40 < 18:30). Se registra primero y, si
+  // falla, no se registra el run-day: una cadencia que mide sin barras produce 0 ciclos.
+  if (installBars) {
+    const barsWrapper = writeBarsWrapper();
+    logInfo(SCOPE, `wrapper de la ingesta escrito en ${barsWrapper}`);
+    const barsOk = registerTask(
+      BARS_TASK_NAME,
+      barsTime,
+      barsWrapper,
+      "Bolsa V1 · ingesta previa de la ventana PAPER: encola las diarias desfasadas en el API " +
+        "para que el worker de auto-sync las drene antes del run-day (sin barras el forward " +
+        "mide con 0 fills). StartWhenAvailable=true.",
+    );
+    if (!barsOk) return 1;
+  }
   if (!registerTask(TASK_NAME, time, wrapper)) return 1;
   if (!installWatch) return 0;
 
@@ -1527,7 +1659,7 @@ function cmdTaskRemove(flags) {
     return 0;
   }
   let ok = true;
-  for (const name of [TASK_NAME, WATCH_TASK_NAME]) {
+  for (const name of [BARS_TASK_NAME, TASK_NAME, WATCH_TASK_NAME]) {
     const command = `schtasks /delete /tn "${name}" /f`;
     if (flags.dryRun) {
       console.log(command);
@@ -1585,6 +1717,8 @@ async function main() {
       return cmdEvidence(config, flags);
     case "unlock":
       return cmdUnlock(flags);
+    case "sync-bars":
+      return cmdSyncBars(flags);
     case "watch":
       return cmdWatch(flags);
     case "task:install":
