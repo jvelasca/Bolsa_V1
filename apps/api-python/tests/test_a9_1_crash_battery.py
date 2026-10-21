@@ -212,3 +212,57 @@ async def test_reconciliation_blocks_openings_when_divergent(auto_env: None) -> 
         sim_auto_positions={"AAA": Decimal("100")},
     )
     assert verdict.status != POSITION_PROJECTION_DIVERGENT
+
+
+@pytest.mark.asyncio
+async def test_projection_without_cost_basis_is_healed_from_applied_fills(
+    auto_env: None,
+) -> None:
+    """V2.88.159 — una proyección OK sin ``entry_price`` recupera su coste del libro.
+
+    El camino REBUILT solo actúa cuando la CANTIDAD diverge. Una fila escrita con
+    ``entry_price=NULL`` y cantidad correcta quedaba ``OK`` y nadie la curaba: la
+    posición real seguía sin stop, sin trailing y sin plan de salida posible
+    (medido 2026-10-21: la posición viva y muda, 0 fills).
+    """
+    from bolsa_analytics.cognitive.position_ledger import AppliedFillFact
+    from bolsa_application.applied_fills import CanonicalPositions
+
+    account = "acc-heal"
+    pos_store = InMemorySimAutoPositionStore()
+
+    _s, clock = step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))
+    worker = AutoSimulationWorker(
+        clock=clock,
+        exec_store=InMemoryExecutionEventStore(),
+        position_store=pos_store,
+        account_id=account,
+    )
+    # Proyección del motor: cantidad CORRECTA, sin base de coste (firma exacta del fallo).
+    await pos_store.upsert(
+        account, worker._engine_id, "AAA", Decimal("100"), entry_price=None
+    )
+
+    async def reader(_acc: str) -> CanonicalPositions:
+        return CanonicalPositions(
+            {"AAA": Decimal("100")},
+            facts=(
+                AppliedFillFact(
+                    execution_id="fill-1",
+                    instrument_id="AAA",
+                    side="buy",
+                    quantity=100.0,
+                    price=12.5,
+                    account_id=account,
+                ),
+            ),
+        )
+
+    worker._canonical_positions_reader = reader
+    await worker.readopt_positions()
+
+    # La cantidad no divergía ⇒ el veredicto es OK, y aun así la fila quedó curada.
+    projection = await pos_store.read_projection(account, worker._engine_id)
+    assert projection["AAA"].entry_price == pytest.approx(Decimal("12.5"))
+    assert worker._entry_price["AAA"] == Decimal("12.5")
+    assert worker._open["AAA"] == Decimal("100"), "curar el coste no altera la posición"

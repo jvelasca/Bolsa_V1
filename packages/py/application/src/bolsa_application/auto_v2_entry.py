@@ -2581,6 +2581,16 @@ class DiscoveryRegimeSource:
         """
         return dict(self._by_symbol)
 
+    def loaded(self) -> bool:
+        """``True`` si ESTA instancia ya leyó barras (``refresh()`` dejó etiquetas).
+
+        El cortocircuito por barra del worker reutiliza el dato entre ticks, pero el
+        runtime real recompone la fuente por sesión/tick: una instancia NUEVA llega
+        vacía. Sin esta lectura, el turno reutilizado decidía con un mapa vacío
+        (``entryRegime=UNKNOWN`` ⇒ todo vetado por ``regime_invalid``).
+        """
+        return bool(self._by_symbol)
+
     def regime_for(self, symbol: str | None) -> str:
         """Régimen operativo del símbolo (ADR-047); sin etiqueta ⇒ ``UNKNOWN``."""
         return map_trial_regime(self._by_symbol.get(str(symbol or "")))
@@ -2674,6 +2684,15 @@ class AtrSource:
     def atr_for(self, symbol: str) -> float | None:
         """Lectura síncrona del ATR cacheado (``None`` si no hay dato verificable)."""
         return self._atr_by_symbol.get(str(symbol or "").strip())
+
+    def loaded(self) -> bool:
+        """``True`` si ESTA instancia ya calculó ATR (``refresh()`` dejó valores).
+
+        Misma razón que ``DiscoveryRegimeSource.loaded``: el runtime real recompone la
+        fuente por sesión/tick, así que el turno reutilizado no puede asumir que una
+        instancia nueva trae dato (quedaba ``atr_source=missing`` toda la barra).
+        """
+        return bool(self._atr_by_symbol)
 
     def __call__(self, symbol: str) -> float | None:
         return self.atr_for(symbol)

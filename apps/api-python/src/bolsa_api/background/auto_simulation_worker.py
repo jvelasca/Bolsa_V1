@@ -112,6 +112,10 @@ from bolsa_analytics.cognitive.position_lifecycle import (
     protection_state_dict,
     trailing_status,
 )
+from bolsa_analytics.cognitive.position_ledger import (
+    build_position_ledger,
+    coerce_applied_fill_fact,
+)
 from bolsa_analytics.cognitive.position_state import (
     PositionState,
     apply_position_current_stop,
@@ -840,6 +844,63 @@ async def read_account_book_equity(session: Any, account_id: str | None) -> floa
     return float(summary.total_equity)
 
 
+def _canonical_entry_prices(events: Any) -> dict[str, float]:
+    """Coste medio por instrumento derivado de los fills APLICADOS del libro canónico.
+
+    Una posición ADOPTADA por un motor sin proyección previa no trae ``entry_price``
+    (``prior is None``). Si se adopta así, la exposición es real pero la base de coste
+    desaparece: no hay stop ni trailing calculables y ningún plan puede proponer salida
+    — la posición queda viva y muda hasta el fin de la serie (medido 2026-10-21: fila de
+    ``sim_auto_positions`` con ``avg_price=NULL`` escrita 3 ms antes del primer tick).
+
+    La base de coste no se inventa: sale del MISMO fold contable que usa la conciliación
+    (``build_position_ledger``: coste medio ponderado de lo que queda abierto, neto de
+    recortes). Sin fills legibles devuelve ``{}`` y la adopción conserva ``None``
+    (fail-closed declarado, nunca un precio de relleno).
+    """
+    # Las trazas llegan en DOS formas (``_AppliedFill`` del libro en RAM y
+    # ``AppliedFillFact`` del lector canónico). Se normalizan al hecho contable con la
+    # misma coerción tolerante que usa la reconciliación: el fold solo entiende
+    # ``AppliedFillFact`` (``is_buy``/``quantity``/``applied_at``), así que pasarle una
+    # traza cruda reventaba y devolvía ``{}`` en silencio.
+    facts: list[Any] = []
+    for event in tuple(events or ()):
+        status = getattr(event, "status", None)
+        if status is not None and str(status).strip().lower() not in {
+            "applied",
+            "apply_filled",
+        }:
+            continue
+        qty = getattr(event, "qty", None)
+        if qty is None:
+            qty = getattr(event, "quantity", None)
+        fact = coerce_applied_fill_fact(
+            execution_id=getattr(event, "execution_id", None),
+            instrument_id=(
+                getattr(event, "instrument_id", None) or getattr(event, "symbol", None)
+            ),
+            side=getattr(event, "side", None),
+            quantity=qty,
+            price=getattr(event, "price", None),
+            applied_at=getattr(event, "applied_at", None),
+            account_id=getattr(event, "account_id", None),
+        )
+        if fact is not None:
+            facts.append(fact)
+    if not facts:
+        return {}
+    try:
+        ledger = build_position_ledger(facts)
+    except Exception:  # noqa: BLE001 — sin fold no hay base de coste que heredar.
+        logger.exception("auto_sim canonical entry price fold failed")
+        return {}
+    return {
+        str(position.instrument_id): float(position.average_entry)
+        for position in ledger.positions
+        if position.average_entry is not None and position.remaining_qty > 0
+    }
+
+
 class AutoSimulationWorker:
     """Driver determinista del día autónomo (por tick; hard SIM-ONLY).
 
@@ -1403,6 +1464,7 @@ class AutoSimulationWorker:
             financial_positions=canonical_map,
             sim_auto_positions=projection_qty,
         )
+        adopted_entries = _canonical_entry_prices(events)
         for verdict in report.verdicts:
             symbol = verdict.symbol
             self._reconciliation[symbol] = verdict.status
@@ -1410,6 +1472,15 @@ class AutoSimulationWorker:
                 # Reconstruye la proyección desde el canónico (conserva protección si la hay).
                 canonical_qty = canonical_map.get(symbol, Decimal("0"))
                 prior = projection.get(symbol)
+                prior_entry = getattr(prior, "entry_price", None)
+                # V2.88.159 — una adopción NO puede perder la base de coste: el motor nuevo
+                # no tiene proyección previa (``prior is None``), y heredar
+                # ``entry_price=None`` dejaba una posición real sin stop, sin trailing y
+                # sin plan de salida posible (inoperable hasta el fin de la serie). La base
+                # de coste SÍ está en el libro de fills aplicados; se reconstruye de ahí.
+                adopted_entry = (
+                    prior_entry if prior_entry is not None else adopted_entries.get(symbol)
+                )
                 if canonical_qty <= 0:
                     # El canónico dice "sin posición": la proyección estaba obsoleta.
                     await self._position_store.delete(account_id, self._engine_id, symbol)
@@ -1419,7 +1490,7 @@ class AutoSimulationWorker:
                         self._engine_id,
                         symbol,
                         canonical_qty,
-                        entry_price=getattr(prior, "entry_price", None),
+                        entry_price=adopted_entry,
                         high_watermark=getattr(prior, "high_watermark", None),
                         stop_price=getattr(prior, "stop_price", None),
                         t1_state=getattr(prior, "t1_state", None),
@@ -1435,6 +1506,52 @@ class AutoSimulationWorker:
                     "auto_sim position reconciliation=%s symbol=%s (aperturas vetadas)",
                     verdict.status,
                     symbol,
+                )
+        # V2.88.159 — CURA de una proyección que YA coincide con el canónico pero nació
+        # sin base de coste. El camino ``REBUILT`` de arriba solo se ejecuta cuando la
+        # cantidad DIVERGE; si la fila se escribió con ``entry_price=NULL`` y la cantidad
+        # es la correcta, el veredicto es ``OK`` y nadie la tocaba: la posición real seguía
+        # sin stop, sin trailing y sin plan de salida (medido 2026-10-21: 0 fills con la
+        # posición viva y muda). Se rellena SOLO con la base de coste del libro de fills
+        # aplicados; sin ella no se inventa nada (se declara y se deja como estaba).
+        if self._position_store is not None and adopted_entries:
+            for verdict in report.verdicts:
+                if verdict.status != POSITION_PROJECTION_OK:
+                    continue
+                symbol = verdict.symbol
+                row = projection.get(symbol)
+                if row is None or row.entry_price is not None:
+                    continue
+                if row.quantity is None or row.quantity <= 0:
+                    continue
+                entry = adopted_entries.get(symbol)
+                if entry is None:
+                    logger.warning(
+                        "auto_sim adopted position without cost basis symbol=%s "
+                        "(sin fills aplicados: sin stop ni plan de salida)",
+                        symbol,
+                    )
+                    continue
+                healed = Decimal(str(entry))
+                await self._position_store.upsert(
+                    account_id,
+                    self._engine_id,
+                    symbol,
+                    row.quantity,
+                    entry_price=healed,
+                    high_watermark=row.high_watermark,
+                    stop_price=row.stop_price,
+                    t1_state=row.t1_state,
+                    trailing_state=row.trailing_state,
+                    strategy_version_id=row.strategy_version_id,
+                    position_state=row.position_state,
+                )
+                self._entry_price[symbol] = healed
+                logger.info(
+                    "auto_sim adopted position healed symbol=%s entry=%s qty=%s",
+                    symbol,
+                    healed,
+                    row.quantity,
                 )
         # V2.43.3 (P0-1) — productor real de la parada dura: una identidad de ejecución
         # DUPLICADA en el libro canónico significa que el mismo hecho financiero llegó dos
@@ -4051,11 +4168,38 @@ class AutoSimulationWorker:
             )
             return None
 
+    def _v2_bar_datum_loaded(self) -> bool:
+        """``W2`` — ¿el dato de barra (régimen y ATR) está cargado en ESTA instancia?
+
+        El cortocircuito por barra reutiliza el dato entre ticks, pero el runtime real
+        (`AutoSimRuntime.run_tick`) **recompone las fuentes por sesión/tick**: la instancia
+        que llega al turno reutilizado es NUEVA y está vacía. Asumir lo contrario dejaba el
+        régimen sin etiquetas y el ATR ausente durante toda la barra.
+
+        Medido 2026-10-21 (ventana PAPER, motor `auto-window-1484e253`): 275 de 280
+        entradas evaluadas cayeron por `regime_invalid` con `entryRegime=UNKNOWN`
+        (`entryRegimeScope=per_symbol`, es decir mapa presente pero vacío) y el ATR real
+        no llegó nunca con `AUTO_ENGINE_SIM_V2_ATR_REQUIRED=1` ⇒ 0 propuestas, 0 fills.
+        Con el mapa real, la misma función pura aprueba los símbolos en rango.
+
+        Fail-closed: una fuente sin lector de estado se da por cargada (no se inventa I/O
+        nuevo para fuentes que no lo declaran); una fuente que declara ``loaded()=False``
+        fuerza el refresco aunque el dato de barra se reutilice.
+        """
+        for source in (self._v2_regime_source, self._v2_atr_source):
+            probe = getattr(source, "loaded", None)
+            if probe is None or not callable(probe):
+                continue
+            try:
+                if not probe():
+                    return False
+            except Exception:  # noqa: BLE001 — sin poder afirmar el dato, se relee.
+                logger.exception("auto_sim v2 bar datum probe failed")
+                return False
+        return True
+
     async def _v2_refresh_regime(self) -> None:
         """Refresca el régimen y el ATR si las fuentes lo soportan (async + lectura sync).
-
-        La lectura del régimen y del ATR en el tick es SÍNCRONA; el I/O (barras) se concentra
-        aquí, una vez por barra, para que decidir no dependa de la red.
 
         E2: el ATR se refresca en el MISMO punto que el régimen para que la geometría de
         un tick sea consistente (una sola foto de barras por decisión).
@@ -4279,7 +4423,7 @@ class AutoSimulationWorker:
         estado de la barra en el momento del turno (una señal nueva que aparezca a mitad de
         barra sigue decidiéndose), y solo desaparece el I/O redundante.
         """
-        if not reuse_bar_datum:
+        if not reuse_bar_datum or not self._v2_bar_datum_loaded():
             await self._v2_refresh_regime()
         # W4: el PRECIO se relee SIEMPRE, también con el dato de barra reutilizado. La
         # fuente se recompone por sesión/tick y el short-circuit por barra no la refresca:

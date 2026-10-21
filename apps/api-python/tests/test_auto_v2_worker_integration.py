@@ -1358,3 +1358,91 @@ async def test_v2_optimizer_on_without_an_economic_producer_is_fail_closed(
     assert "optimizer_expected_value_unmeasured" in codes
     assert "approved" not in codes
 
+
+@pytest.mark.asyncio
+async def test_v2_reused_bar_datum_never_trusts_a_fresh_empty_source(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """W2 · el cortocircuito por barra NO puede decidir con una fuente sin leer.
+
+    El runtime real (`AutoSimRuntime.run_tick`) recompone régimen/ATR en cada tick: la
+    instancia que llega al turno reutilizado es NUEVA y vacía. Medido 2026-10-21 en la
+    ventana PAPER: 275 de 280 entradas cayeron por `regime_invalid` con
+    `entryRegime=UNKNOWN` y 0 propuestas, porque `reuse_bar_datum=True` saltaba el
+    refresco y nadie comprobaba que la instancia nueva estuviera cargada.
+    """
+    from bolsa_application.auto_v2_entry import DiscoveryRegimeSource
+
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_REGIME", "")
+
+    async def provider() -> dict[str, list[dict[str, float]]]:
+        return {"AAA": _bars(+0.6)}
+
+    worker = _worker(regime_source=DiscoveryRegimeSource(bars_provider=provider))
+    # Una instancia recién compuesta NUNCA se da por cargada...
+    assert worker._v2_bar_datum_loaded() is False
+    # ...y el refresco la deja utilizable (mismo valor que el camino sin cortocircuito).
+    await worker._v2_refresh_regime()
+    assert worker._v2_bar_datum_loaded() is True
+    # El mapa por símbolo es el que decide el veto; el valor operativo sale mapeado.
+    assert worker._v2_regime_source.by_symbol() == {"AAA": "trend_up"}
+    assert worker._v2_regime() == "BULL_TREND"
+
+    # Recomposición del tick siguiente (lo que hace el runtime): vuelve a estar vacía.
+    worker._v2_regime_source = DiscoveryRegimeSource(bars_provider=provider)
+    assert worker._v2_bar_datum_loaded() is False, (
+        "con `reuse_bar_datum=True` el turno debe releer, no confiar en el vacío"
+    )
+
+
+def test_v2_canonical_entry_prices_rebuild_adopted_cost_basis() -> None:
+    """Adopción sin proyección previa: la entrada sale de los fills canónicos.
+
+    Medido 2026-10-21: al adoptar una posición existente en un motor nuevo/estable
+    (`prior is None`) el `avg_price` quedaba NULL en `sim_auto_positions`, así que no
+    podían formarse stops, trailings ni planes de salida: 0 fills durante todo el día.
+    """
+    from bolsa_analytics.cognitive.position_ledger import AppliedFillFact
+    from bolsa_api.background.auto_simulation_worker import (
+        _AppliedFill,
+        _canonical_entry_prices,
+    )
+
+    def applied(
+        symbol: str, side: str, qty: str, price: str, execution_id: str
+    ) -> _AppliedFill:
+        """Traza del libro en RAM: la forma que el worker acumula al liquidar."""
+        return _AppliedFill(
+            symbol=symbol,
+            side=side,
+            qty=Decimal(qty),
+            price=Decimal(price),
+            execution_id=execution_id,
+            venue="simulated",
+        )
+
+    events = [
+        applied("AAA", "buy", "10", "100", "e1"),
+        applied("AAA", "buy", "10", "102", "e2"),
+        # Cerrada por completo: no deja coste que adoptar.
+        applied("BBB", "buy", "5", "50", "e3"),
+        applied("BBB", "sell", "5", "55", "e4"),
+        # El lector canónico entrega ya el hecho contable: misma respuesta.
+        AppliedFillFact(
+            execution_id="e5",
+            instrument_id="DDD",
+            side="buy",
+            quantity=3.0,
+            price=20.0,
+        ),
+    ]
+
+    entries = _canonical_entry_prices(events)
+    assert entries["AAA"] == pytest.approx(101.0)
+    assert entries["DDD"] == pytest.approx(20.0)
+    assert "BBB" not in entries, "sin cantidad restante no hay posición que adoptar"
+
+    # Sin trazas legibles no se inventa base de coste (fail-closed declarado).
+    assert _canonical_entry_prices([]) == {}
+    assert _canonical_entry_prices(None) == {}
+
