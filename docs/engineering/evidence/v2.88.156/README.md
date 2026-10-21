@@ -158,6 +158,7 @@ worker reclamara el job y lo ejecutara por segunda vez.
 | `pytest test_auto_chain_durable_reader.py` | **23 passed** |
 | `pytest test_estudio_daily_ops.py` | **7 passed** |
 | `pytest test_estudio_audit.py test_dia_d_auto_feedback.py` | **47 passed** |
+| `pytest test_auto_estudio_audit_route.py` | **6 passed** (tras corregir la expectativa: `signalId`/`planId` nulos en `cycles`) |
 | `pytest test_auto_ops_dia_d.py` | **19 passed** |
 | `pytest test_auto_identity_chain_battery_pg.py` (PostgreSQL real) | **3 passed in 4.44s** — incluye el anclaje con foto posterior |
 | `vitest @bolsa/shared auto-operational-monitor` | **15 passed** |
@@ -220,6 +221,21 @@ inmediatamente posterior al commit del sello, igual que en `.154`/`.155`: el gat
 `window:freeze` del job `shared` es **fail-closed** y el tag no puede apuntar a un commit cuyo
 pin no case con su árbol.
 
-**Cita POST-TAG — pendiente de la corrida del tag.** Este documento **no** declara ningún run
-verde: la cita se añade **después** de que `Release tag CI` termine sobre `v2.88.156-beta`.
-Hasta entonces, el sello está **implementado y verificado en local**, no certificado por CI.
+**Cita POST-TAG — primer intento ROJO, corregido y re-apuntado (medido).** El `Release tag CI` del
+primer objeto de tag, [run **`39553178383`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/39553178383),
+terminó **`failure`** (`2026-10-21T06:04:22Z` → `06:19:40Z`, **15m18s**): **11 jobs `success`**,
+**1 `skipped`** declarado (`playwright` integrated opt-in) y **`python` rojo** con
+**`1 failed, 5299 passed, 58 skipped`**. El fallo fue
+[`test_auto_estudio_audit_route.py::test_latest_window_composes_value_audit`](../../../apps/api-python/tests/test_auto_estudio_audit_route.py):
+la expectativa comparaba `cycles` por igualdad estricta **sin** los campos aditivos
+`signalId`/`planId` que este sello publica en `EstudioAuditCycleDto`; `certify` falló **por
+dependencia**, no por un defecto propio. La corrección es **solo de test** (`Δ src = 0`): el
+diccionario esperado declara `signalId: None` y `planId: None`.
+
+**Fail-closed del proceso.** El pin PAPER se **re-ancla** al árbol corregido —el cambio vive en
+`apps/api-python/tests`, que participa del hash `apps`— y el **tag se re-apunta** al commit de
+re-anclaje, sin dar por bueno el intento rojo (mismo criterio que `.153`). El run rojo queda
+citado arriba como evidencia y el run verde del tag re-apuntado se cita a continuación.
+
+**Cita POST-TAG definitiva:** se añade **solo** cuando `Release tag CI` termine verde sobre el
+tag re-apuntado.

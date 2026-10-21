@@ -120,6 +120,8 @@ async def test_latest_window_composes_value_audit(tmp_path: Path, monkeypatch: p
             "exitDay": "2026-04-02",
             "strategyPresetKey": "sma_crossover",
             "strategyVersion": "ver-1",
+            "signalId": None,
+            "planId": None,
             "realizedR": 0.5,
         }
     ]
