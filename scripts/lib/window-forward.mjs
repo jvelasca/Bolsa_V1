@@ -657,10 +657,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-21 — pin del arbol re-anclado a `bf13d62b`
+ * (`apps` `6767a3b502572037582ec0b294a15581fc404da3` / `packages` `3fa61137184d8639cab2628b3eed4b19d7a3eb57`).
+ * Motivo: Sello .156 (bump 2.11.156-beta de los 13 CLIs + read-models N-155/H-145 + gap 2); Delta motor = 0
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '79131c07',
-  appsHash: '5fccc568215d0aa4b645d2c4f62573cb11f6b3da',
-  packagesHash: 'be243531e663830f0ffa2abb7316c045d917c389',
+  commit: 'bf13d62b',
+  appsHash: '6767a3b502572037582ec0b294a15581fc404da3',
+  packagesHash: '3fa61137184d8639cab2628b3eed4b19d7a3eb57',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
