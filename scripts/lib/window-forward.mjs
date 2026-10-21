@@ -681,9 +681,17 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-21 — pin del arbol re-anclado a `9c485c64`
+ * (`apps` `4c9d5cc3de6307dc210866291ddd032de483d00e` / `packages` `55571608ca700d82752a7b2b8d274d2d7c39c170`).
+ * Motivo: W-157-1: identidad de motor estable (AUTO_ENGINE_SIM_ENGINE_ID) para que la cadencia diaria opere un solo libro y los ciclos puedan cerrarse
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '9f632315',
-  appsHash: '5e5c508649b88cb06a5cbea334416f75ec3dc5ec',
+  commit: '9c485c64',
+  appsHash: '4c9d5cc3de6307dc210866291ddd032de483d00e',
   packagesHash: '55571608ca700d82752a7b2b8d274d2d7c39c170',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
@@ -703,6 +711,17 @@ export const WINDOW_CONFIG = Object.freeze({
     AUTO_ENGINE_SIM_REAL_PRICE: '1',
     AUTO_OPERATIONAL_AUDIT: '1',
     BROKER_VENUE: 'paper',
+    /**
+     * V2.88.158 — IDENTIDAD DE MOTOR ESTABLE de la ventana (una sola, para toda la
+     * cadencia). Sin ella cada corrida acuñaba `auto-v76-<aleatorio>`; como la
+     * readopción de posición va scoped por `(account_id, engine_id)`, el día N no
+     * adoptaba la posición del día N-1 y el ciclo no podía cerrarse NUNCA ⇒ 0 ciclos
+     * medibles y ventana incapaz de certificar (medido 2026-10-21: 2 motores con el
+     * mismo símbolo vivo y 0 ciclos en los días con fills). Con la identidad fijada
+     * la cadencia diaria opera UN libro persistente y los ciclos se cierran.
+     * No es clave de freeze (no es identidad del árbol): vive en `scripts/`.
+     */
+    AUTO_ENGINE_SIM_ENGINE_ID: 'auto-window-1484e253',
   }),
 });
 
