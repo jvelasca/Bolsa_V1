@@ -39,7 +39,9 @@ class OpinionHint:
     fa_score: float | None = None
     ta_score: float | None = None
     distress: bool = False
-    position_open: bool = False
+    #: TRI-ESTADO (H-145-1): ``None`` = la cartera no se midió (adaptador ausente o lectura
+    #: caída). Se propaga tal cual al motor de dictamen; nunca se degrada a ``False``.
+    position_open: bool | None = None
     allow_trading: bool = True
     has_eod_bar: bool | None = None
 
@@ -276,14 +278,16 @@ class DailyOpinionService:
                 top_stars=top_stars,
                 io_score=hint.io_score,
                 fa_distress=bool(hint.distress),
-                position_open=bool(hint.position_open),
+                # H-145-1: el tri-estado viaja TAL CUAL. Convertirlo con ``bool()`` aquí
+                # reintroducía el defecto («no medido» → «sin posición») justo antes del motor.
+                position_open=hint.position_open,
             ),
             now=stance_now,
         )
 
-        # Invariante: sell/reduce solo con largo (defensa en profundidad)
+        # Invariante: sell/reduce solo con largo MEDIDO (defensa en profundidad)
         stance = result.stance
-        if stance in ("sell_exit", "reduce") and not hint.position_open:
+        if stance in ("sell_exit", "reduce") and hint.position_open is not True:
             stance = "no_trade"
             reasons = list(result.reasons) + ["position_closed"]
             gate = result.gate_status
@@ -297,7 +301,9 @@ class DailyOpinionService:
         if hint.distress:
             stars = min(stars, 3)
             if stance == "buy":
-                stance = "no_trade" if not hint.position_open else "reduce"
+                stance = (
+                    "no_trade" if hint.position_open is not True else "reduce"
+                )
                 if "fa_distress" not in reasons:
                     reasons.append("fa_distress")
 

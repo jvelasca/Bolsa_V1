@@ -28,6 +28,7 @@ from bolsa_application.daily_opinion_service import OpinionHint
 from bolsa_application.daily_ops_report import (
     ESTUDIO_STATUS_EMPTY,
     ESTUDIO_STATUS_OK,
+    ESTUDIO_STATUS_UNAVAILABLE,
 )
 from bolsa_application.estudio_auto_hits import resolve_estudio_auto_source
 from bolsa_application.paper_desk_entry import resolve_estudio_universe
@@ -38,6 +39,7 @@ __all__ = [
     "EstudioDailyReport",
     "EstudioDailyValue",
     "RunEstudioDailyOps",
+    "Top3SnapshotsSelector",
 ]
 
 #: Fuente de las opiniones calculadas por este recorrido (idempotencia por esta fuente).
@@ -47,6 +49,11 @@ STATUS_OK = "ok"
 STATUS_NO_SIGNAL = "no_signal"
 STATUS_NO_PLAN = "no_plan"
 STATUS_ERROR = "error"
+
+#: Estado del PARTE (no del valor): el universo y los valores se procesaron, pero alguna
+#: medición que el dictamen usa (cartera, chips, opiniones) no se pudo leer. Es un parte
+#: HONESTO: se publica con sus huecos declarados y el worker lo registra como completado.
+STATUS_PARTIAL = "partial"
 
 _VALUES_STATUSES = (STATUS_OK, STATUS_NO_SIGNAL, STATUS_NO_PLAN, STATUS_ERROR)
 _OPINION_CHUNK = 10
@@ -103,7 +110,42 @@ class _ProposePort(Protocol):
     async def execute(self, payload: dict[str, Any]) -> dict[str, Any]: ...
 
 
+class _SelectorSnapshotsPort(Protocol):
+    """Fotos durables del selector cross-asset (``top3_opportunities``), read-only.
+
+    Debe PROPAGAR el fallo de lectura (no devolver ``[]``): «no hay foto» y «no se pudo
+    leer» son huecos distintos y el parte los declara por separado.
+    """
+
+    async def snapshots(self, account_id: str) -> list[dict[str, Any]]: ...
+
+
+class Top3SnapshotsSelector:
+    """Adaptador del selector durable para el parte diario (misma fuente que la evidencia)."""
+
+    def __init__(self, session: Any) -> None:
+        self._session = session
+
+    async def snapshots(self, account_id: str) -> list[dict[str, Any]]:
+        from bolsa_application.auto_chain_durable_reader import read_top3_snapshots
+
+        return await read_top3_snapshots(
+            self._session, account_id, raise_on_error=True
+        )
+
+
 # ── contrato de salida ───────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True, slots=True)
+class _Hints:
+    """Resultado de la fase de hints (mediciones, huecos declarados y cobertura)."""
+
+    hints: list[OpinionHint]
+    chip_by_id: dict[str, dict[str, Any]]
+    notes: list[str]
+    position_open_by_id: dict[str, bool | None]
+    coverage: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,9 +171,13 @@ class EstudioDailyValue:
     plan: dict[str, Any] | None = None
     why_not: list[str] = field(default_factory=list)
     strategy: dict[str, Any] | None = None
-    #: Tri-estado de posición abierta: ``None`` = no medido (la lectura falló). El motor de
-    #: dictamen sigue recibiendo ``False`` (Δ decisión = 0); esta bandera solo declara el hueco.
+    #: Tri-estado de posición abierta: ``None`` = NO MEDIDO (adaptador ausente o lectura
+    #: caída). El motor de dictamen recibe el mismo ``None`` y falla cerrado; el parte
+    #: declara el hueco en vez de afirmar «sin posición».
     position_open: bool | None = None
+    #: Gap 1 — identidad del selector cross-asset para ESTE valor: foto del día, ganador y
+    #: si el valor ES el ganador. ``measured=False`` declara el hueco (sin foto / sin lectura).
+    selector: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -161,6 +207,7 @@ class EstudioDailyValue:
             "plan": self.plan,
             "whyNot": list(self.why_not),
             "strategy": self.strategy,
+            "selector": self.selector,
         }
 
 
@@ -178,6 +225,15 @@ class EstudioDailyReport:
     #: Tamaño del universo ESTUDIO **antes** del recorte (`_MAX_VALUES`). Permite declarar
     #: cobertura («procesados de esperados») sin fabricar un dato: 0 = no medido.
     universe_count: int = 0
+    #: R-3/H-145-3 — el parte se publicó con mediciones ausentes (``status=partial``). El
+    #: worker lo registra como COMPLETADO: un hueco declarado no es un fallo del trabajo.
+    degraded: bool = False
+    #: Motivos de la degradación (códigos estables; la UI los traduce a frases).
+    degraded_reasons: list[str] = field(default_factory=list)
+    #: Cobertura de las mediciones que alimentan el dictamen (posiciones y chips).
+    coverage: dict[str, Any] = field(default_factory=dict)
+    #: Gap 1 — foto del selector cross-asset del día y su ganador (``None`` si no se mide).
+    selector: dict[str, Any] | None = None
 
     @property
     def counts(self) -> dict[str, int]:
@@ -201,6 +257,12 @@ class EstudioDailyReport:
             "universeCount": self.universe_count,
             # Los contadores SIEMPRE suman el universo escaneado (criterio falsable).
             "countsConsistent": sum(counts.values()) == len(self.values),
+            # R-3 — la degradación deja de vivir solo en las notas: un consumidor que mire
+            # ``status`` ve el parcial, y ``degradedReasons`` dice QUÉ no se midió.
+            "degraded": self.degraded,
+            "degradedReasons": list(self.degraded_reasons),
+            "coverage": dict(self.coverage),
+            "selector": self.selector,
         }
 
 
@@ -211,6 +273,39 @@ def _chunks(ids: Sequence[str], size: int) -> Iterable[list[str]]:
     step = max(1, size)
     for start in range(0, len(ids), step):
         yield list(ids[start : start + step])
+
+
+def _dedupe(items: Sequence[str]) -> list[str]:
+    """Códigos/notas sin repetir, conservando el orden de aparición."""
+    out: list[str] = []
+    for item in items:
+        text = str(item).strip()
+        if text and text not in out:
+            out.append(text)
+    return out
+
+
+def _selector_gap(reason: str) -> dict[str, Any]:
+    """Hueco DECLARADO de la identidad del selector (nunca ``isWinner=False`` sin foto)."""
+    return {
+        "measured": False,
+        "runId": None,
+        "bar": None,
+        "assetId": None,
+        "presetKey": None,
+        "strategyVersion": None,
+        "isWinner": None,
+        "reason": reason,
+    }
+
+
+def _snapshot_bar(snapshot: dict[str, Any]) -> str | None:
+    """Instante ISO-UTC de la barra de una foto (``None`` si no se puede afirmar)."""
+    bar = snapshot.get("bar")
+    if not isinstance(bar, datetime):
+        return None
+    moment = bar if bar.tzinfo is not None else bar.replace(tzinfo=UTC)
+    return moment.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _iso_day(raw: Any) -> str:
@@ -249,6 +344,9 @@ def _plan_payload(plan: dict[str, Any] | None) -> dict[str, Any] | None:
     if not isinstance(plan, dict):
         return None
     return {
+        # Gap 1 — identidad DURABLE del plan (la que sellan ciclo/journal). Sin ella el parte
+        # no puede atribuir su señal a una operación concreta.
+        "decisionId": plan.get("decisionId") or plan.get("decision_id"),
         "status": plan.get("status"),
         "direction": plan.get("direction"),
         "entry": _float_or_none(plan.get("entry")),
@@ -292,6 +390,7 @@ class RunEstudioDailyOps:
         composite: _CompositeChipsPort | None = None,
         fundamentals: _FundamentalsChipsPort | None = None,
         positions: _OpenPositionsPort | None = None,
+        selector: _SelectorSnapshotsPort | None = None,
     ) -> None:
         self._estudio = estudio_list
         self._opinions = opinions
@@ -299,6 +398,7 @@ class RunEstudioDailyOps:
         self._composite = composite
         self._fundamentals = fundamentals
         self._positions = positions
+        self._selector = selector
 
     async def execute(
         self,
@@ -336,10 +436,18 @@ class RunEstudioDailyOps:
             )
 
         await self._emit(on_progress, phase="hints", done=0, total=len(ids))
-        hints, chip_by_id, hint_notes, position_open_by_id = await self._build_hints(
+        hints_result = await self._build_hints(ids, account_id=account_id, day=day)
+        hints = hints_result.hints
+        chip_by_id = hints_result.chip_by_id
+        position_open_by_id = hints_result.position_open_by_id
+        coverage = dict(hints_result.coverage)
+        notes.extend(hints_result.notes)
+
+        # Gap 1 — identidad del selector cross-asset del día (foto + ganador) por valor.
+        selector_block, selector_by_id, selector_notes = await self._build_selector(
             ids, account_id=account_id, day=day
         )
-        notes.extend(hint_notes)
+        notes.extend(selector_notes)
 
         await self._emit(on_progress, phase="opinions", done=0, total=len(ids))
         rows, value_errors = await self._run_opinions(
@@ -371,20 +479,48 @@ class RunEstudioDailyOps:
             value_errors=value_errors,
             propose_error=propose_error,
             position_open_by_id=position_open_by_id,
+            selector_by_id=selector_by_id,
         )
         await self._emit(
             on_progress, phase="done", done=len(values), total=len(values)
         )
 
+        # R-3/H-145-3 — la degradación sube al ESTADO del parte, no se queda en las notas.
+        degraded_reasons = list(hints_result.notes)
+        if value_errors:
+            degraded_reasons.append(f"opinion_errors:{len(value_errors)}_values")
+        if propose_error is not None:
+            degraded_reasons.append("propose_unavailable")
+        if "selector_identity_unavailable" in selector_notes:
+            degraded_reasons.append("selector_identity_unavailable")
+        degraded = bool(degraded_reasons) or truncated
+        if values and all(value.status == STATUS_ERROR for value in values):
+            # Ningún valor se pudo medir: el parte no es «parcial», es inutilizable.
+            status = ESTUDIO_STATUS_UNAVAILABLE
+            degraded_reasons.append("all_values_failed")
+        elif degraded_reasons:
+            status = STATUS_PARTIAL
+        else:
+            status = ESTUDIO_STATUS_OK
+
         return EstudioDailyReport(
             as_of=day,
             account_id=account_id,
-            status=ESTUDIO_STATUS_OK,
+            status=status,
             values=values,
-            notes=notes,
+            notes=_dedupe(notes),
             generated_at=datetime.now(UTC).isoformat(),
             truncated=truncated,
             universe_count=universe_count,
+            degraded=degraded,
+            degraded_reasons=_dedupe(degraded_reasons),
+            coverage={
+                **coverage,
+                "valuesScanned": len(values),
+                "universeCount": universe_count,
+                "truncated": truncated,
+            },
+            selector=selector_block,
         )
 
     # ── hints ────────────────────────────────────────────────────────────────
@@ -395,18 +531,24 @@ class RunEstudioDailyOps:
         *,
         account_id: str,
         day: str,
-    ) -> tuple[list[OpinionHint], dict[str, dict[str, Any]], list[str], dict[str, bool | None]]:
+    ) -> _Hints:
         """Hints por valor + notas de huecos declarados + posición abierta TRI-ESTADO.
 
         Un fallo de chips se DECLARA en ``notes`` (cuántos ids quedaron sin ese indicador); un
         fallo de la lectura de posiciones deja el valor a ``None`` (no medido) en el mapa de
         posición, en vez de afirmar «sin posición».
+
+        H-156-1: un adaptador de posiciones AUSENTE no es «cartera vacía». Antes
+        ``positions_measured`` nacía en ``True`` y el mapa publicaba ``False`` para todos sin
+        haber consultado nada. Ahora la ausencia se declara igual que un fallo de lectura y el
+        hint viaja ``None`` (el motor falla cerrado) hasta el dictamen.
         """
         composite_chips: list[dict[str, Any]] = []
         fundamentals_chips: list[dict[str, Any]] = []
         notes: list[str] = []
+        composite_failed = 0
+        fundamentals_failed = 0
         if self._composite is not None:
-            failed = 0
             for chunk in _chunks(ids, _COMPOSITE_CHUNK):
                 try:
                     composite_chips.extend(
@@ -415,26 +557,26 @@ class RunEstudioDailyOps:
                         )
                     )
                 except Exception:  # noqa: BLE001 — el batch sigue, el hueco se declara.
-                    failed += len(chunk)
-            if failed:
-                notes.append(f"composite_chips_unavailable:{failed}_ids")
+                    composite_failed += len(chunk)
+            if composite_failed:
+                notes.append(f"composite_chips_unavailable:{composite_failed}_ids")
         if self._fundamentals is not None:
-            failed = 0
             for chunk in _chunks(ids, _FUNDAMENTALS_CHUNK):
                 try:
                     fundamentals_chips.extend(
                         await self._fundamentals.execute_chips(chunk, as_of=day)
                     )
                 except Exception:  # noqa: BLE001 — el batch sigue, el hueco se declara.
-                    failed += len(chunk)
-            if failed:
-                notes.append(f"fundamentals_chips_unavailable:{failed}_ids")
+                    fundamentals_failed += len(chunk)
+            if fundamentals_failed:
+                notes.append(f"fundamentals_chips_unavailable:{fundamentals_failed}_ids")
 
         chip_by_id = _chip_map(composite_chips)
         fund_by_id = _chip_map(fundamentals_chips)
 
         open_ids: set[str] = set()
-        positions_measured = True
+        # Sin adaptador NO se ha medido: no es lo mismo que «no hay posiciones abiertas».
+        positions_measured = self._positions is not None
         if self._positions is not None:
             try:
                 for position in await self._positions.list_open_for_account(account_id):
@@ -444,8 +586,12 @@ class RunEstudioDailyOps:
             except Exception:  # noqa: BLE001 — se declara «no medido», no «sin posición».
                 open_ids = set()
                 positions_measured = False
-                notes.append("positions_unavailable")
+        if not positions_measured:
+            notes.append("positions_unavailable")
 
+        position_open_by_id: dict[str, bool | None] = {
+            iid: (iid in open_ids) if positions_measured else None for iid in ids
+        }
         hints: list[OpinionHint] = []
         for iid in ids:
             chip = chip_by_id.get(iid) or {}
@@ -457,15 +603,93 @@ class RunEstudioDailyOps:
                     fa_score=_float_or_none(fund.get("scoreDisplay100")),
                     ta_score=_float_or_none(chip.get("technicalDisplay100")),
                     distress=bool(fund.get("distress")),
-                    position_open=iid in open_ids,
+                    # TRI-ESTADO: ``None`` cuando la cartera no se midió (nunca ``False``).
+                    position_open=position_open_by_id[iid],
                     # Advisory: el veto de ejecución no se simula aquí (se declara en notes).
                     allow_trading=True,
                     has_eod_bar=None,
                 )
             )
-        return hints, chip_by_id, notes, {
-            iid: (iid in open_ids) if positions_measured else None for iid in ids
+        coverage = {
+            "positionsMeasured": positions_measured,
+            "compositeChipsMeasured": self._composite is not None,
+            "fundamentalsChipsMeasured": self._fundamentals is not None,
+            "compositeChipsFailedIds": composite_failed,
+            "fundamentalsChipsFailedIds": fundamentals_failed,
+            "positionsOpenCount": len(open_ids) if positions_measured else None,
         }
+        return _Hints(
+            hints=hints,
+            chip_by_id=chip_by_id,
+            notes=notes,
+            position_open_by_id=position_open_by_id,
+            coverage=coverage,
+        )
+
+    async def _build_selector(
+        self,
+        ids: list[str],
+        *,
+        account_id: str,
+        day: str,
+    ) -> tuple[dict[str, Any] | None, dict[str, dict[str, Any]], list[str]]:
+        """Gap 1 — foto durable del selector del día y su ganador, por valor.
+
+        Sin adaptador el valor declara ``selector_not_configured`` y el parte no se degrada:
+        es una composición sin la capa de identidad, no una lectura fallida. Con adaptador,
+        una lectura caída SÍ degrada (``selector_identity_unavailable``) y se distingue de
+        «ese día no hay ninguna foto» (``no_snapshot_for_day``).
+        """
+        from bolsa_application.auto_chain_durable_reader import (
+            selector_winner,
+            snapshot_for_day,
+        )
+
+        if self._selector is None:
+            gap = _selector_gap("selector_not_configured")
+            return None, {iid: dict(gap) for iid in ids}, []
+        try:
+            snapshots = await self._selector.snapshots(account_id)
+        except Exception:  # noqa: BLE001 — hueco declarado, nunca «no hay ganador».
+            block = {
+                **_selector_gap("selector_read_failed"),
+                "reason": "selector_read_failed",
+            }
+            return (
+                block,
+                {iid: dict(block) for iid in ids},
+                ["selector_identity_unavailable"],
+            )
+
+        snapshot = snapshot_for_day(snapshots, day)
+        if snapshot is None:
+            block = _selector_gap("no_snapshot_for_day")
+            return block, {iid: dict(block) for iid in ids}, []
+
+        winner = selector_winner(snapshot)
+        reason = None if winner is not None else "no_rank_one_row"
+        block = {
+            "measured": True,
+            "runId": snapshot.get("runId"),
+            "bar": (winner or {}).get("bar") or _snapshot_bar(snapshot),
+            "assetId": (winner or {}).get("assetId"),
+            "presetKey": (winner or {}).get("presetKey"),
+            "strategyVersion": (winner or {}).get("strategyVersion"),
+            "reason": reason,
+        }
+        by_id: dict[str, dict[str, Any]] = {}
+        for iid in ids:
+            winner_id = block["assetId"]
+            by_id[iid] = {
+                **block,
+                # Sin fila rank 1 no se puede afirmar que el valor NO sea el ganador.
+                "isWinner": (
+                    None
+                    if winner_id is None
+                    else str(winner_id).strip() == iid
+                ),
+            }
+        return block, by_id, []
 
     # ── opiniones ────────────────────────────────────────────────────────────
 
@@ -560,8 +784,10 @@ class RunEstudioDailyOps:
         value_errors: dict[str, str],
         propose_error: str | None,
         position_open_by_id: dict[str, bool | None],
+        selector_by_id: dict[str, dict[str, Any]] | None = None,
     ) -> list[EstudioDailyValue]:
         values: list[EstudioDailyValue] = []
+        selector_map = selector_by_id or {}
         for iid in ids:
             row = rows.get(iid)
             chip = chip_by_id.get(iid) or {}
@@ -571,6 +797,8 @@ class RunEstudioDailyOps:
                 # H-145-1 — ``None`` cuando la lectura de posiciones falló: el parte declara el
                 # hueco en vez de afirmar «sin posición» desde una lectura caída.
                 "position_open": position_open_by_id.get(iid),
+                # Gap 1 — identidad del selector del día para ESTE valor (o hueco declarado).
+                "selector": selector_map.get(iid),
                 "indicators": {
                     "io": _float_or_none(chip.get("indiceOperativo")),
                     "fa": _float_or_none(chip.get("scoreDisplay100")),
@@ -639,7 +867,12 @@ class RunEstudioDailyOps:
                             "presetKey": signal.get("presetKey"),
                             "strategyDefinitionId": signal.get("strategyDefinitionId"),
                             "strategyVersion": signal.get("strategyVersion"),
-                            "planId": hit.get("planId") or hit.get("scanId"),
+                            # Gap 1 — `planId` es la identidad DURABLE del plan
+                            # (`TradePlan.decisionId`), la MISMA que sellan el ciclo y el
+                            # journal. `scanId` es el id de la corrida de propuesta y viaja
+                            # aparte: confundirlos impedía atribuir la señal al plan real.
+                            "planId": (plan or {}).get("decisionId"),
+                            "proposeRunId": hit.get("scanId"),
                             "signalId": signal.get("id"),
                         },
                         **payload,

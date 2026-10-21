@@ -47,6 +47,17 @@ const REPORT = {
       reason: null,
       asOfBarDate: "2026-10-17",
       computedAt: "2026-10-18T20:00:00+00:00",
+      positionOpen: true,
+      selector: {
+        measured: true,
+        runId: "top3-acc-1-2026-10-18T08:00:00Z",
+        bar: "2026-10-18T08:00:00Z",
+        assetId: "inst-1",
+        presetKey: "estudio_auto",
+        strategyVersion: "1",
+        isWinner: true,
+        reason: null,
+      },
       opinion: {
         stance: "buy",
         dictamenStars: 4,
@@ -563,7 +574,10 @@ describe("EstudioDailyOpsPanel", () => {
     // `presetKey` es el preset de origen, no la identidad de la estrategia.
     expect(strategy?.textContent).toContain("plan-1");
     expect(strategy?.textContent).toContain("preset de origen estudio_auto");
-    expect(strategy?.textContent).toContain("Indicador ganador: no declarado");
+    // R-2: el nivel 1 declara el selector en lenguaje humano (el crudo va al detalle).
+    expect(strategy?.textContent).toContain(
+      "Ganador del selector: estudio_auto",
+    );
 
     const scope = aaa?.querySelector(
       '[data-testid="estudio-daily-value-operation-scope"]',
@@ -1094,5 +1108,165 @@ describe("EstudioDailyOpsPanel", () => {
       values.length,
     );
     expect(screen.queryByTestId("estudio-chain-error")).toBeNull();
+  });
+
+  it("R-2: la nota cruda no se pinta en nivel 1 y sí en el detalle técnico", async () => {
+    vi.mocked(api.getAutoEstudioDaily).mockResolvedValueOnce({
+      asOf: "2026-10-18",
+      accountId: "acc-1",
+      job: null,
+      latestJob: null,
+      report: {
+        ...REPORT,
+        notes: ["composite_chips_unavailable:3_ids"],
+      },
+      notes: ["positions_unavailable"],
+    } as never);
+
+    renderPanel();
+
+    const responseNotes = await screen.findByTestId("estudio-daily-notes");
+    // La frase de nivel 1 no expone el código crudo (la lista visible, no el disclosure)…
+    const level1 = responseNotes.querySelector("ul");
+    expect(level1?.textContent).toContain("No se pudo leer tu cartera");
+    expect(level1?.textContent).not.toContain("positions_unavailable");
+    // …pero el crudo sigue accesible dentro del disclosure técnico.
+    const technical = screen.getByTestId("estudio-daily-notes-technical");
+    expect(technical.textContent).toContain("positions_unavailable");
+
+    const reportNotes = screen.getByTestId("estudio-daily-report-notes");
+    const reportLevel1 = reportNotes.querySelector("ul");
+    expect(reportLevel1?.textContent).toContain(
+      "No se pudieron leer los indicadores del motor en 3 valores",
+    );
+    expect(reportLevel1?.textContent).not.toContain(
+      "composite_chips_unavailable:3_ids",
+    );
+  });
+
+  it("R-3: un parte partial se pinta con su banner y sus valores", async () => {
+    vi.mocked(api.getAutoEstudioDaily).mockResolvedValueOnce({
+      asOf: "2026-10-18",
+      accountId: "acc-1",
+      job: null,
+      latestJob: null,
+      report: {
+        ...REPORT,
+        status: "partial",
+        degraded: true,
+        degradedReasons: ["positions_unavailable"],
+        coverage: { positionsMeasured: false },
+      },
+      notes: [],
+    } as never);
+
+    renderPanel();
+
+    const banner = await screen.findByTestId("estudio-daily-partial");
+    expect(banner.textContent).toContain("Parte parcial");
+    expect(banner.textContent).toContain("No se pudo leer tu cartera");
+    // El parte NO se oculta por ser parcial: los valores siguen visibles.
+    expect(
+      (await screen.findAllByTestId("estudio-daily-value")).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByTestId("estudio-daily-universe-gap")).toBeNull();
+  });
+
+  it("H-145-1: la cartera sin medir se declara «Cartera sin medida», no «sin posición»", async () => {
+    const withUnknown = structuredClone(REPORT);
+    withUnknown.values[2] = {
+      ...withUnknown.values[2]!,
+      positionOpen: null,
+    };
+    vi.mocked(api.getAutoEstudioDaily).mockResolvedValueOnce({
+      asOf: "2026-10-18",
+      accountId: "acc-1",
+      job: null,
+      latestJob: null,
+      report: withUnknown,
+      notes: [],
+    } as never);
+
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const ccc = rows.find((row) => row.getAttribute("data-symbol") === "CCC");
+    const position = ccc?.querySelector(
+      '[data-testid="estudio-daily-value-position"]',
+    );
+    expect(position?.getAttribute("data-position-open")).toBe("unknown");
+    expect(position?.textContent).toContain("Cartera sin medida");
+    expect(position?.textContent).not.toContain("Sin posición abierta");
+    expect(
+      ccc?.querySelector('[data-testid="estudio-daily-value-position-gap"]')
+        ?.textContent,
+    ).toContain("Sin dato de cartera");
+  });
+
+  it("Gap 1: distingue planId (plan) de proposeRunId (corrida de propuesta)", async () => {
+    const withRun = structuredClone(REPORT);
+    withRun.values[0] = {
+      ...withRun.values[0]!,
+      strategy: {
+        ...withRun.values[0]!.strategy!,
+        planId: "tp-plan-1",
+        proposeRunId: "scan-9",
+      },
+    };
+    vi.mocked(api.getAutoEstudioDaily).mockResolvedValueOnce({
+      asOf: "2026-10-18",
+      accountId: "acc-1",
+      job: null,
+      latestJob: null,
+      report: withRun,
+      notes: [],
+    } as never);
+
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    const identity = aaa?.querySelector(
+      '[data-testid="estudio-daily-value-strategy-identity"]',
+    );
+    expect(identity?.textContent).toContain("plan tp-plan-1");
+    expect(identity?.textContent).toContain("corrida de propuesta scan-9");
+  });
+
+  it("Gap 1: un valor que no es el ganador lo declara sin cambiar la propuesta", async () => {
+    const notWinner = structuredClone(REPORT);
+    notWinner.values[1] = {
+      ...notWinner.values[1]!,
+      selector: {
+        measured: true,
+        runId: "top3-acc-1-2026-10-18T08:00:00Z",
+        bar: "2026-10-18T08:00:00Z",
+        assetId: "inst-1",
+        presetKey: "estudio_auto",
+        strategyVersion: "1",
+        isWinner: false,
+        reason: null,
+      },
+    };
+    vi.mocked(api.getAutoEstudioDaily).mockResolvedValueOnce({
+      asOf: "2026-10-18",
+      accountId: "acc-1",
+      job: null,
+      latestJob: null,
+      report: notWinner,
+      notes: [],
+    } as never);
+
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const bbb = rows.find((row) => row.getAttribute("data-symbol") === "BBB");
+    const winner = bbb?.querySelector(
+      '[data-testid="estudio-daily-value-strategy-winner"]',
+    );
+    expect(winner?.getAttribute("data-selector-winner")).toBe("false");
+    expect(winner?.textContent).toContain("Este valor no es el ganador");
+    // El estado del valor NO se degrada por no ser el ganador del selector.
+    expect(bbb?.getAttribute("data-status")).toBe("no_plan");
   });
 });

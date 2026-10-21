@@ -518,3 +518,80 @@ def test_score_replay_declares_an_unsupported_direction_instead_of_assuming_long
 
     assert report.realized_count == 0
     assert any("direccion_no_soportada" in gap for gap in report.unmeasured)
+
+
+# ── Atribución DÍA-D: identidad sellada sin tocar el artefacto congelado ──────────
+
+
+def test_score_replay_seals_signal_and_plan_only_with_include_attribution() -> None:
+    """El camino DÍA-D sella ``signalId``/``planId``; el congelado no gana ni una clave."""
+    ticks = [
+        _tick(
+            _day(0),
+            fills=(
+                ReplayFill(_day(0), "AAA", "buy", 100.0, 100.0, cycle_id="cycle-1"),
+            ),
+            stops={"AAA": 95.0},
+        ),
+        _tick(
+            _day(1),
+            fills=(
+                ReplayFill(_day(1), "AAA", "sell", 100.0, 110.0, cycle_id="cycle-1"),
+            ),
+        ),
+    ]
+
+    report = score_replay(
+        ticks,
+        attribution_by_cycle={
+            "cycle-1": {"signalId": " sig-1 ", "planId": "plan-1"},
+        },
+    )
+
+    trip = report.round_trips[0]
+    assert trip.signal_id == "sig-1"  # se limpia el blanco, no se inventa
+    assert trip.plan_id == "plan-1"
+
+    frozen = report.to_dict()
+    assert "signalId" not in frozen["roundTrips"][0]
+    assert "planId" not in frozen["roundTrips"][0]
+    assert all("cycleId" not in row for row in frozen["openPositions"])
+
+    sealed = report.to_dict(include_attribution=True)
+    assert sealed["roundTrips"][0]["signalId"] == "sig-1"
+    assert sealed["roundTrips"][0]["planId"] == "plan-1"
+
+
+def test_score_replay_seals_open_position_attribution_and_declares_the_gap() -> None:
+    """La posición viva también lleva su ciclo; sin identidad consta ``None`` (no se re-deriva)."""
+    ticks = [
+        _tick(
+            _day(0),
+            fills=(
+                ReplayFill(_day(0), "AAA", "buy", 100.0, 100.0, cycle_id="cycle-1"),
+                ReplayFill(_day(0), "BBB", "buy", 100.0, 100.0, cycle_id="cycle-2"),
+            ),
+            stops={"AAA": 95.0, "BBB": 95.0},
+        ),
+        _tick(_day(1), prices={"AAA": 105.0, "BBB": 105.0}),
+    ]
+
+    report = score_replay(
+        ticks,
+        attribution_by_cycle={
+            "cycle-1": {"signalId": "sig-1", "planId": "plan-1"},
+        },
+    )
+
+    by_symbol = {pos.symbol: pos for pos in report.open_positions}
+    sealed = report.to_dict(include_attribution=True)
+    rows = {row["symbol"]: row for row in sealed["openPositions"]}
+
+    assert by_symbol["AAA"].cycle_id == "cycle-1"
+    assert rows["AAA"]["cycleId"] == "cycle-1"
+    assert rows["AAA"]["signalId"] == "sig-1"
+    assert rows["AAA"]["planId"] == "plan-1"
+
+    assert by_symbol["BBB"].cycle_id == "cycle-2"
+    assert rows["BBB"]["signalId"] is None  # hueco declarado, nunca atribuido por símbolo
+    assert rows["BBB"]["planId"] is None

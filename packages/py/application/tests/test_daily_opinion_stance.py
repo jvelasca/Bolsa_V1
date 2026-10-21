@@ -109,6 +109,28 @@ def test_stance_never_null_and_stars_range() -> None:
     assert 1 <= r.dictamen_stars <= 5
 
 
+def test_unmeasured_position_never_recommends_and_declares_the_gap() -> None:
+    """R-1/H-156-1 — con la cartera sin medir NO se emite dictamen de entrada/salida."""
+    # Incluso con señal de compra fuerte: el hueco de cartera manda.
+    r = compute_stance(_base(position_open=None, io_score=90.0, top_stars=5.0), now=NOW)
+    assert r.stance == "no_trade"
+    assert r.stance != "buy"
+    assert "position_unmeasured" in r.reasons
+    assert r.gate_status == "WARNING"
+
+    # Tampoco se inventa una salida (no se sabe si hay posición).
+    r_low = compute_stance(_base(position_open=None, io_score=20.0), now=NOW)
+    assert r_low.stance == "no_trade"
+    assert r_low.stance not in ("sell_exit", "reduce")
+
+
+def test_unmeasured_io_is_declared_without_changing_the_star_rule() -> None:
+    """El IO ausente sigue valiendo 3★ (Δ decisión = 0) pero el motivo se declara."""
+    r = compute_stance(_base(io_score=None), now=NOW)
+    assert r.dictamen_stars == 3
+    assert "io_unmeasured" in r.reasons
+
+
 def test_map_io_to_stars_boundaries() -> None:
     assert map_io_to_stars(None) == 3
     assert map_io_to_stars(80) == 5

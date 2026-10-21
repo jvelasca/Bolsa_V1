@@ -45,12 +45,29 @@ class _FakeJobRepo:
     completed: tuple[str, dict[str, Any]] | None = None
     failed: tuple[str, str, dict[str, Any] | None] | None = None
     progress: list[dict[str, Any]] = []
+    claim_kwargs: dict[str, Any] | None = None
+    exhausted_kwargs: dict[str, Any] | None = None
 
     def __init__(self, _session: Any = None) -> None:
         pass
 
-    async def claim_next(self, *, stale_after_seconds: int) -> AutoOpsJob | None:
+    async def claim_next(
+        self, *, stale_after_seconds: int, max_attempts: int = 5
+    ) -> AutoOpsJob | None:
+        type(self).claim_kwargs = {
+            "stale_after_seconds": stale_after_seconds,
+            "max_attempts": max_attempts,
+        }
         return type(self).job
+
+    async def fail_exhausted(
+        self, *, max_attempts: int = 5, stale_after_seconds: int = 1800
+    ) -> int:
+        type(self).exhausted_kwargs = {
+            "max_attempts": max_attempts,
+            "stale_after_seconds": stale_after_seconds,
+        }
+        return 0
 
     async def complete(self, job_id: str, result: dict[str, Any]) -> None:
         type(self).completed = (job_id, result)
@@ -96,6 +113,7 @@ def _settings(**overrides: Any) -> SimpleNamespace:
         "auto_ops_dia_d_timeout_seconds": 60.0,
         "auto_ops_job_interval_seconds": 2.0,
         "auto_ops_job_worker_enabled": True,
+        "auto_ops_job_max_attempts": 5,
     }
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -112,6 +130,8 @@ def _reset(monkeypatch: pytest.MonkeyPatch) -> None:
     _FakeJobRepo.completed = None
     _FakeJobRepo.failed = None
     _FakeJobRepo.progress = []
+    _FakeJobRepo.claim_kwargs = None
+    _FakeJobRepo.exhausted_kwargs = None
     monkeypatch.setattr(worker, "SqlAlchemyAutoOpsJobRepository", _FakeJobRepo)
     monkeypatch.setattr(worker, "get_settings", _settings)
 
@@ -268,6 +288,55 @@ async def test_estudio_daily_reports_a_non_ok_universe_as_failed(
 
     assert caught.value.result == report.to_dict()
     assert _FakeJobRepo.progress == [{"phase": "universe", "done": 0, "total": 0}]
+
+
+@pytest.mark.asyncio
+async def test_a_partial_report_completes_the_job_with_its_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """R-3/H-145-3 — un parte con mediciones ausentes es un RESULTADO, no un fallo."""
+    payload = {
+        "status": "partial",
+        "degraded": True,
+        "degradedReasons": ["positions_unavailable"],
+        "values": [],
+    }
+    report = SimpleNamespace(
+        status="partial",
+        degraded_reasons=["positions_unavailable"],
+        notes=["allowTrading=true ..."],
+        to_dict=lambda: payload,
+    )
+
+    class _Service:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        async def execute(self, *, account_id: str, as_of: str, on_progress: Any) -> Any:
+            return report
+
+    monkeypatch.setattr(daily_ops, "RunEstudioDailyOps", _Service)
+
+    result = await worker.run_auto_ops_job(_job(), _factory())
+
+    assert result == payload
+    # Al NO lanzar ``AutoOpsJobFailed``, el tick lo guarda como ``completed``.
+    assert _FakeJobRepo.failed is None
+
+
+@pytest.mark.asyncio
+async def test_the_configured_attempt_cap_is_forwarded_to_the_repository(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """H-145-5 — el tope es configurable y llega al reclamo y al cierre de agotados."""
+    monkeypatch.setattr(
+        worker, "get_settings", lambda: _settings(auto_ops_job_max_attempts=7)
+    )
+    assert await worker.process_next_auto_ops_job(_factory()) is False
+    assert _FakeJobRepo.claim_kwargs is not None
+    assert _FakeJobRepo.claim_kwargs["max_attempts"] == 7
+    assert _FakeJobRepo.exhausted_kwargs is not None
+    assert _FakeJobRepo.exhausted_kwargs["max_attempts"] == 7
 
 
 @pytest.mark.asyncio

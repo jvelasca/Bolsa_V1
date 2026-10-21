@@ -454,9 +454,13 @@ class RoundTrip:
     #: Dirección de la posición (``"long"`` / ``"short"``). NO se serializa en ``to_dict``:
     #: la referencia congelada de ``replay-repro`` se queda byte a byte.
     direction: str = "long"
+    #: DÍA-D real — identidad de atribución sellada desde el ciclo (``capture_cycle_attribution``).
+    #: NO se serializa con ``include_attribution=False``: el artefacto congelado no cambia.
+    signal_id: str | None = None
+    plan_id: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
+    def to_dict(self, include_attribution: bool = False) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "symbol": self.symbol,
             "entryDay": self.entry_day,
             "exitDay": self.exit_day,
@@ -467,6 +471,10 @@ class RoundTrip:
             "strategyVersion": self.strategy_version,
             "cycleId": self.cycle_id,
         }
+        if include_attribution:
+            payload["signalId"] = self.signal_id
+            payload["planId"] = self.plan_id
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -483,9 +491,13 @@ class OpenPosition:
     strategy_version: str | None = None
     #: Dirección de la posición (``"long"`` / ``"short"``). NO se serializa (ver ``RoundTrip``).
     direction: str = "long"
+    #: DÍA-D real — identidad de atribución (misma regla que ``RoundTrip``).
+    cycle_id: str | None = None
+    signal_id: str | None = None
+    plan_id: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
+    def to_dict(self, include_attribution: bool = False) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "symbol": self.symbol,
             "entryDay": self.entry_day,
             "entryPrice": self.entry_price,
@@ -495,6 +507,11 @@ class OpenPosition:
             "unrealizedR": self.unrealized_r,
             "strategyVersion": self.strategy_version,
         }
+        if include_attribution:
+            payload["cycleId"] = self.cycle_id
+            payload["signalId"] = self.signal_id
+            payload["planId"] = self.plan_id
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -543,7 +560,7 @@ class ScoreReport:
         """
         return _bucket(self.round_trips, lambda trip: _year_of(trip.exit_day))
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self, include_attribution: bool = False) -> dict[str, Any]:
         reasons: dict[str, int] = {}
         for gap in self.unmeasured:
             reason = gap.rsplit(":", 1)[-1]
@@ -554,8 +571,14 @@ class ScoreReport:
             "meanR": self.mean_r,
             "medianR": self.median_r,
             "positiveShare": self.positive_share,
-            "roundTrips": [trip.to_dict() for trip in self.round_trips],
-            "openPositions": [pos.to_dict() for pos in self.open_positions],
+            "roundTrips": [
+                trip.to_dict(include_attribution=include_attribution)
+                for trip in self.round_trips
+            ],
+            "openPositions": [
+                pos.to_dict(include_attribution=include_attribution)
+                for pos in self.open_positions
+            ],
             "byVersion": self.by_version(),
             "byDay": self.by_day(),
             "byYear": self.by_year(),
@@ -640,8 +663,18 @@ def _realized_r(
     return signed_r(direction=resolved, entry=entry, risk=risk, price=exit_price)
 
 
-def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
+def score_replay(
+    ticks: Sequence[ReplayTick],
+    *,
+    attribution_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
+) -> ScoreReport:
     """Puntúa el replay contra los fills ya materializados (PURO, sin mirar el futuro).
+
+    ``attribution_by_cycle`` (DÍA-D real) sella ``signalId``/``planId`` por ``cycleId`` en
+    las operaciones cerradas y en las posiciones vivas. Es opcional y NO altera ninguna
+    cifra: solo añade identidad, y únicamente se serializa con
+    ``ScoreReport.to_dict(include_attribution=True)`` (el artefacto congelado de
+    ``replay-repro`` se queda byte a byte con el default ``False``).
 
     **Unidad = el CICLO de la posición, no el fill.** El motor liquida en fills PARCIALES
     (varias filas por entrada y por salida), así que contar una ida y vuelta por cada fila
@@ -662,6 +695,19 @@ def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
     round_trips: list[RoundTrip] = []
     unmeasured: list[str] = []
     last_tick = ticks[-1] if ticks else None
+    attribution = attribution_by_cycle or {}
+
+    def _seal(cycle_id: Any) -> tuple[str | None, str | None]:
+        """Identidad del ciclo (``signalId``/``planId``) o ``(None, None)`` si no consta."""
+        key = str(cycle_id or "").strip()
+        if not key:
+            return None, None
+        facts = attribution.get(key)
+        if not isinstance(facts, Mapping):
+            return None, None
+        signal = str(facts.get("signalId") or "").strip() or None
+        plan = str(facts.get("planId") or "").strip() or None
+        return signal, plan
 
     for tick in ticks:
         for row in tick.fill_rows:
@@ -676,6 +722,7 @@ def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
             if row.side == opening_side:
                 ctx = entry_ctx.get(symbol)
                 if ctx is None:
+                    signal_id, plan_id = _seal(row.cycle_id)
                     entry_ctx[symbol] = {
                         "entry_day": tick.day,
                         "entry_qty": float(row.quantity),
@@ -684,6 +731,8 @@ def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
                         "strategy_version": row.strategy_version,
                         "cycle_id": row.cycle_id,
                         "direction": resolved,
+                        "signal_id": signal_id,
+                        "plan_id": plan_id,
                     }
                 else:
                     ctx["entry_qty"] = float(ctx["entry_qty"]) + float(row.quantity)
@@ -727,6 +776,8 @@ def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
                         strategy_version=ctx.get("strategy_version"),
                         cycle_id=ctx.get("cycle_id"),
                         direction=direction,
+                        signal_id=ctx.get("signal_id"),
+                        plan_id=ctx.get("plan_id"),
                     )
                 )
             entry_ctx.pop(symbol, None)
@@ -763,6 +814,9 @@ def score_replay(ticks: Sequence[ReplayTick]) -> ScoreReport:
                     unrealized_r=unrealized,
                     strategy_version=ctx.get("strategy_version"),
                     direction=direction,
+                    cycle_id=ctx.get("cycle_id"),
+                    signal_id=ctx.get("signal_id"),
+                    plan_id=ctx.get("plan_id"),
                 )
             )
 

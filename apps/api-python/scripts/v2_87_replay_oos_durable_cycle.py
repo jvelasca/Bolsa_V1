@@ -320,6 +320,7 @@ async def _run_durable_replay(
     operable_days: Sequence[bool] = (),
     durable_cycle: bool = True,
     capture_cycle_detail: bool = False,
+    capture_cycle_attribution: bool = False,
     finance_report_path: str | None = None,
     on_tick: Callable[[int, int], None] | None = None,
 ) -> dict[str, Any]:
@@ -436,12 +437,22 @@ async def _run_durable_replay(
     # un evento de gestión journalizado en ese tick pertenece a ese ciclo. Sólo se puebla con la
     # costura encendida; nunca se inventa un ciclo para un símbolo sin posición previa.
     cycle_by_symbol_day: dict[tuple[str, str], str] = {}
+    # DÍA-D real (v2.88.157): ``cycleId → {signalId, planId}`` sellado al NACER la posición en
+    # este replay. Con el flag apagado (default) no se puebla y ``replay-repro`` no cambia.
+    attribution_by_cycle: dict[str, dict[str, Any]] = {}
     total_ticks = max(0, end - start_index)
     for index in range(start_index, end):
         # Progreso de replay (opcional): ``v2_89`` lo publica como JSONL para la UI.
         if on_tick is not None:
             on_tick(index - start_index + 1, total_ticks)
         cursor.set_index(index)
+        # Ciclos YA abiertos al empezar el tick: sólo las posiciones NUEVAS sellan identidad.
+        pre_cycles: set[str] = set()
+        if capture_cycle_attribution:
+            for position in (getattr(worker, "_v2_positions", {}) or {}).values():
+                cid = str(getattr(position, "cycle_id", "") or "")
+                if cid:
+                    pre_cycles.add(cid)
         open_frames: dict[str, dict[str, Any]] = {}
         if capture_cycle_detail:
             day = cursor.current_day()
@@ -487,6 +498,20 @@ async def _run_durable_replay(
             set(getattr(worker, "_v2_exit_orders", {}) or {}) if capture_cycle_detail else set()
         )
         report = await worker.auto_turn()
+        if capture_cycle_attribution:
+            # Se sella ANTES de ``close_tick``: una posición que nace y muere en el mismo tick
+            # también deja su identidad en la ``RoundTrip`` (y no se pierde al vaciar el mapa).
+            tick_signals = getattr(worker, "_v2_tick_signals", {}) or {}
+            for symbol, position in (getattr(worker, "_v2_positions", {}) or {}).items():
+                cid = str(getattr(position, "cycle_id", "") or "")
+                if not cid or cid in pre_cycles or cid in attribution_by_cycle:
+                    continue
+                signal_id = str(tick_signals.get(str(symbol)) or "").strip() or None
+                plan_id = str(getattr(position, "decision_id", "") or "").strip() or None
+                attribution_by_cycle[cid] = {
+                    "signalId": signal_id,
+                    "planId": plan_id,
+                }
         minted_exit_cycles = (
             _minted_exit_cycles(pre_exit_ids, getattr(worker, "_v2_exit_orders", {}) or {})
             if capture_cycle_detail
@@ -656,7 +681,12 @@ async def _run_durable_replay(
                 flush=True,
             )
 
-    score = score_replay(ticks)
+    score = score_replay(
+        ticks,
+        attribution_by_cycle=(
+            attribution_by_cycle if capture_cycle_attribution else None
+        ),
+    )
     regimes: dict[str, int] = {}
     for tick in ticks:
         key = str(tick.regime or "UNKNOWN")
@@ -754,7 +784,7 @@ async def _run_durable_replay(
         "watchA": list(watch_a),
         "watchB": list(watch_b),
         "pairActive": False,
-        "score": score.to_dict(),
+        "score": score.to_dict(include_attribution=capture_cycle_attribution),
         "durableCycle": bool(durable_cycle),
         "book": {
             "perDay": book_rows,
@@ -1193,7 +1223,7 @@ def _run_finance_band(args: argparse.Namespace) -> int:
             "k0Sha256Lf": k0_sha,
         },
         meta={
-            "bump": "2.11.156-beta",
+            "bump": "2.11.157-beta",
             "phase": "V2.88.114 OOS FINANCE BAND (§8-c)",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),

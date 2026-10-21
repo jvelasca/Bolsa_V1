@@ -1661,6 +1661,29 @@ def test_cycle_without_the_decision_declares_attribution_as_none() -> None:
     assert cycle["planId"] is None
 
 
+def test_a_blank_signal_id_is_not_published_as_a_signal_fact() -> None:
+    """R-4 — un ``signalId`` en blanco no es una identidad: no se añade el hecho."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        journal=[_decision_entry(signalId="   ")],
+    )
+    cycle = dto["cycles"][0]
+    assert cycle["signalId"] is None
+    signal = _step(cycle["steps"], "SIGNAL")
+    # El paso sigue REACHED por sus otros hechos; lo que no viaja es el id vacío.
+    assert signal["state"] == "reached"
+    assert all(fact["key"] != "signalId" for fact in signal["facts"])
+
+    padded = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        journal=[_decision_entry(signalId="  sig-inst-1  ")],
+    )
+    padded_signal = _step(padded["cycles"][0]["steps"], "SIGNAL")
+    assert _fact(padded_signal, "signalId")["value"] == "sig-inst-1"
+
+
 def test_entry_reservation_is_none_without_rows() -> None:
     assert _entry_reservation([]) is None
 

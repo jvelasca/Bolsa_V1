@@ -13,7 +13,7 @@ Cubre los criterios falsables del plan:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pytest
@@ -23,6 +23,7 @@ from bolsa_application.estudio_daily_ops import (
     STATUS_NO_PLAN,
     STATUS_NO_SIGNAL,
     STATUS_OK,
+    STATUS_PARTIAL,
     RunEstudioDailyOps,
 )
 
@@ -153,8 +154,11 @@ def _hit(iid: str) -> dict[str, Any]:
     return {
         "instrumentId": iid,
         "symbol": f"T{iid.upper()}",
+        # ``scanId`` es la CORRIDA de propuesta; la identidad del PLAN es ``decisionId``.
         "planId": "plan-1",
+        "scanId": "scan-1",
         "tradePlan": {
+            "decisionId": "tp-plan-1",
             "status": "TRIGGERED",
             "direction": "long",
             # ``target2`` no existe: debe viajar None, jamás 0.
@@ -237,8 +241,10 @@ async def test_every_estudio_value_gets_a_part_and_counts_sum_to_the_universe() 
     # `topId` viaja con la opinión (evidencia real del TOP, no un hueco inventado).
     assert by_id["inst-ok"]["opinion"]["topId"] == "top-1"
     assert by_id["inst-ok"]["strategy"]["presetKey"] == "estudio_auto"
-    # Identidad estable para atribuir el histórico (plan/señal), no solo el ticker.
-    assert by_id["inst-ok"]["strategy"]["planId"] == "plan-1"
+    # Gap 1 — `planId` es la identidad DURABLE del plan, no el id de la corrida de propuesta.
+    assert by_id["inst-ok"]["strategy"]["planId"] == "tp-plan-1"
+    assert by_id["inst-ok"]["strategy"]["proposeRunId"] == "scan-1"
+    assert by_id["inst-ok"]["plan"]["decisionId"] == "tp-plan-1"
     assert by_id["inst-ok"]["strategy"]["signalId"] == "sig-inst-ok"
     # Cobertura declarada: el universo medido antes del recorte.
     assert payload["universeCount"] == 3
@@ -328,6 +334,48 @@ class _BrokenPositions:
         raise RuntimeError("posiciones ilegibles")
 
 
+class _FakeSelector:
+    """Fotos durables del selector (o un fallo de lectura, que debe propagarse)."""
+
+    def __init__(self, snapshots: list[dict[str, Any]], *, fail: bool = False) -> None:
+        self._snapshots = snapshots
+        self._fail = fail
+
+    async def snapshots(self, account_id: str) -> list[dict[str, Any]]:
+        if self._fail:
+            raise RuntimeError("selector ilegible")
+        return list(self._snapshots)
+
+
+def _snapshot(*, asset_id: str = "inst-ok", preset: str = "swing_v2") -> dict[str, Any]:
+    return {
+        "runId": f"top3-acc-1-{_DAY}T08:00:00Z",
+        "bar": datetime(2026, 10, 18, 8, 0, tzinfo=UTC),
+        "rows": [
+            {
+                "assetId": asset_id,
+                "rank": 1,
+                "combined": 0.91,
+                "components": {},
+                "regime": "neutral",
+                "strategyPresetKey": preset,
+                "strategyVersion": "7",
+                "runId": f"top3-acc-1-{_DAY}T08:00:00Z",
+            },
+            {
+                "assetId": "inst-other",
+                "rank": 2,
+                "combined": 0.5,
+                "components": {},
+                "regime": "neutral",
+                "strategyPresetKey": "swing_v1",
+                "strategyVersion": "3",
+                "runId": f"top3-acc-1-{_DAY}T08:00:00Z",
+            },
+        ],
+    }
+
+
 class _BrokenComposite:
     async def execute_chips(self, instrument_ids: list[str], **_: Any) -> list[dict[str, Any]]:
         raise RuntimeError("composite caído")
@@ -355,8 +403,124 @@ async def test_a_failed_positions_read_is_declared_unknown_not_closed() -> None:
     value = payload["values"][0]
     assert value["positionOpen"] is None
     assert "positions_unavailable" in payload["notes"]
-    # Δ decisión = 0: el motor de dictamen sigue recibiendo ``False`` (no se toca el stance).
+    # R-1/R-3 — el hueco ya no es cosmético: el parte se declara PARTIAL y lo dice.
+    assert payload["status"] == STATUS_PARTIAL
+    assert payload["degraded"] is True
+    assert "positions_unavailable" in payload["degradedReasons"]
+    assert payload["coverage"]["positionsMeasured"] is False
     assert value["status"] == STATUS_NO_SIGNAL
+
+
+@pytest.mark.asyncio
+async def test_an_absent_positions_adapter_is_declared_unknown_not_closed() -> None:
+    """H-156-1 — sin adaptador NO se consultó nada: «no medido», nunca «sin posición»."""
+    rows = {"inst-1": _Opinion("inst-1", "buy", 4)}
+    service = RunEstudioDailyOps(
+        _FakeEstudioList(list(rows)),
+        _FakeOpinions(rows),
+        _FakePropose({"hits": [], "skipped": []}),
+        composite=_FakeComposite(),
+        fundamentals=_FakeFundamentals(),
+        # Sin ``positions``: el adaptador NO está configurado.
+    )
+    report = await service.execute(account_id="acc-1", as_of=_DAY)
+    value = report.to_dict()["values"][0]
+    assert value["positionOpen"] is None
+    assert "positions_unavailable" in report.notes
+    assert report.coverage["positionsMeasured"] is False
+    assert report.coverage["positionsOpenCount"] is None
+    assert report.status == STATUS_PARTIAL
+
+
+@pytest.mark.asyncio
+async def test_all_values_failing_marks_the_report_unavailable() -> None:
+    """Ningún valor medible ⇒ el parte es ``unavailable``, no un ``partial`` cosmético."""
+    rows = {
+        "inst-1": _Opinion("inst-1", "hold_watch", 2),
+        "inst-2": _Opinion("inst-2", "hold_watch", 2),
+    }
+    service = RunEstudioDailyOps(
+        _FakeEstudioList(list(rows)),
+        _FakeOpinions(rows, broken={"inst-1", "inst-2"}),
+        _FakePropose({"hits": [], "skipped": []}),
+        composite=_FakeComposite(),
+        fundamentals=_FakeFundamentals(),
+        positions=_FakePositions([]),
+    )
+    report = await service.execute(account_id="acc-1", as_of=_DAY)
+    assert report.status == "unavailable"
+    assert "all_values_failed" in report.degraded_reasons
+    assert all(value.status == STATUS_ERROR for value in report.values)
+
+
+@pytest.mark.asyncio
+async def test_selector_winner_is_published_per_value() -> None:
+    """Gap 1 — el parte declara la foto del día y si el valor era el ganador del selector."""
+    rows = {
+        "inst-ok": _Opinion("inst-ok", "hold_watch", 2),
+        "inst-other": _Opinion("inst-other", "hold_watch", 2),
+    }
+    service = RunEstudioDailyOps(
+        _FakeEstudioList(list(rows)),
+        _FakeOpinions(rows),
+        _FakePropose({"hits": [], "skipped": []}),
+        composite=_FakeComposite(),
+        fundamentals=_FakeFundamentals(),
+        positions=_FakePositions([]),
+        selector=_FakeSelector([_snapshot(asset_id="inst-ok")]),
+    )
+    report = await service.execute(account_id="acc-1", as_of=_DAY)
+    by_id = {value["instrumentId"]: value for value in report.to_dict()["values"]}
+    assert by_id["inst-ok"]["selector"]["isWinner"] is True
+    assert by_id["inst-other"]["selector"]["isWinner"] is False
+    assert by_id["inst-ok"]["selector"]["assetId"] == "inst-ok"
+    assert by_id["inst-ok"]["selector"]["presetKey"] == "swing_v2"
+    assert by_id["inst-ok"]["selector"]["runId"] == f"top3-acc-1-{_DAY}T08:00:00Z"
+    assert report.selector is not None
+    assert report.selector["measured"] is True
+    assert report.selector["assetId"] == "inst-ok"
+
+
+@pytest.mark.asyncio
+async def test_selector_without_a_snapshot_for_the_day_declares_the_gap() -> None:
+    """Sin foto DEL DÍA el ganador es un hueco: ``isWinner=None``, no ``False``."""
+    rows = {"inst-ok": _Opinion("inst-ok", "hold_watch", 2)}
+    other_day = _snapshot()
+    other_day["bar"] = datetime(2026, 10, 17, 8, 0, tzinfo=UTC)
+    service = RunEstudioDailyOps(
+        _FakeEstudioList(list(rows)),
+        _FakeOpinions(rows),
+        _FakePropose({"hits": [], "skipped": []}),
+        composite=_FakeComposite(),
+        fundamentals=_FakeFundamentals(),
+        positions=_FakePositions([]),
+        selector=_FakeSelector([other_day]),
+    )
+    report = await service.execute(account_id="acc-1", as_of=_DAY)
+    value = report.to_dict()["values"][0]
+    assert value["selector"]["measured"] is False
+    assert value["selector"]["reason"] == "no_snapshot_for_day"
+    assert value["selector"]["isWinner"] is None
+    # No es una medición fallida: no degrada el parte.
+    assert "selector_identity_unavailable" not in report.degraded_reasons
+
+
+@pytest.mark.asyncio
+async def test_selector_read_failure_degrades_the_report() -> None:
+    """Una lectura caída del selector SÍ se declara como medición ausente."""
+    rows = {"inst-ok": _Opinion("inst-ok", "hold_watch", 2)}
+    service = RunEstudioDailyOps(
+        _FakeEstudioList(list(rows)),
+        _FakeOpinions(rows),
+        _FakePropose({"hits": [], "skipped": []}),
+        composite=_FakeComposite(),
+        fundamentals=_FakeFundamentals(),
+        positions=_FakePositions([]),
+        selector=_FakeSelector([], fail=True),
+    )
+    report = await service.execute(account_id="acc-1", as_of=_DAY)
+    assert "selector_identity_unavailable" in report.degraded_reasons
+    assert report.status == STATUS_PARTIAL
 
 
 @pytest.mark.asyncio
@@ -397,11 +561,18 @@ async def test_failed_chip_chunks_are_declared_instead_of_silenced() -> None:
         positions=_FakePositions([]),
     )
     report = await service.execute(account_id="acc-1", as_of=_DAY)
-    # El batch NO se cae: los chips son hints, no la señal.
-    assert report.status == "ok"
+    # El batch NO se cae: los chips son hints, no la señal. Pero el parte NO puede decir
+    # «ok»: hay valores sin indicador medido, así que el estado sube a `partial` (R-3).
+    assert report.status == STATUS_PARTIAL
+    assert report.degraded is True
     assert len(report.values) == 2
     assert "composite_chips_unavailable:2_ids" in report.notes
     assert "fundamentals_chips_unavailable:2_ids" in report.notes
+    assert "composite_chips_unavailable:2_ids" in report.degraded_reasons
+    assert report.coverage["compositeChipsFailedIds"] == 2
+    assert report.coverage["fundamentalsChipsFailedIds"] == 2
+    # La lectura de posiciones SÍ respondió en este caso: no se declara hueco de cartera.
+    assert report.coverage["positionsMeasured"] is True
     # El hueco del chip no se convierte en un 0 fabricado: los indicadores viajan None.
     value = next(v for v in report.to_dict()["values"] if v["instrumentId"] == "inst-1")
     assert value["indicators"]["io"] is None

@@ -32,6 +32,12 @@ import {
 } from "@/features/auto-monitor/use-estudio-chain";
 import { EstudioChainEvidence } from "@/features/auto-monitor/estudio-chain-evidence";
 import { useAutoEstudioAudit } from "@/features/auto-monitor/use-auto-dia-d-feedback";
+import { AutoTechnicalDetail } from "@/features/auto/auto-technical-detail";
+import {
+  describeEstudioDailyNotes,
+  describePositionOpen,
+  POSITION_UNMEASURED_DETAIL,
+} from "@/features/auto-monitor/estudio-daily-notes";
 
 type AuditValue =
   ReturnType<typeof indexAuditValuesBySymbol> extends Map<string, infer V>
@@ -92,6 +98,42 @@ function StatusBadge({ status }: { status: string }) {
     >
       {STATUS_LABEL[status] ?? status}
     </span>
+  );
+}
+
+/**
+ * R-2 — notas del parte: frase humana en nivel 1, código crudo SOLO en el disclosure.
+ *
+ * Los códigos del backend (`positions_unavailable`, `composite_chips_unavailable:3_ids`…)
+ * son contrato y evidencia, pero no son lenguaje de usuario. Aquí se traducen y el crudo
+ * queda accesible, no expuesto.
+ */
+function DailyNotes({
+  notes,
+  testId,
+}: {
+  notes: readonly (string | null | undefined)[] | null | undefined;
+  testId: string;
+}) {
+  const described = useMemo(() => describeEstudioDailyNotes(notes), [notes]);
+  if (described.length === 0) return null;
+  return (
+    <div data-testid={testId} className="space-y-0.5">
+      <ul className="space-y-0.5 text-[11px] text-muted-foreground">
+        {described.map((note) => (
+          <li key={note.code} data-code={note.code}>
+            {note.headline}
+          </li>
+        ))}
+      </ul>
+      <AutoTechnicalDetail testId={`${testId}-technical`}>
+        <ul className="space-y-0.5 font-mono text-[10px] text-muted-foreground">
+          {described.map((note) => (
+            <li key={note.code}>{note.technical}</li>
+          ))}
+        </ul>
+      </AutoTechnicalDetail>
+    </div>
   );
 }
 
@@ -234,6 +276,19 @@ function ValueCard({
   const plan = value.plan ?? null;
   const cycles = audit?.cycles ?? [];
   const whyNot = value.whyNot ?? [];
+  const selector = value.selector ?? null;
+  const selectorHeadline =
+    !selector || !selector.measured
+      ? selector?.reason === "no_snapshot_for_day"
+        ? "Sin foto del selector para este día"
+        : selector?.reason === "selector_not_configured"
+          ? "Identidad del selector no incluida en este parte"
+          : "No se pudo leer el selector del día"
+      : selector.isWinner === true
+        ? `Ganador del selector: ${selector.presetKey ?? selector.assetId ?? "sin identidad"}`
+        : selector.isWinner === false
+          ? "Este valor no es el ganador del selector"
+          : "El selector del día no declaró un ganador";
   // Desde el sello .156 el contrato de ciclos SÍ publica `planId`/`signalId` (gap 2): la
   // atribución se resuelve con ellos; sin esos hechos sigue siendo «no atribuido».
   const attribution = auditAttributionForValue(
@@ -302,6 +357,25 @@ function ValueCard({
               ? value.opinion.reasons.join(" · ")
               : absentDataLabel()}
           </p>
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="estudio-daily-value-position"
+            data-position-open={
+              value.positionOpen == null
+                ? "unknown"
+                : String(value.positionOpen)
+            }
+          >
+            Cartera: <strong>{describePositionOpen(value.positionOpen)}</strong>
+          </p>
+          {value.positionOpen == null ? (
+            <p
+              className="text-[10px] text-amber-600 dark:text-amber-400"
+              data-testid="estudio-daily-value-position-gap"
+            >
+              {POSITION_UNMEASURED_DETAIL}
+            </p>
+          ) : null}
         </section>
 
         <section data-testid="estudio-daily-value-strategy">
@@ -322,22 +396,42 @@ function ValueCard({
             data-testid="estudio-daily-value-strategy-identity"
           >
             preset de origen {textOrAbsent(value.strategy?.presetKey)} · plan{" "}
-            {textOrAbsent(value.strategy?.planId)} · señal{" "}
+            {textOrAbsent(value.strategy?.planId)} · corrida de propuesta{" "}
+            {textOrAbsent(value.strategy?.proposeRunId)} · señal{" "}
             {textOrAbsent(value.strategy?.signalId)}
           </p>
           <p
             className="text-[10px] text-muted-foreground"
             data-testid="estudio-daily-value-strategy-winner"
+            data-selector-measured={String(Boolean(selector?.measured))}
+            data-selector-winner={String(selector?.isWinner ?? "unknown")}
           >
-            Indicador ganador: no declarado por el motor · TOP{" "}
-            {textOrAbsent(value.opinion?.topId)}
-            {isAbsent(value.opinion?.topVersion)
-              ? ""
-              : ` v${value.opinion?.topVersion}`}
+            {selectorHeadline}
           </p>
+          <AutoTechnicalDetail testId="estudio-daily-value-selector-technical">
+            <p className="font-mono text-[10px] text-muted-foreground">
+              selector run {textOrAbsent(selector?.runId)} · barra{" "}
+              {textOrAbsent(selector?.bar)} · activo{" "}
+              {textOrAbsent(selector?.assetId)} · preset{" "}
+              {textOrAbsent(selector?.presetKey)} · v
+              {textOrAbsent(selector?.strategyVersion)} · motivo{" "}
+              {textOrAbsent(selector?.reason)}
+            </p>
+            <p className="font-mono text-[10px] text-muted-foreground">
+              TOP {textOrAbsent(value.opinion?.topId)}
+              {isAbsent(value.opinion?.topVersion)
+                ? ""
+                : ` v${value.opinion?.topVersion}`}{" "}
+              · plan {textOrAbsent(value.strategy?.planId)} · corrida{" "}
+              {textOrAbsent(value.strategy?.proposeRunId)}
+            </p>
+          </AutoTechnicalDetail>
           <p className="text-[10px] text-muted-foreground">
-            IO {fmtNumber(value.indicators?.io)} · FA{" "}
-            {fmtNumber(value.indicators?.fa)} · TA{" "}
+            IO{" "}
+            {isAbsent(value.indicators?.io)
+              ? "sin medida"
+              : fmtNumber(value.indicators?.io)}{" "}
+            · FA {fmtNumber(value.indicators?.fa)} · TA{" "}
             {fmtNumber(value.indicators?.ta)} ·{" "}
             {textOrAbsent(value.indicators?.regime)}
           </p>
@@ -611,16 +705,7 @@ export function EstudioDailyOpsPanel() {
           ) : null}
 
           {response?.notes && response.notes.length > 0 ? (
-            <ul
-              data-testid="estudio-daily-notes"
-              className="space-y-0.5 text-[10px] text-muted-foreground"
-            >
-              {response.notes.map((note) => (
-                <li key={note} className="font-mono">
-                  {note}
-                </li>
-              ))}
-            </ul>
+            <DailyNotes notes={response.notes} testId="estudio-daily-notes" />
           ) : null}
         </CardContent>
       </Card>
@@ -741,18 +826,35 @@ export function EstudioDailyOpsPanel() {
         </p>
       ) : null}
 
-      {report && report.status !== "ok" ? (
+      {report &&
+      (report.status === "empty" || report.status === "unavailable") ? (
         <p
           data-testid="estudio-daily-universe-gap"
           className="text-sm text-amber-600 dark:text-amber-400"
         >
           Universo ESTUDIO {report.status}:{" "}
-          {report.notes?.[0] ?? "sin motivo declarado"}. No se escribieron
-          opiniones.
+          {describeEstudioDailyNotes(report.notes)[0]?.headline ??
+            "sin motivo declarado"}
+          . No se escribieron opiniones.
         </p>
       ) : null}
 
-      {report && report.status === "ok" ? (
+      {report?.status === "partial" ? (
+        <div
+          data-testid="estudio-daily-partial"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-700 dark:text-amber-300"
+        >
+          <p className="font-semibold">
+            Parte parcial: hay datos que no se pudieron medir.
+          </p>
+          <DailyNotes
+            notes={report.degradedReasons ?? report.notes}
+            testId="estudio-daily-partial-reasons"
+          />
+        </div>
+      ) : null}
+
+      {report && (report.status === "ok" || report.status === "partial") ? (
         <Card className="rounded-xl border border-border bg-card">
           <CardHeader className="pb-2">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -794,16 +896,10 @@ export function EstudioDailyOpsPanel() {
               </p>
             ) : null}
             {report.notes && report.notes.length > 0 ? (
-              <ul
-                className="space-y-0.5 text-[10px] text-muted-foreground"
-                data-testid="estudio-daily-report-notes"
-              >
-                {report.notes.map((note) => (
-                  <li key={note} className="font-mono">
-                    {note}
-                  </li>
-                ))}
-              </ul>
+              <DailyNotes
+                notes={report.notes}
+                testId="estudio-daily-report-notes"
+              />
             ) : null}
             {report.generatedAt ? (
               <p

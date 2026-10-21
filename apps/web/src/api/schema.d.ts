@@ -8490,11 +8490,8 @@ export interface components {
             instrumentId: string;
             /** Ioscore */
             ioScore?: number | null;
-            /**
-             * Positionopen
-             * @default false
-             */
-            positionOpen: boolean;
+            /** Positionopen */
+            positionOpen?: boolean | null;
             /** Tascore */
             taScore?: number | null;
         };

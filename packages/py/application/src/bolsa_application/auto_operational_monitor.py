@@ -495,8 +495,11 @@ def _entry_decision_step(
     # Gap 2 — la identidad de atribución (``signalId``/``planId``) viaja ADITIVA en las etapas
     # que la declaran. Se añade SOLO si la etapa ya tenía algún hecho, para no convertir un
     # ``UNKNOWN`` en ``REACHED`` por un id: la atribución no es la prueba del paso.
-    if facts and step_id == "SIGNAL" and payload.get("signalId"):
-        facts.append(_fact("signalId", str(payload.get("signalId")).strip() or None))
+    # R-4 — un id EN BLANCO no es una identidad: se normaliza antes de decidir y, si queda
+    # vacío, no se añade el hecho (antes viajaba ``signalId: None`` como si fuera un hecho).
+    clean_signal = str(payload.get("signalId") or "").strip()
+    if facts and step_id == "SIGNAL" and clean_signal:
+        facts.append(_fact("signalId", clean_signal))
     if facts and step_id == "RISK":
         plan_for_id = payload.get("tradePlan")
         if isinstance(plan_for_id, Mapping):

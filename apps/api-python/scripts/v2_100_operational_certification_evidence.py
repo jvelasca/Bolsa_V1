@@ -304,7 +304,7 @@ async def _collect(args: argparse.Namespace) -> dict[str, Any]:
         best_scored=read["bestScored"],
         as_of=captured_at,
         meta={
-            "bump": "2.11.156-beta",
+            "bump": "2.11.157-beta",
             "phase": "V2.100 OPERATIONAL CERTIFICATION EVIDENCE",
             "nature": "INVESTIGACION",
             "account": account_id,
@@ -336,7 +336,7 @@ async def _collect(args: argparse.Namespace) -> dict[str, Any]:
         "readOnly": True,
         "substitutesRealOperation": False,
         "meta": {
-            "bump": "2.11.156-beta",
+            "bump": "2.11.157-beta",
             "phase": "V2.100 OPERATIONAL CERTIFICATION EVIDENCE",
             "nature": "OPERACION",
             "account": account_id,

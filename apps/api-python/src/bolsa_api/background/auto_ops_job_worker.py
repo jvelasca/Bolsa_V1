@@ -66,7 +66,10 @@ async def _run_estudio_daily(
         get_propose_estudio_auto_use_case,
     )
     from bolsa_api.background.estudio_watch import SessionScopedEstudioList
-    from bolsa_application.estudio_daily_ops import RunEstudioDailyOps
+    from bolsa_application.estudio_daily_ops import (
+        RunEstudioDailyOps,
+        Top3SnapshotsSelector,
+    )
 
     account_id = str(job.account_id or "")
     if not account_id:
@@ -88,6 +91,9 @@ async def _run_estudio_daily(
             composite=get_instrument_composite_use_case(session),
             fundamentals=get_instrument_fundamentals_use_case(session),
             positions=get_position_state_repository(session),
+            # Gap 1 — foto durable del selector cross-asset del día (misma fuente que la
+            # evidencia de cadena). Read-only; un fallo se declara en el parte.
+            selector=Top3SnapshotsSelector(session),
         )
         report = await service.execute(
             account_id=account_id,
@@ -98,11 +104,26 @@ async def _run_estudio_daily(
         await session.commit()
 
     result = report.to_dict()
-    if report.status != "ok":
-        raise AutoOpsJobFailed(
-            str((report.notes or ["Universo ESTUDIO no disponible"])[0]),
-            result=result,
+    reasons = [
+        str(reason)
+        for reason in (getattr(report, "degraded_reasons", None) or [])
+        if str(reason).strip()
+    ]
+    status = str(getattr(report, "status", "") or "")
+    if status == "partial":
+        # R-3/H-145-3 — con mediciones ausentes el parte sigue siendo un RESULTADO válido:
+        # se guarda completo con sus huecos declarados y NO se cierra como fallo. El worker
+        # deja la traza de qué se degradó.
+        logger.warning(
+            "estudio_daily %s: parte PARTIAL (degradado: %s)",
+            job.id,
+            ", ".join(reasons) or "sin motivo declarado",
         )
+        return result
+    if status != "ok":
+        notes = [str(note) for note in (getattr(report, "notes", None) or [])]
+        detail = (reasons or notes or ["Universo ESTUDIO no disponible"])[0]
+        raise AutoOpsJobFailed(str(detail), result=result)
     return result
 
 
@@ -160,7 +181,17 @@ async def process_next_auto_ops_job(
 
     async with session_factory() as session:
         repo = SqlAlchemyAutoOpsJobRepository(session)
-        job = await repo.claim_next(stale_after_seconds=int(max(60.0, stale)))
+        attempts = max(1, int(getattr(settings, "auto_ops_job_max_attempts", 5)))
+        # H-145-5 — antes de reclamar, cerrar los ABANDONADOS que agotaron el tope: si no,
+        # quedarían en la cola sin poder reclamarse y sin desenlace durable.
+        await repo.fail_exhausted(
+            max_attempts=attempts,
+            stale_after_seconds=int(max(60.0, stale)),
+        )
+        job = await repo.claim_next(
+            stale_after_seconds=int(max(60.0, stale)),
+            max_attempts=attempts,
+        )
         await session.commit()
     if job is None:
         return False

@@ -81,7 +81,9 @@ __all__ = [
     "read_top3_snapshots",
     "resolve_dia_d_cycle_facts",
     "resolve_executed_vs_best",
+    "selector_winner",
     "snapshot_as_of",
+    "snapshot_for_day",
     "value_strategy",
 ]
 
@@ -756,6 +758,8 @@ def _top3_row(row: Any, *, run_id: str) -> dict[str, Any]:
 async def read_top3_snapshots(
     session: Any,
     account_id: str,
+    *,
+    raise_on_error: bool = False,
 ) -> list[dict[str, Any]]:
     """Lee (read-only) TODAS las fotos durables del selector cross-asset, la más nueva primero.
 
@@ -767,6 +771,10 @@ async def read_top3_snapshots(
     Leer todas las fotos (y no solo la última) es lo que permite contrastar un ciclo con la
     foto VIGENTE EN SU INSTANTE: comparar un ciclo antiguo con la última foto del día mezclaba
     dos momentos y podía reportar una divergencia de estrategia que solo era de tiempo.
+
+    ``raise_on_error`` distingue «no hay fotos» de «la lectura falló»: el parte diario necesita
+    declarar el segundo como medición caída (``selector_identity_unavailable``) y no como «no
+    hay ganador». El default mantiene el comportamiento histórico (``[]``).
     """
     from sqlalchemy import select
 
@@ -790,6 +798,8 @@ async def read_top3_snapshots(
             )
         ).all()
     except Exception:  # noqa: BLE001 — sin foto el hueco se declara, nunca se finge.
+        if raise_on_error:
+            raise
         return []
     if not rows:
         return []
@@ -840,6 +850,53 @@ def snapshot_as_of(
         if isinstance(bar, datetime) and bar <= moment:
             return dict(snap)
     return None
+
+
+def snapshot_for_day(
+    snapshots: Sequence[Mapping[str, Any]] | None,
+    day: Any,
+) -> dict[str, Any] | None:
+    """(PURA) foto durable del selector PUBLICADA en el día ``day``, o ``None``.
+
+    Gap 1 — el parte diario se contrasta con la foto del MISMO día (no con la última
+    disponible): una foto de otro día no es evidencia de lo que el selector eligió hoy.
+    Se devuelve la más reciente cuya barra caiga en ese día. ``None`` = no hay foto de ese día
+    (hueco declarado), nunca una foto de otro día disfrazada.
+    """
+    target = _day_of(day) if not isinstance(day, datetime) else _day_of(_iso_instant(day))
+    if not target or not snapshots:
+        return None
+    for snap in snapshots:
+        if not isinstance(snap, Mapping):
+            continue
+        bar = snap.get("bar")
+        bar_day = _day_of(_iso_instant(bar)) if isinstance(bar, datetime) else None
+        if bar_day == target:
+            return dict(snap)
+    return None
+
+
+def selector_winner(snapshot: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """(PURA) ganador del selector (fila ``rank == 1``) con su identidad y su foto.
+
+    Publica TAL CUAL lo que declara la foto durable: activo, preset, versión y la foto de la
+    que sale (``runId``/``bar``). Sin fila rank 1 devuelve ``None`` (hueco declarado): no se
+    inventa un ganador ni se asume el primero de la lista.
+    """
+    row = best_scored_asset(snapshot)
+    if row is None:
+        return None
+    snap = snapshot if isinstance(snapshot, Mapping) else {}
+    return {
+        "assetId": _clean_identity_text(row.get("assetId")),
+        "rank": _positive_int(row.get("rank")),
+        "combined": row.get("combined"),
+        "regime": row.get("regime"),
+        "presetKey": _clean_identity_text(row.get("strategyPresetKey")),
+        "strategyVersion": _clean_identity_text(row.get("strategyVersion")),
+        "runId": snap.get("runId"),
+        "bar": _iso_instant(snap.get("bar")),
+    }
 
 
 async def read_top3_snapshot(

@@ -231,6 +231,11 @@ class Settings(BaseSettings):
     auto_ops_job_stale_seconds: float = Field(
         default=900.0, validation_alias="AUTO_OPS_JOB_STALE_SECONDS"
     )
+    #: H-145-5 — tope de intentos. Un job que agota el tope se cierra ``failed`` con
+    #: ``max_attempts_exceeded:<n>``: no se reclama para siempre ni se pierde en silencio.
+    auto_ops_job_max_attempts: int = Field(
+        default=5, ge=1, validation_alias="AUTO_OPS_JOB_MAX_ATTEMPTS"
+    )
     #: Timeout del subproceso de replay DÍA-D (segundos).
     auto_ops_dia_d_timeout_seconds: float = Field(
         default=1800.0, validation_alias="AUTO_OPS_DIA_D_TIMEOUT_SECONDS"

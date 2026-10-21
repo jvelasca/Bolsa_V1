@@ -13,7 +13,11 @@
 export const ESTUDIO_DAILY_OPS_SCHEMA = "estudio_daily_ops_v1" as const;
 
 /** Estado del universo del parte diario (infra `unavailable` ≠ `empty`). */
-export type EstudioDailyReportStatusV1 = "ok" | "empty" | "unavailable";
+export type EstudioDailyReportStatusV1 =
+  | "ok"
+  | "partial"
+  | "empty"
+  | "unavailable";
 
 /** Estado por valor: el batch aísla fallos y nunca convierte un error en `ok`. */
 export type EstudioDailyValueStatusV1 =
@@ -80,6 +84,11 @@ export type AutoOpsJobCreateRequestV1 = {
 
 /** Niveles EXCLUSIVAMENTE del `TradePlan`; un hueco es `null`, jamás `0`. */
 export type EstudioDailyPlanV1 = {
+  /**
+   * Identidad DURABLE del plan (`TradePlan.decisionId`): la misma que sellan el ciclo y el
+   * journal. Es la clave con la que se atribuye este parte a una operación concreta.
+   */
+  decisionId?: string | null;
   status: string | null;
   direction: string | null;
   entry: number | null;
@@ -124,9 +133,29 @@ export type EstudioDailyStrategyV1 = {
   presetKey: string | null;
   strategyDefinitionId: string | null;
   strategyVersion: number | null;
+  /** Identidad DURABLE del plan (`TradePlan.decisionId`). `null` si la propuesta no la trae. */
   planId: string | null;
+  /** Id de la CORRIDA de propuesta (`scanId`). No es el plan: viaja aparte a propósito. */
+  proposeRunId?: string | null;
   /** Identidad estable de la señal que originó el plan (`signal.id`). `null` si no existe. */
   signalId?: string | null;
+};
+
+/**
+ * Gap 1 — identidad del selector cross-asset (foto durable `top3_opportunities`) para el día
+ * del parte. `measured: false` declara el hueco: no se sabe quién ganó, y `isWinner` es
+ * `null` (nunca `false` sin foto). `isWinner: true` ⇒ este valor era el activo mejor puntuado.
+ */
+export type EstudioDailySelectorV1 = {
+  measured: boolean;
+  runId: string | null;
+  bar: string | null;
+  /** Activo ganador del selector (fila `rank == 1`). `null` si no consta. */
+  assetId: string | null;
+  presetKey: string | null;
+  strategyVersion: string | null;
+  isWinner?: boolean | null;
+  reason: string | null;
 };
 
 export type EstudioDailyValueV1 = {
@@ -146,6 +175,8 @@ export type EstudioDailyValueV1 = {
    * respondida; `null`/ausente cuando no se pudo medir (NO es «sin posición»).
    */
   positionOpen?: boolean | null;
+  /** Gap 1 — identidad del selector cross-asset para este valor (o hueco declarado). */
+  selector?: EstudioDailySelectorV1 | null;
 };
 
 export type EstudioDailyReportV1 = {
@@ -161,6 +192,17 @@ export type EstudioDailyReportV1 = {
   countsConsistent: boolean;
   /** Tamaño del universo ESTUDIO **antes** del recorte. `0`/ausente ⇒ no medido. */
   universeCount?: number | null;
+  /**
+   * R-3/H-145-3 — el parte se publicó con mediciones ausentes (`status: "partial"`). El job
+   * se registra como COMPLETADO: un hueco declarado no es un fallo del trabajo.
+   */
+  degraded?: boolean;
+  /** Códigos estables de lo que no se midió (la UI los traduce; el crudo va al detalle). */
+  degradedReasons?: string[];
+  /** Cobertura de las mediciones que alimentan el dictamen (posiciones y chips). */
+  coverage?: Record<string, unknown>;
+  /** Gap 1 — foto del selector del día y su ganador. `null`/ausente ⇒ no medido. */
+  selector?: EstudioDailySelectorV1 | null;
 };
 
 export type EstudioDailyResponseV1 = {

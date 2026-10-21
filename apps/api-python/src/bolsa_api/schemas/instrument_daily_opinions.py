@@ -58,7 +58,9 @@ class InstrumentDailyOpinionHintDto(BaseModel):
     fa_score: float | None = Field(default=None, alias="faScore")
     ta_score: float | None = Field(default=None, alias="taScore")
     distress: bool = False
-    position_open: bool = Field(default=False, alias="positionOpen")
+    #: H-145-1 — TRI-ESTADO. ``None`` (o ausente) = la cartera no se midió; NO es «sin
+    #: posición». El motor de dictamen falla cerrado con ese valor.
+    position_open: bool | None = Field(default=None, alias="positionOpen")
     allow_trading: bool = Field(default=True, alias="allowTrading")
     has_eod_bar: bool | None = Field(default=None, alias="hasEodBar")
 

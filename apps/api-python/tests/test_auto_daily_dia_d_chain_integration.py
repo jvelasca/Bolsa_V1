@@ -74,6 +74,13 @@ class _Opinions:
         return [_Opinion("inst-1")]
 
 
+class _Positions:
+    """Cartera medida: sin posiciones abiertas (no es lo mismo que «no medida»)."""
+
+    async def list_open_for_account(self, account_id: str) -> list[Any]:  # noqa: ARG002
+        return []
+
+
 class _Propose:
     def __init__(self, account_id: str) -> None:
         self._account_id = account_id
@@ -87,6 +94,9 @@ class _Propose:
                     "symbol": "AAA",
                     "planId": f"plan-{self._account_id}",
                     "tradePlan": {
+                        # La identidad durable del plan es ``decisionId`` (no el ``planId``
+                        # cosmético del hit ni el ``scanId`` de la corrida).
+                        "decisionId": f"plan-{self._account_id}",
                         "status": "TRIGGERED",
                         "direction": "long",
                         "entry": 100.0,
@@ -114,6 +124,7 @@ async def _daily_report(account_id: str) -> dict[str, Any]:
         _List(),
         _Opinions(),
         _Propose(account_id),
+        positions=_Positions(),
     )
     return (await service.execute(account_id=account_id, as_of=_DAY)).to_dict()
 

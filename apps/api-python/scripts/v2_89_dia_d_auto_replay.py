@@ -418,6 +418,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             engine_id=f"dia-d-auto-{os.urandom(3).hex()}",
             operable_days=operable_flags,
             durable_cycle=True,
+            # DÍA-D real: sella ``signalId``/``planId`` por ciclo en la OOS. El artefacto
+            # congelado de ``replay-repro`` (v2_87 con el default) no cambia byte a byte.
+            capture_cycle_attribution=True,
             on_tick=lambda done, total: progress.emit(
                 "replay", done=done, total=total
             ),
@@ -472,7 +475,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             },
             executed_detail=executed_detail,
             meta={
-                "bump": "2.11.156-beta",
+                "bump": "2.11.157-beta",
                 "phase": "V2.89 DIA-D AUTO SANDBOX",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),

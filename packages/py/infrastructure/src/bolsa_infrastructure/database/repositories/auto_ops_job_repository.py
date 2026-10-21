@@ -200,17 +200,21 @@ class SqlAlchemyAutoOpsJobRepository:
         self,
         *,
         stale_after_seconds: int = 1800,
+        max_attempts: int = 5,
         now: datetime | None = None,
     ) -> AutoOpsJob | None:
         """Reclama el siguiente job pendiente (o uno ``running`` con latido obsoleto).
 
         ``FOR UPDATE SKIP LOCKED`` hace que dos workers no reclamen la misma fila.
+        H-145-5: un job que ya agotó ``max_attempts`` no se reclama (lo cierra
+        ``fail_exhausted`` con el motivo declarado, en vez de reintentarlo para siempre).
         """
         moment = now or datetime.now(UTC)
         stale_before = moment - timedelta(seconds=max(60, int(stale_after_seconds)))
         stmt = (
             select(AutoOpsJobRow)
             .where(
+                AutoOpsJobRow.attempt < max(1, int(max_attempts)),
                 or_(
                     AutoOpsJobRow.status == JOB_STATUS_QUEUED,
                     and_(
@@ -237,6 +241,51 @@ class SqlAlchemyAutoOpsJobRepository:
         row.error = None
         await self._session.flush()
         return self._map(row)
+
+    async def fail_exhausted(
+        self,
+        *,
+        max_attempts: int = 5,
+        stale_after_seconds: int = 1800,
+        now: datetime | None = None,
+    ) -> int:
+        """Cierra los jobs ABANDONADOS que agotaron ``max_attempts`` (H-145-5).
+
+        Solo toca ``queued`` o ``running`` con latido obsoleto: un job ``running`` con
+        latido vivo está trabajando y NO se interrumpe (podría completarse en este tick).
+        Devuelve cuántos cerró. El error publicado es ``max_attempts_exceeded:<n>`` para
+        que el desenlace sea legible y falsable.
+        """
+        limit = max(1, int(max_attempts))
+        moment = now or datetime.now(UTC)
+        stale_before = moment - timedelta(seconds=max(60, int(stale_after_seconds)))
+        stmt = (
+            select(AutoOpsJobRow)
+            .where(
+                AutoOpsJobRow.attempt >= limit,
+                or_(
+                    AutoOpsJobRow.status == JOB_STATUS_QUEUED,
+                    and_(
+                        AutoOpsJobRow.status == JOB_STATUS_RUNNING,
+                        or_(
+                            AutoOpsJobRow.heartbeat_at.is_(None),
+                            AutoOpsJobRow.heartbeat_at < stale_before,
+                        ),
+                    ),
+                ),
+            )
+            .order_by(AutoOpsJobRow.created_at)
+            .with_for_update(skip_locked=True)
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        for row in rows:
+            row.status = JOB_STATUS_FAILED
+            row.error = f"max_attempts_exceeded:{int(row.attempt or 0)}"[:2000]
+            row.finished_at = moment
+            row.heartbeat_at = moment
+        if rows:
+            await self._session.flush()
+        return len(rows)
 
     async def set_progress(
         self,

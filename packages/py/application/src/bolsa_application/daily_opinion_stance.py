@@ -36,7 +36,10 @@ class StanceInput:
     top_stars: float | None
     io_score: float | None
     fa_distress: bool
-    position_open: bool
+    #: H-145-1/H-156-1 — TRI-ESTADO. ``True``/``False`` = lectura de posiciones respondida;
+    #: ``None`` = no medido (adaptador ausente o lectura caída). ``None`` NUNCA se lee como
+    #: «sin posición»: se falla cerrado con ``no_trade`` y el motivo declarado.
+    position_open: bool | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +76,13 @@ def is_top_stale(updated_at: datetime | None, *, now: datetime | None = None, da
 
 
 def compute_stance(inp: StanceInput, *, now: datetime | None = None) -> StanceResult:
-    """Orden: EOD → Gate → TOP → FA distress → buy/hold/reduce (long-only)."""
+    """Orden: EOD → Gate → TOP → cartera medida → FA distress → buy/hold/reduce (long-only).
+
+    H-145-1/R-1: la cartera es un TÉRMINO de la decisión. Con ``position_open=None`` no se
+    puede afirmar ni «sin posición» ni «con posición», así que el dictamen NO se emite: se
+    falla cerrado con ``no_trade`` y el hueco declarado (``position_unmeasured``). Antes se
+    rellenaba con ``False`` y el motor podía recomendar comprar un valor ya en cartera.
+    """
     reasons: list[str] = []
 
     if not inp.has_eod_bar:
@@ -86,18 +95,28 @@ def compute_stance(inp: StanceInput, *, now: datetime | None = None) -> StanceRe
         code = "stale_top" if inp.has_top else "no_valid_top"
         return StanceResult("review_strategy", 1, [code], "PASS")
 
+    # El estado de la cartera no se inventa: sin medición no hay dictamen de entrada/salida.
+    if inp.position_open is None:
+        return StanceResult(
+            "no_trade", 1, reasons + ["position_unmeasured"], "WARNING"
+        )
+
     if inp.fa_distress:
         reasons.append("fa_distress")
         stars = min(3, map_io_to_stars(inp.io_score))
-        if not inp.position_open:
+        if inp.position_open is False:
             return StanceResult("no_trade", stars, reasons, "WARNING")
         return StanceResult("reduce", stars, reasons + ["position_open"], "WARNING")
 
     io = inp.io_score
     stars = map_io_to_stars(io)
     top_stars = float(inp.top_stars or 0)
+    # El indicador ausente tampoco es una medición neutra: se declara el hueco aunque la
+    # regla de estrellas (``UNKNOWN`` → 3) no cambie (Δ decisión = 0 en ese término).
+    if io is None:
+        reasons.append("io_unmeasured")
 
-    if not inp.position_open:
+    if inp.position_open is False:
         if io is not None and io >= 80 and stars >= 4 and top_stars >= 3:
             return StanceResult(
                 "buy",
@@ -105,7 +124,9 @@ def compute_stance(inp: StanceInput, *, now: datetime | None = None) -> StanceRe
                 ["strong_buy_signal", "top_high" if top_stars >= 4 else "top_medium", "io_high"],
                 "PASS",
             )
-        return StanceResult("hold_watch", stars, ["neutral_no_position", "io_medium"], "PASS")
+        return StanceResult(
+            "hold_watch", stars, reasons + ["neutral_no_position", "io_medium"], "PASS"
+        )
 
     # Posición larga abierta
     reasons.append("position_open")

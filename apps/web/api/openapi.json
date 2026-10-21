@@ -11649,9 +11649,15 @@
             "title": "Ioscore"
           },
           "positionOpen": {
-            "default": false,
-            "title": "Positionopen",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positionopen"
           },
           "taScore": {
             "anyOf": [
