@@ -232,9 +232,15 @@ del sello para que el run de las 18:00 no aborte con `TREE_MOVED`; `pnpm window:
 
 ## 12. Publicación
 
-Se publica como `v2.88.157-beta` (anotado, unsigned) sobre el commit de **re-anclaje del pin**,
-inmediatamente posterior al commit del sello, igual que en `.154`/`.155`/`.156`: el gate
-`window:freeze` del job `shared` es **fail-closed** y el tag no puede apuntar a un commit cuyo
-pin no case con su árbol. El `Release tag CI` debe quedar **verde** (`certify`, `lifecycle-pg`,
-`replay-repro`, `web`, `python`) antes de publicar el Release; en particular `replay-repro`
-debe seguir **`REPRODUCIDO`** byte a byte porque la atribución nueva está apagada por defecto.
+Se publica como `v2.88.157-beta` (anotado, unsigned) sobre el commit de **cableado del tope de
+intentos en el CI**, inmediatamente posterior al commit de re-anclaje del pin (que a su vez sigue
+al sello), igual que en `.154`/`.155`/`.156`: el gate `window:freeze` del job `shared` es
+**fail-closed** y el tag no puede apuntar a un commit cuyo pin no case con su árbol. El commit del
+tag solo toca `.github/workflows/` y docs, así que el pin sigue casando.
+
+`Release tag CI` **run [39576853790](https://github.com/jvelasca/Bolsa_V1/actions/runs/39576853790)
+⇒ `success`** sobre `36f7008f`, con **13 jobs verdes** y el `playwright (integrated E2E, opt-in)`
+skip esperado. `lifecycle-pg` ejecutó el paso dedicado nuevo
+(`Pytest … identity battery + attempt cap (PG, fail if skipped)`) y su guard anti-skip: el tope
+de intentos H-145-5 queda certificado contra PostgreSQL real, no solo en local. `replay-repro`
+sigue **`REPRODUCIDO`** byte a byte (`E9B7376B…7F5625`), `certify` verde, `python`/`web` verdes.
