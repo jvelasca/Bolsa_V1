@@ -237,5 +237,14 @@ diccionario esperado declara `signalId: None` y `planId: None`.
 re-anclaje, sin dar por bueno el intento rojo (mismo criterio que `.153`). El run rojo queda
 citado arriba como evidencia y el run verde del tag re-apuntado se cita a continuación.
 
-**Cita POST-TAG definitiva:** se añade **solo** cuando `Release tag CI` termine verde sobre el
-tag re-apuntado.
+**Cita POST-TAG — CI del tag re-apuntado VERDE (medido).** [run **`39559387824`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/39559387824)
+⇒ **`conclusion: success`** (**13 jobs `success`**, `certify` incluido; **1 `skipped`** declarado:
+`playwright` integrated opt-in), `2026-10-21T07:03:43Z` → `07:18:12Z` (**14m29s**), sobre
+`acf64d74` (objeto de tag `9e15bf67`). `python` ⇒ **`5300 passed, 58 skipped`**; `shared` ⇒
+**`freeze OK (acf64d74)`** y `window:test` **`50 passed`**; `replay-repro` ⇒ **`REPRODUCIDO`**
+(`sha256 E9B7376B…7F5625`, idéntico en las dos corridas ⇒ **`Δ decisión = 0` medido por el CI**);
+`lifecycle-pg` ⇒ **`22 passed in 33.04s`** con `AUTO_IDENTITY_CHAIN_PG_REQUIRED=1` y guard anti-skip
+verde; `playwright (integrated AUTO S5)` ⇒ **`8 passed` sin retry**, `S5-04` en **`5.80s`**;
+`certify` ⇒ `"status": "GREEN"` con `"sha": "acf64d74…"`. **Sello CERRADO.** Publicado como
+**GitHub Release pre-release** [`v2.88.156-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.156-beta)
+con audit pack autosuficiente y **sin assets**.
