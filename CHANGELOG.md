@@ -2,6 +2,16 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.158-beta] — **identidad de motor estable en la ventana PAPER: la cadencia diaria opera un solo libro y los ciclos pueden cerrarse** (**`Δ motor = 0` con motor efímero · `Δ decisión = 0` · SIN migración)
+
+**Naturaleza:** sello acotado a `2.11.157-beta`; **no** toca el motor de decisión, umbrales, pesos, régimen, sizing, entradas/salidas, orquestador ni replay OOS: **`Δ motor = 0`** (sin `AUTO_ENGINE_SIM_ENGINE_ID` el runner acuña el mismo motor efímero de siempre) y **sin migración** (`head` sigue `057_top3_opportunity_identity`). **Bump** `2.11.157-beta` → `2.11.158-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**).
+
+**W-157-1 · la ventana PAPER no podía cerrar un ciclo.** La readopción de posición va scoped por `(account_id, engine_id)` (`readopt_positions`), pero `v2_76_forward_market_material` acuñaba `engine_id = auto-v76-<os.urandom(4)>` **en cada corrida**. El día N no adoptaba la posición del día N-1: la posición quedaba huérfana en su motor efímero y **nunca** se gestionaba ni se cerraba, de modo que `measurableCycles` era 0 por construcción y el gate `4 días / 2 episodios / 32 ciclos` no podía leerse `READY` nunca. Evidencia medida el 2026-10-21 en `1484e253d2d54645945a6b1d7`: dos posiciones vivas del **mismo** símbolo bajo `auto-v76-61bd1569` y `auto-v76-3ad9a1c8`, y 0 ciclos cerrados en los días con fills (`2026-10-19`: 8 fills/0 ciclos; `2026-10-20`: 4 fills/0 ciclos).
+
+**Corrección.** El runner honra `AUTO_ENGINE_SIM_ENGINE_ID` (fallback: motor efímero histórico) y la ventana fija `auto-window-1484e253` en `operatorEnv` (`scripts/lib/window-forward.mjs`, fuera del freeze). Verificado: con la variable fijada el productor sella `engineBase` estable y abre/cierra su ciclo (`canary-stable-engine`, 2 ticks, `cycles=1/1`); sin ella, comportamiento histórico intacto.
+
+**Límites declarados.** El pin se re-ancla sobre el commit que contiene este cambio; los días anteriores quedan `STALE` (no cuentan) y la ventana se re-mide desde el siguiente día de sesión. Las posiciones huérfanas de los motores efímeros previos **no** se backfillean ni se adoptan. AUTO sigue **OFF** y `CONFIRMED` no se emite.
+
 ## [2.11.157-beta] — **integridad del parte ESTUDIO y atribución DÍA-D: la cartera no medida no se disfraza, el parte declara `partial`, el ganador TOP3 se publica por identidad y el replay real sella `signalId`/`planId`** (**`Δ motor = 0` con cartera medida · `Δ decisión = 0` salvo `position_open=None` ⇒ `no_trade` · SIN migración)
 
 **Naturaleza:** sello **posterior y acotado** a `2.11.156-beta` — **no** toca el motor de decisión con cartera medida, umbrales, pesos A/B, `TOP_N`, régimen, sizing, entradas/salidas, orquestador ni replay OOS: **`Δ motor = 0`** y **sin migración** (`head` sigue `057_top3_opportunity_identity`). Contrato HTTP **aditivo/ampliado** (`positionOpen` ya era `bool | null`; los campos nuevos viajan en `dict[str, Any]`; `openapi.json`/`schema.d.ts` regenerados, `contract:check` **OK**). **Bump** `2.11.156-beta` → `2.11.157-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**). Tag **anotado, unsigned**. Evidencia: [`docs/engineering/evidence/v2.88.157/README.md`](../docs/engineering/evidence/v2.88.157/README.md).

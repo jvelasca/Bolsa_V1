@@ -621,7 +621,25 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
     engine = create_engine(settings)
     factory = create_session_factory(engine)
 
-    engine_base = f"auto-v76-{os.urandom(4).hex()}"
+    # V2.88.158 — IDENTIDAD DE MOTOR ESTABLE (`AUTO_ENGINE_SIM_ENGINE_ID`).
+    #
+    # Motivo (medido 2026-10-21): la ventana longitudinal PAPER (ADR-046) exige CICLOS
+    # CERRADOS con R medible, y la readopción de posición está scoped por
+    # `(account_id, engine_id)` (`readopt_positions`). Con un motor acuñado al azar en
+    # cada corrida, el día N no adoptaba la posición del día N-1: la posición quedaba
+    # huérfana en su motor efímero y NUNCA se gestionaba ni se cerraba. Evidencia: dos
+    # posiciones vivas del mismo símbolo bajo `auto-v76-61bd1569` y `auto-v76-3ad9a1c8`,
+    # y 0 ciclos cerrados en los días con fills (2026-10-19: 8 fills/0 ciclos;
+    # 2026-10-20: 4 fills/0 ciclos). La ventana no podía certificar por construcción.
+    #
+    # Con la identidad fijada, la cadencia diaria opera UN SOLO libro de posiciones y los
+    # ciclos pueden cerrarse. Sin la variable se conserva el comportamiento histórico
+    # (motor efímero por corrida), de modo que los runners que no certifican ventana no
+    # cambian: Δ = 0 fuera de la ventana.
+    engine_base = (
+        str(os.getenv("AUTO_ENGINE_SIM_ENGINE_ID") or "").strip()
+        or f"auto-v76-{os.urandom(4).hex()}"
+    )
     account_id = str(args.account_id or "")
     watch = _watch_from_cli(args.watch)
     watch_source = "cli" if watch else ""
