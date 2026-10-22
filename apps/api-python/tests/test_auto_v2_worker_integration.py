@@ -627,7 +627,6 @@ async def test_v2_without_trade_sources_is_fail_closed(v2_env: None) -> None:
     cases = [
         # (kwargs de fuentes, motivo esperado) — cascada en el orden del motor:
         # liquidez → edge → sector.
-        ({"sector_source": None, "liquidity_source": None, "edge_source": None}, "liquidity_unknown"),
         (
             {"sector_source": None, "liquidity_source": lambda _s: 1_000_000.0, "edge_source": None},
             "edge_below_threshold",
@@ -649,6 +648,23 @@ async def test_v2_without_trade_sources_is_fail_closed(v2_env: None) -> None:
         assert worker._v2_plan.approved_symbols == ()
         assert expected in worker._v2_plan.decisions[0].reason_codes
         assert worker._v2_plan.journal_entries[0].payload["approved"] is False
+
+    # W-159-4 (Hueco A): SIN NINGUNA fuente medida la candidata no llega ni a competir. No
+    # es un 0,0 en el ranking (eso la hacía ganar huecos del TOP por desempate alfabético):
+    # se declara ``opportunity_unscored`` y no hay decisión que vetar.
+    starved = _worker(sector_source=None, liquidity_source=None, edge_source=None)
+    starved._decider = _buy_lot()
+    await starved.auto_turn()
+    assert starved._open.get("AAA", Decimal("0")) == 0, "sin economía medible no se abre"
+    assert starved._v2_plan.approved_symbols == ()
+    assert starved._v2_plan.decisions == (), "una candidata no comparable no se decide"
+    reasons = [
+        code
+        for entry in starved._v2_plan.journal_entries
+        for code in (entry.payload or {}).get("reasonCodes", ())
+    ]
+    assert "opportunity_unscored" in reasons
+    assert "top_n_excluded" not in reasons, "el motivo del no-trade es el real, no el del TOP"
 
 
 def test_v2_recon_status_never_blocks_protective_exit(v2_env: None) -> None:

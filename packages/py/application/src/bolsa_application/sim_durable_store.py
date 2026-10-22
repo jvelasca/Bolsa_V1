@@ -465,6 +465,25 @@ class InMemorySimAutoPositionStore:
             position_state=dict(position_state) if position_state is not None else None,
         )
 
+    async def read_live_engines(self, account_id: str, symbol: str) -> tuple[str, ...]:
+        """W-159-5 (Hueco E) — motores con una fila VIVA de ese símbolo en la cuenta.
+
+        La cura de ``entry_price`` escribe el coste medio de la CUENTA sobre una fila por
+        motor. Con una sola fila viva eso ES la posición; con dos motores vivos el coste
+        de la cuenta ya no identifica a ninguna de las dos filas y el reparto sería un
+        invento (medido 2026-10-21: ``3204115d`` ×2 con 1933.3953 cada uno). El lector
+        existe para poder DECLARAR esa ambigüedad en vez de fabricar un número.
+        """
+        return tuple(
+            sorted(
+                engine_id
+                for (acc, engine_id), rows in self._rows.items()
+                if acc == account_id
+                and (row := rows.get(symbol)) is not None
+                and row.quantity > 0
+            )
+        )
+
     async def delete(self, account_id: str, engine_id: str, symbol: str) -> None:
         self._rows.get((account_id, engine_id), {}).pop(symbol, None)
 
@@ -937,6 +956,27 @@ class PostgresSimAutoPositionStore:
             )
         )
         await _commit_if(self._session, self._autocommit)
+
+    async def read_live_engines(self, account_id: str, symbol: str) -> tuple[str, ...]:
+        """W-159-5 (Hueco E) — motores con fila VIVA de ese símbolo en la cuenta.
+
+        Mismo contrato que el doble hermético: sirve para declarar que el coste medio de
+        la cuenta es AMBIGUO para una fila concreta cuando hay más de un motor vivo.
+        """
+        from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
+
+        engines = (
+            await self._session.execute(
+                select(SimAutoPositionRow.engine_id).where(
+                    SimAutoPositionRow.account_id == account_id,
+                    SimAutoPositionRow.symbol == symbol,
+                    SimAutoPositionRow.quantity > 0,
+                )
+            )
+        ).scalars()
+        return tuple(sorted({str(engine) for engine in engines}))
 
 
 class PostgresSimConsumedSignalStore:

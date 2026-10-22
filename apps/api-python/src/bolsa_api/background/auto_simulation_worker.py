@@ -103,6 +103,10 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
     PortfolioReservation,
     build_reservation,
 )
+from bolsa_analytics.cognitive.position_ledger import (
+    build_position_ledger,
+    coerce_applied_fill_fact,
+)
 from bolsa_analytics.cognitive.position_lifecycle import (
     advance_lifecycle,
     compute_trail_stop,
@@ -111,10 +115,6 @@ from bolsa_analytics.cognitive.position_lifecycle import (
     is_trail_armed,
     protection_state_dict,
     trailing_status,
-)
-from bolsa_analytics.cognitive.position_ledger import (
-    build_position_ledger,
-    coerce_applied_fill_fact,
 )
 from bolsa_analytics.cognitive.position_state import (
     PositionState,
@@ -326,6 +326,11 @@ _APPLIED_OUTCOMES: frozenset[str] = frozenset({"applied", "already_applied"})
 JOURNAL_FILL_UNAPPLIED = "fill_unapplied"
 
 _QTY_EPS = Decimal("0.000001")
+
+# W-159-2 (Hueco B) — holgura mínima entre el stop de una posición LARGA y el precio de
+# mercado. Un stop reconstruido que nace por encima (o pegado) al mercado no es protección:
+# es una liquidación programada en el mismo tick de la adopción (medido 2026-10-21).
+_ADOPTION_MIN_STOP_GAP = Decimal("0.002")
 
 # v2.88.25 — ventana de lectura de fills del ciclo para sellar el PnL del settlement durable.
 # Con la ventana LLENA (``len == limit``) la evidencia pudo truncarse y el PnL se declara
@@ -863,6 +868,31 @@ def _canonical_entry_prices(events: Any) -> dict[str, float]:
     # misma coerción tolerante que usa la reconciliación: el fold solo entiende
     # ``AppliedFillFact`` (``is_buy``/``quantity``/``applied_at``), así que pasarle una
     # traza cruda reventaba y devolvía ``{}`` en silencio.
+    facts = _canonical_applied_facts(events)
+    if not facts:
+        return {}
+    try:
+        ledger = build_position_ledger(facts)
+    except Exception:  # noqa: BLE001 — sin fold no hay base de coste que heredar.
+        logger.exception("auto_sim canonical entry price fold failed")
+        return {}
+    return {
+        str(position.instrument_id): float(position.average_entry)
+        for position in ledger.positions
+        if position.average_entry is not None and position.remaining_qty > 0
+    }
+
+
+def _canonical_applied_facts(events: Any) -> list[Any]:
+    """Normaliza las trazas del libro canónico a ``AppliedFillFact`` (puerta ÚNICA).
+
+    Las trazas llegan en DOS formas (``_AppliedFill`` del libro en RAM y
+    ``AppliedFillFact`` del lector canónico). Se normalizan al hecho contable con la misma
+    coerción tolerante que usa la reconciliación: el fold solo entiende ``AppliedFillFact``
+    (``is_buy``/``quantity``/``applied_at``), así que pasarle una traza cruda reventaba y
+    devolvía ``{}`` en silencio. La atribución (``strategy_version_id``/``cycle_id``) viaja
+    en el hecho: es lo que permite heredarla sin inventarla (Hueco D).
+    """
     facts: list[Any] = []
     for event in tuple(events or ()):
         status = getattr(event, "status", None)
@@ -883,22 +913,69 @@ def _canonical_entry_prices(events: Any) -> dict[str, float]:
             quantity=qty,
             price=getattr(event, "price", None),
             applied_at=getattr(event, "applied_at", None),
+            strategy_version_id=(
+                getattr(event, "strategy_version_id", None)
+                or getattr(event, "strategy_version", None)
+            ),
             account_id=getattr(event, "account_id", None),
+            cycle_id=getattr(event, "cycle_id", None),
         )
         if fact is not None:
             facts.append(fact)
+    return facts
+
+
+def _canonical_open_attribution(events: Any) -> dict[str, dict[str, Any]]:
+    """W-159-3 (Hueco D) — atribución de la posición viva, derivada del LIBRO canónico.
+
+    Un motor nuevo adopta una posición que otro abrió: sin versión ni ciclo, sus fills de
+    cierre nacen huérfanos y ``paper_material_readiness`` no puede casar el ciclo (medido
+    2026-10-21: 4 ventas con ``ver=None cycle=None`` ⇒ 0 ciclos medibles). Ambos datos
+    EXISTEN en el último BUY aplicado del inventario vivo; aquí se recuperan.
+
+    ``None`` en un componente = el libro no lo declara: no se acuña nada. Acuñar un ciclo
+    de adopción es una decisión de diseño (mediría algo distinto de lo que dice medir) y
+    queda FUERA de este arreglo; lo que sí se hace es no perder el que ya existía.
+    """
+    facts = _canonical_applied_facts(events)
     if not facts:
         return {}
     try:
         ledger = build_position_ledger(facts)
-    except Exception:  # noqa: BLE001 — sin fold no hay base de coste que heredar.
-        logger.exception("auto_sim canonical entry price fold failed")
+    except Exception:  # noqa: BLE001 — sin fold no hay atribución que heredar.
+        logger.exception("auto_sim canonical attribution fold failed")
         return {}
-    return {
-        str(position.instrument_id): float(position.average_entry)
-        for position in ledger.positions
-        if position.average_entry is not None and position.remaining_qty > 0
-    }
+    attribution: dict[str, dict[str, Any]] = {}
+    for position in ledger.positions:
+        if position.remaining_qty <= 0:
+            continue
+        buys = [fact for fact in position.fills if getattr(fact, "is_buy", False)]
+        if not buys:
+            continue
+        # El ÚLTIMO buy aplicado es el que abrió (o amplió) el inventario que sigue vivo.
+        latest = max(buys, key=lambda fact: _instant_sort_key(fact.applied_at))
+        attribution[str(position.instrument_id)] = {
+            "strategyVersion": latest.strategy_version_id,
+            "cycleId": latest.cycle_id,
+            "openedAt": latest.applied_at,
+            "entry": float(position.average_entry)
+            if position.average_entry is not None
+            else None,
+        }
+    return attribution
+
+
+def _instant_sort_key(value: Any) -> float:
+    """``applied_at`` → instante comparable; un valor ilegible ordena primero (-inf)."""
+    if value is None:
+        return float("-inf")
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return float("-inf")
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.timestamp()
 
 
 class AutoSimulationWorker:
@@ -1065,6 +1142,15 @@ class AutoSimulationWorker:
         self._protection = _protection_config_from_env()
         self._entry_price: dict[str, Decimal] = {}
         self._high_price: dict[str, Decimal] = {}
+        # W-159-2 (Hueco B) — base de coste CANÓNICA por símbolo, reconstruida del libro de
+        # fills aplicados (``_canonical_entry_prices``). El espejo ``_entry_price`` puede
+        # venir de una fila obsoleta de otro motor; el libro, no. La adopción usa el libro
+        # cuando existe y el espejo solo como respaldo declarado.
+        self._canonical_entry_by_symbol: dict[str, Decimal] = {}
+        # W-159-3 (Hueco D) — atribución (versión y ciclo) de la posición viva, derivada del
+        # libro canónico. Un motor nuevo no tiene proyección previa, pero el hecho de qué
+        # estrategia abrió la posición y a qué ciclo pertenece SÍ está en los fills.
+        self._canonical_attribution: dict[str, dict[str, Any]] = {}
         # V2.28/A10 (P1-02 real): versión de estrategia que abrió la posición de cada
         # símbolo. Permite atribuir también los fills de CIERRE (protección/venta) a la
         # misma versión: sin esto la serie de la versión tendría compras sin ventas y
@@ -1338,6 +1424,12 @@ class AutoSimulationWorker:
         self._v2_intent_seq: dict[tuple[str, str], int] = {}
         self._active_orders: dict[str, str] = {}
         self._journal: list[SimJournalRow] = []
+        # W-159-1 (Hueco C): los eventos de gestión de posición se acumulan aquí y se
+        # publican UNA vez por turno en el spine durable (``decision_journal_entries``).
+        # Antes vivían solo en ``_v2_journal`` (RAM del proceso) y en la fila agregada del
+        # día: una adopción degradada no dejaba rastro con su ``entry``/``stop``/``atr`` y
+        # el Hueco B quedó sin poder depurarse a posteriori.
+        self._v2_position_journal_pending: list[Any] = []
         # V2.23/A9: última razón del gate determinista (para telemetría/durable).
         self._last_gate_reason: tuple[str, ...] = ("idle",)
 
@@ -1397,6 +1489,14 @@ class AutoSimulationWorker:
                 # estaba siguiendo antes del crash.
                 if row.position_state:
                     self._v2_durable_plans[symbol] = dict(row.position_state)
+        # W-159-3 (Hueco D): el LIBRO manda sobre el espejo. El espejo es una proyección y
+        # puede arrastrar la versión de un round-trip anterior del mismo símbolo; el libro
+        # declara quién abrió EL INVENTARIO VIVO. Se aplica después del bucle para que la
+        # procedencia del hecho (no la copia) sea la que atribuya el cierre.
+        for symbol, data in self._canonical_attribution.items():
+            version = data.get("strategyVersion")
+            if version and symbol in self._open:
+                self._position_version[symbol] = str(version)
         self._readopted = True
         return dict(self._open)
 
@@ -1465,6 +1565,21 @@ class AutoSimulationWorker:
             sim_auto_positions=projection_qty,
         )
         adopted_entries = _canonical_entry_prices(events)
+        # W-159-2 (Hueco B): la base de coste del LIBRO se conserva para la adopción. Antes
+        # solo se usaba para curar una fila ``OK`` sin ``entry_price``; el camino de
+        # geometría reconstruida seguía fiándose del espejo (medido 2026-10-21: stop
+        # 12.9144 sobre un coste real de 10.3335 ⇒ liquidación en el primer tick).
+        self._canonical_entry_by_symbol = {
+            str(sym): Decimal(str(value))
+            for sym, value in adopted_entries.items()
+            if value is not None
+        }
+        # W-159-3 (Hueco D): la versión y el ciclo del inventario VIVO se heredan del último
+        # BUY aplicado. Es recuperación de un dato que ya existía, no acuñación: un
+        # componente que el libro no declara queda en ``None`` (y el cierre lo declarará así).
+        # La aplicación sobre ``_position_version`` se hace en ``readopt_positions`` DESPUÉS
+        # del bucle de la proyección: el libro manda sobre el espejo.
+        self._canonical_attribution = _canonical_open_attribution(events)
         for verdict in report.verdicts:
             symbol = verdict.symbol
             self._reconciliation[symbol] = verdict.status
@@ -1481,6 +1596,21 @@ class AutoSimulationWorker:
                 adopted_entry = (
                     prior_entry if prior_entry is not None else adopted_entries.get(symbol)
                 )
+                # W-159-5 (Hueco E): la cantidad se reconstruye igual (eso es operación),
+                # pero el COSTE no se escribe si el símbolo tiene más de una fila viva:
+                # el medio de la cuenta no identifica a esta fila. Se deja como estaba y
+                # se declara; reconstruir la cantidad sigue siendo correcto.
+                if (
+                    adopted_entry is not None
+                    and prior_entry is None
+                    and await self._cost_basis_is_ambiguous(account_id, symbol)
+                ):
+                    logger.warning(
+                        "auto_sim rebuilt projection without cost basis symbol=%s "
+                        "(varias filas vivas: el coste de la cuenta es ambiguo)",
+                        symbol,
+                    )
+                    adopted_entry = None
                 if canonical_qty <= 0:
                     # El canónico dice "sin posición": la proyección estaba obsoleta.
                     await self._position_store.delete(account_id, self._engine_id, symbol)
@@ -1529,6 +1659,16 @@ class AutoSimulationWorker:
                     logger.warning(
                         "auto_sim adopted position without cost basis symbol=%s "
                         "(sin fills aplicados: sin stop ni plan de salida)",
+                        symbol,
+                    )
+                    continue
+                # W-159-5 (Hueco E): con más de una fila viva el coste medio de la cuenta
+                # no identifica a esta fila; se deja declarado en vez de inventar el
+                # reparto (la cantidad ya coincide, así que la operación no cambia).
+                if await self._cost_basis_is_ambiguous(account_id, symbol):
+                    logger.warning(
+                        "auto_sim adopted position without unambiguous cost basis "
+                        "symbol=%s (varias filas vivas: entry_price no se cura)",
                         symbol,
                     )
                     continue
@@ -5362,10 +5502,34 @@ class AutoSimulationWorker:
         puede fingir es la CERTEZA.
         """
         held = self._open.get(symbol, Decimal("0"))
-        entry = self._entry_price.get(symbol)
-        if held <= 0 or entry is None or entry <= 0 or price <= 0:
-            return None
         at = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if held <= 0 or price <= 0:
+            return None
+        # W-159-2 (Hueco B) — base de coste de la adopción: el LIBRO canónico manda y el
+        # espejo es respaldo declarado. Medido 2026-10-21: el espejo traía una entrada que
+        # no era el coste del libro (10,3335) y la geometría reconstruida nació con un stop
+        # POR ENCIMA del mercado, que liquidó la posición en el primer tick.
+        entry, entry_source = self._adoption_cost_basis(symbol)
+        if entry is None or entry <= 0:
+            self._journal_position_event(
+                symbol,
+                RECONCILIATION_REQUIRED,
+                at=at,
+                detail={
+                    "source": "none",
+                    "reason": "cost_basis_missing",
+                    "reasonCode": PROTECTION_MISSING,
+                    "price": float(price),
+                    "quantity": float(held),
+                    "attention": "high",
+                },
+            )
+            logger.warning(
+                "auto_sim v2 adoption without cost basis symbol=%s qty=%s (sin stop: se declara)",
+                symbol,
+                held,
+            )
+            return None
         restored = self._v2_restore_durable_position(symbol, held)
         if restored is not None:
             if restored.lifecycle_state is None:
@@ -5376,8 +5540,14 @@ class AutoSimulationWorker:
                     source="plan",
                     reason="durable_plan_without_lifecycle_state",
                     at=at,
+                    entry=entry,
+                    price=price,
                 )
             return restored
+        # W-159-3 (Hueco D): el ciclo del inventario vivo se HEREDA del libro (si el fill lo
+        # declara). Sin esto, la salida de una posición adoptada nacía sin ciclo y no podía
+        # casar con su entrada; con esto, el cierre se atribuye al ciclo que de verdad abrió.
+        adopted_cycle = (self._canonical_attribution.get(symbol) or {}).get("cycleId")
         # E2: la geometría reconstruida usa el ATR REAL si existe; el sintético se declara
         # como tal (antes se usaba siempre el 2% del precio, también para adoptar).
         atr_value, atr_source = self._v2_atr_geometry(symbol, float(entry))
@@ -5386,25 +5556,36 @@ class AutoSimulationWorker:
                 symbol,
                 ATR_GEOMETRY,
                 at=at,
-                detail={"atrSource": atr_source, "atr": atr_value, "phase": "adoption"},
+                detail={
+                    "atrSource": atr_source,
+                    "atr": atr_value,
+                    "entry": float(entry),
+                    "entrySource": entry_source,
+                    "price": float(price),
+                    "phase": "adoption",
+                },
             )
         if atr_value is None:
             # Ni siquiera la geometría de emergencia es construible sin ATR.
             atr_value = float(entry) * self._v2_tunables.atr_pct_fallback
-        stop = entry - Decimal(str(self._v2_tunables.atr_multiplier)) * Decimal(str(atr_value))
-        if stop <= 0 or stop >= entry:
-            # Ni siquiera la geometría de emergencia es construible: se declara la
-            # ausencia de protección SIN stop sintético (no se inventa un número).
-            self._journal_position_event(
+        stop, stop_reason = self._v2_adoption_stop(
+            entry=entry, price=price, atr_value=atr_value, atr_source=atr_source
+        )
+        if stop is None:
+            # Ni la geometría de emergencia es construible: se declara la ausencia de
+            # protección SIN stop sintético (no se inventa un número), pero la posición SÍ
+            # se adopta: gestionarla sin estado era peor y dejarla muda, peor aún.
+            return self._v2_declare_adoption_without_stop(
                 symbol,
-                PROTECTION_MISSING,
+                held=held,
+                entry=entry,
+                price=price,
+                atr_value=atr_value,
+                atr_source=atr_source,
+                entry_source=entry_source,
+                reason=stop_reason,
                 at=at,
-                detail={"source": "none", "reason": "geometry_not_constructible"},
             )
-            logger.warning(
-                "auto_sim v2 adoption without protection symbol=%s entry=%s", symbol, entry
-            )
-            return None
         r_multiple = entry - stop
         plan: dict[str, object] = {
             "decisionId": f"adopted-{symbol}",
@@ -5428,6 +5609,8 @@ class AutoSimulationWorker:
             max_holding_period_days=resolve_holding_horizon(
                 self._v2_tunables.exit_template
             ).max_holding_period_days,
+            # W-159-3 (Hueco D): ciclo heredado del libro canónico (``None`` si no lo declara).
+            cycle_id=str(adopted_cycle) if adopted_cycle else None,
         )
         if position is None:
             return None
@@ -5442,6 +5625,158 @@ class AutoSimulationWorker:
             source="reconstructed",
             reason="no_durable_plan",
             at=at,
+            entry=entry,
+            price=price,
+            atr_value=atr_value,
+            atr_source=atr_source,
+            entry_source=entry_source,
+        )
+
+    def _adoption_cost_basis(self, symbol: str) -> tuple[Decimal | None, str]:
+        """W-159-2 — base de coste de una adopción: el LIBRO manda, el espejo respalda.
+
+        El espejo (``sim_auto_positions.entry_price``) es una proyección: puede venir de una
+        fila obsoleta de otro motor o de una reconstrucción anterior. El libro de fills
+        aplicados es el hecho financiero. Se devuelve la fuente usada para que el journal
+        durable (Hueco C) pueda distinguir "coste del libro" de "coste del espejo" sin
+        reinterpretar nada.
+        """
+        canonical = self._canonical_entry_by_symbol.get(symbol)
+        if canonical is not None and canonical > 0:
+            return canonical, "ledger"
+        mirror = self._entry_price.get(symbol)
+        if mirror is not None and mirror > 0:
+            return mirror, "projection"
+        return None, "none"
+
+    async def _cost_basis_is_ambiguous(self, account_id: str, symbol: str) -> bool:
+        """W-159-5 (Hueco E) — ¿el coste del LIBRO identifica a ESTA fila?
+
+        La cura de ``entry_price`` (V2.88.159) escribe el coste medio de la CUENTA sobre
+        una fila POR MOTOR. Mientras el símbolo tenga UNA sola fila viva eso es
+        exactamente la posición; con dos motores vivos (medido 2026-10-21: ``3204115d``
+        ×2 con 1933.3953 cada uno, ``ver=None`` en uno) el coste de la cuenta ya no
+        identifica a ninguna de las dos filas. No se inventa un reparto: se declara y no
+        se cura. Un lector que falle también se lee como ambiguo (no se autoriza el
+        número), y un store sin la capacidad se lee como el caso canónico de un motor.
+        """
+        store = self._position_store
+        reader = getattr(store, "read_live_engines", None)
+        if reader is None:
+            return False
+        try:
+            engines = await reader(account_id, symbol)
+        except Exception:  # noqa: BLE001 — sin lector fiable no se fabrica un coste.
+            logger.exception("auto_sim live engine rows read failed symbol=%s", symbol)
+            return True
+        return len({str(engine) for engine in engines}) > 1
+
+    def _v2_adoption_stop(
+        self,
+        *,
+        entry: Decimal,
+        price: Decimal,
+        atr_value: Any,
+        atr_source: str | None,
+    ) -> tuple[Decimal | None, str]:
+        """W-159-2 (Hueco B) — stop reconstruido y el motivo DECLARADO si no lo hay.
+
+        Tres condiciones, todas necesarias, y el motivo del rechazo viaja al journal:
+
+        1. ``atr_value`` finito y **positivo** (un ATR ≤ 0 no construye geometría; antes se
+           aceptaba un producto negativo, que colocaba el stop ENCIMA de la entrada).
+        2. ``0 < stop < entry`` (el guard histórico).
+        3. ``stop < price · (1 − min_gap)``: el stop de una posición LARGA tiene que quedar
+           por DEBAJO del precio de mercado. Sin (3), una entrada equivocada producía un
+           stop por encima del mercado que se disparaba en el mismo tick de la adopción
+           (medido 2026-10-21: stop 12,9144 sobre mercado 10,42).
+        """
+        multiplier = Decimal(str(self._v2_tunables.atr_multiplier))
+        if multiplier <= 0:
+            return None, "atr_multiplier_not_positive"
+        try:
+            atr_decimal = Decimal(str(atr_value))
+        except (InvalidOperation, TypeError, ValueError):
+            return None, "atr_not_numeric"
+        if not atr_decimal.is_finite() or atr_decimal <= 0:
+            return None, "atr_not_positive"
+        candidate = entry - multiplier * atr_decimal
+        if candidate <= 0:
+            return None, "stop_not_positive"
+        if candidate >= entry:
+            return None, "stop_above_entry"
+        ceiling = price * (Decimal("1") - _ADOPTION_MIN_STOP_GAP)
+        if candidate >= ceiling:
+            return None, "stop_above_market"
+        return candidate, "ok"
+
+    def _v2_declare_adoption_without_stop(
+        self,
+        symbol: str,
+        *,
+        held: Decimal,
+        entry: Decimal,
+        price: Decimal,
+        atr_value: Any,
+        atr_source: str | None,
+        entry_source: str,
+        reason: str,
+        at: str,
+    ) -> PositionState | None:
+        """W-159-2 — adopta la posición SIN stop y lo declara con los datos medidos.
+
+        Antes este caso devolvía ``None``: la posición quedaba fuera de ``_v2_positions`` y
+        el turno la vetaba como ``hold_no_op``, es decir, VIVA y MUDA (con V2 ON la política
+        legacy no se evalúa). Adoptar sin stop la deja gestionada y visible: el estado es
+        ``RECONCILIATION_REQUIRED``/``PROTECTION_MISSING`` y el journal durable guarda la
+        entrada, el precio, el ATR y su fuente — lo que faltó para depurar el 2026-10-21.
+        """
+        plan: dict[str, object] = {
+            "decisionId": f"adopted-{symbol}",
+            "instrumentId": symbol,
+            "direction": "long",
+            "status": "TRIGGERED",
+            "entry": float(entry),
+            # Sin stop: no se inventa un nivel que el plan nunca tuvo.
+            "structuralStop": None,
+            "target1": None,
+            "target2": None,
+            "adopted": True,
+        }
+        adopted_cycle = (self._canonical_attribution.get(symbol) or {}).get("cycleId")
+        position = build_position_state_from_fill(
+            plan,
+            fill_price=float(entry),
+            fill_quantity=float(held),
+            filled_at=at,
+            max_holding_period_days=resolve_holding_horizon(
+                self._v2_tunables.exit_template
+            ).max_holding_period_days,
+            cycle_id=str(adopted_cycle) if adopted_cycle else None,
+        )
+        if position is None:
+            return None
+        logger.warning(
+            "auto_sim v2 adoption without valid geometry symbol=%s entry=%s price=%s "
+            "atr=%s atrSource=%s entrySource=%s (sin stop: se declara)",
+            symbol,
+            entry,
+            price,
+            atr_value,
+            atr_source,
+            entry_source,
+        )
+        return self._v2_degrade_adoption(
+            symbol,
+            position,
+            source="none",
+            reason=reason,
+            at=at,
+            entry=entry,
+            price=price,
+            atr_value=atr_value,
+            atr_source=atr_source,
+            entry_source=entry_source,
         )
 
     def _v2_degrade_adoption(
@@ -5452,6 +5787,11 @@ class AutoSimulationWorker:
         source: Literal["plan", "reconstructed", "none"],
         reason: str,
         at: str,
+        entry: Decimal | None = None,
+        price: Decimal | None = None,
+        atr_value: Any = None,
+        atr_source: str | None = None,
+        entry_source: str | None = None,
     ) -> PositionState:
         """Declara la adopción como no verificable y journaliza con atención alta."""
         degraded = replace(
@@ -5462,18 +5802,26 @@ class AutoSimulationWorker:
             ),
             updated_at=at,
         )
-        self._journal_position_event(
-            symbol,
-            RECONCILIATION_REQUIRED,
-            at=at,
-            detail={
-                "source": source,
-                "reason": reason,
-                "reasonCode": PROTECTION_MISSING,
-                "stop": degraded.current_stop,
-                "attention": "high",
-            },
-        )
+        detail: dict[str, Any] = {
+            "source": source,
+            "reason": reason,
+            "reasonCode": PROTECTION_MISSING,
+            "stop": degraded.current_stop,
+            "attention": "high",
+        }
+        # W-159-1 (Hueco C): los datos con los que se construyó (o no) la geometría van al
+        # hecho durable. Sin ellos, un stop imposible no es depurable a posteriori.
+        if entry is not None:
+            detail["entry"] = float(entry)
+        if entry_source is not None:
+            detail["entrySource"] = entry_source
+        if price is not None:
+            detail["price"] = float(price)
+        if atr_value is not None:
+            detail["atr"] = atr_value
+        if atr_source is not None:
+            detail["atrSource"] = atr_source
+        self._journal_position_event(symbol, RECONCILIATION_REQUIRED, at=at, detail=detail)
         logger.warning(
             "auto_sim v2 adoption degraded symbol=%s source=%s reason=%s stop=%s",
             symbol,
@@ -5989,6 +6337,10 @@ class AutoSimulationWorker:
             strategy_version=self._position_version.get(symbol),
         )
         self._v2_journal.append(entry)
+        # W-159-1 (Hueco C): además de la RAM del proceso, el hecho entra en la cola del
+        # spine durable. Se publica al final del turno (``_v2_flush_position_journal``),
+        # mientras la sesión del tick sigue abierta.
+        self._v2_position_journal_pending.append(entry)
         try:
             self._emit(
                 "position_management",
@@ -6002,6 +6354,25 @@ class AutoSimulationWorker:
             )
         except Exception:  # noqa: BLE001 — journalizar nunca tumba el turno.
             logger.exception("auto_sim position journal emit failed symbol=%s", symbol)
+
+    async def _v2_flush_position_journal(self) -> None:
+        """W-159-1 (Hueco C) — publica en el spine los eventos de gestión acumulados.
+
+        ``_journal_position_event`` es síncrono y corre en varias ramas del turno; el
+        sumidero M2 es asíncrono y va atado a la sesión del tick. Acumular y volcar al
+        final del turno conserva la secuencia (los eventos se publican en el orden en que
+        se produjeron) sin convertir en ``await`` cada punto de journalización.
+
+        Best-effort declarado, igual que ``_v2_audit_emit``: sin sumidero es un no-op (Δ = 0
+        en hermético) y un fallo se registra pero no tumba el turno (el dinero ya está
+        comprometido aguas arriba). La cola se VACÍA siempre para no reintentar un hecho
+        ya fallido en cada tick restante del día.
+        """
+        pending, self._v2_position_journal_pending = self._v2_position_journal_pending, []
+        for entry in pending:
+            await self._v2_audit_emit(
+                self._v2_seal_audit_identity(entry), label="position_management"
+            )
 
     async def _v2_track_entry(self, symbol: str, price: Decimal, qty: Decimal) -> None:
         """Crea el ``PositionState`` V2 al abrir (desde el TradePlan que lo originó).
@@ -6612,6 +6983,7 @@ class AutoSimulationWorker:
                     )
             report.orders += 1
             report.fills += len(settlement.applied)
+        await self._v2_flush_position_journal()
         self._v2_bar_note_settlement()
         self._last_gate_reason = tuple(dict.fromkeys(reasons))
         return report

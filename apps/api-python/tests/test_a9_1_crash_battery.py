@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
@@ -266,3 +267,287 @@ async def test_projection_without_cost_basis_is_healed_from_applied_fills(
     assert projection["AAA"].entry_price == pytest.approx(Decimal("12.5"))
     assert worker._entry_price["AAA"] == Decimal("12.5")
     assert worker._open["AAA"] == Decimal("100"), "curar el coste no altera la posición"
+
+
+# ---------------------------------------------------------------------------
+# W-159-5 (Hueco E) — el coste de la CUENTA no es el coste de una fila cuando hay
+# más de un motor vivo con el mismo símbolo.
+# ---------------------------------------------------------------------------
+
+
+def _duplicate_engines_reader(account: str, *, facts_qty: float = 100.0):
+    from bolsa_analytics.cognitive.position_ledger import AppliedFillFact
+    from bolsa_application.applied_fills import CanonicalPositions
+
+    async def reader(_acc: str) -> CanonicalPositions:
+        return CanonicalPositions(
+            {"AAA": Decimal("100")},
+            facts=(
+                AppliedFillFact(
+                    execution_id="fill-1",
+                    instrument_id="AAA",
+                    side="buy",
+                    quantity=facts_qty,
+                    price=12.5,
+                    account_id=account,
+                ),
+            ),
+        )
+
+    return reader
+
+
+@pytest.mark.asyncio
+async def test_duplicate_engine_rows_are_not_healed_with_an_account_average(
+    auto_env: None,
+) -> None:
+    """Hueco E — dos filas vivas ⇒ no se cura ``entry_price`` (se declara, no se inventa).
+
+    Medido 2026-10-21: ``3204115d`` con 1933.3953 bajo dos motores huérfanos (uno con
+    ``ver=None``) mientras el canónico tenía una sola posición. La cura de ``.159``
+    escribe el coste medio de la CUENTA sobre una fila POR MOTOR: con dos filas vivas
+    ese número no identifica a ninguna de ellas.
+    """
+    account = "acc-dup"
+    pos_store = InMemorySimAutoPositionStore()
+
+    _s, clock = step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))
+    worker = AutoSimulationWorker(
+        clock=clock,
+        exec_store=InMemoryExecutionEventStore(),
+        position_store=pos_store,
+        account_id=account,
+    )
+    # La MISMA cantidad bajo dos motores: el caso medido.
+    await pos_store.upsert(
+        account, worker._engine_id, "AAA", Decimal("100"), entry_price=None
+    )
+    await pos_store.upsert(account, "auto-orphan", "AAA", Decimal("100"), entry_price=None)
+
+    worker._canonical_positions_reader = _duplicate_engines_reader(account)
+    await worker.readopt_positions()
+
+    projection = await pos_store.read_projection(account, worker._engine_id)
+    assert projection["AAA"].entry_price is None, (
+        "el coste medio de la cuenta no se escribe sobre una fila por motor"
+    )
+    assert worker._open["AAA"] == Decimal("100"), "la cantidad sí se adopta"
+
+
+@pytest.mark.asyncio
+async def test_rebuilt_duplicate_row_keeps_the_quantity_but_not_the_invented_cost(
+    auto_env: None,
+) -> None:
+    """Hueco E — la reconstrucción de cantidad sigue; la del COSTE se niega."""
+    account = "acc-dup-rebuilt"
+    pos_store = InMemorySimAutoPositionStore()
+
+    _s, clock = step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))
+    worker = AutoSimulationWorker(
+        clock=clock,
+        exec_store=InMemoryExecutionEventStore(),
+        position_store=pos_store,
+        account_id=account,
+    )
+    # Cantidad divergente (50 vs canónico 100) ⇒ el camino REBUILT sí se ejecuta.
+    await pos_store.upsert(account, worker._engine_id, "AAA", Decimal("50"), entry_price=None)
+    await pos_store.upsert(account, "auto-orphan", "AAA", Decimal("50"), entry_price=None)
+
+    worker._canonical_positions_reader = _duplicate_engines_reader(account)
+    await worker.readopt_positions()
+
+    projection = await pos_store.read_projection(account, worker._engine_id)
+    assert projection["AAA"].quantity == Decimal("100"), "la cantidad se reconcilia"
+    assert projection["AAA"].entry_price is None, "el coste no se fabrica desde el medio"
+
+
+# ---------------------------------------------------------------------------
+# W-159 — Huecos B (geometría), C (durabilidad) y D (atribución) del diagnóstico
+# ``docs/engineering/diagnostico-adopcion-puntuacion-atribucion-2026-10-21.md``.
+# ---------------------------------------------------------------------------
+
+
+def _adoption_worker(account: str = "acc-adopt") -> AutoSimulationWorker:
+    _s, clock = step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))
+    return AutoSimulationWorker(
+        clock=clock,
+        exec_store=InMemoryExecutionEventStore(),
+        # Sin espejo no hay readopción: ``readopt_positions`` no reconcilia y la
+        # atribución canónica (Hueco D) nunca se calcula.
+        position_store=InMemorySimAutoPositionStore(),
+        account_id=account,
+    )
+
+
+def test_adoption_geometry_never_lands_above_the_market(auto_env: None) -> None:
+    """Hueco B — una entrada rancio no puede fabricar un stop que liquide en el tick.
+
+    Medido 2026-10-21: la posición ``3204115d`` se adoptó con ``stop=12,9144`` sobre un
+    mercado de ``10,42`` y cuatro ventas la cerraron 0,04 s después. El guard histórico
+    (``0 < stop < entry``) no podía verlo porque comparaba contra la MISMA entrada
+    equivocada: hay que validar contra el precio de mercado.
+    """
+    price = Decimal("10.42")
+
+    # (a) sólo el espejo (rancio, 13,3): la geometría queda por encima del mercado ⇒ se
+    #     adopta SIN stop y se declara el motivo. Nunca un número que dispare.
+    stale = _adoption_worker()
+    stale._open["AAA"] = Decimal("100")
+    stale._entry_price["AAA"] = Decimal("13.3")
+    degraded = stale._v2_adopt_position("AAA", price)
+    assert degraded is not None, "una adopción imposible no puede dejar la posición muda"
+    assert degraded.current_stop is None, "no se inventa un stop por encima del mercado"
+    assert degraded.lifecycle_state == "RECONCILIATION_REQUIRED"
+    reasons = [e.payload.get("reason") for e in stale._v2_position_journal_pending]
+    assert "stop_above_market" in reasons
+
+    # (b) el LIBRO manda sobre el espejo: con el coste canónico la geometría es válida y
+    #     el stop queda por DEBAJO del mercado (no se liquida sola).
+    fixed = _adoption_worker()
+    fixed._open["AAA"] = Decimal("100")
+    fixed._entry_price["AAA"] = Decimal("13.3")
+    fixed._canonical_entry_by_symbol["AAA"] = Decimal("10.3335")
+    adopted = fixed._v2_adopt_position("AAA", price)
+    assert adopted is not None
+    assert adopted.current_stop is not None
+    assert Decimal(str(adopted.current_stop)) < price
+
+
+def test_adoption_cost_basis_prefers_the_ledger_over_the_mirror(auto_env: None) -> None:
+    """Hueco B — el coste de la adopción sale del libro de fills aplicados."""
+    worker = _adoption_worker()
+    worker._entry_price["AAA"] = Decimal("13.3")
+    assert worker._adoption_cost_basis("AAA") == (Decimal("13.3"), "projection")
+
+    worker._canonical_entry_by_symbol["AAA"] = Decimal("10.3335")
+    assert worker._adoption_cost_basis("AAA") == (Decimal("10.3335"), "ledger")
+
+    # Sin ninguna de las dos fuentes no se inventa: la adopción se declara y no se finge.
+    assert worker._adoption_cost_basis("ZZZ") == (None, "none")
+
+
+@pytest.mark.asyncio
+async def test_position_management_events_reach_the_durable_spine(
+    auto_env: None,
+) -> None:
+    """Hueco C — la gestión de posición deja de vivir sólo en la RAM del proceso.
+
+    Medido 2026-10-21: 238 filas de posición en el spine y **0** del símbolo adoptado;
+    tras el run sólo quedaba el agregado del día. Sin ``entry``/``stop``/``atr`` en un
+    hecho durable, el Hueco B no era depurable a posteriori.
+    """
+    worker = _adoption_worker(account="acc-evidence")
+    published: list[Any] = []
+
+    async def sink(entry: Any) -> None:
+        published.append(entry)
+
+    worker._operational_audit_sink = sink
+    worker._journal_position_event(
+        "AAA",
+        "PROTECTION_MISSING",
+        at="2026-10-21T17:46:06Z",
+        detail={"source": "reconstructed", "stop": 12.9144, "entry": 10.3335},
+    )
+    assert published == [], "journalizar no publica: se acumula para el final del turno"
+    assert worker._v2_position_journal_pending, "el hecho queda en cola"
+
+    await worker._v2_flush_position_journal()
+
+    assert len(published) == 1
+    payload = published[0].payload
+    assert payload["instrumentId"] == "AAA"
+    assert payload["reasonCodes"] == ["PROTECTION_MISSING"]
+    assert payload["stop"] == 12.9144
+    assert published[0].account_id == "acc-evidence", "el hecho durable sella su cuenta"
+    assert worker._v2_position_journal_pending == [], "la cola se vacía siempre"
+
+    # Sin sumidero (hermético) es un no-op: no hay nada que fingir, pero no se acumula.
+    worker._operational_audit_sink = None
+    worker._journal_position_event("AAA", "PROTECTION_MISSING", at="2026-10-21T17:47:06Z")
+    await worker._v2_flush_position_journal()
+    assert worker._v2_position_journal_pending == []
+
+
+@pytest.mark.asyncio
+async def test_adopted_position_inherits_version_and_cycle_from_the_ledger(
+    auto_env: None,
+) -> None:
+    """Hueco D — la adopción no pierde la atribución: versión y ciclo salen del libro.
+
+    Medido 2026-10-21: las compras del ``2026-10-20`` declaraban ``v283-window-a`` y las
+    ventas de cierre salieron con ``ver=None cycle=None`` ⇒ el cierre no casaba como
+    ciclo medible. El dato existía en el último BUY aplicado; sólo se ignoraba.
+    """
+    from bolsa_analytics.cognitive.position_ledger import AppliedFillFact
+    from bolsa_application.applied_fills import CanonicalPositions
+
+    account = "acc-attrib"
+    worker = _adoption_worker(account=account)
+
+    async def reader(_acc: str) -> CanonicalPositions:
+        return CanonicalPositions(
+            {"AAA": Decimal("100")},
+            facts=(
+                AppliedFillFact(
+                    execution_id="fill-old",
+                    instrument_id="AAA",
+                    side="buy",
+                    quantity=60.0,
+                    price=10.30,
+                    applied_at="2026-10-19T16:09:00+00:00",
+                    strategy_version_id="v282-old",
+                    account_id=account,
+                ),
+                AppliedFillFact(
+                    execution_id="fill-last",
+                    instrument_id="AAA",
+                    side="buy",
+                    quantity=40.0,
+                    price=10.39,
+                    applied_at="2026-10-20T16:11:28+00:00",
+                    strategy_version_id="v283-window-a",
+                    cycle_id="cyc-9b1599c7c635",
+                    account_id=account,
+                ),
+            ),
+        )
+
+    worker._canonical_positions_reader = reader
+    await worker.readopt_positions()
+
+    # El ÚLTIMO buy aplicado manda: es el que abrió (o amplió) el inventario vivo.
+    assert worker._position_version["AAA"] == "v283-window-a"
+    assert worker._canonical_attribution["AAA"]["cycleId"] == "cyc-9b1599c7c635"
+
+    worker._open["AAA"] = Decimal("100")
+    position = worker._v2_adopt_position("AAA", Decimal("10.42"))
+    assert position is not None
+    assert position.cycle_id == "cyc-9b1599c7c635", "el cierre hereda el ciclo de la entrada"
+
+    # Un libro que NO declara ciclo no autoriza a inventarlo.
+    async def reader_without_cycle(_acc: str) -> CanonicalPositions:
+        return CanonicalPositions(
+            {"AAA": Decimal("100")},
+            facts=(
+                AppliedFillFact(
+                    execution_id="fill-nocycle",
+                    instrument_id="AAA",
+                    side="buy",
+                    quantity=100.0,
+                    price=10.3335,
+                    applied_at="2026-10-20T16:11:28+00:00",
+                    strategy_version_id="v283-window-a",
+                    account_id=account,
+                ),
+            ),
+        )
+
+    bare = _adoption_worker(account=account)
+    bare._canonical_positions_reader = reader_without_cycle
+    await bare.readopt_positions()
+    bare._open["AAA"] = Decimal("100")
+    bare_position = bare._v2_adopt_position("AAA", Decimal("10.42"))
+    assert bare_position is not None
+    assert bare_position.cycle_id is None, "sin ciclo en el libro no se acuña ninguno"
+    assert bare._position_version["AAA"] == "v283-window-a"

@@ -63,6 +63,26 @@ OPPORTUNITY_COMPONENTS: tuple[str, ...] = (
 # pipeline.
 TOP_N_EXCLUDED = "top_n_excluded"
 
+# W-159-4 (Hueco A) — una candidata SIN ningún componente medido NO es comparable.
+#
+# Medido 2026-10-21: 40 de 41 candidatas puntuaron ``0.0`` exacto (ni edge ni liquidez
+# declarados) y con ``top_n=5`` el TOP lo formaban 1 candidata real y 4 ceros elegidos por
+# desempate alfabético. El motivo ``top_n_excluded`` era cierto pero vacío: no distingue
+# "no compitió" de "no medía nada". Estas candidatas se declaran con su propio motivo y
+# quedan FUERA del TOP (fail-closed honesto; el TOP no se rellena con ceros).
+OPPORTUNITY_UNSCORED = "opportunity_unscored"
+
+
+def _is_measured(value: Any) -> bool:
+    """¿El componente viene DECLARADO y finito? Un ``0.0`` declarado SÍ es medición."""
+    if value is None:
+        return False
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return False
+    return number == number and number not in (float("inf"), float("-inf"))
+
 
 def _clamp01(value: Any) -> float:
     """Normaliza a [0,1]; ausente/no finito ⇒ 0.0 (fail-closed)."""
@@ -95,6 +115,23 @@ class OpportunityScore:
     rank: int | None = None
     strategy_preset_key: str | None = None
     strategy_version: str | None = None
+    # W-159-4 (Hueco A): componentes que la señal DECLARÓ. ``()`` = nada medido, así que el
+    # ``combined`` es un 0,0 estructural y no una nota baja: esa candidata no es
+    # comparable económicamente y no debe ocupar un hueco del TOP. ``None`` = no calculado
+    # por el score builder (construcción directa): no se afirma ni lo uno ni lo otro.
+    measured_components: tuple[str, ...] | None = None
+
+    @property
+    def scored(self) -> bool:
+        """``True`` si hay algún componente medido (un ``0.0`` declarado cuenta).
+
+        ``measured_components is None`` (score construido a mano, sin pasar por
+        ``score_opportunity``) NO se lee como "sin medir": ausencia de cálculo no es una
+        afirmación de ausencia de medición.
+        """
+        if self.measured_components is None:
+            return True
+        return bool(self.measured_components)
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -156,6 +193,9 @@ def score_opportunity(
         combined=combined,
         strategy_preset_key=_clean_identity(strategy_preset_key),
         strategy_version=_clean_identity(strategy_version),
+        measured_components=tuple(
+            name for name in OPPORTUNITY_COMPONENTS if _is_measured(raw[name])
+        ),
     )
 
 
@@ -183,6 +223,7 @@ def rank_opportunities(scores: Iterable[OpportunityScore]) -> tuple[OpportunityS
             rank=index + 1,
             strategy_preset_key=s.strategy_preset_key,
             strategy_version=s.strategy_version,
+            measured_components=s.measured_components,
         )
         for index, s in enumerate(ordered)
     )
@@ -192,6 +233,7 @@ def select_top_opportunities(
     scores: Iterable[OpportunityScore],
     *,
     top_n: int,
+    require_measured: bool = False,
 ) -> tuple[OpportunityScore, ...]:
     """Devuelve el TOP ``top_n`` a EVALUAR (ya rankeado).
 
@@ -200,7 +242,18 @@ def select_top_opportunities(
     motivo de journal es ``TOP_N_EXCLUDED`` (nunca ``edge_below_threshold``).
 
     ``top_n <= 0`` ⇒ vacío (fail-closed, no se inventa un top). Orden estable.
+
+    W-159-4 (Hueco A) — ``require_measured``: con ``True`` el TOP se forma SÓLO con
+    candidatas que tengan algún componente medido (``OpportunityScore.scored``) y una
+    candidata sin nada medido NO entra "por relleno" con un ``0,0``. Es el modo del
+    camino de DECISIÓN (medido 2026-10-21: 40 de 41 candidatas con 0,0 exacto ⇒ el TOP
+    era 1 candidata real + 4 ceros por desempate alfabético).
+
+    El modo por defecto (``False``) se conserva para las FOTOS de evidencia (TOP3
+    cross-asset): ahí una candidata sin campeón debe seguir apareciendo con su scoring
+    histórico DECLARADO. El ranking informa; sólo la decisión exige medición.
     """
     if top_n <= 0:
         return ()
-    return rank_opportunities(scores)[:top_n]
+    candidates = [score for score in scores if score.scored] if require_measured else list(scores)
+    return rank_opportunities(candidates)[:top_n]

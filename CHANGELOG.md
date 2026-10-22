@@ -2,6 +2,28 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.160-beta] — **la adopción deja de fabricar geometría y de perder atribución: el stop ya no nace encima del mercado, el cierre hereda versión y ciclo, y el TOP no se rellena con candidatas sin medir** (**`Δ motor = 0` · `Δ decisión = 0` salvo selección sin medición · SIN migración)
+
+**Naturaleza:** sello acotado a `2.11.159-beta`; **no** toca umbrales, pesos, régimen, sizing, `TOP_N`, optimizador, orquestador ni replay OOS. Cierra los cinco huecos del diagnóstico [`diagnostico-adopcion-puntuacion-atribucion-2026-10-21.md`](docs/engineering/diagnostico-adopcion-puntuacion-atribucion-2026-10-21.md). **Sin migración** (`head` sigue `057_top3_opportunity_identity`). **Bump** `2.11.159-beta` → `2.11.160-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**).
+
+**W-160-1 · Hueco C — la gestión de posición no llegaba al spine durable.** `_journal_position_event` solo escribía en RAM y en la fila diaria: un crash entre la adopción y el cierre perdía los hechos de gestión. Nuevo buffer `_v2_position_journal_pending` + `_v2_flush_position_journal()` al final del turno, que sella cada hecho con `build_position_management_journal_entry` en `_operational_audit_sink`.
+
+**W-160-2 · Hueco B — la geometría se construía sobre el espejo.** Medido el 2026-10-21: stop `12.9144` sobre mercado `10.42` ⇒ cuatro ventas cerraron la posición en `0,04 s`. Ahora `_adoption_cost_basis(symbol)` da precedencia al **libro** (`_canonical_entry_by_symbol`) sobre la proyección, y `_v2_adoption_stop()` exige tres condiciones —ATR finito y **positivo**, `0 < stop < entry` y `stop < price·(1−0,002)`— devolviendo el motivo del rechazo. Cuando la geometría no es construible se **declara** (`RECONCILIATION_REQUIRED`/`PROTECTION_MISSING`) con telemetría completa en vez de inventar un stop invertido.
+
+**W-160-3 · Hueco D — la posición adoptada perdía versión y ciclo.** `_canonical_applied_facts`/`_canonical_open_attribution` leen el último BUY aplicado con `build_position_ledger`; `readopt_positions` restaura `_position_version` desde el libro **después** del bucle de la proyección (el libro manda sobre el espejo) y propaga `cycle_id` a `build_position_state_from_fill`.
+
+**W-160-4 · Hueco A — el TOP se rellenaba con ceros.** Medido: 40 de 41 candidatas puntuaron `0.0` exacto y, con `top_n=5`, cuatro ceros ocupaban hueco por desempate alfabético. `OpportunityScore` gana `measured_components`/`scored`, las candidatas sin medición se declaran `OPPORTUNITY_UNSCORED` y `select_top_opportunities(..., require_measured=True)` se aplica **solo** en la decisión: la foto TOP3 cross-asset sigue mostrando el histórico (un `0.0` declarado **sí** es medición; `None` no se lee como ausencia).
+
+**W-160-5 · Hueco E — el coste de la cuenta no es el coste de una fila.** Con dos motores vivos para el mismo símbolo (medido: `3204115d` ×2 con 1933.3953), la cura de `entry_price` escribía el medio de la cuenta sobre una fila por motor. Nuevo `read_live_engines` en los dos stores y `_cost_basis_is_ambiguous`: se sigue reconciliando la **cantidad**, se niega el **coste** y se declara. Un lector que falla se lee como ambiguo (fail-closed).
+
+**Verificación (medida).** Focalizado **74 passed** (batería de crash A9.1, ranker, worker integration, TOP3 PG) · suite completa `packages/py apps/api-python` **5900 passed / 1 skipped** con `chaos/live_a7` deseleccionado (los 7 son caos con workers reales: fallan de forma intermitente bajo carga, en una pasada `c3a` y en otra `c3b`, sin relación con estos cambios) · `ruff` **All checks passed!** · `mypy` **no issues / 567 source files** · guardián de bump **2 passed**.
+
+**Cierre del día `20261021` (medido, no interpretado).** El run terminó a las `2026-10-22T15:54:32Z` con `status = MEDIDO`, `steps.forward = {exit: 2, declared: true, hard: false}` y `sample.verdict = BLOCKED` — **sin `HARD_ERROR`**, que era el objeto de la corrección. Freeze del artefacto: `apps f37b6da0` / `packages b33bf1e0`, idéntico al pin. `window:certify` ⇒ **`INCONCLUSIVE`** (`días 4/4 · episodios 0/2 · ciclos 0/32`, faltan `episodes` y `measurable_cycles`); `window:evidence` ⇒ **P4 CERRADO**, P1/P2/P3 abiertos.
+
+**Corrección de una predicción propia.** El diagnóstico afirmaba que el día cerraría con **0 ciclos**. Falso: cerró **4 round-trips** (`closedCycles 4`, `durableFills 20`, `turnTotals.closed 1`). Lo que sí se cumplió es lo que el gate mide: **0 medibles** (`measurableCycles 0`, blockers `no measurable risk` / `no exit orders` / `insufficient measurable cycles per strategy`). Se documenta como **Huecos F-1/F-2** (ciclos cerrados sin día —`undatedCycles 4`— y sin denominador de riesgo enlazado), que **no** forman parte de este sello y requieren su propio ciclo.
+
+**Límites declarados.** AUTO sigue **OFF**; la ventana sigue **`INCONCLUSIVE`** y `CONFIRMED` no se emite. Los 4 ciclos cerrados **no** son evidencia de rentabilidad: no tienen R reconstruible ni día atribuido. No se backfillea nada de lo ya corrido.
+
 ## [2.11.159-beta] — **la posición adoptada recupera su base de coste y el dato de barra no se reutiliza vacío: la ventana PAPER deja de vetar por régimen fantasma y de mantener posiciones mudas** (**`Δ motor = 0` · `Δ decisión = 0` con fuentes cargadas · SIN migración)
 
 **Naturaleza:** sello acotado a `2.11.158-beta`; **no** toca umbrales, pesos, régimen, sizing, TOP_N, optimizador, orquestador ni replay OOS. Solo se cierran dos huecos de CABLEADO del worker SIM: **sin migración** (`head` sigue `057_top3_opportunity_identity`). **Bump** `2.11.158-beta` → `2.11.159-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**).

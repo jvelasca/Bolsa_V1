@@ -56,6 +56,7 @@ from bolsa_analytics.cognitive.operational_governor import (
     assess_from_measurements,
 )
 from bolsa_analytics.cognitive.opportunity_ranker import (
+    OPPORTUNITY_UNSCORED,
     TOP_N_EXCLUDED,
     OpportunityScore,
     rank_opportunities,
@@ -1262,7 +1263,7 @@ def plan_v2_tick(
         for s in entry_signals
     ]
     ranked = rank_opportunities(scored)
-    top = select_top_opportunities(ranked, top_n=cfg.top_n)
+    top = select_top_opportunities(ranked, top_n=cfg.top_n, require_measured=True)
     score_by_candidate = {s.instrument_id: s for s in top}
 
     # V2.40.4 — TOP_N es un TOPE DE EVALUACIÓN, no una prioridad. Solo el TOP se decide
@@ -1279,7 +1280,10 @@ def plan_v2_tick(
     excluded: list[DecisionJournalEntryRecord] = [
         _rejected_signal_entry(
             deduped[score.instrument_id],
-            TOP_N_EXCLUDED,
+            # W-159-4 (Hueco A): "no medía nada" y "no entró en el TOP" son motivos
+            # distintos. Antes ambos se declaraban ``top_n_excluded`` y el día no podía
+            # distinguir una candidata sin economía de una que perdió el ranking.
+            OPPORTUNITY_UNSCORED if not score.scored else TOP_N_EXCLUDED,
             actor=actor,
             as_of=as_of,
             score=score,
@@ -1293,7 +1297,7 @@ def plan_v2_tick(
         _opportunity_row(
             deduped[score.instrument_id],
             status=OPPORTUNITY_REJECTED,
-            reason=TOP_N_EXCLUDED,
+            reason=OPPORTUNITY_UNSCORED if not score.scored else TOP_N_EXCLUDED,
         )
         for score in ranked
         if score.instrument_id not in score_by_candidate and score.instrument_id in deduped
