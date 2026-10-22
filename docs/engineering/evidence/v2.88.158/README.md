@@ -73,3 +73,13 @@ diferida, no fabricación**.
 README: se escribió al publicar y vive en el `tip` del árbol (commit `97d61cbc`, junto a `.159` y
 `.160`). Lo que el tag sí contiene es el código, el `CHANGELOG` y el pin del sello. Cite este
 documento por su ruta en `main`, no por el tag.
+
+## 9. CI del tag (post-publicación, medido)
+
+Medido el **2026-10-22** sobre el `headSha` del tag, no sobre `main`:
+
+| Workflow | Run | `headSha` | Conclusión |
+| --- | --- | --- | --- |
+| `Release tag CI` | [39815515439](https://github.com/jvelasca/Bolsa_V1/actions/runs/39815515439) | `6b6dd6f0` | **`success`** (13/13 jobs) |
+
+Cita: https://github.com/jvelasca/Bolsa_V1/actions/runs/39815515439

@@ -93,3 +93,13 @@ día de sesión que se corra **después** de este tag.
   atribuido.
 - No se backfillea nada de lo ya corrido; ningún día se reinterpretó a posteriori.
 - Los Huecos **F-1/F-2** están declarados y **no** se arreglan aquí.
+
+## 9. CI del tag (post-publicación, medido)
+
+Medido el **2026-10-22** sobre el `headSha` del tag, no sobre `main`:
+
+| Workflow | Run | `headSha` | Conclusión |
+| --- | --- | --- | --- |
+| `Release tag CI` | [39815515285](https://github.com/jvelasca/Bolsa_V1/actions/runs/39815515285) | `2e0f1fa6` | **`success`** (13/13 jobs) |
+
+Cita: https://github.com/jvelasca/Bolsa_V1/actions/runs/39815515285

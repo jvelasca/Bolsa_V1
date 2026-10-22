@@ -81,3 +81,23 @@ que el gate mide: `measurableCycles = 0`.
 
 AUTO sigue **OFF**; la ventana sigue **`INCONCLUSIVE`**; `CONFIRMED` no se emite. No se backfillea
 ningún día previo y las posiciones huérfanas no se adoptan.
+
+## 9. CI del tag (post-publicación, medido)
+
+Medido el **2026-10-22** sobre el `headSha` del tag, no sobre `main`:
+
+| Workflow | Run | `headSha` | Conclusión |
+| --- | --- | --- | --- |
+| `Release tag CI` | [39815515824](https://github.com/jvelasca/Bolsa_V1/actions/runs/39815515824) | `fd8049c6` | **`failure`** (job `python`; el agregado `certify` cae en cascada) |
+
+**Por qué falló.** `ruff` emitió `I001 Import block is un-sorted or un-formatted` en
+`apps/api-python/src/bolsa_api/background/auto_simulation_worker.py:34`: en el árbol `fd8049c6` el
+bloque `position_lifecycle` precedía a `position_ledger`, y el orden lexicográfico exige lo contrario
+(`ledger` < `lifecycle`). Los otros doce jobs pasaron, incluidos `lifecycle-pg`, `a7-gate`, `spine` y
+`replay-repro`.
+
+**Qué NO se hizo.** No se movió el tag ni se reescribió la historia para «arreglar» el rojo. El
+defecto se corrigió **hacia adelante** en `.160` (`4a76d477`), cuyo árbol el CI mide verde
+([run 39815515285](https://github.com/jvelasca/Bolsa_V1/actions/runs/39815515285)). La etiqueta
+`v2.88.159-beta` sigue apuntando a `fd8049c6` y su run sigue en `failure`: la evidencia válida de
+`.159` es su árbol y su freeze, no un CI verde que no existe.
