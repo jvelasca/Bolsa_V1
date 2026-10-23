@@ -37,7 +37,7 @@ const ADVISORY =
 const UNIVERSE_TRUNCATED =
   "El universo se recortó: este parte no cubre todos los valores de la lista.";
 const SELECTOR_UNAVAILABLE =
-  "No se pudo leer el selector del día: no se sabe qué estrategia era la mejor puntuada.";
+  "No se pudo leer el selector del día: no se sabe qué estrategia quedó primera en el ranking.";
 const SELECTOR_NOT_CONFIGURED =
   "Este parte no incluye la identidad del selector; no se puede afirmar qué estrategia ganó.";
 const SELECTOR_NO_SNAPSHOT =

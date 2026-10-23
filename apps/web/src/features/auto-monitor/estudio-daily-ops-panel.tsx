@@ -14,6 +14,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { EstudioDailyPlanV1, EstudioDailyValueV1 } from "@bolsa/shared";
+import { deriveValueSummary } from "@bolsa/shared";
 import { absentDataLabel, isAbsent } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -98,6 +99,109 @@ function StatusBadge({ status }: { status: string }) {
     >
       {STATUS_LABEL[status] ?? status}
     </span>
+  );
+}
+
+/**
+ * Resumen de las CUATRO preguntas que el usuario básico necesita de un vistazo.
+ *
+ * Sustituye a la jerga como primera lectura: qué propone, por qué, qué falta para actuar y
+ * si está validado. Los ids, la cadena y el DÍA-D quedan detrás de «Detalle técnico»
+ * (aunque sus testids se conservan, para no romper la batería existente).
+ */
+function ValueSummaryBlock({
+  value,
+  chainValue,
+  validation,
+}: {
+  value: EstudioDailyValueV1;
+  chainValue: import("@bolsa/shared").EstudioChainValueV1 | undefined;
+  validation: {
+    k: number | null;
+    windowVerdict: string | null;
+  } | null;
+}) {
+  const summary = useMemo(
+    () =>
+      deriveValueSummary(value, {
+        chain: chainValue ?? null,
+        validation: validation
+          ? {
+              k: validation.k,
+              windowVerdict: validation.windowVerdict,
+              // Esta vista NO valida: el veredicto se emite en su propia evidencia.
+              validated: false,
+            }
+          : null,
+      }),
+    [value, chainValue, validation],
+  );
+  const rows = [
+    {
+      key: "proposal",
+      question: "¿Qué propone?",
+      section: summary.proposal,
+    },
+    { key: "why", question: "¿Por qué?", section: summary.why },
+    {
+      key: "missing",
+      question: "¿Qué falta para actuar?",
+      section: summary.missing,
+    },
+    {
+      key: "validation",
+      question: "¿Está validada?",
+      section: summary.validation,
+    },
+  ] as const;
+  return (
+    <div
+      className="mt-2 space-y-1"
+      data-testid="estudio-daily-value-summary"
+      data-validation={String(summary.validation.validated)}
+    >
+      <dl className="grid gap-1 text-[11px] sm:grid-cols-2">
+        {rows.map((row) => (
+          <div
+            key={row.key}
+            data-testid={`estudio-daily-value-summary-${row.key}`}
+            data-measurement={row.section.measurement}
+          >
+            <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {row.question}
+            </dt>
+            <dd>
+              {row.section.headline}
+              {row.section.detail ? (
+                <span className="block text-[10px] text-muted-foreground">
+                  {row.section.detail}
+                </span>
+              ) : null}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {/*
+        La CLASIFICACIÓN del selector se publica aparte de la validación: «mejor puntuada»
+        es un puesto del ranking del día, no una validación ni una promesa de rentabilidad.
+      */}
+      <p
+        className="text-[10px] text-muted-foreground"
+        data-testid="estudio-daily-value-summary-classification"
+        data-rank={summary.classification.rank ?? "unknown"}
+      >
+        {summary.classification.headline}
+        {summary.classification.detail
+          ? ` ${summary.classification.detail}`
+          : ""}
+      </p>
+      <p
+        className="text-[10px] text-muted-foreground"
+        data-testid="estudio-daily-value-summary-attribution"
+      >
+        {summary.technical.attributionLabel}
+      </p>
+    </div>
   );
 }
 
@@ -285,10 +389,10 @@ function ValueCard({
           ? "Identidad del selector no incluida en este parte"
           : "No se pudo leer el selector del día"
       : selector.isWinner === true
-        ? `Ganador del selector: ${selector.presetKey ?? selector.assetId ?? "sin identidad"}`
+        ? `Clasificación del selector: #1 de la foto (run ${textOrAbsent(selector.runId)}, barra ${textOrAbsent(selector.bar)})`
         : selector.isWinner === false
-          ? "Este valor no es el ganador del selector"
-          : "El selector del día no declaró un ganador";
+          ? `Clasificación del selector: no es la primera de la foto (run ${textOrAbsent(selector.runId)})`
+          : "Clasificación del selector: la foto del día no declaró un puesto";
   // Desde el sello .156 el contrato de ciclos SÍ publica `planId`/`signalId` (gap 2): la
   // atribución se resuelve con ellos; sin esos hechos sigue siendo «no atribuido».
   const attribution = auditAttributionForValue(
@@ -340,195 +444,219 @@ function ValueCard({
         </div>
       </div>
 
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        <section data-testid="estudio-daily-value-signal">
-          <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            1 · Señal calculada
-          </h4>
-          <p className="text-[11px]">
-            {textOrAbsent(value.opinion?.stance)} ·{" "}
-            {isAbsent(value.opinion?.dictamenStars)
-              ? absentDataLabel()
-              : `${value.opinion.dictamenStars}★`}{" "}
-            · canal {textOrAbsent(value.opinion?.channel)}
-          </p>
-          <p className="text-[10px] text-muted-foreground">
-            {value.opinion?.reasons?.length
-              ? value.opinion.reasons.join(" · ")
-              : absentDataLabel()}
-          </p>
-          <p
-            className="text-[11px] text-muted-foreground"
-            data-testid="estudio-daily-value-position"
-            data-position-open={
-              value.positionOpen == null
-                ? "unknown"
-                : String(value.positionOpen)
-            }
-          >
-            Cartera: <strong>{describePositionOpen(value.positionOpen)}</strong>
-          </p>
-          {value.positionOpen == null ? (
-            <p
-              className="text-[10px] text-amber-600 dark:text-amber-400"
-              data-testid="estudio-daily-value-position-gap"
-            >
-              {POSITION_UNMEASURED_DETAIL}
-            </p>
-          ) : null}
-        </section>
+      {/*
+        Cuatro preguntas delante. La jerga (ids, cadena, selector) vive detrás del
+        disclosure único de la casa; los testids se conservan para no romper la batería.
+      */}
+      <ValueSummaryBlock
+        value={value}
+        chainValue={chainValue}
+        validation={{
+          k: audit?.resultR?.measuredCycles ?? null,
+          windowVerdict: audit?.resultR?.verdict ?? null,
+        }}
+      />
 
-        <section data-testid="estudio-daily-value-strategy">
-          <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Estrategia e indicadores
-          </h4>
-          <p
-            className="font-mono text-[11px]"
-            data-testid="estudio-daily-value-strategy-name"
-          >
-            {textOrAbsent(value.strategy?.strategyDefinitionId)} · v
-            {isAbsent(value.strategy?.strategyVersion)
-              ? absentDataLabel()
-              : value.strategy?.strategyVersion}
-          </p>
-          <p
-            className="font-mono text-[10px] text-muted-foreground"
-            data-testid="estudio-daily-value-strategy-identity"
-          >
-            preset de origen {textOrAbsent(value.strategy?.presetKey)} · plan{" "}
-            {textOrAbsent(value.strategy?.planId)} · corrida de propuesta{" "}
-            {textOrAbsent(value.strategy?.proposeRunId)} · señal{" "}
-            {textOrAbsent(value.strategy?.signalId)}
-          </p>
-          <p
-            className="text-[10px] text-muted-foreground"
-            data-testid="estudio-daily-value-strategy-winner"
-            data-selector-measured={String(Boolean(selector?.measured))}
-            data-selector-winner={String(selector?.isWinner ?? "unknown")}
-          >
-            {selectorHeadline}
-          </p>
-          <AutoTechnicalDetail testId="estudio-daily-value-selector-technical">
-            <p className="font-mono text-[10px] text-muted-foreground">
-              selector run {textOrAbsent(selector?.runId)} · barra{" "}
-              {textOrAbsent(selector?.bar)} · activo{" "}
-              {textOrAbsent(selector?.assetId)} · preset{" "}
-              {textOrAbsent(selector?.presetKey)} · v
-              {textOrAbsent(selector?.strategyVersion)} · motivo{" "}
-              {textOrAbsent(selector?.reason)}
-            </p>
-            <p className="font-mono text-[10px] text-muted-foreground">
-              TOP {textOrAbsent(value.opinion?.topId)}
-              {isAbsent(value.opinion?.topVersion)
-                ? ""
-                : ` v${value.opinion?.topVersion}`}{" "}
-              · plan {textOrAbsent(value.strategy?.planId)} · corrida{" "}
-              {textOrAbsent(value.strategy?.proposeRunId)}
-            </p>
-          </AutoTechnicalDetail>
-          <p className="text-[10px] text-muted-foreground">
-            IO{" "}
-            {isAbsent(value.indicators?.io)
-              ? "sin medida"
-              : fmtNumber(value.indicators?.io)}{" "}
-            · FA {fmtNumber(value.indicators?.fa)} · TA{" "}
-            {fmtNumber(value.indicators?.ta)} ·{" "}
-            {textOrAbsent(value.indicators?.regime)}
-          </p>
-        </section>
-
-        <section data-testid="estudio-daily-value-decision">
-          <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            2 · Decisión tomada
-          </h4>
-          {plan?.status === "TRIGGERED" ? (
-            <PlanLevels plan={plan} />
-          ) : (
-            <>
-              <p className="text-[11px] text-muted-foreground">
-                {value.reason
-                  ? value.reason
-                  : plan?.status
-                    ? `Plan ${plan.status}`
-                    : absentDataLabel()}
+      <div className="mt-2">
+        <AutoTechnicalDetail testId="estudio-daily-value-technical">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <section data-testid="estudio-daily-value-signal">
+              <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                1 · Señal calculada
+              </h4>
+              <p className="text-[11px]">
+                {textOrAbsent(value.opinion?.stance)} ·{" "}
+                {isAbsent(value.opinion?.dictamenStars)
+                  ? absentDataLabel()
+                  : `${value.opinion.dictamenStars}★`}{" "}
+                · canal {textOrAbsent(value.opinion?.channel)}
               </p>
-              {whyNot.length > 0 ? (
+              <p className="text-[10px] text-muted-foreground">
+                {value.opinion?.reasons?.length
+                  ? value.opinion.reasons.join(" · ")
+                  : absentDataLabel()}
+              </p>
+              <p
+                className="text-[11px] text-muted-foreground"
+                data-testid="estudio-daily-value-position"
+                data-position-open={
+                  value.positionOpen == null
+                    ? "unknown"
+                    : String(value.positionOpen)
+                }
+              >
+                Cartera:{" "}
+                <strong>{describePositionOpen(value.positionOpen)}</strong>
+              </p>
+              {value.positionOpen == null ? (
                 <p
-                  className="font-mono text-[10px] text-muted-foreground"
-                  data-testid="estudio-daily-value-whynot"
+                  className="text-[10px] text-amber-600 dark:text-amber-400"
+                  data-testid="estudio-daily-value-position-gap"
                 >
-                  whyNot: {whyNot.join(", ")}
+                  {POSITION_UNMEASURED_DETAIL}
                 </p>
               ) : null}
-            </>
-          )}
-        </section>
+            </section>
 
-        <section data-testid="estudio-daily-value-operation">
-          <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            3 · Operación ejecutada
-          </h4>
-          <p
-            className="text-[10px] text-muted-foreground"
-            data-testid="estudio-daily-value-operation-scope"
-            data-attributed={String(attribution.attributed)}
-          >
-            {attribution.label} · ventana {textOrAbsent(auditWindow)}
-          </p>
-          {auditFailed ? (
-            <p className="text-[11px] text-destructive">
-              No se pudo leer la evidencia de ejecución (no implica que no
-              exista).
-            </p>
-          ) : cycles.length === 0 ? (
-            <p className="text-[11px] text-muted-foreground">
-              {absentDataLabel()}: sin ciclos durables en la ventana de
-              auditoría.
-            </p>
-          ) : (
-            <ul className="space-y-0.5 text-[11px]">
-              {cycles.map((cycle, index) => (
-                <li
-                  key={`${cycle.cycleId}#${index}`}
-                  className="flex flex-wrap items-center gap-2"
-                  data-testid="estudio-daily-value-cycle"
-                  data-cycle-id={cycle.cycleId}
-                >
-                  <span className="font-mono">
-                    {cycle.entryDay} → {cycle.exitDay ?? absentDataLabel()} ·{" "}
-                    {fmtR(cycle.realizedR)}
-                  </span>
-                  <Link
-                    to={autoOperacionHref(cycle.cycleId)}
-                    className="underline hover:text-primary"
-                  >
-                    Ver operación →
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+            <section data-testid="estudio-daily-value-strategy">
+              <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Estrategia e indicadores
+              </h4>
+              <p
+                className="font-mono text-[11px]"
+                data-testid="estudio-daily-value-strategy-name"
+              >
+                {textOrAbsent(value.strategy?.strategyDefinitionId)} · v
+                {isAbsent(value.strategy?.strategyVersion)
+                  ? absentDataLabel()
+                  : value.strategy?.strategyVersion}
+              </p>
+              <p
+                className="font-mono text-[10px] text-muted-foreground"
+                data-testid="estudio-daily-value-strategy-identity"
+              >
+                preset de origen {textOrAbsent(value.strategy?.presetKey)} ·
+                plan {textOrAbsent(value.strategy?.planId)} · corrida de
+                propuesta {textOrAbsent(value.strategy?.proposeRunId)} · señal{" "}
+                {textOrAbsent(value.strategy?.signalId)}
+              </p>
+              <p
+                className="text-[10px] text-muted-foreground"
+                data-testid="estudio-daily-value-strategy-winner"
+                data-selector-measured={String(Boolean(selector?.measured))}
+                data-selector-winner={String(selector?.isWinner ?? "unknown")}
+              >
+                {selectorHeadline}
+              </p>
+              <AutoTechnicalDetail testId="estudio-daily-value-selector-technical">
+                <p className="font-mono text-[10px] text-muted-foreground">
+                  selector run {textOrAbsent(selector?.runId)} · barra{" "}
+                  {textOrAbsent(selector?.bar)} · activo{" "}
+                  {textOrAbsent(selector?.assetId)} · preset{" "}
+                  {textOrAbsent(selector?.presetKey)} · v
+                  {textOrAbsent(selector?.strategyVersion)} · motivo{" "}
+                  {textOrAbsent(selector?.reason)}
+                </p>
+                <p className="font-mono text-[10px] text-muted-foreground">
+                  TOP {textOrAbsent(value.opinion?.topId)}
+                  {isAbsent(value.opinion?.topVersion)
+                    ? ""
+                    : ` v${value.opinion?.topVersion}`}{" "}
+                  · plan {textOrAbsent(value.strategy?.planId)} · corrida{" "}
+                  {textOrAbsent(value.strategy?.proposeRunId)}
+                </p>
+              </AutoTechnicalDetail>
+              <p className="text-[10px] text-muted-foreground">
+                IO{" "}
+                {isAbsent(value.indicators?.io)
+                  ? "sin medida"
+                  : fmtNumber(value.indicators?.io)}{" "}
+                · FA {fmtNumber(value.indicators?.fa)} · TA{" "}
+                {fmtNumber(value.indicators?.ta)} ·{" "}
+                {textOrAbsent(value.indicators?.regime)}
+              </p>
+            </section>
 
+            <section data-testid="estudio-daily-value-decision">
+              <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                2 · Decisión tomada
+              </h4>
+              {plan?.status === "TRIGGERED" ? (
+                <PlanLevels plan={plan} />
+              ) : (
+                <>
+                  <p className="text-[11px] text-muted-foreground">
+                    {value.reason
+                      ? value.reason
+                      : plan?.status
+                        ? `Plan ${plan.status}`
+                        : absentDataLabel()}
+                  </p>
+                  {whyNot.length > 0 ? (
+                    <p
+                      className="font-mono text-[10px] text-muted-foreground"
+                      data-testid="estudio-daily-value-whynot"
+                    >
+                      whyNot: {whyNot.join(", ")}
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </section>
+
+            <section data-testid="estudio-daily-value-operation">
+              <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                3 · Operación ejecutada
+              </h4>
+              <p
+                className="text-[10px] text-muted-foreground"
+                data-testid="estudio-daily-value-operation-scope"
+                data-attributed={String(attribution.attributed)}
+              >
+                {attribution.label} · ventana {textOrAbsent(auditWindow)}
+              </p>
+              {auditFailed ? (
+                <p className="text-[11px] text-destructive">
+                  No se pudo leer la evidencia de ejecución (no implica que no
+                  exista).
+                </p>
+              ) : cycles.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {absentDataLabel()}: sin ciclos durables en la ventana de
+                  auditoría.
+                </p>
+              ) : (
+                <ul className="space-y-0.5 text-[11px]">
+                  {cycles.map((cycle, index) => (
+                    <li
+                      key={`${cycle.cycleId}#${index}`}
+                      className="flex flex-wrap items-center gap-2"
+                      data-testid="estudio-daily-value-cycle"
+                      data-cycle-id={cycle.cycleId}
+                    >
+                      <span className="font-mono">
+                        {cycle.entryDay} → {cycle.exitDay ?? absentDataLabel()}{" "}
+                        · {fmtR(cycle.realizedR)}
+                      </span>
+                      <Link
+                        to={autoOperacionHref(cycle.cycleId)}
+                        className="underline hover:text-primary"
+                      >
+                        Ver operación →
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+          {/*
+            La CADENA durable (ids, nueve etapas, selector y DÍA-D del valor) es evidencia
+            técnica: vive detrás del MISMO desplegable de la casa, no en la vista inicial.
+            Los `data-testid` se conservan para no romper la batería existente.
+          */}
+          <EstudioChainEvidence
+            value={value}
+            chainValue={chainValue}
+            chain={chain}
+            chainLoading={chainLoading}
+            chainFailed={chainFailed}
+            audit={audit}
+            auditWindow={auditWindow}
+          />
+        </AutoTechnicalDetail>
+      </div>
+
+      <div className="mt-2 grid gap-2">
         <section
           className="sm:col-span-2"
           data-testid="estudio-daily-value-validated"
         >
           <h4 className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            4 · Operativa validada
+            4 · Validación estadística (no es una clasificación)
           </h4>
           <ValidationBlock audit={audit} auditFailed={auditFailed} />
         </section>
-
-        <EstudioChainEvidence
-          value={value}
-          chainValue={chainValue}
-          chain={chain}
-          chainLoading={chainLoading}
-          chainFailed={chainFailed}
-          audit={audit}
-          auditWindow={auditWindow}
-        />
       </div>
     </li>
   );
@@ -577,10 +705,18 @@ export function EstudioDailyOpsPanel() {
   // Un fallo de la auditoría NO es «este valor no existe»: se declara como error.
   const auditFailed = auditQuery.isError;
   const universeCount = report?.universeCount ?? null;
+  // Cobertura RECONCILIABLE: si el parte publica `universe`, la verdad de servidor manda
+  // (esperados, excluidos y ausentes con motivo). El contador antiguo queda como respaldo.
+  const universe = report?.universe ?? null;
+  const expectedCount = universe?.expectedCount ?? universeCount;
+  const missingUniverse = universe?.missing ?? [];
+  const excludedUniverse = universe?.excluded ?? [];
+  const reconciled = universe?.reconciled ?? null;
   const coverageGap =
-    typeof universeCount === "number" &&
-    universeCount > 0 &&
-    universeCount !== report?.scannedCount;
+    reconciled === false ||
+    (typeof universeCount === "number" &&
+      universeCount > 0 &&
+      universeCount !== report?.scannedCount);
   const runLabel =
     isRunning || isQueuing
       ? "Calculando operativa…"
@@ -725,8 +861,21 @@ export function EstudioDailyOpsPanel() {
               3 · Operación ejecutada: ciclos durables DÍA-D (histórico del
               valor salvo identidad estable).
             </li>
-            <li>4 · Operativa validada: veredicto, K y expectancy OOS.</li>
+            <li>
+              4 · Validación estadística: veredicto, K y expectancy OOS. No es
+              una clasificación.
+            </li>
           </ol>
+          <p
+            className="mt-1 text-[10px] text-muted-foreground"
+            data-testid="estudio-daily-legend-separation"
+          >
+            <strong>Clasificación ≠ validación.</strong> «#1 de la foto» o
+            «mejor puntuada» describe el <em>ranking del día</em> (una posición
+            en la lista); no afirma que la operativa esté validada ni que sea
+            rentable. La validación se lee con su K y su ventana — mientras no
+            se demuestre lo contrario, sigue <code>INCONCLUSIVE</code>.
+          </p>
           <p
             className="mt-1 text-[10px] text-muted-foreground"
             data-testid="estudio-daily-chain-legend"
@@ -874,13 +1023,54 @@ export function EstudioDailyOpsPanel() {
               className="text-[10px] tabular-nums text-muted-foreground"
               data-testid="estudio-daily-coverage"
               data-truncated={String(Boolean(report.truncated))}
+              data-reconciled={String(reconciled ?? "unknown")}
             >
               Cobertura: {report.scannedCount}
-              {universeCount != null ? ` de ${universeCount}` : ""} valores
+              {expectedCount != null ? ` de ${expectedCount}` : ""} valores
               ESTUDIO procesados
+              {reconciled === true ? " · conjunto reconciliado" : ""}
+              {missingUniverse.length > 0
+                ? ` · faltan ${missingUniverse.length}`
+                : ""}
               {report.truncated ? " · universo recortado" : ""}
               {coverageGap ? " · parte parcial" : ""}.
             </p>
+            {missingUniverse.length > 0 || excludedUniverse.length > 0 ? (
+              <details
+                className="rounded-md border border-border/60 p-2 text-[11px]"
+                data-testid="estudio-daily-universe-detail"
+              >
+                <summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Valores sin fila y excluidos, con su motivo
+                </summary>
+                {missingUniverse.length > 0 ? (
+                  <ul
+                    className="mt-1 list-disc pl-4"
+                    data-testid="estudio-daily-universe-missing"
+                  >
+                    {missingUniverse.map((item) => (
+                      <li key={`missing-${item.instrumentId}`}>
+                        <span className="font-mono">{item.instrumentId}</span> ·{" "}
+                        {item.reason}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {excludedUniverse.length > 0 ? (
+                  <ul
+                    className="mt-1 list-disc pl-4 text-muted-foreground"
+                    data-testid="estudio-daily-universe-excluded"
+                  >
+                    {excludedUniverse.map((item) => (
+                      <li key={`excluded-${item.instrumentId}`}>
+                        <span className="font-mono">{item.instrumentId}</span> ·
+                        excluido: {item.reason}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </details>
+            ) : null}
             {report.truncated ||
             coverageGap ||
             report.countsConsistent === false ? (

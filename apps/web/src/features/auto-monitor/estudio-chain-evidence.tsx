@@ -22,6 +22,7 @@ import type {
   EstudioDailyValueV1,
 } from "@bolsa/shared";
 import { ESTUDIO_CHAIN_STEPS } from "@bolsa/shared";
+import { describeAttribution } from "@bolsa/shared";
 import { absentDataLabel, isAbsent } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import {
@@ -292,15 +293,24 @@ function DiaDValueVerification({
         </Button>
       </div>
 
+      <p
+        className="text-[10px] text-muted-foreground"
+        data-testid="estudio-chain-dia-d-scope"
+      >
+        Día solicitado {day ?? absentDataLabel()} · origen: {source} · cuenta{" "}
+        {effectiveAccountId ?? absentDataLabel()}. Ruta de solo lectura:
+        consultar el artefacto no ejecuta el replay.
+      </p>
+
       {replay.occupiedBy ? (
         <p
           role="alert"
           data-testid="estudio-chain-dia-d-occupied"
+          data-slot-state={replay.slot?.state ?? "unknown"}
           className="text-[10px] text-amber-600 dark:text-amber-400"
         >
-          Hay otra verificación en curso para {replay.occupiedBy} el mismo día:
-          la cola serializa una por (cuenta, día). Este valor se podrá verificar
-          cuando termine.
+          {replay.slotMessage ??
+            `Hay otra verificación en curso para ${replay.occupiedBy} el mismo día: la cola serializa una por (cuenta, día). Este valor se podrá verificar cuando termine.`}
         </p>
       ) : null}
 
@@ -352,12 +362,24 @@ function DiaDValueVerification({
               {artifact.summary?.steps ?? absentDataLabel()} · conciliación{" "}
               {artifact.summary?.match ?? absentDataLabel()}
             </p>
-            <p className="text-muted-foreground">
-              artefacto {textOrAbsent(artifact.artifactModifiedAt)} · watch{" "}
-              {String(
-                (artifact.meta?.watch as unknown[] | undefined)?.join(",") ??
-                  absentDataLabel(),
-              )}
+            <p
+              className="text-muted-foreground"
+              data-testid="estudio-chain-dia-d-artifact-meta"
+              data-artifact-account={String(artifact.meta?.account ?? "")}
+              data-artifact-day={String(artifact.meta?.day ?? "")}
+              data-artifact-watch={
+                Array.isArray(artifact.meta?.watch)
+                  ? (artifact.meta?.watch as unknown[]).map(String).join(",")
+                  : ""
+              }
+            >
+              artefacto {textOrAbsent(artifact.artifactModifiedAt)} · cuenta{" "}
+              {String(artifact.meta?.account ?? absentDataLabel())} · día{" "}
+              {String(artifact.meta?.day ?? absentDataLabel())} · watch real{" "}
+              {Array.isArray(artifact.meta?.watch) &&
+              (artifact.meta?.watch as unknown[]).length > 0
+                ? (artifact.meta?.watch as unknown[]).map(String).join(",")
+                : absentDataLabel()}
             </p>
           </div>
         ) : artifact ? (
@@ -403,6 +425,13 @@ export function EstudioChainEvidence({
     : [];
   const resultR = audit?.resultR ?? null;
   const verdict = resultR?.verdict ?? null;
+  // Atribución declarada por el servidor (igualdad de ids durables). Sin estado ⇒ hueco:
+  // la leyenda histórica se mantiene y NO se infiere por símbolo.
+  const attribution = cycle?.attribution ?? null;
+  const attributionState = attribution?.state ?? "unmeasured";
+  const attributionLabel = attribution
+    ? describeAttribution(attribution)
+    : CHAIN_NOT_ATTRIBUTED_LABEL;
 
   return (
     <section
@@ -416,8 +445,9 @@ export function EstudioChainEvidence({
       <p
         className="text-[9px] text-muted-foreground"
         data-testid="estudio-chain-attribution"
+        data-attribution-state={attributionState}
       >
-        {CHAIN_NOT_ATTRIBUTED_LABEL}
+        {attributionLabel}
       </p>
 
       {chainFailed ? (
@@ -477,8 +507,15 @@ export function EstudioChainEvidence({
 
           <section data-testid="estudio-chain-why">
             <h5 className="text-[10px] font-semibold text-muted-foreground">
-              Por qué esa y no otra
+              Por qué esa y no otra · ranking del día
             </h5>
+            <p
+              className="text-[9px] text-muted-foreground"
+              data-testid="estudio-chain-why-scope"
+            >
+              Es una clasificación (puesto en la foto del día), no una
+              validación estadística.
+            </p>
             {cycle ? (
               <>
                 <p className="font-mono text-[11px]">
@@ -492,7 +529,7 @@ export function EstudioChainEvidence({
                   {flagLabel(cycle.executedVsBest.executedIsBestScoredAsset)}
                 </p>
                 <p className="text-[10px] text-muted-foreground">
-                  Mejor puntuada:{" "}
+                  Mejor puntuada del ranking:{" "}
                   <span className="font-mono">
                     {textOrAbsent(cycle.executedVsBest.bestScoredAssetId)}
                   </span>{" "}
@@ -581,6 +618,21 @@ export function EstudioChainEvidence({
               {textOrAbsent(value.strategy?.planId)} · oportunidad{" "}
               {textOrAbsent(cycle?.opportunityId)}
             </p>
+            {cycle?.dailyProposal ? (
+              <p
+                className="font-mono text-[10px] text-muted-foreground"
+                data-testid="estudio-chain-daily-proposal"
+                data-proposal-source={cycle.dailyProposal.source ?? "unknown"}
+              >
+                propuesta adoptada: día{" "}
+                {textOrAbsent(
+                  cycle.dailyProposal.day ?? cycle.dailyProposal.barDate,
+                )}{" "}
+                · plan {textOrAbsent(cycle.dailyProposal.planId)} · señal{" "}
+                {textOrAbsent(cycle.dailyProposal.signalId)} · origen{" "}
+                {textOrAbsent(cycle.dailyProposal.source)}
+              </p>
+            ) : null}
             <p className="text-[10px] text-muted-foreground">
               {value.asOfBarDate
                 ? `vela ${value.asOfBarDate}`
@@ -643,7 +695,7 @@ export function EstudioChainEvidence({
             {resultR && resultR.measured ? (
               <p className="font-mono text-[10px]">
                 veredicto {textOrAbsent(verdict)} · K=
-                {resultR.measuredCycles ?? 0} · expectancy{" "}
+                {resultR.measuredCycles ?? absentDataLabel()} · expectancy{" "}
                 {fmtR(resultR.expectancyR)} · R total{" "}
                 {fmtR(resultR.realizedRTotal)} · evidencia{" "}
                 {textOrAbsent(resultR.evidenceQuality)} · ventana{" "}

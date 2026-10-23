@@ -86,3 +86,4 @@ export * from "./account-settings.js";
 export * from "./tax-report.js";
 export * from "./portfolio-cash.js";
 export * from "./estudio-daily-ops.js";
+export * from "./estudio-daily-summary.js";

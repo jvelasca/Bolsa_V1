@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AutoOpsJobV1 } from "@bolsa/shared";
+import type { AutoOpsJobSlotV1, AutoOpsJobV1 } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 
@@ -48,6 +48,9 @@ export function useDiaDValueReplayJob(
   const [jobId, setJobId] = useState<string | null>(null);
   const [settledJobId, setSettledJobId] = useState<string | null>(null);
   const [occupiedBy, setOccupiedBy] = useState<string | null>(null);
+  // Verdad de SERVIDOR sobre el hueco `(kind, cuenta, día)`. Es la fuente de los mensajes
+  // de cola: `payload.symbol` ya no se interpreta para decidir si el job es nuestro.
+  const [slot, setSlot] = useState<AutoOpsJobSlotV1 | null>(null);
 
   // Jobs del (cuenta, día): se filtra por `payload.symbol` en cliente. La lista es corta
   // (kinds distintos por día) y evita inventar un índice por símbolo que el backend no tiene.
@@ -83,6 +86,20 @@ export function useDiaDValueReplayJob(
         symbol: wanted as string,
       })) as unknown as AutoOpsJobV1,
     onSuccess: (job) => {
+      const serverSlot = job.slot ?? null;
+      if (serverSlot) {
+        setSlot(serverSlot);
+        if (!serverSlot.matchesRequest) {
+          // El servidor declara que el hueco está ocupado por OTRA petición: se muestra su
+          // mensaje tal cual (la UI no redacta la verdad de la cola ni la deduce).
+          setOccupiedBy(serverSlot.activeSymbol);
+          return;
+        }
+        setOccupiedBy(null);
+        setJobId(job.id);
+        return;
+      }
+      // Compatibilidad: respuesta sin `slot` (backend antiguo) ⇒ cae al camino anterior.
       const recent = jobSymbol(job);
       if (recent && recent !== wanted) {
         // El hueco (kind, cuenta, día) está ocupado por otro valor: se declara, no se pinta.
@@ -101,6 +118,7 @@ export function useDiaDValueReplayJob(
     setJobId(null);
     setSettledJobId(null);
     setOccupiedBy(null);
+    setSlot(null);
   }, [day, wanted, effectiveAccountId]);
 
   // Rehidratación acotada: solo el job del MISMO símbolo, y solo si sigue visible.
@@ -137,8 +155,12 @@ export function useDiaDValueReplayJob(
     hasAccount: Boolean(effectiveAccountId),
     isRunning: Boolean(job && ACTIVE_STATUSES.has(job.status)),
     isQueuing: mutation.isPending,
-    /** Símbolo del job ACTIVO del día cuando es OTRO valor (limitación declarada). */
+    /** Símbolo del job ACTIVO del día cuando es OTRO valor (verdad de servidor o respaldo). */
     occupiedBy,
+    /** Verdad de servidor del hueco `(kind, cuenta, día)`; `null` si no se declaró. */
+    slot,
+    /** Mensaje de cola compuesto en servidor (no se redacta en cliente). */
+    slotMessage: slot?.message ?? null,
     runError: mutation.error,
     jobError: jobQuery.error,
     run: () => {
@@ -150,6 +172,7 @@ export function useDiaDValueReplayJob(
       setJobId(null);
       setSettledJobId(null);
       setOccupiedBy(null);
+      setSlot(null);
       mutation.reset();
     },
   };

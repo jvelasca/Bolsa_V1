@@ -164,4 +164,59 @@ describe("useDiaDValueReplayJob", () => {
     result.current.run();
     expect(api.createAutoDiaDValueReplayJob).not.toHaveBeenCalled();
   });
+
+  it("usa la verdad de servidor: slot.matchesRequest decide, no el payload", async () => {
+    vi.mocked(api.createAutoDiaDValueReplayJob).mockResolvedValue(
+      job({
+        id: "job-other",
+        payload: { symbol: "BBB" },
+        slot: {
+          state: "active_other_symbol",
+          activeJobId: "job-other",
+          activeSymbol: "BBB",
+          requestedSymbol: "AAA",
+          matchesRequest: false,
+          startedAt: "2026-10-16T09:00:00Z",
+          message:
+            "Verificación en curso para BBB (job job-other, iniciada 2026-10-16T09:00:00Z). La cola admite una por cuenta y día; AAA queda pendiente.",
+        },
+      }) as never,
+    );
+
+    const { result } = render();
+    result.current.run();
+
+    await waitFor(() => expect(result.current.occupiedBy).toBe("BBB"));
+    expect(result.current.slot?.state).toBe("active_other_symbol");
+    expect(result.current.slotMessage).toContain("BBB");
+    expect(result.current.job).toBeNull();
+  });
+
+  it("un slot con matchesRequest adopta el job aunque el payload no coincida", async () => {
+    vi.mocked(api.createAutoDiaDValueReplayJob).mockResolvedValue(
+      job({
+        id: "job-mine",
+        payload: { symbol: "aaa" },
+        slot: {
+          state: "active_same_request",
+          activeJobId: "job-mine",
+          activeSymbol: "AAA",
+          requestedSymbol: "AAA",
+          matchesRequest: true,
+          startedAt: "2026-10-16T09:00:00Z",
+          message: "Verificación ya en curso para AAA (job job-mine).",
+        },
+      }) as never,
+    );
+    vi.mocked(api.getAutoOpsJob).mockResolvedValue(
+      job({ id: "job-mine", payload: { symbol: "aaa" } }) as never,
+    );
+
+    const { result } = render();
+    result.current.run();
+
+    await waitFor(() => expect(result.current.job?.id).toBe("job-mine"));
+    expect(result.current.occupiedBy).toBeNull();
+    expect(result.current.slot?.matchesRequest).toBe(true);
+  });
 });
