@@ -812,6 +812,13 @@ def _env_for(
             "AUTO_ENGINE_SIMULATED_WATCH": ",".join(instrument_ids),
             "AUTO_ENGINE_SIM_INTERVAL_SECONDS": "1.0",
             "AUTO_ENGINE_SIM_LOT_QTY": "100",
+            # Régimen de precio DECLARADO en la base: el Golden Day A1 inyecta el
+            # ``flat_price_script`` (100.0) y el A2 lo sobreescribe a ``1`` en ``extra``.
+            # Sin este pin, el flag del proceso padre (la ventana PAPER exporta
+            # ``AUTO_ENGINE_SIM_REAL_PRICE=1``) secuestra la corrida: el hijo compone
+            # ``OhlcvPriceSource``, los instrumentos sembrados no tienen barra en A1 y el
+            # día entero cae en ``precio AUSENTE`` ⇒ 0 posiciones (medido el 2026-10-23).
+            "AUTO_ENGINE_SIM_REAL_PRICE": "0",
             # v2.88.29 — overlay M2 ON: el día sella los HECHOS durables (orden de entrada,
             # liquidación y transiciones de protección) con su ``dedupe_key`` determinista.
             # Sin esto el monitor declaraba ``*_not_durable`` y el exactly-once no se ejercía.

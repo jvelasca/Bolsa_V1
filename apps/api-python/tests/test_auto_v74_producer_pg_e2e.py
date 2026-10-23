@@ -400,6 +400,12 @@ def _configure_producer_env(monkeypatch: pytest.MonkeyPatch, instrument_id: str)
     monkeypatch.setenv("AUTO_ENGINE_SIM_V2_TOP_N", "5")
     monkeypatch.setenv("AUTO_ENGINE_SIM_LOT_QTY", str(int(_LOT)))
     monkeypatch.setenv("AUTO_ENGINE_SIM_INTERVAL_SECONDS", "1.0")
+    # Este arnés INYECTA ``price_script``: el precio del tick es sintético a propósito. Con el
+    # proveedor de precio REAL encendido (fuga del entorno de la ventana) el runtime compone
+    # ``OhlcvPriceSource``, el instrumento sintético no tiene barra y el turno cae en
+    # ``precio AUSENTE`` ⇒ HOLD: el test mediría el fail-closed, no el productor. Se apaga
+    # EXPLÍCITAMENTE (la ruta real se certifica en ``test_auto_real_route_producer_pg.py``).
+    monkeypatch.setenv("AUTO_ENGINE_SIM_REAL_PRICE", "0")
     # El gate PAPER se corre con esta venue: su guarda exige ``paper``.
     monkeypatch.setenv("BROKER_VENUE", "paper")
 

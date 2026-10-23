@@ -318,6 +318,11 @@ jobs:
         # van en ``--ignore`` aquí y corren por COMMIT en ``auto-v2-durable-pg`` con
         # ``DIA_D_CYCLE_VERIFICATION_PG_REQUIRED=1`` / ``SIGNAL_ALERTS_PG_REQUIRED=1`` y guard
         # anti-skip: sin PG skipearían en mudo y la certificación sería fantasma.
+        # CIERRE 815ed4d0: ``test_auto_real_route_producer_pg.py`` (ruta REAL del productor:
+        # barras D1 sembradas + ACTIVE de PostgreSQL + ``close(B-1)``/``open(B)``, sin
+        # ``price_script`` ni decider fake) también va en ``--ignore`` aquí y se certifica en
+        # ``auto-v2-durable-pg`` en un paso PROPIO con ``AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED=1``
+        # y guarda anti-skip: sin PG skipearía en mudo y aparentaría certificar la ruta real.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -436,6 +441,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py
           --ignore=apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py
           --ignore=apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
+          --ignore=apps/api-python/tests/test_auto_real_route_producer_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_auto_estudio_universe_coverage_pg.py
           --ignore=apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py
@@ -737,6 +743,14 @@ jobs:
       # ``paper_material_readiness_v2`` desde una conexión NUEVA. Sin PG el test skipearía en
       # mudo y el bloqueo del productor quedaría sin certificar por commit.
       AUTO_V74_PRODUCER_PG_REQUIRED: '1'
+      # CIERRE 815ed4d0 (auditoría, ruta REAL del productor): el gate anterior certifica el
+      # cableado con ``price_script`` inyectado; este certifica la ruta de PRODUCCIÓN —
+      # barras D1 sembradas en PG, decisión con ``close(B-1)`` y ejecución con ``open(B)``
+      # desde ``OhlcvPriceSource``, estrategia ACTIVE leída de PostgreSQL y el decider de
+      # producción (``load_active_strategy_decider``)— más seis controles negativos
+      # fail-closed, sin fuentes fabricadas. Paso propio con guarda anti-skip más abajo:
+      # sin PG skipearía en mudo y aparentaría certificar la ruta real.
+      AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED: '1'
       # V2.88.17/W4 (precio REAL del motor AUTO): el criterio re-declarado de W4 —que el
       # camino de PRODUCCIÓN deje de fabricar un precio— solo se certifica contra PG real
       # (dos fronteras close(B-1)/open(B), fail-closed sin barra B y el interruptor que
@@ -828,6 +842,14 @@ jobs:
       # la estructura, se COMMITEA, se cortan las conexiones y el gate (lector REAL del CLI)
       # la reconstruye desde una conexión NUEVA hasta ``PRODUCER_READY``.
       # Gate fail-if-skipped: AUTO_V74_PRODUCER_PG_REQUIRED=1.
+      # CIERRE 815ed4d0 (auditoría, ruta REAL del productor): el E2E sintético de V2.74
+      # demuestra el cableado con ``price_script``, no que el camino real abra. La ruta
+      # REAL —barras D1 sembradas en PG, ``close(B-1)`` para decidir y ``open(B)`` para
+      # ejecutar, estrategia ACTIVE leída de PostgreSQL y el decider de producción
+      # ``load_active_strategy_decider``, sin fuentes inyectadas— corre en un paso PROPIO
+      # más abajo con su gate (``AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED=1``, declarado en el
+      # ``env`` del job) y su propia guarda anti-skip, para que un skip de la ruta real no
+      # quede compensado por los ficheros sintéticos del lote.
       # V2.70/AUTO-23 (G2/`OBS-19`, 2026-10-01): el certificador del VALIDADOR de evidencia
       # (``test_auto_v70_auto23_evidence_validation.py``) NO estaba en la lista de ningún
       # workflow: existía y no corría. Su sonda PG estaba roja (``measuredCycles`` 17 frente a
@@ -871,6 +893,30 @@ jobs:
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-v2-durable-pg.log; then
             echo "::error::AUTO 2.0 durable PG dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/auto-v2-durable-pg.log || true
+            exit 1
+          fi
+        if: always()
+
+      # CIERRE 815ed4d0: RUTA REAL del productor con su PROPIO gate y su PROPIA guarda.
+      # Corre aparte del lote anterior a propósito: si el fichero viviera en el lote, un
+      # skip de la ruta real quedaría dentro de un log más grande y el gate sintético
+      # (``AUTO_V74_PRODUCER_PG_REQUIRED``) taparía el agujero. Dos gates, dos evidencias.
+      - name: Pytest AUTO ruta REAL del productor PG (fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_real_route_producer_pg.py \
+            -q --tb=short -rs | tee /tmp/auto-real-route-pg.log
+
+      - name: Fail on skipped AUTO ruta REAL PG (no skip silencioso)
+        run: |
+          if [ ! -s /tmp/auto-real-route-pg.log ]; then
+            echo "::error::La RUTA REAL del productor no dejó log; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-real-route-pg.log; then
+            echo "::error::La RUTA REAL del productor dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/auto-real-route-pg.log || true
             exit 1
           fi
         if: always()

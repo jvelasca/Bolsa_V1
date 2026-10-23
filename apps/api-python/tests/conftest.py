@@ -337,6 +337,29 @@ def _cleanup_residuals_around_session() -> Iterator[None]:
     _purge_residuals_once()
 
 
+#: Interruptor del proveedor de precio REAL del motor AUTO.
+#:
+#: La suite NO hereda la configuración de la ventana PAPER: el proceso padre puede tener
+#: ``AUTO_ENGINE_SIM_REAL_PRICE=1`` (es lo que inyecta el runner en el hijo de la ventana) y,
+#: si se cuela en pytest, ``AutoSimRuntime`` compone ``OhlcvPriceSource`` sobre instrumentos
+#: sintéticos que NO tienen barras ⇒ ``precio AUSENTE`` y HOLD fail-closed en tests que
+#: inyectan ``price_script`` (medido el 2026-10-23: ``inst-gd2-*`` y el E2E del productor V2).
+#: Ese rojo es una fuga de entorno de test, no un defecto del worker. El default es OFF
+#: (idéntico al default de producto) y cada test que quiera precio REAL lo enciende EXPLÍCITA
+#: y localmente (``monkeypatch``) o en el ``env`` del subproceso.
+_AUTO_REAL_PRICE_ENV = "AUTO_ENGINE_SIM_REAL_PRICE"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_auto_real_price_switch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Aísla el interruptor de precio real: OFF por defecto en TODA la suite.
+
+    ``monkeypatch`` restaura el valor previo al terminar cada test, así que el pin no
+    contamina la sesión y un test puede encenderlo dentro de su cuerpo sin pelear con esto.
+    """
+    monkeypatch.setenv(_AUTO_REAL_PRICE_ENV, "0")
+
+
 # ── Wiring de logging para las suites de redacción de credenciales (G6) ────────────────
 #: Loggers que `install_log_redact()` muta (root + estos nombres).
 _REDACT_TOUCHED_LOGGERS = ("bolsa_api", "uvicorn", "uvicorn.error", "uvicorn.access")

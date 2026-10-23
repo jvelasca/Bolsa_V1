@@ -992,6 +992,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py
           --ignore=apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py
           --ignore=apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
+          --ignore=apps/api-python/tests/test_auto_real_route_producer_pg.py
           --ignore=apps/api-python/tests/test_auto_operational_monitor_pg.py
           --ignore=apps/api-python/tests/test_dia_d_cycle_verification_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
@@ -1129,6 +1130,13 @@ jobs:
       # el lector REAL del CLI). Un skip mudo dejaría el bloqueo del productor sin certificar
       # sobre PG en el tag.
       AUTO_V74_PRODUCER_PG_REQUIRED: '1'
+      # CIERRE 815ed4d0 (ruta REAL del productor): el gate anterior certifica el cableado
+      # con ``price_script`` inyectado; este certifica la ruta de PRODUCCIÓN: barras D1
+      # sembradas en PG, decisión con ``close(B-1)`` y ejecución con ``open(B)`` desde
+      # ``OhlcvPriceSource``, estrategia ACTIVE leída de PostgreSQL y el decider de
+      # producción (``load_active_strategy_decider``), sin fuentes fabricadas. Guard
+      # anti-skip dedicado (log + grep de ``skipped``) más abajo.
+      AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -1487,6 +1495,36 @@ jobs:
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/golden-day-v2-pg.log; then
             echo "::error::Golden Day 2.0 dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/golden-day-v2-pg.log || true
+            exit 1
+          fi
+
+      # CIERRE 815ed4d0 (ruta REAL del productor): el E2E ``test_auto_v74_producer_pg_e2e.py``
+      # del lote certifica el cableado con ``price_script``; NO demuestra que el camino de
+      # producción abra. Este paso conduce la ruta REAL contra PG: barras D1 sembradas,
+      # ``close(B-1)`` para decidir y ``open(B)`` para ejecutar (``OhlcvPriceSource``),
+      # estrategia ACTIVE leída de PostgreSQL y el decider de producción
+      # (``load_active_strategy_decider``), sin ``price_script`` ni decider fake, más seis
+      # controles negativos fail-closed (sin reserva, claim rechazado, claim con excepción,
+      # sin barra B, salida EMERGENCY y HALT durable). Gate propio
+      # ``AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED=1`` y guard anti-skip: un skip aquí no puede
+      # quedar compensado por el gate sintético.
+      - name: Pytest AUTO ruta REAL del productor (PG, fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_real_route_producer_pg.py \
+            -q --tb=short -rs | tee /tmp/auto-real-route-pg.log
+
+      - name: Fail on skipped AUTO ruta REAL del productor (no skip silencioso)
+        if: always()
+        run: |
+          if [ ! -s /tmp/auto-real-route-pg.log ]; then
+            echo "::error::La RUTA REAL del productor no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-real-route-pg.log; then
+            echo "::error::La RUTA REAL del productor dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/auto-real-route-pg.log || true
             exit 1
           fi
 
