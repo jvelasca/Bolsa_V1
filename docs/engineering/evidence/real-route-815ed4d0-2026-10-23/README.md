@@ -208,10 +208,16 @@ Con PostgreSQL caído y el gate activo el fichero debe **fallar** (7 failed), no
 
 ## 8. CI y publicación
 
-| Workflow | Run | Rama | Resultado |
+| Workflow | Run | `headSha` | Resultado |
 | --- | --- | --- | --- |
-| `Python CI` | [39964377178](https://github.com/jvelasca/Bolsa_V1/actions/runs/39964377178) | `fix/audit-815ed4d0-real-route` | `auto-v2-durable-pg` **`success`** (el paso de la ruta real corre y no skipea) · `quality` **`failure`** por los 4 `I001` preexistentes de `815ed4d0` (§5), corregidos en commit aparte |
+| `Python CI` | [39964377178](https://github.com/jvelasca/Bolsa_V1/actions/runs/39964377178) | `9ab5ebed` | `auto-v2-durable-pg` **`success`** (el paso de la ruta real corre y **no** skipea) · `quality` **`failure`** por los 4 `I001` preexistentes de `815ed4d0` (§5) |
+| `Python CI` | [39964791740](https://github.com/jvelasca/Bolsa_V1/actions/runs/39964791740) | `2aeb0d8d` | **`success`** (5/5 jobs), con `Pytest AUTO ruta REAL del productor PG` y `Fail on skipped AUTO ruta REAL PG` en **`success`** |
+
+La segunda corrida es la que certifica: `quality`, `auto-v2-durable-pg`, `lifecycle-pg`,
+`paper-forward-pg` y `grammar-discovery-pg` en verde, y el paso nuevo de la ruta real ejecutado (sin
+`skipped`). `Fase 2 scientific` y `Optimize lab` del mismo `headSha` también quedaron en `success`.
 
 Rama `fix/audit-815ed4d0-real-route` creada desde `815ed4d0` y tag anotado
 `audit-815ed4d0-real-route` para el auditor. **`main` no se toca**: su puntero sigue en `815ed4d0`
-(igual que el tag preexistente `audit-815ed4d0`), y el sello `.160` permanece intacto.
+(igual que el tag preexistente `audit-815ed4d0`), y el sello `.160` permanece intacto. Un bump
+`.161` queda **pendiente de aprobación explícita**; esta rama no lo hace.
