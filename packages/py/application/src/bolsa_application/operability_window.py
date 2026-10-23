@@ -46,7 +46,6 @@ from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
     MEASUREMENT_UNKNOWN,
 )
-
 from bolsa_application.auto_reason_codes import (
     RESERVATION_ALREADY_LIVE,
     RESERVATION_UNMEASURABLE,

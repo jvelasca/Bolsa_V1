@@ -16,13 +16,13 @@ from typing import Protocol
 
 import pytest
 
+from bolsa_analytics.cognitive.portfolio_reservation import build_reservation
 from bolsa_api.background.auto_simulation_worker import (
     AutoSimulationWorker,
     _declare_effective_mirrors,
     derive_activity,
     step_minute_clock,
 )
-from bolsa_analytics.cognitive.portfolio_reservation import build_reservation
 from bolsa_application.auto_daily_journal import build_auto_daily_report
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore

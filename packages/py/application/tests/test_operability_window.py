@@ -15,7 +15,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE, MEASUREMENT_UNKNOWN
-
 from bolsa_application.market_operability import (
     ENTRY_DECISION_EVENT,
     POSITION_JOURNAL_EVENTS,

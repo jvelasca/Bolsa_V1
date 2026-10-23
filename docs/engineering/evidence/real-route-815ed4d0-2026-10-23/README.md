@@ -154,7 +154,29 @@ Ambos workflows validan como YAML (`yaml.safe_load` OK) y la lista de rutas exis
 | `AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED=1` + `DATABASE_URL` inalcanzable (`127.0.0.1:1`) | **7 failed** con `AssertionError: PostgreSQL requerido para el E2E de la RUTA REAL del productor pero no disponible…` — el skip silencioso es **fallo duro** |
 | Sin el gate + PostgreSQL inalcanzable | **7 skipped**, motivo explícito (`-rs`) — nunca una certificación fantasma |
 
-## 5. Límites declarados
+## 5. Hallazgo colateral en `quality`: el commit auditado estaba rojo de lint
+
+El primer CI de esta rama dejó **`auto-v2-durable-pg` en `success`** (el paso nuevo de la ruta real
+corrió y no skipeó) y **`quality` en `failure`**, por **4 `I001`** en ficheros que **no** toca este
+trabajo:
+
+| Fichero | Último commit que lo tocó |
+| --- | --- |
+| `apps/api-python/tests/test_auto_simulation_worker.py` | `815ed4d0` |
+| `apps/api-python/tests/test_auto_v88_durable_facts.py` | `815ed4d0` |
+| `packages/py/application/src/bolsa_application/operability_window.py` | `815ed4d0` |
+| `packages/py/application/tests/test_operability_window.py` | `815ed4d0` |
+
+Es decir: **`815ed4d0` nunca corrió `quality` en verde** (`ruff check packages/py apps/api-python
+--config pyproject.toml` fallaba en `main`). Se corrige en un **commit aparte**
+(`style(lint): ordena los imports que dejó rojos 815ed4d0`) con `ruff check --fix` y **diff
+verificado**: solo reordena imports y quita dos líneas en blanco; **cero** cambios de lógica. Tras el
+fix, el gate exacto del CI queda en **`All checks passed!`**.
+
+Se aísla en su propio commit para que el auditor pueda comprobar que es mecánico y que **no** forma
+parte de la certificación de la ruta.
+
+## 6. Límites declarados
 
 - **PAPER virtual**: un instrumento y un día; **no** hay LIVE, **no** hay rentabilidad. El E2E
   certifica la **ruta** (precio → decisión ACTIVE → plan → reserva → fill → salida → gate), no que el
@@ -172,7 +194,7 @@ Ambos workflows validan como YAML (`yaml.safe_load` OK) y la lista de rutas exis
 - La suite nueva **borra su propio residuo** (cuenta, instrumento, barras, versión/candidata/promoción
   y tablas del motor) al terminar cada escenario: no comparte estado con otros tests PG.
 
-## 6. Reproducir
+## 7. Reproducir
 
 ```powershell
 cd apps/api-python
@@ -184,7 +206,11 @@ python -m pytest tests/test_golden_day_v2_process_pg.py -q             # 2 passe
 
 Con PostgreSQL caído y el gate activo el fichero debe **fallar** (7 failed), no skipear.
 
-## 7. Publicación
+## 8. CI y publicación
+
+| Workflow | Run | Rama | Resultado |
+| --- | --- | --- | --- |
+| `Python CI` | [39964377178](https://github.com/jvelasca/Bolsa_V1/actions/runs/39964377178) | `fix/audit-815ed4d0-real-route` | `auto-v2-durable-pg` **`success`** (el paso de la ruta real corre y no skipea) · `quality` **`failure`** por los 4 `I001` preexistentes de `815ed4d0` (§5), corregidos en commit aparte |
 
 Rama `fix/audit-815ed4d0-real-route` creada desde `815ed4d0` y tag anotado
 `audit-815ed4d0-real-route` para el auditor. **`main` no se toca**: su puntero sigue en `815ed4d0`
