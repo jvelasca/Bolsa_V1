@@ -705,10 +705,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-23 — pin del arbol re-anclado a `64e23eaf`
+ * (`apps` `d06695aba31c3e9c1db821b304a3a5a8089fccd0` / `packages` `243cd09cfe16752e4e18ad47eedad858a1389192`).
+ * Motivo: post-tag v2.88.161-beta: bump de 13 CLIs en apps (seal 64e23eaf); el tag debe apuntar a un commit con freeze OK
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '4a76d477',
-  appsHash: '4be4a32f87b4f2c8feaace4d09842fbcf020bf5c',
-  packagesHash: '0824c030a43bb057ef782dad22a1bc76614b10fa',
+  commit: '64e23eaf',
+  appsHash: 'd06695aba31c3e9c1db821b304a3a5a8089fccd0',
+  packagesHash: '243cd09cfe16752e4e18ad47eedad858a1389192',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
