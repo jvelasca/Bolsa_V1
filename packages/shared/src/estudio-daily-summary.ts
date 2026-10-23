@@ -46,6 +46,29 @@ export type ValueSummaryChainInput = {
   cycles?: EstudioChainCycleV1[];
 } | null;
 
+/**
+ * Atribución AGREGADA de todos los ciclos de un valor.
+ *
+ * Nunca se elige un ciclo arbitrario: si los ciclos no coinciden en un único estado, el
+ * estado es `mixed` con el recuento por estado. Así la ficha no puede afirmar que «este
+ * ciclo ejecutó la propuesta» cuando solo uno de varios lo hizo (o ninguno).
+ */
+export type ValueSummaryAttribution = EstudioChainAttributionV1 & {
+  /** Número de ciclos del valor sobre los que se agrega. */
+  cycles: number;
+  /** Recuento por estado de atribución (`exact`, `mismatch`, …). */
+  counts: Record<string, number>;
+  exactCount: number;
+  /** Ciclos `exact` abiertos (`closed === false`). */
+  exactOpen: number;
+  /** Ciclos `exact` cerrados (`closed === true`). */
+  exactClosed: number;
+  /** Ciclos abiertos, cerrados y con estado de cierre sin dato. */
+  open: number;
+  closed: number;
+  closedUnknown: number;
+};
+
 export type ValueSummary = {
   /** 1 · «¿Qué propone?» */
   proposal: SummarySection;
@@ -70,7 +93,7 @@ export type ValueSummary = {
     selectorRunId: string | null;
     asOfBarDate: string | null;
     cycleIds: string[];
-    attribution: EstudioChainAttributionV1 | null;
+    attribution: ValueSummaryAttribution | null;
     /** Estado de atribución legible, ya traducido (sin jerga). */
     attributionLabel: string;
   };
@@ -91,6 +114,8 @@ const ATTRIBUTION_LABELS: Record<string, string> = {
   unmeasured:
     "Atribución no medible: falta la identidad de una de las dos partes.",
   ambiguous: "Atribución ambigua: más de una propuesta reclama el mismo ciclo.",
+  mixed:
+    "Atribución mixta: los ciclos del valor no coinciden en un único estado; se muestran todos, sin elegir uno.",
 };
 
 /** Traduce el estado de atribución a una frase; un hueco se declara, no se disfraza. */
@@ -104,6 +129,94 @@ export const describeAttribution = (
     ATTRIBUTION_LABELS[attribution.state] ??
     `Atribución declarada: ${attribution.state}.`
   );
+};
+
+/** Atribución que se puede afirmar como medida; el resto es hueco declarado. */
+const attributionMeasurement = (state: string): SummaryMeasurement =>
+  state === "exact" || state === "mismatch" ? "COMPLETE" : "UNKNOWN";
+
+/**
+ * Agrega la atribución de TODOS los ciclos del valor (función PURA).
+ *
+ * - Sin ciclos → `null`: es un hueco declarado, no un «no atribuido».
+ * - Un único estado → ese estado, con recuentos de apertura y cierre.
+ * - Estados distintos → `mixed`, con el recuento por estado. Nunca se elige un ciclo
+ *   «representativo»: elegir el primero (o el último) afirmaría una atribución que los
+ *   demás ciclos contradicen.
+ * - Un ciclo sin `attribution` cuenta como `unmeasured`, jamás como `exact`.
+ */
+export const aggregateAttribution = (
+  cycles: EstudioChainCycleV1[] | null | undefined,
+): ValueSummaryAttribution | null => {
+  const list = cycles ?? [];
+  if (list.length === 0) {
+    return null;
+  }
+
+  const counts: Record<string, number> = {};
+  const declared: EstudioChainAttributionV1[] = [];
+  let exactCount = 0;
+  let exactOpen = 0;
+  let exactClosed = 0;
+  let open = 0;
+  let closed = 0;
+  let closedUnknown = 0;
+
+  for (const cycle of list) {
+    const attribution = cycle.attribution ?? null;
+    const declaredState =
+      attribution && String(attribution.state ?? "").trim()
+        ? String(attribution.state)
+        : "unmeasured";
+    counts[declaredState] = (counts[declaredState] ?? 0) + 1;
+    if (attribution) declared.push(attribution);
+    if (declaredState === "exact") {
+      exactCount += 1;
+      if (cycle.closed === true) exactClosed += 1;
+      else if (cycle.closed === false) exactOpen += 1;
+    }
+    if (cycle.closed === true) closed += 1;
+    else if (cycle.closed === false) open += 1;
+    else closedUnknown += 1;
+  }
+
+  const tally = {
+    cycles: list.length,
+    counts,
+    exactCount,
+    exactOpen,
+    exactClosed,
+    open,
+    closed,
+    closedUnknown,
+  };
+  const states = Object.keys(counts);
+  if (states.length > 1) {
+    return {
+      state: "mixed",
+      reason: "mixed_attribution",
+      measurement: "PARTIAL",
+      proposalPlanId: null,
+      proposalSignalId: null,
+      proposalId: null,
+      proposalBarDate: null,
+      source: null,
+      ...tally,
+    };
+  }
+  const state = states[0] ?? "unmeasured";
+  const single = declared.find((item) => item.state === state) ?? null;
+  return {
+    state,
+    reason: single?.reason ?? null,
+    measurement: attributionMeasurement(state),
+    proposalPlanId: single?.proposalPlanId ?? null,
+    proposalSignalId: single?.proposalSignalId ?? null,
+    proposalId: single?.proposalId ?? null,
+    proposalBarDate: single?.proposalBarDate ?? null,
+    source: single?.source ?? null,
+    ...tally,
+  };
 };
 
 const statusHeadline = (value: EstudioDailyValueV1): SummarySection => {
@@ -184,9 +297,37 @@ const whySection = (value: EstudioDailyValueV1): SummarySection => {
   };
 };
 
+/** Recuentos legibles del agregado (nunca oculta un ciclo abierto ni uno sin cierre). */
+const attributionTally = (attribution: ValueSummaryAttribution): string => {
+  const parts = [
+    `${attribution.cycles} ciclo(s) durables`,
+    `${attribution.closed} cerrado(s)`,
+    `${attribution.open} abierto(s)`,
+  ];
+  if (attribution.closedUnknown > 0) {
+    parts.push(`${attribution.closedUnknown} sin estado de cierre`);
+  }
+  return parts.join(" · ");
+};
+
+/** Recuento por estado, para no resumir «mixta» en un único ganador. */
+const attributionStatesTally = (attribution: ValueSummaryAttribution): string =>
+  Object.entries(attribution.counts)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([state, count]) => `${state} ${count}`)
+    .join(" · ");
+
+/**
+ * «¿Qué falta para actuar?» — se decide por la ATRIBUCIÓN del ciclo, no por su existencia.
+ *
+ * Un ciclo del mismo valor no demuestra que ese ciclo ejecutara la propuesta del parte:
+ * pudo nacer de otra señal/plan (`mismatch`), sin propuesta (`not_proposed`), sin identidad
+ * suficiente (`unmeasured`) o reclamado por varias propuestas (`ambiguous`). Solo `exact`
+ * autoriza «Nada pendiente».
+ */
 const missingSection = (
   value: EstudioDailyValueV1,
-  chain: ValueSummaryChainInput,
+  attribution: ValueSummaryAttribution | null,
 ): SummarySection => {
   const status = String(value.status ?? "");
   if (status === "error") {
@@ -218,8 +359,7 @@ const missingSection = (
       measurement: "UNKNOWN",
     };
   }
-  const cycles = chain?.cycles ?? [];
-  if (cycles.length === 0) {
+  if (attribution === null) {
     return {
       headline:
         "Falta que el motor AUTO adopte esta propuesta y la ejecute en PAPER.",
@@ -228,11 +368,67 @@ const missingSection = (
       measurement: "COMPLETE",
     };
   }
-  const closed = cycles.filter((cycle) => cycle.closed === true).length;
+  const state = attribution.state;
+  if (state === "exact") {
+    return {
+      headline: "Nada pendiente: el motor ya ejecutó esta propuesta.",
+      detail: attributionTally(attribution),
+      measurement: "COMPLETE",
+    };
+  }
+  if (state === "mismatch") {
+    return {
+      headline:
+        "Hay un ciclo, pero no corresponde a la propuesta de este parte.",
+      detail: `El ciclo declara otra señal/plan que el parte · ${attributionTally(
+        attribution,
+      )}.`,
+      measurement: "COMPLETE",
+    };
+  }
+  if (state === "not_proposed") {
+    return {
+      headline:
+        "Hay un ciclo, pero nació sin adoptar una propuesta de este parte.",
+      detail: attributionTally(attribution),
+      measurement: "COMPLETE",
+    };
+  }
+  if (state === "ambiguous") {
+    return {
+      headline:
+        "Atribución ambigua: más de una propuesta reclama el ciclo; no se elige una.",
+      detail: attributionTally(attribution),
+      measurement: "UNKNOWN",
+    };
+  }
+  if (state === "mixed") {
+    const states = attributionStatesTally(attribution);
+    if (attribution.exactCount > 0) {
+      return {
+        headline: "Nada pendiente: al menos un ciclo ejecutó esta propuesta.",
+        detail: `Atribución mixta (${states}) · ${attributionTally(
+          attribution,
+        )}.`,
+        measurement: "COMPLETE",
+      };
+    }
+    return {
+      headline: "Hay ciclos, pero ninguno está atribuido a esta propuesta.",
+      detail: `Atribución mixta (${states}) · ${attributionTally(
+        attribution,
+      )}.`,
+      measurement: "PARTIAL",
+    };
+  }
   return {
-    headline: "Nada pendiente: el motor ya ejecutó esta propuesta.",
-    detail: `${cycles.length} ciclo(s) durables · ${closed} cerrado(s).`,
-    measurement: "COMPLETE",
+    headline:
+      "No hay datos suficientes para afirmar que un ciclo ejecutara esta propuesta.",
+    detail:
+      attribution.reason !== null
+        ? `${attribution.reason} · ${attributionTally(attribution)}`
+        : attributionTally(attribution),
+    measurement: "UNKNOWN",
   };
 };
 
@@ -326,11 +522,13 @@ export const deriveValueSummary = (
   },
 ): ValueSummary => {
   const chain = options?.chain ?? null;
-  const attribution = chain?.cycles?.[0]?.attribution ?? null;
+  // La atribución se AGREGA sobre todos los ciclos: `cycles[0]` no representa al valor y
+  // podría afirmar «ejecutada» con un ciclo que el resto contradice.
+  const attribution = aggregateAttribution(chain?.cycles);
   return {
     proposal: proposalSection(value),
     why: whySection(value),
-    missing: missingSection(value, chain),
+    missing: missingSection(value, attribution),
     validation: validationSection(options?.validation),
     classification: classificationSection(value),
     technical: {

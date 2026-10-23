@@ -6,6 +6,7 @@ import type {
   EstudioDailyValueV1,
 } from "./estudio-daily-ops.js";
 import {
+  aggregateAttribution,
   deriveValueSummary,
   describeAttribution,
 } from "./estudio-daily-summary.js";
@@ -80,6 +81,18 @@ const attribution = (
     cycles: [],
     reason: null,
   }) as unknown as EstudioChainAttributionV1;
+
+/** Ciclo durable mínimo: estado de atribución (o hueco) y si está cerrado. */
+const chainCycle = (
+  state: EstudioChainAttributionV1["state"] | null,
+  closed: boolean | null = true,
+  cycleId = "cyc-1",
+): EstudioChainCycleV1 =>
+  ({
+    cycleId,
+    closed,
+    attribution: state === null ? null : attribution(state),
+  }) as unknown as EstudioChainCycleV1;
 
 describe("deriveValueSummary", () => {
   it("responde qué propone con los niveles del plan TRIGGERED", () => {
@@ -173,20 +186,135 @@ describe("deriveValueSummary", () => {
     expect(summary.technical.cycleIds).toEqual([]);
   });
 
-  it("declara el ciclo adoptado sin pedir nada más", () => {
+  it("declara el ciclo EXACT adoptado sin pedir nada más", () => {
     const summary = deriveValueSummary(baseValue(), {
-      chain: chainValue([
-        {
-          cycleId: "cyc-1",
-          closed: true,
-          attribution: attribution("exact"),
-        } as unknown as EstudioChainCycleV1,
-      ]),
+      chain: chainValue([chainCycle("exact", true)]),
     });
     expect(summary.missing.headline).toContain("Nada pendiente");
+    expect(summary.missing.detail).toContain("1 cerrado(s)");
+    expect(summary.missing.measurement).toBe("COMPLETE");
     expect(summary.technical.cycleIds).toEqual(["cyc-1"]);
     expect(summary.technical.attribution?.state).toBe("exact");
     expect(summary.technical.attributionLabel).toContain("atribuida");
+  });
+
+  it("distingue el ciclo exact ABIERTO del cerrado en el detalle", () => {
+    const summary = deriveValueSummary(baseValue(), {
+      chain: chainValue([chainCycle("exact", false)]),
+    });
+    expect(summary.missing.headline).toContain("Nada pendiente");
+    expect(summary.missing.detail).toContain("1 abierto(s)");
+    expect(summary.missing.detail).toContain("0 cerrado(s)");
+    expect(summary.missing.measurement).toBe("COMPLETE");
+  });
+
+  it("un ciclo con OTRA identidad no se declara «Nada pendiente»", () => {
+    const summary = deriveValueSummary(baseValue(), {
+      chain: chainValue([chainCycle("mismatch", true)]),
+    });
+    expect(summary.missing.headline).not.toContain("Nada pendiente");
+    expect(summary.missing.headline).toContain("no corresponde");
+    expect(summary.missing.detail).toContain("otra señal/plan");
+    expect(summary.missing.measurement).toBe("COMPLETE");
+    expect(summary.technical.attribution?.state).toBe("mismatch");
+  });
+
+  it("un ciclo sin propuesta adoptada se declara como tal, no como ejecutado", () => {
+    const summary = deriveValueSummary(baseValue(), {
+      chain: chainValue([chainCycle("not_proposed", true)]),
+    });
+    expect(summary.missing.headline).not.toContain("Nada pendiente");
+    expect(summary.missing.headline).toContain(
+      "sin adoptar una propuesta de este parte",
+    );
+    expect(summary.missing.measurement).toBe("COMPLETE");
+  });
+
+  it("sin identidad suficiente declara el hueco como no medido", () => {
+    const summary = deriveValueSummary(baseValue(), {
+      chain: chainValue([chainCycle("unmeasured", true)]),
+    });
+    expect(summary.missing.headline).toContain("No hay datos suficientes");
+    expect(summary.missing.headline).not.toContain("Nada pendiente");
+    expect(summary.missing.measurement).toBe("UNKNOWN");
+  });
+
+  it("declara la ambigüedad sin elegir un ciclo arbitrario", () => {
+    const summary = deriveValueSummary(baseValue(), {
+      chain: chainValue([chainCycle("ambiguous", true)]),
+    });
+    expect(summary.missing.headline).toContain("Atribución ambigua");
+    expect(summary.missing.headline).not.toContain("Nada pendiente");
+    expect(summary.missing.measurement).toBe("UNKNOWN");
+  });
+
+  it("con varios ciclos, uno exact y otro mismatch, la atribución es MIXTA", () => {
+    const summary = deriveValueSummary(baseValue(), {
+      chain: chainValue([
+        chainCycle("exact", true, "cyc-1"),
+        chainCycle("mismatch", false, "cyc-2"),
+      ]),
+    });
+    expect(summary.technical.attribution?.state).toBe("mixed");
+    expect(summary.technical.attribution?.exactCount).toBe(1);
+    expect(summary.technical.attribution?.counts).toEqual({
+      exact: 1,
+      mismatch: 1,
+    });
+    expect(summary.missing.headline).toContain("Nada pendiente");
+    expect(summary.missing.detail).toContain("exact 1");
+    expect(summary.missing.detail).toContain("mismatch 1");
+    expect(summary.missing.measurement).toBe("COMPLETE");
+  });
+
+  it("una atribución mixta SIN exact no se declara «Nada pendiente»", () => {
+    const summary = deriveValueSummary(baseValue(), {
+      chain: chainValue([
+        chainCycle("mismatch", true, "cyc-1"),
+        chainCycle("not_proposed", true, "cyc-2"),
+      ]),
+    });
+    expect(summary.technical.attribution?.state).toBe("mixed");
+    expect(summary.technical.attribution?.exactCount).toBe(0);
+    expect(summary.missing.headline).not.toContain("Nada pendiente");
+    expect(summary.missing.headline).toContain("ninguno está atribuido");
+    expect(summary.missing.measurement).toBe("PARTIAL");
+  });
+
+  it("varios ciclos todos exact siguen siendo attribución exact", () => {
+    const summary = deriveValueSummary(baseValue(), {
+      chain: chainValue([
+        chainCycle("exact", true, "cyc-1"),
+        chainCycle("exact", false, "cyc-2"),
+      ]),
+    });
+    expect(summary.technical.attribution?.state).toBe("exact");
+    expect(summary.technical.attribution?.cycles).toBe(2);
+    expect(summary.technical.attribution?.exactCount).toBe(2);
+    expect(summary.technical.attribution?.exactClosed).toBe(1);
+    expect(summary.technical.attribution?.exactOpen).toBe(1);
+  });
+
+  it("la atribución del valor NO la decide el primer ciclo (regresión cycles[0])", () => {
+    const summary = deriveValueSummary(baseValue(), {
+      chain: chainValue([
+        chainCycle("mismatch", true, "cyc-1"),
+        chainCycle("exact", true, "cyc-2"),
+      ]),
+    });
+    expect(summary.technical.attribution?.state).toBe("mixed");
+    expect(summary.technical.attribution?.exactCount).toBe(1);
+    expect(summary.technical.attributionLabel).toContain("mixta");
+    expect(summary.missing.headline).toContain("al menos un ciclo");
+  });
+
+  it("un ciclo sin atribución declarada cuenta como unmeasured", () => {
+    const summary = deriveValueSummary(baseValue(), {
+      chain: chainValue([chainCycle(null, true)]),
+    });
+    expect(summary.technical.attribution?.state).toBe("unmeasured");
+    expect(summary.missing.headline).not.toContain("Nada pendiente");
+    expect(summary.missing.measurement).toBe("UNKNOWN");
   });
 });
 
@@ -203,9 +331,40 @@ describe("describeAttribution", () => {
       "no medible",
     );
     expect(describeAttribution(attribution("ambiguous"))).toContain("ambigua");
+    expect(describeAttribution(attribution("mixed"))).toContain("mixta");
   });
 
   it("un hueco se declara como hueco, no como estado", () => {
     expect(describeAttribution(null)).toContain("Sin dato de atribución");
+  });
+});
+
+describe("aggregateAttribution", () => {
+  it("sin ciclos es un hueco declarado, no un «no atribuido»", () => {
+    expect(aggregateAttribution([])).toBeNull();
+    expect(aggregateAttribution(null)).toBeNull();
+    expect(aggregateAttribution(undefined)).toBeNull();
+  });
+
+  it("no elige un ciclo representativo cuando los estados discrepan", () => {
+    const aggregated = aggregateAttribution([
+      chainCycle("exact", true, "cyc-1"),
+      chainCycle("mismatch", true, "cyc-2"),
+    ]);
+    expect(aggregated?.state).toBe("mixed");
+    expect(aggregated?.reason).toBe("mixed_attribution");
+    expect(aggregated?.proposalId).toBeNull();
+    expect(aggregated?.counts).toEqual({ exact: 1, mismatch: 1 });
+    expect(aggregated?.closed).toBe(2);
+    expect(aggregated?.open).toBe(0);
+  });
+
+  it("cuenta aparte los ciclos sin estado de cierre declarado", () => {
+    const aggregated = aggregateAttribution([
+      chainCycle("exact", null, "cyc-1"),
+    ]);
+    expect(aggregated?.closedUnknown).toBe(1);
+    expect(aggregated?.open).toBe(0);
+    expect(aggregated?.closed).toBe(0);
   });
 });
