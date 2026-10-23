@@ -432,6 +432,12 @@ def decide_portfolio(
     trade_context: TradeContext | None = None,
     config: PortfolioDecisionConfig | None = None,
     decision_id: str = "",
+    #: Identidad DURABLE del PLAN (``TradePlan.decisionId``). Vacía ⇒ la del claim
+    #: (``decision_id``), que es el comportamiento histórico byte-idéntico. Cuando el
+    #: productor adopta una propuesta diaria ESTUDIO, el plan conserva la identidad que
+    #: el usuario vio en pantalla y la reserva sigue usando la del claim (``RES-dec-…``),
+    #: que es la clave atómica por ``(cuenta, señal)``: dos partes distintas, no un alias.
+    plan_id: str = "",
     expires_at: str | None = None,
     as_of: str = "",
 ) -> PortfolioDecision:
@@ -664,7 +670,10 @@ def decide_portfolio(
     )
 
     plan = _build_trade_plan(
-        decision_id=did,
+        # Identidad del PLAN: la propuesta del parte si se adoptó; si no, la del claim
+        # (histórico). El ``decision_id`` de la decisión —y por tanto la PK de la
+        # reserva— NO cambia: son identidades distintas a propósito.
+        decision_id=plan_id.strip() or did,
         instrument_id=instrument_id,
         direction=direction,
         entry=entry,

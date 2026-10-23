@@ -1083,6 +1083,15 @@ class AutoSimulationWorker:
         # test) no se escribe nada ⇒ Δ = 0 y el hueco sigue declarado, nunca inventado.
         top3_opportunity_sink: Callable[[list[Any], str | None], Awaitable[None]] | None = None,
         consumed_signal_store: Any = None,
+        # Handoff durable ESTUDIO → AUTO (migración 058). El LECTOR recibe
+        # ``(cuenta, día de barra de decisión, instrumentos)`` y devuelve la selección
+        # (``AdoptionResult``); el SUMIDERO recibe los desenlaces (consumida/rechazada) y
+        # los sella. Sin ellos el motor no adopta nada y la cadena publica
+        # ``not_attributed``: nunca se infiere por símbolo.
+        daily_proposal_source: (
+            Callable[[str, str, Sequence[str]], Awaitable[Any]] | None
+        ) = None,
+        daily_proposal_sink: Callable[[list[dict[str, Any]]], Awaitable[Any]] | None = None,
         # AUTO-1b: espejo durable de las RESERVAS de cartera (``portfolio_reservations``).
         # Con él, las reservas vivas son la autoridad de ``reserved_cash``/``pending_risk``
         # y ``execution_events`` queda como reconciliación de arranque. Sin él (camino
@@ -1419,6 +1428,21 @@ class AutoSimulationWorker:
         self._v2_trade_context_source: CatalogTradeContextSource | None = trade_context_source
         self._v2_edge_source: EdgeReportSource | None = edge_source
         self._v2_evidence_source: Any = evidence_source
+        # Handoff ESTUDIO → AUTO (migración 058): el LECTOR de propuestas pendientes y el
+        # SUMIDERO de desenlaces. Se inyectan por sesión/tick como los demás espejos; sin
+        # ellos el camino es el histórico (Δ = 0) y la cadena declara ``not_attributed``.
+        self._daily_proposal_source: (
+            Callable[[str, str, Sequence[str]], Awaitable[Any]] | None
+        ) = daily_proposal_source
+        self._daily_proposal_sink: Callable[[list[dict[str, Any]]], Awaitable[Any]] | None = (
+            daily_proposal_sink
+        )
+        # Foto de propuestas adoptables de la BARRA corriente (se relee al cambiar de barra).
+        self._v2_bar_proposals: dict[str, dict[str, Any]] = {}
+        self._v2_bar_proposals_bar: str = ""
+        # Propuestas de ESTA pasada del plan (``instrumento → payload``) y caducadas.
+        self._v2_tick_proposals: dict[str, dict[str, Any]] = {}
+        self._v2_tick_expired: tuple[tuple[str, str], ...] = ()
         # V2.88.84 — espejo durable del TOP3 cross-asset (``top3_opportunities``, migración 052).
         # Inyectable por sesión/tick como los demás; sin él no se escribe (Δ = 0).
         self._top3_opportunity_sink: Callable[[list[Any], str | None], Awaitable[None]] | None = (
@@ -2763,6 +2787,17 @@ class AutoSimulationWorker:
                 moment=self._time,
             )
             signal_id = identity.signal_id if identity is not None else ""
+            # Handoff ESTUDIO → AUTO: si el parte publicó una propuesta ADOPTABLE para este
+            # instrumento, la IDENTIDAD de la señal es la del parte (``signalId``) y no la
+            # que deriva la barra. Así el ciclo durable nace con la identidad que el
+            # usuario vio en pantalla; sin propuesta se conserva la histórica (Δ = 0).
+            proposal = self._v2_tick_proposals.get(symbol) or self._v2_tick_proposals.get(
+                symbol.upper()
+            )
+            if proposal is not None:
+                declared = str(proposal.get("signalId") or "").strip()
+                if declared:
+                    signal_id = declared
             if signal_id:
                 self._v2_tick_signals[symbol] = signal_id
             context = self._v2_context(symbol, pkg)
@@ -4691,6 +4726,9 @@ class AutoSimulationWorker:
         # V2.88.84 — la evidencia se lee UNA vez y se reusa para el plan y para la foto del
         # TOP3, de modo que la procedencia declarada por slot es la MISMA que la del scoring.
         evidence_lookup = self._v2_evidence_lookup(packages)
+        # Handoff ESTUDIO → AUTO: las propuestas pendientes de la barra de decisión. Se
+        # leen ANTES de construir las señales (la identidad adoptada viaja en la señal).
+        await self._v2_load_daily_proposals()
         plan = plan_v2_tick(
             snapshot=snapshot,
             signals=self._v2_signals(packages),
@@ -4704,12 +4742,20 @@ class AutoSimulationWorker:
             halted=self._v2_kill_switch_halted(),
             adaptive=adaptive,
             evidence=evidence_lookup,
+            # Handoff: ``instrumento → propuesta validada``. Sin propuestas es ``None`` y
+            # el tick es byte-idéntico al histórico.
+            daily_proposals=self._v2_tick_proposals or None,
         )
         # AUTO-1b: el compromiso se hace DURABLE antes de emitir la orden. Sin persistir
         # no hay aprobación que emitir (fail-closed, ver ``_v2_persist_tick_reservations``).
         # Con el dato de barra reutilizado la llamada se conserva: si la barra aún aprobara
         # algo nuevo (señal distinta aparecida a mitad de barra) su reserva DEBE persistirse.
         await self._v2_persist_tick_reservations(plan)
+        # Handoff ESTUDIO → AUTO: el desenlace de las propuestas que el motor evaluó. Se
+        # sella DESPUÉS de persistir la reserva (la reserva es el compromiso; la traza va
+        # después) y ANTES de emitir la orden, para que ``consumed_cycle_id`` sea el ciclo
+        # que de verdad viaja a la orden.
+        await self._v2_settle_daily_proposals(plan)
         # AUTO-11: la recomendación Adaptive se publica DESPUÉS de que el motor determinista la
         # consumió (mismo orden que AUTO-10: primero el dinero, después la traza). Así el journal
         # nunca registra una recomendación que no llegó a aplicarse.
@@ -4793,6 +4839,108 @@ class AutoSimulationWorker:
                 ",".join(degraded),
                 run_id,
             )
+
+    # ── Handoff durable ESTUDIO → AUTO (migración 058) ────────────────────────
+
+    def _v2_tick_proposal_map(self) -> dict[str, dict[str, Any]]:
+        """Propuestas adoptables del tick (normalmente vacío: sin parte no hay handoff)."""
+        return dict(self._v2_tick_proposals)
+
+    async def _v2_load_daily_proposals(self) -> None:
+        """Carga las propuestas del parte adoptables para la barra de decisión.
+
+        Se leen UNA vez por barra (``_v2_bar_proposals``), de modo que dos turnos dentro
+        de la misma barra —el segundo ya sin la propuesta pendiente— conservan la MISMA
+        identidad de señal: si no, el dedupe de señal se rompería a mitad de barra.
+
+        Fail-closed: sin fuente inyectada, sin cuenta o sin frontera de barras no se
+        adopta nada (Δ = 0) y la cadena declarará ``not_attributed``. Un fallo de lectura
+        se registra y deja el tick sin propuestas: la traza no tumba el turno.
+        """
+        self._v2_tick_proposals = {}
+        self._v2_tick_expired = ()
+        source = self._daily_proposal_source
+        if source is None or not self._account_id:
+            return
+        bar = self._v2_current_bar_start()
+        if bar and bar == self._v2_bar_proposals_bar:
+            self._v2_tick_proposals = self._v2_tick_proposal_map_from_bar()
+            return
+        decision_day = self._v2_closed_bar_as_of()
+        if not decision_day:
+            return
+        instruments = [s.strip() for s in _watch_symbols() if s.strip()]
+        try:
+            adoption = await source(self._account_id, decision_day, instruments)
+        except Exception:  # noqa: BLE001 — el handoff no puede tumbar el turno.
+            logger.exception("auto_sim v2 daily proposal handoff failed (declared gap)")
+            return
+        try:
+            by_key = adoption.by_instrument()
+        except Exception:  # noqa: BLE001 — un contrato roto se declara, no se inventa.
+            logger.exception("auto_sim v2 daily proposal handoff contract invalid")
+            return
+        self._v2_bar_proposals = dict(by_key)
+        self._v2_bar_proposals_bar = bar
+        self._v2_tick_proposals = self._v2_tick_proposal_map_from_bar()
+        self._v2_tick_expired = tuple(getattr(adoption, "expired", ()) or ())
+        if self._v2_tick_proposals:
+            logger.info(
+                "auto_sim v2 handoff ESTUDIO: %d propuesta(s) adoptable(s) day=%s bar=%s",
+                len(self._v2_tick_proposals),
+                decision_day,
+                bar,
+            )
+
+    def _v2_tick_proposal_map_from_bar(self) -> dict[str, dict[str, Any]]:
+        """Copia defensiva del mapa de la barra (el tick no muta el de la barra)."""
+        return {key: dict(value) for key, value in self._v2_bar_proposals.items()}
+
+    async def _v2_settle_daily_proposals(self, plan: Any) -> None:
+        """Sella el desenlace de las propuestas que el motor evaluó en este tick.
+
+        * Aprobada con ciclo ⇒ ``consumed`` + ``consumed_cycle_id`` (atribución exacta).
+        * Veto del motor ⇒ ``rejected`` con el motivo (NO se busca otro plan).
+        * Propuesta caducada por frescura ⇒ ``expired`` con el motivo.
+
+        Sin sumidero es un no-op (Δ = 0). Un fallo se declara y NO tumba el turno: la
+        decisión ya está tomada y el hueco queda visible en la cadena.
+        """
+        sink = self._daily_proposal_sink
+        if sink is None or (not self._v2_tick_proposals and not self._v2_tick_expired):
+            return
+        outcomes: list[dict[str, Any]] = []
+        for entry in tuple(getattr(plan, "journal_entries", ()) or ()):
+            payload = getattr(entry, "payload", None) or {}
+            proposal_payload = payload.get("dailyProposal")
+            if not isinstance(proposal_payload, Mapping):
+                continue
+            proposal_id = str(proposal_payload.get("proposalId") or "").strip()
+            if not proposal_id:
+                continue
+            cycle_id = str(payload.get("cycleId") or "").strip()
+            approved = bool(payload.get("approved"))
+            reason = ",".join(
+                str(code) for code in (payload.get("reasonCodes") or []) if code
+            )
+            outcomes.append(
+                {
+                    "proposalId": proposal_id,
+                    "status": "consumed" if approved and cycle_id else "rejected",
+                    "cycleId": cycle_id or None,
+                    "reason": None if approved and cycle_id else (reason or "engine_rejected"),
+                }
+            )
+        for proposal_id, reason in self._v2_tick_expired:
+            outcomes.append(
+                {"proposalId": proposal_id, "status": "expired", "reason": reason}
+            )
+        if not outcomes:
+            return
+        try:
+            await sink(outcomes)
+        except Exception:  # noqa: BLE001 — el desenlace es traza, no dinero.
+            logger.exception("auto_sim v2 daily proposal outcome sink failed")
 
     async def _v2_cycle_risk(self, fills: Sequence[Any]) -> dict[str, CycleRisk] | None:
         """AUTO-9/AUTO-10 — denominador de R, coste y RÉGIMEN por CICLO.
@@ -7158,6 +7306,11 @@ class AutoSimulationWorker:
         adaptive_reader: Callable[[str | None], Awaitable[AdaptiveStateReading]] | None = None,
         # AUTO-15: la racha durable de fallos del sink, sobre la MISMA sesión del tick.
         adaptive_gate_store: AdaptiveGateStore | None = None,
+        # Handoff durable ESTUDIO → AUTO (migración 058), atado a la MISMA sesión del tick.
+        daily_proposal_source: (
+            Callable[[str, str, Sequence[str]], Awaitable[Any]] | None
+        ) = None,
+        daily_proposal_sink: Callable[[list[dict[str, Any]]], Awaitable[Any]] | None = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
 
@@ -7201,6 +7354,8 @@ class AutoSimulationWorker:
         prev_adaptive_sink = self._adaptive_sink
         prev_adaptive_reader = self._adaptive_reader
         prev_adaptive_gate_store = self._adaptive_gate_store
+        prev_daily_proposal_source = self._daily_proposal_source
+        prev_daily_proposal_sink = self._daily_proposal_sink
         # W2 · Fase A: el seam de la barra queda ENCENDIDO todo el turno durable y se
         # restaura al salir, para que el camino hermético (``auto_turn`` directo) siga
         # midiendo el plan completo aunque comparta instancia con el camino real.
@@ -7235,6 +7390,18 @@ class AutoSimulationWorker:
             # demás espejos). Sin él se conserva el del constructor (hermético/tests).
             self._top3_opportunity_sink = (
                 top3_opportunity_sink if top3_opportunity_sink is not None else prev_top3_sink
+            )
+            # Handoff ESTUDIO → AUTO: lector y sumidero viajan con la sesión del tick. Sin
+            # ellos se conserva lo del constructor (hermético/tests) ⇒ Δ = 0.
+            self._daily_proposal_source = (
+                daily_proposal_source
+                if daily_proposal_source is not None
+                else prev_daily_proposal_source
+            )
+            self._daily_proposal_sink = (
+                daily_proposal_sink
+                if daily_proposal_sink is not None
+                else prev_daily_proposal_sink
             )
             # E2: la fuente de ATR del tick se enlaza igual que el régimen (misma sesión).
             self._v2_atr_source = atr_source if atr_source is not None else prev_atr
@@ -7405,6 +7572,8 @@ class AutoSimulationWorker:
             self._adaptive_sink = prev_adaptive_sink
             self._adaptive_reader = prev_adaptive_reader
             self._adaptive_gate_store = prev_adaptive_gate_store
+            self._daily_proposal_source = prev_daily_proposal_source
+            self._daily_proposal_sink = prev_daily_proposal_sink
             self._v2_bar_short_circuit = prev_bar_short_circuit
 
 
@@ -8323,6 +8492,33 @@ class AutoSimRuntime:
             # durable de «qué 3 oportunidades ha rankeado AUTO y por qué», sobre la MISMA sesión del tick.
             # Cierra el hueco de ``v2.88.82`` (cadena probada pero sin productor cableado).
             top3_opportunity_sink = build_top3_opportunity_sink(session)
+            # Handoff durable ESTUDIO → AUTO (migración 058): el lector de propuestas
+            # pendientes y el sumidero de desenlaces, sobre la MISMA sesión del tick. El
+            # productor adopta la identidad del parte y la sella en el ciclo; sin esto la
+            # cadena solo podría "cuadrar" por símbolo (una inferencia, no una prueba).
+            from bolsa_application.estudio_daily_proposals import (  # noqa: PLC0415
+                LoadAdoptableDailyProposals,
+                RecordDailyProposalOutcomes,
+            )
+            from bolsa_infrastructure.database.repositories.estudio_daily_proposal_repository import (  # noqa: PLC0415, E501
+                SqlAlchemyEstudioDailyProposalRepository,
+            )
+
+            proposal_repository = SqlAlchemyEstudioDailyProposalRepository(session)
+            proposal_loader = LoadAdoptableDailyProposals(proposal_repository)
+            proposal_outcomes = RecordDailyProposalOutcomes(proposal_repository)
+
+            async def _daily_proposal_source(
+                account_id: str,
+                decision_bar_day: str,
+                instruments: Sequence[str],
+            ) -> Any:
+                """Propuestas adoptables para la frontera de decisión del tick."""
+                return await proposal_loader.execute(
+                    account_id=account_id,
+                    instruments=instruments,
+                    decision_bar_day=decision_bar_day,
+                )
             # v2.88.70: la equity del turno es la del libro. Si falla, las aperturas
             # quedan vetadas dentro de ``auto_turn``. No se sustituye por 100_000.
             await self._worker.load_book_equity(session)
@@ -8369,6 +8565,10 @@ class AutoSimRuntime:
                 evidence_source=self._evidence_source or _compose_evidence_source(session),
                 # V2.88.84 — productor durable del TOP3 cross-asset (tabla 052), misma sesión.
                 top3_opportunity_sink=top3_opportunity_sink,
+                # Handoff durable ESTUDIO → AUTO (058): la propuesta del parte manda en la
+                # identidad del plan/ciclo; el desenlace se sella con el ``cycle_id``.
+                daily_proposal_source=_daily_proposal_source,
+                daily_proposal_sink=proposal_outcomes.execute,
                 atr_source=self._atr_source
                 or _compose_atr_source(
                     session,

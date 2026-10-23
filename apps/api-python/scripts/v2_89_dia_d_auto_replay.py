@@ -174,22 +174,6 @@ async def _read_executed_facts(
                 PortfolioReservationRow.created_at < end,
             ),
         )
-        fills = await _count(
-            session,
-            select(SimFillFinanceContextRow.execution_id).where(
-                SimFillFinanceContextRow.account_id == account_id,
-                SimFillFinanceContextRow.created_at >= start,
-                SimFillFinanceContextRow.created_at < end,
-            ),
-        )
-        exit_orders = await _count(
-            session,
-            select(AutoExitOrderRow.exit_order_id).where(
-                AutoExitOrderRow.account_id == account_id,
-                AutoExitOrderRow.created_at >= start,
-                AutoExitOrderRow.created_at < end,
-            ),
-        )
         journal_entries = await _count(
             session,
             select(DecisionJournalEntryRow.id).where(
@@ -204,19 +188,55 @@ async def _read_executed_facts(
                     SimFillFinanceContextRow.cycle_id,
                     SimFillFinanceContextRow.side,
                     SimFillFinanceContextRow.created_at,
-                ).where(
+                )
+                .where(
                     SimFillFinanceContextRow.account_id == account_id,
-                    SimFillFinanceContextRow.created_at >= start,
                     SimFillFinanceContextRow.created_at < close_end,
-                    SimFillFinanceContextRow.cycle_id.is_not(None),
+                )
+                .order_by(SimFillFinanceContextRow.created_at.asc())
+            )
+        ).all()
+        exit_rows = (
+            await session.execute(
+                select(
+                    AutoExitOrderRow.cycle_id,
+                    AutoExitOrderRow.created_at,
+                ).where(
+                    AutoExitOrderRow.account_id == account_id,
+                    AutoExitOrderRow.created_at < close_end,
                 )
             )
         ).all()
+        journal_rows = (
+            await session.execute(
+                select(DecisionJournalEntryRow.payload)
+                .where(
+                    DecisionJournalEntryRow.account_id == account_id,
+                    DecisionJournalEntryRow.created_at >= start,
+                    DecisionJournalEntryRow.created_at < end,
+                )
+                .order_by(DecisionJournalEntryRow.created_at.asc(), DecisionJournalEntryRow.id.asc())
+            )
+        ).scalars().all()
 
     # Identidad ÚNICA (D34-01): el D-cycle nace con su APERTURA (buy) en D; su cierre es un
     # sell POSTERIOR a la apertura, hasta el horizonte OOS del replay. Un ciclo abierto en
     # D-1 y cerrado en D NO es un D-cycle (no nació aquí).
-    opened_cycle_ids: set[str] = set()
+    #
+    # El sello temporal del fill depende del reloj del MOTOR (no de la barra) y por eso NO
+    # puede decidir la atribución. Cuando el journal de ``D`` sella la decisión de apertura
+    # (``cycleId`` + ``tradePlan``) esa identidad MANDA: los hechos del ciclo se cuentan por
+    # igualdad de id durable; la ventana temporal queda sólo como respaldo cuando no hay
+    # identidad durable (compatibilidad con trazas antiguas sin ``cycle_id``).
+    identity_born: set[str] = set()
+    for payload_row in journal_rows:
+        if not isinstance(payload_row, dict):
+            continue
+        key = str(payload_row.get("cycleId") or "").strip()
+        if key and isinstance(payload_row.get("tradePlan"), dict):
+            identity_born.add(key)
+
+    opened_cycle_ids: set[str] = set(identity_born)
     closed_cycle_ids: set[str] = set()
     for cycle_id, side, created_at in cycle_rows:
         key = str(cycle_id) if cycle_id is not None else ""
@@ -227,7 +247,50 @@ async def _read_executed_facts(
             opened_cycle_ids.add(key)
         elif side_key == "sell":
             closed_cycle_ids.add(key)
+
+    if identity_born:
+        fills = sum(1 for cycle_id, _side, _created in cycle_rows if str(cycle_id) in identity_born)
+        exit_orders = sum(1 for cycle_id, _created in exit_rows if str(cycle_id) in identity_born)
+    else:
+        fills = sum(1 for _cycle_id, _side, created in cycle_rows if start <= created < end)
+        exit_orders = sum(1 for _cycle_id, created in exit_rows if start <= created < end)
     closure = cycle_closure_summary(opened_cycle_ids, closed_cycle_ids)
+
+    # Handoff ESTUDIO → AUTO — identidad DURABLE del ciclo nacido en ``D``. El artefacto
+    # declara los ids que la cadena compara por IGUALDAD (``planId``/``signalId``/
+    # ``cycleId``), no por símbolo. Se leen del journal de decisión, que es la única fuente
+    # que sella la propuesta adoptada; las claves se OMITEN si faltan (la ausencia es
+    # información, jamás un relleno).
+    #
+    # El ciclo emite VARIOS eventos (materialización, protección, orden, decisión…): la
+    # identidad se COMPONE de todos ellos por ciclo, porque sólo la decisión de entrada
+    # lleva ``tradePlan``/``signalId``/``dailyProposal``. Quedarse con el primer evento
+    # dejaría la atribución vacía por orden de escritura, no por falta de dato.
+    identity_by_cycle: dict[str, dict[str, Any]] = {}
+    for payload_row in journal_rows:
+        if not isinstance(payload_row, dict):
+            continue
+        cycle_key = str(payload_row.get("cycleId") or "").strip()
+        if not cycle_key or cycle_key not in opened_cycle_ids:
+            continue
+        identity = identity_by_cycle.setdefault(cycle_key, {"cycleId": cycle_key})
+        plan_payload = payload_row.get("tradePlan") if isinstance(payload_row.get("tradePlan"), dict) else {}
+        proposal = (
+            payload_row.get("dailyProposal") if isinstance(payload_row.get("dailyProposal"), dict) else {}
+        )
+        plan_id = str(plan_payload.get("decisionId") or "").strip()
+        if plan_id:
+            identity["planId"] = plan_id
+        if str(payload_row.get("signalId") or "").strip():
+            identity["signalId"] = str(payload_row["signalId"])
+        if str(payload_row.get("instrumentId") or "").strip():
+            identity["instrumentId"] = str(payload_row["instrumentId"])
+        if str(proposal.get("proposalId") or "").strip():
+            identity["proposalId"] = str(proposal["proposalId"])
+    cycle_identities: list[dict[str, Any]] = []
+    for identity in identity_by_cycle.values():
+        identity["attributed"] = bool(identity.get("planId") and identity.get("signalId"))
+        cycle_identities.append(identity)
 
     any_durable = bool(reservations or fills or exit_orders or journal_entries)
     if any_durable:
@@ -261,8 +324,16 @@ async def _read_executed_facts(
             "openCycles": closure["open"],
             "cycleClosureUnmeasured": closure["unmeasured"],
             "chainCounts": chain_counts,
+            "cycleIdentities": cycle_identities,
         }
     )
+    if len(cycle_identities) == 1:
+        only = cycle_identities[0]
+        detail["cycleId"] = only["cycleId"]
+        if only.get("planId"):
+            detail["planId"] = only["planId"]
+        if only.get("signalId"):
+            detail["signalId"] = only["signalId"]
     return executed, detail
 
 
@@ -316,6 +387,46 @@ def _cycle_closed_step(oos: dict[str, Any]) -> Any:
 
 
 # ── Orquestación ─────────────────────────────────────────────────────────────────
+
+
+async def _resolve_instrument_ids(factory: Any, tokens: list[str]) -> list[str]:
+    """Traduce el ``--watch`` pedido (ticker o id) a ID de instrumento del catálogo.
+
+    El modo valor nombra el artefacto por SÍMBOLO (lo que el usuario ve y lo que valida la
+    ruta HTTP), pero barras, sector y estrategia se indexan por **id de instrumento**. Sin
+    esta traducción ``--watch RRT123`` no encontraba ni una barra y el replay fallaba con
+    «no hay barras D1 para simular». Un token desconocido falla cerrado (nunca un watch
+    vacío silencioso).
+    """
+    from sqlalchemy import or_, select
+
+    from bolsa_infrastructure.database.models.tables import InstrumentRow
+
+    wanted = [str(token).strip() for token in tokens if str(token).strip()]
+    if not wanted:
+        return []
+    upper = [token.upper() for token in wanted]
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                select(InstrumentRow.id, InstrumentRow.symbol).where(
+                    or_(InstrumentRow.id.in_(wanted), InstrumentRow.symbol.in_(upper))
+                )
+            )
+        ).all()
+    by_token: dict[str, str] = {}
+    for instrument_id, symbol in rows:
+        if instrument_id:
+            by_token[str(instrument_id)] = str(instrument_id)
+        if symbol:
+            by_token[str(symbol).upper()] = str(instrument_id)
+    resolved: list[str] = []
+    for token in wanted:
+        instrument_id = by_token.get(token) or by_token.get(token.upper())
+        if instrument_id is None:
+            raise RuntimeError(f"instrumento no encontrado en el catálogo: {token}")
+        resolved.append(instrument_id)
+    return resolved
 
 
 async def _run(args: argparse.Namespace) -> dict[str, Any]:
@@ -382,13 +493,19 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             watch_source = "pit"
         else:
             watch_source = "catalog"
-        v86._configure_env(watch=watch, venue=str(args.venue), edge=float(args.edge))  # noqa: SLF001
+        # ``watch`` son las ETIQUETAS del artefacto (lo pedido por el usuario, p.ej. el
+        # ticker); ``watch_ids`` es lo que indexa barras/sector/estrategia. En un watch
+        # derivado del catálogo ambos coinciden.
+        watch_ids = (
+            await _resolve_instrument_ids(factory, watch) if explicit_watch else list(watch)
+        )
+        v86._configure_env(watch=watch_ids, venue=str(args.venue), edge=float(args.edge))  # noqa: SLF001
         # Determinismo: el precio del replay es el ``price_script`` histórico inyectado, no
         # una lectura en vivo. No se fuerza régimen ni se baja ningún umbral.
         os.environ["AUTO_ENGINE_SIM_REAL_PRICE"] = "0"
 
-        bars_by_symbol = await v86._read_bars(factory, watch)  # noqa: SLF001
-        progress.emit("loading_bars", done=len(bars_by_symbol), total=len(watch))
+        bars_by_symbol = await v86._read_bars(factory, watch_ids)  # noqa: SLF001
+        progress.emit("loading_bars", done=len(bars_by_symbol), total=len(watch_ids))
         days = v86._trading_days(bars_by_symbol)  # noqa: SLF001
         if not days:
             raise RuntimeError("no hay barras D1 para simular")
@@ -401,12 +518,12 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         end_index = min(len(days), d_index + 1 + max(0, int(args.horizon_days)))
         census = census_operable_days(bars_by_symbol, days)
         operable_flags = [row.entries_allowed_long for row in census.days]
-        sectors = await v86._load_sectors(factory, watch)  # noqa: SLF001
+        sectors = await v86._load_sectors(factory, watch_ids)  # noqa: SLF001
 
         total_ticks = max(0, end_index - start_index)
         progress.emit("replay", done=0, total=total_ticks)
         replay = await v87._run_durable_replay(  # noqa: SLF001 — harness hermético.
-            watch=watch,
+            watch=watch_ids,
             bars_by_symbol=bars_by_symbol,
             sectors=sectors,
             days=days,
@@ -478,14 +595,20 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 "bump": "2.11.161-beta",
                 "phase": "V2.89 DIA-D AUTO SANDBOX",
                 "nature": "INVESTIGACION",
+                # El artefacto DECLARA su propio día (no se hereda del request): el lector
+                # puede contrastar día pedido vs día servido sin inferirlo del nombre del
+                # fichero ni de la fecha de modificación.
+                "day": day,
                 "account": str(args.account_id),
                 "versionA": str(args.version_a),
-                # Watch EFECTIVO del replay. Aditivo y sin efecto en la decisión: permite a
+                # Watch EFECTIVO del replay (etiquetas pedidas) + ids de instrumento que
+                # realmente se simularon. Aditivo y sin efecto en la decisión: permite a
                 # quien consume el artefacto exigir que cubra EXACTAMENTE el valor pedido
-                # (verificación DÍA-D por valor) en vez de suponerlo por el tamaño del watch.
+                # (verificación DÍA-D por valor) sin inferir por el tamaño del watch.
                 "watch": list(watch),
+                "watchInstrumentIds": list(watch_ids),
                 "venue": str(args.venue),
-                "watchSize": len(watch),
+                "watchSize": len(watch_ids),
                 "watchSource": watch_source,
                 "survivorBiasRisk": watch_source == "catalog",
                 "universeCoverage": universe_coverage,

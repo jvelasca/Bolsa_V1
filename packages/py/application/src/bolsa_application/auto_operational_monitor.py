@@ -43,6 +43,13 @@ from bolsa_analytics.cognitive.measurement import (
 )
 from bolsa_application.auto_cycle_journal import cycle_decision_id
 from bolsa_application.auto_self_evaluation_feed import cycles_from_fills
+from bolsa_application.estudio_daily_proposals import (
+    ADOPTION_ABSENT_NOT_PROPOSED,
+    ADOPTION_ABSENT_UNMEASURED,
+    ADOPTION_EXACT,
+    ADOPTION_MISMATCH,
+    proposal_identity_matches,
+)
 
 __all__ = [
     "AUTO_CYCLE_SETTLEMENT_EVENT",
@@ -270,6 +277,69 @@ def _cycle_plan_id(entries: Sequence[Any]) -> str | None:
         if text:
             return text
     return None
+
+
+def _cycle_daily_proposal(entries: Sequence[Any]) -> dict[str, Any] | None:
+    """Propuesta ESTUDIO que el productor ADOPTÓ para este ciclo, o ``None``.
+
+    El handoff (migración 058) sella en el hecho durable de la decisión
+    ``payload.dailyProposal`` (fila, ``planId``, ``signalId``, vela y su retraso). Se
+    publica TAL CUAL: sin la clave, el ciclo simplemente no declara propuesta (hueco
+    declarado, nunca una propuesta inferida por símbolo).
+    """
+    for entry in entries:
+        if _get(entry, "event_type", "eventType") != AUTO_ENTRY_DECISION_EVENT:
+            continue
+        value = _entry_payload(entry).get("dailyProposal")
+        if isinstance(value, Mapping):
+            return dict(value)
+    return None
+
+
+def _cycle_attribution(
+    *,
+    daily_proposal: Mapping[str, Any] | None,
+    signal_id: str | None,
+    plan_id: str | None,
+) -> dict[str, Any]:
+    """Estado de atribución ``señal → plan`` por IGUALDAD de identidades durables.
+
+    ``exact`` (las dos identidades coinciden), ``mismatch`` (declaradas y distintas),
+    ``unmeasured`` (una de las partes no declara identidad) o ``not_attributed`` (el ciclo
+    no nació de una propuesta del parte). El símbolo NO participa: la coincidencia de
+    ticker es una inferencia, no una atribución.
+    """
+    if not isinstance(daily_proposal, Mapping):
+        return {
+            "state": ADOPTION_ABSENT_NOT_PROPOSED,
+            "reason": "no_daily_proposal",
+            "measurement": MEASUREMENT_UNKNOWN,
+            "proposalPlanId": None,
+            "proposalSignalId": None,
+        }
+    proposal_plan = str(daily_proposal.get("planId") or "").strip() or None
+    proposal_signal = str(daily_proposal.get("signalId") or "").strip() or None
+    state = proposal_identity_matches(
+        proposal_plan_id=proposal_plan,
+        proposal_signal_id=proposal_signal,
+        cycle_plan_id=plan_id,
+        cycle_signal_id=signal_id,
+    )
+    if state == ADOPTION_EXACT:
+        reason = None
+    elif state == ADOPTION_MISMATCH:
+        reason = "identity_mismatch"
+    else:
+        reason = ADOPTION_ABSENT_UNMEASURED
+    return {
+        "state": state,
+        "reason": reason,
+        "measurement": MEASUREMENT_COMPLETE
+        if state in (ADOPTION_EXACT, ADOPTION_MISMATCH)
+        else MEASUREMENT_UNKNOWN,
+        "proposalPlanId": proposal_plan,
+        "proposalSignalId": proposal_signal,
+    }
 
 
 def _cycle_decision(entries: Sequence[Any]) -> dict[str, Any] | None:
@@ -1014,6 +1084,12 @@ def _build_cycle(
     else:
         closed_value = closed is not None and not is_open
         closed_measurement = MEASUREMENT_COMPLETE
+    # Gap 2 + handoff (058) — identidad durable de la señal y del plan del ciclo, y el
+    # estado de atribución frente a la propuesta del parte. Son LOCALES para que el
+    # veredicto se calcule con los MISMOS valores que se publican (una sola verdad).
+    cycle_signal_id = _cycle_signal_id(cycle_journal)
+    cycle_plan_id = _cycle_plan_id(cycle_journal)
+    cycle_daily_proposal = _cycle_daily_proposal(cycle_journal)
     return {
         "cycleId": cycle_id,
         "opportunityId": _cycle_opportunity_id(cycle_journal),
@@ -1049,8 +1125,16 @@ def _build_cycle(
         # Gap 2 — atribución señal → plan: la identidad estable que el ciclo ya sella en el
         # hecho durable de la decisión. Sin ella, la cadena desde la señal hasta el resultado
         # no era seguible; ``None`` cuando el hecho no la declara (nunca se rellena).
-        "signalId": _cycle_signal_id(cycle_journal),
-        "planId": _cycle_plan_id(cycle_journal),
+        "signalId": cycle_signal_id,
+        "planId": cycle_plan_id,
+        # Handoff ESTUDIO → AUTO (058): la propuesta adoptada (tal cual la selló el
+        # productor) y el estado de atribución por igualdad de identidades durables.
+        "dailyProposal": cycle_daily_proposal,
+        "attribution": _cycle_attribution(
+            daily_proposal=cycle_daily_proposal,
+            signal_id=cycle_signal_id,
+            plan_id=cycle_plan_id,
+        ),
         "closed": closed_value,
         "closedMeasurement": closed_measurement,
         "steps": steps,

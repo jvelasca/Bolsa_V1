@@ -241,3 +241,43 @@ async def test_listing_is_scoped_to_the_active_account(
 
     assert len(own.json()["jobs"]) == 1
     assert other.json()["jobs"] == []
+
+
+@pytest.mark.asyncio
+async def test_slot_declares_server_truth_for_the_queue(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El hueco `(kind, cuenta, día)` lo declara el SERVIDOR: la UI no infiere por payload."""
+    app = _app("acc-1", monkeypatch)
+    kind = "dia_d_value_replay"
+    day = "2026-10-16"
+
+    mine = (
+        await _request(
+            app,
+            "POST",
+            "/auto/ops-jobs",
+            json={"kind": kind, "day": day, "payload": {"symbol": "AAA"}},
+        )
+    ).json()
+    assert mine["slot"]["state"] == "active_same_request"
+    assert mine["slot"]["matchesRequest"] is True
+    assert mine["slot"]["activeSymbol"] == "AAA"
+
+    # Otro valor del MISMO día: el servidor devuelve el job activo y declara el choque.
+    other = (
+        await _request(
+            app,
+            "POST",
+            "/auto/ops-jobs",
+            json={"kind": kind, "day": day, "payload": {"symbol": "BBB"}},
+        )
+    ).json()
+    assert other["id"] == mine["id"]
+    slot = other["slot"]
+    assert slot["state"] == "active_other_symbol"
+    assert slot["matchesRequest"] is False
+    assert slot["activeSymbol"] == "AAA"
+    assert slot["requestedSymbol"] == "BBB"
+    assert slot["activeJobId"] == mine["id"]
+    assert "BBB queda pendiente" in slot["message"]

@@ -60,6 +60,12 @@ from bolsa_application.estudio_audit import (
     _cycles_for_symbol,
     _strategy_for_symbol,
 )
+from bolsa_application.estudio_daily_proposals import (
+    ADOPTION_ABSENT_UNMEASURED,
+    ADOPTION_EXACT,
+    ADOPTION_MISMATCH,
+    proposal_identity_matches,
+)
 
 __all__ = [
     "CANONICAL_STEPS",
@@ -76,7 +82,9 @@ __all__ = [
     "executed_vs_dia_d",
     "pnl_reconciliation",
     "read_dia_d_verifications",
+    "read_daily_proposals",
     "read_estudio_chain_evidence",
+    "resolve_cycle_attribution",
     "read_top3_snapshot",
     "read_top3_snapshots",
     "resolve_dia_d_cycle_facts",
@@ -558,6 +566,10 @@ def _cycle_view(
         # Gap 2 — la atribución señal → plan que sella el ciclo (``None`` = no consta).
         "signalId": cycle.get("signalId"),
         "planId": cycle.get("planId"),
+        # Handoff ESTUDIO → AUTO (058): propuesta adoptada y estado de atribución por
+        # igualdad de identidades durables (``exact``/``mismatch``/``not_proposed``/…).
+        "dailyProposal": cycle.get("dailyProposal"),
+        "attribution": cycle.get("attribution"),
         # Día de ENTRADA durable (``at`` de la reserva) y de cierre (``closedAt`` del
         # resultado). Son hechos: sin ellos la UI no inventa la fecha del DÍA-D del valor.
         "entryDay": _cycle_day(cycle, "RESERVATION"),
@@ -1088,6 +1100,136 @@ async def resolve_dia_d_cycle_facts(
     )
 
 
+async def read_daily_proposals(
+    session: Any,
+    account_id: str,
+    *,
+    cycle_ids: Sequence[str] | None = None,
+    day: str | None = None,
+) -> list[dict[str, Any]]:
+    """Lee (read-only) las propuestas diarias ESTUDIO de la cuenta (``058``).
+
+    Devuelve una fila por propuesta, en orden de creación. ``consumedCycleId`` es el enlace
+    DURABLE al ciclo que la adoptó; el resto son las identidades publicadas. Sin filas
+    devuelve ``[]`` (el hueco se declara aguas arriba, nunca una propuesta inventada).
+    """
+    from sqlalchemy import select
+
+    from bolsa_infrastructure.database.models.tables import EstudioDailyProposalRow
+
+    stmt = select(
+        EstudioDailyProposalRow.id,
+        EstudioDailyProposalRow.day,
+        EstudioDailyProposalRow.instrument_id,
+        EstudioDailyProposalRow.symbol,
+        EstudioDailyProposalRow.decision_id,
+        EstudioDailyProposalRow.signal_id,
+        EstudioDailyProposalRow.bar_date,
+        EstudioDailyProposalRow.status,
+        EstudioDailyProposalRow.consumed_cycle_id,
+        EstudioDailyProposalRow.consumed_at,
+        EstudioDailyProposalRow.reason,
+        EstudioDailyProposalRow.strategy_definition_id,
+        EstudioDailyProposalRow.strategy_version,
+        EstudioDailyProposalRow.preset_key,
+        EstudioDailyProposalRow.created_at,
+    ).where(EstudioDailyProposalRow.account_id == account_id)
+    if cycle_ids:
+        stmt = stmt.where(
+            EstudioDailyProposalRow.consumed_cycle_id.in_(list(cycle_ids))
+        )
+    if day:
+        stmt = stmt.where(EstudioDailyProposalRow.day == day)
+    try:
+        rows = (
+            await session.execute(stmt.order_by(EstudioDailyProposalRow.created_at.asc()))
+        ).all()
+    except Exception:  # noqa: BLE001 — esquema ausente/ilegible: el hueco se declara.
+        return []
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        out.append(
+            {
+                "proposalId": row[0],
+                "day": row[1],
+                "instrumentId": row[2],
+                "symbol": row[3],
+                "planId": row[4],
+                "signalId": row[5],
+                "barDate": row[6],
+                "status": row[7],
+                "consumedCycleId": row[8],
+                "consumedAt": _iso_instant(row[9]),
+                "reason": row[10],
+                "strategyDefinitionId": row[11],
+                "strategyVersion": row[12],
+                "presetKey": row[13],
+                "createdAt": _iso_instant(row[14]),
+            }
+        )
+    return out
+
+
+def resolve_cycle_attribution(
+    cycle: Mapping[str, Any],
+    links: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Atribución del ciclo a su propuesta: por journal (preferente) o por enlace durable.
+
+    Si el journal ya sella ``dailyProposal`` (el productor adoptó la propuesta), ese es el
+    hecho y manda. Si no, pero la BD declara que una propuesta fue CONSUMIDA por este
+    ``cycleId``, se compara contra ella —con el mismo criterio de IGUALDAD de ids— y se
+    declara ``source: durable_link``. Varias propuestas reclamando el mismo ciclo es
+    ``ambiguous`` (una contradicción declarada, nunca una elección arbitraria).
+    """
+    current = cycle.get("attribution")
+    if isinstance(current, Mapping) and current.get("state") != "not_proposed":
+        return dict(current)
+    if len(links) > 1:
+        return {
+            "state": "ambiguous",
+            "reason": "multiple_proposals_for_cycle",
+            "measurement": MEASUREMENT_UNKNOWN,
+            "proposalIds": [str(link.get("proposalId")) for link in links],
+            "source": "durable_link",
+        }
+    if not links:
+        return (
+            dict(current)
+            if isinstance(current, Mapping)
+            else {
+                "state": "not_proposed",
+                "reason": "no_daily_proposal",
+                "measurement": MEASUREMENT_UNKNOWN,
+            }
+        )
+    link = links[0]
+    state = proposal_identity_matches(
+        proposal_plan_id=link.get("planId"),
+        proposal_signal_id=link.get("signalId"),
+        cycle_plan_id=cycle.get("planId"),
+        cycle_signal_id=cycle.get("signalId"),
+    )
+    return {
+        "state": state,
+        "reason": None
+        if state == ADOPTION_EXACT
+        else (
+            "identity_mismatch"
+            if state == ADOPTION_MISMATCH
+            else ADOPTION_ABSENT_UNMEASURED
+        ),
+        "measurement": MEASUREMENT_COMPLETE
+        if state in (ADOPTION_EXACT, ADOPTION_MISMATCH)
+        else MEASUREMENT_UNKNOWN,
+        "proposalPlanId": link.get("planId"),
+        "proposalSignalId": link.get("signalId"),
+        "proposalId": link.get("proposalId"),
+        "proposalBarDate": link.get("barDate"),
+        "source": "durable_link",
+    }
+
+
 async def read_estudio_chain_evidence(
     session: Any,
     account_id: str,
@@ -1161,12 +1303,35 @@ async def read_estudio_chain_evidence(
     dia_d_by_cycle = await read_dia_d_verifications(
         session, account_id, cycle_ids=cycle_ids or None
     )
+    # Handoff ESTUDIO → AUTO (058): propuestas de la cuenta, indexadas por el ciclo que
+    # las consumió. Es la prueba DURABLE de «señal del parte → plan → ciclo»; sin enlace
+    # ni journal, el ciclo declara ``not_proposed`` (nunca se infiere por símbolo).
+    proposals = await read_daily_proposals(
+        session, account_id, cycle_ids=cycle_ids or None
+    )
+    proposals_by_cycle: dict[str, list[Mapping[str, Any]]] = {}
+    for proposal in proposals:
+        consumed = str(proposal.get("consumedCycleId") or "").strip()
+        if consumed:
+            proposals_by_cycle.setdefault(consumed, []).append(proposal)
     cycles: list[dict[str, Any]] = []
     for cycle in raw_cycles:
         if not isinstance(cycle, Mapping):
             continue
         enriched = dict(cycle)
         enriched["diaD"] = dia_d_by_cycle.get(str(cycle.get("cycleId")))
+        links = proposals_by_cycle.get(str(cycle.get("cycleId")), [])
+        enriched["attribution"] = resolve_cycle_attribution(cycle, links)
+        if enriched.get("dailyProposal") is None and links:
+            link = links[0]
+            enriched["dailyProposal"] = {
+                "proposalId": link.get("proposalId"),
+                "planId": link.get("planId"),
+                "signalId": link.get("signalId"),
+                "barDate": link.get("barDate"),
+                "day": link.get("day"),
+                "source": "durable_link",
+            }
         cycles.append(enriched)
     return {
         "monitor": monitor,
@@ -1175,6 +1340,7 @@ async def read_estudio_chain_evidence(
         "bestScoredByCycle": best_scored_by_cycle,
         "top3": snapshot,
         "diaDByCycle": dia_d_by_cycle,
+        "dailyProposals": proposals,
     }
 
 

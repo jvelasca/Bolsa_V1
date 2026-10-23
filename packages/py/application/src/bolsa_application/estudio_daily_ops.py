@@ -234,6 +234,10 @@ class EstudioDailyReport:
     coverage: dict[str, Any] = field(default_factory=dict)
     #: Gap 1 — foto del selector cross-asset del día y su ganador (``None`` si no se mide).
     selector: dict[str, Any] | None = None
+    #: Cobertura RECONCILIABLE del universo: ``expectedIds`` completo, excluidos declarados
+    #: (recorte) y ausentes con motivo. ``reconciled`` exige que TODO esperado tenga estado
+    #: terminal o exclusión declarada: no hay recorte silencioso.
+    universe: dict[str, Any] = field(default_factory=dict)
 
     @property
     def counts(self) -> dict[str, int]:
@@ -263,6 +267,8 @@ class EstudioDailyReport:
             "degradedReasons": list(self.degraded_reasons),
             "coverage": dict(self.coverage),
             "selector": self.selector,
+            # Cobertura reconciliable del universo (esperados, excluidos y ausentes).
+            "universe": dict(self.universe),
         }
 
 
@@ -424,11 +430,27 @@ class RunEstudioDailyOps:
                 status=resolution.status,
                 notes=[reason],
                 generated_at=datetime.now(UTC).isoformat(),
+                # Fail-closed: sin universo no hay NADA esperado ni medido. El bloque lo
+                # declara en vez de publicar una cobertura vacía que parezca completa.
+                universe={
+                    "expectedCount": 0,
+                    "expectedIds": [],
+                    "scannedIds": [],
+                    "excluded": [],
+                    "missing": [],
+                    "reconciled": False,
+                    "complete": False,
+                    "reason": f"universe_{resolution.status}",
+                },
             )
 
         ids = list(dict.fromkeys(str(i) for i in resolution.instrument_ids if i))
+        # Cobertura: el universo ESPERADO se conserva completo ANTES del recorte. El recorte
+        # deja de ser silencioso: cada excluido viaja con su motivo.
+        expected_ids = list(ids)
         universe_count = len(ids)
         truncated = len(ids) > _MAX_VALUES
+        excluded_ids = expected_ids[_MAX_VALUES:] if truncated else []
         if truncated:
             ids = ids[:_MAX_VALUES]
             notes.append(
@@ -485,12 +507,54 @@ class RunEstudioDailyOps:
             on_progress, phase="done", done=len(values), total=len(values)
         )
 
+        # Cobertura RECONCILIABLE: todo valor esperado (y dentro del recorte) tiene fila
+        # terminal. Un esperado sin fila se declara con motivo; el conjunto solo reconcilia
+        # cuando no falta ninguno Y los excluidos están enumerados.
+        reported_ids = {str(value.instrument_id) for value in values}
+        missing = [
+            {"instrumentId": instrument_id, "reason": "value_not_reported"}
+            for instrument_id in ids
+            if instrument_id not in reported_ids
+        ]
+        universe = {
+            "expectedCount": len(expected_ids),
+            "expectedIds": expected_ids,
+            "scannedIds": list(ids),
+            "excluded": [
+                {"instrumentId": instrument_id, "reason": f"truncated:{_MAX_VALUES}"}
+                for instrument_id in excluded_ids
+            ],
+            "missing": missing,
+            # ``reconciled``: nada esperado quedó sin estado terminal ni exclusión declarada.
+            "reconciled": not missing,
+            # ``complete``: además se procesó el universo ENTERO (sin recorte).
+            "complete": not missing and not excluded_ids,
+            "reason": (
+                None
+                if not missing and not excluded_ids
+                else (
+                    "universe_truncated_and_values_missing"
+                    if missing and excluded_ids
+                    else (
+                        "universe_truncated"
+                        if excluded_ids
+                        else "values_not_reported"
+                    )
+                )
+            ),
+        }
+
         # R-3/H-145-3 — la degradación sube al ESTADO del parte, no se queda en las notas.
         degraded_reasons = list(hints_result.notes)
         if value_errors:
             degraded_reasons.append(f"opinion_errors:{len(value_errors)}_values")
         if propose_error is not None:
             degraded_reasons.append("propose_unavailable")
+        if missing:
+            # Un valor esperado sin fila terminal es una degradación MEDIBLE del parte.
+            degraded_reasons.append(f"values_not_reported:{len(missing)}")
+        if excluded_ids:
+            degraded_reasons.append(f"universe_truncated:{len(excluded_ids)}")
         if "selector_identity_unavailable" in selector_notes:
             degraded_reasons.append("selector_identity_unavailable")
         degraded = bool(degraded_reasons) or truncated
@@ -521,6 +585,7 @@ class RunEstudioDailyOps:
                 "truncated": truncated,
             },
             selector=selector_block,
+            universe=universe,
         )
 
     # ── hints ────────────────────────────────────────────────────────────────

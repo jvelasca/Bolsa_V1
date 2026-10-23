@@ -3046,3 +3046,67 @@ class Top3OpportunityRow(Base):
     regime: Mapped[str | None] = mapped_column("regime", String, nullable=True)
     reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+
+
+class EstudioDailyProposalRow(Base):
+    """Propuesta diaria ESTUDIO con identidad durable (handoff propuesta → ciclo).
+
+    Migración 058. Una fila por ``(cuenta, día, instrumento)`` en estado
+    ``proposed``; al consumirse conserva el ``cycle_id`` que la adoptó. Es el puente
+    que permite demostrar ``señal → plan → reserva → orden → fill → posición →
+    salida → cierre`` con los MISMOS identificadores, sin inferir por símbolo.
+    """
+
+    __tablename__ = "estudio_daily_proposals"
+    __table_args__ = (
+        Index(
+            "estudio_daily_proposals_pending_key",
+            "account_id",
+            "day",
+            "instrument_id",
+            unique=True,
+            postgresql_where=text("status = 'proposed'"),
+        ),
+        Index(
+            "estudio_daily_proposals_decision_key",
+            "decision_id",
+            unique=True,
+            postgresql_where=text("decision_id IS NOT NULL"),
+        ),
+        Index("estudio_daily_proposals_account_bar_idx", "account_id", "bar_date"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
+    day: Mapped[str] = mapped_column("day", String, nullable=False)
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", String, nullable=False
+    )
+    symbol: Mapped[str | None] = mapped_column("symbol", String, nullable=True)
+    #: Identidad DURABLE del plan (``TradePlan.decisionId``); ``NULL`` si no la declara.
+    decision_id: Mapped[str | None] = mapped_column(
+        "decision_id", String, nullable=True
+    )
+    signal_id: Mapped[str | None] = mapped_column(
+        "signal_id", String, nullable=True
+    )
+    strategy_definition_id: Mapped[str | None] = mapped_column(
+        "strategy_definition_id", String, nullable=True
+    )
+    strategy_version: Mapped[int | None] = mapped_column(
+        "strategy_version", Integer, nullable=True
+    )
+    preset_key: Mapped[str | None] = mapped_column("preset_key", String, nullable=True)
+    #: Día de la VELA de la propuesta (``asOfBarDate``): la frescura REAL del plan.
+    bar_date: Mapped[str | None] = mapped_column("bar_date", String, nullable=True)
+    plan: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    status: Mapped[str] = mapped_column("status", String, nullable=False)
+    consumed_cycle_id: Mapped[str | None] = mapped_column(
+        "consumed_cycle_id", String, nullable=True
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        "consumed_at", DateTime(timezone=True), nullable=True
+    )
+    reason: Mapped[str | None] = mapped_column("reason", String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))

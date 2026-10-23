@@ -100,10 +100,34 @@ async def _run_estudio_daily(
             as_of=job.day,
             on_progress=on_progress,
         )
+        result = report.to_dict()
+        # Handoff durable ESTUDIO → AUTO (migración 058): las propuestas del parte se
+        # persisten en la MISMA transacción que el parte, de modo que lo que el usuario ve
+        # en pantalla es exactamente lo que el productor podrá adoptar. Idempotente: una
+        # reejecución del día no duplica ni reescribe identidades ya publicadas.
+        try:
+            from bolsa_application.estudio_daily_proposals import (  # noqa: PLC0415
+                PersistEstudioDailyProposals,
+            )
+            from bolsa_infrastructure.database.repositories.estudio_daily_proposal_repository import (  # noqa: PLC0415, E501
+                SqlAlchemyEstudioDailyProposalRepository,
+            )
+
+            handoff = await PersistEstudioDailyProposals(
+                # La transacción la cierra este handler: el store no commitea solo.
+                SqlAlchemyEstudioDailyProposalRepository(session, autocommit=False)
+            ).execute(account_id=account_id, report=result)
+            result["handoff"] = handoff.to_dict()
+        except Exception as exc:  # noqa: BLE001 — sin handoff no hay atribución exacta.
+            await session.rollback()
+            raise AutoOpsJobFailed(
+                f"handoff de propuestas falló: {type(exc).__name__}: {exc}",
+                result=result,
+            ) from exc
         # Persistir opiniones/propuestas calculadas en esta sesión.
         await session.commit()
 
-    result = report.to_dict()
+
     reasons = [
         str(reason)
         for reason in (getattr(report, "degraded_reasons", None) or [])

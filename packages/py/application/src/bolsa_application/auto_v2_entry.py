@@ -1084,6 +1084,7 @@ def plan_v2_tick(
     halted: bool = False,
     adaptive: AdaptivePlan | None = None,
     evidence: Mapping[str, dict[str, float]] | None = None,
+    daily_proposals: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> V2TickPlan:
     """Planifica las entradas del tick: rankeo → decisión → TradePlan → propuesta.
 
@@ -1128,6 +1129,13 @@ def plan_v2_tick(
     vetar a los demás. El agregado ``regime`` se conserva como **declaración** del tick
     (``marketRegime``) y el gobernador lo sigue usando como dial de riesgo. Con ``None``
     (llamantes históricos) todo se decide con ``regime`` y el payload es byte-idéntico.
+
+    ``daily_proposals`` (handoff ESTUDIO → AUTO) es el mapa ``instrumento → propuesta``
+    ya validada por :mod:`bolsa_application.estudio_daily_proposals`. Cuando existe
+    para una candidata, el plan conserva la identidad del parte (``planId``), la
+    geometría publicada (entrada/stop/objetivo) y la señal adoptada viaja ya en
+    ``V2Signal.signal_id``: el ciclo durable nace con la MISMA identidad que el usuario
+    vio en pantalla. Con ``None`` (o sin entrada) el tick es byte-idéntico al histórico.
     """
     cfg = tunables if tunables is not None else V2Tunables()
     declared_regime = cfg.regime_override if cfg.regime_override is not None else regime
@@ -1251,6 +1259,21 @@ def plan_v2_tick(
         if cached is not None:
             return cached
         return candidate_key(signal, allow_distinct_strategies=cfg.allow_distinct_strategies)
+
+    def _proposal_for(signal: V2Signal) -> Mapping[str, Any] | None:
+        """Propuesta del parte ESTUDIO para este instrumento (ya validada; ``None`` si no).
+
+        El mapa lo construye :mod:`bolsa_application.estudio_daily_proposals` con AMBAS
+        claves (id y símbolo) apuntando a la MISMA propuesta: aquí no se busca «algo
+        parecido» ni se atribuye por coincidencia de ticker.
+        """
+        if not daily_proposals:
+            return None
+        for key in (signal.instrument_id, str(signal.instrument_id or "").strip().upper()):
+            row = daily_proposals.get(key)
+            if isinstance(row, Mapping):
+                return row
+        return None
 
     def _components_of(signal: V2Signal) -> dict[str, float] | None:
         """Evidencia LAB del campeón para este instrumento (``None`` si no se aporta)."""
@@ -1443,10 +1466,22 @@ def plan_v2_tick(
                 decision_config = replace(
                     decision_config, adaptive_risk_multiplier=multiplier
                 )
+        # Handoff ESTUDIO → AUTO: la propuesta del parte manda en la IDENTIDAD del plan y
+        # en la geometría publicada. Sin propuesta el camino es el histórico (Δ = 0).
+        proposal = _proposal_for(signal)
+        entry_price = signal.price if signal.price > 0 else None
+        stop_price: float | None = None
+        target_price = signal.target_price
+        if proposal is not None:
+            entry_price = _declared_number(proposal, "entry") or entry_price
+            stop_price = _declared_number(proposal, "structuralStop")
+            target_price = _declared_number(proposal, "target1") or target_price
         decision = decide_portfolio(
             instrument_id=signal.instrument_id,
             direction=_ENTRY_DIRECTION,
-            entry_price=signal.price if signal.price > 0 else None,
+            entry_price=entry_price,
+            stop_price=stop_price,
+            target_price=target_price,
             atr=atr,
             opportunity_score=entry_score,
             snapshot=working_snapshot,
@@ -1461,6 +1496,9 @@ def plan_v2_tick(
                 account_id=account_id_value,
                 signal=signal,
             ),
+            # Handoff: la identidad del PLAN es la del parte cuando se adoptó. Es OTRA
+            # identidad que la del claim, a propósito (la reserva no cambia de clave).
+            plan_id=str((proposal or {}).get("planId") or ""),
         )
         decisions.append(decision)
         decision_keys.append(signal_key)
@@ -1553,6 +1591,10 @@ def plan_v2_tick(
                 entry_regime_scope=(
                     None if symbol_regimes is None else "per_symbol"
                 ),
+                # Handoff ESTUDIO → AUTO: la propuesta adoptada viaja con la decisión para
+                # que la cadena pueda demostrar la igualdad EXACTA de identidades (y su
+                # ausencia cuando no la hubo). Se omite si no hay propuesta.
+                daily_proposal=proposal,
             )
         )
 
@@ -2360,6 +2402,21 @@ def _expected_value_for_decision(
     )
 
 
+def _declared_number(row: Mapping[str, Any], key: str) -> float | None:
+    """Número declarado por una propuesta; ``None`` si falta o no es numérico.
+
+    Doctrina «Sin dato todavía»: un hueco no se convierte en ``0.0`` (un stop en 0 sería
+    una geometría inventada, no un dato ausente).
+    """
+    value = row.get(key)
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _journal_entry(
     decision: PortfolioDecision,
     *,
@@ -2375,6 +2432,7 @@ def _journal_entry(
     adaptive: AdaptivePlan | None = None,
     market_regime: str | None = None,
     entry_regime_scope: str | None = None,
+    daily_proposal: Mapping[str, Any] | None = None,
 ) -> DecisionJournalEntryRecord:
     from uuid import uuid4
 
@@ -2427,6 +2485,25 @@ def _journal_entry(
     # demostrable sin depender del ranking. La clave se OMITE si no hay dato.
     if str(opportunity_id or "").strip():
         payload["opportunityId"] = str(opportunity_id)
+    # Handoff ESTUDIO → AUTO — la PROPUESTA DURABLE que originó este plan: su fila, la
+    # identidad del plan y la vela que la alimentó. Es lo que permite a la cadena
+    # demostrar «señal → plan → ciclo» por IGUALDAD de identidades y no por símbolo.
+    # Las claves se OMITEN si no hay propuesta (la ausencia es información, no un relleno).
+    if daily_proposal is not None:
+        proposal_payload = {
+            key: daily_proposal.get(key)
+            for key in (
+                "proposalId",
+                "planId",
+                "signalId",
+                "barDate",
+                "barLagDays",
+                "day",
+            )
+            if daily_proposal.get(key) is not None
+        }
+        if proposal_payload:
+            payload["dailyProposal"] = proposal_payload
     if decision.opportunity_score is not None:
         payload["opportunityScore"] = decision.opportunity_score
     if score is not None and score.rank is not None:

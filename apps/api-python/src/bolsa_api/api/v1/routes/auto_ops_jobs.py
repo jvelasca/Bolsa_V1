@@ -39,6 +39,27 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+class AutoOpsJobSlotDto(BaseModel):
+    """Verdad de SERVIDOR sobre el hueco ``(kind, cuenta, día)`` de la cola.
+
+    La UI deja de inferir «quién ocupa la cola» leyendo el payload: el servidor declara
+    el job activo, el símbolo con el que trabaja y si ESE job corresponde a la petición
+    que acaba de hacer el usuario. ``state`` es la fuente de verdad del mensaje.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    #: ``free`` | ``active_same_request`` | ``active_other_symbol``
+    state: str
+    active_job_id: str | None = Field(default=None, alias="activeJobId")
+    active_symbol: str | None = Field(default=None, alias="activeSymbol")
+    requested_symbol: str | None = Field(default=None, alias="requestedSymbol")
+    matches_request: bool = Field(default=False, alias="matchesRequest")
+    started_at: str | None = Field(default=None, alias="startedAt")
+    #: Mensaje legible compuesto en servidor (la UI no redacta la verdad de la cola).
+    message: str
+
+
 class AutoOpsJobDto(BaseModel):
     """Foto de un job (progreso y resultado son datos; un hueco queda vacío, nunca en 0)."""
 
@@ -58,6 +79,8 @@ class AutoOpsJobDto(BaseModel):
     started_at: str | None = Field(default=None, alias="startedAt")
     finished_at: str | None = Field(default=None, alias="finishedAt")
     heartbeat_at: str | None = Field(default=None, alias="heartbeatAt")
+    #: Verdad de servidor sobre el hueco. ``None`` en lecturas que no compiten por él.
+    slot: AutoOpsJobSlotDto | None = None
 
 
 class AutoOpsJobListDto(BaseModel):
@@ -75,7 +98,7 @@ class AutoOpsJobCreateDto(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
-def job_to_dto(job: AutoOpsJob) -> AutoOpsJobDto:
+def job_to_dto(job: AutoOpsJob, *, slot: AutoOpsJobSlotDto | None = None) -> AutoOpsJobDto:
     return AutoOpsJobDto(
         id=job.id,
         kind=job.kind,
@@ -91,6 +114,68 @@ def job_to_dto(job: AutoOpsJob) -> AutoOpsJobDto:
         started_at=job.started_at,
         finished_at=job.finished_at,
         heartbeat_at=job.heartbeat_at,
+        slot=slot,
+    )
+
+
+def build_slot(job: AutoOpsJob, *, requested_symbol: str | None) -> AutoOpsJobSlotDto:
+    """Verdad de servidor del hueco de la cola para esta petición.
+
+    ``matchesRequest`` es la ÚNICA fuente para saber si el job devuelto es el que el
+    usuario pidió: comparar ``payload.symbol`` en el cliente era una inferencia que
+    fallaba justo cuando importaba (dos valores del mismo día se serializan).
+    """
+    active_symbol = (
+        str((job.payload or {}).get("symbol") or "").strip().upper() or None
+    )
+    requested = str(requested_symbol or "").strip().upper() or None
+    if not job.is_active:
+        return AutoOpsJobSlotDto(
+            state="free",
+            active_job_id=job.id,
+            active_symbol=active_symbol,
+            requested_symbol=requested,
+            matches_request=False,
+            started_at=job.started_at or job.created_at,
+            message=(
+                "Hueco libre: el trabajo quedó encolado para "
+                f"{requested}." if requested else "Hueco libre: el trabajo quedó encolado."
+            ),
+        )
+    matches = requested == active_symbol
+    if matches:
+        return AutoOpsJobSlotDto(
+            state="active_same_request",
+            active_job_id=job.id,
+            active_symbol=active_symbol,
+            requested_symbol=requested,
+            matches_request=True,
+            started_at=job.started_at or job.created_at,
+            message=(
+                "Verificación ya en curso para "
+                f"{active_symbol} (job {job.id}, iniciada "
+                f"{job.started_at or job.created_at or 'sin marca'})."
+            ),
+        )
+    detail = (
+        f"Verificación en curso para {active_symbol}"
+        if active_symbol
+        else "Hay un trabajo en curso en esta cola"
+    )
+    pending = requested or "este trabajo"
+    return AutoOpsJobSlotDto(
+        state="active_other_symbol",
+        active_job_id=job.id,
+        active_symbol=active_symbol,
+        requested_symbol=requested,
+        matches_request=False,
+        started_at=job.started_at or job.created_at,
+        message=(
+            f"{detail} (job {job.id}, iniciada "
+            f"{job.started_at or job.created_at or 'sin marca'}). "
+            "La cola admite una por cuenta y día; "
+            f"{pending} queda pendiente."
+        ),
     )
 
 
@@ -129,7 +214,10 @@ async def create_auto_ops_job(
         job.day,
         job.account_id,
     )
-    return job_to_dto(job)
+    slot = build_slot(
+        job, requested_symbol=str((body.payload or {}).get("symbol") or "").strip() or None
+    )
+    return job_to_dto(job, slot=slot)
 
 
 @router.get("/auto/ops-jobs", response_model=AutoOpsJobListDto)
