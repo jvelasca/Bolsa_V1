@@ -206,6 +206,15 @@ del servidor.
 2. El helper `ensureDiaDEvidenceOpen` cerraba el panel recién abierto al pulsar el toggle a ciegas. Corregido leyendo el
    texto del botón antes de pulsar.
 
+**Un tercer defecto, este de comportamiento, lo destapó el CI (no el navegador):** el handoff pasaba siempre
+`signal.target_price` como `target1` del plan, también **sin** propuesta. Un `target1` por encima de `target2`
+(`entry + 2R`) convertía en `plan_invalid` decisiones que nada tenían que ver con el parte: **22 tests de aplicación**
+en rojo. Corregido en `feat(auto)` → `fix(auto)`: sin propuesta `stop_price`/`target_price` son `None` (valor por
+defecto histórico) y el motor deriva la geometría del ATR (**Δ = 0**). Se añadió
+`packages/py/application/tests/test_estudio_daily_proposal_handoff.py` (4 tests) que fija las dos propiedades:
+con propuesta se hereda identidad + geometría y se sella `dailyProposal`; sin propuesta el tick es el histórico y
+**no** aparece `dailyProposal`.
+
 ---
 
 ## 8. CI
@@ -221,13 +230,20 @@ Runs de esta rama:
 
 | Workflow | Run | Estado |
 | --- | --- | --- |
-| Python CI | [40002381117](https://github.com/jvelasca/Bolsa_V1/actions/runs/40002381117) | _(ver §8.1)_ |
-| Frontend CI | [40002381109](https://github.com/jvelasca/Bolsa_V1/actions/runs/40002381109) | _(ver §8.1)_ |
-| Fase 2 scientific | [40002381230](https://github.com/jvelasca/Bolsa_V1/actions/runs/40002381230) | success |
+| Python CI (`a82bdcaa`) | [40002381117](https://github.com/jvelasca/Bolsa_V1/actions/runs/40002381117) | **failure** — `Pytest`: 22 tests de aplicación por el defecto descrito en §7.3 |
+| Frontend CI (`a82bdcaa`) | [40002381109](https://github.com/jvelasca/Bolsa_V1/actions/runs/40002381109) | success |
+| Fase 2 scientific (`a82bdcaa`) | [40002381230](https://github.com/jvelasca/Bolsa_V1/actions/runs/40002381230) | success |
+| Python CI (`399d05e0`, tras el fix) | _(ver §8.1)_ | _(ver §8.1)_ |
+| Frontend CI (`399d05e0`, tras el fix) | _(ver §8.1)_ | _(ver §8.1)_ |
 
 ### 8.1 Resultado de los runs
 
-_(se completa al cerrar la fase; si un run queda rojo, se dice aquí y no se maquilla)_
+El primer run de Python CI **falló y se dice aquí**: no fue un fallo del entorno, fue un defecto real del handoff
+(§7.3) que la suite de aplicación detectó y que ningún test focalizado previo cubría, porque hasta esta fase el
+handoff no tenía tests unitarios. Se corrigió, se añadió la cobertura unitaria que faltaba y se re-ejecutó todo
+(`2848 passed` en `packages/py/application/tests`, E2E PG y Playwright live verdes de nuevo).
+
+Estado final de la rama: _(se completa al cerrar la fase; si un run queda rojo, se dice aquí y no se maquilla)_
 
 ---
 
@@ -235,7 +251,9 @@ _(se completa al cerrar la fase; si un run queda rojo, se dice aquí y no se maq
 
 ```powershell
 # Python
-uv run --no-sync python -m pytest apps/api-python/tests/test_auto_daily_chain_full_real_e2e_pg.py        # 1 passed, 17.88s
+uv run --no-sync python -m pytest apps/api-python/tests/test_auto_daily_chain_full_real_e2e_pg.py        # 1 passed, 17.81s
+uv run --no-sync python -m pytest packages/py/application/tests                                         # 2848 passed
+uv run --no-sync python -m pytest packages/py/application/tests/test_estudio_daily_proposal_handoff.py   # 4 passed
 uv run --no-sync python -m pytest -k "proposal"                                                          # 96 passed
 uv run --no-sync python -m pytest apps/api-python/tests/test_auto_ops_job_worker.py `
   apps/api-python/tests/test_auto_ops_jobs_route.py apps/api-python/tests/test_auto_daily_dia_d_chain_integration.py  # 21 passed
@@ -265,7 +283,9 @@ La fase sí introduce migración (`058`), declarada aquí y en `PROJECT_STATE`. 
 `signalId`/`planId` del parte. Sin propuesta no hay sustitución por otro plan. **La atribución ya no se infiere por símbolo.**
 La cobertura es reconciliable y el recorte dejó de ser silencioso. *Límite*: `mismatch` y `ambiguous` existen como estados
 declarados; en este mundo sembrado se observó `exact`, y no se ha ejercitado `ambiguous` con datos reales (queda como
-capacidad declarada, no como caso demostrado).
+capacidad declarada, no como caso demostrado). *Corrección honesta*: el primer run de CI puso en rojo 22 tests de
+aplicación porque el handoff filtraba el `target_price` de la señal en decisiones **sin** propuesta; corregido (Δ = 0)
+y cubierto con `test_estudio_daily_proposal_handoff.py`.
 
 **3) UI.** La vista inicial responde a las cuatro preguntas y los ids técnicos quedan detrás de un desplegable.
 Clasificación y validación están **separadas por construcción** (funciones puras con tests), no por copy.
