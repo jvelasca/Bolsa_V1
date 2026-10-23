@@ -30,6 +30,7 @@ sello **no** cambia la ventana: la evidencia duradera de la cuenta operativa sig
 | Worker fail-closed + matriz de crash de salida | **35 passed in 1.17 s** |
 | Guardián de bump (`test_dia_d_bump_guard`) | **2 passed in 0.52 s** |
 | `ruff` (`packages/py` + `apps/api-python`) | **All checks passed!** |
+| CI del tag (`39977948590`) | **`success`** · **13 jobs `success`** · `certify` **`success`** · 1 `skipped` declarado |
 
 **Los 6 controles negativos** (el positivo está en §3.1): sin espejo de reservas · claim rechazado ·
 claim con excepción · falta la barra de ejecución `B` (cae a `HOLD` fail-closed) · fallo al persistir
@@ -72,15 +73,27 @@ de re-anclaje, no al del sello.
 válida arranca en el primer día de sesión posterior al tag. Re-anclar **no** crea ciclos ni mejora el
 veredicto: cambia el árbol de referencia.
 
-## 6. Dictamen
+## 6. Dictamen — **CERRADO**
 
-**Sello PREPARADO, NO CERRADO.** El commit del sello existe y el tag anotado se crea **sobre el
-commit de re-anclaje** (§5), no sobre el del sello. Las comprobaciones de §3 están verdes en este
-árbol. La condición de cierre del dictamen —**CI obligatorio del tag verde**— sigue **PENDIENTE**:
-ningún run del `Release tag CI` se ha ejecutado para `v2.88.161-beta` en el momento de escribir esta
-evidencia, y ese run es el **primero** que ejecuta los gates ESTUDIO/identidad (universo, DÍA-D trace,
-daily watch, PAPER window, cadena por valor y batería de identidad) que ningún run por commit corre.
-Hasta que exista ese verde, el sello **no se declara cerrado**.
+`Release tag CI` [run **`39977948590`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/39977948590) ⇒
+**`conclusion: success`** sobre `headSha` **`9b6d3252`**, `2026-10-23T15:24:07Z` → `15:39:22Z`
+(**15m15s**): **13 jobs `success`** + **1 `skipped` declarado** (`playwright (integrated E2E, opt-in)`,
+que **no certifica**) + `certify (aggregate + artifact)` **`success`**.
+
+| Job | Evidencia |
+| --- | --- |
+| `shared` | **`freeze OK (9b6d3252)`** · `window:test` **50 passed** |
+| `python` | `ruff` / `imports` / `mypy` / `pytest` offline **`success`** |
+| `lifecycle-pg` | **`Pytest AUTO ruta REAL del productor (PG, fail if skipped)` ⇒ `7 passed in 7.42 s`** (el E2E de este sello corrió en el CI, no sólo en local) |
+| `lifecycle-pg` | **`AUTO universe coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window + ESTUDIO chain + identity battery + attempt cap (PG)` ⇒ `23 passed in 34.23 s`** — primera verificación completa de los gates ESTUDIO/identidad |
+| `lifecycle-pg` | `W-G2/2` **176** · `lifecycle` **222** · `account-isolation` **45** · `Golden Day` **2** · `crash/recovery` **2** · `concurrent` **3** · `hardkill` **2** · `crash injection` **2** · `multiprocess` **1 passed in 113.07 s** |
+| `replay-repro` | **`REPRODUCIDO`** (`sha256 E9B7376B…F5625`, `3 383 461` bytes LF; `DIGEST` idéntico en las dos corridas) ⇒ **`Δ decisión = 0` medido por el CI**, mismo artefacto que `.160` |
+| `a7-gate` · `spine` · `frontend` · `dr-verify` · `security` · `S5` · `axe` · `mock E2E` | **`success`** |
+| `certify` | **`success`** |
+
+El tag anotado `v2.88.161-beta` apunta al commit de re-anclaje `9b6d3252` (no al del sello
+`64e23eaf`), que es el que tiene el pin casando con su propio árbol. **No se movió ningún tag
+anterior y no se reescribió historia.**
 
 ## 7. Límites declarados
 
