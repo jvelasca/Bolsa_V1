@@ -233,8 +233,10 @@ Runs de esta rama:
 | Python CI (`a82bdcaa`) | [40002381117](https://github.com/jvelasca/Bolsa_V1/actions/runs/40002381117) | **failure** — `Pytest`: 22 tests de aplicación por el defecto descrito en §7.3 |
 | Frontend CI (`a82bdcaa`) | [40002381109](https://github.com/jvelasca/Bolsa_V1/actions/runs/40002381109) | success |
 | Fase 2 scientific (`a82bdcaa`) | [40002381230](https://github.com/jvelasca/Bolsa_V1/actions/runs/40002381230) | success |
-| Python CI (`399d05e0`, tras el fix) | _(ver §8.1)_ | _(ver §8.1)_ |
-| Frontend CI (`399d05e0`, tras el fix) | _(ver §8.1)_ | _(ver §8.1)_ |
+| **Python CI** (`02e7fb79`, tras el fix) | [40004115803](https://github.com/jvelasca/Bolsa_V1/actions/runs/40004115803) | **success** — `quality` 2m16s · `auto-v2-durable-pg` 1m31s |
+| Fase 2 scientific (`02e7fb79`) | [40004115741](https://github.com/jvelasca/Bolsa_V1/actions/runs/40004115741) | success |
+| Optimize lab (`02e7fb79`) | [40004115731](https://github.com/jvelasca/Bolsa_V1/actions/runs/40004115731) | success |
+| Frontend CI (`02e7fb79`) | — | no se dispara: el workflow filtra por `apps/web/**`, `packages/shared/**`, lockfiles y su propio YAML; este commit solo toca rutas Python y docs. El último run con cambios de UI (`a82bdcaa`) fue **success**. |
 
 ### 8.1 Resultado de los runs
 
@@ -243,7 +245,19 @@ El primer run de Python CI **falló y se dice aquí**: no fue un fallo del entor
 handoff no tenía tests unitarios. Se corrigió, se añadió la cobertura unitaria que faltaba y se re-ejecutó todo
 (`2848 passed` en `packages/py/application/tests`, E2E PG y Playwright live verdes de nuevo).
 
-Estado final de la rama: _(se completa al cerrar la fase; si un run queda rojo, se dice aquí y no se maquilla)_
+El run posterior ([40004115803](https://github.com/jvelasca/Bolsa_V1/actions/runs/40004115803)) quedó **verde** con
+los cinco jobs. El paso dedicado de la cadena diaria corrió **de verdad**, con el gate puesto:
+
+```
+Pytest AUTO cadena diaria señal→ciclo→DÍA-D PG (fail if skipped)   AUTO_DAILY_CHAIN_E2E_PG_REQUIRED=1
+  apps/api-python/tests/test_auto_daily_chain_full_real_e2e_pg.py
+  1 passed in 15.28s
+Pytest AUTO 2.0 durable PG (fail if skipped)                        124 passed in 22.60s
+Pytest AUTO ruta REAL del productor PG (fail if skipped)              7 passed in 8.80s
+```
+
+Estado final de la rama: **CI verde** en los workflows aplicables, **cero skips silenciosos** en la cadena diaria
+(un PostgreSQL ausente habría sido FALLO, no skip), y `main`, tags, sello y ventana intactos.
 
 ---
 
