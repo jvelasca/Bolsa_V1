@@ -195,7 +195,7 @@ del servidor.
 `Resultado` medido:
 
 ```
-2 passed (24.8s)     # pnpm exec playwright test gp-e2e-auto-daily-chain-live
+2 passed (24.8s | 31.4s)   # pnpm exec playwright test gp-e2e-auto-daily-chain-live (antes y después del fix)
 8 passed (1.5m)      # pnpm exec playwright test gp-v288-s5  (batería previa, sin regresión)
 ```
 
@@ -271,9 +271,11 @@ uv run --no-sync python -m pytest packages/py/application/tests/test_estudio_dai
 uv run --no-sync python -m pytest -k "proposal"                                                          # 96 passed
 uv run --no-sync python -m pytest apps/api-python/tests/test_auto_ops_job_worker.py `
   apps/api-python/tests/test_auto_ops_jobs_route.py apps/api-python/tests/test_auto_daily_dia_d_chain_integration.py  # 21 passed
-uv run --no-sync ruff check .                       # All checks passed
-uv run --no-sync mypy packages/py apps/api-python/src apps/api-python/tests  # Success: 570 files
-uv run --no-sync lint-imports                       # 4 kept, 0 broken
+uv run --no-sync ruff check packages/py apps/api-python --config pyproject.toml   # All checks passed
+uv run --no-sync mypy packages/py/domain/src packages/py/market/src `
+  packages/py/infrastructure/src packages/py/application/src apps/api-python/src `
+  --follow-imports=silent                                                        # Success: 570 files
+uv run --no-sync lint-imports --config packages/py/.importlinter                 # 4 kept, 0 broken
 
 # Web
 pnpm --filter @bolsa/shared test                    # 842 passed, 1 todo
@@ -281,7 +283,7 @@ pnpm --filter web exec vitest run src/features/auto-monitor/estudio-daily-ops-pa
   src/features/auto-monitor/use-dia-d-value-replay.test.tsx                                             # 40 passed
 pnpm exec tsc --noEmit -p apps/web/tsconfig.json    # limpio
 pnpm exec eslint apps/web/src apps/web/e2e          # limpio
-pnpm exec playwright test gp-e2e-auto-daily-chain-live                                                  # 2 passed, 24.8s
+pnpm exec playwright test gp-e2e-auto-daily-chain-live                                                  # 2 passed (31.4s)
 pnpm exec playwright test gp-v288-s5                                                                    # 8 passed, 1.5m
 ```
 
