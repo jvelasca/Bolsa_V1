@@ -1375,15 +1375,25 @@ test.describe("GP-V288-S5 — puente AUTO → estrategia → DÍA-D (API real)",
 
     // Si el parte trae valores, la ficha enlaza a DÍA-D con contexto DECLARADO (global).
     if (hasContextLink) {
-      // La ficha incorpora la evidencia durable (sección 5) sin pedir una query por valor.
+      // La evidencia durable (cadena, selector y DÍA-D del valor) es DETALLE TÉCNICO: vive
+      // tras el desplegable único de la casa. Se abre para poder leerla (la vista inicial
+      // sólo responde a las cuatro preguntas).
+      const card = contextLink.locator("xpath=ancestor::li[1]");
+      // `first()`: el disclosure RAÍZ de la ficha (dentro vive otro disclosure técnico del
+      // selector con su propio testid; ambos comparten el rótulo único de la casa).
+      await card
+        .getByTestId("estudio-daily-value-technical")
+        .locator("summary")
+        .first()
+        .click();
+      await expect(card.getByTestId("estudio-daily-value-chain")).toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(card.getByTestId("estudio-chain-attribution")).toContainText(
+        "Cadena histórica del valor",
+      );
       await expect(
-        page.getByTestId("estudio-daily-value-chain").first(),
-      ).toBeVisible({ timeout: 20_000 });
-      await expect(
-        page.getByTestId("estudio-chain-attribution").first(),
-      ).toContainText("Cadena histórica del valor");
-      await expect(
-        page.getByTestId("estudio-chain-dia-d-verify").first(),
+        card.getByTestId("estudio-chain-dia-d-verify"),
       ).toBeVisible();
 
       await contextLink.click();

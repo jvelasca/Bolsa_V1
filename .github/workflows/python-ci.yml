@@ -442,6 +442,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py
           --ignore=apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
           --ignore=apps/api-python/tests/test_auto_real_route_producer_pg.py
+          --ignore=apps/api-python/tests/test_auto_daily_chain_full_real_e2e_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_auto_estudio_universe_coverage_pg.py
           --ignore=apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py
@@ -751,6 +752,13 @@ jobs:
       # fail-closed, sin fuentes fabricadas. Paso propio con guarda anti-skip más abajo:
       # sin PG skipearía en mudo y aparentaría certificar la ruta real.
       AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED: '1'
+      # CIERRE UI/TRAZABILIDAD DIARIA (migración 058): la cadena COMPLETA —parte real
+      # (``estudio_daily`` por la ruta ASGI + worker), propuesta durable, productor que la
+      # ADOPTA (reserva → orden → fill → posición → salida → cierre con los MISMOS ids) y el
+      # CLI real del replay DÍA-D por valor— solo se certifica contra PG real. Paso propio
+      # con guarda anti-skip: sin PG el test skipearía en mudo y la cadena aparentaría estar
+      # certificada.
+      AUTO_DAILY_CHAIN_E2E_PG_REQUIRED: '1'
       # V2.88.17/W4 (precio REAL del motor AUTO): el criterio re-declarado de W4 —que el
       # camino de PRODUCCIÓN deje de fabricar un precio— solo se certifica contra PG real
       # (dos fronteras close(B-1)/open(B), fail-closed sin barra B y el interruptor que
@@ -917,6 +925,33 @@ jobs:
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-real-route-pg.log; then
             echo "::error::La RUTA REAL del productor dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/auto-real-route-pg.log || true
+            exit 1
+          fi
+        if: always()
+
+      # CIERRE UI/TRAZABILIDAD DIARIA (migración 058): un paso PROPIO, con su gate y su
+      # guarda. Certifica la cadena señal → plan → ciclo → DÍA-D con los servicios REALES:
+      # parte del job ``estudio_daily``, propuesta durable adoptada por el productor (misma
+      # identidad en fill/posición/salida/cierre), replay DÍA-D por valor por subproceso y
+      # lectura por la app ASGI (atribución ``exact`` por IGUALDAD de ids, aislamiento por
+      # cuenta y cola con verdad de servidor). El job no declara ``timeout-minutes`` (default
+      # de GitHub, 360 min): el CLI real corre dentro del test sin riesgo de corte.
+      - name: Pytest AUTO cadena diaria señal→ciclo→DÍA-D PG (fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_daily_chain_full_real_e2e_pg.py \
+            -q --tb=short -rs | tee /tmp/auto-daily-chain-pg.log
+
+      - name: Fail on skipped AUTO cadena diaria PG (no skip silencioso)
+        run: |
+          if [ ! -s /tmp/auto-daily-chain-pg.log ]; then
+            echo "::error::La cadena diaria AUTO no dejó log; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-daily-chain-pg.log; then
+            echo "::error::La cadena diaria AUTO dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/auto-daily-chain-pg.log || true
             exit 1
           fi
         if: always()

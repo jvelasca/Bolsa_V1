@@ -506,6 +506,196 @@ jobs:
             exit 1
           fi
 
+  # 2026-10-23 — CIERRE UI/TRAZABILIDAD DIARIA (migración 058): journey de NAVEGADOR sobre el
+  # sistema real —PostgreSQL + API FastAPI + WORKER de la cola durable— que pulsa «Calcular
+  # operativa diaria» y «Verificar DÍA-D de este valor» y comprueba lo que el dictamen exige:
+  # estado terminal por valor, resumen de cuatro preguntas, validación NO afirmada, ids técnicos
+  # solo tras el desplegable, cola con verdad de servidor y artefacto DÍA-D de SU cuenta/día/
+  # símbolo. El mundo ESTUDIO lo siembra `scripts/dev/seed_estudio_daily_for_ui.py` (el MISMO
+  # harness que el E2E de Python: `apps/api-python/tests/support/auto_chain_e2e.py`), no se
+  # rebaja ningún gate y no se fabrica ninguna fuente.
+  #
+  # BLOQUEO DECLARADO (explícito, como pide el plan): este job **NO** entra en `certify.needs`
+  # todavía. Corre en CADA push de tag y su resultado se publica (informe + logs como artefacto),
+  # pero no puede tumbar el sello hasta que acumule una racha verde en tags reales. Se promociona
+  # a gate duro —añadirlo a `certify.needs` y borrar esta nota— cuando 3 tags consecutivos
+  # terminen en verde sin reintentos. Mientras tanto el gate duro de la MISMA cadena es el E2E de
+  # Python `test_auto_daily_chain_full_real_e2e_pg.py` (job `auto-v2-durable-pg` de python-ci),
+  # que sí es fail-if-skipped y bloquea por commit.
+  #
+  # `E2E_LIVE_REQUIRED=1` convierte en FALLO cualquier precondición ausente (API caída, worker
+  # apagado, seed imposible, catálogo vacío) y el guard anti-skip de abajo lo reafirma sobre el
+  # log: un skip mudo NO puede dar verde.
+  playwright-live-auto-daily:
+    name: playwright (live AUTO daily chain)
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bolsa
+          POSTGRES_PASSWORD: bolsa_dev
+          POSTGRES_DB: bolsa_v1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bolsa -d bolsa_v1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: bolsa
+      DB_PASSWORD: bolsa_dev
+      DB_NAME: bolsa_v1
+      ENVIRONMENT: testing
+      JWT_SIGNING_KEY: ci-e2e-integration-test-secret-key
+      APP_AUTH_SECRET: ci-e2e-integration-test-secret-key
+      CORS_ORIGIN: http://localhost:5173
+      # La cola durable la drena el PROCESO de workers (no el `lifespan` de la API): sin este
+      # interruptor el CTA encolaría y el job se quedaría `queued` para siempre — el fallo que
+      # este journey existe para detectar (se declara como FALLO, nunca como skip).
+      AUTO_OPS_JOB_WORKER_ENABLED: '1'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.12.1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Expose uv venv on PATH
+        run: echo "${{ github.workspace }}/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Build shared
+        run: pnpm --filter @bolsa/shared build
+
+      # El seed dev (subproceso `uv run --no-sync python`) y la API leen el MISMO `.env`:
+      # una sola verdad de configuración para el journey (sin variables duplicadas a mano).
+      - name: Write CI env file
+        run: |
+          cat > .env <<'EOF'
+          DATABASE_URL=postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1
+          DB_PASSWORD=bolsa_dev
+          JWT_SIGNING_KEY=ci-e2e-integration-test-secret-key
+          APP_AUTH_SECRET=ci-e2e-integration-test-secret-key
+          ENVIRONMENT=testing
+          CORS_ORIGIN=http://localhost:5173
+          AUTO_OPS_JOB_WORKER_ENABLED=true
+          EOF
+
+      - name: Alembic upgrade
+        run: cd packages/py/infrastructure && uv run alembic upgrade head
+
+      - name: Prisma generate + seed instruments
+        run: |
+          pnpm --filter @bolsa/database db:generate
+          pnpm db:seed
+
+      - name: Start API
+        run: |
+          uvicorn bolsa_api.main:app --host 127.0.0.1 --port 8000 > /tmp/live-daily-api.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/api/health >/dev/null; then
+              echo "API ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API failed to start"
+          cat /tmp/live-daily-api.log
+          exit 1
+
+      # Proceso de workers SEPARADO (D3): un solo drenador de `auto_ops_jobs`. `uv run
+      # --no-sync python` garantiza que el CLI del replay DÍA-D que lanza el worker use el
+      # MISMO intérprete del venv (`sys.executable`), sin resolver el lock por segunda vez.
+      - name: Start AUTO_OPS worker (scheduler process)
+        run: |
+          uv run --no-sync python -m bolsa_api.workers.scheduler_worker \
+            > /tmp/live-daily-scheduler.log 2>&1 &
+          for i in $(seq 1 30); do
+            if grep -q "Worker AUTO_OPS_JOB iniciado" /tmp/live-daily-scheduler.log; then
+              echo "AUTO_OPS worker ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::El worker AUTO_OPS_JOB no arrancó; el journey diario no podría terminar."
+          cat /tmp/live-daily-scheduler.log
+          exit 1
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @bolsa/web exec playwright install --with-deps chromium
+
+      # Filtro por FICHERO: Playwright recibe `gp-e2e-auto-daily-chain-live` verbatim y solo
+      # corre el journey LIVE (el hermano mock/integrado tiene otro nombre).
+      - name: Run live AUTO daily chain E2E (fail if skipped)
+        working-directory: apps/web
+        env:
+          E2E_RUN: '1'
+          E2E_INTEGRATION: '1'
+          E2E_ALLOW_DEV_DB: '1'
+          # Una precondición ausente es FALLO: este run existe para certificar, no para pasar.
+          E2E_LIVE_REQUIRED: '1'
+          # `127.0.0.1` EXPLÍCITO: el health-check del gate y el `webServer` deben hablar del
+          # mismo socket. Con `localhost`, Node puede resolver `::1` mientras Vite escucha en
+          # IPv4 y el gate declararía (falsamente) que no hay entorno.
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:5173
+          PLAYWRIGHT_JSON_OUTPUT_NAME: /tmp/live-daily-report.json
+        run: |
+          set -o pipefail
+          pnpm exec playwright test gp-e2e-auto-daily-chain-live --reporter=list --reporter=json | tee /tmp/live-daily.log
+
+      - uses: actions/upload-artifact@v4
+        # `if: always()`: un rojo también TIENE que entregar informe, logs y estado del worker.
+        if: always()
+        with:
+          name: playwright-live-auto-daily
+          path: |
+            /tmp/live-daily-report.json
+            /tmp/live-daily.log
+            /tmp/live-daily-api.log
+            /tmp/live-daily-scheduler.log
+            apps/web/test-results/**
+          if-no-files-found: warn
+
+      - name: Fail on skipped live AUTO daily (no skip silencioso)
+        if: always()
+        run: |
+          if [ ! -s /tmp/live-daily.log ]; then
+            echo "::error::El journey LIVE de la cadena diaria no dejó log; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/live-daily.log; then
+            echo "::error::El journey LIVE de la cadena diaria dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/live-daily.log || true
+            exit 1
+          fi
+
+      # Cierre ordenado de los procesos en segundo plano (no se deja nada colgado en el runner).
+      - name: Stop background processes
+        if: always()
+        run: |
+          pkill -f "bolsa_api.workers.scheduler_worker" || true
+          pkill -f "uvicorn bolsa_api.main:app" || true
+
   # 2026-10-14 — el barrido `axe` INTEGRADO (WCAG A/AA + `heading-order` sobre 16 rutas L1 ×
   # {desktop, móvil} contra FastAPI + PostgreSQL reales) deja de ser OTP-IN y pasa a GATE DURO
   # del tag: se ejecuta en CADA push de tag y BLOQUEA si hay violaciones. `E2E_AXE_REQUIRED=1`
