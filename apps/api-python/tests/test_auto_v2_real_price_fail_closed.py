@@ -34,6 +34,8 @@ from bolsa_api.background.auto_simulation_worker import (
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV, EdgeReportSource
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
+from bolsa_application.exit_order_store import InMemoryExitOrderStore
+from bolsa_application.reservation_store import InMemoryReservationStore
 
 _SYMBOLS = ("AAA",)
 
@@ -97,6 +99,9 @@ def _worker(price_source: PriceSource | None) -> AutoSimulationWorker:
     return AutoSimulationWorker(
         clock=step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))[1],
         exec_store=InMemoryExecutionEventStore(),
+        # P1 (2026-10-23): entrada y salida no se emiten sin libro durable.
+        reservation_store=InMemoryReservationStore(),
+        exit_order_store=InMemoryExitOrderStore(),
         sector_source=lambda _symbol: "tech",
         liquidity_source=lambda _symbol: 1_000_000.0,
         edge_source=_edge_source(),

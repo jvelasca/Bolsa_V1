@@ -36,15 +36,17 @@ Reglas duras (las mismas del instrumento):
 from __future__ import annotations
 
 import html
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from bolsa_analytics.cognitive.auto_adaptive_confidence import measured_r
+from bolsa_analytics.cognitive.auto_adaptive_confidence import closed_instant, measured_r
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
     MEASUREMENT_UNKNOWN,
 )
+
 from bolsa_application.auto_reason_codes import (
     RESERVATION_ALREADY_LIVE,
     RESERVATION_UNMEASURABLE,
@@ -76,6 +78,8 @@ __all__ = [
     "MARKET_WINDOW_MIN_EPISODES",
     "MARKET_WINDOW_READY",
     "UNRESOLVED_AGE_BUCKETS",
+    "ClosedCycleDays",
+    "bucket_closed_cycles",
     "build_operability_funnel",
     "build_window_row",
     "render_window_html",
@@ -492,6 +496,68 @@ def build_window_row(
     return row
 
 
+@dataclass(frozen=True, slots=True)
+class ClosedCycleDays:
+    """(PURA) ciclos CERRADOS repartidos por día, con el ``motivo`` de cada exclusión.
+
+    Existe porque el gate cuenta ciclos **medibles** por cubo de calendario y, cuando no hay
+    ninguno, hay dos causas distintas que NO son lo mismo: un ciclo sin identidad durable
+    (``unattributed``: no se le puede atar reserva ni día sin inventarlo) y un ciclo con
+    identidad cuyo instante de cierre no es legible (``undated_with_identity``: hay identidad,
+    falta la fecha). Colapsarlas en un solo contador hacía leer «no hay día» donde el hecho es
+    «no hay identidad de ciclo».
+    """
+
+    by_day: Mapping[str, tuple[Any, ...]] = field(default_factory=dict)
+    unattributed: int = 0
+    undated_with_identity: int = 0
+
+    @property
+    def undated(self) -> int:
+        """Ciclos cerrados que no entran en ningún cubo (unión de las dos causas)."""
+        return self.unattributed + self.undated_with_identity
+
+
+def _closed_cycle_day(raw: Any) -> str:
+    """Día ISO del cierre declarado por la fila, o ``""`` si no es legible (no se adivina).
+
+    Usa ``closed_instant`` —el MISMO lector con el que la confianza ordena la muestra— para que
+    la ventana no derive la fecha con una segunda regla que pudiera divergir del orden real.
+    """
+    instant = closed_instant(raw)
+    if not isinstance(instant, datetime):
+        return ""
+    return (instant.astimezone(UTC) if instant.tzinfo else instant).date().isoformat()
+
+
+def bucket_closed_cycles(cycles: Iterable[Any]) -> ClosedCycleDays:
+    """(PURA) reparte los ciclos cerrados por día y declara por qué excluye cada uno.
+
+    Regla dura: **no se fabrica** ni la identidad ni la fecha. Una fila sin ``cycleId`` durable
+    cuenta en ``unattributed`` —da igual que su último fill tenga instante, porque sin identidad
+    de ciclo no hay frontera de cierre que afirmar ni reserva a la que atar el denominador de R—;
+    una fila con identidad y sin instante legible cuenta en ``undated_with_identity``. Solo las
+    que tienen ambas cosas entran en su cubo.
+    """
+    by_day: dict[str, list[Any]] = {}
+    unattributed = 0
+    undated_with_identity = 0
+    for row in cycles:
+        if not _text(_field(row, "cycleId")):
+            unattributed += 1
+            continue
+        day = _closed_cycle_day(row)
+        if not day:
+            undated_with_identity += 1
+            continue
+        by_day.setdefault(day, []).append(row)
+    return ClosedCycleDays(
+        by_day={day: tuple(rows) for day, rows in by_day.items()},
+        unattributed=unattributed,
+        undated_with_identity=undated_with_identity,
+    )
+
+
 def window_gate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """(PURA) ¿acredita la ventana diversidad de mercado? (≥4 días, ≥2 episodios, ≥32 ciclos).
 
@@ -675,11 +741,21 @@ def _price_cell(row: Mapping[str, Any]) -> str:
 def _gate_html(gate: Mapping[str, Any]) -> str:
     ready = bool(gate.get("ready"))
     css = "ready" if ready else "inconclusive"
+    # Solo se declara cuando hay ciclos cerrados fuera del numerador: así un ``0/32`` no se lee
+    # como «el motor no cerró nada». Sin la clave (artefactos anteriores) no se inventa un cero.
+    excluded = _count(gate.get("excludedCycles"))
+    detail = (
+        f" · fuera del numerador {excluded}"
+        f" (sin identidad {_count(gate.get('excludedWithoutIdentity'))}"
+        f" · sin instante {_count(gate.get('excludedWithoutInstant'))})"
+        if excluded
+        else ""
+    )
     return (
         f'<div class="gate {css}"><strong>GATE: {_e(gate.get("verdict") or "INCONCLUSIVE")}'
         f'</strong> — dias {_count(gate.get("days"))}/{_count(gate.get("minDays"))}'
         f' · episodios {_count(gate.get("episodes"))}/{_count(gate.get("minEpisodes"))}'
-        f' · ciclos {_count(gate.get("cycles"))}/{_count(gate.get("minCycles"))}</div>'
+        f' · ciclos {_count(gate.get("cycles"))}/{_count(gate.get("minCycles"))}{detail}</div>'
     )
 
 

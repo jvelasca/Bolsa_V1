@@ -15,6 +15,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from bolsa_analytics.cognitive.measurement import MEASUREMENT_COMPLETE, MEASUREMENT_UNKNOWN
+
 from bolsa_application.market_operability import (
     ENTRY_DECISION_EVENT,
     POSITION_JOURNAL_EVENTS,
@@ -30,6 +31,7 @@ from bolsa_application.operability_window import (
     MARKET_WINDOW_MIN_EPISODES,
     MARKET_WINDOW_READY,
     UNRESOLVED_AGE_BUCKETS,
+    bucket_closed_cycles,
     build_window_row,
     render_window_html,
     render_window_series,
@@ -210,6 +212,58 @@ def test_window_gate_declares_unmeasured_when_there_are_no_rows() -> None:
     assert gate["verdict"] == MARKET_WINDOW_INCONCLUSIVE
 
 
+# ── bucket_closed_cycles ──────────────────────────────────────────────────────────────────────
+
+
+def test_bucket_closed_cycles_declares_anonymous_pairs_as_without_identity() -> None:
+    """El caso MEDIDO en la ventana: pares FIFO de fills sin ``cycle_id``.
+
+    Sin identidad durable no hay día que afirmar (la frontera de cierre es del ciclo, no del
+    par) ni reserva a la que atar el denominador de R. El hueco se declara por su causa.
+    """
+    anonymous = [{"strategyVersion": "vA", "pnl": 3.0} for _ in range(4)]
+    bucket = bucket_closed_cycles(anonymous)
+    assert bucket.by_day == {}
+    assert bucket.unattributed == 4
+    assert bucket.undated_with_identity == 0
+    assert bucket.undated == 4
+
+
+def test_bucket_closed_cycles_puts_a_named_cycle_on_the_day_it_closed() -> None:
+    row = {**_cycle("cyc-1"), "closedAt": "2026-10-22T14:25:17.260717+00:00"}
+    bucket = bucket_closed_cycles([row])
+    assert list(bucket.by_day) == ["2026-10-22"]
+    assert bucket.by_day["2026-10-22"] == (row,)
+    assert bucket.unattributed == 0
+    assert bucket.undated_with_identity == 0
+    assert bucket.undated == 0
+
+
+def test_bucket_closed_cycles_accepts_a_datetime_instant_and_uses_the_utc_day() -> None:
+    row = {"cycleId": "cyc-1", "closedAt": datetime(2026, 10, 22, 23, 30, tzinfo=UTC)}
+    bucket = bucket_closed_cycles([row])
+    assert list(bucket.by_day) == ["2026-10-22"]
+
+
+def test_bucket_closed_cycles_keeps_the_identity_when_the_instant_is_unreadable() -> None:
+    """Con identidad pero sin instante la causa es la FECHA, no la identidad: no se confunden."""
+    missing = {"cycleId": "cyc-1", "pnl": 1.0}
+    broken = {"cycleId": "cyc-2", "pnl": 1.0, "closedAt": "no-es-fecha"}
+    bucket = bucket_closed_cycles([missing, broken])
+    assert bucket.by_day == {}
+    assert bucket.unattributed == 0
+    assert bucket.undated_with_identity == 2
+    assert bucket.undated == 2
+
+
+def test_bucket_closed_cycles_never_fabricates_a_day_for_a_blank_identity() -> None:
+    bucket = bucket_closed_cycles(
+        [{"cycleId": "   ", "pnl": 1.0, "closedAt": "2026-10-22T10:00:00+00:00"}]
+    )
+    assert bucket.by_day == {}
+    assert bucket.unattributed == 1
+
+
 # ── render_window_series ───────────────────────────────────────────────────────────────────────
 
 
@@ -363,3 +417,26 @@ def test_render_window_html_publishes_gate_verdict_and_contract_alert() -> None:
     rendered = render_window_html([row], meta)
     assert "GATE: INCONCLUSIVE" in rendered
     assert "ALERTA CONTRATO: other&gt;0" in rendered
+
+
+def test_render_window_html_declares_why_cycles_stay_out_of_the_numerator() -> None:
+    """Un ``0/32`` con cierres reales se explica: el HTML dice cuántos y por qué quedan fuera."""
+    row = build_window_row("2026-10-21", entries=[_entry("approved")], cycles=[], fills=4)
+    meta = {
+        "header": {"account": "acc", "versions": ["vA"], "capturedAt": "x"},
+        "gate": {
+            **window_gate([row]),
+            "excludedCycles": 4,
+            "excludedWithoutIdentity": 4,
+            "excludedWithoutInstant": 0,
+        },
+    }
+    rendered = render_window_html([row], meta)
+    assert "fuera del numerador 4" in rendered
+    assert "sin identidad 4" in rendered
+
+
+def test_render_window_html_does_not_invent_exclusions_for_older_artifacts() -> None:
+    row = build_window_row("2026-09-27", entries=[_entry("approved")], fills=0)
+    meta = {"header": {"account": "acc", "versions": [], "capturedAt": "x"}, "gate": window_gate([row])}
+    assert "fuera del numerador" not in render_window_html([row], meta)

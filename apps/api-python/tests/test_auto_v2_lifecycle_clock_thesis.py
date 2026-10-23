@@ -34,6 +34,8 @@ from bolsa_application.auto_reason_codes import (
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
+from bolsa_application.exit_order_store import InMemoryExitOrderStore
+from bolsa_application.reservation_store import InMemoryReservationStore
 
 _SYMBOLS = ["AAA"]
 #: Plantilla de salida por defecto del motor V2 (``V2Tunables.exit_template``).
@@ -90,10 +92,25 @@ def _trade_kwargs() -> dict[str, object]:
     }
 
 
+def _mirrors() -> dict[str, object]:
+    """Espejos durables del banco hermético.
+
+    P1 (2026-10-23): ni la entrada ni la salida se emiten sin libro durable. Declararlos
+    aquí es lo que se hacía con ``exec_store``: sin ellos el motor veta / para (fail-closed),
+    que es exactamente lo que la ventana demostró que faltaba.
+    """
+    return {
+        "reservation_store": InMemoryReservationStore(),
+        "exit_order_store": InMemoryExitOrderStore(),
+    }
+
+
 def _worker(*, clock=None, **kwargs: object) -> AutoSimulationWorker:
     defaults: dict[str, object] = dict(_trade_kwargs())
     defaults.update(kwargs)
     defaults.setdefault("exec_store", InMemoryExecutionEventStore())
+    for name, mirror in _mirrors().items():
+        defaults.setdefault(name, mirror)
     if clock is None:
         _start, clock = step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
     return AutoSimulationWorker(clock=clock, **defaults)  # type: ignore[arg-type]
@@ -268,6 +285,7 @@ async def test_v2_adverse_mark_is_persisted_not_only_in_the_tick_copy(v2_env: No
     pos_store = InMemorySimAutoPositionStore()
     store = InMemoryExecutionEventStore()
     _start, clock1 = step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    mirrors = _mirrors()
     w1 = AutoSimulationWorker(
         clock=clock1,
         exec_store=store,
@@ -275,6 +293,7 @@ async def test_v2_adverse_mark_is_persisted_not_only_in_the_tick_copy(v2_env: No
         account_id=account,
         price_script=lambda _s, _m: prices["v"],
         **_trade_kwargs(),  # type: ignore[arg-type]
+        **mirrors,  # type: ignore[arg-type]
     )
     w1._decider = _buy_lot()
     await w1.auto_turn()
@@ -315,6 +334,7 @@ async def test_v2_adverse_mark_is_persisted_not_only_in_the_tick_copy(v2_env: No
         account_id=account,
         price_script=lambda _s, _m: prices["v"],
         **_trade_kwargs(),  # type: ignore[arg-type]
+        **mirrors,  # type: ignore[arg-type]
     )
     await w2.readopt_positions()
     assert w2._open.get("AAA", Decimal("0")) > 0, "debe readoptar la posición durable"
@@ -342,6 +362,7 @@ async def test_v2_favourable_mark_is_persisted_even_without_r_memory(v2_env: Non
     pos_store = InMemorySimAutoPositionStore()
     store = InMemoryExecutionEventStore()
     _start, clock1 = step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    mirrors = _mirrors()
     w1 = AutoSimulationWorker(
         clock=clock1,
         exec_store=store,
@@ -349,6 +370,7 @@ async def test_v2_favourable_mark_is_persisted_even_without_r_memory(v2_env: Non
         account_id=account,
         price_script=lambda _s, _m: prices["v"],
         **_trade_kwargs(),  # type: ignore[arg-type]
+        **mirrors,  # type: ignore[arg-type]
     )
     w1._decider = _buy_lot()
     await w1.auto_turn()

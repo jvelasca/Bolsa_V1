@@ -42,6 +42,8 @@ from bolsa_application.auto_reason_codes import (
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
+from bolsa_application.exit_order_store import InMemoryExitOrderStore
+from bolsa_application.reservation_store import InMemoryReservationStore
 
 #: Tres símbolos, tres sectores: el gate de concentración sectorial no veta el día.
 _SYMBOLS = ["AAA", "BBB", "CCC"]
@@ -109,6 +111,9 @@ def _worker(*, clock=None, prices: dict[str, float], atr: bool = True, **kwargs:
         defaults["atr_source"] = lambda _symbol: _ATR["v"]
     defaults.update(kwargs)
     defaults.setdefault("exec_store", InMemoryExecutionEventStore())
+    # P1 (2026-10-23): entrada y salida no se emiten sin libro durable.
+    defaults.setdefault("reservation_store", InMemoryReservationStore())
+    defaults.setdefault("exit_order_store", InMemoryExitOrderStore())
     if clock is None:
         _start, clock = step_minute_clock(_GOLDEN_DAY)
     return AutoSimulationWorker(clock=clock, **defaults)  # type: ignore[arg-type]

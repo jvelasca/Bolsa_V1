@@ -285,6 +285,46 @@ from bolsa_application.top3_opportunities import (
 
 logger = logging.getLogger(__name__)
 
+#: Medición 2026-10-23 — combinaciones (cuenta, motor) cuyo enlace de espejos ya se declaró.
+#: La declaración es de PROCESO (una vez por binomio): un espejo ausente se grita una vez, no
+#: en cada tick.
+_MIRRORS_DECLARED: set[tuple[str, str]] = set()
+
+
+def _declare_effective_mirrors(
+    *,
+    account_id: str | None,
+    engine_id: str | None,
+    mirrors: Sequence[tuple[str, Any]],
+) -> None:
+    """Declara UNA vez qué store quedó en cada espejo durable y si falta alguno.
+
+    Nace de un hecho medido el 2026-10-21/23: dos salidas se emitieron con su identidad
+    (``{engine}-sell-{symbol}-{exit_order_id}``) y **sin fila en ``auto_exit_orders``**, sin un
+    solo log que lo dijera. ``_v2_save_exit_order`` devuelve ``False`` cuando el store no está
+    y el llamante no comprueba el retorno, así que la ausencia del espejo era invisible.
+
+    El nivel no es cosmético: ``alembic.ini`` fija el root logger en ``WARN`` al migrar
+    (``fileConfig`` desde ``ensure_migrated``), de modo que un ``logger.info`` aquí **no se ve**
+    justo en la ruta de la ventana. Por eso grita en ``WARNING`` cuando falta un espejo y se
+    queda en ``INFO`` (silencioso) cuando están todos: la anomalía se ve, el día normal no
+    ensucia el log.
+    """
+    key = (str(account_id or ""), str(engine_id or ""))
+    if key in _MIRRORS_DECLARED:
+        return
+    _MIRRORS_DECLARED.add(key)
+    missing = [name for name, store in mirrors if store is None]
+    logger.log(
+        logging.WARNING if missing else logging.INFO,
+        "auto_sim v2 espejos account=%s engine=%s %s%s",
+        key[0] or "-",
+        key[1] or "-",
+        " ".join(f"{name}={type(store).__name__}" for name, store in mirrors),
+        f" FALTAN={','.join(missing)}" if missing else "",
+    )
+
+
 AUTO_SIM_WORKER_ENABLED = "AUTO_SIMULATION_WORKER_ENABLED"
 _FILL_CHUNKS = 4
 # V2.40.4 — tope de lectura del libro de órdenes pendientes por tick. Acotado a
@@ -3163,12 +3203,28 @@ class AutoSimulationWorker:
           ANTERIORES (aún sin fill): no se apila un segundo compromiso sobre el mismo
           instrumento (``reservation_already_live``). Se captura ANTES de dar de alta las
           del tick para no vetar la propia aprobación de este tick.
+
+        Sin espejo (``store is None``) el tick **veta** los instrumentos que el plan quería
+        comprometer: la mitad durable del invariante no se puede cumplir, así que la
+        aprobación no se emite. Salir con ``blocked`` vacío era fail-OPEN y es el defecto
+        que dejó la ventana con fills y sin una sola fila de reserva (medido el 2026-10-23).
         """
         store = self._reservation_store
         previous = self._v2_reservations
         reservations = tuple(getattr(plan, "reservations", ()) or ())
         if store is None:
-            self._v2_reservation_blocked = frozenset()
+            # P1 (medido el 2026-10-23): sin espejo de reservas NO hay compromiso durable.
+            # Antes se salía declarando ``blocked`` VACÍO —fail-OPEN—: la aprobación se
+            # emitía igual y el fill nacía sin reserva. La ventana lo dejó medido: 24 fills
+            # (19→22 oct) y **0 filas** en ``portfolio_reservations`` con los contadores de
+            # inserción a 0 y ``stats_reset`` nulo (nunca hubo un alta). Se veta exactamente
+            # lo que el plan pretendía comprometer; sin reservas que persistir, nada cambia
+            # (un tick hermético sin espejo y sin entradas sigue siendo un no-op).
+            self._v2_reservation_blocked = frozenset(
+                reservation.instrument_id
+                for reservation in reservations
+                if getattr(reservation, "instrument_id", None)
+            )
             self._v2_reservation_carryover = frozenset()
             return
         self._v2_reservation_carryover = frozenset(
@@ -3764,6 +3820,12 @@ class AutoSimulationWorker:
         identidad durable: si la reserva no es durable se persiste un INTENT de emergencia
         (``EMERGENCY``) y, si eso tampoco es durable, el sistema se para (``SYSTEM_ERROR``)
         en vez de emitir una salida sin rastro.
+
+        P1 (medido el 2026-10-23): la política alcanza también al INTENT. Antes se ignoraba el
+        retorno de ``_v2_save_exit_order(order)``: con el espejo ausente se emitía la salida
+        con una identidad que ningún reinicio podía reconciliar y sin un solo log. Ahora, si
+        el INTENT no es durable, se intenta uno de emergencia y, si tampoco, se para el
+        sistema y no se emite.
         """
         store = self._reservation_store
         amount = _dec_or_none(qty)
@@ -3789,7 +3851,22 @@ class AutoSimulationWorker:
         if order is None:  # defensivo: la salida no tiene datos suficientes para un INTENT.
             logger.error("auto_sim v2 exit order not buildable symbol=%s qty=%s", symbol, qty)
             return None
-        await self._v2_save_exit_order(order)
+        if not await self._v2_save_exit_order(order):
+            # P1 (medido el 2026-10-23): el INTENT es la identidad durable de la salida. Antes
+            # se emitía igual aunque no quedara escrito — el fill viajaba con un
+            # ``exit_order_id`` que ningún reinicio podía reconciliar y sin un solo log que lo
+            # dijera. Se aplica la MISMA política B que a la reserva: INTENT de emergencia o
+            # parada; nunca una salida sin rastro. Se devuelve aquí, sin crear la reserva de
+            # salida, para no reescribir después la fila ``EMERGENCY`` con un estado normal.
+            emergency = order.as_emergency("exit_intent_persist_failed", at=at)
+            if not await self._v2_save_exit_order(emergency):
+                logger.error(
+                    "auto_sim v2 exit intent persist failed intent=%s; HALT", exit_order_id
+                )
+                await self.engage_kill_switch_durable("SYSTEM_ERROR", at=at)
+                return None
+            self._v2_exit_orders[exit_order_id] = emergency
+            return exit_order_id
         reservation = build_reservation(
             reservation_id=f"exit:{exit_order_id}",
             account_id=self._account_id or "",
@@ -7176,6 +7253,21 @@ class AutoSimulationWorker:
             )
             self._exit_order_store = (
                 exit_order_store if exit_order_store is not None else prev_exit_store
+            )
+            # Medición 2026-10-23 — el espejo EFECTIVO de la salida, ya resuelto el merge de la
+            # sesión. Existe porque un ``_exit_order_store = None`` persistía SIN RASTRO:
+            # la identidad de la salida se minteaba y la orden se emitía, pero el INTENT no se
+            # escribía y ningún log lo declaraba (``_v2_save_exit_order`` devuelve ``False`` en
+            # silencio y el llamante no lo comprueba). Con esta línea, un espejo ausente deja de
+            # ser invisible: dice qué tipo quedó en cada espejo, sin tocar ninguna decisión.
+            _declare_effective_mirrors(
+                account_id=self._account_id,
+                engine_id=self._engine_id,
+                mirrors=(
+                    ("reservations", self._reservation_store),
+                    ("exitOrders", self._exit_order_store),
+                    ("kill", self._kill_switch_store),
+                ),
             )
             # AUTO-10: el sink del régimen por ciclo viaja con la sesión del tick (como los
             # demás espejos). Sin él se conserva el del constructor (hermético/tests).

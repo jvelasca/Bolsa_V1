@@ -39,6 +39,8 @@ from bolsa_application.auto_daily_journal import build_auto_daily_report
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import ExecutionEvent, InMemoryExecutionEventStore
+from bolsa_application.exit_order_store import InMemoryExitOrderStore
+from bolsa_application.reservation_store import InMemoryReservationStore
 from bolsa_application.sim_durable_store import (
     InMemorySimAutoPositionStore,
     InMemorySimFillFinanceContextStore,
@@ -242,6 +244,10 @@ def _worker(**kwargs: Any) -> AutoSimulationWorker:
     }
     defaults.update(kwargs)
     defaults.setdefault("exec_store", InMemoryExecutionEventStore())
+    # P1 (2026-10-23): entrada y salida no se emiten sin libro durable. El banco hermético
+    # declara los dos espejos igual que declara el ejecutor.
+    defaults.setdefault("reservation_store", InMemoryReservationStore())
+    defaults.setdefault("exit_order_store", InMemoryExitOrderStore())
     return AutoSimulationWorker(
         clock=step_minute_clock(datetime(2026, 9, 17, 9, 0, tzinfo=UTC))[1],
         **defaults,

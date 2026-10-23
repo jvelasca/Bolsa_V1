@@ -8,22 +8,27 @@ positions/exits, sin duplicados, venues {paper, simulated}, sin LIVE).
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Protocol
 
 import pytest
 
 from bolsa_api.background.auto_simulation_worker import (
     AutoSimulationWorker,
+    _declare_effective_mirrors,
     derive_activity,
     step_minute_clock,
 )
+from bolsa_analytics.cognitive.portfolio_reservation import build_reservation
 from bolsa_application.auto_daily_journal import build_auto_daily_report
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
 
 _SYMBOLS = ["AAA", "GBP"]
+_WORKER_LOGGER = "bolsa_api.background.auto_simulation_worker"
 
 
 @pytest.fixture
@@ -508,3 +513,108 @@ async def test_evidence_source_absent_returns_none(auto_env: None) -> None:
     worker = AutoSimulationWorker(exec_store=InMemoryExecutionEventStore())
     assert worker._v2_evidence_lookup({"AAA": object()}) is None
     await worker._v2_refresh_evidence({"AAA": object()}, regime="trend_up")  # no-op sin fuente
+
+
+def test_effective_mirrors_grita_una_vez_si_falta_un_espejo(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Un espejo ausente no puede volver a ser invisible (medición 2026-10-23).
+
+    El 2026-10-21 se emitieron salidas con identidad minteada y sin fila en
+    ``auto_exit_orders``, sin un solo log: ``_v2_save_exit_order`` devuelve ``False`` en
+    silencio cuando el store no está. Esta alarma declara el enlace efectivo, una vez por
+    (cuenta, motor), en ``WARNING`` solo si falta alguno.
+    """
+    with caplog.at_level(logging.WARNING, logger=_WORKER_LOGGER):
+        _declare_effective_mirrors(
+            account_id="acc-espejos-falta",
+            engine_id="eng-espejos-falta",
+            mirrors=(
+                ("reservations", object()),
+                ("exitOrders", None),
+                ("kill", object()),
+            ),
+        )
+        # Segundo tick del MISMO binomio: no repite la declaración.
+        _declare_effective_mirrors(
+            account_id="acc-espejos-falta",
+            engine_id="eng-espejos-falta",
+            mirrors=(("exitOrders", None),),
+        )
+
+    records = [r for r in caplog.records if "espejos" in r.getMessage()]
+    assert len(records) == 1
+    assert records[0].levelno == logging.WARNING
+    message = records[0].getMessage()
+    assert "reservations=NoneType" not in message
+    assert "exitOrders=NoneType" in message
+    assert "FALTAN=exitOrders" in message
+
+
+def test_effective_mirrors_callado_cuando_estan_todos(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Con los tres espejos presentes no se ensucia el log: queda en ``INFO`` sin ``FALTAN``."""
+    with caplog.at_level(logging.INFO, logger=_WORKER_LOGGER):
+        _declare_effective_mirrors(
+            account_id="acc-espejos-completa",
+            engine_id="eng-espejos-completa",
+            mirrors=(
+                ("reservations", object()),
+                ("exitOrders", object()),
+                ("kill", object()),
+            ),
+        )
+
+    records = [r for r in caplog.records if "espejos" in r.getMessage()]
+    assert len(records) == 1
+    assert records[0].levelno == logging.INFO
+    assert "FALTAN=" not in records[0].getMessage()
+
+
+def _reserva_de_entrada(instrument_id: str) -> object:
+    """Reserva de ENTRADA mínima, con la misma forma que ``_reservation_for``."""
+    return build_reservation(
+        reservation_id=f"RES-dec-{instrument_id.lower()}",
+        account_id="acc-reserva-fail-closed",
+        tick_id="2026-10-23T09:00:00Z",
+        instrument_id=instrument_id,
+        side="buy",
+        quantity=100.0,
+        entry=10.0,
+        sector="tech",
+        reserved_cash=1000.0,
+        reserved_risk=20.0,
+        created_at="2026-10-23T09:00:00Z",
+    )
+
+
+@pytest.mark.asyncio
+async def test_reserva_de_entrada_sin_espejo_veta_la_emision() -> None:
+    """P1 (medido el 2026-10-23): sin espejo de reservas NO se emite la entrada.
+
+    El método salía declarando ``blocked`` VACÍO —fail-OPEN—: la aprobación se emitía igual
+    y el fill nacía sin compromiso durable. La ventana lo dejó medido: 24 fills entre el
+    19 y el 22 de octubre y **0 filas** en ``portfolio_reservations`` (contadores de
+    inserción a 0 con ``stats_reset`` nulo: nunca hubo un alta).
+    """
+    worker = AutoSimulationWorker(exec_store=InMemoryExecutionEventStore())
+    assert worker._reservation_store is None
+
+    await worker._v2_persist_tick_reservations(
+        SimpleNamespace(reservations=(_reserva_de_entrada("AAA"),))
+    )
+
+    assert worker._v2_reservation_blocked == frozenset({"AAA"}), (
+        "la entrada no puede emitirse sin reserva durable: el veteo es fail-closed"
+    )
+
+
+@pytest.mark.asyncio
+async def test_sin_reservas_que_persistir_el_espejo_ausente_no_veta_nada() -> None:
+    """Sin entradas en el plan no hay compromiso que vetar (Δ = 0 en el tick hermético)."""
+    worker = AutoSimulationWorker(exec_store=InMemoryExecutionEventStore())
+
+    await worker._v2_persist_tick_reservations(SimpleNamespace(reservations=()))
+
+    assert worker._v2_reservation_blocked == frozenset()

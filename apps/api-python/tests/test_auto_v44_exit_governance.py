@@ -81,6 +81,13 @@ def _trade_kwargs() -> dict[str, object]:
 def _worker(**kwargs: object) -> AutoSimulationWorker:
     defaults: dict[str, object] = dict(_trade_kwargs())
     defaults.setdefault("exec_store", InMemoryExecutionEventStore())
+    # P1 (2026-10-23): una salida no se emite sin espejo de INTENT. El banco hermético
+    # declara el suyo igual que declara la reserva; sin él, el motor para (fail-closed).
+    defaults.setdefault("exit_order_store", InMemoryExitOrderStore())
+    # P1 (2026-10-23): la ENTRADA tampoco se emite sin espejo de reservas (fail-closed
+    # medido en la ventana: fills sin una sola fila de reserva). El banco hermético
+    # declara el libro durable igual que declara la salida.
+    defaults.setdefault("reservation_store", InMemoryReservationStore())
     defaults.update(kwargs)
     return AutoSimulationWorker(
         clock=step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))[1],
@@ -414,6 +421,8 @@ async def test_v2_restart_mid_risk_exit_releases_the_dead_sell_reservation_once(
         )
     )
     marks.update(account_id, 100000.0, now=datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    # P1: el espejo de INTENT viaja con los stores del reinicio (mismo libro, no uno nuevo).
+    exit_orders = InMemoryExitOrderStore()
 
     # Reinicio sobre los MISMOS stores.
     monkeypatch.setenv("AUTO_ENGINE_SIM_V2_EQUITY", "84000")  # RISK_OFF
@@ -427,6 +436,7 @@ async def test_v2_restart_mid_risk_exit_releases_the_dead_sell_reservation_once(
         exec_store=store,
         context_store=contexts,
         reservation_store=reservations,
+        exit_order_store=exit_orders,
         position_store=positions,
         account_id=account_id,
         equity_marks=marks,

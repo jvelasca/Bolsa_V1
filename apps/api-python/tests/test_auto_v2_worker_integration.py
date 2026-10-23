@@ -28,6 +28,8 @@ from bolsa_application.auto_operational_monitor import AUTO_PROTECTION_EVENT
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
+from bolsa_application.exit_order_store import InMemoryExitOrderStore
+from bolsa_application.reservation_store import InMemoryReservationStore
 
 _SYMBOLS = ["AAA"]
 
@@ -79,12 +81,31 @@ class _Collector:
         self.entries.append(entry)
 
 
+def _mirrors() -> dict[str, object]:
+    """Espejos durables del banco hermético.
+
+    P1 (2026-10-23): ni la entrada ni la salida se emiten sin libro durable. Las costuras
+    que construyen el worker a mano (reinicios, ciclos con reloj propio) declaran los suyos
+    con esto, igual que declaran el ``exec_store``.
+    """
+    return {
+        "reservation_store": InMemoryReservationStore(),
+        "exit_order_store": InMemoryExitOrderStore(),
+    }
+
+
 def _worker(**kwargs: object) -> AutoSimulationWorker:
     defaults: dict[str, object] = dict(_trade_kwargs())
     defaults.update(kwargs)
     # Store hermético por defecto; un test puede inyectar el suyo (si no, el default
     # pisaría su ``exec_store`` y no podría preparar trazas pendientes).
     defaults.setdefault("exec_store", InMemoryExecutionEventStore())
+    # P1 (2026-10-23): la entrada no se emite sin espejo durable de RESERVAS (fail-closed).
+    # El banco declara el libro, igual que declara el ejecutor: sin él, el tick veta.
+    defaults.setdefault("reservation_store", InMemoryReservationStore())
+    # P1 (2026-10-23): la salida no se emite sin espejo durable del INTENT. Sin él el motor
+    # para (fail-closed) y una protección quedaría sin ejecutarse en el banco.
+    defaults.setdefault("exit_order_store", InMemoryExitOrderStore())
     return AutoSimulationWorker(
         clock=step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))[1],
         **defaults,  # type: ignore[arg-type]
@@ -412,6 +433,7 @@ async def test_v2_adopts_readopted_position_after_restart(v2_env: None) -> None:
 
     store = InMemoryExecutionEventStore()
     pos_store = InMemorySimAutoPositionStore()
+    mirrors = _mirrors()
     account_id = "acc-v2-readopt"
 
     _s1, clock1 = step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
@@ -421,6 +443,7 @@ async def test_v2_adopts_readopted_position_after_restart(v2_env: None) -> None:
         position_store=pos_store,
         account_id=account_id,
         **_trade_kwargs(),
+        **mirrors,  # type: ignore[arg-type]
     )
     w1._decider = _buy_lot()
     await w1.auto_turn()
@@ -445,6 +468,7 @@ async def test_v2_adopts_readopted_position_after_restart(v2_env: None) -> None:
         account_id=account_id,
         price_script=script,
         **_trade_kwargs(),
+        **mirrors,  # type: ignore[arg-type]
     )
     await w2.real_turn(
         exec_store=store,
@@ -785,6 +809,7 @@ async def test_v2_new_bar_signal_can_open_again(v2_env: None) -> None:
         exec_store=InMemoryExecutionEventStore(),
         price_script=script,
         **_trade_kwargs(),
+        **_mirrors(),  # type: ignore[arg-type]
     )
     worker._decider = _buy_lot()
     await worker.auto_turn()
@@ -829,6 +854,7 @@ async def test_v2_consumed_signal_survives_restart(v2_env: None) -> None:
     store = InMemoryExecutionEventStore()
 
     _s1, clock1 = step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    mirrors = _mirrors()
     w1 = AutoSimulationWorker(
         clock=clock1,
         exec_store=store,
@@ -836,6 +862,7 @@ async def test_v2_consumed_signal_survives_restart(v2_env: None) -> None:
         consumed_signal_store=signals,
         price_script=lambda _symbol, _minute: 100.0,
         **_trade_kwargs(),
+        **mirrors,  # type: ignore[arg-type]
     )
     w1._decider = _buy_lot()
     await w1.auto_turn()
@@ -857,6 +884,7 @@ async def test_v2_consumed_signal_survives_restart(v2_env: None) -> None:
         consumed_signal_store=signals,
         price_script=lambda _symbol, _minute: 100.0,
         **_trade_kwargs(),
+        **mirrors,  # type: ignore[arg-type]
     )
     assert w2._v2_consumed_signals == set(), "el proceso nuevo nace sin memoria de RAM"
     w2._decider = _buy_lot()
@@ -1205,6 +1233,7 @@ async def test_v2_restart_rehydrates_trailing_and_keeps_ratcheting(v2_env: None)
     account = "acc-v2-ratchet-restart"
     store = InMemoryExecutionEventStore()
     pos_store = InMemorySimAutoPositionStore()
+    mirrors = _mirrors()
     _s1, clock1 = step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
     w1 = AutoSimulationWorker(
         clock=clock1,
@@ -1213,6 +1242,7 @@ async def test_v2_restart_rehydrates_trailing_and_keeps_ratcheting(v2_env: None)
         account_id=account,
         price_script=script,
         **_trade_kwargs(),
+        **mirrors,  # type: ignore[arg-type]
     )
     w1._decider = _buy_lot()
     await w1.auto_turn()
@@ -1235,6 +1265,7 @@ async def test_v2_restart_rehydrates_trailing_and_keeps_ratcheting(v2_env: None)
         account_id=account,
         price_script=script,
         **_trade_kwargs(),
+        **mirrors,  # type: ignore[arg-type]
     )
     await w2.readopt_positions()
     assert w2._open.get("AAA", Decimal("0")) > 0

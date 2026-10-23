@@ -611,6 +611,20 @@ class _ExplodingExitOrderStore(InMemoryExitOrderStore):
         raise RuntimeError("exit order store down")
 
 
+class _FlakyExitOrderStore(InMemoryExitOrderStore):
+    """El INTENT normal NO llega a ser durable; el de emergencia (segundo ``save``) sí."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.failures = 1
+
+    async def save(self, order: object) -> bool:  # type: ignore[override]
+        if self.failures:
+            self.failures -= 1
+            raise RuntimeError("exit order store down (solo el primer intent)")
+        return await super().save(order)
+
+
 @pytest.mark.asyncio
 async def test_p1_4_reservation_failure_persists_an_emergency_intent_and_still_exits(
     v2_env: None, monkeypatch: pytest.MonkeyPatch
@@ -660,3 +674,84 @@ async def test_p1_4_when_neither_store_is_durable_the_system_halts_and_does_not_
     assert state is not None and state.engaged is True
     assert state.reason == "SYSTEM_ERROR"
     assert w._v2_kill_switch_halted() is True
+
+
+# ── P1 · el INTENT de salida no durable ya no se traga ────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_p1_exit_intent_sin_store_para_el_sistema_y_no_emite(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sin espejo de INTENT no hay salida: antes se emitía con una identidad irrecuperable."""
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_EQUITY", "84000")  # RISK_OFF
+    stores = _Stores()
+    stores.exit_orders = None  # type: ignore[assignment]
+    await _seed_buy_position(
+        stores, execution_id="buy-p1-sin-store", qty=Decimal("200"), price=Decimal("100")
+    )
+
+    w = _restart(stores, minute=1)
+    await w.readopt_positions()
+    w._decider = _hold()
+    await w.auto_turn()
+
+    assert w._open.get("AAA", Decimal("0")) == 200, "fail-closed: no se emite la salida"
+    assert await _sell_fills(stores) == [], "sin INTENT durable no hay venta"
+    state = await stores.kill_state.load(ACCOUNT_ID, ENGINE_ID)
+    assert state is not None and state.engaged is True
+    assert state.reason == "SYSTEM_ERROR"
+    assert w._v2_kill_switch_halted() is True
+
+
+@pytest.mark.asyncio
+async def test_p1_exit_intent_caido_y_emergencia_caida_para_el_sistema(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Si el INTENT y su emergencia fallan, el sistema se para y no se emite nada."""
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_EQUITY", "84000")  # RISK_OFF
+    stores = _Stores()
+    stores.exit_orders = _ExplodingExitOrderStore()  # type: ignore[assignment]
+    await _seed_buy_position(
+        stores, execution_id="buy-p1-caido", qty=Decimal("200"), price=Decimal("100")
+    )
+
+    w = _restart(stores, minute=1)
+    await w.readopt_positions()
+    w._decider = _hold()
+    await w.auto_turn()
+
+    assert w._open.get("AAA", Decimal("0")) == 200, "fail-closed: no se emite la salida"
+    assert await _sell_fills(stores) == []
+    state = await stores.kill_state.load(ACCOUNT_ID, ENGINE_ID)
+    assert state is not None and state.engaged is True
+    assert state.reason == "SYSTEM_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_p1_exit_intent_caido_con_emergencia_durable_sigue_saliendo(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Si la emergencia sí es durable, la salida sale declarada como ``EMERGENCY``."""
+    monkeypatch.setenv("AUTO_ENGINE_SIM_V2_EQUITY", "84000")  # RISK_OFF
+    stores = _Stores()
+    flaky = _FlakyExitOrderStore()
+    stores.exit_orders = flaky  # type: ignore[assignment]
+    await _seed_buy_position(
+        stores, execution_id="buy-p1-flaky", qty=Decimal("200"), price=Decimal("100")
+    )
+
+    w = _restart(stores, minute=1)
+    await w.readopt_positions()
+    w._decider = _hold()
+    await w.auto_turn()
+
+    intents = list(flaky._rows.values())  # noqa: SLF001 — lectura de test.
+    assert len(intents) == 1
+    assert intents[0].emergency is True
+    assert intents[0].state == "EMERGENCY"
+    assert intents[0].reason == "exit_intent_persist_failed"
+    assert _sell_total(await _sell_fills(stores)) == Decimal("200"), "reducir riesgo no se bloquea"
+    assert await stores.kill_state.load(ACCOUNT_ID, ENGINE_ID) is None, (
+        "con el INTENT de emergencia durable NO se para el sistema"
+    )
