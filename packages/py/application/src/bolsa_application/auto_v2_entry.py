@@ -1470,12 +1470,18 @@ def plan_v2_tick(
         # en la geometría publicada. Sin propuesta el camino es el histórico (Δ = 0).
         proposal = _proposal_for(signal)
         entry_price = signal.price if signal.price > 0 else None
+        # Geometría PUBLICADA por el parte (entrada/stop/objetivo). Solo se aporta cuando
+        # la propuesta se ADOPTA: sin propuesta ``stop_price``/``target_price`` son
+        # ``None`` —exactamente el valor por defecto histórico— y el motor deriva ambos
+        # del ATR. Pasar siempre el ``target_price`` de la señal cambiaría ``target1`` y
+        # con él la coherencia ``target1 < target2`` (``plan_invalid``) de decisiones que
+        # nada tienen que ver con el parte.
         stop_price: float | None = None
-        target_price = signal.target_price
+        target_price: float | None = None
         if proposal is not None:
             entry_price = _declared_number(proposal, "entry") or entry_price
             stop_price = _declared_number(proposal, "structuralStop")
-            target_price = _declared_number(proposal, "target1") or target_price
+            target_price = _declared_number(proposal, "target1")
         decision = decide_portfolio(
             instrument_id=signal.instrument_id,
             direction=_ENTRY_DIRECTION,
