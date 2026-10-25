@@ -20,12 +20,15 @@ from bolsa_api.background import window_day_watch_worker as watch_worker
 from bolsa_api.background.window_day_watch_worker import (
     ALERT_EXIT_CODE,
     DEFAULT_LOOKBACK_DAYS,
+    alert_key,
     alert_recipient,
+    announce_pending,
     default_lookback_days,
     evaluate_backfill,
     evaluate_day_watch,
     evaluate_once,
     main,
+    read_alerted,
     read_ledger_rows,
     start_window_day_watch,
     write_status,
@@ -344,6 +347,57 @@ def test_default_lookback_days_env_and_clamp(monkeypatch) -> None:
     assert default_lookback_days(get_settings()) == DEFAULT_LOOKBACK_DAYS
 
 
+# ---------------------------------------------------------------------------
+# Marca durable de avisos — el dedupe sobrevive a los reinicios
+# ---------------------------------------------------------------------------
+
+
+def test_alert_key_is_day_and_verdict() -> None:
+    watch = _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO")])
+    assert alert_key(watch) == "20261016:OK"
+    missed = _decide(_WEEKDAY_AFTER_DUE, [])
+    assert alert_key(missed) == "20261016:MISSED"
+
+
+def test_read_alerted_is_fail_open(tmp_path: Path) -> None:
+    """Latido ausente, corrupto, o sin marcas ⇒ conjunto vacío (repetir antes que callar)."""
+    assert read_alerted(tmp_path) == set()
+    path = tmp_path / "day-watch.json"
+    path.write_text("no-es-json", encoding="utf-8")
+    assert read_alerted(tmp_path) == set()
+    path.write_text('{"alerted": "no-es-lista"}', encoding="utf-8")
+    assert read_alerted(tmp_path) == set()
+    path.write_text('{"alerted": ["20261016:MISSED", 7, ""]}', encoding="utf-8")
+    assert read_alerted(tmp_path) == {"20261016:MISSED"}
+
+
+def test_read_alerted_migrates_the_previous_format(tmp_path: Path) -> None:
+    """Un latido sin ``alerted`` adopta sus ``alerts``: el primer tick no reenvía lo ya visto."""
+    (tmp_path / "day-watch.json").write_text(
+        json.dumps({"alerts": ["20261020:MISSED", "20261023:MISSED"]}), encoding="utf-8"
+    )
+    assert read_alerted(tmp_path) == {"20261020:MISSED", "20261023:MISSED"}
+
+
+@pytest.mark.asyncio
+async def test_announce_pending_skips_known_keys(monkeypatch) -> None:
+    sent: list[str] = []
+    monkeypatch.setattr(
+        watch_worker,
+        "send_alert_email",
+        lambda settings, watch: bool(sent.append(alert_key(watch))) or False,
+    )
+    checks = [_decide(_WEEKDAY_AFTER_DUE, [])]
+    already = {"20261016:MISSED"}
+    updated = await announce_pending(get_settings(), checks, already)
+    assert sent == []  # ya constaba: no hay email
+    assert updated == already
+
+    updated_again = await announce_pending(get_settings(), checks, set())
+    assert sent == ["20261016:MISSED"]
+    assert updated_again == {"20261016:MISSED"}
+
+
 @pytest.mark.asyncio
 async def test_tick_writes_heartbeat_and_announces_once(monkeypatch, tmp_path: Path) -> None:
     sent: list[str] = []
@@ -352,7 +406,6 @@ async def test_tick_writes_heartbeat_and_announces_once(monkeypatch, tmp_path: P
     )
     monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: [])
     monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
-    monkeypatch.setattr(watch_worker, "_announced", set())
 
     cfg = get_settings()
     first = await watch_worker._tick(
@@ -366,6 +419,70 @@ async def test_tick_writes_heartbeat_and_announces_once(monkeypatch, tmp_path: P
     assert sent == ["20261016"]  # el aviso NO se repite en el segundo tick…
     journal = (tmp_path / "day-watch.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(journal) == 2  # …pero el latido sí se reescribe (prueba de vida)
+
+
+@pytest.mark.asyncio
+async def test_tick_dedupe_survives_a_restart(monkeypatch, tmp_path: Path) -> None:
+    """La marca vive en el latido: un «reinicio» (sin estado en memoria) no reenvía.
+
+    Regresión del ruido medido: ``_announced`` era un ``set`` en memoria y cada arranque del
+    stack reenviaba el email del mismo día perdido.
+    """
+    sent: list[str] = []
+    monkeypatch.setattr(
+        watch_worker, "send_alert_email", lambda settings, watch: bool(sent.append(watch.day)) or False
+    )
+    monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: [])
+    monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
+
+    cfg = get_settings()
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+    # «Reinicio»: no queda estado en memoria; la única memoria es el latido en disco.
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+
+    assert sent == ["20261016"]
+    assert read_alerted(tmp_path) == {"20261016:MISSED"}
+
+
+@pytest.mark.asyncio
+async def test_tick_reannounces_when_the_verdict_changes(monkeypatch, tmp_path: Path) -> None:
+    """Un veredicto nuevo del mismo día SÍ avisa: la marca no silencia información nueva."""
+    sent: list[str] = []
+    monkeypatch.setattr(
+        watch_worker, "send_alert_email", lambda settings, watch: bool(sent.append(watch.verdict)) or False
+    )
+    rows: list[dict] = []
+    monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: rows)
+    monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
+
+    cfg = get_settings()
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+    rows.append(_row("20261016", "HARD_ERROR", "API_NOT_READY"))
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+
+    assert sent == ["MISSED", "HARD_ERROR"]
+    assert read_alerted(tmp_path) == {"20261016:MISSED", "20261016:HARD_ERROR"}
+
+
+@pytest.mark.asyncio
+async def test_failed_delivery_is_not_marked_as_announced(monkeypatch, tmp_path: Path) -> None:
+    """Si la entrega falla, la marca NO se guarda: el siguiente tick reintenta."""
+    attempts: list[str] = []
+
+    def boom(settings, watch):
+        attempts.append(watch.day)
+        raise RuntimeError("smtp caído")
+
+    monkeypatch.setattr(watch_worker, "send_alert_email", boom)
+    monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: [])
+    monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
+
+    cfg = get_settings()
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+
+    assert attempts == ["20261016", "20261016"]
+    assert read_alerted(tmp_path) == set()
 
 
 # ---------------------------------------------------------------------------
@@ -394,7 +511,56 @@ def test_main_missed_exit_code_and_latido(monkeypatch, tmp_path: Path) -> None:
     assert payload["verdict"] == "MISSED"
     assert payload["severity"] == "alert"
     assert payload["alerts"] == ["20261016:MISSED"]
+    assert payload["alerted"] == ["20261016:MISSED"]
     assert payload["source"] == "cli"
+
+
+def test_main_does_not_repeat_the_email_across_runs(monkeypatch, tmp_path: Path) -> None:
+    """Dos ejecuciones del CLI (la tarea de 20:20) ⇒ UN solo email, y exit 3 en ambas.
+
+    Regresión del ruido: el CLI no consultaba la marca (``_announced``) y reenviaba el aviso
+    del mismo día perdido en cada ejecución.
+    """
+    sent: list[str] = []
+    monkeypatch.setattr(
+        watch_worker,
+        "send_alert_email",
+        lambda settings, watch: bool(sent.append(alert_key(watch))) or False,
+    )
+    monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: [])
+    monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
+    monkeypatch.setattr(watch_worker, "runs_dir", lambda: tmp_path)
+
+    first = main(["--now", "2026-10-16T20:30:00+02:00", "--lookback-days", "0"])
+    second = main(["--now", "2026-10-16T20:30:00+02:00", "--lookback-days", "0"])
+
+    assert first == second == ALERT_EXIT_CODE
+    assert sent == ["20261016:MISSED"]
+    payload = json.loads((tmp_path / "day-watch.json").read_text(encoding="utf-8"))
+    assert payload["alerted"] == ["20261016:MISSED"]
+
+
+def test_main_shares_the_mark_with_the_worker(monkeypatch, tmp_path: Path) -> None:
+    """Lo que el worker ya avisó no lo repite el CLI (la marca es la misma)."""
+    sent: list[str] = []
+    monkeypatch.setattr(
+        watch_worker,
+        "send_alert_email",
+        lambda settings, watch: bool(sent.append(alert_key(watch))) or False,
+    )
+    monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: [])
+    monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
+    monkeypatch.setattr(watch_worker, "runs_dir", lambda: tmp_path)
+    write_status(
+        [_decide(_WEEKDAY_AFTER_DUE, [])],
+        now=_WEEKDAY_AFTER_DUE,
+        source="worker",
+        directory=tmp_path,
+        alerted={"20261016:MISSED"},
+    )
+
+    assert main(["--now", "2026-10-16T20:30:00+02:00", "--lookback-days", "0"]) == ALERT_EXIT_CODE
+    assert sent == []
 
 
 def test_main_veto_is_not_alert(monkeypatch, tmp_path: Path) -> None:
