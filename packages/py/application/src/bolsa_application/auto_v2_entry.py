@@ -91,6 +91,8 @@ from bolsa_analytics.cognitive.signal_identity import (
 )
 from bolsa_analytics.cognitive.trade_context import DEFAULT_MAX_AGE_DAYS, TradeContext
 from bolsa_analytics.indicators.compute import compute_atr
+from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
+
 from bolsa_application.auto_daily_journal import OpportunityRow
 from bolsa_application.auto_investment_system import trade_plan_to_decision_package
 from bolsa_application.auto_reason_codes import (
@@ -123,7 +125,6 @@ from bolsa_application.position_manager import (
     PositionManagerSkip,
     manage_position_outcome,
 )
-from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
 
 logger = logging.getLogger(__name__)
 
@@ -853,7 +854,7 @@ def _score_from_signal(
     signal: V2Signal,
     *,
     key: str | None = None,
-    components: dict[str, float] | None = None,
+    components: Mapping[str, float | None] | None = None,
 ) -> OpportunityScore:
     """Score de oportunidad de una señal (componentes derivados de la señal).
 
@@ -871,6 +872,11 @@ def _score_from_signal(
     ``execution_quality``) calculada por ``opportunity_evidence_adapter``. Nunca pisa el
     ``edge``/``liquidity`` de la propia señal (son su fuente directa). Con ``None`` el
     output es byte-idéntico al histórico (dedupe de candidata inalterado).
+
+    C-3 — un componente a ``None`` (o ausente del diccionario) se pasa como ``None``, no
+    como ``0.0``: el ranker lo clampa para el combinado pero NO lo cuenta como medido. El
+    relleno con ``0.0`` convertía «evidencia sin ninguna métrica» en una candidata
+    puntuada y la dejaba entrar al TOP.
 
     V2.40.1: ni el edge ni la liquidez tienen valor de reserva. Un ``edge`` ausente vale
     0 (el ranker no redistribuye pesos) y una liquidez desconocida también vale 0, en vez
@@ -902,11 +908,11 @@ def _score_from_signal(
         key if key is not None else signal.instrument_id,
         edge=signal.edge,
         liquidity=liquidity,
-        robustness=components.get("robustness", 0.0),
-        regime_fit=components.get("regime_fit", 0.0),
-        momentum=components.get("momentum", 0.0),
-        risk_reward=components.get("risk_reward", 0.0),
-        execution_quality=components.get("execution_quality", 0.0),
+        robustness=components.get("robustness"),
+        regime_fit=components.get("regime_fit"),
+        momentum=components.get("momentum"),
+        risk_reward=components.get("risk_reward"),
+        execution_quality=components.get("execution_quality"),
         **identity,
     )
 
@@ -1083,7 +1089,7 @@ def plan_v2_tick(
     consumed_signal_ids: Iterable[str] = (),
     halted: bool = False,
     adaptive: AdaptivePlan | None = None,
-    evidence: Mapping[str, dict[str, float]] | None = None,
+    evidence: Mapping[str, Mapping[str, float | None]] | None = None,
     daily_proposals: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> V2TickPlan:
     """Planifica las entradas del tick: rankeo → decisión → TradePlan → propuesta.
@@ -1116,10 +1122,12 @@ def plan_v2_tick(
 
     ``evidence`` (V2.88 · TOP3 cross-asset) es el lookup de componentes de evidencia del
     LAB por ``instrument_id`` (``opportunity_evidence_adapter.evidence_components``): un
-    ``dict[str, dict[str, float]]`` con ``robustness``/``regime_fit``/``momentum``/
+    ``dict[str, dict[str, float | None]]`` con ``robustness``/``regime_fit``/``momentum``/
     ``risk_reward``/``execution_quality``. Con ``None`` (o sin entrada para un
     instrumento) el scoring es byte-idéntico al histórico: solo ``edge``/``liquidity``
-    aportan, el resto vale 0 (fail-closed, no se inventa evidencia). El lookup se indexa
+    aportan, el resto vale 0 (fail-closed, no se inventa evidencia). Dentro de una
+    entrada, un componente a ``None`` significa NO medido: se propaga como ``None`` para
+    que el ranker no lo cuente en ``measured_components`` (C-3). El lookup se indexa
     por instrumento (no por clave de candidata) porque la evidencia del campeón es una
     propiedad del ACTIVO, no de la versión concreta que dedupe la cartera.
 
@@ -1275,7 +1283,7 @@ def plan_v2_tick(
                 return row
         return None
 
-    def _components_of(signal: V2Signal) -> dict[str, float] | None:
+    def _components_of(signal: V2Signal) -> Mapping[str, float | None] | None:
         """Evidencia LAB del campeón para este instrumento (``None`` si no se aporta)."""
         if evidence is None:
             return None

@@ -36,6 +36,8 @@ const ADVISORY =
   "El parte es informativo: la ejecución real se decide en el camino de ejecución.";
 const UNIVERSE_TRUNCATED =
   "El universo se recortó: este parte no cubre todos los valores de la lista.";
+const VALUES_NOT_REPORTED =
+  "El parte no trajo {n} valores del universo: su estado no se pudo declarar.";
 const SELECTOR_UNAVAILABLE =
   "No se pudo leer el selector del día: no se sabe qué estrategia quedó primera en el ranking.";
 const SELECTOR_NOT_CONFIGURED =
@@ -50,6 +52,9 @@ const ALL_VALUES_FAILED =
 const CHIP_PATTERN = /^(composite|fundamentals)_chips_unavailable:(\d+)_ids$/;
 const OPINION_ERRORS_PATTERN = /^opinion_errors:(\d+)_values$/;
 const TRUNCATED_PATTERN = /^Universo recortado a (\d+) valores/i;
+//: C-2 — códigos ESTABLES del parte cuando el universo se recorta o faltan valores.
+const UNIVERSE_TRUNCATED_CODE = /^universe_truncated(?::(\d+))?$/;
+const VALUES_NOT_REPORTED_CODE = /^values_not_reported:(\d+)$/;
 
 /**
  * Traduce UN código del parte a `{ headline, technical }`. PURA y total: siempre devuelve
@@ -79,6 +84,21 @@ export function describeEstudioDailyNote(raw: string): EstudioDailyNoteV1 {
     return {
       code,
       headline: OPINION_ERRORS.replace("{n}", opinionErrors[1] ?? ""),
+      technical,
+    };
+  }
+
+  // C-2 — el recorte del universo llega como código desde `degradedReasons`; sin esto
+  // caía en el texto genérico y el banner de parcial no decía QUÉ faltaba.
+  if (UNIVERSE_TRUNCATED_CODE.test(code)) {
+    return { code, headline: UNIVERSE_TRUNCATED, technical };
+  }
+
+  const notReported = VALUES_NOT_REPORTED_CODE.exec(code);
+  if (notReported) {
+    return {
+      code,
+      headline: VALUES_NOT_REPORTED.replace("{n}", notReported[1] ?? ""),
       technical,
     };
   }

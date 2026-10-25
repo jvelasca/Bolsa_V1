@@ -426,6 +426,145 @@ def test_adoption_cost_basis_prefers_the_ledger_over_the_mirror(auto_env: None) 
     assert worker._adoption_cost_basis("ZZZ") == (None, "none")
 
 
+def test_adoption_cost_basis_rejects_an_ambiguous_ledger(auto_env: None) -> None:
+    """C-4 — con dos motores vivos el medio de la cuenta no identifica la fila.
+
+    Medido 2026-10-21: ``3204115d`` ×2 con 1933.3953 cada uno. El libro sigue mandando
+    cuando NO es ambiguo; cuando lo es, el único coste que pertenece a ESTA fila es el
+    espejo del motor. Sin espejo no se autoriza ningún número.
+    """
+    worker = _adoption_worker()
+    worker._canonical_entry_by_symbol["AAA"] = Decimal("10.3335")
+    worker._entry_price["AAA"] = Decimal("10.4")
+
+    assert worker._adoption_cost_basis("AAA") == (Decimal("10.3335"), "ledger")
+    assert worker._adoption_cost_basis("AAA", canonical_ambiguous=True) == (
+        Decimal("10.4"),
+        "projection_ambiguous_ledger",
+    )
+
+    bare = _adoption_worker()
+    bare._canonical_entry_by_symbol["AAA"] = Decimal("10.3335")
+    assert bare._adoption_cost_basis("AAA", canonical_ambiguous=True) == (
+        None,
+        "ledger_ambiguous",
+    )
+
+
+def test_adoption_with_ambiguous_ledger_uses_the_mirror_and_declares(auto_env: None) -> None:
+    """C-4 — la parada se construye con el espejo del motor y se declara degradada."""
+    worker = _adoption_worker()
+    worker._open["AAA"] = Decimal("100")
+    worker._canonical_entry_by_symbol["AAA"] = Decimal("10.3335")
+    worker._entry_price["AAA"] = Decimal("10.4")
+    price = Decimal("10.42")
+
+    adopted = worker._v2_adopt_position("AAA", price, ledger_cost_ambiguous=True)
+    assert adopted is not None, "una adopción con coste ambiguo no deja la posición muda"
+    assert adopted.current_stop is not None
+    assert Decimal(str(adopted.current_stop)) < price, "el stop sigue por debajo del mercado"
+    assert adopted.lifecycle_state == "RECONCILIATION_REQUIRED", (
+        "el nivel se declara: el coste no es el del libro"
+    )
+    reasons = [e.payload.get("reason") for e in worker._v2_position_journal_pending]
+    assert "cost_basis_ambiguous" in reasons
+    sources = [e.payload.get("entrySource") for e in worker._v2_position_journal_pending]
+    assert "projection_ambiguous_ledger" in sources
+
+
+def test_adoption_with_ambiguous_ledger_and_no_mirror_is_declared(auto_env: None) -> None:
+    """C-4 — libro ambiguo y sin espejo: NO se adopta con un coste inventado."""
+    worker = _adoption_worker()
+    worker._open["AAA"] = Decimal("100")
+    worker._canonical_entry_by_symbol["AAA"] = Decimal("10.3335")
+
+    assert (
+        worker._v2_adopt_position("AAA", Decimal("10.42"), ledger_cost_ambiguous=True) is None
+    )
+    holes = [
+        e.payload
+        for e in worker._v2_position_journal_pending
+        if e.payload.get("reason") == "cost_basis_ambiguous"
+    ]
+    assert holes, "el hueco de coste se declara con su motivo propio"
+    assert holes[0]["entrySource"] == "ledger_ambiguous"
+    assert holes[0]["reason"] != "cost_basis_missing", "son huecos distintos"
+
+
+def test_adoption_with_ambiguous_ledger_rehydrates_the_durable_plan(auto_env: None) -> None:
+    """C-4 — un plan durable trae su propia geometría: no necesita el coste del libro."""
+    from dataclasses import replace
+
+    from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
+
+    worker = _adoption_worker()
+    worker._open["AAA"] = Decimal("100")
+    worker._canonical_entry_by_symbol["AAA"] = Decimal("10.3335")
+    plan = build_position_state_from_fill(
+        {
+            "decisionId": "dec-durable",
+            "instrumentId": "AAA",
+            "direction": "long",
+            "status": "TRIGGERED",
+            "entry": 10.3335,
+            "structuralStop": 9.8,
+            "target1": 11.2,
+            "target2": 12.0,
+        },
+        fill_price=10.3335,
+        fill_quantity=100.0,
+        filled_at="2026-09-09T09:00:00Z",
+    )
+    assert plan is not None
+    worker._v2_durable_plans["AAA"] = replace(plan, lifecycle_state="PROTECTED").to_dict()
+
+    adopted = worker._v2_adopt_position("AAA", Decimal("10.42"), ledger_cost_ambiguous=True)
+    assert adopted is not None
+    assert adopted.current_stop == plan.current_stop, "el plan durable manda en el CÓMO salir"
+    assert adopted.lifecycle_state == "PROTECTED", "no se degrada un plan verificado"
+
+
+@pytest.mark.asyncio
+async def test_position_package_measures_ledger_ambiguity_before_adopting(
+    auto_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """C-4 — el cableado: la ambigüedad se mide (async) y viaja a la adopción.
+
+    ``_v2_adopt_position`` se mantiene síncrona para la batería de crash; el dato lo mide
+    ``_v2_position_package`` una sola vez por símbolo, y sólo cuando no hay estado vivo.
+    """
+    worker = _adoption_worker()
+    worker._open["AAA"] = Decimal("100")
+    worker._canonical_entry_by_symbol["AAA"] = Decimal("10.3335")
+    worker._entry_price["AAA"] = Decimal("10.4")
+    measured: list[str] = []
+    flags: list[bool] = []
+
+    async def fake_ambiguous(account_id: str, symbol: str) -> bool:
+        measured.append(f"{account_id}:{symbol}")
+        return True
+
+    original = worker._v2_adopt_position
+
+    def spy(
+        symbol: str, price: Decimal, *, ledger_cost_ambiguous: bool = False
+    ) -> Any:
+        flags.append(ledger_cost_ambiguous)
+        return original(symbol, price, ledger_cost_ambiguous=ledger_cost_ambiguous)
+
+    monkeypatch.setattr(worker, "_cost_basis_is_ambiguous", fake_ambiguous)
+    monkeypatch.setattr(worker, "_v2_adopt_position", spy)
+
+    await worker._v2_position_package("AAA", Decimal("10.42"))
+
+    assert measured == [f"{worker._account_id}:AAA"], "se mide una vez, para ese símbolo"
+    assert flags == [True], "el veredicto de ambigüedad llega a la adopción"
+    adopted = worker._v2_positions["AAA"]
+    assert adopted.current_stop is not None, "el espejo del motor sigue dando un stop"
+    reasons = [e.payload.get("reason") for e in worker._v2_position_journal_pending]
+    assert "cost_basis_ambiguous" in reasons
+
+
 @pytest.mark.asyncio
 async def test_position_management_events_reach_the_durable_spine(
     auto_env: None,

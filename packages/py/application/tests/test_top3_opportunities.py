@@ -11,6 +11,11 @@ import asyncio
 from typing import Any
 
 from bolsa_analytics.cognitive.opportunity_ranker import OpportunityScore
+from bolsa_domain.entities.strategy_lifecycle import (
+    GateResult,
+    StrategyEvaluation,
+)
+
 from bolsa_application.opportunity_board import AssetEvidence, OpportunityBoard
 from bolsa_application.opportunity_evidence_adapter import (
     StrategyEvidenceBundle,
@@ -23,10 +28,6 @@ from bolsa_application.top3_opportunities import (
     HISTORICAL_SCORING_NO_CHAMPION,
     select_top3_assets,
     select_top3_records,
-)
-from bolsa_domain.entities.strategy_lifecycle import (
-    GateResult,
-    StrategyEvaluation,
 )
 
 
@@ -58,9 +59,47 @@ def test_robustness_is_blend_of_wfe_dsr_1_minus_pbo() -> None:
     assert robustness_component(evaluation) == round((0.8 + 0.6 + 0.6) / 3, 4)
 
 
-def test_robustness_missing_metrics_is_zero() -> None:
+def test_robustness_missing_metrics_is_none_not_zero() -> None:
+    """C-3 — sin ninguna métrica el componente NO se midió: ``None``, no un 0 medido."""
     evaluation = _evaluation("c1", score=2.0, metrics={})
-    assert robustness_component(evaluation) == 0.0
+    assert robustness_component(evaluation) is None
+
+
+def test_regime_fit_without_measured_regime_is_none() -> None:
+    """C-3 — sin régimen declarado no se sabe si encaja: ``None`` (no un 0 estructural)."""
+    evaluation = _evaluation("c1", score=2.0, metrics={})
+    assert evidence_components(evaluation)["regime_fit"] is None
+    assert evidence_components(evaluation, expected_regime="trend_up")["regime_fit"] is None
+
+
+def test_evidence_components_absent_inputs_are_unmeasured() -> None:
+    """C-3 — lo no aportado viaja como ``None``; un ``0.0`` explícito SÍ es medición."""
+    evaluation = _evaluation("c1", score=2.0, metrics={})
+    components = evidence_components(evaluation)
+    for name in ("robustness", "regime_fit", "momentum", "liquidity", "risk_reward", "execution_quality"):
+        assert components[name] is None, name
+    explicit = evidence_components(
+        evaluation,
+        momentum=0.0,
+        liquidity=0.0,
+        risk_reward=0.0,
+        execution_quality=0.0,
+    )
+    for name in ("momentum", "liquidity", "risk_reward", "execution_quality"):
+        assert explicit[name] == 0.0, name
+
+
+def test_evidence_dictionary_without_metrics_is_not_scored() -> None:
+    """C-3 — una candidata con dict de evidencia pero sin métricas no cuenta como medida."""
+    from bolsa_analytics.cognitive.opportunity_ranker import score_opportunity
+
+    # Sin evaluación no hay ninguna fuente de métricas: el dict sale entero a ``None``.
+    components = evidence_components(None)
+    score = score_opportunity("AAA", **components)
+    # El combinado sigue siendo 0 (Δ score = 0 respecto al histórico) pero NO hay medición.
+    assert score.combined == 0.0
+    assert score.scored is False
+    assert score.measured_components == ()
 
 
 def test_edge_prefers_oos_over_is() -> None:
@@ -163,10 +202,10 @@ def test_evidence_source_preloads_and_reads_sync() -> None:
         aaa = source.components_for("AAA")
         assert aaa is not None
         assert aaa["regime_fit"] == 1.0
-        # Sin evaluación ni salud ⇒ todos los componentes a 0 (fail-closed).
+        # Sin evaluación ni salud ⇒ ningún componente medido (C-3: ``None``, no 0.0).
         bbb = source.components_for("BBB")
         assert bbb is not None
-        assert all(v == 0.0 for v in bbb.values())
+        assert all(v is None for v in bbb.values())
         # Símbolo no observado ⇒ None (el motor conserva el scoring histórico).
         assert source.components_for("ZZZ") is None
 
@@ -208,9 +247,10 @@ class _FakeSession:
 
 def test_postgres_sink_maps_records_to_rows() -> None:
     """El sink traduce ``Top3OpportunityRecord`` a ``Top3OpportunityRow`` con régimen."""
+    from bolsa_infrastructure.database.models.tables import Top3OpportunityRow
+
     from bolsa_application.top3_opportunities import Top3OpportunityRecord
     from bolsa_application.top3_opportunity_store import PostgresTop3OpportunitySink
-    from bolsa_infrastructure.database.models.tables import Top3OpportunityRow
 
     session = _FakeSession()
     sink = PostgresTop3OpportunitySink(session, regime="trend_up")

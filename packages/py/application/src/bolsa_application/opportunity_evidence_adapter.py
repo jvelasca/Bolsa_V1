@@ -7,8 +7,10 @@ completa los componentes de robustez, régimen y el resto a partir de la evidenc
 el Strategy Lifecycle ya calcula.
 
 Sin IA, sin red, sin DB: transformaciones deterministas y fail-closed. Un componente
-ausente o no finito vale ``0`` (nunca se inventa evidencia); el ``score_opportunity``
-del ranker ya clampa a [0, 1] y no redistribuye pesos.
+ausente o no finito vale ``None`` — **no** ``0`` — (nunca se inventa evidencia): el
+``score_opportunity`` del ranker clampa lo ausente a 0 para el combinado y, al mismo
+tiempo, lo excluye de ``measured_components``. Esa distinción es la que impide que una
+candidata «con evidencia» pero sin ninguna métrica real cuente como medida (C-3).
 """
 
 from __future__ import annotations
@@ -62,14 +64,30 @@ def _clamp01(value: Any) -> float:
     return min(1.0, max(0.0, number))
 
 
-def _normalize_edge(score: Any) -> float:
-    """Mapea un score de borde (return% - 0.25·dd%) a [0, 1].
+def _clamp01_measured(value: Any) -> float | None:
+    """C-3 — ``None`` si el valor NO se aportó; ``0.0`` si se aportó y vale cero.
 
-    Negativo ⇒ 0 (sin borde). Lineal hasta ``EDGE_SCALE`` (saturación), transparente y
-    calibrable. Es un proxy del ``edge`` (EV / expectancy operacional) del ranker.
+    Un ``0`` declarado es una medición (una estrategia sin borde, un régimen que no
+    encaja); un componente ausente no lo es. Confundirlos hacía que una candidata sin
+    ninguna métrica real contara como ``scored`` y ocupara un hueco del TOP.
+    """
+    number = _finite(value)
+    if number is None:
+        return None
+    return min(1.0, max(0.0, number))
+
+
+def _normalize_edge(score: Any) -> float | None:
+    """Mapea un score de borde (return% - 0.25·dd%) a [0, 1], o ``None`` si no hay score.
+
+    Negativo o cero ⇒ 0 (sin borde, pero MEDIDO). Lineal hasta ``EDGE_SCALE``
+    (saturación), transparente y calibrable. Es un proxy del ``edge`` (EV / expectancy
+    operacional) del ranker.
     """
     number = _finite(score)
-    if number is None or number <= 0.0:
+    if number is None:
+        return None
+    if number <= 0.0:
         return 0.0
     return _clamp01(number / EDGE_SCALE)
 
@@ -93,12 +111,12 @@ def _metric(
 def robustness_component(
     evaluation: StrategyEvaluation | None = None,
     health: StrategyHealth | None = None,
-) -> float:
+) -> float | None:
     """Componente ``robustness`` = media de (WFE, DSR, 1 - PBO) presentes.
 
-    Ninguno presente ⇒ 0.0 (fail-closed). Los componentes se claman a [0, 1]:
-    WFE es OOS/IS (puede superar 1), DSR es una probabilidad [0, 1] y ``1 - PBO``
-    también es [0, 1].
+    Ninguno presente ⇒ ``None`` (C-3: no medido, no un 0 disfrazado de medición). Los
+    componentes se claman a [0, 1]: WFE es OOS/IS (puede superar 1), DSR es una
+    probabilidad [0, 1] y ``1 - PBO`` también es [0, 1].
     """
     wfe = _finite(_metric(evaluation, health, "wfe", "walk_forward_efficiency"))
     dsr = _finite(_metric(evaluation, health, "dsr", "dsr"))
@@ -110,7 +128,7 @@ def robustness_component(
         parts.append(_clamp01(dsr))
     if pbo is not None:
         parts.append(_clamp01(1.0 - pbo))
-    return round(sum(parts) / len(parts), 4) if parts else 0.0
+    return round(sum(parts) / len(parts), 4) if parts else None
 
 
 def regime_fit_component(
@@ -118,12 +136,16 @@ def regime_fit_component(
     *,
     expected_regime: str | None = None,
     direction: str = "long",
-) -> float:
+) -> float | None:
     """Componente ``regime_fit``: 1.0 si el régimen permite la entrada, else 0.0.
 
     Con ``expected_regime`` se compara el régimen persistido del trial (match exacto).
     Sin ``expected_regime`` se usa el gate direccional fail-closed de
     ``market_regime_gate`` (UNKNOWN/RISK_OFF/BEAR bloquean LONG).
+
+    C-3 — sin régimen MEDIDO (ni ``expected_regime`` ni ``evaluation.metrics["regime"]``)
+    devuelve ``None``: no se sabe si encaja, y un ``0.0`` estructural no es una medición.
+    Cuando sí hay régimen, ``0.0`` es legítimo (hay dato y no encaja).
     """
     candidate_regime = None
     if evaluation is not None:
@@ -131,11 +153,11 @@ def regime_fit_component(
     if expected_regime:
         if isinstance(candidate_regime, str) and candidate_regime.strip():
             return 1.0 if candidate_regime.strip() == str(expected_regime).strip() else 0.0
-        return 0.0
+        return None
     if isinstance(candidate_regime, str) and candidate_regime.strip():
         regime = resolve_operational_regime(trial_regime=candidate_regime)
         return 1.0 if regime_allows_entry_for(regime, direction) else 0.0
-    return 0.0
+    return None
 
 
 def evidence_components(
@@ -148,16 +170,21 @@ def evidence_components(
     momentum: Any = None,
     risk_reward: Any = None,
     execution_quality: Any = None,
-) -> dict[str, Any]:
+) -> dict[str, float | None]:
     """Mapea la evidencia de estrategia a los 7 componentes del ``OpportunityScore``.
 
     - ``edge``            ← score de borde robusto (OOS preferido, IS fallback).
     - ``robustness``      ← media de (WFE, DSR, 1 - PBO).
     - ``regime_fit``      ← encaje de régimen (gate direccional / match esperado).
-    - ``momentum``        ← aportado por el llamante (0 si no se aporta).
-    - ``liquidity``       ← aportado por el llamante (0 si no se aporta).
-    - ``risk_reward``     ← aportado por el llamante (0 si no se aporta).
-    - ``execution_quality`` ← aportado por el llamante (0 si no se aporta).
+    - ``momentum``        ← aportado por el llamante.
+    - ``liquidity``       ← aportado por el llamante.
+    - ``risk_reward``     ← aportado por el llamante.
+    - ``execution_quality`` ← aportado por el llamante.
+
+    C-3 — lo NO aportado viaja como ``None``, no como ``0.0``. El ``score_opportunity``
+    del ranker sigue clampeando ``None`` a 0 en el combinado (Δ score = 0 respecto al
+    histórico) pero deja de contarlo como componente medido, así que una candidata sin
+    ninguna métrica real no puede entrar en el TOP de decisión.
     """
     edge_score = _metric(evaluation, health, "robust_score")
     if edge_score is None:
@@ -173,10 +200,10 @@ def evidence_components(
         "regime_fit": regime_fit_component(
             evaluation, expected_regime=expected_regime, direction=direction
         ),
-        "momentum": _clamp01(momentum),
-        "liquidity": _clamp01(liquidity),
-        "risk_reward": _clamp01(risk_reward),
-        "execution_quality": _clamp01(execution_quality),
+        "momentum": _clamp01_measured(momentum),
+        "liquidity": _clamp01_measured(liquidity),
+        "risk_reward": _clamp01_measured(risk_reward),
+        "execution_quality": _clamp01_measured(execution_quality),
     }
 
 
@@ -203,7 +230,16 @@ def score_instrument_opportunity(
         risk_reward=risk_reward,
         execution_quality=execution_quality,
     )
-    return score_opportunity(instrument_id, **components)
+    return score_opportunity(
+        instrument_id,
+        edge=components["edge"],
+        robustness=components["robustness"],
+        regime_fit=components["regime_fit"],
+        momentum=components["momentum"],
+        liquidity=components["liquidity"],
+        risk_reward=components["risk_reward"],
+        execution_quality=components["execution_quality"],
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,7 +264,10 @@ class StrategyEvidenceSource:
     reader: Callable[
         [Sequence[str], str | None], Awaitable[Mapping[str, StrategyEvidenceBundle]]
     ]
-    _by_symbol: dict[str, dict[str, float]] = field(default_factory=dict, init=False, repr=False)
+    #: ``None`` = componente NO medido (C-3). Un ``0.0`` aquí sí es una medición.
+    _by_symbol: dict[str, dict[str, float | None]] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     async def refresh(self, symbols: Iterable[str], *, regime: str | None = None) -> None:
         wanted = [str(s).strip() for s in symbols if str(s).strip()]
@@ -251,6 +290,6 @@ class StrategyEvidenceSource:
                 direction="long",
             )
 
-    def components_for(self, symbol: str) -> dict[str, float] | None:
+    def components_for(self, symbol: str) -> dict[str, float | None] | None:
         key = str(symbol).strip()
         return self._by_symbol.get(key) if key else None

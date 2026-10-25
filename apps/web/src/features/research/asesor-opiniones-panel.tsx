@@ -19,6 +19,10 @@ import {
 } from "@bolsa/shared";
 import { absentDataLabel } from "@/components/absent-data";
 import { api } from "@/lib/api";
+import {
+  portfolioMeasured,
+  positionOpenHintFor,
+} from "@/lib/position-open-hint";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { focusInstrumentInMercado } from "@/features/trading/focus-instrument-in-mercado";
 import {
@@ -92,16 +96,19 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
     queryFn: api.getPortfolio,
     staleTime: 30_000,
   });
-  const openPositionIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const p of portfolioQuery.data?.data.positions ?? []) {
-      if (Math.abs(Number(p.quantity ?? 0)) > 0) set.add(p.instrumentId);
-    }
-    return set;
-  }, [portfolioQuery.data]);
 
   const { faByInstrument, taByInstrument, scoresLoading } =
     useInstrumentsHubScores(studyIds);
+
+  // C-1 — `openPositionIds.has(id)` sobre `?? []` convertía «cartera cargando/fallida» en
+  // «sin posición». El hint es ahora tri-estado: `null` mientras no se haya medido.
+  // `portfolioSettled` evita que la primera pregunta al motor se haga con la cartera a
+  // medio leer (el hueco declarado sigue siendo válido si la lectura falla).
+  const portfolioSettled = !portfolioQuery.isLoading;
+  // Se toman valores ESTABLES (referencia de `positions` + booleano) en vez del objeto
+  // de react-query: así el `useMemo` no se recalcula en cada render.
+  const portfolioPositions = portfolioQuery.data?.data.positions;
+  const portfolioIsMeasured = portfolioMeasured(portfolioQuery);
 
   const hints: InstrumentDailyOpinionHintV1[] = useMemo(
     () =>
@@ -119,16 +126,28 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
           faScore: fa?.scoreDisplay100 ?? null,
           taScore: ta?.technicalDisplay100 ?? null,
           distress: Boolean(fa?.distress),
-          positionOpen: openPositionIds.has(id),
+          positionOpen: positionOpenHintFor(
+            portfolioPositions,
+            portfolioIsMeasured,
+            id,
+          ),
           allowTrading: true,
           hasEodBar: true,
         };
       }),
-    [studyIds, faByInstrument, taByInstrument, openPositionIds],
+    // La cartera entra como dato estable: cuando termina de cargar cambia la referencia
+    // de `positions` (o el booleano) y el memo se recalcula.
+    [
+      studyIds,
+      faByInstrument,
+      taByInstrument,
+      portfolioPositions,
+      portfolioIsMeasured,
+    ],
   );
 
   const opinionsQuery = useInstrumentDailyOpinions(studyIds, hints, {
-    enabled: studyIds.length > 0 && !scoresLoading,
+    enabled: studyIds.length > 0 && !scoresLoading && portfolioSettled,
   });
   const telemetryQuery = useQuery({
     queryKey: ["instrument-daily-opinions-telemetry", studyIds],

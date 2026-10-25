@@ -4,12 +4,12 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
-
 from bolsa_analytics.cognitive.portfolio_reservation import (
     ReservationLedger,
     build_reservation,
 )
 from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
+
 from bolsa_application.auto_v2_entry import (
     V2_ENGINE_ENV,
     V2Signal,
@@ -315,6 +315,55 @@ def test_plan_v2_tick_evidence_components_reorder_ranking() -> None:
     )
     assert plan.ranked[0].instrument_id == "BBB"
     assert plan.ranked[1].instrument_id == "AAA"
+
+
+def test_plan_v2_tick_evidence_without_metrics_is_not_measured() -> None:
+    """C-3 — un dict de evidencia SIN métricas no convierte la candidata en medida.
+
+    Antes ``_score_from_signal`` rellenaba los cinco componentes de evidencia con ``0.0``
+    y ``score_opportunity`` los contaba como medidos: una candidata sin edge ni liquidez
+    declarados entraba al TOP de DECISIÓN por relleno, con un ``0,0`` que parecía una nota.
+    """
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=None, liquidity=None)],
+        regime="BULL_TREND",
+        evidence={"AAA": {}},
+    )
+    assert plan.approved_symbols == ()
+    assert plan.decisions == (), "una candidata no comparable no se decide"
+    reasons = [
+        code
+        for entry in plan.journal_entries
+        for code in (entry.payload or {}).get("reasonCodes", ())
+    ]
+    assert "opportunity_unscored" in reasons
+    assert "top_n_excluded" not in reasons
+
+
+def test_plan_v2_tick_evidence_zero_declared_is_measured() -> None:
+    """C-3 (control positivo) — un ``0,0`` DECLARADO sí es medición y compite."""
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=None, liquidity=None)],
+        regime="BULL_TREND",
+        evidence={
+            "AAA": {
+                "robustness": 0.0,
+                "regime_fit": 0.0,
+                "momentum": 0.0,
+                "risk_reward": 0.0,
+                "execution_quality": 0.0,
+            }
+        },
+    )
+    reasons = [
+        code
+        for entry in plan.journal_entries
+        for code in (entry.payload or {}).get("reasonCodes", ())
+    ]
+    assert "opportunity_unscored" not in reasons, "0,0 declarado es medición"
+    assert plan.decisions != (), "una candidata medida se decide (y aquí se veta)"
 
 
 def test_plan_v2_tick_evidence_none_is_historical() -> None:

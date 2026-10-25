@@ -14,6 +14,10 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { absentDataLabel } from "@/components/absent-data";
+import {
+  portfolioMeasured,
+  positionOpenHintFor,
+} from "@/lib/position-open-hint";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { instrumentTopBacktestsHref } from "@/features/backtests/instrument-strategy-top-panel";
 import {
@@ -155,15 +159,13 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
       ? fromPosition
       : null;
   }, [instrumentId, instrumentsCatalogQuery.data, portfolioQuery.data]);
-  const positionOpen = useMemo(() => {
-    if (!instrumentId) return false;
-    const positions = portfolioQuery.data?.data.positions ?? [];
-    return positions.some(
-      (p) =>
-        p.instrumentId === instrumentId &&
-        Math.abs(Number(p.quantity ?? 0)) > 0,
-    );
-  }, [instrumentId, portfolioQuery.data]);
+  // C-1 — tri-estado: `?? []` convertía «cartera cargando/fallida» en «sin posición», y
+  // el motor recibía `positionOpen=false` en vez del «no medido» que ya sabe tratar.
+  const positionOpen = positionOpenHintFor(
+    portfolioQuery.data?.data.positions,
+    portfolioMeasured(portfolioQuery),
+    instrumentId,
+  );
 
   const { faByInstrument, taByInstrument, scoresLoading } =
     useInstrumentsHubScores(studyIds);

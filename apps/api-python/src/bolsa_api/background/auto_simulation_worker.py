@@ -446,6 +446,19 @@ def real_price_enabled() -> bool:
     }
 
 
+# ── Base de coste de una ADOPCIÓN (W-159-2 · C-4) ───────────────────────────────
+#: Fuente del coste con el que se reconstruye la geometría de una posición adoptada.
+#: Viaja al journal durable (``entrySource``) para que un stop imposible sea depurable
+#: a posteriori sin reinterpretar nada.
+ADOPTION_COST_SOURCE_LEDGER = "ledger"
+ADOPTION_COST_SOURCE_PROJECTION = "projection"
+#: C-4 — el libro es AMBIGUO (dos motores vivos) y se usa el espejo de ESTE motor.
+ADOPTION_COST_SOURCE_PROJECTION_AMBIGUOUS_LEDGER = "projection_ambiguous_ledger"
+#: C-4 — el libro es ambiguo y no hay espejo: no se autoriza ningún coste.
+ADOPTION_COST_SOURCE_LEDGER_AMBIGUOUS = "ledger_ambiguous"
+ADOPTION_COST_SOURCE_NONE = "none"
+
+
 # ── Reloj / precio SIM deterministas (inyectables; "minutos simulados") ─────────
 #: Precio por ``(símbolo, tick)``. ``tick`` es el índice temporal del CALENDARIO del
 #: proveedor: el worker le pasa el **tick de BARRA** (``closed_bars.bar_tick``), que es
@@ -2981,11 +2994,15 @@ class AutoSimulationWorker:
         except Exception:  # noqa: BLE001 — sin evidencia, scoring histórico.
             logger.exception("auto_sim v2 strategy evidence refresh failed")
 
-    def _v2_evidence_lookup(self, packages: Mapping[str, Any]) -> dict[str, dict[str, float]] | None:
+    def _v2_evidence_lookup(
+        self, packages: Mapping[str, Any]
+    ) -> dict[str, dict[str, float | None]] | None:
         """Lookup síncrono ``instrument_id → components`` para ``plan_v2_tick``.
 
         ``None`` cuando no hay fuente o ningún instrumento tiene evidencia: el motor
-        conserva el scoring histórico (solo edge+liquidity).
+        conserva el scoring histórico (solo edge+liquidity). Dentro de una entrada, un
+        componente a ``None`` significa NO medido (C-3): el ranker lo clampa para el
+        combinado pero no lo cuenta en ``measured_components``.
         """
         source = self._v2_evidence_source
         if source is None:
@@ -2993,7 +3010,7 @@ class AutoSimulationWorker:
         components_for = getattr(source, "components_for", None)
         if not callable(components_for):
             return None
-        lookup: dict[str, dict[str, float]] = {}
+        lookup: dict[str, dict[str, float | None]] = {}
         for symbol in packages:
             comps = components_for(str(symbol))
             if isinstance(comps, dict):
@@ -5704,7 +5721,13 @@ class AutoSimulationWorker:
             return "clean"
         return None
 
-    def _v2_adopt_position(self, symbol: str, price: Decimal) -> PositionState | None:
+    def _v2_adopt_position(
+        self,
+        symbol: str,
+        price: Decimal,
+        *,
+        ledger_cost_ambiguous: bool = False,
+    ) -> PositionState | None:
         """Recupera el ``PositionState`` de una posición abierta sin estado V2 vivo.
 
         Dos caminos, en este orden:
@@ -5725,6 +5748,12 @@ class AutoSimulationWorker:
         de fingir que hay protección. El stop se conserva/reconstruye igual: una posición
         declarada sin protección sigue protegida por el mejor stop conocido; lo que no se
         puede fingir es la CERTEZA.
+
+        C-4 (auditoría .161) — ``ledger_cost_ambiguous`` lo mide el llamante async
+        (:meth:`_cost_basis_is_ambiguous`); esta función se mantiene síncrona para no
+        romper la batería de crash. Con el libro ambiguo la adopción usa el espejo del
+        motor y se declara degradada: el nivel deja de fingir que el coste de la CUENTA es
+        el coste de ESTA fila.
         """
         held = self._open.get(symbol, Decimal("0"))
         at = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -5734,25 +5763,52 @@ class AutoSimulationWorker:
         # espejo es respaldo declarado. Medido 2026-10-21: el espejo traía una entrada que
         # no era el coste del libro (10,3335) y la geometría reconstruida nació con un stop
         # POR ENCIMA del mercado, que liquidó la posición en el primer tick.
-        entry, entry_source = self._adoption_cost_basis(symbol)
+        entry, entry_source = self._adoption_cost_basis(
+            symbol, canonical_ambiguous=ledger_cost_ambiguous
+        )
         if entry is None or entry <= 0:
+            if entry_source == ADOPTION_COST_SOURCE_LEDGER_AMBIGUOUS:
+                # C-4 — un plan durable trae su PROPIA geometría: no necesita el coste del
+                # libro. Se intenta antes de declarar el hueco de coste.
+                restored = self._v2_restore_durable_position(symbol, held)
+                if restored is not None:
+                    if restored.lifecycle_state is None:
+                        return self._v2_degrade_adoption(
+                            symbol,
+                            restored,
+                            source="plan",
+                            reason="durable_plan_without_lifecycle_state",
+                            at=at,
+                            entry=None,
+                            price=price,
+                            entry_source=entry_source,
+                        )
+                    return restored
+            reason = (
+                "cost_basis_ambiguous"
+                if entry_source == ADOPTION_COST_SOURCE_LEDGER_AMBIGUOUS
+                else "cost_basis_missing"
+            )
             self._journal_position_event(
                 symbol,
                 RECONCILIATION_REQUIRED,
                 at=at,
                 detail={
                     "source": "none",
-                    "reason": "cost_basis_missing",
+                    "reason": reason,
                     "reasonCode": PROTECTION_MISSING,
+                    "entrySource": entry_source,
                     "price": float(price),
                     "quantity": float(held),
                     "attention": "high",
                 },
             )
             logger.warning(
-                "auto_sim v2 adoption without cost basis symbol=%s qty=%s (sin stop: se declara)",
+                "auto_sim v2 adoption without cost basis symbol=%s qty=%s reason=%s "
+                "(sin stop: se declara)",
                 symbol,
                 held,
+                reason,
             )
             return None
         restored = self._v2_restore_durable_position(symbol, held)
@@ -5767,6 +5823,7 @@ class AutoSimulationWorker:
                     at=at,
                     entry=entry,
                     price=price,
+                    entry_source=entry_source,
                 )
             return restored
         # W-159-3 (Hueco D): el ciclo del inventario vivo se HEREDA del libro (si el fill lo
@@ -5848,7 +5905,14 @@ class AutoSimulationWorker:
             symbol,
             position,
             source="reconstructed",
-            reason="no_durable_plan",
+            # C-4 — con el libro ambiguo se usa el espejo del motor: el plan se declara
+            # degradado por el COSTE, no por «no hay plan durable» (el plan es reconstruido
+            # en ambos casos y el motivo real es el que viaja al journal).
+            reason=(
+                "cost_basis_ambiguous"
+                if entry_source == ADOPTION_COST_SOURCE_PROJECTION_AMBIGUOUS_LEDGER
+                else "no_durable_plan"
+            ),
             at=at,
             entry=entry,
             price=price,
@@ -5857,7 +5921,12 @@ class AutoSimulationWorker:
             entry_source=entry_source,
         )
 
-    def _adoption_cost_basis(self, symbol: str) -> tuple[Decimal | None, str]:
+    def _adoption_cost_basis(
+        self,
+        symbol: str,
+        *,
+        canonical_ambiguous: bool = False,
+    ) -> tuple[Decimal | None, str]:
         """W-159-2 — base de coste de una adopción: el LIBRO manda, el espejo respalda.
 
         El espejo (``sim_auto_positions.entry_price``) es una proyección: puede venir de una
@@ -5865,14 +5934,26 @@ class AutoSimulationWorker:
         aplicados es el hecho financiero. Se devuelve la fuente usada para que el journal
         durable (Hueco C) pueda distinguir "coste del libro" de "coste del espejo" sin
         reinterpretar nada.
+
+        C-4 (auditoría .161) — ``canonical_ambiguous`` (lo mide
+        :meth:`_cost_basis_is_ambiguous`, que es async) significa que el coste del libro es
+        el MEDIO DE LA CUENTA y no identifica a esta fila: hay más de un motor vivo sobre
+        el símbolo. En ese caso el libro no autoriza el número y la adopción usa el espejo,
+        que sí es de ESTE motor, declarando la fuente. Sin espejo no se inventa un coste:
+        se devuelve ``None`` con ``ledger_ambiguous`` para que el llamante lo declare.
         """
         canonical = self._canonical_entry_by_symbol.get(symbol)
         if canonical is not None and canonical > 0:
-            return canonical, "ledger"
+            if not canonical_ambiguous:
+                return canonical, ADOPTION_COST_SOURCE_LEDGER
+            mirror = self._entry_price.get(symbol)
+            if mirror is not None and mirror > 0:
+                return mirror, ADOPTION_COST_SOURCE_PROJECTION_AMBIGUOUS_LEDGER
+            return None, ADOPTION_COST_SOURCE_LEDGER_AMBIGUOUS
         mirror = self._entry_price.get(symbol)
         if mirror is not None and mirror > 0:
-            return mirror, "projection"
-        return None, "none"
+            return mirror, ADOPTION_COST_SOURCE_PROJECTION
+        return None, ADOPTION_COST_SOURCE_NONE
 
     async def _cost_basis_is_ambiguous(self, account_id: str, symbol: str) -> bool:
         """W-159-5 (Hueco E) — ¿el coste del LIBRO identifica a ESTA fila?
@@ -6108,11 +6189,25 @@ class AutoSimulationWorker:
         (``stop_update`` de un ``PROTECT``) y journaliza el resultado. Antes el stop
         propuesto se descartaba y ``current_stop`` quedaba congelado en el valor de
         nacimiento: ni break-even ni trailing existían en AUTO.
+
+        C-4: la adopción consulta aquí (async, una sola vez por símbolo y sólo cuando no
+        hay estado V2 vivo) si el coste del LIBRO es ambiguo — dos motores vivos sobre el
+        mismo símbolo hacen que el medio de la cuenta no identifique a esta fila.
         """
         position: PositionState | None = self._v2_positions.get(symbol)
         degraded = False
         if position is None:
-            position = self._v2_adopt_position(symbol, price)
+            # C-4 — la ambigüedad del coste del libro se mide UNA vez aquí (async) y viaja
+            # como dato: ``_v2_adopt_position`` se mantiene síncrona (batería de crash).
+            account_id = self._account_id or ""
+            ledger_cost_ambiguous = (
+                await self._cost_basis_is_ambiguous(account_id, symbol)
+                if account_id
+                else False
+            )
+            position = self._v2_adopt_position(
+                symbol, price, ledger_cost_ambiguous=ledger_cost_ambiguous
+            )
             if position is None:
                 return None
             degraded = derive_lifecycle_state(position) in (

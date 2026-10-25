@@ -9,6 +9,25 @@ import type {
   InstrumentDailyOpinionV1,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
+import { positionOpenHintKey } from "@/lib/position-open-hint";
+
+/**
+ * Clave de UN hint dentro de la `queryKey`. `positionOpen` es tri-estado: `null` (cartera
+ * no medida) NO puede compartir clave con `false` (sin posición), o la caché de una
+ * medición anterior se serviría para un estado que el servidor debe fallar cerrado.
+ */
+export function instrumentDailyOpinionHintKey(
+  hint: InstrumentDailyOpinionHintV1,
+): string {
+  return [
+    hint.instrumentId,
+    hint.ioScore ?? "",
+    hint.distress ? 1 : 0,
+    positionOpenHintKey(hint.positionOpen),
+    hint.allowTrading === false ? 0 : 1,
+    hint.hasEodBar === undefined ? "u" : hint.hasEodBar ? 1 : 0,
+  ].join(":");
+}
 
 export function useInstrumentDailyOpinions(
   instrumentIds: string[],
@@ -27,16 +46,7 @@ export function useInstrumentDailyOpinions(
       "instrument-daily-opinions",
       ids,
       options?.forceRefresh ?? false,
-      hints.map((h) =>
-        [
-          h.instrumentId,
-          h.ioScore ?? "",
-          h.distress ? 1 : 0,
-          h.positionOpen ? 1 : 0,
-          h.allowTrading === false ? 0 : 1,
-          h.hasEodBar === undefined ? "u" : h.hasEodBar ? 1 : 0,
-        ].join(":"),
-      ),
+      hints.map(instrumentDailyOpinionHintKey),
     ],
     enabled,
     staleTime: 60_000,
