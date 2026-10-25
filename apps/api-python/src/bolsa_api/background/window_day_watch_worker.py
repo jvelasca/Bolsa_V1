@@ -47,8 +47,12 @@ Reglas duras:
   pasado anterior a la primera fila** (baseline): en un ledger vacío no hay días perdidos que
   declarar.
 * **Fail-safe por tick**: un error del tick se registra y NO mata el bucle.
-* **Idempotente por aviso**: cada par ``(día, veredicto)`` se anuncia **una sola vez** por
-  proceso (el latido sí se reescribe en cada tick, para poder probar que el vigía vive).
+* **Idempotente por aviso, con marca DURABLE**: cada par ``(día, veredicto)``
+  se anuncia **una sola vez**, y la marca se persiste en el latido (``alerted``) — de modo
+  que sobrevive a los reinicios del proceso y la comparte el CLI. Antes el dedupe vivía en
+  memoria: cada arranque del stack (y cada ``pnpm window:watch``, que no deduplicaba nada)
+  reenviaba el email del mismo día perdido, y el aviso se volvía ruido. El latido sí se
+  reescribe en cada tick, para poder probar que el vigía vive.
 
 @see scripts/window-forward-runner.mjs (ledger del día + lock ``.run.lock`` + ``--watch``)
 @see docs/engineering/runbook-ventana-forward-v2.78-2026-09-27.md
@@ -61,7 +65,7 @@ import json
 import logging
 import os
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from email.message import EmailMessage
@@ -134,6 +138,16 @@ class WindowDayWatch:
 def day_stamp(moment: datetime) -> str:
     """Sello ``YYYYMMDD`` (mismo formato que las carpetas del runner)."""
     return moment.strftime("%Y%m%d")
+
+
+def alert_key(watch: WindowDayWatch) -> str:
+    """Clave DURABLE de aviso: ``(día evaluado, veredicto)``.
+
+    Un mismo par se anuncia **una sola vez**, aunque el proceso se reinicie o lo evalúe el
+    CLI. Si el veredicto del día cambia (p. ej. ``MISSED`` → ``HARD_ERROR``), la clave cambia
+    y vuelve a avisar: la marca no silencia información nueva.
+    """
+    return f"{watch.day}:{watch.verdict}"
 
 
 def evaluate_day_watch(
@@ -367,8 +381,13 @@ def status_payload(
     now: datetime,
     lookback_days: int,
     source: str,
+    alerted: Collection[str] | None = None,
 ) -> dict[str, Any]:
-    """Payload del latido (falsable y estable para leer desde fuera)."""
+    """Payload del latido (falsable y estable para leer desde fuera).
+
+    ``alerted`` es la marca **durable** de avisos ya emitidos: sin ella el dedupe moría con
+    el proceso y cada reinicio del stack reenviaba el mismo correo.
+    """
     today = next((check for check in checks if check.day == day_stamp(now)), None)
     return {
         "at": now.isoformat(),
@@ -380,6 +399,7 @@ def status_payload(
         "reason": today.reason if today is not None else None,
         "message": today.message if today is not None else "",
         "alerts": [f"{check.day}:{check.verdict}" for check in checks if check.severity == "alert"],
+        "alerted": sorted(alerted or ()),
         "checks": [
             {
                 "day": check.day,
@@ -401,11 +421,13 @@ def write_status(
     lookback_days: int = 0,
     source: str = "worker",
     directory: Path | None = None,
+    alerted: Collection[str] | None = None,
 ) -> Path | None:
     """Escribe el latido (``day-watch.json`` + línea en ``day-watch.jsonl``).
 
     Best-effort: un fallo de escritura se registra y NO tumba al vigía (el aviso por log y
-    email es independiente). Devuelve la ruta escrita o ``None``.
+    email es independiente). Devuelve la ruta escrita o ``None``. ``alerted`` es la marca
+    durable de avisos ya emitidos (ver ``read_alerted``).
     """
     path = status_path(directory)
     journal = status_journal_path(directory)
@@ -413,7 +435,13 @@ def write_status(
         logger.warning("ventana PAPER: sin raíz de repo; no se pudo escribir el latido")
         return None
     body = json.dumps(
-        status_payload(checks, now=now, lookback_days=lookback_days, source=source),
+        status_payload(
+            checks,
+            now=now,
+            lookback_days=lookback_days,
+            source=source,
+            alerted=alerted,
+        ),
         ensure_ascii=False,
         sort_keys=True,
     )
@@ -426,6 +454,35 @@ def write_status(
         logger.exception("ventana PAPER: no se pudo escribir el latido en %s", path)
         return None
     return path
+
+
+def read_alerted(directory: Path | None = None) -> set[str]:
+    """Claves ``(día:veredicto)`` ya anunciadas, leídas del latido.
+
+    Best-effort y **fail-open**: un latido ausente, ilegible o sin marcas devuelve un conjunto
+    vacío, de modo que el peor caso es repetir un aviso — nunca silenciarlo por un fichero
+    corrupto.
+
+    Migración declarada: un latido del **formato anterior** (sin ``alerted``) ya se escribió
+    por un proceso que anunció sus ``alerts``; se adoptan como marca para que el primer tick
+    tras el despliegue no reenvíe lo mismo que el usuario ya recibió. El tradeoff se declara:
+    si aquel email falló, no se reintenta (quedó la línea ``ALERTA`` en el log).
+    """
+    path = status_path(directory)
+    if path is None or not path.exists():
+        return set()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    if not isinstance(payload, dict):
+        return set()
+    raw = payload.get("alerted")
+    if not isinstance(raw, list):
+        raw = payload.get("alerts")
+    if not isinstance(raw, list):
+        return set()
+    return {str(item) for item in raw if isinstance(item, str) and item.strip()}
 
 
 # ---------------------------------------------------------------------------
@@ -483,11 +540,16 @@ def _worker_enabled() -> bool:
     return raw not in {"0", "false", "no", "off"}
 
 
-async def _announce(settings: Settings, watch: WindowDayWatch) -> None:
-    """Avisa de un veredicto: log SIEMPRE; email sólo si es alerta y hay canal."""
+async def _announce(settings: Settings, watch: WindowDayWatch) -> bool:
+    """Avisa de un veredicto: log SIEMPRE; email sólo si es alerta y hay canal.
+
+    Devuelve ``True`` si el aviso quedó emitido por su canal (email enviado, o log cuando no
+    hay canal configurado) y ``False`` si la entrega **falló**: en ese caso NO se marca como
+    anunciado, para que el siguiente tick lo reintente.
+    """
     if watch.severity != "alert":
         logger.info("vigía ventana PAPER · %s: %s", watch.verdict, watch.message)
-        return
+        return True
     logger.error(
         "ALERTA VENTANA PAPER · %s (%s): %s",
         watch.verdict,
@@ -499,12 +561,38 @@ async def _announce(settings: Settings, watch: WindowDayWatch) -> None:
         sent = await asyncio.to_thread(send_alert_email, settings, watch)
     except Exception:
         logger.exception("ventana PAPER: fallo enviando el aviso por email")
+        return False
     if not sent:
         logger.warning(
             "ventana PAPER: aviso %s sin email (SMTP/destinatario no configurado); "
             "el aviso queda registrado en el log",
             watch.verdict,
         )
+    return True
+
+
+async def announce_pending(
+    settings: Settings,
+    checks: Sequence[WindowDayWatch],
+    already: Collection[str],
+) -> set[str]:
+    """Avisa sólo de los ``(día, veredicto)`` que no constan en ``already``.
+
+    Devuelve el conjunto actualizado de marcas. La persistencia la decide el llamante (el
+    latido en el bucle, y el mismo latido en el CLI): así el dedupe **sobrevive a los
+    reinicios** y lo comparten el worker y ``pnpm window:watch``. Un fallo de entrega no
+    añade la marca, de modo que no se pierde el aviso.
+    """
+    pending = set(already)
+    for watch in checks:
+        if watch.verdict == "NOT_DUE":
+            continue
+        key = alert_key(watch)
+        if key in pending:
+            continue
+        if await _announce(settings, watch):
+            pending.add(key)
+    return pending
 
 
 async def evaluate_all(
@@ -521,9 +609,10 @@ async def evaluate_all(
 ) -> list[WindowDayWatch]:
     """Evalúa HOY + el arrastre de días perdidos y AVISA de cada veredicto.
 
-    Devuelve los veredictos (hoy primero). ``persist=True`` escribe el latido durable;
-    ``announce=False`` deja el veredicto en el latido sin volver a avisar (idempotencia
-    por día/veredicto del bucle), de modo que un ``MISSED`` no se repita cada tick.
+    Devuelve los veredictos (hoy primero). ``persist=True`` escribe el latido durable y
+    ``announce=False`` deja el aviso al llamante (que es quien deduplica contra la marca
+    ``alerted`` del latido vía ``announce_pending``). La forma «todo de golpe» con
+    ``announce=True`` se conserva para usos puntuales y tests.
     """
     cfg = settings or get_settings()
     moment = now or datetime.now(MADRID)
@@ -578,10 +667,6 @@ async def evaluate_once(
     return checks[0]
 
 
-#: Avisos ya emitidos en este proceso: ``{día:veredicto}`` (no se repite el mismo aviso).
-_announced: set[str] = set()
-
-
 async def _tick(
     cfg: Settings,
     *,
@@ -589,24 +674,33 @@ async def _tick(
     directory: Path | None = None,
     now: datetime | None = None,
 ) -> WindowDayWatch:
-    """Un tick: evalúa hoy + arrastre, escribe el latido y avisa (una vez por veredicto)."""
+    """Un tick: evalúa hoy + arrastre, avisa lo NO anunciado y deja el latido.
+
+    El orden importa: primero se evalúa, después se avisa **deduplicando contra el latido** y
+    sólo al final se escribe el latido con las marcas nuevas. Si un aviso falla, su marca no
+    se guarda y el siguiente tick lo reintenta.
+    """
     moment = now or datetime.now(MADRID)
-    day = day_stamp(moment)
     checks = await evaluate_all(
         now=moment,
         settings=cfg,
         lookback_days=lookback_days,
-        persist=True,
+        persist=False,
         directory=directory,
         source="worker",
         announce=False,
     )
-    for watch in checks:
-        key = f"{day}:{watch.day}:{watch.verdict}"
-        if watch.verdict == "NOT_DUE" or key in _announced:
-            continue
-        _announced.add(key)
-        await _announce(cfg, watch)
+    # La marca durable es la ÚNICA fuente de verdad del dedupe: no hay estado en memoria que
+    # se pierda al reiniciar el proceso.
+    alerted = await announce_pending(cfg, checks, read_alerted(directory))
+    write_status(
+        checks,
+        now=moment,
+        lookback_days=lookback_days,
+        source="worker",
+        directory=directory,
+        alerted=alerted,
+    )
     return checks[0]
 
 
@@ -673,6 +767,9 @@ Evalúa el día de hoy y arrastra los días laborables anteriores sin fila en el
 deja el latido en `operability_runs/window-runs/day-watch.json` y AVISA (log + email si
 hay SMTP). No toca la ventana: sólo lee el ledger y escribe su propio latido.
 
+Cada par (día, veredicto) se avisa UNA sola vez: la marca se guarda en el campo `alerted`
+del latido y la comparten este CLI y el worker del stack (los reinicios no repiten emails).
+
 Opciones:
   --once               (implícito) una única evaluación y salir
   --lookback-days N    días naturales de arrastre (0 desactiva; default 7)
@@ -729,16 +826,42 @@ def main(argv: Sequence[str] | None = None) -> int:
     span = _int_flag(args, "--lookback-days", default_lookback_days())
     persist = "--no-persist" not in args
     moment = _now_flag(args) or datetime.now(MADRID)
+    cfg = get_settings()
     checks = asyncio.run(
-        evaluate_all(now=moment, lookback_days=span, persist=persist, source="cli"),
+        evaluate_all(
+            now=moment,
+            settings=cfg,
+            lookback_days=span,
+            persist=False,
+            source="cli",
+            announce=False,
+        ),
     )
+    # Misma marca durable que el worker: el CLI ya no reenvía lo que el stack dev avisó.
+    alerted = asyncio.run(announce_pending(cfg, checks, read_alerted()))
+    if persist:
+        write_status(
+            checks,
+            now=moment,
+            lookback_days=span,
+            source="cli",
+            alerted=alerted,
+        )
     alerts = [check for check in checks if check.severity == "alert"]
     if "--json" in args:
-        payload = status_payload(checks, now=moment, lookback_days=span, source="cli")
+        payload = status_payload(
+            checks,
+            now=moment,
+            lookback_days=span,
+            source="cli",
+            alerted=alerted,
+        )
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
     else:
         for check in checks:
             print(f"[window:watch] {check.day_iso} · {check.verdict} · {check.message}")
+    # El exit 3 sigue declarando «hay día perdido» aunque el email ya se emitiera: es lo que
+    # deja la señal en `LastTaskResult` de la tarea programada.
     return ALERT_EXIT_CODE if alerts else 0
 
 
@@ -754,7 +877,9 @@ __all__ = [
     "STATUS_FILE",
     "STATUS_JOURNAL",
     "WindowDayWatch",
+    "alert_key",
     "alert_recipient",
+    "announce_pending",
     "day_is_running",
     "day_stamp",
     "default_lookback_days",
@@ -764,6 +889,7 @@ __all__ = [
     "evaluate_once",
     "ledger_path",
     "main",
+    "read_alerted",
     "read_ledger_rows",
     "repo_root",
     "runs_dir",
