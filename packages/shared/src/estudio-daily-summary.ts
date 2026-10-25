@@ -322,8 +322,9 @@ const attributionStatesTally = (attribution: ValueSummaryAttribution): string =>
  *
  * Un ciclo del mismo valor no demuestra que ese ciclo ejecutara la propuesta del parte:
  * pudo nacer de otra señal/plan (`mismatch`), sin propuesta (`not_proposed`), sin identidad
- * suficiente (`unmeasured`) o reclamado por varias propuestas (`ambiguous`). Solo `exact`
- * autoriza «Nada pendiente».
+ * suficiente (`unmeasured`) o reclamado por varias propuestas (`ambiguous`). Solo un agregado
+ * `exact` PURO autoriza «Nada pendiente»: `mixed` nunca lo hace, aunque contenga algún ciclo
+ * `exact`, porque el resto de ciclos del valor no está atribuido.
  */
 const missingSection = (
   value: EstudioDailyValueV1,
@@ -405,12 +406,16 @@ const missingSection = (
   if (state === "mixed") {
     const states = attributionStatesTally(attribution);
     if (attribution.exactCount > 0) {
+      // `exactCount > 0` NO autoriza «Nada pendiente»: el agregado es mixto y el resto de
+      // ciclos del valor (mismatch, not_proposed, unmeasured…) sigue sin atribuir a esta
+      // propuesta. El titular nombra la discrepancia en vez de dar la cadena por completa.
       return {
-        headline: "Nada pendiente: al menos un ciclo ejecutó esta propuesta.",
+        headline:
+          "Hay al menos un ciclo atribuido a esta propuesta, pero la cadena contiene ciclos con atribución discrepante.",
         detail: `Atribución mixta (${states}) · ${attributionTally(
           attribution,
-        )}.`,
-        measurement: "COMPLETE",
+        )}. Revisa el detalle antes de darla por completa.`,
+        measurement: "PARTIAL",
       };
     }
     return {

@@ -261,10 +261,15 @@ describe("deriveValueSummary", () => {
       exact: 1,
       mismatch: 1,
     });
-    expect(summary.missing.headline).toContain("Nada pendiente");
+    // Un `exact` dentro de un agregado mixto NO da la cadena por completa.
+    expect(summary.missing.headline).not.toContain("Nada pendiente");
+    expect(summary.missing.headline).toContain("al menos un ciclo atribuido");
+    expect(summary.missing.headline).toContain("discrepante");
+    expect(summary.missing.detail).toContain("Atribución mixta");
     expect(summary.missing.detail).toContain("exact 1");
     expect(summary.missing.detail).toContain("mismatch 1");
-    expect(summary.missing.measurement).toBe("COMPLETE");
+    expect(summary.missing.detail).toContain("Revisa el detalle");
+    expect(summary.missing.measurement).toBe("PARTIAL");
   });
 
   it("una atribución mixta SIN exact no se declara «Nada pendiente»", () => {
@@ -296,16 +301,29 @@ describe("deriveValueSummary", () => {
   });
 
   it("la atribución del valor NO la decide el primer ciclo (regresión cycles[0])", () => {
-    const summary = deriveValueSummary(baseValue(), {
+    const firstMismatch = deriveValueSummary(baseValue(), {
       chain: chainValue([
         chainCycle("mismatch", true, "cyc-1"),
         chainCycle("exact", true, "cyc-2"),
       ]),
     });
-    expect(summary.technical.attribution?.state).toBe("mixed");
-    expect(summary.technical.attribution?.exactCount).toBe(1);
-    expect(summary.technical.attributionLabel).toContain("mixta");
-    expect(summary.missing.headline).toContain("al menos un ciclo");
+    expect(firstMismatch.technical.attribution?.state).toBe("mixed");
+    expect(firstMismatch.technical.attribution?.exactCount).toBe(1);
+    expect(firstMismatch.technical.attributionLabel).toContain("mixta");
+    expect(firstMismatch.missing.headline).toContain("al menos un ciclo");
+    expect(firstMismatch.missing.headline).not.toContain("Nada pendiente");
+    expect(firstMismatch.missing.measurement).toBe("PARTIAL");
+
+    // El orden de los ciclos no cambia el dictamen: tampoco si el `exact` va primero.
+    const firstExact = deriveValueSummary(baseValue(), {
+      chain: chainValue([
+        chainCycle("exact", true, "cyc-2"),
+        chainCycle("mismatch", true, "cyc-1"),
+      ]),
+    });
+    expect(firstExact.technical.attribution?.state).toBe("mixed");
+    expect(firstExact.missing.headline).toBe(firstMismatch.missing.headline);
+    expect(firstExact.missing.measurement).toBe("PARTIAL");
   });
 
   it("un ciclo sin atribución declarada cuenta como unmeasured", () => {
