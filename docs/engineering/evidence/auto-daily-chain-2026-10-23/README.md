@@ -237,6 +237,21 @@ Runs de esta rama:
 | Fase 2 scientific (`02e7fb79`) | [40004115741](https://github.com/jvelasca/Bolsa_V1/actions/runs/40004115741) | success |
 | Optimize lab (`02e7fb79`) | [40004115731](https://github.com/jvelasca/Bolsa_V1/actions/runs/40004115731) | success |
 | Frontend CI (`02e7fb79`) | — | no se dispara: el workflow filtra por `apps/web/**`, `packages/shared/**`, lockfiles y su propio YAML; este commit solo toca rutas Python y docs. El último run con cambios de UI (`a82bdcaa`) fue **success**. |
+| **Frontend CI** (`04764b47`, fin del `cycles[0]`) | [40029061992](https://github.com/jvelasca/Bolsa_V1/actions/runs/40029061992) | **success** — `headSha` del run == `04764b47010bea2e202a6ee4e5085092f29db5e6`; job `quality` con build, typecheck y tests de `shared`, typecheck general, lint, tests y build |
+| Frontend CI (`cad1a775`, titular mixto honesto) | — | se cita el run del commit siguiente cuando exista; este cambio solo añade el matiz de presentación descrito abajo |
+
+Alcance de [40029061992](https://github.com/jvelasca/Bolsa_V1/actions/runs/40029061992): cubre el módulo compartido
+`packages/shared/src/estudio-daily-summary.ts` y sus tests, y los gates estáticos y unitarios del monorepo. **No**
+ejecuta el E2E live con PostgreSQL ni el worker reales (§7), y **no** demuestra validación estadística: la ventana
+sigue `INCONCLUSIVE`, `evidence_ready=false` y 0/32 ciclos medibles.
+
+### 8.0.1 Matiz de presentación de la atribución mixta
+
+El run anterior cerró el defecto de `cycles[0]`, pero `mixed` con al menos un ciclo `exact` publicaba
+«Nada pendiente: al menos un ciclo ejecutó esta propuesta», que un lector básico puede leer como cadena completa.
+Se corrigió en `cad1a775`: ese caso pasa a «Hay al menos un ciclo atribuido a esta propuesta, pero la cadena contiene
+ciclos con atribución discrepante», con el recuento por estado y `measurement: PARTIAL`. Solo un agregado `exact`
+**puro** autoriza «Nada pendiente».
 
 ### 8.1 Resultado de los runs
 
@@ -318,6 +333,9 @@ reales —`meta.day` vacío y el toggle que cerraba el panel— y ambos quedaron
 
 - No se ha ejecutado con la cuenta real ni con datos de mercado en vivo: el mundo es **sembrado y determinista** (pinned).
 - No se ha ejercitado `ambiguous` ni `mismatch` con datos reales; existen y se muestran, pero no hay evidencia de campo.
+- El agregado `mixed` (varios ciclos del mismo valor con estados distintos) se demuestra hoy **solo con tests puros** de
+  `packages/shared/src/estudio-daily-summary.test.ts`; ningún mundo sembrado ni dato real ha producido todavía varios
+  ciclos discrepantes para un mismo valor.
 - El job `playwright-live-auto-daily` es **no bloqueante** de `certify` hasta acumular verde sostenido.
 - Los 24 fills históricos sin `cycle_id` **siguen sin `cycle_id`**: no se reescribe historia. La cadena demuestra desde aquí.
 - El recorte del universo sigue existiendo (ventana/composite); lo que cambia es que ahora es **declarado y reconciliable**.
