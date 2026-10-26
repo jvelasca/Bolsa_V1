@@ -255,13 +255,12 @@ def _worker(
     account_id: str,
 ):
     """Worker de PRODUCCIÓN sobre la sesión del test (store + lector canónico reales)."""
-    from bolsa_application.sim_durable_store import PostgresSimAutoPositionStore
-
     from bolsa_api.background.auto_simulation_worker import (
         AutoSimulationWorker,
         _compose_canonical_reader,
         step_minute_clock,
     )
+    from bolsa_application.sim_durable_store import PostgresSimAutoPositionStore
 
     _start, clock = step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))
     return AutoSimulationWorker(
@@ -361,11 +360,10 @@ async def test_ambiguous_ledger_without_mirror_invents_no_cost(
     el hueco con su motivo PROPIO (distinto de ``cost_basis_missing``) y la fila durable
     se queda como estaba (``entry_price`` NULL, cantidad intacta).
     """
-    from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
-
     from bolsa_api.background.auto_simulation_worker import (
         ADOPTION_COST_SOURCE_LEDGER_AMBIGUOUS,
     )
+    from bolsa_infrastructure.database.models.tables import SimAutoPositionRow
 
     case = await _seed_case(c4_pg_factory, with_mirror=False, with_plan=False)
     try:
