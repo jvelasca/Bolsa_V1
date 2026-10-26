@@ -30,6 +30,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+
 from bolsa_analytics.cognitive.exit_plan import (
     build_exit_plan_from_position,
     protective_fill_price,
@@ -40,6 +41,7 @@ from bolsa_analytics.cognitive.position_state import (
     apply_position_reduce,
     build_position_state_from_fill,
 )
+from bolsa_api.background import auto_simulation_worker as worker_module
 from bolsa_application.applied_fills import CanonicalPositions
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
 from bolsa_application.decision_contract import DecisionPackage
@@ -47,8 +49,6 @@ from bolsa_application.kill_switch_store import InMemoryKillSwitchStore, KillSta
 from bolsa_application.sim_durable_store import (
     InMemorySimAutoPositionStore,
 )
-
-from bolsa_api.background import auto_simulation_worker as worker_module
 from tests.test_auto_v44_exit_crash_matrix import (
     ACCOUNT_ID,
     ENGINE_ID,
