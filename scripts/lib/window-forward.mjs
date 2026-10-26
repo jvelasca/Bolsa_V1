@@ -713,10 +713,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-26 — pin del arbol re-anclado a `1523cfe7`
+ * (`apps` `807f67a090b181cb2444128ba17782a055d90efe` / `packages` `b2fae3bf7983762f8d17e1f95c8679730da17d54`).
+ * Motivo: post seal v2.88.162-beta (1523cfe7): bump de 13 CLIs y fix de feature OHLCV en apps/packages; el tag debe apuntar a un commit con freeze OK; la ventana sigue INCONCLUSIVE (0/2 episodios, 0/32 ciclos)
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '64e23eaf',
-  appsHash: 'd06695aba31c3e9c1db821b304a3a5a8089fccd0',
-  packagesHash: '243cd09cfe16752e4e18ad47eedad858a1389192',
+  commit: '1523cfe7',
+  appsHash: '807f67a090b181cb2444128ba17782a055d90efe',
+  packagesHash: 'b2fae3bf7983762f8d17e1f95c8679730da17d54',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
