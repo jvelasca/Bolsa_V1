@@ -249,6 +249,8 @@ def manage_position_outcome(
     risk_regime: str | None = None,
     drawdown_band: str | None = None,
     operational_state: str | None = None,
+    bar_low: float | None = None,
+    bar_high: float | None = None,
 ) -> PositionManagerResult | PositionManagerSkip | None:
     """Como ``manage_position`` pero DEVOLVIENDO el motivo cuando no pudo gestionar.
 
@@ -263,6 +265,10 @@ def manage_position_outcome(
     V2.44: ``risk_regime``/``drawdown_band``/``operational_state`` son la lectura del
     gobernador para ESTA posición (no el régimen de mercado). Se normalizan con los
     coercers canónicos: un valor no reconocido ⇒ ``UNKNOWN`` (nunca permisivo).
+
+    P-2 (verificación 2026-10-26 §8): ``bar_low``/``bar_high`` son los extremos de la
+    barra corriente. ``None`` (default) reproduce el comportamiento anterior, que sólo
+    veía el ``open`` que llega como ``mark_price``.
     """
     if position is None or position.status == "CLOSED":
         return None
@@ -270,7 +276,18 @@ def manage_position_outcome(
         return None
 
     instrument_id = str(getattr(position, "instrument_id", "") or "")
-    marked = apply_position_mark(position, mark_price, at=at)
+    # P-2: el extremo ADVERSO de la barra alimenta el MAE persistido (el "peor adverso"
+    # deja de ser el mínimo de los *opens*). En long es ``low(B)``; en short, ``high(B)``.
+    adverse = (
+        bar_low
+        if position.direction == "long"
+        else bar_high
+        if position.direction == "short"
+        else None
+    )
+    marked = apply_position_mark(
+        position, mark_price, at=at, worst_adverse_price=adverse
+    )
     if marked is None:
         return PositionManagerSkip(
             instrument_id=instrument_id,
@@ -304,6 +321,10 @@ def manage_position_outcome(
         regime_exit=regime_exit,
         kill_switch=halted,
         manual=manual,
+        # P-2: extremos de la barra corriente para que el stop se contraste con el
+        # recorrido intradía (y no sólo con el ``open`` que llega como ``mark_price``).
+        bar_low=bar_low,
+        bar_high=bar_high,
     )
     if decision is None:
         return PositionManagerSkip(

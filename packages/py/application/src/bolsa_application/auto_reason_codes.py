@@ -79,6 +79,11 @@ POSITION_DECISION_UNAVAILABLE = "decision_unavailable"
 FILL_NOT_MATERIALIZED = "fill_not_materialized"
 FILL_PARTIALLY_MATERIALIZED = "fill_partially_materialized"
 EXIT_QTY_OVER_POSITION = "exit_qty_over_position"
+#: R-2 (cierre 2026-10-26) — la cantidad de la fila NO está reconciliada con el libro.
+#: Con más de un motor vivo sobre el mismo símbolo el total de la CUENTA no identifica a
+#: esta fila: el cierre se permite (reducir no empeora el riesgo) pero se declara, porque
+#: una fila históricamente inflada puede dimensionar la venta por encima de lo propio.
+POSITION_ROW_UNRECONCILED = "position_row_unreconciled"
 
 # AUTO-1 — ciclo de vida de una reserva (el compromiso explícito de una aprobación).
 RESERVATION_CREATED = "reservation_created"
@@ -307,6 +312,7 @@ __all__ = [
     "POSITION_DECISION_UNAVAILABLE",
     "POSITION_LIFECYCLE_REASONS",
     "POSITION_MARK_REJECTED",
+    "POSITION_ROW_UNRECONCILED",
     "POSITION_SKIP_REASONS",
     "PROTECTION_MISSING",
     "PROTECT_REQUESTED",

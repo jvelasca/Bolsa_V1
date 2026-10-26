@@ -66,12 +66,18 @@ from bolsa_analytics.cognitive.exit_order import (
     build_exit_order,
     new_exit_order_id,
 )
-from bolsa_analytics.cognitive.exit_plan import is_thesis_invalidated
+from bolsa_analytics.cognitive.exit_plan import (
+    is_thesis_invalidated,
+    protective_fill_price,
+)
 from bolsa_analytics.cognitive.exit_policy import (
     resolve_exit_policy,
     resolve_holding_horizon,
 )
-from bolsa_analytics.cognitive.hard_kill_switch import HardKillSwitch
+from bolsa_analytics.cognitive.hard_kill_switch import (
+    KILL_STATE_UNREADABLE,
+    HardKillSwitch,
+)
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
     MEASUREMENT_PARTIAL,
@@ -126,21 +132,6 @@ from bolsa_analytics.cognitive.position_state import (
 )
 from bolsa_analytics.cognitive.signal_identity import bar_window
 from bolsa_analytics.cognitive.trade_context import TradeContext
-from bolsa_api.background.auto_price_provider import (
-    OhlcvPriceSource,
-    PriceSource,
-    price_source_kind,
-)
-from bolsa_api.background.estudio_watch import SessionScopedEstudioList
-from bolsa_api.background.paper_auto_engine_worker import (
-    DecisionProvider,
-    _effective_venue,
-    _kill_switch_env_on,
-    _watch_from_estudio_enabled,
-    _watch_symbols,
-    refresh_watch_from_estudio,
-    sync_decider_watch,
-)
 from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.adaptive_gate_store import AdaptiveGateStore, sink_failures_from_state
 from bolsa_application.applied_fills import read_applied_fill_facts
@@ -192,6 +183,7 @@ from bolsa_application.auto_reason_codes import (
     FILL_PARTIALLY_MATERIALIZED,
     LIFECYCLE_TRANSITION_REJECTED,
     OPPORTUNITY_TRADED,
+    POSITION_ROW_UNRECONCILED,
     PROTECT_REQUESTED,
     PROTECTION_MISSING,
     RECONCILIATION_REQUIRED,
@@ -281,6 +273,22 @@ from bolsa_application.simulated_settlement import (
 from bolsa_application.top3_opportunities import (
     HISTORICAL_SCORING_NO_CHAMPION,
     select_top3_records,
+)
+
+from bolsa_api.background.auto_price_provider import (
+    OhlcvPriceSource,
+    PriceSource,
+    price_source_kind,
+)
+from bolsa_api.background.estudio_watch import SessionScopedEstudioList
+from bolsa_api.background.paper_auto_engine_worker import (
+    DecisionProvider,
+    _effective_venue,
+    _kill_switch_env_on,
+    _watch_from_estudio_enabled,
+    _watch_symbols,
+    refresh_watch_from_estudio,
+    sync_decider_watch,
 )
 
 logger = logging.getLogger(__name__)
@@ -1197,6 +1205,11 @@ class AutoSimulationWorker:
         # pueden relajarlo explícitamente con ``require_account_id=False``.
         self._require_account_id = require_account_id
         self._reconciliation: dict[str, str] = {}
+        # R-2 (cierre 2026-10-26): símbolos con MÁS de un motor vivo en la cuenta. El
+        # total de la cuenta no identifica a esta fila, así que su cantidad no está
+        # reconciliada aunque se conserve la propia (una fila ya inflada por el defecto
+        # anterior no se repara sola). Se usa para DECLARAR el cierre, nunca para vetarlo.
+        self._multi_engine_symbols: set[str] = set()
         self._readopted = False
         # V2.23/A9 (Bloque 6): protección autónoma (SL/T1/trailing/cierre de sesión).
         # Configurable por env, OFF por defecto. El precio de entrada/máximo se toma
@@ -1291,10 +1304,15 @@ class AutoSimulationWorker:
         self._v2_reservations_reconciled = False
         # V2.43.3 (P0-1) — espejo durable del latch de la parada dura. Sin store la parada
         # queda SOLO en memoria (camino hermético): se declara y el arranque no puede
-        # restaurarla. Con store, ``_v2_kill_state_loaded`` garantiza que el load ocurre una
-        # vez por proceso y ANTES de cualquier evaluación del gobernador.
+        # restaurarla. Con store, el load se repite en cada turno real (P-1: es la única
+        # forma de adoptar un HALT durable aparecido después y de recuperar la lectura
+        # tras un fallo transitorio).
         self._kill_switch_store = kill_switch_store
-        self._v2_kill_state_loaded = False
+        # R-1 (verificación 2026-10-26 §8) — latch de LECTURA de la proyección: si el
+        # espejo (o el canónico) no se pudo leer, NINGÚN símbolo autoriza aperturas en
+        # este tick, aunque ``_watch_symbols()`` venga vacío o el símbolo no esté en el
+        # diccionario de reconciliación. Se libera sólo tras una lectura válida.
+        self._projection_read_failed = False
         # V2.43.3 (P0-2) — identidad durable de las salidas. ``_v2_exit_orders`` son los
         # INTENT vivos conocidos en memoria (espejo del libro durable); el store es la
         # autoridad tras un reinicio.
@@ -1343,7 +1361,7 @@ class AutoSimulationWorker:
         #: siguiente reinicio: la mitad viva de una memoria que no se persiste.
         self._v2_adaptive_reactivated_at: dict[str, str] = {}
         # AUTO-11: recuperación del estado Adaptive y reconciliación del rastro de ciclo, una vez
-        # por proceso cada una (mismo patrón que ``_v2_kill_state_loaded``).
+        # por proceso cada una.
         self._v2_adaptive_state_recovered = False
         self._v2_cycle_trace_reconciled = False
         # v2.88.27 — recuperación de hechos durables del spine, una vez por proceso. Reemite el
@@ -1537,19 +1555,63 @@ class AutoSimulationWorker:
             projection = await self._read_projection(account_id)
         except Exception:  # noqa: BLE001 — un fallo de lectura no debe inventar posición.
             logger.exception("auto_sim readopt_positions failed")
-            self._readopted = True
+            # R-1 (verificación 2026-10-26 §8) — un fallo de lectura NO autoriza abrir.
+            # Antes se marcaba ``_readopted = True`` con ``_open`` vacío y
+            # ``_reconciliation`` sin entrada para esos símbolos: ``_openings_vetoed``
+            # devolvía ``False`` y el tick siguiente ejecutaba un BUY (fail-open). El
+            # símbolo se declara ``UNKNOWN`` (veta aperturas) y la readopción NO se
+            # consume: un fallo transitorio se reintenta en el tick siguiente y sólo se
+            # levanta el veto con una lectura correcta.
+            self._reconciliation = {
+                symbol: POSITION_PROJECTION_UNKNOWN for symbol in _watch_symbols()
+            }
+            self._projection_read_failed = True
             return dict(self._open)
+        # La lectura de la proyección fue válida: el latch de lectura se libera AQUÍ (y
+        # sólo aquí). La reconciliación puede volver a engancharlo si el canónico tampoco
+        # se puede leer; un fallo posterior no deja el veto «a medias».
+        self._projection_read_failed = False
         # V2.32/A12: la proyección durable YA guarda la versión de estrategia que abrió
         # la posición (migración 033). Al readoptarla se restaura ``_position_version``,
         # de modo que los fills de cierre posteriores al crash vuelven a atribuirse a la
         # misma versión (antes quedaban en NULL y truncaban la serie observada).
         authoritative = await self._reconcile_before_trusting(account_id, projection)
+        # R-1 (cierre 2026-10-26) — si la reconciliación enganchó el latch porque el
+        # CANÓNICO no se pudo leer, la readopción NO se consume: se adopta el espejo de la
+        # propia fila (para poder cerrar lo materializado) y se reintenta en el tick
+        # siguiente. Antes se marcaba ``_readopted = True`` y el veto de aperturas quedaba
+        # enganchado para siempre: un fallo transitorio del lector canónico exigía
+        # reiniciar el proceso.
+        canonical_read_failed = self._projection_read_failed
         # La posición abierta se adopta desde la proyección Y, si la reconciliación
         # determinó un canónico fiable, también desde él (un espejo vacío no debe
         # hacer perder una posición real: P1-01).
         for symbol, qty in (authoritative or {}).items():
-            if qty and qty > 0:
-                self._open[symbol] = qty
+            if not qty or qty <= 0:
+                continue
+            # R-2 (verificación 2026-10-26 §8) — el canónico es de CUENTA; ``_open`` es de
+            # MOTOR. Con más de una fila viva, adoptar el total dejaría a este motor
+            # gestionando (y pudiendo vender) títulos de otro: medido con dos filas de 100
+            # y canónico 200, ``held`` pasaba a 200 y un SELL de 200 no se clampaba. Se
+            # conserva la cantidad de la PROPIA fila y se declara UNKNOWN (aperturas
+            # vetadas); el cierre queda acotado a lo materializado por este motor.
+            if await self._multiple_live_rows(account_id, symbol):
+                self._multi_engine_symbols.add(symbol)
+                own = projection.get(symbol)
+                own_qty = getattr(own, "quantity", None)
+                if own_qty is not None and own_qty > 0:
+                    self._open[symbol] = own_qty
+                self._reconciliation[symbol] = POSITION_PROJECTION_UNKNOWN
+                logger.warning(
+                    "auto_sim readopt keeps the engine row symbol=%s own=%s canonical=%s "
+                    "(varias filas vivas: el total de la cuenta no es de este motor)",
+                    symbol,
+                    own_qty,
+                    qty,
+                )
+                continue
+            self._multi_engine_symbols.discard(symbol)
+            self._open[symbol] = qty
         for symbol, row in projection.items():
             qty = row.quantity
             if qty and qty > 0:
@@ -1574,6 +1636,23 @@ class AutoSimulationWorker:
             version = data.get("strategyVersion")
             if version and symbol in self._open:
                 self._position_version[symbol] = str(version)
+        if self._multi_engine_symbols:
+            # R-2: el cierre queda acotado a la propia fila, pero el invariante agregado
+            # (Σ filas vivas == canónico) NO se comprueba implícitamente. Se declara aquí,
+            # en el único momento en que ya se detectó la ambigüedad (sin I/O por tick).
+            try:
+                await self.live_row_invariant_report(
+                    account_id=account_id,
+                    symbols=tuple(sorted(self._multi_engine_symbols)),
+                )
+            except Exception:  # noqa: BLE001 — un informe no puede tumbar la readopción.
+                logger.exception("auto_sim live row invariant report failed")
+        if canonical_read_failed:
+            logger.warning(
+                "auto_sim readopt incomplete: canonical positions unreadable "
+                "(aperturas vetadas; se reintenta en el tick siguiente)"
+            )
+            return dict(self._open)
         self._readopted = True
         return dict(self._open)
 
@@ -1611,11 +1690,15 @@ class AutoSimulationWorker:
         except Exception:  # noqa: BLE001 — sin canónico no se puede confiar en el espejo.
             logger.exception("auto_sim canonical positions read failed")
             self._reconciliation = {s: POSITION_PROJECTION_UNKNOWN for s in projection}
+            # R-1: el canónico tampoco se pudo leer ⇒ el latch de lectura sigue enganchado
+            # (ni siquiera un watch vacío puede quedar sin veto).
+            self._projection_read_failed = True
             return {}
         if canonical is None:
             # El lector no pudo determinar el canónico (distinto de "sin posiciones"):
             # no se reconstruye nada y NO se autorizan aperturas.
             self._reconciliation = {s: POSITION_PROJECTION_UNKNOWN for s in projection}
+            self._projection_read_failed = True
             return {}
         # AUTO-1A: ``expected`` sale del MISMO libro que el canónico (Σ fills aplicados)
         # cuando el lector lo aporta (``CanonicalPositions.facts``). Tras un crash el
@@ -1673,21 +1756,25 @@ class AutoSimulationWorker:
                 adopted_entry = (
                     prior_entry if prior_entry is not None else adopted_entries.get(symbol)
                 )
-                # W-159-5 (Hueco E): la cantidad se reconstruye igual (eso es operación),
-                # pero el COSTE no se escribe si el símbolo tiene más de una fila viva:
-                # el medio de la cuenta no identifica a esta fila. Se deja como estaba y
-                # se declara; reconstruir la cantidad sigue siendo correcto.
-                if (
-                    adopted_entry is not None
-                    and prior_entry is None
-                    and await self._cost_basis_is_ambiguous(account_id, symbol)
-                ):
+                # R-2 (verificación 2026-10-26 §8) — el canónico es de CUENTA y esta fila
+                # es de MOTOR. Con más de una fila viva el reparto no es determinable:
+                # escribir ``canonical_qty`` aquí sumaba el total de la cuenta a cada motor
+                # (medido: 300 con un worker, 400 si ambos reconstruyen) y la convergencia
+                # posterior a OK ocultaba la discrepancia agregada. Se declara UNKNOWN, se
+                # veta la apertura y NO se toca la cantidad: es preferible vetar a inventar.
+                multiple_rows = await self._multiple_live_rows(account_id, symbol)
+                if multiple_rows:
+                    self._multi_engine_symbols.add(symbol)
+                    self._reconciliation[symbol] = POSITION_PROJECTION_UNKNOWN
                     logger.warning(
-                        "auto_sim rebuilt projection without cost basis symbol=%s "
-                        "(varias filas vivas: el coste de la cuenta es ambiguo)",
+                        "auto_sim rebuilt projection skipped symbol=%s canonical=%s "
+                        "(varias filas vivas: el total de la cuenta no es de una fila)",
                         symbol,
+                        canonical_qty,
                     )
-                    adopted_entry = None
+                    continue
+                # W-159-5 (Hueco E): con una sola fila viva el coste del libro sí
+                # identifica a esta fila; el guard de ambigüedad queda cubierto arriba.
                 if canonical_qty <= 0:
                     # El canónico dice "sin posición": la proyección estaba obsoleta.
                     await self._position_store.delete(account_id, self._engine_id, symbol)
@@ -1789,6 +1876,10 @@ class AutoSimulationWorker:
 
     def _openings_vetoed(self, symbol: str) -> bool:
         """True si la reconciliación de ese símbolo impide nuevas aperturas."""
+        # R-1: un fallo de LECTURA veta globalmente, sin depender de que el símbolo esté
+        # enumerado en ``_watch_symbols()`` (que puede venir vacío con el universo ESTUDIO).
+        if self._projection_read_failed:
+            return True
         return self._reconciliation.get(symbol) in {
             POSITION_PROJECTION_DIVERGENT,
             POSITION_PROJECTION_UNKNOWN,
@@ -2026,6 +2117,30 @@ class AutoSimulationWorker:
             logger.exception("auto_sim v2 price_source.mid failed symbol=%s", symbol)
             return None
 
+    def _v2_bar_extremes(self, symbol: str) -> tuple[float | None, float | None]:
+        """``(low, high)`` de la barra corriente — ``(None, None)`` si la fuente no los da.
+
+        P-2: sin fuente real (``price_script`` hermético) no hay extremos y la gestión es
+        **byte-idéntica** a la anterior. Un campo ausente o un lector que falle se declara
+        ``None`` (nunca se fabrica un rango): el fail-closed es "no verlo", no inventarlo.
+        """
+        source = self._price_source
+        if source is None:
+            return (None, None)
+
+        def _read(name: str) -> float | None:
+            reader = getattr(source, name, None)
+            if not callable(reader):
+                return None
+            try:
+                value = reader(symbol)
+            except Exception:  # noqa: BLE001 — un extremo ilegible no tumba el tick.
+                logger.exception("auto_sim v2 price_source.%s failed symbol=%s", name, symbol)
+                return None
+            return None if value is None else float(value)
+
+        return (_read("low"), _read("high"))
+
     def _v2_note_price_missing(self, symbol: str) -> None:
         """Declara y CUENTA una ausencia de precio (una vez por símbolo en el log).
 
@@ -2071,6 +2186,7 @@ class AutoSimulationWorker:
         strategy_version_id: str | None = None,
         exit_order_id: str | None = None,
         cycle_id: str | None = None,
+        exec_price: Decimal | None = None,
     ) -> _Settlement:
         """Liquida la orden SIM y separa lo MATERIALIZADO de lo que quedó PENDIENTE.
 
@@ -2103,6 +2219,12 @@ class AutoSimulationWorker:
         if exec_mid is None:
             self._v2_note_price_missing(symbol)
             return _Settlement(requested_qty=qty)
+        # P-2: una salida disparada por el EXTREMO de la barra declara su precio de
+        # ejecución (``min(open, stop)`` en long, ``max(open, stop)`` en short). Se
+        # declara aquí y NO se recalcula: el nivel que disparó la orden es el que se
+        # liquida, salvo que el hueco ya ofreciera un precio mejor.
+        if exec_price is not None and exec_price > 0:
+            exec_mid = float(exec_price)
         try:
             result, outcomes = await submit_simulated_order(
                 self._exec_store,
@@ -2409,18 +2531,34 @@ class AutoSimulationWorker:
         store = self._kill_switch_store
         account_id = self._account_id or ""
         engine_id = self._engine_id or ""
-        self._v2_kill_state_loaded = True
         if store is None or not account_id or not engine_id:
             return
         try:
             state = await store.load(account_id, engine_id)
         except Exception:  # noqa: BLE001 — no poder leer no autoriza a operar.
             logger.exception("auto_sim v2 kill state load failed")
+            # P-1 (verificación 2026-10-26 §8) — un store ilegible NO puede dejar el
+            # latch desengajado: el proceso seguiría publicando ``RUNNING`` sin poder
+            # afirmar que no hay un HALT persistido. Se engancha el latch LOCAL con el
+            # motivo declarado ``KILL_STATE_UNREADABLE`` (no se persiste: la escritura
+            # puede fallar por la misma causa) y las entradas quedan vetadas.
+            self._v2_kill_switch.engage(KILL_STATE_UNREADABLE, at=self._v2_instant())
             return
         if state is None:
+            # P-1 (cierre 2026-10-26) — lectura VÁLIDA y SIN fila durable: la tabla
+            # significa "la parada nunca se activó". Si el latch local venía del
+            # placeholder ``KILL_STATE_UNREADABLE``, se libera aquí: es la única vía de
+            # recuperación tras un fallo TRANSITORIO de lectura. Sin esto el proceso
+            # quedaba parado en memoria hasta reiniciarse, aunque la lectura ya fuese sana.
+            self._release_unreadable_placeholder(detail="sin fila durable")
             return
         if state.engaged:
-            if self._v2_kill_switch.engaged:
+            # El placeholder ``KILL_STATE_UNREADABLE`` NO oculta la causa durable: en
+            # cuanto la lectura vuelve, el latch adopta el motivo/identidad persistidos.
+            if (
+                self._v2_kill_switch.engaged
+                and self._v2_kill_switch.reason != KILL_STATE_UNREADABLE
+            ):
                 return
             self._v2_kill_switch = HardKillSwitch.from_persisted(
                 engaged=True,
@@ -2441,6 +2579,15 @@ class AutoSimulationWorker:
         # reiniciarlo. Una fila liberada más ANTIGUA que el halt local no lo revive al revés
         # (una re-activación posterior manda sobre un release previo): por eso se comparan
         # instantes, nunca texto.
+        # P-1 (cierre 2026-10-26) — una fila RELEASED con reconciliación demuestra que no
+        # hay HALT durable activo (y que el levantamiento fue explícito y auditable). Si el
+        # latch local era el placeholder de lectura ilegible, se libera: un ``engaged_at``
+        # del placeholder no es una activación durable, así que comparar instantes no
+        # aplica aquí.
+        if state.release_reconciliation_id:
+            self._release_unreadable_placeholder(
+                detail=f"fila durable liberada reconciliation={state.release_reconciliation_id}"
+            )
         if not self._v2_kill_switch.engaged or not state.release_reconciliation_id:
             return
         released_at = _instant(state.released_at)
@@ -2453,6 +2600,24 @@ class AutoSimulationWorker:
             state.release_reconciliation_id,
             state.release_actor,
         )
+
+    def _release_unreadable_placeholder(self, *, detail: str) -> None:
+        """P-1 — libera SÓLO el placeholder local ``KILL_STATE_UNREADABLE``.
+
+        Un HALT con motivo real NO se libera aquí: es un hecho durable y sólo una
+        reconciliación explícita lo levanta. La lectura VÁLIDA del espejo que demuestre
+        que no hay parada activa (sin fila, o fila liberada con ``reconciliation_id``) es
+        la única vía para deshacer el placeholder tras un fallo TRANSITORIO. Antes, el
+        proceso quedaba parado en memoria hasta reiniciarse aunque el store ya leyese.
+        """
+        switch = self._v2_kill_switch
+        if not switch.engaged or switch.reason != KILL_STATE_UNREADABLE:
+            return
+        if switch.release(reconciliation_ok=True):
+            logger.warning(
+                "auto_sim v2 hard kill placeholder RELEASED by a valid durable read (%s)",
+                detail,
+            )
 
     async def _v2_persist_kill_state(self, *, at: str | None = None) -> bool:
         """Persiste el latch actual; ``False`` si no fue durable.
@@ -5977,6 +6142,122 @@ class AutoSimulationWorker:
             return True
         return len({str(engine) for engine in engines}) > 1
 
+    async def _multiple_live_rows(self, account_id: str, symbol: str) -> bool:
+        """R-2 — ¿hay más de un MOTOR con fila viva para ``symbol``?
+
+        Es el predicado de ``_cost_basis_is_ambiguous`` extraído para reusarlo en la
+        reconstrucción: la cantidad canónica es de la CUENTA, y con dos filas vivas no
+        hay forma determinista de repartirla entre motores.
+        """
+        return await self._cost_basis_is_ambiguous(account_id, symbol)
+
+    async def live_row_invariant_report(
+        self,
+        *,
+        account_id: str | None = None,
+        symbols: Sequence[str] | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """R-2 — informe READ-ONLY de ``Σ filas vivas por MOTOR`` frente al canónico.
+
+        El invariante que el defecto anterior rompía es agregado: la suma de las filas
+        vivas de TODOS los motores debe igualar la posición de la CUENTA. Antes, cada
+        motor podía escribir el total de la cuenta en su propia fila (300 con un worker y
+        400 con dos) y la convergencia posterior a ``OK`` ocultaba la discrepancia.
+
+        Este método NO cura ni corrige nada: una fila ya inflada no se repara con una
+        heurística (el reparto entre motores no es determinable desde el total). Su único
+        propósito es hacer la reconciliación EXPLÍCITA y medible por un operador. Un lector
+        que falle se declara como no medible, nunca como cero.
+        """
+        store = self._position_store
+        account = account_id or self._account_id or ""
+        if store is None or not account:
+            return {}
+        engines_reader = getattr(store, "read_live_engines", None)
+        if engines_reader is None:
+            return {}
+        candidates = (
+            tuple(symbols)
+            if symbols is not None
+            else tuple(s for s in _watch_symbols() if s.strip())
+        )
+        if not candidates:
+            return {}
+        canonical_map: dict[str, Decimal] | None = None
+        reader = self._canonical_positions_reader
+        if reader is not None:
+            try:
+                canonical = await reader(account)
+            except Exception:  # noqa: BLE001 — sin canónico el invariante no es medible.
+                logger.exception("auto_sim live row invariant: canonical read failed")
+            else:
+                if canonical is not None:
+                    canonical_map = {
+                        str(s): Decimal(str(q)) for s, q in dict(canonical).items()
+                    }
+        try:
+            own_rows = await store.read_projection(account, self._engine_id)
+        except Exception:  # noqa: BLE001 — la fila propia ilegible se declara como tal.
+            logger.exception("auto_sim live row invariant: own projection read failed")
+            own_rows = {}
+        report: dict[str, dict[str, Any]] = {}
+        for symbol in candidates:
+            try:
+                engines = tuple(str(e) for e in await engines_reader(account, symbol))
+            except Exception:  # noqa: BLE001 — sin lector fiable no hay informe.
+                logger.exception("auto_sim live row invariant: engines read failed symbol=%s", symbol)
+                continue
+            if not engines:
+                continue
+            rows: dict[str, str] = {}
+            unreadable: list[str] = []
+            total = Decimal("0")
+            for engine in engines:
+                try:
+                    projection = await store.read_projection(account, engine)
+                except Exception:  # noqa: BLE001 — una fila ilegible no es un cero.
+                    logger.exception(
+                        "auto_sim live row invariant: engine row unreadable engine=%s symbol=%s",
+                        engine,
+                        symbol,
+                    )
+                    unreadable.append(engine)
+                    continue
+                row = projection.get(symbol)
+                qty = Decimal(str(row.quantity)) if row is not None else Decimal("0")
+                rows[engine] = str(qty)
+                total += qty
+            canonical_qty = (
+                None if canonical_map is None else canonical_map.get(symbol, Decimal("0"))
+            )
+            delta = (
+                None if canonical_qty is None or unreadable else total - canonical_qty
+            )
+            own = own_rows.get(symbol)
+            entry: dict[str, Any] = {
+                "engines": list(engines),
+                "engineRows": rows,
+                "unreadableEngines": unreadable,
+                "ownRow": None if own is None else str(own.quantity),
+                "projectedTotal": str(total),
+                "canonical": None if canonical_qty is None else str(canonical_qty),
+                "delta": None if delta is None else str(delta),
+                "consistent": None if delta is None else delta == 0,
+            }
+            report[symbol] = entry
+            if len(engines) > 1 or unreadable or (delta is not None and delta != 0):
+                logger.warning(
+                    "auto_sim live row invariant NOT proven symbol=%s engines=%s total=%s "
+                    "canonical=%s delta=%s unreadable=%s",
+                    symbol,
+                    len(engines),
+                    entry["projectedTotal"],
+                    entry["canonical"],
+                    entry["delta"],
+                    unreadable,
+                )
+        return report
+
     def _v2_adoption_stop(
         self,
         *,
@@ -6177,7 +6458,14 @@ class AutoSimulationWorker:
         )
         return position
 
-    async def _v2_position_package(self, symbol: str, price: Decimal) -> DecisionPackage | None:
+    async def _v2_position_package(
+        self,
+        symbol: str,
+        price: Decimal,
+        *,
+        bar_low: float | None = None,
+        bar_high: float | None = None,
+    ) -> DecisionPackage | None:
         """Intención de gestión de la posición abierta (PositionManager) o ``None``.
 
         Requiere un ``PositionState`` V2 vivo para el símbolo. Si no lo hay (posición
@@ -6258,6 +6546,10 @@ class AutoSimulationWorker:
             risk_regime=governor["risk_regime"],
             drawdown_band=governor["drawdown_band"],
             operational_state=governor["operational_state"],
+            # P-2: el rango de la barra entra en la MISMA decisión; ``None`` conserva el
+            # comportamiento previo (sólo ``open(B)``).
+            bar_low=bar_low,
+            bar_high=bar_high,
         )
         if isinstance(outcome, PositionManagerSkip):
             # AUTO-1A: la posición NO se pudo gestionar (mark rechazado / decisión no
@@ -6961,6 +7253,9 @@ class AutoSimulationWorker:
                     self._high_price[symbol] = price
             prot: str | None = None
             v2_pkg: DecisionPackage | None = None
+            # P-2: precio de ejecución DECLARADO cuando la salida la dispara un extremo
+            # de la barra (stop objetivo). ``None`` ⇒ se liquida al precio de siempre.
+            settle_price: Decimal | None = None
             if self._v2_enabled:
                 # AUTO-2 (criterio de salida) · V2.42 slice 2c: con el motor V2 ON la
                 # política legacy NO se evalúa — ni siquiera el caso ``held == 0``/``price
@@ -6972,8 +7267,24 @@ class AutoSimulationWorker:
                     # AUTO 2.0 (V2): gestión por PositionManager (PositionState + ExitPlan
                     # + PositionDecision). AUTO-2: el ratchet de stop se aplica y se
                     # persiste AQUÍ mismo (aunque no haya orden).
-                    v2_pkg = await self._v2_position_package(symbol, price)
-                    reasons.extend(self._v2_last_exit_reasons.get(symbol, ()))
+                    bar_low, bar_high = self._v2_bar_extremes(symbol)
+                    v2_pkg = await self._v2_position_package(
+                        symbol, price, bar_low=bar_low, bar_high=bar_high
+                    )
+                    exit_reasons = self._v2_last_exit_reasons.get(symbol, ())
+                    reasons.extend(exit_reasons)
+                    # P-2: si el motivo DECISORIO es el stop (u objetivo) y la barra trajo
+                    # extremos, el fill se declara al nivel que disparó la orden.
+                    # ``protective_fill_price`` devuelve ``None`` para cualquier otro
+                    # motivo o cuando no hay extremos (Δ = 0 en el camino hermético).
+                    if exit_reasons and (bar_low is not None or bar_high is not None):
+                        fill_price = protective_fill_price(
+                            self._v2_positions.get(symbol),
+                            open_price=float(price),
+                            primary_reason=exit_reasons[0],
+                        )
+                        if fill_price is not None:
+                            settle_price = Decimal(str(fill_price))
             else:
                 prot = protection_exit_reason(
                     self._protection,
@@ -7033,7 +7344,13 @@ class AutoSimulationWorker:
                 _veto("non_positive_qty")
                 continue
             # 1) Simulation Gate (kill fail-closed ANTES de nada AUTO).
-            if kill:
+            # P-1 (cierre 2026-10-26) — el latch DURABLE de la parada también veta
+            # APERTURAS en el camino legacy (``AUTO_ENGINE_SIM_V2=0``): ``kill`` sólo
+            # consulta la fuente de entorno, así que un HALT recuperado del espejo (o el
+            # placeholder ``KILL_STATE_UNREADABLE``) no llegaba hasta aquí y un BUY podía
+            # abrir con el motor parado. SELL sigue permitido: reducir/cerrar nunca
+            # empeora el riesgo (mismo invariante que la reconciliación de posición).
+            if kill or (action == "BUY" and self._v2_kill_switch_halted()):
                 _veto("kill_switch_active")
                 continue
             # 2) Simulation Gate: venue AUTO-only (paper/simulated).
@@ -7077,6 +7394,13 @@ class AutoSimulationWorker:
                 continue
             if action == "SELL" and exec_qty < qty:
                 _veto("sell_overshoot_clamped")
+            if action == "SELL" and symbol in self._multi_engine_symbols:
+                # R-2 (cierre 2026-10-26) — el cierre se PERMITE (reducir no empeora el
+                # riesgo), pero se declara que la cantidad NO está reconciliada: con varios
+                # motores vivos el total de la cuenta no identifica a esta fila, así que una
+                # fila ya inflada dimensiona la venta por encima de lo propio. No se corrige
+                # aquí (no hay reparto determinable): requiere reconciliación de operador.
+                reasons.append(POSITION_ROW_UNRECONCILED)
             report.proposals += 1
             # V2.28/A10 (P1-02 real): atribuye el fill a la versión ACTIVE. La apertura
             # aporta la versión desde el ``source`` de la propuesta; el CIERRE (venta de
@@ -7107,6 +7431,16 @@ class AutoSimulationWorker:
             # v2.88.25: el ciclo se captura UNA vez y lo comparten el settlement y los hechos
             # durables (orden de entrada / liquidación) para que todos apunten al mismo ciclo.
             cycle_id = self._v2_cycle_for(symbol)
+            # P-2 (verificación 2026-10-26 §8) — UN ÚNICO precio de ejecución para TODO el
+            # cierre. El settlement ya liquidaba al nivel del stop (``exec_price``), pero el
+            # fill aplicado, el P&L realizado y el ``PositionState`` seguían usando el
+            # ``open(B)``: medido con entrada 100 · qty 200 · open 100 · low 80 · stop 95, el
+            # fill quedaba en 95 y el P&L en 0 (la pérdida real es 1.000). El precio
+            # declarado se propaga aquí una sola vez; sin extremo ni motivo protector es
+            # exactamente ``price`` (Δ = 0 en el camino hermético).
+            realized_price = (
+                settle_price if settle_price is not None and settle_price > 0 else price
+            )
             settlement = await self._settle(
                 action.lower(),
                 symbol,
@@ -7118,6 +7452,8 @@ class AutoSimulationWorker:
                 exit_order_id=exit_order_id,
                 # V2.47: el fill (entrada o salida) queda atado a su ciclo financiero.
                 cycle_id=cycle_id,
+                # P-2: precio declarado por el extremo que disparó la orden (o ``None``).
+                exec_price=settle_price,
             )
             # AUTO-1A (P0) — SOLO lo materializado es posición/riesgo/protección. La
             # cantidad PEDIDA (`exec_qty`) se sigue liquidando y se journaliza como
@@ -7162,7 +7498,7 @@ class AutoSimulationWorker:
                 )
             for o in settlement.applied:
                 self._emit("fill", o.venue, o.execution_id, o.side, o.qty)
-                self._record_applied_event(symbol, o, price)
+                self._record_applied_event(symbol, o, realized_price)
             first_execution_id = settlement.applied[0].execution_id
             if action == "BUY":
                 materialized = held + applied_qty
@@ -7231,7 +7567,9 @@ class AutoSimulationWorker:
                 # protección); sin referencia no se inventa P&L.
                 entry_ref = self._entry_price.get(symbol)
                 if entry_ref is not None and applied_qty > 0:
-                    self._sim_realized_pnl += (price - entry_ref) * applied_qty
+                    # P-2: el P&L se mide contra el precio DECLARADO del cierre (stop/gap),
+                    # no contra el ``open`` que sólo se usó para decidir.
+                    self._sim_realized_pnl += (realized_price - entry_ref) * applied_qty
                 # V2.45/AUTO-5 — MAE/MFE del ``mfe_mae`` del PositionState ANTES de reducir:
                 # tras el cierre puede desaparecer del mapa y la medición se perdería. Se
                 # RECOGE tal cual (si falta alguna pata, se declara sin números).
@@ -7242,7 +7580,8 @@ class AutoSimulationWorker:
                     await self._v2_track_reduce(
                         symbol,
                         applied_qty,
-                        price,
+                        # P-2: el estado final usa el MISMO precio que el fill y el P&L.
+                        realized_price,
                         self._v2_last_exit_reasons.get(symbol, ()),
                     )
                 # V2.44 · F9 — lo vendido deja de ser reserva de salida; con fill parcial la
@@ -8743,6 +9082,38 @@ def _sim_engine_id(default: str = "auto-sim") -> str:
     return raw or default
 
 
+class EngineIdentityMissingError(RuntimeError):
+    """R-4 — el arranque durable no puede identificar al motor (variable ausente).
+
+    Es un ``RuntimeError`` a propósito (un despliegue roto debe verse), pero el scheduler
+    la captura para acotar el daño: AUTO queda apagado y el resto de workers arranca.
+    """
+
+
+def _durable_sim_engine_id() -> str:
+    """R-4 (verificación 2026-10-26 §8) — identidad de motor OBLIGATORIA en durable.
+
+    Con composición PG, dos procesos que caigan al default ``auto-sim`` comparten las
+    mismas filas de proyección/latch y la reconciliación deja de identificar al motor.
+    El arranque durable exige la variable explícita y falla con un mensaje accionable; el
+    constructor hermético conserva su default (Δ = 0 fuera de la ventana durable).
+
+    El fallo es ``EngineIdentityMissingError`` (subclase de ``RuntimeError``) para que el
+    scheduler pueda ACOTARLO: este proceso no arranca el motor AUTO, pero no se lleva por
+    delante los demás workers (ver ``scheduler_worker._start_workers``).
+    """
+    raw = _sim_engine_id(default="")
+    if not raw:
+        raise EngineIdentityMissingError(
+            "AUTO_ENGINE_SIM_ENGINE_ID es obligatorio para arrancar el motor AUTO "
+            "durable (composición PG): sin identidad explícita de motor la proyección y "
+            "el latch de la parada no identifican a este proceso. Defina la variable "
+            "(p. ej. AUTO_ENGINE_SIM_ENGINE_ID=auto-sim-prod-1) o arranque el camino "
+            "hermético con un worker inyectado."
+        )
+    return raw
+
+
 def start_auto_sim_worker(
     session_factory: Any = None,
     *,
@@ -8770,6 +9141,12 @@ def start_auto_sim_worker(
     El decider por defecto es el Spine determinista (Bloque 4), seguro (HOLD a menos
     que ``AUTO_ENGINE_SIM_SPINE_AUTO=1``). Sin ``session_factory`` (uso unit/hermético)
     permite seguir con un ``worker`` inyectado (p.ej. con ``InMemoryExecutionEventStore``).
+
+    R-4 (verificación 2026-10-26 §8): con composición durable, la ausencia de
+    ``AUTO_ENGINE_SIM_ENGINE_ID`` (y sin ``engine_id`` explícito) RAISE
+    ``EngineIdentityMissingError``. El scheduler acota el fallo a este worker
+    (``_start_workers``): AUTO queda apagado y el resto de crons arranca. Un arranque
+    directo (script/prueba) sigue viendo el fallo explícito.
     """
     if not sim_worker_enabled():
         logger.info(
@@ -8806,11 +9183,14 @@ def start_auto_sim_worker(
         # El spine determinista fija su ``watch`` al componerse; lo capturamos para
         # poder alinearlo por tick cuando el flag ESTUDIO esté ON (V2.88.123/S2).
         spine_decider = decider if decider is not None else _default_spine_decider()
+        # R-4 (verificación 2026-10-26 §8) — con composición PG la identidad del motor es
+        # obligatoria: un default silencioso ``auto-sim`` comparte filas entre procesos.
+        durable_engine_id = engine_id or _durable_sim_engine_id()
         runtime = AutoSimRuntime(
             session_factory,
             worker=worker,
             decider=spine_decider,
-            engine_id=engine_id or _sim_engine_id(),
+            engine_id=durable_engine_id,
             account_id=effective_account,
             finance_resolver=finance_resolver,
             regime_source=regime_source,

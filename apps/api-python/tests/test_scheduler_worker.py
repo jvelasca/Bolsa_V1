@@ -118,3 +118,51 @@ def test_scheduler_no_embebe_scan_ni_optimize() -> None:
     assert start_scan_worker not in starters
     assert start_optimization_worker not in starters
     assert not hasattr(scheduler_worker, "_queue_loop_starters")
+
+
+def test_auto_identity_failure_does_not_take_down_the_other_workers(monkeypatch) -> None:
+    """R-4 (verificación 2026-10-26 §8): blast radius acotado al worker AUTO.
+
+    AUTO ON + composición PG (session_factory no nulo) sin ``AUTO_ENGINE_SIM_ENGINE_ID``:
+    ``start_auto_sim_worker`` falla con ``EngineIdentityMissingError``. El scheduler debe
+    registrarlo y seguir arrancando el resto; AUTO queda simplemente ausente.
+    """
+    from bolsa_api.background import auto_simulation_worker as auto_module  # noqa: PLC0415
+    from bolsa_api.background.auto_simulation_worker import (  # noqa: PLC0415
+        EngineIdentityMissingError,
+    )
+
+    monkeypatch.setenv("AUTO_SIMULATION_WORKER_ENABLED", "1")
+    monkeypatch.delenv("AUTO_ENGINE_SIM_ENGINE_ID", raising=False)
+    # La cuenta SIM se lee del módulo al llamar: se fija para llegar a la comprobación de
+    # identidad (si no, el worker se apaga antes por «sin cuenta» y no se probaría nada).
+    monkeypatch.setattr(auto_module, "SIM_ACCOUNT_ID", "00000000-0000-0000-0000-000000000001")
+
+    started: list[str] = []
+
+    def _healthy(name: str):
+        def _start(_session_factory):
+            started.append(name)
+            return None
+
+        return _start
+
+    tasks = scheduler_worker._start_workers(
+        [start_auto_sim_worker, _healthy("alertas"), _healthy("custodia")],
+        object(),  # type: ignore[arg-type] — el AUTO falla antes de tocar la sesión.
+    )
+
+    assert tasks == []
+    assert started == ["alertas", "custodia"], (
+        "el fallo de identidad de AUTO no puede abortar los demás starters"
+    )
+
+    # Y el arranque DIRECTO sigue siendo explícito (no se silencia en el worker).
+    import pytest  # noqa: PLC0415
+
+    with pytest.raises(EngineIdentityMissingError):
+        start_auto_sim_worker(
+            session_factory=object(),
+            account_id="00000000-0000-0000-0000-000000000001",
+            interval_seconds=60.0,
+        )

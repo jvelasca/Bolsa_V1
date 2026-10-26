@@ -284,6 +284,8 @@ def build_position_decision(
     risk_exit: bool = False,
     regime_exit: bool = False,
     kill_switch: bool = False,
+    bar_low: float | None = None,
+    bar_high: float | None = None,
 ) -> PositionDecision | None:
     if position is None:
         return None
@@ -309,6 +311,8 @@ def build_position_decision(
         kill_switch=kill_switch,
         at=at,
         exit_policy=policy,
+        bar_low=bar_low,
+        bar_high=bar_high,
     )
     if exit_plan is None:
         return None

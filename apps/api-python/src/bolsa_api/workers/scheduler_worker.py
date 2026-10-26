@@ -24,12 +24,18 @@ import signal
 import sys
 from typing import Any
 
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.migrations import database_bootstrap
+from bolsa_infrastructure.database.session import create_engine, create_session_factory
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from bolsa_api.background.alert_delivery_worker import start_alert_delivery_worker
 from bolsa_api.background.auto_ops_job_worker import start_auto_ops_job_worker
 from bolsa_api.background.auto_orchestrator_worker import start_auto_orchestrator
-from bolsa_api.background.auto_simulation_worker import start_auto_sim_worker
+from bolsa_api.background.auto_simulation_worker import (
+    EngineIdentityMissingError,
+    start_auto_sim_worker,
+)
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
 from bolsa_api.background.core_r_cron_worker import start_core_r_cron_worker
 from bolsa_api.background.custody_job_worker import start_custody_job_worker
@@ -55,9 +61,6 @@ from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evalu
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
 from bolsa_api.background.window_day_watch_worker import start_window_day_watch
 from bolsa_api.logging_redact import install_log_redact
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.migrations import database_bootstrap
-from bolsa_infrastructure.database.session import create_engine, create_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +103,32 @@ def _event_loop_starters() -> list[Any]:
     ]
 
 
+def _start_workers(
+    starters: list[Any],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> list[asyncio.Task[None]]:
+    """Arranca los starters y devuelve los tasks vivos.
+
+    R-4 (verificación 2026-10-26 §8): una composición durable de AUTO sin
+    ``AUTO_ENGINE_SIM_ENGINE_ID`` es un fallo REAL del motor AUTO, pero no debe tumbar el
+    resto del scheduler (alertas, custodia, orquestador…). El fallo se registra con su
+    mensaje accionable y AUTO queda deshabilitado en ESTE proceso; los demás starters
+    siguen arrancando. Cualquier otra excepción se propaga.
+    """
+    tasks: list[asyncio.Task[None]] = []
+    for starter in starters:
+        try:
+            task = starter(session_factory)
+        except EngineIdentityMissingError as exc:
+            logger.error(
+                "AUTO SIM no arranca en este proceso (identidad de motor): %s", exc
+            )
+            continue
+        if task is not None:
+            tasks.append(task)
+    return tasks
+
+
 async def _run_scheduler(
     session_factory: async_sessionmaker[AsyncSession],
     engine: AsyncEngine,
@@ -109,12 +138,7 @@ async def _run_scheduler(
     # FastAPI con --workers N) mediante advisory lock, fuera del path de petición.
     await database_bootstrap(engine=engine, session_factory=session_factory)
 
-    starters = _event_loop_starters()
-    tasks: list[asyncio.Task[None]] = []
-    for starter in starters:
-        task = starter(session_factory)
-        if task is not None:
-            tasks.append(task)
+    tasks = _start_workers(_event_loop_starters(), session_factory)
 
     if not tasks:
         logger.warning(

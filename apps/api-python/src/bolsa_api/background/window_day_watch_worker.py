@@ -101,6 +101,7 @@ WindowDayVerdict = Literal[
     "OK",
     "VETO",
     "DECLARED",
+    "INCONCLUSIVE",
     "HARD_ERROR",
     "MISSED",
 ]
@@ -118,6 +119,11 @@ _STATUS_MESSAGE: dict[WindowDayVerdict, str] = {
     "OK": "MEDIDO: la ventana avanzó un día de calendario",
     "VETO": "veto de régimen declarado (NO_MEDIDO_REGIMEN): no es alerta",
     "DECLARED": "declarado sin material medible (DECLARADO): no es alerta",
+    # W-1 (verificación 2026-10-26 §8): un día ``MEDIDO`` cuyo gate no tiene episodios
+    # medibles NO es un día ganado para la ventana, aunque el runner lo anote como medido.
+    "INCONCLUSIVE": (
+        "MEDIDO sin ciclos medibles / gate INCONCLUSIVE: el día no cuenta para la ventana"
+    ),
     "HARD_ERROR": "HARD_ERROR: el día requiere atención",
 }
 
@@ -148,6 +154,36 @@ def alert_key(watch: WindowDayWatch) -> str:
     y vuelve a avisar: la marca no silencia información nueva.
     """
     return f"{watch.day}:{watch.verdict}"
+
+
+def _gate_is_inconclusive(gate: Any) -> bool:
+    """W-1 — ¿el gate del día acredita material medible?
+
+    Un día ``MEDIDO`` **no** acredita nada por sí solo: lo que acredita es su gate. La
+    ausencia de gate (ledger antiguo, ``null`` o bloque vacío) es AUSENCIA DE EVIDENCIA y
+    no puede presentarse como evidencia favorable: devuelve ``True`` (no acredita). Sólo
+    un ``verdict`` declarado y distinto de ``INCONCLUSIVE`` —sin un contador de ciclos en
+    cero que lo contradiga— o un contador positivo sin veredicto lo acreditan.
+    """
+    if not isinstance(gate, Mapping):
+        return True
+    verdict = str(gate.get("verdict") or "").strip().upper()
+    if verdict == "INCONCLUSIVE":
+        return True
+    saw_counter = False
+    for key in ("cycles", "measurableCycles", "measurable_cycles"):
+        if key not in gate:
+            continue
+        value = gate.get(key)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            saw_counter = True
+            if value <= 0:
+                return True
+    if verdict:
+        return False
+    return not saw_counter
 
 
 def evaluate_day_watch(
@@ -213,6 +249,24 @@ def evaluate_day_watch(
             message=f"día {iso} con estado no reconocido: {status or 'n/d'} (declarado)",
         )
     kind, severity = mapped
+    # W-1 (verificación 2026-10-26 §8) — ``MEDIDO`` no es sinónimo de día ganado: si el
+    # gate del día no tiene ciclos medibles (``INCONCLUSIVE``/``cycles=0``) el día NO
+    # cuenta para la ventana y hay que avisar. Antes el mapeo directo ``MEDIDO → OK``
+    # silenciaba exactamente el caso que mantiene la ventana INCONCLUSIVE.
+    if kind == "OK" and _gate_is_inconclusive(latest.get("gate")):
+        gate = latest.get("gate")
+        detail = (
+            "MEDIDO sin gate verificable: la ausencia de evidencia no acredita el día"
+            if not isinstance(gate, Mapping)
+            else _STATUS_MESSAGE["INCONCLUSIVE"]
+        )
+        return make(
+            "INCONCLUSIVE",
+            "alert",
+            status=status,
+            reason="gate_inconclusive" if isinstance(gate, Mapping) else "gate_missing",
+            message=f"día {iso} · {detail}",
+        )
     detail = _STATUS_MESSAGE.get(kind, f"día {iso}: {status}")
     if reason:
         detail = f"{detail} ({reason})"

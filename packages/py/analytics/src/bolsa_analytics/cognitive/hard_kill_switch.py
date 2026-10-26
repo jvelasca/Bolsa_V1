@@ -25,6 +25,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
+#: P-1 — motivo canónico de la parada que nace de NO poder leer el espejo durable.
+KILL_STATE_UNREADABLE: KillSwitchReason = "KILL_STATE_UNREADABLE"
+
 #: Motivos canónicos del kill switch (contrato con el journal).
 KillSwitchReason = Literal[
     "DATA_CORRUPTION",
@@ -35,6 +38,11 @@ KillSwitchReason = Literal[
     "STALE_DATA",
     "MANUAL_KILL",
     "SYSTEM_ERROR",
+    # P-1 (verificación 2026-10-26 §8): el espejo durable del latch NO se puede leer.
+    # Antes este caso se registraba y se seguía con el latch desengajado (el proceso
+    # publicaba RUNNING sin poder afirmar que no había un HALT persistido). El motivo
+    # declara la parada por ignorancia: sin lectura fiable no se autoriza operar.
+    "KILL_STATE_UNREADABLE",
 ]
 
 ENCODED_KILL_SWITCH_REASONS: tuple[KillSwitchReason, ...] = (
@@ -46,6 +54,7 @@ ENCODED_KILL_SWITCH_REASONS: tuple[KillSwitchReason, ...] = (
     "STALE_DATA",
     "MANUAL_KILL",
     "SYSTEM_ERROR",
+    "KILL_STATE_UNREADABLE",
 )
 
 _VALID_REASONS: frozenset[str] = frozenset(ENCODED_KILL_SWITCH_REASONS)
@@ -176,6 +185,7 @@ class HardKillSwitch:
 
 __all__ = [
     "ENCODED_KILL_SWITCH_REASONS",
+    "KILL_STATE_UNREADABLE",
     "HardKillSwitch",
     "KillSwitchReason",
     "coerce_kill_switch_reason",

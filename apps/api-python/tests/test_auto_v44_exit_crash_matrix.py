@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import NamedTuple, Protocol
+from typing import Any, NamedTuple, Protocol
 
 import pytest
 
@@ -108,7 +108,21 @@ class _Stores:
         self.marks = EquityMarkBook()
 
 
-def _restart(stores: _Stores, *, minute: int) -> AutoSimulationWorker:
+def _restart(
+    stores: _Stores,
+    *,
+    minute: int,
+    engine_id: str = ENGINE_ID,
+    atr_source: Any = None,
+    price_source: Any = None,
+) -> AutoSimulationWorker:
+    """Worker nuevo sobre los MISMOS stores durables (la RAM se pierde).
+
+    Los tres parámetros extra son aditivos y conservan el comportamiento histórico:
+    ``engine_id`` permite montar un SEGUNDO motor sobre el mismo símbolo (R-2),
+    ``atr_source`` fija la geometría reconstruida y ``price_source`` sustituye el
+    ``price_script`` por una fuente OHLC real (P-2).
+    """
     _s, clock = step_minute_clock(datetime(2026, 9, 15, 9, minute, tzinfo=UTC))
     return AutoSimulationWorker(
         clock=clock,
@@ -119,8 +133,13 @@ def _restart(stores: _Stores, *, minute: int) -> AutoSimulationWorker:
         exit_order_store=stores.exit_orders,
         kill_switch_store=stores.kill_state,
         account_id=ACCOUNT_ID,
+        engine_id=engine_id,
         equity_marks=stores.marks,
-        price_script=lambda _symbol, _minute: 100.0,
+        price_script=(
+            None if price_source is not None else lambda _symbol, _minute: 100.0
+        ),
+        price_source=price_source,
+        atr_source=atr_source,
         **_trade_kwargs(),
     )
 

@@ -91,6 +91,14 @@ class _SplitSource:
     def execution(self, symbol: str) -> float | None:
         return self._exec.get(symbol)
 
+    # P-2: el Protocol exige declarar los extremos de la barra; sin OHLC se declaran
+    # ``None`` (comportamiento idéntico al camino sin barra).
+    def low(self, symbol: str) -> float | None:
+        return None
+
+    def high(self, symbol: str) -> float | None:
+        return None
+
     def missing(self, symbols: Sequence[str]) -> tuple[str, ...]:
         return tuple(s for s in symbols if self._exec.get(s) is None)
 

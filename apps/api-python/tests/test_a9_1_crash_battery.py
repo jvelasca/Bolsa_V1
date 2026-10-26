@@ -335,10 +335,15 @@ async def test_duplicate_engine_rows_are_not_healed_with_an_account_average(
 
 
 @pytest.mark.asyncio
-async def test_rebuilt_duplicate_row_keeps_the_quantity_but_not_the_invented_cost(
+async def test_rebuilt_duplicate_row_refuses_to_project_the_account_total(
     auto_env: None,
 ) -> None:
-    """Hueco E — la reconstrucción de cantidad sigue; la del COSTE se niega."""
+    """R-2 §8 — con dos filas vivas ni el coste ni la cantidad de la cuenta.
+
+    La cura de ``.159`` escribía el total canónico de la CUENTA (200) sobre cada fila
+    por motor: dos motores vivos acababan sumando 400. Con más de una fila viva no se
+    proyecta nada; el símbolo queda ``UNKNOWN`` y las aperturas se vetan.
+    """
     account = "acc-dup-rebuilt"
     pos_store = InMemorySimAutoPositionStore()
 
@@ -357,8 +362,12 @@ async def test_rebuilt_duplicate_row_keeps_the_quantity_but_not_the_invented_cos
     await worker.readopt_positions()
 
     projection = await pos_store.read_projection(account, worker._engine_id)
-    assert projection["AAA"].quantity == Decimal("100"), "la cantidad se reconcilia"
+    assert projection["AAA"].quantity == Decimal("50"), (
+        "el total de la cuenta no se escribe sobre una fila por motor"
+    )
     assert projection["AAA"].entry_price is None, "el coste no se fabrica desde el medio"
+    assert worker._reconciliation["AAA"] == "UNKNOWN"
+    assert worker._openings_vetoed("AAA") is True
 
 
 # ---------------------------------------------------------------------------

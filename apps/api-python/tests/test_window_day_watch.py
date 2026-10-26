@@ -44,9 +44,15 @@ _WEEKDAY_AFTER_DUE = datetime(2026, 10, 16, 20, 30, tzinfo=MADRID)
 #: Sábado 2026-10-17 20:30 — fin de semana.
 _WEEKEND = datetime(2026, 10, 17, 20, 30, tzinfo=MADRID)
 
+#: W-1 — gate de un día que SÍ acredita material medible (lo que el runner publica).
+_MEASURED_GATE = {"verdict": "READY", "cycles": 8}
 
-def _row(day: str, status: str, reason: str | None = None) -> dict:
-    return {"day": day, "status": status, "reason": reason}
+
+def _row(day: str, status: str, reason: str | None = None, gate: dict | None = None) -> dict:
+    row: dict = {"day": day, "status": status, "reason": reason}
+    if gate is not None:
+        row["gate"] = gate
+    return row
 
 
 def _decide(now: datetime, rows: list[dict], *, running: bool = False):
@@ -86,11 +92,84 @@ def test_missed_when_weekday_without_row() -> None:
     assert watch.reason == "ledger_sin_dia"
 
 
-def test_measured_is_ok() -> None:
-    watch = _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO")])
+def test_measured_with_measurable_cycles_is_ok() -> None:
+    """Control positivo: ``MEDIDO`` + gate con ciclos medibles es un día ganado."""
+    watch = _decide(
+        _WEEKDAY_AFTER_DUE,
+        [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)],
+    )
     assert watch.verdict == "OK"
     assert watch.severity == "ok"
+
+
+def test_measured_without_a_gate_is_inconclusive() -> None:
+    """W-1: sin gate no hay evidencia; ``MEDIDO`` a secas NO es un día ganado.
+
+    Un ledger antiguo o uno cuya procedencia no se pudo verificar deja ``gate`` en
+    ``None``. Publicar ``OK`` ahí convertiría la ausencia de evidencia en evidencia
+    favorable.
+    """
+    watch = _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO")])
+    assert watch.verdict == "INCONCLUSIVE"
+    assert watch.severity == "alert"
+    assert watch.reason == "gate_missing"
     assert watch.status == "MEDIDO"
+
+
+def test_measured_with_a_null_or_empty_gate_is_inconclusive() -> None:
+    for gate in (None, {}):
+        watch = _decide(
+            _WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO", gate=gate)]
+        )
+        assert watch.verdict == "INCONCLUSIVE", gate
+        assert watch.severity == "alert", gate
+
+
+def test_measured_with_zero_cycles_and_inconclusive_gate_alerts() -> None:
+    """W-1: un día ``MEDIDO`` sin ciclos medibles NO es un día ganado.
+
+    Antes ``MEDIDO`` se mapeaba directo a ``OK`` y el caso que mantiene la ventana
+    INCONCLUSIVE (0 ciclos) se publicaba como un día bueno.
+    """
+    watch = _decide(
+        _WEEKDAY_AFTER_DUE,
+        [_row("20261016", "MEDIDO", gate={"verdict": "INCONCLUSIVE", "cycles": 0})],
+    )
+    assert watch.verdict == "INCONCLUSIVE"
+    assert watch.severity == "alert"
+    assert watch.reason == "gate_inconclusive"
+    assert watch.status == "MEDIDO"
+    assert alert_key(watch) != alert_key(
+        _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)])
+    )
+
+
+def test_measured_with_inconclusive_gate_alerts_even_without_the_counter() -> None:
+    """El verdicto del gate basta: no hace falta que el contador viaje en la fila."""
+    watch = _decide(
+        _WEEKDAY_AFTER_DUE,
+        [_row("20261016", "MEDIDO", gate={"verdict": "INCONCLUSIVE"})],
+    )
+    assert watch.verdict == "INCONCLUSIVE"
+    assert watch.severity == "alert"
+
+
+def test_hard_error_wins_over_an_inconclusive_gate() -> None:
+    """Control negativo: el HARD_ERROR no se disfraza de ``INCONCLUSIVE``."""
+    watch = _decide(
+        _WEEKDAY_AFTER_DUE,
+        [
+            _row(
+                "20261016",
+                "HARD_ERROR",
+                "API_NOT_READY",
+                gate={"verdict": "INCONCLUSIVE", "cycles": 0},
+            )
+        ],
+    )
+    assert watch.verdict == "HARD_ERROR"
+    assert watch.severity == "alert"
+    assert watch.reason == "API_NOT_READY"
 
 
 def test_veto_is_info_not_alert() -> None:
@@ -119,7 +198,7 @@ def test_unknown_status_is_declared_not_alert() -> None:
 
 
 def test_latest_row_for_day_wins() -> None:
-    rows = [_row("20261016", "HARD_ERROR"), _row("20261016", "MEDIDO")]
+    rows = [_row("20261016", "HARD_ERROR"), _row("20261016", "MEDIDO", gate=_MEASURED_GATE)]
     assert _decide(_WEEKDAY_AFTER_DUE, rows).verdict == "OK"
 
 
@@ -300,7 +379,7 @@ async def test_evaluate_once_alerts_backfill_days_too(monkeypatch) -> None:
 
 
 def test_write_status_writes_latido_and_journal(tmp_path: Path) -> None:
-    checks = [_decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO")])]
+    checks = [_decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)])]
     path = write_status(
         checks, now=_WEEKDAY_AFTER_DUE, lookback_days=7, source="test", directory=tmp_path
     )
@@ -353,7 +432,7 @@ def test_default_lookback_days_env_and_clamp(monkeypatch) -> None:
 
 
 def test_alert_key_is_day_and_verdict() -> None:
-    watch = _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO")])
+    watch = _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)])
     assert alert_key(watch) == "20261016:OK"
     missed = _decide(_WEEKDAY_AFTER_DUE, [])
     assert alert_key(missed) == "20261016:MISSED"
@@ -592,7 +671,7 @@ def test_main_json_prints_payload(monkeypatch, tmp_path: Path, capsys) -> None:
     monkeypatch.setattr(
         watch_worker,
         "read_ledger_rows",
-        lambda path: [_row("20261016", "MEDIDO")],
+        lambda path: [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)],
     )
     monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
     monkeypatch.setattr(watch_worker, "runs_dir", lambda: tmp_path)

@@ -70,6 +70,19 @@ class PriceSource(Protocol):
         """Precio de **EJECUCIÓN/MARCA**: ``open`` de la barra corriente (conocido, no lookahead)."""
         ...
 
+    def low(self, symbol: str) -> float | None:
+        """**Mínimo** de la barra corriente (``low(B)``) o ``None`` si la fuente no lo tiene.
+
+        P-2 (verificación 2026-10-26 §8): sin este dato la gestión de la posición sólo ve
+        ``open(B)`` y un recorrido intradía por debajo del stop pasaba invisible. ``None``
+        conserva EXACTAMENTE el comportamiento anterior (Δ = 0 en el camino sin OHLC).
+        """
+        ...
+
+    def high(self, symbol: str) -> float | None:
+        """**Máximo** de la barra corriente (``high(B)``) o ``None`` (misma semántica)."""
+        ...
+
     def missing(self, symbols: Sequence[str]) -> tuple[str, ...]:
         """Símbolos de ``symbols`` SIN precio de ejecución ⇒ no ejecutables (``HOLD``)."""
         ...
@@ -117,6 +130,13 @@ class ConstantPriceSource:
     def execution(self, symbol: str) -> float | None:
         return self._price(symbol)
 
+    def low(self, symbol: str) -> float | None:  # noqa: ARG002 — contrato sin OHLC.
+        """Un ``PriceScript`` no aporta extremos: ``None`` ⇒ gestión byte-idéntica."""
+        return None
+
+    def high(self, symbol: str) -> float | None:  # noqa: ARG002 — contrato sin OHLC.
+        return None
+
     def missing(self, symbols: Sequence[str]) -> tuple[str, ...]:
         return tuple(s for s in symbols if self._price(s) is None)
 
@@ -145,6 +165,13 @@ class MappingPriceSource:
 
     def execution(self, symbol: str) -> float | None:
         return self._prices.get(symbol)
+
+    def low(self, symbol: str) -> float | None:  # noqa: ARG002 — mapa sin OHLC.
+        """Un mapa de precios no declara extremos de barra: ``None`` (Δ = 0)."""
+        return None
+
+    def high(self, symbol: str) -> float | None:  # noqa: ARG002 — mapa sin OHLC.
+        return None
 
     def missing(self, symbols: Sequence[str]) -> tuple[str, ...]:
         return tuple(s for s in symbols if self._prices.get(s) is None)
@@ -197,6 +224,10 @@ class OhlcvPriceSource:
         self._limit = limit
         self._mid: dict[str, float] = {}
         self._exec: dict[str, float] = {}
+        # P-2: extremos de la barra CORRIENTE (``low(B)``/``high(B)``). Son datos
+        # conocidos de la barra, no lookahead: el rango ya recorrido es un hecho.
+        self._low: dict[str, float] = {}
+        self._high: dict[str, float] = {}
 
     async def refresh(self) -> None:
         """Una lectura por símbolo con ``as_of = día(B)``; parte la ventana en las dos fronteras."""
@@ -209,8 +240,11 @@ class OhlcvPriceSource:
         day_b = resolve_as_of(self._as_of)
         mid: dict[str, float] = {}
         exec_: dict[str, float] = {}
+        low: dict[str, float] = {}
+        high: dict[str, float] = {}
         if not day_b:
             self._mid, self._exec = mid, exec_
+            self._low, self._high = low, high
             return
         timeframe = self._timeframe if self._timeframe is not None else _default_timeframe()
         for symbol in self._symbols:
@@ -243,14 +277,30 @@ class OhlcvPriceSource:
                 open_ = _finite_field(bar, "open")
                 if open_ is not None:
                     exec_[symbol] = open_
+                # P-2: el rango de la barra corriente. Se lee junto al open (misma barra,
+                # mismo instante conocido); un campo ausente se declara ``None`` y deja la
+                # gestión byte-idéntica al camino sin OHLC.
+                low_ = _finite_field(bar, "low")
+                if low_ is not None:
+                    low[symbol] = low_
+                high_ = _finite_field(bar, "high")
+                if high_ is not None:
+                    high[symbol] = high_
                 break  # solo la ÚLTIMA barra del día B (la corriente).
         self._mid, self._exec = mid, exec_
+        self._low, self._high = low, high
 
     def mid(self, symbol: str) -> float | None:
         return self._mid.get(symbol)
 
     def execution(self, symbol: str) -> float | None:
         return self._exec.get(symbol)
+
+    def low(self, symbol: str) -> float | None:
+        return self._low.get(symbol)
+
+    def high(self, symbol: str) -> float | None:
+        return self._high.get(symbol)
 
     def missing(self, symbols: Sequence[str]) -> tuple[str, ...]:
         return tuple(s for s in symbols if self._exec.get(s) is None)
@@ -264,8 +314,9 @@ class OhlcvPriceSource:
 def _finite_field(bar: Any, name: str) -> float | None:
     """Campo numérico finito de una barra (dataclass/Mapping/atributo); ``None`` si no.
 
-    ``high``/``low``/``close`` de la barra corriente NO se leen nunca: sólo se pide ``open``
-    de ``B`` y ``close`` de ``< B`` (leer ``close(B)`` sería lookahead).
+    De la barra corriente ``B`` se leen ``open``, ``low`` y ``high`` (hechos conocidos del
+    rango ya recorrido, P-2); ``close(B)`` NO se lee nunca: sería lookahead. De la última
+    cerrada se lee ``close``.
     """
     value = bar.get(name) if isinstance(bar, Mapping) else getattr(bar, name, None)
     if value is None:

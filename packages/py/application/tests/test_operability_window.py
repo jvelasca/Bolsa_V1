@@ -439,3 +439,63 @@ def test_render_window_html_does_not_invent_exclusions_for_older_artifacts() -> 
     row = build_window_row("2026-09-27", entries=[_entry("approved")], fills=0)
     meta = {"header": {"account": "acc", "versions": [], "capturedAt": "x"}, "gate": window_gate([row])}
     assert "fuera del numerador" not in render_window_html([row], meta)
+
+# ── W-2 (verificación 2026-10-26 §8): regímenes del runner vs. declarados ───────────
+
+
+def test_w2_build_window_row_derives_regimes_only_from_cycles() -> None:
+    """El runner NO puede inyectar episodios: sin ciclos, ``regimes`` queda vacío.
+
+    Antes esta prueba no existía y la del gate construía las filas con ``regimes`` ya
+    puestos (``_gate_row``), de modo que la simetría entre lo que el runner DERIVA y lo
+    que el gate LEE no estaba fijada en ningún sitio.
+    """
+    rows = [
+        build_window_row(
+            f"2026-09-2{day}",
+            entries=[_entry("approved")],
+            cycles=[],
+            fills=0,
+            evidence={"marketRegime": regime},
+        )
+        for day, regime in ((4, "trend_up"), (5, "trend_down"), (6, "range"), (7, "trend_up"))
+    ]
+    for row in rows:
+        assert row["regimes"] == []
+        assert row["measurableCycles"] == 0
+    gate = window_gate(rows)
+    assert gate["days"] == 4, "los días SÍ se cuentan (el día corrió)"
+    assert gate["episodes"] == 0, "sin ciclos no hay episodios medibles"
+    assert gate["cycles"] == 0
+    assert gate["ready"] is False
+    assert gate["verdict"] == MARKET_WINDOW_INCONCLUSIVE
+
+
+def test_w2_build_window_row_publishes_the_regime_of_a_measured_cycle() -> None:
+    """Control positivo: UN ciclo con régimen implica un episodio (y no más)."""
+    row = build_window_row("2026-09-27", cycles=[_cycle("cyc-1", regime="trend_down")], fills=1)
+    assert row["regimes"] == ["trend_down"]
+    gate = window_gate([row])
+    assert gate["episodes"] == 1
+    assert gate["cycles"] == 1
+    assert gate["ready"] is False, "un día y un ciclo no acreditan la ventana"
+
+
+def test_w2_window_gate_cannot_be_ready_with_a_declared_regime_and_zero_cycles() -> None:
+    """Simetría: el régimen declarado puede dar ``episodes``, NUNCA ``READY`` sin ciclos.
+
+    Es la propiedad que el informe Día-D necesita: puede leer ``row["regime"]``, pero el
+    denominador duro son los ciclos medibles.
+    """
+    rows = [
+        {"day": f"2026-09-2{index}", "regime": regime, "regimes": [regime], "measurableCycles": 0}
+        for index, regime in ((4, "trend_up"), (5, "trend_down"), (6, "range"), (7, "trend_up"))
+    ]
+    gate = window_gate(rows)
+    assert gate["days"] == MARKET_WINDOW_MIN_DAYS
+    # El régimen declarado SÍ alimenta los episodios (3 regímenes distintos en 4 días)…
+    assert gate["episodes"] >= MARKET_WINDOW_MIN_EPISODES
+    # …pero el denominador duro son los ciclos medibles: 0 ⇒ nunca READY.
+    assert gate["cycles"] == 0
+    assert gate["ready"] is False
+    assert gate["verdict"] == MARKET_WINDOW_INCONCLUSIVE

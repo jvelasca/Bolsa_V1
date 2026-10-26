@@ -1736,6 +1736,8 @@ def plan_v2_position_outcome(
     risk_regime: str | None = None,
     drawdown_band: str | None = None,
     operational_state: str | None = None,
+    bar_low: float | None = None,
+    bar_high: float | None = None,
 ) -> PositionManagerResult | PositionManagerSkip | None:
     """AUTO-1A — como ``plan_v2_position_decision`` pero conservando el motivo del skip.
 
@@ -1749,6 +1751,8 @@ def plan_v2_position_outcome(
     V2.44: acepta y propaga la lectura del GOBERNADOR (``risk_regime``/``drawdown_band``/
     ``operational_state``) y los flags ``manual``/``portfolio_risk``. Sin esto, la gestión
     de posición solo veía el régimen de mercado y ``RISK_OFF``/``HALTED`` no llegaban.
+
+    P-2: ``bar_low``/``bar_high`` propagan los extremos de la barra al plan de salida.
     """
     return manage_position_outcome(
         position,
@@ -1767,6 +1771,8 @@ def plan_v2_position_outcome(
         risk_regime=risk_regime,
         drawdown_band=drawdown_band,
         operational_state=operational_state,
+        bar_low=bar_low,
+        bar_high=bar_high,
     )
 
 

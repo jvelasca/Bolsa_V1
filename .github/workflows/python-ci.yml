@@ -152,7 +152,10 @@ jobs:
         # crash por transición y la concurrencia MULTI-PROCESO son capas PG (sus gemelos
         # herméticos —``test_auto_v46_hardkill_recovery.py`` y
         # ``test_auto_v46_crash_injection_matrix.py``— entran por el pase de directorio).
-        # Sus ficheros PG se ignoran aquí y corren en pasos DEDICADOS del tag.
+        # Sus ficheros PG se ignoran aquí y corren en pasos DEDICADOS del tag; la
+        # recuperación de la PARADA DURA deja de ser sólo del tag (P-3, verificación
+        # 2026-10-26 §8): ``test_auto_v46_hardkill_recovery_pg.py`` corre POR COMMIT en
+        # ``auto-v2-durable-pg`` con ``AUTO_HARDKILL_PG_REQUIRED=1``.
         # V2.47 (trazabilidad de ciclo, identidad de señales, valor esperado en el journal
         # y AUTO-7) + AUTO-6.1: sus gates de APLICACIÓN NO entran por el pase de directorio
         # de ``packages/py/analytics/tests`` (a diferencia del informe PURO de
@@ -708,6 +711,10 @@ jobs:
       DB_PASSWORD: bolsa_dev
       DB_NAME: bolsa_v1
       AUTO_V2_DURABLE_PG_REQUIRED: '1'
+      # P-3 (verificación 2026-10-26 §8): la recuperación del HALT durable
+      # (``test_auto_v46_hardkill_recovery_pg.py``) deja de certificarse sólo en el tag y
+      # pasa a correr POR COMMIT. Sin PG el fichero skipea; aquí un skip es un fallo duro.
+      AUTO_HARDKILL_PG_REQUIRED: '1'
       # C-4 (auditoría .161): el COSTE AMBIGUO de una adopción —libro con más de un motor
       # vivo y espejo del motor como único coste de la fila— solo se certifica midiendo
       # las filas REALES de ``sim_auto_positions`` (espejo, sin espejo y plan durable).
@@ -879,6 +886,7 @@ jobs:
             apps/api-python/tests/test_unique_natural_keys_pg.py \
             apps/api-python/tests/test_portfolio_reservation_pg.py \
             apps/api-python/tests/test_auto_v44_exit_identity_pg.py \
+            apps/api-python/tests/test_auto_v46_hardkill_recovery_pg.py \
             apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py \
             apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py \
             apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py \
