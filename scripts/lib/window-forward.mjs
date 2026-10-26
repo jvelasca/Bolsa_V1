@@ -721,10 +721,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-26 — pin del arbol re-anclado a `9b91f472`
+ * (`apps` `d7e698cfafa21262ee9b9bca3409ee0c0ed127c3` / `packages` `26ec8a8ed5514a88053ddd764877e6e00c1d957e`).
+ * Motivo: post seal v2.88.163-beta (9b91f472): fix de logging del bootstrap en proceso (env.py + migrations.py) en packages; el tag debe apuntar a un commit con freeze OK; la ventana sigue INCONCLUSIVE y el dia 20261026 se perdio por API_NOT_READY
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '1523cfe7',
-  appsHash: '807f67a090b181cb2444128ba17782a055d90efe',
-  packagesHash: 'b2fae3bf7983762f8d17e1f95c8679730da17d54',
+  commit: '9b91f472',
+  appsHash: 'd7e698cfafa21262ee9b9bca3409ee0c0ed127c3',
+  packagesHash: '26ec8a8ed5514a88053ddd764877e6e00c1d957e',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
