@@ -776,6 +776,16 @@ Medidos antes de la primera tanda y después de la última (360 herméticas + 38
 repo. La guarda de sesión convierte cualquier reincidencia en rojo cuando la escritura es atribuible
 a la propia corrida de pytest.
 
+> **Errata de ventana (2026-10-26, 18:32 — posterior a esta verificación).** Las huellas de arriba
+> son el estado **en el momento de medir**. Después, el **runner programado de la ventana**
+> (`window:run-day`, no la suite) añadió la **fila 13** al `ledger.jsonl`: día `20261026`,
+> `status: HARD_ERROR`, `reason: API_NOT_READY` (`sha256 71390655…`, 30 432 B, 13 líneas,
+> `mtime 2026-10-26T18:32:14`). `day-watch.json`/`.jsonl` **no** cambiaron (siguen en
+> `0D14165A…`/`9AF8A3E2…`, 17:05). Es un día **perdido** de la ventana por el API apagado tras el
+> reinicio del equipo: se declara, **no** se reintenta ni se imputa a las pruebas. La guarda de
+> sesión sólo cubre los artefactos del vigía; el ledger lo escribe el proceso de la ventana y su
+> huella **debe** cambiar cuando ese proceso corre.
+
 ### 12.5 Gates de CI reproducidos
 
 | Gate (comando de `.github/workflows/python-ci.yml`) | Resultado |

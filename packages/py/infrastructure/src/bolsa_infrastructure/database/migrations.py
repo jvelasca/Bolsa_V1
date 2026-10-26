@@ -83,6 +83,12 @@ def ensure_migrated() -> bool:
     url = _normalized_url(settings.database_url)
 
     cfg = _alembic_config()
+    # El bootstrap corre EN PROCESO (worker, API, tests PG). ``alembic.ini`` fija
+    # ``[logger_root] level = WARN`` y ``fileConfig`` lo aplicaría al proceso entero:
+    # tras migrar, todo ``logger.info`` de la app se pierde. No es teórico —el tag
+    # ``v2.88.162-beta`` falló su gate de disponibilidad del worker por esto—, así que
+    # la ruta embebida NO reconfigura logging; el CLI de Alembic sí lo hace.
+    cfg.attributes["configure_logger"] = False
     cfg.attributes["DATABASE_URL"] = url
     engine = create_engine(url, poolclass=NullPool)
     try:

@@ -28,12 +28,21 @@ from bolsa_infrastructure.database.models import Base
 
 config = context.config
 
-if config.config_file_name is not None:
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     # ``disable_existing_loggers=False``: cuando Alembic corre EN PROCESO (p.ej.
     # ``ensure_migrated`` durante el bootstrap de un worker o en tests PG), el default
     # de ``fileConfig`` (True) deshabilitaría los loggers de la app ya creados —
     # silenciando el logging del proceso. No queremos eso: las migraciones no deben
     # mutar el estado de logging de la aplicación.
+    #
+    # ``configure_logger``: ``disable_existing_loggers=False`` NO basta. ``fileConfig``
+    # sigue aplicando ``[logger_root] level = WARN`` de ``alembic.ini`` al logger raíz
+    # del proceso, así que todo ``logger.info`` posterior al bootstrap desaparece.
+    # Medido en el tag ``v2.88.162-beta`` (job ``playwright (live AUTO daily chain)``):
+    # el gate de disponibilidad esperaba ``Worker AUTO_OPS_JOB iniciado`` y nunca llegó,
+    # aunque el worker estaba vivo (su siguiente ``logger.warning`` sí se vio). El
+    # bootstrap en proceso marca ``configure_logger=False`` y el CLI de Alembic sigue
+    # configurando el logging como siempre (atributo ausente ⇒ True).
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata

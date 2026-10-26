@@ -630,12 +630,18 @@ jobs:
         run: |
           uv run --no-sync python -m bolsa_api.workers.scheduler_worker \
             > /tmp/live-daily-scheduler.log 2>&1 &
+          # 30 × 3 s = 90 s: el bootstrap en proceso encadena `alembic upgrade` +
+          # migración de datos de cuentas + usuario de bootstrap bajo advisory lock.
+          # Con 60 s el sondeo podía agotarse antes de que los starters arrancaran
+          # (medido en el tag v2.88.162-beta, run 40364412142). No se relaja el
+          # criterio: si el worker no arranca, el job sigue rojo y el anti-skip de
+          # abajo lo reafirma.
           for i in $(seq 1 30); do
             if grep -q "Worker AUTO_OPS_JOB iniciado" /tmp/live-daily-scheduler.log; then
               echo "AUTO_OPS worker ready"
               exit 0
             fi
-            sleep 2
+            sleep 3
           done
           echo "::error::El worker AUTO_OPS_JOB no arrancó; el journey diario no podría terminar."
           cat /tmp/live-daily-scheduler.log
