@@ -1188,6 +1188,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
+          --ignore=apps/api-python/tests/test_auto_v88_161_c4_ambiguous_cost_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_auto_estudio_universe_coverage_pg.py
           --ignore=apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py
@@ -1285,6 +1286,10 @@ jobs:
       # posición + señales consumidas por barra, migración 040). Sin PG este test
       # skipearía en mudo, así que un skip aquí es un fallo duro.
       AUTO_V2_DURABLE_PG_REQUIRED: '1'
+      # C-4 (auditoría .161): el coste AMBIGUO de una adopción (libro con dos motores
+      # vivos, espejo del motor y plan durable) se certifica con las filas REALES de
+      # ``sim_auto_positions``. Un skip aquí es un fallo duro, no una certificación fantasma.
+      C4_AMBIGUOUS_COST_PG_REQUIRED: '1'
       # V2.40.1/AUTO 2.0: contexto de cartera del catálogo (sector + ADV + frescura)
       # que alimenta los gates fail-closed del tick. Mismo gobierno: sin PG el test
       # skipearía en mudo, así que un skip aquí es un fallo duro.
@@ -1605,6 +1610,7 @@ jobs:
           apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
+          apps/api-python/tests/test_auto_v88_161_c4_ambiguous_cost_pg.py
           apps/api-python/tests/test_health.py
           packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py

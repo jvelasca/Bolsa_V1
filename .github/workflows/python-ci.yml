@@ -431,6 +431,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
+          --ignore=apps/api-python/tests/test_auto_v88_161_c4_ambiguous_cost_pg.py
           --ignore=apps/api-python/tests/test_auto_paper_evidence_pg.py
           --ignore=apps/api-python/tests/test_auto_paper_evidence_restart_pg.py
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
@@ -707,6 +708,11 @@ jobs:
       DB_PASSWORD: bolsa_dev
       DB_NAME: bolsa_v1
       AUTO_V2_DURABLE_PG_REQUIRED: '1'
+      # C-4 (auditoría .161): el COSTE AMBIGUO de una adopción —libro con más de un motor
+      # vivo y espejo del motor como único coste de la fila— solo se certifica midiendo
+      # las filas REALES de ``sim_auto_positions`` (espejo, sin espejo y plan durable).
+      # Sin PG el test skipearía en mudo: un skip aquí es un fallo duro.
+      C4_AMBIGUOUS_COST_PG_REQUIRED: '1'
       # V2.40.1/AUTO 2.0: contexto de cartera del catálogo (sector + ADV + frescura) —
       # la fuente REAL que alimenta los gates fail-closed del tick. Un skip silencioso
       # invalidaría la certificación del cableado de producción.
@@ -901,6 +907,34 @@ jobs:
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-v2-durable-pg.log; then
             echo "::error::AUTO 2.0 durable PG dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/auto-v2-durable-pg.log || true
+            exit 1
+          fi
+        if: always()
+
+      # C-4 (auditoría .161) — coste AMBIGUO de una adopción: paso PROPIO, no dentro del
+      # lote anterior. Los dos fallos que este paso debe ver son distintos del verde de la
+      # suite: (a) el fichero se OMITE o se renombra ⇒ pytest sale con exit 4 y el paso
+      # rompe; (b) el test se SALTA (sin PG real) ⇒ la guarda de abajo rompe. Dentro de un
+      # lote grande, (a) podría pasar desapercibido. Cubre los tres escenarios del
+      # dictamen sobre filas REALES: espejo del motor con libro ambiguo, libro ambiguo sin
+      # espejo (ningún coste inventado) y plan durable que impone su geometría.
+      - name: Pytest C-4 coste ambiguo PG (fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_v88_161_c4_ambiguous_cost_pg.py \
+            -q --tb=short -rs | tee /tmp/c4-ambiguous-cost-pg.log
+
+      - name: Fail on skipped C-4 coste ambiguo PG (no skip silencioso)
+        # Sin PG real los tres escenarios de C-4 darían "verde" sin medir nada.
+        run: |
+          if [ ! -s /tmp/c4-ambiguous-cost-pg.log ]; then
+            echo "::error::C-4 coste ambiguo PG no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/c4-ambiguous-cost-pg.log; then
+            echo "::error::C-4 coste ambiguo PG dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/c4-ambiguous-cost-pg.log || true
             exit 1
           fi
         if: always()
