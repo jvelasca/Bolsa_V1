@@ -44,7 +44,7 @@ skip; la suite PG corre en los pasos propios de `auto-v2-durable-pg` con guarda 
 
 | SHA | Contenido | Alcance |
 | --- | --- | --- |
-| `b11e26ae` | Motor, pruebas y **cableado de CI** del cierre (`P-1`, `R-1`, `R-2`, `P-2`, `R-4`, `W-1`, y el gate de `P-3`) | 20 ficheros |
+| `b11e26ae` | Motor, pruebas y **cableado de CI** del cierre (`P-1`, `R-1`, `R-2`, `P-2`, `R-4`, `W-1`, el gate de `P-3` y las pruebas de caracterización de `W-2`) | 20 ficheros |
 | `fe0ea524` | Anexo de verificación y runbook | 2 ficheros |
 | `2fa7d33d` | Corrección de Ruff (**sólo lint**) | 3 ficheros |
 | `c1d2d9da` | Certificación documental del cierre y corrección del veredicto del stop | 1 fichero |
@@ -77,7 +77,7 @@ Los siete to-dos son las siete filas de cierre de
 
 | Frente | Estado declarado | Qué lo sostiene | Qué sigue abierto |
 | --- | --- | --- | --- |
-| **Siete to-dos** | **Implementados y publicados** | `b11e26ae` + CI verde `40314593833` sobre `2fa7d33d` | Residuales de §4 |
+| **Siete to-dos** | **Implementados y publicados** | `b11e26ae` + CI verde `40314593833` sobre `2fa7d33d` | Residuales de §4. `P-3` y `W-2` quedan **fuera** del cómputo (§2) |
 | **P-1 · parada dura** | **Contrato de bloqueo reforzado** | Latch `KILL_STATE_UNREADABLE` fail-closed en cada tick; liberación **sólo** con lectura válida (sin fila o fila liberada con `reconciliation_id`); veto también en el camino legacy (`AUTO_ENGINE_SIM_V2=0`), con SELL permitido | **Permanencia** durante fallos persistentes: el latch es local y no deja evidencia durable del tramo ilegible |
 | **R-1 · readopción** | **Recuperación transitoria cubierta** | Latch `_projection_read_failed` veta aperturas de cualquier símbolo; el fallo del canónico **no** consume la readopción (`_readopted` queda `False`) y el tick siguiente reintenta; se limpia sólo tras lectura + reconciliación válidas | El fail-open exige que falle **sólo** la proyección (si la equity también es ilegible, el BUY ya estaba vetado). No es un cierre de todos los modos de fallo |
 | **R-2 · filas duplicadas** | **Invariante medible; no apropia la cantidad de otro motor** | Con más de una fila viva el motor conserva la cantidad de **su** fila y declara `UNKNOWN` (aperturas vetadas); `live_row_invariant_report()` publica `Σ filas vivas` frente al canónico (`delta`, `consistent`); el cierre multi-motor se declara `position_row_unreconciled` y se acota a la fila propia | **Reparación de datos históricos:** una fila ya inflada **no se cura sola**; exige reconciliación explícita de operador. Prohibida la reparación heurística: el reparto entre motores no es determinable desde el total |
@@ -87,12 +87,25 @@ Los siete to-dos son las siete filas de cierre de
 | **PAPER / AUTO** | **Sin cambio operativo** | Pin `.161` autoconsistente; AUTO **OFF**; operativa **100 % PAPER virtual** | Ventana **`INCONCLUSIVE`**: `d=5 e=0 c=0` |
 | **Rentabilidad** | **No demostrada** | — | `0/32` ciclos medibles, `evidence_ready = false`. Un CI verde no es evidencia estadística |
 
-**P-3 queda cerrado por el mismo run, pero no cuenta en los siete.** El anexo §8 lista ocho huecos:
-los siete de la tabla más `P-3` (cobertura de CI asimétrica de la durabilidad, que dejaba la
-recuperación del HALT sólo en el tag). `b11e26ae` lo cierra al mover
+**Composición exacta de §8 y qué queda fuera de los siete.** El anexo §8 registra **ocho filas**:
+`R-1`, `R-2`, `P-1`, `P-2`, `W-1`, **`W-2`**, `R-4` y `P-3`. Los **siete to-dos** son las siete
+filas de cierre de §8.1, que **desdobla** `P-2` en contable y MAE y **no** incluye `W-2`. Quedan,
+por tanto, **fuera de los siete** dos filas, ambas ejecutadas por el run:
+
+**P-3 — cobertura de CI de la durabilidad.** `b11e26ae` la cierra al mover
 `test_auto_v46_hardkill_recovery_pg.py` a `auto-v2-durable-pg` con `AUTO_HARDKILL_PG_REQUIRED=1`, y
 el run lo ejecuta (`126 passed`). Se declara aquí porque el cierre técnico lo incluye, pero la
 aceptación explícita se limita a los **siete to-dos** que originaron este dictamen.
+
+**W-2 — episodios derivados sólo de los ciclos** (veredicto `MATIZADA` en el anexo §6). `b11e26ae`
+añade **pruebas de caracterización** que fijan el comportamiento vigente en el camino del runner:
+`test_w2_build_window_row_derives_regimes_only_from_cycles`,
+`test_w2_build_window_row_publishes_the_regime_of_a_measured_cycle` y
+`test_w2_window_gate_cannot_be_ready_with_a_declared_regime_and_zero_cycles`, en
+`packages/py/application/tests/test_operability_window.py`, ejecutadas en el job `quality` del run
+`40314593833`. Se declara **fuera de los siete** porque **no** es un cambio de comportamiento ni un
+residual: documenta y blinda el estado ya descrito por la auditoría (el runner no puede acreditar
+episodios sin ciclos), sin alterar el contrato del gate.
 
 **Salvedad sobre la fila PAPER/AUTO.** «Pin `.161` autoconsistente» no es una medición de este
 commit: se hereda de
@@ -175,16 +188,17 @@ La evidencia que interpretan ya estaba publicada: el anexo
 Dos precisiones que evitan leer esta publicación como una reescritura:
 
 1. El dictamen PAPER **no se retoca**: se publica tal como se midió en `6a9f7cab` y lleva una **nota
-   de publicación** fechada que declara qué secciones son históricas (§1, §2.1, §2.2, §11.6) y cuál
-   es el estado vigente. Sus veredictos `PARCIAL`/`HUECO DECLARADO` son pre-fix.
+   de publicación** fechada que declara qué secciones son históricas (§1, §2.1, §2.2 y §11, punto 6)
+   y cuál es el estado vigente. Sus veredictos `PARCIAL`/`HUECO DECLARADO` son pre-fix.
 2. Los enlaces cruzados resuelven porque los tres ficheros entran **en el mismo commit**. Publicar
    el bloque de `PROJECT_STATE.md` sin ellos sí habría dejado los enlaces rotos para un lector de
    GitHub.
 
-**Commit local, no publicado todavía.** Este registro se amenda sobre el commit local que aún no se
-ha empujado; hasta que exista `push`, nada de esto está en GitHub y `main`, la rama remota, el tag
-`v2.88.161-beta`, la PR [#76](https://github.com/jvelasca/Bolsa_V1/pull/76) y el pin PAPER siguen
-intactos.
+**Commit local, no publicado todavía.** Este registro se **añade** sobre `c1d2d9da`, que **ya está
+publicado** en `origin/audit/c1-c4-integrity-fold-2026-10-25`; **no** lo amenda ni reescribe
+historia. Hasta que exista `push` del commit nuevo, nada de esto está en GitHub y `main`, la rama
+remota, el tag `v2.88.161-beta`, la PR [#76](https://github.com/jvelasca/Bolsa_V1/pull/76) y el pin
+PAPER siguen intactos.
 
 ---
 

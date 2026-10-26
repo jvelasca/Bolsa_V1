@@ -14,8 +14,9 @@
 
 > **Nota de publicación (2026-10-26, posterior a la redacción).** Este dictamen se redactó como
 > **snapshot** con `HEAD = 6a9f7cab` y se publica **sin retocar sus veredictos ni sus mediciones**.
-> Con posterioridad, el commit `b11e26ae` cerró **R-1**, **R-2**, **P-1**, **P-2**, **W-1** y **R-4**
-> y cableó la guarda anti-skip del HALT durable en CI (**P-3**), con run verde
+> Con posterioridad, el commit `b11e26ae` cerró **R-1**, **R-2**, **P-1**, **P-2**, **W-1** y **R-4**,
+> cableó la guarda anti-skip del HALT durable en CI (**P-3**) y añadió las pruebas de
+> caracterización de **W-2** (episodios sólo desde ciclos), con run verde
 > [`40314593833`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40314593833) sobre `2fa7d33d`.
 > Por tanto:
 >
@@ -23,7 +24,7 @@
 >   DECLARADO` en readopción, stop y HALT son el estado **pre-fix**, no el vigente.
 > - **§2.1** (verificado en GitHub) y **§2.2** (local sin publicar) son la foto del momento: el HEAD
 >   remoto era `6a9f7cab` y los dos dictámenes estaban `untracked`.
-> - **§11.6** («el fichero es local») queda superado por esta publicación.
+> - **§11, punto 6** («el fichero es local») queda superado por esta publicación.
 >
 > El estado vigente, con los tres residuales que siguen abiertos, es
 > [`dictamen-aceptacion-cierre-siete-todos-2026-10-26.md`](./dictamen-aceptacion-cierre-siete-todos-2026-10-26.md).
