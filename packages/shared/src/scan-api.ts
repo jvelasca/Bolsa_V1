@@ -42,6 +42,20 @@ export interface ScanSkippedInstrumentDto {
   reason: string;
 }
 
+/**
+ * Prefijo estable del motivo «la ventana no alcanza el warmup del preset» (B-1/B-6).
+ *
+ * Lo emite `bolsa_analytics.signals.preset_evaluability` y es el único trozo del motivo
+ * del que un consumidor puede depender: el resto del texto es libre. Existe para que la
+ * UI distinga «no evaluable» de «sin señal» sin re-parsear prosa.
+ */
+export const SCAN_WARMUP_INSUFFICIENT_REASON = "warmup_insufficient";
+
+/** `true` si el motivo declara que el preset no puede disparar con la ventana disponible. */
+export function isWarmupInsufficientReason(reason: string): boolean {
+  return reason.trimStart().startsWith(SCAN_WARMUP_INSUFFICIENT_REASON);
+}
+
 export interface ScanHitDto {
   instrumentId: string;
   symbol: string;

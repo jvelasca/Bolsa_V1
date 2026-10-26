@@ -754,10 +754,23 @@ dice «Sin señales en la última barra de la lista» (`:325-328`) sin separar t
 3. el preset **no puede disparar** con la ventana disponible (warmup > barras), que hoy no produce
    ningún motivo: cae en el caso 1.
 
-Es decir: la UI distingue «omitido» de «sin señal», pero **no** distingue «no evaluable» de «sin
-señal» para el caso 3, que es exactamente el que produce B-1/B-6. Entradas P0-1 (motivo
-`warmup_insufficient`), P1-10 y **P1-12b** (declarar «no evaluable» en el titular del scan, sin
-tocar la UI en esta iteración).
+Es decir: la UI distinguía «omitido» de «sin señal», pero **no** distinguía «no evaluable» de «sin
+señal» para el caso 3, que es exactamente el que produce B-1/B-6.
+
+> **Resuelto el 2026-10-27 (P1-12b).** El titular ya no afirma «sin señales» cuando el motor no
+> evaluó. `apps/web/src/lib/scan-silence.ts` clasifica los `skipped` por el **prefijo estable**
+> `warmup_insufficient` —el único trozo del motivo del que un consumidor puede depender; el resto es
+> prosa libre— y el panel pasa a decir:
+>
+> - nada evaluado ⇒ **«Ningún instrumento pudo evaluarse»** + causa («N por warmup: el preset
+>   necesita más barras que la ventana disponible» / «N sin barras suficientes — sincroniza el
+>   instrumento»);
+> - algo evaluado y algo no ⇒ **«K sin señal · N instrumentos no evaluables»**. El «K» cuenta
+>   **solo** lo evaluado: el número deja de mezclar universos.
+>
+> El caso 1 conserva el titular de siempre. La prueba `scan-silence.test.ts` (14) fija también que
+> «Instrumento no encontrado» o un filtro fundamental **no** se etiqueten como no evaluable por
+> warmup, y que la palabra `warmup_insufficient` a mitad de frase no active la clasificación.
 
 **Veredicto: PARCIAL.**
 
@@ -991,8 +1004,8 @@ el decisor ACTIVE consume su ventana — el cambio de `memo` no altera sus aserc
 
 **Lo que NO se ha hecho, y por qué.** No se sube `AUTO_ENGINE_SIM_SIGNAL_BARS` por defecto (sigue en
 120): hacerlo multiplica las barras por símbolo y turno del AUTO, y esa decisión de coste no se toma
-aquí. Tampoco se toca la UI del scan (**P1-12b**): el titular puede seguir diciendo «sin señales»
-cuando el motivo ya está en `skipped`. Ambos quedan declarados como pendientes.
+aquí. La UI del scan (**P1-12b**) se cierra aparte, el 2026-10-27: el titular ya no dice «sin
+señales» cuando el preset no era evaluable (§7.4).
 
 ### 9.2 B-3 implementado: el estado `gated` viene del libro, no de un replay de la ventana
 
@@ -1074,6 +1087,52 @@ medido con esto.
 
 ---
 
+### 9.3 P1-12b aplicado: el titular del scan separa «no evaluable» de «sin señal»
+
+**El fallo, en una frase.** Un scan vacío pintaba siempre «Sin señales en la última barra de la
+lista», aunque el motor **no hubiera evaluado** el instrumento. El dato de que no era evaluable
+existía —`ScanSkippedInstrument.reason` con `warmup_insufficient`, B-1/B-6—, pero solo se veía
+abriendo un desplegable; el titular afirmaba una conclusión que el sistema no había alcanzado.
+
+**Decisión de diseño: clasificar por prefijo, no por prosa.** El motivo lo construye el backend con
+texto libre (`warmup_insufficient: sma period 200 requiere >= 201 barras (ventana: 120 barras)`).
+`preset_evaluability.WARMUP_INSUFFICIENT` existe precisamente como **prefijo estable** y su docstring
+lo dice: «La API y los tests no deben depender del texto libre». Se exporta al frontend en
+`packages/shared/src/scan-api.ts` (`SCAN_WARMUP_INSUFFICIENT_REASON`, `isWarmupInsufficientReason`)
+y `apps/web/src/lib/scan-silence.ts` clasifica los `skipped` en tres causas: `not_evaluable`
+(warmup), `insufficient_data` («Menos de 50 barras», otro origen) y `other` (fundamentales,
+instrumento no encontrado, errores de evaluación).
+
+**Titular resultante.** Dos reglas, ninguna adorno del dato:
+
+1. **Nada evaluado** (`evaluated === 0` y hay omitidos) ⇒ «Ningún instrumento pudo evaluarse» +
+   desglose por causa. No se escribe «sin señal» sobre algo que no se miró.
+2. **Mixto** ⇒ «K sin señal · N instrumentos no evaluables», donde **K cuenta solo lo evaluado**
+   (`scannedCount - skipped.length`). El número deja de sumar universos distintos.
+3. **Todo evaluado** ⇒ se conserva el titular de siempre.
+
+`evaluated` se acota a `>= 0`: un `scannedCount` inconsistente no produce un «-1 sin señal».
+
+**Pruebas (E1, herméticas de frontend).** `apps/web/src/lib/scan-silence.test.ts` (**14**):
+prefijo estable con espacios iniciales; un `warmup_insufficient` a mitad de frase **no** clasifica;
+«Menos de 50 barras» va a `insufficient_data` y no a warmup; «Instrumento no encontrado» y el filtro
+fundamental van a `other` sin disfrazarse de no evaluable; singular/plural; recuento no negativo;
+titular de siempre cuando no hay omitidos.
+
+**Gates ejecutados** (2026-10-27, árbol de trabajo): `vitest run src/lib` ⇒ **84 passed** (14 de
+`scan-silence`); `pnpm --filter @bolsa/web typecheck` ⇒ limpio; `pnpm --filter @bolsa/web lint` ⇒
+**0 errores** (23 warnings preexistentes en otros ficheros); `pnpm --filter @bolsa/shared lint` ⇒
+limpio. La UI no tiene pruebas de render en este repo, así que el titular se fija en la función pura
+que lo produce; el componente solo la pinta.
+
+**Lo que NO se ha hecho, y por qué.** No se añade un campo `cause` al DTO de `skipped`: obligaría a
+regenerar `openapi.json` y `schema.d.ts` y a versionar el contrato para un dato que el prefijo ya
+transporta. Tampoco se toca el bloque plegado de omitidos ni el recuento «N escaneados» de la
+cabecera —ese número sí incluye los omitidos, y cambiarlo es otra decisión de contrato—. La evidencia
+es **E1**: ninguna ventana real se ha mirado con esto.
+
+---
+
 ## 10. Backlog priorizado
 
 ### P0 — afecta a la validez de lo que se concluya de la ventana
@@ -1112,9 +1171,9 @@ medido con esto.
     `WINDOW_DAY_WATCH_ENABLED=0` en el proceso de pytest y en los subprocesos, y guarda de sesión que
     falla si el árbol cambia (**O-5**, también criterio de reproducibilidad).
 12b. **Declarar «no evaluable» en el titular del scan.** El panel distingue «omitido» de «sin señal»
-    en un bloque colapsado, pero el titular dice «sin señales» también cuando el preset **no puede**
-    disparar por warmup (caso 3 de §7.4, B-1/B-6). **No** se toca la UI en esta iteración: entra como
-    P1 para que no se lea como ausencia de señal lo que es ausencia de datos.
+    en un bloque colapsado, pero el titular decía «sin señales» también cuando el preset **no puede**
+    disparar por warmup (caso 3 de §7.4, B-1/B-6). **Aplicado 2026-10-27:** `scan-silence.ts`
+    clasifica por el prefijo estable y el titular separa lo evaluado de lo no evaluable (§7.4).
 
 ### P2 — deuda declarada, no bloqueante
 

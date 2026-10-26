@@ -985,3 +985,46 @@ Presentar `assume_long` como «el motor ya vende solo» habría sido **falso**.
 - **La evidencia es E1.** Ninguna ventana ni operación real se ha medido con esto; falta el frente
   `S-1` (TIME_STOP/F5) y `O-6` (journal con `featureSource`/`signalWindowBars`).
 
+### 12.10 P1-12b: el titular del scan deja de decir «sin señales» sin haber evaluado
+
+> **Cierra el ítem P1-12b** de §7.4 y §10 de la auditoría. No cierra ningún hallazgo con ID: es la
+> consecuencia visible de B-1/B-6 en la UI.
+
+**Qué se implementó.** `apps/web/src/lib/scan-silence.ts` clasifica los `skipped` por el **prefijo
+estable** que el backend ya declaraba (`WARMUP_INSUFFICIENT`), exportado al frontend en
+`packages/shared/src/scan-api.ts`. El panel pinta un titular que separa lo evaluado de lo no
+evaluable:
+
+| Situación | Titular antes | Titular ahora |
+|---|---|---|
+| Nada evaluado | «Sin señales en la última barra de la lista.» | «Ningún instrumento pudo evaluarse» + causa |
+| Mixto | «Sin señales…» | «K sin señal · N instrumentos no evaluables» |
+| Todo evaluado | «Sin señales…» | igual |
+
+`K` cuenta **solo** lo evaluado (`scannedCount - skipped.length`, acotado a `>= 0`): antes el titular
+mezclaba dos universos en una sola frase.
+
+**Verificación (E1, frontend hermético).**
+
+| Gate | Resultado |
+|---|---|
+| `apps/web/src/lib/scan-silence.test.ts` | **14 passed** |
+| `vitest run src/lib` (suite de utilidades web) | **84 passed** |
+| `pnpm --filter @bolsa/web typecheck` | limpio |
+| `pnpm --filter @bolsa/web lint` | **0 errores** (23 warnings preexistentes, ajenos al cambio) |
+| `pnpm --filter @bolsa/shared lint` | limpio |
+
+Las pruebas fijan explícitamente los **falsos positivos** que importan: «Menos de 50 barras» **no** es
+warmup, «Instrumento no encontrado» y el filtro fundamental **no** son «no evaluable», y la palabra
+`warmup_insufficient` a mitad de frase **no** activa la clasificación.
+
+**Lo que NO se ha hecho, y queda declarado.**
+
+- **No se añade `cause` al DTO de `skipped`.** Obligaría a regenerar `openapi.json` y `schema.d.ts` y
+  a versionar el contrato para un dato que el prefijo estable ya transporta.
+- **No se toca el recuento «N escaneados»** de la cabecera: ese número sí incluye los omitidos y
+  cambiarlo es una decisión de contrato distinta.
+- **La UI no tiene pruebas de render en este repo**: el titular se fija en la función pura que lo
+  produce; el componente solo lo pinta.
+- **Sin sello, sin tag y sin bump.** La evidencia es **E1**.
+
