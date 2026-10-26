@@ -243,6 +243,13 @@ pnpm window:task:remove
   se contamina (evita el falso rojo de las suites PG del §5).
 - **Intérprete**: usa `uv run --no-sync python`; si `uv` no puede lanzar `python` (bloqueo de
   Application Control), cae a `python` directo con un aviso. Override explícito: `WINDOW_PY=python`.
+- **Identidad de motor (R-4, 2026-10-26).** La ventana fija `AUTO_ENGINE_SIM_ENGINE_ID`
+  (`auto-window-1484e253`, `scripts/lib/window-forward.mjs`) en el `env` del hijo. Cualquier
+  **despliegue con composición PostgreSQL** debe declarar la suya y mantenerla **estable**: sin la
+  variable el arranque durable falla (`EngineIdentityMissingError`), AUTO queda apagado en ese
+  proceso y el resto de workers sigue arrancando (blast radius acotado en
+  `scheduler_worker._start_workers`). Un default silencioso (`auto-sim`) haría que dos procesos
+  compartiesen filas de proyección y el latch de la parada.
 
 **Lectura honesta al cerrar.** Si el preflight sigue en `BEAR_TREND` (LONG vetadas), la ventana puede dar
 **0 oportunidades por veto de régimen legítimo**: se **declara** (`regime_invalid`), **no** se fuerza el
