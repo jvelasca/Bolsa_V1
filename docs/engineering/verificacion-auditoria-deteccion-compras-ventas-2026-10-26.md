@@ -905,6 +905,11 @@ suponía un warmup de `senkouBPeriod = 52` e ignoraba el desplazamiento de 26.
 | `lint-imports` | **4 contratos, 0 rotos** |
 | `apps/api-python/tests/test_auto_sim_active_strategy_seam.py` | **8 passed** |
 
+**CI por commit** [`40387427120`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40387427120) sobre
+`51c976b8` ⇒ **`success`** (`quality` + `auto-v2-durable-pg` + `grammar-discovery-pg` +
+`lifecycle-pg` + `paper-forward-pg`). Los tres jobs PG son la parte que aquí importa: ejercitan la
+ruta AUTO real contra PostgreSQL.
+
 **Lo que NO se ha hecho, y queda declarado.**
 
 - **`AUTO_ENGINE_SIM_SIGNAL_BARS` sigue en 120.** Subirlo multiplica las barras por símbolo y turno

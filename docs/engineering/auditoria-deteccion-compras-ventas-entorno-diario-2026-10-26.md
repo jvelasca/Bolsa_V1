@@ -976,6 +976,12 @@ Los **cuatro** presets que el hallazgo declaró inalcanzables con `bar_limit = 1
 | `packages/py/application/tests/test_scan_preset_warmup.py` (5) | `bar_limit = 120` + `golden_cross` ⇒ `skipped` con `warmup_insufficient`; 201 barras ⇒ sin omisión; 200 barras ⇒ «requiere >= 201»; `vwap_reclaim` a 50 ⇒ sin omisión. |
 | `packages/py/application/tests/test_active_strategy_warmup.py` (6) | 120 barras ⇒ `HOLD` con `memo` de warmup; 200 ⇒ «>= 201»; 201 ⇒ memo limpio; `vwap_reclaim` a 120 ⇒ memo limpio; una sola declaración por decisión. |
 
+**CI por commit** [`40387427120`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40387427120) sobre
+`51c976b8` ⇒ **`success`**: `quality` (ruff + mypy + lint-imports + pytest) y los tres jobs PG
+(`auto-v2-durable-pg`, `grammar-discovery-pg`, `lifecycle-pg`, `paper-forward-pg`) en verde. Los jobs
+PG importan aquí: son los que ejercitan la ruta AUTO real con PostgreSQL, es decir, el camino donde
+el decisor ACTIVE consume su ventana — el cambio de `memo` no altera sus aserciones.
+
 **Lo que NO se ha hecho, y por qué.** No se sube `AUTO_ENGINE_SIM_SIGNAL_BARS` por defecto (sigue en
 120): hacerlo multiplica las barras por símbolo y turno del AUTO, y esa decisión de coste no se toma
 aquí. Tampoco se toca la UI del scan (**P1-12b**): el titular puede seguir diciendo «sin señales»
