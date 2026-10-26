@@ -1059,6 +1059,12 @@ a comprar** al final tras cerrar a mitad de ventana. Está cubierto por
 `ruff check` (raíz) ⇒ limpio; `lint-imports` ⇒ 4 contratos KEPT; `mypy` con el alcance de CI ⇒
 **571 ficheros, 0 errores**.
 
+**CI por commit** [`40408610263`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40408610263) sobre
+`5ef9354d` ⇒ **`success`**: `quality` (ruff + mypy + lint-imports + pytest) y los cuatro jobs PG
+(`auto-v2-durable-pg`, `grammar-discovery-pg`, `lifecycle-pg`, `paper-forward-pg`). Esos jobs son los
+que ejercitan la ruta AUTO real con PostgreSQL: el decisor ACTIVE consume ahí su ventana, y el
+`long_by_symbol` opcional no altera ninguna aserción existente.
+
 **Lo que NO se ha hecho, y por qué.** No se persiste el estado `gated` en base de datos: la fuente
 de verdad ya existe (`_open` en el worker) y duplicarla crearía una segunda verdad que puede
 desincronizarse. Tampoco se toca la ventana de 120 barras (sigue siendo la de B-1/§9.1) ni el

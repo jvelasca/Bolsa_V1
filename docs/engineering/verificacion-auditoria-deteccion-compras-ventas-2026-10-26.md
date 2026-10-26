@@ -971,6 +971,10 @@ Presentar `assume_long` como «el motor ya vende solo» habría sido **falso**.
 | `mypy` (los 5 directorios del gate) | **571 ficheros, sin incidencias** |
 | `lint-imports` | **4 contratos, 0 rotos** |
 
+**CI por commit** [`40408610263`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40408610263) sobre
+`5ef9354d` ⇒ **`success`** (`quality` + `auto-v2-durable-pg` + `grammar-discovery-pg` +
+`lifecycle-pg` + `paper-forward-pg`).
+
 **Lo que NO se ha hecho, y queda declarado.**
 
 - **No se persiste el estado `gated` en base de datos.** `_open` ya es la fuente de verdad; una copia
