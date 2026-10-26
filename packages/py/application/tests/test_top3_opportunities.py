@@ -11,11 +11,6 @@ import asyncio
 from typing import Any
 
 from bolsa_analytics.cognitive.opportunity_ranker import OpportunityScore
-from bolsa_domain.entities.strategy_lifecycle import (
-    GateResult,
-    StrategyEvaluation,
-)
-
 from bolsa_application.opportunity_board import AssetEvidence, OpportunityBoard
 from bolsa_application.opportunity_evidence_adapter import (
     StrategyEvidenceBundle,
@@ -28,6 +23,10 @@ from bolsa_application.top3_opportunities import (
     HISTORICAL_SCORING_NO_CHAMPION,
     select_top3_assets,
     select_top3_records,
+)
+from bolsa_domain.entities.strategy_lifecycle import (
+    GateResult,
+    StrategyEvaluation,
 )
 
 
@@ -247,10 +246,9 @@ class _FakeSession:
 
 def test_postgres_sink_maps_records_to_rows() -> None:
     """El sink traduce ``Top3OpportunityRecord`` a ``Top3OpportunityRow`` con régimen."""
-    from bolsa_infrastructure.database.models.tables import Top3OpportunityRow
-
     from bolsa_application.top3_opportunities import Top3OpportunityRecord
     from bolsa_application.top3_opportunity_store import PostgresTop3OpportunitySink
+    from bolsa_infrastructure.database.models.tables import Top3OpportunityRow
 
     session = _FakeSession()
     sink = PostgresTop3OpportunitySink(session, regime="trend_up")

@@ -4,12 +4,12 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
+
 from bolsa_analytics.cognitive.portfolio_reservation import (
     ReservationLedger,
     build_reservation,
 )
 from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
-
 from bolsa_application.auto_v2_entry import (
     V2_ENGINE_ENV,
     V2Signal,
