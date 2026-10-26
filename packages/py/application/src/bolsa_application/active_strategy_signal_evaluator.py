@@ -176,11 +176,19 @@ def _evaluate_last_signal(
     Se apoya en ``evaluate_strategy_last_bar`` (motor declarativo real). ``exit`` tiene
     prioridad sobre ``entry_long``: si en la misma barra hay ambas, cerrar es la acción
     conservadora.
+
+    El ``indicator_context`` se construye con las MISMAS barras OHLCV que usa el scan
+    (``signal_feature_context``). Sin él, el motor sintetiza ``open = high = low = close`` y
+    ``volume = 0``, y el decisor evalúa una señal distinta de la que el scan publica sobre
+    las mismas barras: el banco de contrato mide **5 de 16 acciones** distintas en presets de
+    volumen/rango. El modo sigue siendo ``gated``: el contrato es la **proyección** del scan,
+    no el scan.
     """
     from bolsa_analytics.signals.strategy import (
         StrategyBarInput,
         evaluate_strategy_last_bar,
     )
+    from bolsa_application.signal_feature_context import build_signal_indicator_context
 
     bar_inputs = [
         StrategyBarInput(timestamp=str(getattr(b, "timestamp", "")), close=float(b.close))
@@ -188,8 +196,13 @@ def _evaluate_last_signal(
     ]
     if not bar_inputs:
         return None
+    indicator_context = build_signal_indicator_context(bars, executable)
     events = evaluate_strategy_last_bar(
-        executable, bar_inputs, instrument_id=symbol, mode="gated"
+        executable,
+        bar_inputs,
+        instrument_id=symbol,
+        mode="gated",
+        indicator_context=indicator_context or None,
     )
     kinds = {e.kind for e in events}
     if "exit" in kinds:

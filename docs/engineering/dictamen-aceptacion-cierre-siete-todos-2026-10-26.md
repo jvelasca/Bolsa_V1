@@ -172,14 +172,14 @@ es operativo. Declararlos es el cierre correcto en este nivel.
 
 ## 6. Estado de publicación de los documentos de auditoría
 
-Los dos dictámenes de origen se publican **en este mismo commit**, junto con este registro y con la
-evidencia C-4:
+Los dos dictámenes de origen entran **en el commit `be1c1295` de este bloque local**, junto con este
+registro y con la evidencia C-4:
 
 | Fichero | Estado en git | Contenido |
 | --- | --- | --- |
-| [`dictamen-c4-postgresql-real-2026-10-26.md`](./dictamen-c4-postgresql-real-2026-10-26.md) | **publicado aquí** | Dictamen C-4 completo |
-| [`dictamen-paper-multidia-operativa-auto-2026-10-26.md`](./dictamen-paper-multidia-operativa-auto-2026-10-26.md) | **publicado aquí** | Auditoría PAPER multi-día, como **snapshot** de `6a9f7cab` |
-| [`evidencia-c4-coste-ambiguo-pg-2026-10-26.md`](./evidencia-c4-coste-ambiguo-pg-2026-10-26.md) | **publicado aquí** | Enlace al dictamen C-4 (antes en el working tree) |
+| [`dictamen-c4-postgresql-real-2026-10-26.md`](./dictamen-c4-postgresql-real-2026-10-26.md) | **añadido en `be1c1295`** | Dictamen C-4 completo |
+| [`dictamen-paper-multidia-operativa-auto-2026-10-26.md`](./dictamen-paper-multidia-operativa-auto-2026-10-26.md) | **añadido en `be1c1295`** | Auditoría PAPER multi-día, como **snapshot** de `6a9f7cab` |
+| [`evidencia-c4-coste-ambiguo-pg-2026-10-26.md`](./evidencia-c4-coste-ambiguo-pg-2026-10-26.md) | **añadido en `be1c1295`** | Enlace al dictamen C-4 (antes en el working tree) |
 
 La evidencia que interpretan ya estaba publicada: el anexo
 [`verificacion-dictamen-paper-multidia-2026-10-26.md`](./verificacion-dictamen-paper-multidia-2026-10-26.md)
@@ -190,15 +190,18 @@ Dos precisiones que evitan leer esta publicación como una reescritura:
 1. El dictamen PAPER **no se retoca**: se publica tal como se midió en `6a9f7cab` y lleva una **nota
    de publicación** fechada que declara qué secciones son históricas (§1, §2.1, §2.2 y §11, punto 6)
    y cuál es el estado vigente. Sus veredictos `PARCIAL`/`HUECO DECLARADO` son pre-fix.
-2. Los enlaces cruzados resuelven porque los tres ficheros entran **en el mismo commit**. Publicar
-   el bloque de `PROJECT_STATE.md` sin ellos sí habría dejado los enlaces rotos para un lector de
-   GitHub.
+2. Los enlaces cruzados resuelven porque los tres ficheros entran **en el mismo commit
+   (`be1c1295`)**. Publicar el bloque de `PROJECT_STATE.md` sin ellos sí habría dejado los enlaces
+   rotos para un lector de GitHub.
 
-**Commit local, no publicado todavía.** Este registro se **añade** sobre `c1d2d9da`, que **ya está
-publicado** en `origin/audit/c1-c4-integrity-fold-2026-10-25`; **no** lo amenda ni reescribe
-historia. Hasta que exista `push` del commit nuevo, nada de esto está en GitHub y `main`, la rama
-remota, el tag `v2.88.161-beta`, la PR [#76](https://github.com/jvelasca/Bolsa_V1/pull/76) y el pin
-PAPER siguen intactos.
+**Bloque local de dos commits, no publicado todavía.** El registro se **añade** sobre
+`c1d2d9da`, que **ya está publicado** en `origin/audit/c1-c4-integrity-fold-2026-10-25`;
+**no** lo amenda ni reescribe historia. El bloque local consta de `be1c1295` (registro de
+aceptación y entrada de los dos dictámenes) y `8ce53c3c` (errata de la composición de §8 y
+del estado de publicación), **dos commits por delante** de
+`origin/audit/c1-c4-integrity-fold-2026-10-25`. Hasta que exista `push` de ambos, nada de
+esto está en GitHub y `main`, la rama remota, el tag `v2.88.161-beta`, la PR
+[#76](https://github.com/jvelasca/Bolsa_V1/pull/76) y el pin PAPER siguen intactos.
 
 ---
 

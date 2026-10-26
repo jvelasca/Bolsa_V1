@@ -14,11 +14,20 @@ import asyncio
 import logging
 import re
 import sys
+import uuid
 import warnings
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+
+#: La guarda de sesión vive en un módulo hermano para poder probar su lógica sin arrancar
+#: una sesión de pytest anidada. ``conftest`` no siempre tiene su directorio en ``sys.path``
+#: al importarse, así que se asegura de forma explícita.
+_TESTS_DIR = Path(__file__).resolve().parent
+if str(_TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TESTS_DIR))
+import _day_watch_guard as day_watch_guard  # noqa: E402
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -358,6 +367,98 @@ def _isolate_auto_real_price_switch(monkeypatch: pytest.MonkeyPatch) -> None:
     contamina la sesión y un test puede encenderlo dentro de su cuerpo sin pelear con esto.
     """
     monkeypatch.setenv(_AUTO_REAL_PRICE_ENV, "0")
+
+
+#: Interruptor del vigía de ventana (``window_day_watch_worker``).
+#:
+#: Está **on-by-default** en producto, y cualquier proceso que arranque
+#: ``bolsa_api.workers.scheduler_worker`` (los PG que lanzan el worker real por
+#: ``subprocess``) deja un latido en ``operability_runs/window-runs/day-watch.json`` y
+#: añade una línea a ``day-watch.jsonl``. Ese directorio **no está trackeado**, así que
+#: ``git status`` no lo detecta: el banco de pruebas ensuciaba artefactos del repo sin
+#: que nadie lo viera (medido el 2026-10-26: la auditoría citaba una marca de tiempo que
+#: ya no existía porque las pruebas la habían reescrito).
+_WINDOW_DAY_WATCH_ENABLED_ENV = "WINDOW_DAY_WATCH_ENABLED"
+_WINDOW_DAY_WATCH_DIR_ENV = "WINDOW_DAY_WATCH_DIR"
+
+#: Identidad de esta corrida de pytest. Viaja en el entorno (también a los subprocesos) y
+#: el latido la declara como ``runId``: así se puede atribuir una reescritura a la suite.
+_PYTEST_RUN_ID = f"pytest-{uuid.uuid4().hex}"
+
+#: Directorio de los latidos del repo (no trackeado por git).
+_DAY_WATCH_REPO_DIR = (
+    Path(__file__).resolve().parents[3] / "operability_runs" / "window-runs"
+)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_window_day_watch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Apaga el vigía y manda su estado a un temporal, en TODA la suite.
+
+    Dos capas, a propósito:
+
+    - ``WINDOW_DAY_WATCH_ENABLED=0``: ningún tick, ni en el proceso de test ni en los
+      subprocesos que heredan ``os.environ``.
+    - ``WINDOW_DAY_WATCH_DIR=<tmp_path>``: si un test lo enciende a propósito (el suyo lo
+      hace, pasando además ``directory=``), el latido y el lock caen fuera del repo.
+
+    Además se propaga ``BOLSA_DAY_WATCH_RUN_ID`` para que cualquier escritura que logre
+    escapar sea atribuible a esta corrida (ver ``_guard_window_day_watch_artifacts``).
+
+    ``monkeypatch`` restaura el entorno al terminar cada test, así que un test puede
+    encender el vigía localmente sin contaminar al siguiente.
+    """
+    monkeypatch.setenv(_WINDOW_DAY_WATCH_ENABLED_ENV, "0")
+    monkeypatch.setenv(_WINDOW_DAY_WATCH_DIR_ENV, str(tmp_path / "window-day-watch"))
+    monkeypatch.setenv("BOLSA_DAY_WATCH_RUN_ID", _PYTEST_RUN_ID)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _guard_window_day_watch_artifacts() -> Iterator[None]:
+    """Comprueba al terminar que la suite no reescribió ``day-watch.*`` del repositorio.
+
+    No basta con que el contenido sea semánticamente igual: una reescritura demuestra que
+    alguien tocó estado del repo, y con él la reproducibilidad de cualquier cita de esas
+    cifras. La atribución es determinista: el latido declara el ``runId`` del proceso que lo
+    escribió, y este proceso inyecta el suyo en el entorno (los hijos lo heredan).
+
+    - escritor con **nuestro** ``runId`` ⇒ **falla**: la suite ensució el árbol.
+    - escritor **sin** ``runId`` (o con otro) ⇒ **avisa** y se declara que la guarda no
+      puede concluir: un stack de desarrollo vivo escribe el mismo fichero cada pocos
+      minutos, y convertirlo en rojo haría el banco inservible.
+    """
+    before = day_watch_guard.fingerprint(_DAY_WATCH_REPO_DIR)
+    yield
+    after = day_watch_guard.fingerprint(_DAY_WATCH_REPO_DIR)
+    changed = [
+        name
+        for name in day_watch_guard.DAY_WATCH_ARTIFACTS
+        if before[name] != after[name]
+    ]
+    if not changed:
+        return
+
+    detail = "\n".join(
+        f"  {name}: antes={before[name]} después={after[name]}" for name in changed
+    )
+    found = day_watch_guard.writers(before, _DAY_WATCH_REPO_DIR)
+    if day_watch_guard.polluted_by(_PYTEST_RUN_ID, found):
+        pytest.fail(
+            "el test escribió estado del repo; aísla WINDOW_DAY_WATCH_DIR o desactiva el "
+            "vigía (WINDOW_DAY_WATCH_ENABLED=0) en el proceso que arranca el scheduler.\n"
+            f"{detail}\n  escritores={sorted(found)} nuestro={_PYTEST_RUN_ID}",
+            pytrace=False,
+        )
+    warnings.warn(
+        "day-watch.* cambió durante la suite, pero ningún escritor trae el runId de pytest "
+        f"({_PYTEST_RUN_ID}): escritores={sorted(found) or 'sin runId'}. La guarda NO puede "
+        "concluir sobre la higiene del árbol mientras haya un stack de desarrollo vivo "
+        "escribiendo el latido.\n"
+        f"{detail}",
+        stacklevel=1,
+    )
 
 
 # ── Wiring de logging para las suites de redacción de credenciales (G6) ────────────────

@@ -31,6 +31,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _DOTENV = _REPO_ROOT / ".env"
+#: Directorio de estado del vigía de ventana para los subprocesos del scheduler. Nunca
+#: dentro del repo: ``operability_runs/`` no está trackeado y una reescritura del latido
+#: pasaría desapercibida en ``git status``.
+_WINDOW_DAY_WATCH_TEST_DIR = Path(tempfile.gettempdir()) / "bolsa-window-day-watch-test"
 _REQUIRED_ENV = "AUTO_SCHEDULER_PROCESS_PG_REQUIRED"
 _TIMEOUT_S = 90.0
 # Presupuesto de espera para que el subproceso produzca sus ticks. El arranque paga
@@ -551,6 +555,11 @@ async def test_a9_scheduler_process_full_day_pg_zero_human(
             "AUTO_ENGINE_SIM_INTERVAL_SECONDS": "1.0",
             "AUTO_ENGINE_SIM_LOT_QTY": "100",
             "PYTHONUNBUFFERED": "1",
+            # El scheduler arranca el vigía de ventana (on-by-default) y su latido cae en
+            # `operability_runs/window-runs/`, que NO está trackeado: `git status` no lo
+            # detectaría. Se apaga y se manda el estado fuera del repo.
+            "WINDOW_DAY_WATCH_ENABLED": "0",
+            "WINDOW_DAY_WATCH_DIR": str(_WINDOW_DAY_WATCH_TEST_DIR),
         }
     )
 
@@ -788,10 +797,16 @@ async def test_a9_scheduler_process_restart_with_open_protected_position_pg(
             # Retén largo: la posición debe seguir ABIERTA cuando matemos el proceso.
             "AUTO_ENGINE_SIM_EXIT_AFTER_TICKS": "1000",
             "PYTHONUNBUFFERED": "1",
+            # Ver el escenario de día completo: el latido del vigía nunca va al repo.
+            "WINDOW_DAY_WATCH_ENABLED": "0",
+            "WINDOW_DAY_WATCH_DIR": str(_WINDOW_DAY_WATCH_TEST_DIR),
         }
     )
 
     def _spawn() -> subprocess.Popen[bytes]:
+        # Defensa para cualquier reconstrucción del env.
+        env.setdefault("WINDOW_DAY_WATCH_ENABLED", "0")
+        env.setdefault("WINDOW_DAY_WATCH_DIR", str(_WINDOW_DAY_WATCH_TEST_DIR))
         return subprocess.Popen(  # noqa: S603 — comando fijo del repo.
             [sys.executable, "-m", "bolsa_api.workers.scheduler_worker"],
             cwd=str(_REPO_ROOT),

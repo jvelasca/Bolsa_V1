@@ -415,6 +415,123 @@ def test_write_status_records_alerts(tmp_path: Path) -> None:
     assert len(payload["alerts"]) == len(checks) == 5
 
 
+# ---------------------------------------------------------------------------
+# Aislamiento del estado (WINDOW_DAY_WATCH_DIR)
+# ---------------------------------------------------------------------------
+
+
+def test_state_dir_override_replaces_runs_dir(monkeypatch, tmp_path: Path) -> None:
+    """``WINDOW_DAY_WATCH_DIR`` sustituye ``operability_runs/window-runs``.
+
+    Sin la variable el comportamiento es el de siempre; con ella, latido **y** lock caen
+    fuera del repo, que es lo que necesita la suite para no reescribir un artefacto que
+    ``git status`` no vería.
+    """
+    monkeypatch.delenv("WINDOW_DAY_WATCH_DIR", raising=False)
+    assert watch_worker.state_dir_override() is None
+    assert watch_worker.runs_dir() == (
+        watch_worker.repo_root() / "operability_runs" / "window-runs"
+    )
+
+    monkeypatch.setenv("WINDOW_DAY_WATCH_DIR", str(tmp_path))
+    assert watch_worker.state_dir_override() == tmp_path
+    assert watch_worker.runs_dir() == tmp_path
+    assert watch_worker.status_path() == tmp_path / "day-watch.json"
+    assert watch_worker.status_journal_path() == tmp_path / "day-watch.jsonl"
+
+
+def test_write_status_without_directory_uses_the_override(monkeypatch, tmp_path: Path) -> None:
+    """``write_status(directory=None)`` respeta el override y no toca el repo."""
+    monkeypatch.setenv("WINDOW_DAY_WATCH_DIR", str(tmp_path))
+    checks = [
+        _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)])
+    ]
+    path = write_status(checks, now=_WEEKDAY_AFTER_DUE, lookback_days=7, source="test")
+
+    assert path == tmp_path / "day-watch.json"
+    assert path is not None and path.exists()
+    assert (tmp_path / "day-watch.jsonl").exists()
+    # El repo no se toca: el fichero del repo sigue siendo otro objeto (o no existe).
+    repo_latido = (
+        watch_worker.repo_root() / "operability_runs" / "window-runs" / "day-watch.json"
+    )
+    assert repo_latido != path
+
+
+def test_day_is_running_reads_the_lock_from_the_override(monkeypatch, tmp_path: Path) -> None:
+    """El lock del día también se busca en el directorio aislado."""
+    monkeypatch.setenv("WINDOW_DAY_WATCH_DIR", str(tmp_path))
+    assert watch_worker.day_is_running("20261016") is False
+    lock = tmp_path / "20261016" / ".run.lock"
+    lock.mkdir(parents=True)
+    assert watch_worker.day_is_running("20261016") is True
+
+
+@pytest.mark.asyncio
+async def test_day_watch_alerts_on_measured_inconclusive_day(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """O-5 con una fila REAL del ledger: ``20261019``, ``MEDIDO``, gate ``INCONCLUSIVE``.
+
+    Reproduce el caso que la ventana tiene de verdad (0 ciclos, gate no acreditado) y exige
+    que el vigía lo publique como ALERTA, no como día bueno. El latido se escribe en un
+    directorio temporal: la prueba del hallazgo no puede depender de tocar el repositorio.
+    """
+    # Fila real (recortada a los campos que decide el vigía) tal como la anexa el runner.
+    real_row = {
+        "day": "20261019",
+        "dayIso": "2026-10-19",
+        "status": "MEDIDO",
+        "veto": False,
+        "reason": None,
+        "gate": {
+            "days": 2,
+            "episodes": 0,
+            "cycles": 0,
+            "minDays": 4,
+            "minEpisodes": 2,
+            "minCycles": 32,
+            "ready": False,
+            "measured": True,
+            "verdict": "INCONCLUSIVE",
+            "dayList": ["2026-10-19", "2026-10-20"],
+            "regimes": [],
+        },
+    }
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(json.dumps(real_row) + "\n", encoding="utf-8")
+    rows = watch_worker.read_ledger_rows(ledger)
+    assert len(rows) == 1
+
+    sent: list[str] = []
+    monkeypatch.setattr(
+        "bolsa_api.background.window_day_watch_worker.send_alert_email",
+        lambda settings, watch: bool(sent.append(watch.day)) or False,
+    )
+    monday_after_due = datetime(2026, 10, 19, 20, 30, tzinfo=MADRID)
+    watch = await evaluate_once(
+        now=monday_after_due,
+        rows=rows,
+        running=False,
+        settings=get_settings(),
+        lookback_days=0,
+        persist=True,
+        directory=tmp_path,
+    )
+
+    assert watch.verdict == "INCONCLUSIVE"
+    assert watch.severity == "alert"
+    assert watch.reason == "gate_inconclusive"
+    assert sent == ["20261019"]
+
+    payload = json.loads((tmp_path / "day-watch.json").read_text(encoding="utf-8"))
+    assert payload["day"] == "20261019"
+    assert payload["verdict"] == "INCONCLUSIVE"
+    assert payload["severity"] == "alert"
+    assert payload["reason"] == "gate_inconclusive"
+    assert payload["alerts"] == ["20261019:INCONCLUSIVE"]
+
+
 def test_default_lookback_days_env_and_clamp(monkeypatch) -> None:
     monkeypatch.delenv("WINDOW_DAY_WATCH_LOOKBACK_DAYS", raising=False)
     assert default_lookback_days(get_settings()) == DEFAULT_LOOKBACK_DAYS
@@ -567,6 +684,17 @@ async def test_failed_delivery_is_not_marked_as_announced(monkeypatch, tmp_path:
 # ---------------------------------------------------------------------------
 # CLI autónomo (`pnpm window:watch`) — vigila sin el stack dev
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _enable_the_watcher_for_its_own_suite(monkeypatch) -> None:
+    """Esta suite es la del vigía: se prueba **encendido**.
+
+    El ``conftest`` lo apaga por defecto para que ningún otro test escriba el latido, y
+    ``WINDOW_DAY_WATCH_DIR`` ya apunta a un temporal: encenderlo aquí no toca el repo.
+    ``test_main_help_and_disabled`` fija ``0`` explícitamente para cubrir el apagado.
+    """
+    monkeypatch.setenv("WINDOW_DAY_WATCH_ENABLED", "1")
 
 
 def test_main_help_and_disabled(monkeypatch, capsys) -> None:

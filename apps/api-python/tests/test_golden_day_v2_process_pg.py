@@ -824,6 +824,14 @@ def _env_for(
             # Sin esto el monitor declaraba ``*_not_durable`` y el exactly-once no se ejercía.
             "AUTO_OPERATIONAL_AUDIT": "1",
             "PYTHONUNBUFFERED": "1",
+            # El scheduler arranca `start_window_day_watch` (on-by-default). Sin este pin el
+            # hijo reescribe `operability_runs/window-runs/day-watch.json` y añade latidos a
+            # `day-watch.jsonl`: un artefacto del repo que `git status` NO detecta porque ese
+            # directorio no está trackeado. El estado va a un temporal fuera del repo.
+            "WINDOW_DAY_WATCH_ENABLED": "0",
+            "WINDOW_DAY_WATCH_DIR": str(
+                Path(tempfile.gettempdir()) / "bolsa-window-day-watch-test"
+            ),
         }
     )
     if extra:
@@ -832,6 +840,13 @@ def _env_for(
 
 
 def _spawn(env: dict[str, str], log_path: Path) -> subprocess.Popen[bytes]:
+    # Defensa en profundidad para cualquier llamante que construya su propio ``env``: el
+    # vigía de ventana nunca debe escribir su latido en el árbol del repo desde un test.
+    env.setdefault("WINDOW_DAY_WATCH_ENABLED", "0")
+    env.setdefault(
+        "WINDOW_DAY_WATCH_DIR",
+        str(Path(tempfile.gettempdir()) / "bolsa-window-day-watch-test"),
+    )
     return subprocess.Popen(  # noqa: S603 — comando fijo del repo.
         [sys.executable, "-m", "bolsa_api.workers.scheduler_worker"],
         cwd=str(_REPO_ROOT),
@@ -839,6 +854,23 @@ def _spawn(env: dict[str, str], log_path: Path) -> subprocess.Popen[bytes]:
         stdout=open(log_path, "a", encoding="utf-8"),  # noqa: SIM115 — cerrado abajo.
         stderr=subprocess.STDOUT,
     )
+
+
+def test_env_for_isolates_the_window_day_watch() -> None:
+    """El ``env`` del subproceso nunca deja que el vigía escriba en el repo.
+
+    ``scheduler_worker`` arranca ``start_window_day_watch`` y el vigía es on-by-default: sin
+    este pin, cada corrida del Golden Day reescribe
+    ``operability_runs/window-runs/day-watch.json`` y añade líneas a ``day-watch.jsonl``.
+    Ese directorio no está trackeado, así que ``git status`` no lo delata.
+    """
+    env = _env_for("acc", "eng", instrument_ids=["X"])
+
+    assert env["WINDOW_DAY_WATCH_ENABLED"] == "0"
+    state_dir = Path(env["WINDOW_DAY_WATCH_DIR"])
+    assert state_dir.is_absolute()
+    assert _REPO_ROOT not in state_dir.parents, state_dir
+    assert state_dir != _REPO_ROOT
 
 
 async def _stop(proc: subprocess.Popen[bytes]) -> None:

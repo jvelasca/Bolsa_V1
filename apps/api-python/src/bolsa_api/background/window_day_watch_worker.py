@@ -25,6 +25,9 @@ Tres piezas nuevas, sin tocar la ventana:
 * **Latido durable** (``operability_runs/window-runs/day-watch.json`` + ``day-watch.jsonl``):
   cada tick deja por escrito el veredicto del día, los días comprobados y las alertas. Es el
   **instrumento** que hace falsable «está vigilando» sin depender de logs ni de emails.
+  El directorio se puede sustituir con ``WINDOW_DAY_WATCH_DIR`` (latido **y** lock): las pruebas
+  lo apuntan a un temporal para no reescribir un artefacto del repositorio, que ``git status``
+  no detectaría porque ``operability_runs/`` no está trackeado.
 * **Arrastre de días perdidos** (``WINDOW_DAY_WATCH_LOOKBACK_DAYS``, default ``7``): además de
   hoy, revisa los días laborables **anteriores** al último día del ledger y avisa de los que
   faltan (equipo apagado, stack caído, tarea no disparada).
@@ -83,6 +86,15 @@ CHECK_INTERVAL_SECONDS = 15 * 60
 _ENV_ENABLED = "WINDOW_DAY_WATCH_ENABLED"
 _ENV_LEDGER_PATH = "WINDOW_LEDGER_PATH"
 _ENV_LOOKBACK_DAYS = "WINDOW_DAY_WATCH_LOOKBACK_DAYS"
+# Directorio del latido y del lock. Sin la variable, el comportamiento no cambia
+# (``operability_runs/window-runs``). Las pruebas lo apuntan a un ``tmp_path`` para no
+# reescribir artefactos del repositorio: ``operability_runs/`` no está trackeado, de modo
+# que ``git status`` **no** detectaría esa reescritura.
+_ENV_STATE_DIR = "WINDOW_DAY_WATCH_DIR"
+# Correlación opcional del proceso que escribe el latido. La suite la usa para poder
+# atribuir una reescritura a sus propias pruebas (o a un proceso externo, p. ej. el stack de
+# desarrollo, cuyo latido NO la lleva). Sin la variable, el payload no cambia.
+_ENV_RUN_ID = "BOLSA_DAY_WATCH_RUN_ID"
 
 #: Arrastre por defecto (días naturales hacia atrás). ``0`` desactiva el arrastre.
 DEFAULT_LOOKBACK_DAYS = 7
@@ -372,6 +384,12 @@ def read_ledger_rows(path: Path | None) -> list[Mapping[str, Any]]:
     return rows
 
 
+def state_dir_override() -> Path | None:
+    """Directorio de estado forzado por ``WINDOW_DAY_WATCH_DIR`` (o ``None``)."""
+    raw = (os.getenv(_ENV_STATE_DIR) or "").strip()
+    return Path(raw) if raw else None
+
+
 def day_is_running(day: str) -> bool:
     """¿Hay un ``run-day`` en curso para ``day``? (lock presente ⇒ en curso).
 
@@ -379,11 +397,10 @@ def day_is_running(day: str) -> bool:
     un lock presente señala un run **arrancado**; se prefiere callar a avisar en falso
     mientras el ``run-day`` aún no ha anexado su fila al ledger.
     """
-    root = repo_root()
-    if root is None:
+    base = runs_dir()
+    if base is None:
         return False
-    lock_dir = root / "operability_runs" / "window-runs" / day / ".run.lock"
-    return lock_dir.exists()
+    return (base / day / ".run.lock").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -392,7 +409,14 @@ def day_is_running(day: str) -> bool:
 
 
 def runs_dir() -> Path | None:
-    """Carpeta de la ventana (``operability_runs/window-runs``) o ``None``."""
+    """Carpeta de la ventana (``operability_runs/window-runs``) o ``None``.
+
+    ``WINDOW_DAY_WATCH_DIR`` la sustituye por completo (latido **y** lock), para que las
+    pruebas puedan escribir el estado en un directorio temporal.
+    """
+    override = state_dir_override()
+    if override is not None:
+        return override
     root = repo_root()
     return None if root is None else root / "operability_runs" / "window-runs"
 
@@ -465,6 +489,10 @@ def status_payload(
         ],
         "lookbackDays": int(lookback_days),
         "source": source,
+        # Qué proceso dejó el latido: hace atribuible una reescritura (y permite distinguir
+        # el worker del stack dev de un test que escribió por error en el repo).
+        "pid": os.getpid(),
+        "runId": (os.getenv(_ENV_RUN_ID) or "").strip() or None,
     }
 
 
