@@ -121,8 +121,28 @@ def evaluate_strategy(
     indicator_snapshot_hash: str | None = None,
     features: PresetFeatureSeries | None = None,
     indicator_context: dict[str, list[float | None]] | None = None,
+    assume_long: bool = False,
 ) -> list[SignalEventV1]:
-    """Evalúa StrategyDefinitionV1 H0 (presets) sobre OHLCV → señales discretas."""
+    """Evalúa StrategyDefinitionV1 H0 (presets) sobre OHLCV → señales discretas.
+
+    ``assume_long`` (B-3): con ``mode="gated"`` el estado de cartera se **replaya** desde
+    el inicio de la ventana. Si la posición ya estaba abierta **antes** de la ventana,
+    ese replay no ve la entrada y suprime la salida. Declarar ``assume_long=True``
+    arranca el replay con la posición abierta —que es la verdad del libro— y **suprime
+    las entradas**: dentro no se vuelve a comprar, ni siquiera si el replay consume una
+    salida a mitad de ventana (re-entrar en la misma evaluación no es una decisión
+    posible).
+
+    Ojo: esto sigue siendo un replay de **transiciones**. Si la salida ya se cumplía al
+    empezar la ventana, el replay la consume ahí y la última barra puede no emitir nada
+    aunque la condición de salida vuelva a cumplirse. La pregunta «¿cierro ahora?» es de
+    **nivel** y la responde el decisor de la ACTIVE sobre la última barra
+    (``active_strategy_signal_evaluator``), no este motor.
+
+    Solo aplica al camino **declarativo** (definiciones con reglas en ``entries``/
+    ``exits``). El camino legacy de presets sin reglas lo ignora; los 21 presets del
+    catálogo llevan reglas, así que no queda fuera ningún preset.
+    """
     if not bars:
         raise ValueError("bars must not be empty")
 
@@ -147,6 +167,7 @@ def evaluate_strategy(
             timestamps,
             closes,
             mode=mode,
+            assume_long=assume_long,
             context=indicator_context,
         )
     else:
@@ -181,8 +202,14 @@ def evaluate_strategy_last_bar(
     indicator_snapshot_hash: str | None = None,
     features: PresetFeatureSeries | None = None,
     indicator_context: dict[str, list[float | None]] | None = None,
+    assume_long: bool = False,
 ) -> list[SignalEventV1]:
-    """Señales en la última barra — modo screener (SC-2)."""
+    """Señales en la última barra — modo screener (SC-2).
+
+    ``assume_long`` (B-3) delega en ``evaluate_strategy``: arranca la posición abierta y
+    suprime las entradas. La decisión de **cerrar** con la posición abierta es una
+    pregunta de nivel que resuelve el decisor de la ACTIVE, no esta proyección.
+    """
     events = evaluate_strategy(
         definition,
         bars,
@@ -192,6 +219,7 @@ def evaluate_strategy_last_bar(
         indicator_snapshot_hash=indicator_snapshot_hash,
         features=features,
         indicator_context=indicator_context,
+        assume_long=assume_long,
     )
     if not bars:
         return []

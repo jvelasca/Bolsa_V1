@@ -343,8 +343,11 @@ posición real de la cartera: es un replay de la ventana. Dos consecuencias:
    cada barra de la ventana cumple. El dedupe por barra evita la repetición intra-barra, pero la
    señal se re-emite en cada barra nueva.
 
-**Veredicto: PARCIAL.** `raw` y `gated` responden a preguntas distintas (¿hay señal? / ¿hay una
-transición long-only en esta ventana?) y el producto las presenta como si fueran la misma.
+**Veredicto: RESUELTO el 2026-10-26 (§9.2).** El diagnóstico original sigue siendo el correcto:
+`raw` y `gated` responden a preguntas distintas y el producto las presentaba como la misma. Lo que
+cambia es que el decisor deja de **inferir** la posición desde la ventana y la lee del libro real
+(`holds_long`), con lo que la salida ya no se suprime; y con la posición abierta la entrada no se
+re-emite. `raw` sigue sin estado —eso es contractual— y el scan sigue preguntando «¿hay señal?».
 
 ### 3.6 Hallazgo B-4 · Las alertas evalúan con barras sintéticas
 
@@ -894,12 +897,16 @@ restantes describen qué habría que observar para dar el hallazgo por cerrado.
 > implementadas** (`B-1`, `B-2`, `B-4`, `B-6`, `O-5`); `B-3` sigue solo caracterizado y las 16
 > restantes conservan criterio sin prueba ejecutada. La evidencia de `B-1`/`B-6` es **E1** en el
 > commit de trabajo, **no** E2 ni E3: ninguna ventana ni operación real se ha medido con esto.
+>
+> **Actualización 2026-10-26 (cierre de B-3).** `B-3` también queda **implementado** con prueba en
+> verde (§9.2): **6 implementadas** (`B-1`, `B-2`, `B-3`, `B-4`, `B-6`, `O-5`) y **15** con criterio
+> sin prueba ejecutada. La evidencia sigue siendo **E1**: herméticas, sin ventana ni operación real.
 
 | ID | Nombre de prueba propuesto | Aserción falsable |
 |---|---|---|
 | B-1 | `test_sma200_requires_201_bars_in_active_window` | Con 120 barras, `all(v is None for v in compute_sma(closes, 200))`; con 201 barras y un cruce construido, `evaluate_strategy_last_bar` emite `entry_long`. Fija el mínimo y obliga a declarar `AUTO_ENGINE_SIM_SIGNAL_BARS >= warmup`. |
 | B-2 | `test_decider_matches_the_gated_projection_of_the_same_signal` | Para `stoch_oversold`/`vwap_reclaim` (y los otros dos presets), la acción del decisor **coincide** con la proyección `gated` de la misma feature OHLCV, en los 4 escenarios. Añadido: el Δ frente al camino close-only queda fijado (5/16). |
-| B-3 | `test_gated_exit_is_reachable_without_entry_in_window` | 120 barras monótonas + posición abierta antes de la ventana ⇒ el decisor emite `exit`. Hoy devuelve `[]` (medido y **caracterizado** por `test_raw_and_gated_diverge_on_a_sustained_trend`, que no sustituye a esta prueba). |
+| B-3 | `test_held_position_exits_without_an_entry_in_the_window` | 120 barras sin entrada en la ventana + posición en el libro ⇒ el decisor emite `SELL`. **Implementado 2026-10-26** (§9.2); la versión propuesta en este documento se llamaba `test_gated_exit_is_reachable_without_entry_in_window` y hoy vive en el motor, con el caso de nivel en el decisor. |
 | B-4 | `test_the_alert_evaluates_with_the_ohlcv_context` | Misma definición, mismas barras: la alerta entrega al motor un `indicator_context` construido desde OHLCV (con VWAP real) y no evalúa sobre barras sintéticas. |
 | B-5 | `test_active_signal_flag_off_blocks_buy_explicitly` | `ACTIVE_STRATEGY=1`, `SIGNAL=0` ⇒ `HOLD` **y** un motivo de journal `active_signal_disabled` (hoy: `HOLD` sin motivo). |
 | B-6 | `test_scan_rejects_preset_below_warmup` | `bar_limit < 200` + `golden_cross` ⇒ `ScanSkippedInstrument` con motivo `warmup_insufficient` (hoy: 0 hits silenciosos). |
@@ -987,6 +994,78 @@ el decisor ACTIVE consume su ventana — el cambio de `memo` no altera sus aserc
 aquí. Tampoco se toca la UI del scan (**P1-12b**): el titular puede seguir diciendo «sin señales»
 cuando el motivo ya está en `skipped`. Ambos quedan declarados como pendientes.
 
+### 9.2 B-3 implementado: el estado `gated` viene del libro, no de un replay de la ventana
+
+**El fallo, en una frase.** `mode="gated"` no modela la cartera: modela *«¿hubo una transición
+long-only dentro de esta ventana?»*. Arranca en `has_long = False` y replaya las entradas y salidas
+de los últimos 120 cierres. Si la posición se abrió **antes** de la ventana, la entrada no está en
+la serie y la salida que la propia estrategia pide **no se emite**: el portador queda atrapado.
+
+**Decisión de diseño.** La posición es un hecho del **libro**, no una inferencia de la ventana. Se
+cablea en dos piezas:
+
+1. **Motor** (`evaluate_rules_signals`, `evaluate_strategy`, `evaluate_strategy_last_bar`):
+   parámetro `assume_long: bool = False`. Con `True` el replay arranca con la posición abierta y
+   **suprime las entradas**: dentro no se vuelve a comprar, ni siquiera si el replay consume una
+   salida a mitad de ventana —re-entrar en la misma evaluación no es una decisión posible—.
+2. **Decisor ACTIVE** (`make_active_strategy_decider`): parámetro
+   `long_by_symbol: Callable[[str], bool] | None`. Se pasa **como callable**, no como booleano,
+   porque el libro cambia dentro del turno: se lee en el instante de decidir. El worker lo alimenta
+   con `AutoSimulationWorker.holds_long`, que consulta `_open` (el libro real) y no el journal ni
+   la ventana.
+
+**Transición frente a nivel: dónde vive cada pregunta.** Este es el detalle que hizo falta medir, y
+es la razón de que el fix no sea «pasar `assume_long` y ya»:
+
+- El motor responde a **transiciones** (¿la regla se volvió verdadera dentro de la ventana?). Si la
+  salida ya se cumplía al empezar la ventana, el replay la consume en el índice 0 y la última barra
+  no emite nada aunque la condición siga cumpliéndose.
+- La pregunta del portador es de **nivel**: «¿cierro ahora?». La responde el decisor evaluando el
+  grupo de `exits` en la **última barra** con el `indicator_context` real (`_exit_rule_holds`), no
+  `evaluate_exit_last_bar_gated` (que reconstruye barras sintéticas close-only y perdería volumen y
+  rango).
+
+Por eso `assume_long` **no** se presenta como «el motor ya vende solo»: el motor deja de comprar lo
+que ya se tiene, y el decisor decide el cierre por nivel. Sin libro (`long_by_symbol=None`) todo se
+comporta exactamente como antes: el default no cambia ningún camino existente.
+
+**Comportamiento medido** (preset `rsi_mean_reversion` y `vwap_reclaim`, series deterministas):
+
+| Escenario | Sin libro | Con libro | Qué fija |
+|---|---|---|---|
+| 119 barras laterales + salto final (`rsi_mean_reversion`) | `[]` | `exit` en la última barra | La salida **sí** es alcanzable sin entrada en la ventana |
+| Todo el tramo por debajo del VWAP (`vwap_reclaim`) | `HOLD` | `SELL` | El cierre por nivel, con el replay ya consumido en el índice 0 |
+| Última barra mantiene la entrada, posición abierta | `BUY` | `HOLD` | No se compra lo que ya se tiene |
+| Sube y luego baja (`rsi_mean_reversion`) | `entry_long` (al final) | `exit` (a mitad) y **ninguna** entrada | Una salida dentro de la ventana no reabre la posición |
+| Flujo plano | `entry_long` | `[]` | La entrada de nivel se suprime con la posición abierta |
+
+El cuarto caso es el que destapó el banco de contrato: la primera versión de `assume_long` **volvía
+a comprar** al final tras cerrar a mitad de ventana. Está cubierto por
+`test_assume_long_does_not_reenter_after_an_in_window_exit`.
+
+**Fail-closed.** Un `long_by_symbol` que lanza cae en el mismo `except` que el resto del decisor ⇒
+`HOLD`. No se inventa una venta ni se silencia una.
+
+**Pruebas (E1, herméticas).**
+
+| Fichero | Qué fija |
+|---|---|
+| `packages/py/analytics/tests/test_signal_strategy.py` (9 en total, 4 de B-3) | Salida alcanzable sin entrada en la ventana; la entrada de nivel se suprime con la posición abierta; no se re-entra tras una salida en ventana; `raw` **no** cambia (no tiene estado). |
+| `packages/py/application/tests/test_active_strategy_signal_evaluator.py` (15 en total, 4 de B-3) | Con libro ⇒ `SELL` donde antes había `HOLD`; con libro ⇒ `HOLD` donde antes había `BUY`; libro vacío ⇒ comportamiento previo; libro ilegible ⇒ `HOLD`. |
+| `apps/api-python/tests/test_auto_sim_active_strategy_seam.py` (9 en total, 1 de B-3) | El callable se consulta **al decidir**, no al cablear: el mismo decisor compra con el libro vacío y queda en `HOLD` en cuanto la posición entra en `_open`. |
+
+**Suites completas re-ejecutadas** (2026-10-26, árbol de trabajo con este cambio):
+`packages/py/analytics/tests` + `packages/py/application/tests` ⇒ **4216 passed, 5 skipped**;
+`ruff check` (raíz) ⇒ limpio; `lint-imports` ⇒ 4 contratos KEPT; `mypy` con el alcance de CI ⇒
+**571 ficheros, 0 errores**.
+
+**Lo que NO se ha hecho, y por qué.** No se persiste el estado `gated` en base de datos: la fuente
+de verdad ya existe (`_open` en el worker) y duplicarla crearía una segunda verdad que puede
+desincronizarse. Tampoco se toca la ventana de 120 barras (sigue siendo la de B-1/§9.1) ni el
+`mode="raw"` del scan: la divergencia `raw`/`gated` es **contractual** —preguntan cosas distintas—
+y ahora el decisor declara de qué lado está. La evidencia es **E1**: ninguna ventana real se ha
+medido con esto.
+
 ---
 
 ## 10. Backlog priorizado
@@ -1003,7 +1082,9 @@ cuando el motivo ya está en `skipped`. Ambos quedan declarados como pendientes.
 2. **Unificar la procedencia de la feature.** El decisor y las alertas deben usar OHLCV real como
    el scan, o declarar en el journal que evalúan close-only (B-2, B-4, **O-6**).
 3. **Decidir el contrato `gated` vs `raw`.** Si la ACTIVE debe poder vender una posición anterior a
-   la ventana, el gating no puede reiniciarse en cada llamada (B-3, S-1).
+   la ventana, el gating no puede reiniciarse en cada llamada (B-3, S-1). **Aplicado en §9.2:** el
+   decisor recibe el libro real (`holds_long`) y la salida se decide por nivel en la última barra;
+   `raw` queda como está porque responde a otra pregunta. Queda abierto el frente `S-1`.
 4. **Cerrar la asimetría TIME_STOP/THESIS.** O el AUTO consulta F5, o F5 y el AUTO comparten el
    mismo conjunto de motivos accionables (S-1, S-2, S-6).
 5. **Declarar por qué la ACTIVE no opera.** `ACTIVE_STRATEGY=1` con `SIGNAL=0` hoy produce `HOLD`
@@ -1049,7 +1130,7 @@ E3.**
 |---|---|---|---|---|
 | B-1 | P0-1 | B-1 + §9.1 | `test_sma200_requires_201_bars_in_active_window` · `test_the_default_window_declares_the_missing_warmup` | **E1** (umbrales medidos 1…201; el decisor declara `memo`) |
 | B-2 | P0-2 | B-2 | `test_decider_matches_the_gated_projection_of_the_same_signal` (16 pares) | **E1** (16/16 gated; Δ 5/16 frente a close-only) |
-| B-3 | P0-3 | B-3 | `test_raw_and_gated_diverge_on_a_sustained_trend` | **E1** de caracterización (3/16 pares `raw ≠ gated`); sin fix |
+| B-3 | P0-3 | B-3 + §9.2 | `test_held_position_exits_without_an_entry_in_the_window` · `test_assume_long_does_not_reenter_after_an_in_window_exit` | **E1** (`HOLD`→`SELL` con libro; `BUY`→`HOLD` con posición; libro ilegible ⇒ `HOLD`) |
 | B-4 | P0-2 | B-4 | `test_the_alert_evaluates_with_the_ohlcv_context` | **E1** (el motor recibe `indicator_context` con VWAP real) |
 | B-5 | P0-5 | B-5 | `test_active_signal_flag_off_blocks_buy_explicitly` | E0 + E1 parcial (`test_auto_sim_active_strategy_seam`; falta el motivo) |
 | B-6 | P0-1 | B-6 + §9.1 | `test_scan_rejects_preset_below_warmup` (implementada en `test_scan_preset_warmup.py`) | **E1** (`bar_limit = 120` ⇒ `skipped` con `warmup_insufficient`; 200 ⇒ `>= 201`) |
@@ -1071,12 +1152,12 @@ E3.**
 
 **Cobertura:** 21 hallazgos · **22** entradas de backlog (las 21 con ID + P1-12b, que cubre el
 silencio de la UI del scan descrito en §7.4) · 21 criterios · 21
-pruebas propuestas · **5 implementadas** (`B-1` y `B-6` en §9.1, `B-2`, `B-4` y `O-5`), más `B-3`
-con prueba de **caracterización** que no cierra el hallazgo. `B-1`, `B-2`, `B-4` y `O-5` entran con el
-sello `2.11.162-beta`; `B-6` y el cierre de `B-1` son **posteriores** al sello `2.11.163-beta` y viven
-en el commit de trabajo. Las cinco filas que en una lectura anterior quedaban huérfanas
-(`B-5`, `B-6`, `O-5`, `O-6`, `T-3`) tienen ahora backlog, criterio y prueba; su evidencia sigue siendo
-E0/E1/E2 y **no** se eleva por tener criterio escrito.
+pruebas propuestas · **6 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `B-2`, `B-4` y
+`O-5`). `B-1`, `B-2`, `B-4` y `O-5` entran con el sello `2.11.162-beta`; `B-6`, el cierre de `B-1` y
+`B-3` son **posteriores** al sello `2.11.163-beta` y viven en el commit de trabajo. Las cinco filas
+que en una lectura anterior quedaban huérfanas (`B-5`, `B-6`, `O-5`, `O-6`, `T-3`) tienen ahora
+backlog, criterio y prueba; su evidencia sigue siendo E0/E1/E2 y **no** se eleva por tener criterio
+escrito.
 
 ---
 

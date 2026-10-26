@@ -927,3 +927,57 @@ ruta AUTO real contra PostgreSQL.
 **Ningún dato de mercado se ha fabricado** y **ninguna ventana se ha medido** con esto: la evidencia
 es **E1** (pruebas herméticas), no E2 ni E3.
 
+### 12.9 Cierre de B-3 (posterior a §12.8)
+
+> **Supersede el bullet «`B-3` y `O-6` siguen abiertos» de §12.8** en lo que respecta a `B-3`. `O-6`
+> sigue abierto. §12.8 era exacto en su commit; esto ocurre después, en el árbol de trabajo.
+
+**Qué se implementó.** El estado `gated` deja de inferirse de la ventana y se lee del **libro real**:
+
+- **Motor** (`evaluate_rules_signals` / `evaluate_strategy` / `evaluate_strategy_last_bar`):
+  `assume_long: bool = False`. Arranca la posición abierta y **suprime las entradas** —dentro no se
+  vuelve a comprar, ni siquiera tras consumir una salida a mitad de ventana—.
+- **Decisor ACTIVE** (`make_active_strategy_decider`): `long_by_symbol: Callable[[str], bool] | None`.
+  Es un **callable**, no un booleano, porque el libro cambia dentro del turno.
+- **Worker** (`AutoSimulationWorker.holds_long`): consulta `_open`, el libro real; se cablea en
+  `start_auto_sim_worker` y viaja por `load_active_strategy_decider` / `_build_signal_decider`.
+
+**El matiz que la medición obligó a añadir.** El motor responde a **transiciones**; la pregunta del
+portador es de **nivel** («¿cierro ahora?»). Si la salida ya se cumplía al empezar la ventana, el
+replay la consume en el índice 0 y la última barra no emite nada aunque la condición siga vigente.
+Por eso el decisor evalúa el grupo de `exits` en la última barra con el `indicator_context` real
+(`_exit_rule_holds`) —no `evaluate_exit_last_bar_gated`, que reconstruye barras close-only—.
+Presentar `assume_long` como «el motor ya vende solo» habría sido **falso**.
+
+**Comportamiento medido** (series deterministas; detalle en §9.2 de la auditoría):
+
+| Escenario | Sin libro | Con libro |
+|---|---|---|
+| Sin entrada en la ventana y salida al final | `[]` | `exit` |
+| Todo el tramo por debajo del VWAP | `HOLD` | `SELL` |
+| Última barra mantiene la entrada, posición abierta | `BUY` | `HOLD` |
+| Salida a mitad de ventana + entrada al final | `entry_long` | `exit`, sin reentrada |
+| Libro ilegible | — | `HOLD` (fail-closed) |
+
+**Verificación (E1, hermética), re-ejecutada en el árbol de trabajo.**
+
+| Suite / gate | Resultado |
+|---|---|
+| `packages/py/analytics/tests/test_signal_strategy.py` | **9 passed** (4 de B-3) |
+| `packages/py/application/tests/test_active_strategy_signal_evaluator.py` | **15 passed** (4 de B-3) |
+| `apps/api-python/tests/test_auto_sim_active_strategy_seam.py` | **9 passed** (1 de B-3) |
+| `packages/py/application/tests` + `packages/py/analytics/tests` | **4216 passed, 5 skipped** |
+| `ruff check packages/py apps/api-python` | **All checks passed** |
+| `mypy` (los 5 directorios del gate) | **571 ficheros, sin incidencias** |
+| `lint-imports` | **4 contratos, 0 rotos** |
+
+**Lo que NO se ha hecho, y queda declarado.**
+
+- **No se persiste el estado `gated` en base de datos.** `_open` ya es la fuente de verdad; una copia
+  sería una segunda verdad que puede desincronizarse.
+- **La ventana sigue en 120 barras** (B-1/§9.1) y **`mode="raw"` sigue sin estado**: la divergencia
+  `raw`/`gated` es contractual, y ahora el decisor declara de qué lado pregunta.
+- **Sin sello, sin tag y sin bump**: vive en el commit de trabajo.
+- **La evidencia es E1.** Ninguna ventana ni operación real se ha medido con esto; falta el frente
+  `S-1` (TIME_STOP/F5) y `O-6` (journal con `featureSource`/`signalWindowBars`).
+

@@ -299,3 +299,41 @@ def test_signal_flag_defaults_off() -> None:
 
     os.environ.pop("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL", None)
     assert w.active_strategy_signal_enabled() is False
+
+
+@pytest.mark.asyncio
+async def test_signal_enabled_reads_the_book_at_decision_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """B-3: ``long_by_symbol`` se consulta al DECIDIR, no al cablear el decisor.
+
+    Es la razón de pasar un callable: el libro cambia dentro del turno, así que el estado
+    ``gated`` tiene que leerse en el instante de la decisión.
+    """
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL", "1")
+    from bolsa_application.strategy_lifecycle_store import (
+        ActiveStrategyRecord,
+        InMemoryStrategyLifecycleStore,
+    )
+
+    store = InMemoryStrategyLifecycleStore()
+    await store.save_active(
+        ActiveStrategyRecord(active=_active_with_executable(), promoted_at="2026-09-10")
+    )
+    factory, StoreCls, sls = _stub_session_factory(store)
+    monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
+
+    book = {"AAA": False}
+    decider = await w.load_active_strategy_decider(
+        factory,
+        instrument_id="AAA",
+        watch=("AAA",),
+        signal_enabled=True,
+        ohlcv=_FakeOhlcv([10.0] * 7 + [20.0]),
+        long_by_symbol=lambda symbol: book[symbol],
+    )
+    assert decider is not None
+    assert decider("AAA").action == "BUY"
+    book["AAA"] = True
+    assert decider("AAA").action == "HOLD"

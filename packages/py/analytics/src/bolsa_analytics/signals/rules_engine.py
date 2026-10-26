@@ -652,7 +652,11 @@ def evaluate_rules_signals(
         )
 
         if mode == "gated":
-            if entry_kind == "entry_long" and not has_long:
+            # B-3: con ``assume_long`` la posición ya estaba abierta al empezar la
+            # ventana. Las ENTRADAS no aplican —ya se está dentro—; si el replay consume
+            # una salida a mitad de ventana, volver a comprar en la última barra sería
+            # re-entrar en la misma evaluación, que no es una decisión posible.
+            if entry_kind == "entry_long" and not has_long and not assume_long:
                 events.append(
                     SignalEvent(
                         kind="entry_long",

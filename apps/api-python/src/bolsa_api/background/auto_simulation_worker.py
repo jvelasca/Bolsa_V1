@@ -2000,6 +2000,14 @@ class AutoSimulationWorker:
     def open_symbols(self) -> tuple[str, ...]:
         return tuple(s for s, q in self._open.items() if q > 0)
 
+    def holds_long(self, symbol: str) -> bool:
+        """¿El libro **real** tiene posición larga abierta en ``symbol``? (B-3).
+
+        Es la fuente de verdad del estado ``gated``: la posición puede haberse abierto
+        antes de la ventana de barras, y en ese caso el replay de la ventana no la vería.
+        """
+        return self._open.get(str(symbol).strip(), Decimal("0")) > 0
+
     def journal_pairs(self) -> tuple[SimJournalRow, ...]:
         """Filas de journal completas del día simulado hasta ahora (M7)."""
         return tuple(self._journal)
@@ -8609,6 +8617,7 @@ async def load_active_strategy_decider(
     ohlcv: Any = None,
     signal_enabled: bool = False,
     as_of: Any = None,
+    long_by_symbol: Callable[[str], bool] | None = None,
 ) -> DecisionProvider | None:
     """Carga la estrategia ACTIVE del store y la expone vía ``DecisionProvider``.
 
@@ -8629,6 +8638,10 @@ async def load_active_strategy_decider(
     señal (día de la última barra cerrada, o provider). Es un parámetro EXPLÍCITO: si no
     se declara, la señal se evalúa como antes (sin cota) y eso es un lookahead declarado
     del llamante, no un default escondido del motor.
+
+    ``B-3``: ``long_by_symbol`` es el **libro real**. Sin él, el estado ``gated`` se
+    replaya desde el inicio de la ventana y una posición abierta antes de la ventana no
+    puede cerrarse (su entrada no está en la ventana). Con él, el estado arranca abierto.
     """
     if not active_strategy_enabled():
         return None
@@ -8654,6 +8667,7 @@ async def load_active_strategy_decider(
                     ohlcv=repo,
                     instrument_id=instrument_id,
                     as_of=as_of,
+                    long_by_symbol=long_by_symbol,
                 )
 
         return active_strategy_decider(
@@ -8675,6 +8689,7 @@ async def _build_signal_decider(
     ohlcv: Any,
     instrument_id: str,
     as_of: Any = None,
+    long_by_symbol: Callable[[str], bool] | None = None,
 ) -> DecisionProvider:
     """Compone el ``DecisionProvider`` con SignalEvaluator real + snapshot de barras.
 
@@ -8716,6 +8731,7 @@ async def _build_signal_decider(
         watch=watch,
         bars_by_symbol=_bars_for,
         lot_qty=lot_qty,
+        long_by_symbol=long_by_symbol,
     )
 
 
@@ -9221,6 +9237,10 @@ def start_auto_sim_worker(
                     # así que la frontera va como mínimo un tick por detrás del reloj vivo
                     # — estrictamente conservador, jamás por delante).
                     as_of=runtime.worker._v2_closed_bar_as_of,  # noqa: SLF001 — seam interno.
+                    # B-3: el estado `gated` viene del LIBRO REAL, no de un replay de la
+                    # ventana. Se pasa como callable para que lea la posición en el
+                    # instante de decidir —el libro cambia dentro del turno—.
+                    long_by_symbol=runtime.worker.holds_long,
                 )
 
             decider_refresher = _refresh_active_decider

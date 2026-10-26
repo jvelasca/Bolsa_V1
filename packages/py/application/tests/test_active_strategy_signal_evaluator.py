@@ -280,6 +280,129 @@ def test_signal_evaluator_holds_without_snapshot_loader() -> None:
     assert decider("AAA").action == "HOLD"
 
 
+# ── B-3: el estado ``gated`` sale del libro real, no de replayar la ventana ──────
+
+
+def _below_vwap_bars(count: int = 10) -> list[_OhlcvBar]:
+    """Toda la serie por DEBAJO del VWAP: la salida se cumple, la entrada nunca.
+
+    Es el caso del portador: la posición se abrió antes de la ventana, así que el replay
+    ``gated`` no ve ninguna entrada y la salida queda muda.
+    """
+    return [
+        _OhlcvBar(
+            timestamp=f"2026-02-{index + 1:02d}",
+            open=110.0 - index,
+            high=110.0 - index,
+            low=110.0 - index,
+            close=110.0 - index,
+            volume=1000.0,
+        )
+        for index in range(count)
+    ]
+
+
+def _above_vwap_bars(count: int = 9, last_close: float = 108.0) -> list[_OhlcvBar]:
+    """Serie plana por encima del VWAP y un último cierre que mantiene la entrada."""
+    bars = [
+        _OhlcvBar(
+            timestamp=f"2026-03-{index + 1:02d}",
+            open=99.8,
+            high=100.5,
+            low=99.5,
+            close=100.0,
+            volume=1500.0,
+        )
+        for index in range(count)
+    ]
+    bars.append(
+        _OhlcvBar(
+            timestamp="2026-03-10",
+            open=99.8,
+            high=last_close + 0.5,
+            low=99.5,
+            close=last_close,
+            volume=1500.0,
+        )
+    )
+    return bars
+
+
+def test_held_position_exits_without_an_entry_in_the_window() -> None:
+    """B-3: con posición en el libro, la salida es una pregunta de NIVEL en la última barra.
+
+    Sin ``long_by_symbol`` el replay arranca plano, nunca ve la entrada y la venta se
+    suprime: el portador se queda atrapado en una posición que su regla pide cerrar.
+    """
+    bars = _below_vwap_bars()
+    assert bars[-1].close < sum(b.close for b in bars) / len(bars)
+    baseline = make_active_strategy_decider(
+        active=_vwap_active(),
+        watch=("AAA",),
+        bars_by_symbol=lambda symbol: bars,
+    )
+    with_book = make_active_strategy_decider(
+        active=_vwap_active(),
+        watch=("AAA",),
+        bars_by_symbol=lambda symbol: bars,
+        long_by_symbol=lambda symbol: True,
+    )
+
+    assert baseline("AAA").action == "HOLD"
+    proposal = with_book("AAA")
+    assert proposal.action == "SELL"
+    assert proposal.quantity == 100.0
+    assert proposal.source == "active-strategy:ver-vwap"
+
+
+def test_held_position_does_not_buy_what_it_already_holds() -> None:
+    """B-3: la entrada de la última barra no se convierte en una compra de más."""
+    bars = _above_vwap_bars()
+    baseline = make_active_strategy_decider(
+        active=_vwap_active(),
+        watch=("AAA",),
+        bars_by_symbol=lambda symbol: bars,
+    )
+    with_book = make_active_strategy_decider(
+        active=_vwap_active(),
+        watch=("AAA",),
+        bars_by_symbol=lambda symbol: bars,
+        long_by_symbol=lambda symbol: True,
+    )
+
+    assert baseline("AAA").action == "BUY"
+    assert with_book("AAA").action == "HOLD"
+
+
+def test_flat_book_keeps_the_previous_behaviour() -> None:
+    """Sin posición abierta el decisor se comporta como antes de B-3."""
+    bars = _above_vwap_bars()
+    decider = make_active_strategy_decider(
+        active=_vwap_active(),
+        watch=("AAA",),
+        bars_by_symbol=lambda symbol: bars,
+        long_by_symbol=lambda symbol: False,
+    )
+
+    assert decider("AAA").action == "BUY"
+
+
+def test_holds_when_the_book_cannot_be_read() -> None:
+    """Un libro ilegible no inventa una venta (fail-closed, igual que el resto)."""
+
+    def _boom(symbol: str) -> bool:
+        raise RuntimeError("libro roto")
+
+    decider = make_active_strategy_decider(
+        active=_vwap_active(),
+        watch=("AAA",),
+        bars_by_symbol=lambda symbol: _below_vwap_bars(),
+        long_by_symbol=_boom,
+    )
+
+    assert decider("AAA").action == "HOLD"
+
+
 # ── Snapshot loader ─────────────────────────────────────────────────────────────
 
 

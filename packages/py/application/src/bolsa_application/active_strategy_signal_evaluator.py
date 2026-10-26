@@ -117,6 +117,7 @@ def make_active_strategy_decider(
     watch: Sequence[str],
     bars_by_symbol: Callable[[str], list[Any]] | None = None,
     lot_qty: float = 100.0,
+    long_by_symbol: Callable[[str], bool] | None = None,
 ) -> Callable[[str], DecisionPackage]:
     """``DecisionProvider`` que evalúa la señal real de la ACTIVE (SIM-only).
 
@@ -124,6 +125,15 @@ def make_active_strategy_decider(
     síncrono). Si no hay barras, si la definición no trae ``executable`` o si la
     evaluación falla, devuelve **HOLD** (fail-closed): la ACTIVE nunca ejecuta la
     lógica de otra estrategia (V2.31/A11, P1-02).
+
+    ``long_by_symbol`` (B-3) devuelve si el **libro real** tiene posición larga abierta
+    en ese símbolo. Con él, el motor arranca el estado ``gated`` con la posición abierta
+    en vez de replayar la ventana desde cero: así una salida se emite aunque no haya
+    entrada en la ventana (la posición pudo abrirse antes). Sin él se conserva el replay
+    —comportamiento previo— y el contrato ``raw``/``gated`` queda como estaba.
+
+    Un fallo de ``long_by_symbol`` cae en el mismo ``except`` que los demás: **HOLD**,
+    nunca una venta inventada ni una venta silenciada.
     """
     definition = dict(getattr(active, "definition", None) or {})
     executable = definition.get("executable")
@@ -148,7 +158,10 @@ def make_active_strategy_decider(
             bars = bars_by_symbol(symbol)
             if not bars:
                 return _hold(symbol)
-            signal_kind, warmup_reason = _evaluate_last_signal(executable, bars, symbol)
+            assume_long = bool(long_by_symbol(symbol)) if long_by_symbol is not None else False
+            signal_kind, warmup_reason = _evaluate_last_signal(
+                executable, bars, symbol, assume_long=assume_long
+            )
         except Exception:  # noqa: BLE001 — una evaluación fallida no rompe el motor.
             logger.debug("signal evaluator failed for %s", symbol, exc_info=True)
             return _hold(symbol)
@@ -183,6 +196,8 @@ def _evaluate_last_signal(
     executable: dict[str, Any],
     bars: list[Any],
     symbol: str,
+    *,
+    assume_long: bool = False,
 ) -> tuple[str | None, str | None]:
     """Evalúa la última barra y devuelve ``(signalKind dominante | None, motivo | None)``.
 
@@ -201,6 +216,9 @@ def _evaluate_last_signal(
     alcanza, el segundo elemento trae el motivo ``warmup_insufficient`` y el decisor lo
     publica: la ventana por defecto (120 barras) **no es evaluable** para SMA200 ni para
     los cruces de 50/200, y devolver ``None`` sin más los confundía con «sin señal».
+
+    **B-3.** ``assume_long`` arranca el replay ``gated`` con la posición del libro real. Sin
+    él, una posición abierta antes de la ventana no ve su entrada y la salida se suprime.
     """
     from bolsa_analytics.signals.preset_evaluability import evaluability_reason
     from bolsa_analytics.signals.strategy import (
@@ -229,10 +247,52 @@ def _evaluate_last_signal(
         instrument_id=symbol,
         mode="gated",
         indicator_context=indicator_context or None,
+        assume_long=assume_long,
     )
     kinds = {e.kind for e in events}
+    if assume_long:
+        # Estamos DENTRO. La única acción con sentido es cerrar, y la pregunta de salida
+        # es de NIVEL, no de transición (B-3): con la posición abierta antes de la
+        # ventana, el replay ya consumió la transición al principio y en la última barra
+        # no queda ningún ``exit`` que emitir. Se pregunta a la regla de salida en la
+        # última barra con el contexto REAL (no se reutiliza
+        # ``evaluate_exit_last_bar_gated``, que reconstruye barras sintéticas close-only
+        # y perdería volumen/rango).
+        if "exit" in kinds or _exit_rule_holds(executable, bars, indicator_context):
+            return "exit", None
+        # Sin salida: no se vuelve a comprar lo que ya se tiene.
+        return None, None
     if "exit" in kinds:
         return "exit", None
     if "entry_long" in kinds:
         return "entry_long", None
     return None, None
+
+
+def _exit_rule_holds(
+    executable: dict[str, Any],
+    bars: list[Any],
+    indicator_context: dict[str, list[float | None]] | None,
+) -> bool:
+    """¿La regla de SALIDA se cumple en la última barra? (pregunta de nivel, B-3).
+
+    Usa el ``indicator_context`` real, de modo que la salida de un preset de volumen o
+    rango se decide con las mismas series que el scan. Un contexto vacío no inventa una
+    venta: el motor devuelve ``None`` para las reglas que dependen de series, así que el
+    resultado es el mismo ``False`` sin cortar antes las reglas que solo miran ``close``.
+    """
+    from bolsa_analytics.signals.preset_rules import enrich_definition_with_preset_rules
+    from bolsa_analytics.signals.rules_engine import evaluate_rules_bar
+
+    closes = [float(bar.close) for bar in bars]
+    if not closes:
+        return False
+    resolved = enrich_definition_with_preset_rules(executable)
+    kind = evaluate_rules_bar(
+        resolved,
+        index=len(closes) - 1,
+        context=indicator_context or {},
+        closes=closes,
+        side="exits",
+    )
+    return kind == "exit"
