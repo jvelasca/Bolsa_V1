@@ -809,3 +809,63 @@ en ficheros no tocados): quedan fuera del gate de CI, que no analiza `scripts/`,
 - **Sin etiqueta**: ni tag, ni PR, ni cambio de estado de AUTO/PAPER; el commit del sello queda en la
   rama `audit/c1-c4-integrity-fold-2026-10-25` hasta que el CI por commit esté verde.
 
+### 12.7 Epílogo de publicación (2026-10-26, posterior al cuerpo del documento)
+
+> **Este epílogo supersede, como afirmación de estado presente, las frases «nada se ha publicado»,
+> «sin commit, tag, PR ni push» y «`HEAD` continúa en `8ce53c3c`» de §12.6 y §11.** Aquellas frases
+> eran ciertas **en el instante de redacción** (`HEAD = 8ce53c3c`); el cuerpo se conserva sin
+> reescribir porque es un parte fechado, no un documento vivo.
+
+**Lo que ocurrió después y sí está publicado:**
+
+| Hecho | Valor verificado |
+|---|---|
+| Sello | `2.11.163-beta` (commit `9b91f472`) |
+| `HEAD` de rama | `cdf06bdb` (`docs(evidence): certifica el cierre POST-TAG…`) |
+| Tag en `HEAD` | `v2.88.163-beta` → `84f58d0f` |
+| `git status --porcelain` | **0 entradas** |
+| `@{u}...HEAD` | **0 / 0** (sin commits pendientes de publicar) |
+| CI por commit `84f58d0f` | run **40372006755** — **5/5 success** |
+| CI por tag `v2.88.163-beta` | run **40372630308** — **14/14** jobs no saltados, 1 `skipped` |
+| CI del tag histórico `v2.88.162-beta` | run **40364412142** — **failure** en `playwright (live AUTO daily chain)`, conservado como rojo histórico |
+
+**Causa del rojo `.162` y su remedio (`.163`).** El worker AUTO_OPS no arrancaba porque
+`alembic/env.py` invocaba `fileConfig`, que degradaba el **root logger a `WARN`** aunque se pasara
+`disable_existing_loggers=False`; el `logger.info("Worker AUTO_OPS_JOB iniciado")` quedaba silenciado
+y el paso de CI esperaba ese marcador hasta agotar el timeout. La migración en proceso
+(`ensure_migrated()`) ahora marca `config.attributes["configure_logger"] = False` y `env.py` respeta
+la marca, de modo que el bootstrap por CLI conserva su logging y el bootstrap embebido **no toca** el
+logging del proceso anfitrión. Cubierto por `test_alembic_logging_isolation.py` (5 pruebas).
+
+**Estado de la ventana PAPER tras el re-anclaje del pin (`84f58d0f`).**
+
+- Pin re-anclado a `9b91f472` (`apps` `d7e698cf`, `packages` `26ec8a8e`) porque el sello `.163` mueve
+  `packages` y el tag debe apuntar a un commit con **freeze OK**.
+- `pnpm window:status` → gate **`STALE`** con motivo `apps_hash_no_congelado`,
+  `packages_hash_no_congelado`. **No es una regresión del re-anclaje**: los 3 días `MEDIDO`
+  (`20261019`, `20261021`, `20261022`) se corrieron sobre un árbol cuyo hash **nunca** estuvo
+  congelado, así que **jamás contaron** para la certificación. Por eso el recuento sigue en
+  **0 episodios / 0/32 ciclos** y el veredicto es **INCONCLUSIVE**, igual que antes del sello.
+- `pnpm window:certify` → **BLOQUEADO** (`OperationalError: connection timeout` contra
+  `localhost:5432`): el demonio de Docker no está levantado tras el reinicio del equipo. Es un
+  bloqueo **de infraestructura local**, no de código ni de datos.
+- Día `20261026` en `operability_runs/window-runs/ledger.jsonl`: **`HARD_ERROR` /
+  `API_NOT_READY`**, registrado como día perdido por indisponibilidad de la API y **no** como
+  resultado de mercado.
+
+**Backlog del dictamen: estado real, sin adornos.**
+
+| Ítem | Estado verificado en `HEAD` |
+|---|---|
+| **B-1 / B-6** (warmup por preset) | **NO implementado.** `scans.py:245` sigue comparando contra `MIN_SCAN_BARS=50` plano. Existe `bolsa_analytics/warmup_matrix.py` con `WarmupInsufficientError` y `min_bars_for`, pero **solo lo consumen** `optimize/{sma,rsi,macd}_grid.py`, `orchestrator_lab_runner.py` y `scripts/research/*`; **ningún** camino de scan lo importa. Además su `_sma_min` devuelve `max(slow, fast)` y **no suma +1** que exige la detección de cruce. |
+| **B-3** (estado gated) | **NO implementado**; solo existe la prueba de **caracterización** que documenta la divergencia `raw ≠ gated`. |
+| **P1-12b** (UI «no evaluable») | **NO iniciado.** |
+| **O-6** (`featureSource`, `signalWindowBars`) | **NO implementado.** Los campos aparecen **solo** como propuesta en la auditoría y en §12; no existen en el journal. |
+
+**Consecuencia operativa declarada.** El warmup por preset es el único de los cuatro que puede
+producir **silencio falso** (cero señales publicado como «sin señal» cuando en realidad el preset
+**no era evaluable**). B-3, P1-12b y O-6 degradan **explicabilidad**, no corrección del recuento.
+
+**Nada de este epílogo cambia:** AUTO OFF, PAPER virtual, ventana INCONCLUSIVE, 0 episodios,
+0/32 ciclos, rentabilidad no demostrada, evidencia máxima E2.
+
