@@ -5,6 +5,10 @@
 **Alcance:** prueba de integración + cableado de CI. Sin cambios de motor, `package.json`,
 PR #76 ni tag `v2.88.161-beta`.
 
+**Dictamen:** [`dictamen-c4-postgresql-real-2026-10-26.md`](./dictamen-c4-postgresql-real-2026-10-26.md).
+El SHA que **certifica el run** es `b3456897`; `6a9f7cab` es el commit **documental** que publica
+esta evidencia y **no** certifica ese run.
+
 Cierra la reserva declarada en el dictamen del lote C-1–C-4: el hallazgo estaba cubierto
 con dobles (`test_a9_1_crash_battery.py`) pero **no** contra las filas reales de
 `sim_auto_positions`, que es donde la ambigüedad existe.
