@@ -415,16 +415,29 @@ materializada habría desaparecido del estado final.
 - `apps/api-python/tests/test_auto_v2_audit_regressions.py` y este anexo pasan a estar
   **trackeados** en este cierre (commit separado del de motor). Antes no entraban en `git diff`
   ni en CI. `git add` no equivale a certificación: la certificación exige el run remoto verde.
-- Verificación **local**, sin CI remoto ni PostgreSQL nuevo:
+- **Certificación remota (2026-10-26).** Run [`40314593833`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40314593833)
+  sobre `2fa7d33d` en `audit/c1-c4-integrity-fold-2026-10-25`: **5/5 jobs `success`**
+  (`quality`, `paper-forward-pg`, `lifecycle-pg`, `grammar-discovery-pg`,
+  `auto-v2-durable-pg`). Detalle de lo que acredita cada uno:
+  - `quality`: **5405 passed, 50 skipped** (suite completa, `ruff` con la config **raíz**,
+    `lint-imports` 4/4 y `mypy` full-tree).
+  - `auto-v2-durable-pg`: **126 passed** en `test_auto_v46_hardkill_recovery_pg.py` con
+    `AUTO_HARDKILL_PG_REQUIRED=1` y la guarda anti-skip en verde; además C-4 (3 passed) y la
+    ruta REAL del productor (7 passed) y la cadena diaria (1 passed).
+  - Este run **sí** ejecuta el fichero de regresión: el `git add` era la condición, no la
+    certificación por sí mismo.
+- Verificación **local** previa al push (misma máquina, sin PostgreSQL):
   - `pytest apps/api-python/tests/test_auto_v2_audit_regressions.py -q` ⇒ **29 passed**
     (22 del cierre declarado + 7 de recuperación/legacy/reconciliación añadidos hoy).
   - `pytest` sobre `test_auto_v44_exit_crash_matrix.py`, `test_a9_1_crash_battery.py`,
     `test_window_day_watch.py`, `test_scheduler_worker.py`, `test_operability_window.py` y
     `packages/py/analytics/tests` (excluido `test_vectorbt_optuna.py`, que el Control de
     aplicaciones de esta máquina bloquea por `llvmlite.dll`) ⇒ **1425 passed**.
-  - `ruff check` sobre los ficheros cambiados, `mypy packages/py/application/src
-    apps/api-python/src` (408 ficheros) ⇒ **sin hallazgos**.
-  - **No ejecutado**: `lint-imports`, suites completas 844/1417, PostgreSQL local y CI remoto.
+  - `ruff check --config pyproject.toml` (config **raíz**, la del CI), `mypy` con el alcance
+    del CI (570 ficheros) y `lint-imports --config packages/py/.importlinter` (4/4) ⇒ **sin
+    hallazgos**.
+  - **No ejecutado en local**: PostgreSQL (las suites PG crean/destruyen esquemas; se certifican
+    en CI) y las suites completas de 5000+ pruebas (se certifican en el run remoto).
 - Declarado en configuración: `AUTO_ENGINE_SIM_ENGINE_ID` en `.env.example` y en el runbook de
   la ventana forward (R-4). Sin él, el arranque durable falla y AUTO queda apagado con error.
 - **No** cambian los estados operativos: AUTO sigue **OFF**, la operativa es **PAPER virtual** y
@@ -456,16 +469,19 @@ materializada habría desaparecido del estado final.
 | Estado | Veredicto de esta verificación |
 | --- | --- |
 | **C-4 (integridad PostgreSQL)** | **Cerrado y no reabierto.** Los tres escenarios de coste ambiguo se certifican en `b3456897` (run `40287111793`, `3 passed in 1.79s` + guarda anti-skip). R-2 es un hueco **adyacente de cantidad**, no una refutación del coste |
-| **Readopción cantidad/coste** | **PARCIAL — cerrado localmente, pendiente de CI.** Coste y plan sólidos, con cura de `entry_price` ya existente. R-1 pasa a fail-closed con reintento (el veto de aperturas se libera sólo con lectura y reconciliación válidas). R-2 deja de estar ciego: no adopta el total de la cuenta, **declara** la discrepancia (`live_row_invariant_report`) y **no** la repara; una fila ya inflada sigue exigiendo reconciliación de operador |
+| **Readopción cantidad/coste** | **CERTIFICADO POR CI (`2fa7d33d`).** Coste y plan sólidos, con cura de `entry_price` ya existente. R-1 pasa a fail-closed con reintento (el veto de aperturas se libera sólo con lectura y reconciliación válidas). R-2 deja de estar ciego: no adopta el total de la cuenta, **declara** la discrepancia (`live_row_invariant_report`) y **no** la repara. Residual declarado: una fila ya inflada sigue exigiendo reconciliación de operador |
 | **Estado parcial (T1, P&L, FSM V2)** | **PARCIAL.** `_t1_done` sin efecto con V2 ON; `_sim_realized_pnl` sin efecto con gobernador OFF; `_v2_positions` con adopción perezosa |
-| **HALT durable** | **PARCIAL — cerrado localmente, pendiente de CI.** Semántica normal sólida y ordenación probada. P-1 pasa a fail-closed en cada tick (`KILL_STATE_UNREADABLE`), el placeholder se libera sólo con lectura válida, el veto alcanza al camino legacy y la prueba PG sólo corre en el tag (P-3). Residual: durante un fallo persistente no hay evidencia durable del tramo ilegible |
-| **Stop de posición** | **HUECO DECLARADO.** `BAR_OHLC` describe al backtester: el motor AUTO evalúa el stop con `open(B)`. El **gap overnight sí se detecta** (al open siguiente); el **rango intradía no**, nunca |
-| **Ventana multi-día** | **NO CERTIFICADO.** `d=5 e=0 c=0 INCONCLUSIVE`; el gate cuenta 5 días pero sólo **3 ejecuciones completas**; los otros 2 tienen `forward` fallido sin fila de ledger (§4.1); el vigía no mira el gate |
+| **HALT durable** | **CERTIFICADO POR CI (`2fa7d33d`, job `auto-v2-durable-pg`, `AUTO_HARDKILL_PG_REQUIRED=1`).** Semántica normal sólida y ordenación probada. P-1 pasa a fail-closed en cada tick (`KILL_STATE_UNREADABLE`), el placeholder se libera sólo con lectura válida y el veto alcanza al camino legacy. Residual: durante un fallo **persistente** no hay evidencia durable del tramo ilegible (la prueba PG corre por commit, no sólo en el tag) |
+| **Stop de posición** | **CERRADO CON SUPUESTO DECLARADO.** El motor ya evalúa el stop y los objetivos con `bar_low`/`bar_high` de la barra (no sólo `open(B)`) y liquida al precio declarado (`min(open, stop)` en long; `max(open, target)` en el objetivo), con el **mismo** precio en settlement, hecho aplicado, P&L y reducción. Supuesto declarado: en barras D1 no se conoce el orden intrabar, así que el fill es un precio **de contabilidad** y el MAE es la cota conservadora de la barra (§8.2) |
+| **Ventana multi-día** | **NO CERTIFICADO.** `d=5 e=0 c=0 INCONCLUSIVE`; el gate cuenta 5 días pero sólo **3 ejecuciones completas**; los otros 2 tienen `forward` fallido sin fila de ledger (§4.1). El vigía ya **no** interpreta un `MEDIDO` sin gate como favorable (W-1: pasa a `INCONCLUSIVE` con `gate_missing`/`gate_inconclusive`), pero eso **no** convierte los días históricos en mediciones válidas |
 | **Rentabilidad** | **NO CERTIFICADO.** `0/32` ciclos, `evidence_ready=false`. Un CI verde no es evidencia estadística |
 
-**Límites del cierre.** Este anexo confirma la integridad funcional descrita y corrige **diez**
-imprecisiones de trazabilidad. **No** certifica rentabilidad y **no** autoriza el paso a dinero
-real: AUTO sigue **OFF**, la operativa es **PAPER virtual** y la ventana sigue **`INCONCLUSIVE`**.
+**Límites del cierre.** Este anexo confirma la integridad funcional descrita, la **certifica en
+CI** para el código de `2fa7d33d` y corrige **diez** imprecisiones de trazabilidad. Lo que el run
+verde acredita es que los contratos se cumplen y las regresiones no vuelven; **no** acredita
+rentabilidad, ni calidad de las señales, ni que una cuenta ya inflada esté reconciliada. **No**
+autoriza el paso a dinero real: AUTO sigue **OFF**, la operativa es **PAPER virtual** y la ventana
+sigue **`INCONCLUSIVE`**.
 
 **Actualización 2026-10-26 (posterior a la verificación read-only).** Tras revisar el diff real,
 R-1, R-2, P-2 (contable y MAE), W-1 y R-4 tienen cambio de código **y** prueba local (§8.1). Los
