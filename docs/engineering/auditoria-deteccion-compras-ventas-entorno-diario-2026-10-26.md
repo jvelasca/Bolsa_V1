@@ -268,6 +268,12 @@ el silencio no se distingue de "sin señal". Es un fallo de **configuración por
 evaluador. El denominador correcto es **21** (el catálogo tiene 21 entradas con `entries.rules` y
 `exits.rules`, y `preset_strategy_keys()` devuelve las mismas 21).
 
+> **Cerrado parcialmente en el commit de trabajo (posterior al sello `2.11.163-beta`).** El decisor
+> sigue devolviendo **HOLD** (fail-closed), pero ya **declara** `warmup_insufficient` en
+> `DecisionPackage.memo`, con la serie y las barras que faltan (§9.1). El silencio deja de ser
+> indistinguible. **No** se sube `AUTO_ENGINE_SIM_SIGNAL_BARS` (sigue 120): la configuración por
+> defecto no se toca, se hace explícita su consecuencia.
+
 ### 3.4 Hallazgo B-2 · Barras sintéticas close-only en el decisor
 
 El decisor ACTIVE no pasa OHLCV: construye `StrategyBarInput` con **solo** `timestamp` y `close`
@@ -391,7 +397,17 @@ de 50 barras y producir **cero señales** sin declararlo. No hay validación `wa
 más `sma_crossover`, que necesita **51** barras para que el cruce SMA50 tenga los dos valores
 consecutivos. `pullback_in_uptrend` (warmup 50) cabe justo.
 
+> **Errata medida (2026-10-26, post-sello `2.11.163-beta`).** Son **6**, no 5: falta
+> **`ichimoku_tk_cross`**, que necesita **78** barras (`spanB` se define en el índice 77 y la regla
+> lee `-1`). La omisión venía de suponer que su warmup era `senkouBPeriod = 52`; el desplazamiento de
+> 26 barras se paga aparte. Umbrales exactos por preset en §9.1.
+
 **Veredicto: PARCIAL.** El scan no promete warmup; el silencio se lee como "sin señal".
+
+> **Cerrado en el commit de trabajo (posterior al sello `2.11.163-beta`).** El scan ya declara
+> `warmup_insufficient` con la serie y las barras que faltan (§9.1,
+> `test_scan_preset_warmup.py`). `MIN_SCAN_BARS` **no** se toca: sigue siendo el mínimo de datos del
+> instrumento, no el warmup del preset.
 
 ---
 
@@ -873,6 +889,12 @@ escribirlo; a 2026-10-26 (tarde) existen **3** en el commit del sello `2.11.162-
 `O-5`), `B-3` cuenta con una prueba de **caracterización** que no es la propuesta, y las 17
 restantes describen qué habría que observar para dar el hallazgo por cerrado.
 
+> **Actualización 2026-10-26 (posterior al sello `2.11.163-beta`).** `B-1` y `B-6` dejan de ser
+> propuestas: están **implementados** con prueba en verde (§9.1). El recuento pasa a **5
+> implementadas** (`B-1`, `B-2`, `B-4`, `B-6`, `O-5`); `B-3` sigue solo caracterizado y las 16
+> restantes conservan criterio sin prueba ejecutada. La evidencia de `B-1`/`B-6` es **E1** en el
+> commit de trabajo, **no** E2 ni E3: ninguna ventana ni operación real se ha medido con esto.
+
 | ID | Nombre de prueba propuesto | Aserción falsable |
 |---|---|---|
 | B-1 | `test_sma200_requires_201_bars_in_active_window` | Con 120 barras, `all(v is None for v in compute_sma(closes, 200))`; con 201 barras y un cruce construido, `evaluate_strategy_last_bar` emite `entry_long`. Fija el mínimo y obliga a declarar `AUTO_ENGINE_SIM_SIGNAL_BARS >= warmup`. |
@@ -897,18 +919,81 @@ restantes describen qué habría que observar para dar el hallazgo por cerrado.
 | T-2 | `test_daily_scan_runs_immediately_when_due` | Reloj en hora de ejecución ⇒ el primer `_run_opportunity_daily_once` ocurre **sin** esperar 24 h. |
 | T-3 | `test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar` | Con la barra cerrada fija, N ticks de 60 s producen **como máximo una** decisión con nueva identidad de barra (`bar_tick`) y el reintento intrabarra es idempotente (mismo `execution_id`, sin segunda ejecución). |
 
+### 9.1 B-1 / B-6 implementados: el warmup se mide sobre la serie, no sobre el periodo
+
+**Decisión de diseño.** El mínimo por preset **no** se calcula como `max(parametros) + 1`. Esa
+aritmética se desincroniza en cuanto cambia un indicador y falla ya con los presets actuales:
+Ichimoku desplaza 26 barras sobre `senkouBPeriod = 52`, MACD necesita `slow + signal`, y un cruce
+compara la barra `-1` con la `-2`, no con la serie. Se pregunta a la **serie que el motor realmente
+lee** en qué índice se define por primera vez, y se le suma la profundidad que exige la regla (`1`
+para comparaciones, `2` para cruces). Nuevo módulo
+`bolsa_analytics.signals.preset_evaluability` (`required_spec_depth`, `unevaluable_specs`,
+`evaluability_reason`).
+
+**Umbrales medidos** (serie determinista de 500 barras sobre el catálogo real; el número es barras
+mínimas para decidir la última barra):
+
+| Barras | Preset(s) | Serie que manda |
+|---|---|---|
+| 1 | `vwap_reclaim` | `vwap` (definida desde la primera barra) |
+| 10 | `supertrend_follow` | `st::atrPeriod=10` |
+| 14 | `stoch_oversold` | `stoch::kPeriod=14` |
+| 15 | `rsi_mean_reversion`, `rsi_momentum`, `rsi_oversold_bounce` | `rsi::period=14` |
+| 20 | `bollinger_lower_bounce`, `bollinger_upper_breakout`, `donchian_breakout`, `cci_oversold` | periodo 20 |
+| 26 | `macd_zero_line` | `macd` línea `main` |
+| 27 | `ema_crossover`, `adx_di_trend` | `ema::period=26`; `adx` (más el cruce DI) |
+| 35 | `macd_signal_cross` | `macd` línea `signal` (cruce) |
+| 50 | `pullback_in_uptrend` | `sma::period=50` |
+| 51 | `sma_crossover` | cruce 20/50 (50 + 1) |
+| 78 | `ichimoku_tk_cross` | `spanB`: primer índice definido **77**, regla lee `-1` |
+| 200 | `ma_stack_bullish`, `price_above_sma200` | `sma::period=200` |
+| **201** | `golden_cross`, `death_cross` | cruce sobre `sma::period=200` (199 + 2) |
+
+Los **cuatro** presets que el hallazgo declaró inalcanzables con `bar_limit = 120` quedan confirmados
+(`201, 201, 200, 200`), más otros dos que exceden los 50 de `MIN_SCAN_BARS` (`sma_crossover` 51,
+`ichimoku_tk_cross` 78).
+
+**Qué cambia, exactamente.**
+
+1. **Scan** (`RunScan.execute`): antes de evaluar, si la ventana no cubre el warmup, el instrumento
+   va a `ScanSkippedInstrument` con motivo `warmup_insufficient: …` en vez de desaparecer del
+   recuento. No se toca `MIN_SCAN_BARS` ni el `bar_limit` por defecto (500).
+2. **Decisor ACTIVE** (`_evaluate_last_signal`): sigue siendo **fail-closed a HOLD** —nunca inventa
+   una orden—, pero el motivo viaja en `DecisionPackage.memo`, que ya existía: sin campo nuevo y sin
+   cambio de contrato. Un HOLD por falta de datos deja de ser idéntico a un HOLD por ausencia de
+   señal.
+3. **`warmup_matrix.py` no se reutiliza aquí.** Su `min_bars_for` es por **familia** (grids de
+   campaña: `sma`, `ema`, `rsi`, `macd`, `bollinger`, `adx`, `atr`) y su `_sma_min` devuelve
+   `max(slow, fast)` **sin** la profundidad del cruce; además no cubre `ich`, `dc`, `stoch`, `cci`,
+   `vwap`, `st`. Se deja intacto para el optimizador y las campañas: sigue siendo la fuente de verdad
+   de **ese** camino.
+
+**Pruebas (E1, herméticas).**
+
+| Fichero | Qué fija |
+|---|---|
+| `packages/py/analytics/tests/test_preset_evaluability.py` (28) | Ningún preset sano se declara no evaluable a 500 barras; umbral exacto `N-1`/`N` para los **21** presets; el cruce necesita la barra anterior; Ichimoku paga el desplazamiento (78); el motivo nombra serie y barras; una serie ausente **no** se disfraza de warmup. |
+| `packages/py/application/tests/test_scan_preset_warmup.py` (5) | `bar_limit = 120` + `golden_cross` ⇒ `skipped` con `warmup_insufficient`; 201 barras ⇒ sin omisión; 200 barras ⇒ «requiere >= 201»; `vwap_reclaim` a 50 ⇒ sin omisión. |
+| `packages/py/application/tests/test_active_strategy_warmup.py` (6) | 120 barras ⇒ `HOLD` con `memo` de warmup; 200 ⇒ «>= 201»; 201 ⇒ memo limpio; `vwap_reclaim` a 120 ⇒ memo limpio; una sola declaración por decisión. |
+
+**Lo que NO se ha hecho, y por qué.** No se sube `AUTO_ENGINE_SIM_SIGNAL_BARS` por defecto (sigue en
+120): hacerlo multiplica las barras por símbolo y turno del AUTO, y esa decisión de coste no se toma
+aquí. Tampoco se toca la UI del scan (**P1-12b**): el titular puede seguir diciendo «sin señales»
+cuando el motivo ya está en `skipped`. Ambos quedan declarados como pendientes.
+
 ---
 
 ## 10. Backlog priorizado
 
 ### P0 — afecta a la validez de lo que se concluya de la ventana
 
-1. **Declarar y validar el warmup por preset.** `AUTO_ENGINE_SIM_SIGNAL_BARS` debe ser
-   `max(period)+1` para el preset ACTIVE, o rechazarse con motivo explícito. Hoy 4/21 presets no
-   pueden disparar con 120 barras (**B-1**). **B-6** entra aquí como el mismo defecto en el scan:
-   `MIN_SCAN_BARS=50` deja 5 presets por debajo de su warmup y el scan lo publica como «sin señal».
-   Cierre conjunto: un `warmup_insufficient` explícito en `ScanSkippedInstrument` y en el rechazo del
-   preset ACTIVE.
+1. **Declarar y validar el warmup por preset.** ~~`AUTO_ENGINE_SIM_SIGNAL_BARS` debe ser
+   `max(period)+1`~~ — **la fórmula era incorrecta y queda supersedida por §9.1**: un cruce necesita
+   `+2` e Ichimoku no se rige por el periodo máximo (`senkouB 52` + desplazamiento 26 ⇒ 78, no 53).
+   El requisito se **mide sobre la serie**. **Aplicado:** `B-1` (decisor declara `warmup_insufficient`
+   en `memo`) y `B-6` (scan va a `skipped` con motivo). **Pendiente y declarado:** subir
+   `AUTO_ENGINE_SIM_SIGNAL_BARS` (sigue 120) es una decisión de coste, no de corrección, y no se toma
+   aquí; hoy esos presets se declaran **no evaluables** en vez de dar cero señales en silencio.
 2. **Unificar la procedencia de la feature.** El decisor y las alertas deben usar OHLCV real como
    el scan, o declarar en el journal que evalúan close-only (B-2, B-4, **O-6**).
 3. **Decidir el contrato `gated` vs `raw`.** Si la ACTIVE debe poder vender una posición anterior a
@@ -956,12 +1041,12 @@ E3.**
 
 | ID | Entrada de backlog | Criterio §9 | Prueba | Evidencia actual |
 |---|---|---|---|---|
-| B-1 | P0-1 | B-1 | `test_sma200_requires_201_bars_in_active_window` | E0 (120/120 `None`; 4/21) |
+| B-1 | P0-1 | B-1 + §9.1 | `test_sma200_requires_201_bars_in_active_window` · `test_the_default_window_declares_the_missing_warmup` | **E1** (umbrales medidos 1…201; el decisor declara `memo`) |
 | B-2 | P0-2 | B-2 | `test_decider_matches_the_gated_projection_of_the_same_signal` (16 pares) | **E1** (16/16 gated; Δ 5/16 frente a close-only) |
 | B-3 | P0-3 | B-3 | `test_raw_and_gated_diverge_on_a_sustained_trend` | **E1** de caracterización (3/16 pares `raw ≠ gated`); sin fix |
 | B-4 | P0-2 | B-4 | `test_the_alert_evaluates_with_the_ohlcv_context` | **E1** (el motor recibe `indicator_context` con VWAP real) |
 | B-5 | P0-5 | B-5 | `test_active_signal_flag_off_blocks_buy_explicitly` | E0 + E1 parcial (`test_auto_sim_active_strategy_seam`; falta el motivo) |
-| B-6 | P0-1 | B-6 | `test_scan_rejects_preset_below_warmup` | E0 (`MIN_SCAN_BARS=50`; 5 presets) |
+| B-6 | P0-1 | B-6 + §9.1 | `test_scan_rejects_preset_below_warmup` (implementada en `test_scan_preset_warmup.py`) | **E1** (`bar_limit = 120` ⇒ `skipped` con `warmup_insufficient`; 200 ⇒ `>= 201`) |
 | S-1 | P0-4 | S-1 | `test_time_stop_permission_matches_auto_execution` | E0 + E1 parcial |
 | S-2 | P0-4 | S-2 | `test_thesis_invalidation_is_protective_under_critical_recon` | E0 + E1 parcial |
 | S-3 | P1-6 | S-3 | `test_exit_pending_requires_emitted_order` | E0 |
@@ -980,8 +1065,10 @@ E3.**
 
 **Cobertura:** 21 hallazgos · **22** entradas de backlog (las 21 con ID + P1-12b, que cubre el
 silencio de la UI del scan descrito en §7.4) · 21 criterios · 21
-pruebas propuestas · **4 implementadas** (`B-2`, `B-3` solo de caracterización, `B-4` y `O-5`), todas
-en el commit del sello `2.11.162-beta`. Las cinco filas que en una lectura anterior quedaban huérfanas
+pruebas propuestas · **5 implementadas** (`B-1` y `B-6` en §9.1, `B-2`, `B-4` y `O-5`), más `B-3`
+con prueba de **caracterización** que no cierra el hallazgo. `B-1`, `B-2`, `B-4` y `O-5` entran con el
+sello `2.11.162-beta`; `B-6` y el cierre de `B-1` son **posteriores** al sello `2.11.163-beta` y viven
+en el commit de trabajo. Las cinco filas que en una lectura anterior quedaban huérfanas
 (`B-5`, `B-6`, `O-5`, `O-6`, `T-3`) tienen ahora backlog, criterio y prueba; su evidencia sigue siendo
 E0/E1/E2 y **no** se eleva por tener criterio escrito.
 

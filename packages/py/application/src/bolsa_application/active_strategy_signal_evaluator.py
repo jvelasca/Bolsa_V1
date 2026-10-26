@@ -148,10 +148,23 @@ def make_active_strategy_decider(
             bars = bars_by_symbol(symbol)
             if not bars:
                 return _hold(symbol)
-            signal_kind = _evaluate_last_signal(executable, bars, symbol)
+            signal_kind, warmup_reason = _evaluate_last_signal(executable, bars, symbol)
         except Exception:  # noqa: BLE001 — una evaluación fallida no rompe el motor.
             logger.debug("signal evaluator failed for %s", symbol, exc_info=True)
             return _hold(symbol)
+        if warmup_reason is not None:
+            # B-1: la ventana no alcanza el warmup del preset. Se sigue en HOLD
+            # (fail-closed), pero el motivo viaja en ``memo``: un HOLD por falta de
+            # datos **no** es un HOLD por ausencia de señal, y hasta ahora se leían
+            # igual. El artefacto de decisión lo declara en vez de callarlo.
+            logger.info("signal evaluator %s: %s", symbol, warmup_reason)
+            return DecisionPackage(
+                action="HOLD",
+                instrument_id=symbol,
+                quantity=0,
+                source=source,
+                memo=warmup_reason,
+            )
         if signal_kind is None:
             return _hold(symbol)
         effective = _bounded_lot(signal_kind, effective_lot)
@@ -170,8 +183,8 @@ def _evaluate_last_signal(
     executable: dict[str, Any],
     bars: list[Any],
     symbol: str,
-) -> str | None:
-    """Evalúa la última barra y devuelve el ``signalKind`` dominante (o ``None``).
+) -> tuple[str | None, str | None]:
+    """Evalúa la última barra y devuelve ``(signalKind dominante | None, motivo | None)``.
 
     Se apoya en ``evaluate_strategy_last_bar`` (motor declarativo real). ``exit`` tiene
     prioridad sobre ``entry_long``: si en la misma barra hay ambas, cerrar es la acción
@@ -183,7 +196,13 @@ def _evaluate_last_signal(
     las mismas barras: el banco de contrato mide **5 de 16 acciones** distintas en presets de
     volumen/rango. El modo sigue siendo ``gated``: el contrato es la **proyección** del scan,
     no el scan.
+
+    **B-1.** Antes de evaluar se pregunta si la ventana alcanza el warmup del preset. Si no
+    alcanza, el segundo elemento trae el motivo ``warmup_insufficient`` y el decisor lo
+    publica: la ventana por defecto (120 barras) **no es evaluable** para SMA200 ni para
+    los cruces de 50/200, y devolver ``None`` sin más los confundía con «sin señal».
     """
+    from bolsa_analytics.signals.preset_evaluability import evaluability_reason
     from bolsa_analytics.signals.strategy import (
         StrategyBarInput,
         evaluate_strategy_last_bar,
@@ -195,8 +214,15 @@ def _evaluate_last_signal(
         for b in bars
     ]
     if not bar_inputs:
-        return None
+        return None, None
     indicator_context = build_signal_indicator_context(bars, executable)
+    warmup_reason = evaluability_reason(
+        executable,
+        indicator_context or {},
+        bar_count=len(bar_inputs),
+    )
+    if warmup_reason is not None:
+        return None, warmup_reason
     events = evaluate_strategy_last_bar(
         executable,
         bar_inputs,
@@ -206,7 +232,7 @@ def _evaluate_last_signal(
     )
     kinds = {e.kind for e in events}
     if "exit" in kinds:
-        return "exit"
+        return "exit", None
     if "entry_long" in kinds:
-        return "entry_long"
-    return None
+        return "entry_long", None
+    return None, None

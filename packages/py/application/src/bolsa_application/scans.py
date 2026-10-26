@@ -31,6 +31,7 @@ from bolsa_analytics.signals.hybrid_scan import (
     is_hybrid_definition,
 )
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
+from bolsa_analytics.signals.preset_evaluability import evaluability_reason
 from bolsa_analytics.signals.preset_rules import (
     definition_has_rules,
     enrich_definition_with_preset_rules,
@@ -395,6 +396,18 @@ class RunScan:
                                 global_score=candidate.global_score,
                             )
                         )
+                    continue
+
+                # B-1/B-6: si la ventana no alcanza el warmup del preset, el motor
+                # devolvería cero señales y el scan lo publicaría como «sin señal».
+                # Se declara «no evaluable» en lugar de mentir por omisión.
+                warmup_reason = evaluability_reason(
+                    per_instrument_definition,
+                    indicator_context,
+                    bar_count=len(bars),
+                )
+                if warmup_reason is not None:
+                    skipped.append(ScanSkippedInstrument(instrument_id, warmup_reason))
                     continue
 
                 last_bar_events = evaluate_strategy_last_bar(

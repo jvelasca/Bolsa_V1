@@ -869,3 +869,56 @@ producir **silencio falso** (cero señales publicado como «sin señal» cuando 
 **Nada de este epílogo cambia:** AUTO OFF, PAPER virtual, ventana INCONCLUSIVE, 0 episodios,
 0/32 ciclos, rentabilidad no demostrada, evidencia máxima E2.
 
+### 12.8 Cierre de B-1 / B-6 (posterior al epílogo §12.7)
+
+> **Supersede, para esos dos ítems, la fila «NO implementado» de la tabla de §12.7.** El epílogo era
+> exacto en su commit; esto ocurre después, en el árbol de trabajo.
+
+**Qué se implementó.** El warmup por preset deja de ser una promesa y pasa a decidirse sobre la
+**serie real** que el motor lee (`bolsa_analytics.signals.preset_evaluability`): profundidad `1` para
+comparaciones y `2` para cruces, medida por el primer índice definido de cada serie. No se usa
+`period + 1` porque es falso ya con el catálogo actual (Ichimoku paga el desplazamiento: 78; MACD
+`slow + signal`; el cruce necesita la barra anterior).
+
+- **B-6 (scan).** `RunScan.execute` emite `ScanSkippedInstrument` con motivo
+  `warmup_insufficient: …` en vez de dejar al instrumento fuera del recuento.
+- **B-1 (decisor ACTIVE).** Sigue **fail-closed a HOLD**, pero el motivo viaja en
+  `DecisionPackage.memo` (campo preexistente: sin cambio de contrato).
+
+**Umbrales medidos** (los 21 presets, detalle en §9.1 de la auditoría): 1 · 10 · 14 · 15 (×3) ·
+20 (×4) · 26 · 27 (×2) · 35 · 50 · 51 · **78** · 200 (×2) · **201** (×2).
+
+**Errata que la medición obliga a declarar.** §3.8 de la auditoría afirmaba que con `bar_limit = 50`
+quedaban bloqueados **5** presets. Son **6**: falta `ichimoku_tk_cross` (78 barras). La cifra anterior
+suponía un warmup de `senkouBPeriod = 52` e ignoraba el desplazamiento de 26.
+
+**Verificación (E1, hermética).**
+
+| Suite | Resultado |
+|---|---|
+| `packages/py/analytics/tests/test_preset_evaluability.py` | **28 passed** |
+| `packages/py/application/tests/test_scan_preset_warmup.py` | **5 passed** |
+| `packages/py/application/tests/test_active_strategy_warmup.py` | **6 passed** |
+| `packages/py/application/tests` + `packages/py/analytics/tests` | **4208 passed, 5 skipped** |
+| `ruff check packages/py apps/api-python` | **All checks passed** |
+| `mypy` (los 5 directorios del gate) | **571 ficheros, sin incidencias** |
+| `lint-imports` | **4 contratos, 0 rotos** |
+| `apps/api-python/tests/test_auto_sim_active_strategy_seam.py` | **8 passed** |
+
+**Lo que NO se ha hecho, y queda declarado.**
+
+- **`AUTO_ENGINE_SIM_SIGNAL_BARS` sigue en 120.** Subirlo multiplica las barras por símbolo y turno
+  del AUTO: es una decisión de **coste**, no de corrección. Hoy esos presets se declaran no
+  evaluables en vez de publicar cero señales.
+- **`MIN_SCAN_BARS = 50` no se toca.** Es el mínimo de datos del instrumento, no el warmup del preset.
+- **`warmup_matrix.py` no se reutiliza** en este camino: es por familia (campañas/optimizador) y su
+  `_sma_min` no paga la profundidad del cruce. Se deja intacto como fuente de verdad de **ese** camino.
+- **P1-12b (UI) sigue sin hacer**: el titular del scan puede seguir diciendo «sin señales» aunque el
+  motivo ya esté en `skipped`.
+- **`B-3` y `O-6` siguen abiertos** tal como los describe §12.7.
+- **Sin sello, sin tag y sin bump**: esto vive en el commit de trabajo, no en `CHANGELOG` ni en
+  `PROJECT_STATE`. Su entrada corresponde al sello que lo recoja.
+
+**Ningún dato de mercado se ha fabricado** y **ninguna ventana se ha medido** con esto: la evidencia
+es **E1** (pruebas herméticas), no E2 ni E3.
+
