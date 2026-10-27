@@ -1427,6 +1427,19 @@ geometría). El precio ausente sigue declarándose por su propio canal (W4,
 | `apps/api-python` offline (`-m "not integration"`) | **1405 passed**, 12 deseleccionadas |
 | `ruff` / `mypy` (gate de CI) / import-linter | limpio / **573 ficheros sin issues** / **4 kept, 0 broken** |
 
+**CI por commit.** [`40503888911`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40503888911)
+(`Python CI`, commit `98f7b3fd`) ⇒ **`success`**, con el job `quality` en verde (`Ruff`,
+`Import-linter`, `Mypy`, `Pytest`).
+
+**Errata declarada (medida, no atribuida al cambio).** Una corrida de `apps/api-python` con
+**PostgreSQL alcanzable** mientras otra suite migraba la MISMA base terminó en `71 failed`
+(`psycopg.errors.TooManyColumns` sobre `ALTER TABLE signal_alert_subscriptions ADD COLUMN …`, y
+`UndefinedTable` en `dia_d_cycle_verifications`): el error viene de dos procesos compitiendo por
+el esquema, no del diff. Reproducido a mano **después**, los mismos ficheros pasan
+(`test_signal_alerts_v111_pg.py` ⇒ `12 passed`; `test_health`/`test_lists`/`test_workspaces`/
+`test_lifecycle_auth` ⇒ `17 passed`) y la base queda en `058_estudio_daily_proposals` con 21
+columnas en esa tabla. La cifra que se cita como gate es la de la corrida **aislada**.
+
 **Lo que NO se ha hecho, y queda declarado.**
 
 - **No** se enciende la señal de la ACTIVE ni se cambia el veredicto: el caso `SIGNAL=0` sigue

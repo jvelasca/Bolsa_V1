@@ -1685,6 +1685,10 @@ del mercado. Con el evento propio el motivo es visible y el censo no se toca; un
 (application + api, gate de CI) ⇒ **573 ficheros sin issues**; `import-linter` ⇒ **4 kept /
 0 broken**.
 
+**CI por commit** [`40503888911`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40503888911)
+(`Python CI`, commit `98f7b3fd`) ⇒ **`success`**: el job `quality` da **`Ruff`**, **`Import-linter`**,
+**`Mypy`** y **`Pytest`** en verde.
+
 **Lo que NO se ha hecho.** No se enciende la señal de la ACTIVE ni se altera su veredicto
 (`SIGNAL=0` sigue en `HOLD`, fail-closed de V2.31). El motivo vive en el journal duradero; el panel
 web no gana columna nueva en este paso (la lectura del gate es **O-3/O-4**, aún abierta). La
