@@ -1373,6 +1373,13 @@ contraria; el cambio de veredicto es el objetivo, no un efecto colateral.
 **Gates ejecutados** (2026-10-27): `analytics` + `application` ⇒ **4281 passed**;
 `ruff` ⇒ limpio; `lint-imports` ⇒ 4 contratos; `mypy` (gate CI, sin `analytics`) ⇒ **571 ficheros**.
 
+**CI por commit** [`40467379256`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40467379256)
+sobre `e82ff02d` ⇒ **`success`** (`quality` + los cuatro jobs PG). En la misma cabecera:
+[`Optimize lab`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40467379448) y
+[`Fase 2 scientific`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40467379334) ⇒ `success`.
+`paper-forward-pg` vuelve a ser el job que importa: es la ruta que ejecuta el manager y F5 sobre
+posiciones de simulación, no una prueba aislada de la tabla.
+
 **Lo que NO se ha hecho.** No se toca `TIME_STOP`/`MANUAL`/objetivos: su exclusión está declarada y
 probada, y meterlos cambiaría el sentido de «proteger». No se cierra **S-3**: sigue habiendo motivos
 (`TIME_STOP` bajo `CRITICAL`) que producen `hold` y pueden dejar `EXIT_PENDING` sin orden. La

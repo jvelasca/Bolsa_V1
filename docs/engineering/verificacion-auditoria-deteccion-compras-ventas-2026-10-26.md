@@ -1157,6 +1157,12 @@ reintroduce una lista local en cualquiera de las dos capas, se rompe antes de qu
 discrepar. Los controles negativos fijan lo que **no** debe entrar: `TIME_STOP` y `MANUAL` siguen
 vetados por datos rancios, y `TIME_STOP`/`TARGET_2` siguen degradando a `REVIEW` bajo `CRITICAL`.
 
+**CI por commit** [`40467379256`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40467379256)
+sobre `e82ff02d` ⇒ **`success`** (`quality` + los cuatro jobs PG); `Optimize lab`
+([`40467379448`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40467379448)) y `Fase 2
+scientific` ([`40467379334`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40467379334)) también
+en verde sobre la misma cabecera.
+
 **Lo que NO se ha hecho, y queda declarado.**
 
 - **No** se mete `TIME_STOP` ni `MANUAL` ni los objetivos en la tabla: su exclusión está declarada y
