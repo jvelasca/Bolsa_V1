@@ -134,6 +134,27 @@ es una prueba de **concurrencia real** que compartía la misma base con la suite
 lanzada en paralelo. **Re-ejecutado en aislamiento ⇒ `1 passed in 4.36s`**; no se atribuye al diff
 ni se declara como rojo del sello.
 
+**Cierre POST-TAG (medido).** `Release tag CI`
+[`40508374102`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40508374102) ⇒ **`success`** sobre
+`13362515` (`13:00:52Z`→`13:13:24Z`, **12m32s**): **13 jobs `success`** + **1 `skipped`** declarado
+(`playwright (integrated E2E, opt-in)`, que no certifica) + `certify` **`success`**. El tag apunta al
+commit de **re-anclaje** `13362515` porque el `window:freeze` del job `shared` es **fail-closed** y el
+bump mueve `apps` (los `meta.bump` viven en `apps/api-python/scripts`). Medido **en el CI**, no solo
+en local:
+
+| Job | Evidencia |
+|---|---|
+| `shared` | **`freeze OK (13362515)`** + `window:test` **50 passed** + `shared` **99 ficheros** |
+| `frontend` | **`Contract check (no gen)` `success`** (el `contract:check` que estaba rojo) + `Test web` **317 ficheros** |
+| `python` | **`5567 passed, 62 skipped`** (104 s); `mypy` **573 ficheros**; `Contracts: 4 kept, 0 broken` |
+| `lifecycle-pg` | W-G2/2 **176 passed** · account isolation **45** · Golden Day **3** · AUTO ruta REAL **7** · universe/DÍA-D/watch/PAPER/chain/identity/attempt cap **23 passed** (incluye `scan_queue_health_pg`) · crash/recovery **2** · concurrent **3** · hardkill **2** · crash matrix **2** · multiprocess **1** (113 s) |
+| `playwright (live AUTO daily chain)` | **`2 passed (36.7s)`** y `Start AUTO_OPS worker` **`success`** |
+| `playwright (mock E2E)` / `integrated AUTO S5` / `integrated axe` | **139 passed (11.3m)** / **8 passed (1.5m)** / **32 passed (2.6m)** |
+| `replay-repro` | **`REPRODUCIDO`** (`sha256 E9B7376B…F5625`) y 2ª corrida **idéntica** ⇒ **`Δ decisión = 0`** en el artefacto congelado |
+| `a7-gate` / `decision-spine` / `security` / `dr-verify` | **7 passed** / **621 passed** / gitleaks `success` / `success` |
+
+Publicado como **GitHub Release pre-release** `v2.88.164-beta` con audit pack **sin assets**.
+
 ## [2.11.163-beta] — **migrar en proceso deja de apagar el logging: el `fileConfig` de Alembic ya no degrada el nivel raíz, y el gate de disponibilidad del worker puede verlo arrancar** (**`Δ motor ≠ 0` en observabilidad y bootstrap · `Δ decisión = 0` · SIN migración nueva · head `058_estudio_daily_proposals`)
 
 **Naturaleza:** sello acotado a `2.11.162-beta` que remedia el **único rojo** de su CI de tag. **No** toca umbrales, pesos A/B, régimen, sizing, `TOP_N`, optimizador, orquestador, decisor ni replay OOS. **Sin migración nueva** (`head` sigue `058_estudio_daily_proposals`). **Bump** `2.11.162-beta` → `2.11.163-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**).

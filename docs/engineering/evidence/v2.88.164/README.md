@@ -79,8 +79,24 @@ cd Bolsa_V1 && git rev-parse HEAD
 | Contrato | `pnpm contract:check` ⇒ **OK** |
 | Freeze de la ventana | `node scripts/window-pin.mjs --check` ⇒ **freeze OK** |
 
-## 6. Cierre POST-TAG
+## 6. Cierre POST-TAG (medido)
 
-Pendiente de ejecutar al cerrar este apartado: `Release tag CI` del tag `v2.88.164-beta`, jobs
-verdes, `certify`, `replay-repro` y `freeze OK` sobre el commit del sello. Se añade aquí **después**
-de que exista el run, sin placeholders.
+`Release tag CI` [`40508374102`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40508374102) ⇒
+**`success`** sobre `13362515` (`13:00:52Z`→`13:13:24Z`, **12m32s**): **13 jobs `success`** +
+**1 `skipped`** declarado (`playwright (integrated E2E, opt-in)`) + `certify` **`success`**.
+
+| Job | Evidencia |
+| --- | --- |
+| `shared` | **`freeze OK (13362515)`** + `window:test` **50 passed** + `shared` **99 ficheros** |
+| `frontend` | **`Contract check (no gen)` `success`** + `Test web` **317 ficheros** |
+| `python` | **`5567 passed, 62 skipped`** (104 s); `mypy` **573 ficheros**; `Contracts: 4 kept, 0 broken` |
+| `lifecycle-pg` | W-G2/2 **176 passed** · account isolation **45** · Golden Day **3** · AUTO ruta REAL **7** · universe/DÍA-D/watch/PAPER/chain/identity/attempt cap **23 passed** (incluye `scan_queue_health_pg`) · crash/recovery **2** · concurrent **3** · hardkill **2** · crash matrix **2** · multiprocess **1** (113 s) |
+| `playwright (live AUTO daily chain)` | **`2 passed (36.7s)`**, `Start AUTO_OPS worker` **`success`** y guard anti-skip verde |
+| `playwright (mock E2E)` / `integrated AUTO S5` / `integrated axe` | **139 passed (11.3m)** / **8 passed (1.5m)** / **32 passed (2.6m)** |
+| `replay-repro` | **`REPRODUCIDO`** (`sha256 E9B7376B…F5625`, 3 383 461 B) y 2ª corrida **idéntica** ⇒ **`Δ decisión = 0`** |
+| `a7-gate` / `decision-spine` / `security` / `dr-verify` | **7 passed** / **621 passed** / gitleaks `success` / `success` |
+
+El tag `v2.88.164-beta` apunta a `13362515`, el commit de **re-anclaje del pin** inmediatamente
+posterior al sello `3e9ab2cc`: el `window:freeze` del job `shared` es **fail-closed** y el bump mueve
+`apps` (los `meta.bump` viven en `apps/api-python/scripts`). Los dos tree hashes del pin
+(`apps 381aa48…`, `packages 54a96c1…`) son los del árbol del sello.
