@@ -1423,7 +1423,15 @@ volverían a ser la misma fila).
 `test_auto_v2_worker_integration` + `test_auto_simulation_worker` + `test_auto_v44_exit_governance` +
 `test_auto_v2_golden_day_evidence` + `test_auto_sim_active_strategy_seam` ⇒ **90 passed**;
 `test_auto_operational_monitor` + `test_auto_v2_entry` ⇒ **143 passed**; `ruff` ⇒ limpio;
-`mypy` (api + application) ⇒ **409 ficheros sin issues**.
+`mypy` (api + application) ⇒ **409 ficheros sin issues**; `lint-imports` ⇒ 4 contratos.
+
+**CI por commit** [`40470621587`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40470621587)
+sobre `a9429465` ⇒ **`success`** (`quality` + los cuatro jobs PG). El primer intento de esta serie
+(`a4a29e59`) quedó **rojo en `quality`** por orden de imports bajo la config del gate
+(`ruff check … --config pyproject.toml`), aunque pasaba con la config local por paquete: `a9429465` es
+sólo ese reordenamiento. [`Optimize lab`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40470100721)
+y [`Fase 2 scientific`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40470100724) ⇒ `success`
+sobre `a4a29e59`, cuyo código es el mismo salvo el orden de `import`.
 
 **Lo que NO se ha hecho.** No se cambia el FSM: sigue siendo forward-only y
 `EXIT_FILLED`/`CLOSED` no se tocan. No se cierra **S-6** (el AUTO sigue sin consultar F5) ni se

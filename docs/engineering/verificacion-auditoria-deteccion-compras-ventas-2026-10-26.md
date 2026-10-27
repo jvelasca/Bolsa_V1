@@ -1196,6 +1196,17 @@ atribución de gestión, nunca veto de entrada.
 | `test_auto_operational_monitor` · `test_auto_v2_entry` (application) | **143 passed** |
 | `ruff` / `mypy` (api + application) | limpio / **409 ficheros sin issues** |
 
+**CI por commit** [`40470621587`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40470621587)
+sobre `a9429465` ⇒ **`success`** (`quality` + los cuatro jobs PG). El commit de código (`a4a29e59`)
+quedó rojo **sólo** en `quality` por el orden de imports exigido por `ruff --config pyproject.toml`
+(localmente pasaba con la config del paquete); `a9429465` es ese reordenamiento. `Optimize lab`
+([`40470100721`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40470100721)) y `Fase 2 scientific`
+([`40470100724`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40470100724)) ⇒ `success` sobre
+`a4a29e59`.
+
+Además, la suite offline completa de `api-python` (`-m "not integration"`) ⇒ **1385 passed, 12
+deselected** (8 min 14 s), incluida la prueba nueva.
+
 La prueba es un **control negativo de S-2** en el mismo turno: techo vencido (`TIME_STOP`) con
 reconciliación `DIVERGENT` ⇒ `CRITICAL` ⇒ `REVIEW` ⇒ `hold`. Se afirma que (a) no hubo venta, (b) el
 `lifecycleState` **no** es `EXIT_PENDING` y (c) el journal dice `exit_not_emitted` y **no** `time_exit`.
