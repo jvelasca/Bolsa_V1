@@ -1277,6 +1277,10 @@ es el veredicto sobre el mismo plan, no el cableado.
 - `test_a_time_stop_is_not_protective_against_stale_data` — control negativo: con datos rancios
   sigue denegando; el arreglo no suplanta a S-2.
 
+**CI por commit** [`40465967324`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40465967324)
+sobre `b48cc407` ⇒ **`success`** (`quality` + los cuatro jobs PG; `paper-forward-pg` es el que
+ejercita F5 sobre posiciones de simulación).
+
 La prueba anterior `test_deny_hint` codificaba el defecto (afirmaba `not_actionable` para un plan
 vencido) y se sustituye por las cuatro de arriba.
 
@@ -1286,6 +1290,11 @@ vencido) y se sustituye por las cuatro de arriba.
 **63 passed**; `ruff` ⇒ limpio; `lint-imports` ⇒ 4 contratos intactos; `mypy` (gate de CI, **sin**
 `analytics`) ⇒ **571 ficheros sin issues**. El gate de mypy no cubre `packages/py/analytics`, así
 que el cambio de `exit_permission.py` queda sostenido por `ruff` y por las pruebas, no por tipos.
+
+**CI por commit** [`40465967324`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40465967324)
+sobre `b48cc407` ⇒ **`success`**: `quality` y los cuatro jobs PG (`auto-v2-durable-pg`,
+`grammar-discovery-pg`, `lifecycle-pg`, `paper-forward-pg`) en verde. `paper-forward-pg` importa
+especialmente: es la ruta PAPER que consume F5 sobre posiciones reales de simulación.
 
 **Lo que NO se ha hecho.** No se hace que el AUTO consulte F5 (eso es S-6 y es un cambio de
 cableado, no de veredicto). No se cambia el status de `TIME_STOP` a `TRIGGERED`: `HINT` es correcto

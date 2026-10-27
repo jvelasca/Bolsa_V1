@@ -1111,6 +1111,9 @@ Las dos pruebas que importan son la del criterio —`perm.action == suggestion_f
 sobre el **mismo** plan— y los dos controles negativos: `HINT` + `protect`/`hold` sigue denegado, y
 `TIME_STOP` con datos rancios sigue denegado.
 
+**CI por commit** [`40465967324`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40465967324)
+sobre `b48cc407` ⇒ **`success`** (`quality` + los cuatro jobs PG).
+
 **Lo que NO se ha hecho, y queda declarado.**
 
 - **No** se hace que el AUTO consulte F5: es **S-6**, cambio de cableado y no de veredicto.
