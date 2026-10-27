@@ -1058,6 +1058,12 @@ indistinguible.
 | `application` + 4 suites de worker AUTO | **2996 passed** |
 | `ruff` / `lint-imports` / `mypy` | limpio / 4 contratos / **571 ficheros sin issues** |
 
+**CI por commit** [`40464917112`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40464917112)
+sobre `7c491690` ⇒ **`success`**: `quality` (ruff + mypy + lint-imports + pytest) y los cuatro jobs
+PG (`auto-v2-durable-pg`, `grammar-discovery-pg`, `lifecycle-pg`, `paper-forward-pg`) en verde. Los
+jobs PG importan aquí porque `_journal_entry` corre en la ruta AUTO real: el payload gana dos claves
+y sus aserciones siguen pasando.
+
 **Lo que NO se ha hecho, y queda declarado.**
 
 - **No se publica en el DTO del monitor ni en `openapi.json`.** Las claves viven en el `payload` que

@@ -1199,6 +1199,11 @@ inventado del que se podría leer «evaluado con cero barras». La clave se omit
 `test_auto_sim_active_strategy_seam.py` + `test_auto_v2_bar_short_circuit.py` ⇒ **2996 passed**;
 `ruff` ⇒ limpio; `lint-imports` ⇒ 4 contratos intactos; `mypy` ⇒ **571 ficheros sin issues**.
 
+**CI por commit** [`40464917112`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40464917112)
+sobre `7c491690` ⇒ **`success`**: `quality` y los cuatro jobs PG (`auto-v2-durable-pg`,
+`grammar-discovery-pg`, `lifecycle-pg`, `paper-forward-pg`), que son los que ejercitan el journal
+durable con PostgreSQL.
+
 **Lo que NO se ha hecho, y por qué.** No se publica en el DTO del monitor ni en `openapi.json`: las
 claves ya viajan en el `payload` y elevarlas a campo de primera clase es una decisión de contrato
 aparte (obligaría a regenerar `schema.d.ts` y a versionar la API). La exposición en la UI queda
