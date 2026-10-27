@@ -2,6 +2,138 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.164-beta] — **la auditoría de detección cierra 16 de sus 21 criterios: el warmup se mide sobre la serie real, el estado `gated` sale del libro, la salida declara su permiso y la ACTIVE dice por qué no operó** (**`Δ motor ≠ 0` acotado a evaluación de señal y decisión de salida · `Δ decisión ≠ 0` en el camino ACTIVE y en posiciones con tesis invalidada · contrato HTTP ADITIVO · AUTO OFF · SIN migración nueva · head `058_estudio_daily_proposals` · cubre 25 commits**)
+
+**Naturaleza:** sello de **remediación** posterior y acotado a `2.11.163-beta`. Cubre **25 commits**
+(`v2.88.163-beta..sello`, **52 ficheros**, +6 236/−164) que aplican los hallazgos de
+[`auditoria-deteccion-compras-ventas-entorno-diario-2026-10-26.md`](docs/engineering/auditoria-deteccion-compras-ventas-entorno-diario-2026-10-26.md)
+y su [`verificación`](docs/engineering/verificacion-auditoria-deteccion-compras-ventas-2026-10-26.md).
+**No** toca umbrales de mercado, pesos A/B, régimen, sizing, `TOP_N`, optimizador, orquestador ni
+replay OOS. **Sin migración nueva** (`head` sigue `058_estudio_daily_proposals`). **Bump**
+`2.11.163-beta` → `2.11.164-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard` **2 passed**). **Contrato HTTP aditivo**: `AutoOpsJobSlotDto` entra en el DTO
+de `ops-jobs`; `openapi.json`/`schema.d.ts` **regenerados** (el `contract:check` estaba rojo en el
+árbol de partida y el sello lo cierra).
+
+**W-164-1 · B-1/B-6 — el warmup por preset se mide en la serie, no se deduce del periodo.** Nuevo
+`bolsa_analytics.signals.preset_evaluability` (`required_spec_depth`, `unevaluable_specs`,
+`evaluability_reason`) pregunta a la **serie que el motor lee** en qué índice se define por primera
+vez y le suma la profundidad de la regla (`1` comparaciones, `2` cruces). Umbrales medidos para los
+**21** presets: `1 · 10 · 14 · 15 (×3) · 20 (×4) · 26 · 27 (×2) · 35 · 50 · 51 · 78 · 200 (×2) ·
+201 (×2)`. El scan emite `ScanSkippedInstrument` con `warmup_insufficient: …` en vez de dejar al
+instrumento fuera del recuento, y el decisor ACTIVE sigue **fail-closed a HOLD** declarando el
+motivo en `memo`. **No** se sube `MIN_SCAN_BARS` ni `AUTO_ENGINE_SIM_SIGNAL_BARS`, y
+`warmup_matrix.py` **no** se reutiliza (es por familia y su `_sma_min` omite la profundidad del
+cruce). Errata medida: con `bar_limit = 50` los presets bloqueados son **6**, no 5 —falta
+`ichimoku_tk_cross` (78)—.
+
+**W-164-2 · B-3 — el estado `gated` viene del libro, no de replayar la ventana.** `gated` arrancaba
+en `has_long = False` y replayaba las entradas/salidas de los últimos 120 cierres: si la posición se
+abrió **antes** de la ventana, la salida que la propia estrategia pide **no se emitía** y el
+portador quedaba atrapado. Ahora `evaluate_rules_signals`/`evaluate_strategy`/
+`evaluate_strategy_last_bar` aceptan `assume_long` (arranca con la posición abierta y **suprime**
+las entradas: dentro no se vuelve a comprar) y el decisor recibe `long_by_symbol` **como callable**
+—se lee en el instante de decidir—. Libro ilegible ⇒ **HOLD**, nunca una compra inventada.
+
+**W-164-3 · P1-12b — el titular del scan separa «no evaluable» de «sin señal».** El prefijo estable
+`WARMUP_INSUFFICIENT` se exporta al frontend (`packages/shared/src/scan-api.ts`:
+`SCAN_WARMUP_INSUFFICIENT_REASON`, `isWarmupInsufficientReason`) y
+`apps/web/src/lib/scan-silence.ts` clasifica los `skipped` en `not_evaluable` (warmup),
+`insufficient_data` (<50 barras) y `other` (fundamentales, instrumento ausente, error). El titular
+deja de afirmar una conclusión que el sistema no alcanzó. **14** pruebas de la clasificación.
+
+**W-164-4 · O-6 — el journal declara con qué dato se decidió.** Dos claves **aditivas** del
+`payload`: `featureSource` (`real` sólo si **todas** las barras son OHLCV completas; una barra
+close-only sintetizada obliga a `synthetic`) y `signalWindowBars` (la ventana real, para distinguir
+«no había señal» de «la ventana no llegaba»). Lo no medido **se omite**, no se rellena con `0`.
+
+**W-164-5 · S-1 — un plan vencido es una salida, no un aviso.** `check_exit_permission` filtraba
+**por el status** y exigía `TRIGGERED`: un `TIME_STOP` marcado `HINT` con `suggested_action =
+full_exit` caía en `none` para F5 mientras el AUTO vendía. Nueva tabla
+`_ACTIONABLE_BY_STATUS` (`TRIGGERED` ⇒ `full_exit`/`reduce`; `ARMED` ⇒ `protect`): la misma
+condición resuelve igual en las dos capas.
+
+**W-164-6 · S-2 — una sola tabla de salidas protectoras.** `exit_permission._is_protective` y
+`position_decision._PROTECTIVE_EXIT_REASONS` ya habían divergido: `THESIS_INVALIDATION` cubría
+riesgo para F5 y no para la decisión de posición, así que bajo `CRITICAL` la posición **sobrevivía a
+su propia invalidación**. El conjunto pasa a `exit_plan.PROTECTIVE_EXIT_REASONS` y ambas capas lo
+consumen: `THESIS_INVALIDATION` vende, igual que `STRUCTURAL_STOP`/`TRAIL`/`PORTFOLIO_RISK` y los
+exits del gobernador.
+
+**W-164-7 · S-3 — `EXIT_PENDING` sólo cuando la orden existe.** El FSM avanzaba **al decidir**,
+antes de los gates: un `hold` del manager dejaba la posición marcada «salida pedida» sin ninguna
+venta. El turno se parte en `_v2_note_exit_intent` (guarda la intención), `_v2_confirm_exit_emitted`
+(transición **después** de emitir) y `_v2_flush_unemitted_exits` (`exit_not_emitted` con el motivo
+decisorio y el estado real).
+
+**W-164-8 · O-1/O-2 — el settle fallido se cuenta y el modo estructural se publica.** Un settlement
+que lanzaba sólo dejaba un log: ahora cuenta `settlement_failures` y journaliza
+`settlement_failed` (motivo de **materialización**, atribución de gestión, nunca veto de entrada). El
+modo **estructural** —el que existe porque no hay `finance_applier` y por tanto no mueve caja— viaja
+como `structural`/`structuralOrders` en el parte del día: un despliegue mal compuesto deja de leerse
+igual que dinero real.
+
+**W-164-9 · T-1/T-2 — quién drena la cola se declara y el scan diario no espera 24 h.** Nuevo
+`background/scan_queue_health.py` (`scan_queue_authority`, `inspect_scan_queue`,
+`report_scan_queue_health`): el scheduler publica `scan_queue_stalled` con la acción
+(`bolsa-queue-poll-worker`) si hay `pending` ≥ 300 s, y el poll worker declara el hecho positivo.
+`opportunity_daily_scan_worker` hace el **primer tick inmediato** (`sleep` al final del bucle) y
+dedupe **durable** del día por SQL (`list_payloads_since`), que aguanta reinicios.
+
+**W-164-10 · S-6 — el AUTO consulta F5 antes de una salida y lo declara.** `check_exit_permission`
+no se invocaba en el worker: `data_stale`, `market_closed`, `portfolio_drift` y
+`paper_auto_env_blocked` no tenían efecto **ni rastro**. Nuevo `auto_exit_gate.review_auto_exit`
+(con `build_position_decision_and_plan` para no cambiar la firma histórica) y
+`PositionManagerResult.exit_plan`: un `DENY` llega con `exemption = "auto_sim_exit_precedence"` y
+`blocksExit: false`. **El veredicto no cambia** —las salidas protectoras no esperan—; lo que cambia
+es que se puede leer.
+
+**W-164-11 · B-5 — la ACTIVE declara por qué no operó.** Con `ACTIVE_STRATEGY=1` y `SIGNAL=0` el
+decisor devolvía `HOLD` y **nada** lo declaraba. `DecisionPackage.hold_reason` transporta un motivo
+**tipificado** (`active_signal_disabled`, `no_executable`, `no_snapshot`, `evaluation_failed`,
+`no_signal` y el `warmup_insufficient` **re-exportado de su dueño**) y el worker lo journaliza con
+evento **propio** `auto_active_strategy_hold`, una vez por `(símbolo, motivo, barra)`. No es
+`auto_entry_decision`, así que **no infla `vetoCounted`**; un HOLD con motivo se declara **también
+sin precio** (no ejecuta ni marca). El veredicto sigue siendo no operar.
+
+**W-164-12 · cobertura de CI y contrato.** `python-ci.yml`: `test_scan_queue_health_pg.py` sale del
+job offline (compite por el esquema) y entra en `lifecycle-pg` con `SCAN_QUEUE_PG_REQUIRED=1` y
+guard anti-skip. `contract:gen` regenera `openapi.json` + `schema.d.ts` con `AutoOpsJobSlotDto`
+(231 rutas / 495 esquemas).
+
+**Trazabilidad de la auditoría.** El documento pasa de **11** a **16 implementadas** de 21 criterios
+(`B-1`, `B-2`, `B-3`, `B-4`, `B-5`, `B-6`, `O-1`, `O-2`, `O-5`, `O-6`, `S-1`, `S-2`, `S-3`, `S-6`,
+`T-1`, `T-2`); las **5** restantes (`S-4`, `S-5`, `O-3`, `O-4`, `T-3`) conservan criterio y evidencia
+**E0/E2 parcial**, y así se declaran. Las secciones §9.1–§9.11 y §12.8–§12.18 recogen, por hallazgo,
+qué se midió, qué prueba lo fija y qué **no** se hizo.
+
+**Verificación (medida, 2026-10-27).**
+
+| Gate | Resultado |
+|---|---|
+| `packages/py/application` completo | **2944 passed** |
+| `packages/py/analytics` + `packages/py/infrastructure` | **1547 passed** (el caos de concurrencia se re-ejecuta en aislamiento, ver límites) |
+| `apps/api-python` offline (`-m "not integration"`) | **1405 passed**, 12 deseleccionadas |
+| `apps/web` (`vitest`) | **2371 passed / 317 ficheros** |
+| `packages/shared` (`vitest`) | **855 passed / 99 ficheros** (+1 todo) |
+| `pnpm typecheck` | **4/4 OK** |
+| `pnpm lint` | **0 errores** (23 avisos preexistentes) |
+| `contract:gen` / `contract:check` | **OK** (aditivo: `AutoOpsJobSlotDto`) |
+| `ruff` / `mypy` (gate de CI) / `import-linter` | limpio / **573 ficheros sin issues** / **4 kept, 0 broken** |
+| `pnpm window:test` | **50 passed** |
+| Guardián de bump | **2 passed** |
+
+**Límites declarados.** AUTO sigue **OFF**; operativa **100 % PAPER virtual**, sin LIVE ni XTB real.
+La ventana sigue **`INCONCLUSIVE`** (`episodios 0/2`, `ciclos 0/32`) y este sello **no** la mueve: un
+CI verde **no** certifica la ventana ni la rentabilidad. La evidencia de las remediaciones es **E1**
+(hermética) salvo `S-6` y `T-1`, con **E2** parcial por CI; **ningún** hallazgo llega a **E3**. El
+único fallo local de la primera pasada fue
+`infrastructure/tests/chaos/test_multi_portfolio_ledger_sequence.py::
+test_same_account_two_portfolios_concurrent_ledger_sequence` (`ValueError: Cartera no encontrada`):
+es una prueba de **concurrencia real** que compartía la misma base con la suite de `api-python`
+lanzada en paralelo. **Re-ejecutado en aislamiento ⇒ `1 passed in 4.36s`**; no se atribuye al diff
+ni se declara como rojo del sello.
+
 ## [2.11.163-beta] — **migrar en proceso deja de apagar el logging: el `fileConfig` de Alembic ya no degrada el nivel raíz, y el gate de disponibilidad del worker puede verlo arrancar** (**`Δ motor ≠ 0` en observabilidad y bootstrap · `Δ decisión = 0` · SIN migración nueva · head `058_estudio_daily_proposals`)
 
 **Naturaleza:** sello acotado a `2.11.162-beta` que remedia el **único rojo** de su CI de tag. **No** toca umbrales, pesos A/B, régimen, sizing, `TOP_N`, optimizador, orquestador, decisor ni replay OOS. **Sin migración nueva** (`head` sigue `058_estudio_daily_proposals`). **Bump** `2.11.162-beta` → `2.11.163-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**).

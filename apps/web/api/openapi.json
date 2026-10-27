@@ -1788,6 +1788,16 @@
             "title": "Result",
             "type": "object"
           },
+          "slot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoOpsJobSlotDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "startedAt": {
             "anyOf": [
               {
@@ -1831,6 +1841,74 @@
           }
         },
         "title": "AutoOpsJobListDto",
+        "type": "object"
+      },
+      "AutoOpsJobSlotDto": {
+        "description": "Verdad de SERVIDOR sobre el hueco ``(kind, cuenta, día)`` de la cola.\n\nLa UI deja de inferir «quién ocupa la cola» leyendo el payload: el servidor declara\nel job activo, el símbolo con el que trabaja y si ESE job corresponde a la petición\nque acaba de hacer el usuario. ``state`` es la fuente de verdad del mensaje.",
+        "properties": {
+          "activeJobId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activejobid"
+          },
+          "activeSymbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activesymbol"
+          },
+          "matchesRequest": {
+            "default": false,
+            "title": "Matchesrequest",
+            "type": "boolean"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "requestedSymbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requestedsymbol"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message"
+        ],
+        "title": "AutoOpsJobSlotDto",
         "type": "object"
       },
       "AutoPaperEvidenceDto": {

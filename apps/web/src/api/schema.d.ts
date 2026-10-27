@@ -4971,6 +4971,7 @@ export interface components {
             result?: {
                 [key: string]: unknown;
             };
+            slot?: components["schemas"]["AutoOpsJobSlotDto"] | null;
             /** Startedat */
             startedAt?: string | null;
             /** Status */
@@ -4982,6 +4983,33 @@ export interface components {
             jobs?: components["schemas"]["AutoOpsJobDto"][];
             /** Notes */
             notes?: string[];
+        };
+        /**
+         * AutoOpsJobSlotDto
+         * @description Verdad de SERVIDOR sobre el hueco ``(kind, cuenta, día)`` de la cola.
+         *
+         *     La UI deja de inferir «quién ocupa la cola» leyendo el payload: el servidor declara
+         *     el job activo, el símbolo con el que trabaja y si ESE job corresponde a la petición
+         *     que acaba de hacer el usuario. ``state`` es la fuente de verdad del mensaje.
+         */
+        AutoOpsJobSlotDto: {
+            /** Activejobid */
+            activeJobId?: string | null;
+            /** Activesymbol */
+            activeSymbol?: string | null;
+            /**
+             * Matchesrequest
+             * @default false
+             */
+            matchesRequest: boolean;
+            /** Message */
+            message: string;
+            /** Requestedsymbol */
+            requestedSymbol?: string | null;
+            /** Startedat */
+            startedAt?: string | null;
+            /** State */
+            state: string;
         };
         /**
          * AutoPaperEvidenceDto
