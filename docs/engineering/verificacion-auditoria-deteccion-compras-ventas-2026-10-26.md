@@ -1322,3 +1322,10 @@ el operador sepa qué arrancar y no sólo que algo va mal.
 - **No** se toca la cadencia del AUTO ni el reloj de barras (**T-3** sigue abierto).
 - **Sin sello, sin tag y sin bump.** La evidencia es **E1** + **E2** parcial.
 
+**CI por commit** [`40479567239`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40479567239)
+sobre `bc8c60ab` ⇒ **`success`**. `quality` corrió el offline completo: **5531 passed, 50 skipped**
+(mypy 572 ficheros, ruff limpio). `lifecycle-pg` corrió con `SCAN_QUEUE_PG_REQUIRED=1`: **17 passed**
+y **0 skips**, así que `test_scan_queue_health_pg` se midió contra PostgreSQL real (E2) y no quedó
+fuera del veredicto. `Fase 2 scientific`
+([`40479567203`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40479567203)) ⇒ `success`.
+
