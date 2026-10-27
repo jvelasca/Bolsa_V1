@@ -66,6 +66,10 @@ lanzada en paralelo. **Re-ejecutado en aislamiento ⇒ `1 passed in 4.36s`.**
 
 ## 5. Cómo auditar este sello
 
+Audit pack publicado con este sello:
+[`audit-pack-v2.88.164-beta-2026-10-27.md`](../../audit-pack-v2.88.164-beta-2026-10-27.md)
+(mismo contenido que el cuerpo de la GitHub Release `v2.88.164-beta`, pre-release y sin assets).
+
 ```bash
 git clone --branch v2.88.164-beta --depth 1 https://github.com/jvelasca/Bolsa_V1.git
 cd Bolsa_V1 && git rev-parse HEAD
