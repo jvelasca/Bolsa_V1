@@ -29,17 +29,18 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 | **Commit apuntado** | `00f321bb6e05332b677e7c880ba23442af9486cf` (**re-anclaje del pin** PAPER) |
 | **Commit del sello** | `803613db` (código + pruebas + docs + bump + contrato) |
 | **Corrección del E2E** | `fb18d729` (`gp-e2e-v290` lee el veredicto del gate; ver §5.6) |
+| **Objeto de tag anterior (retirado)** | `e62b2b7b31ef4fe54921fe51d3dcb71042ae7c65` → commit `068b3fae` · CI **rojo** ([run 40516676602](https://github.com/jvelasca/Bolsa_V1/actions/runs/40516676602)) |
 | **Base (tag anterior)** | `v2.88.164-beta` → `133625155f3dc9bbf29795e72344d6813641eb65` |
 | **Versión monorepo** | `2.11.165-beta` ([`package.json`](../../package.json)) |
 | **Alembic head** | `058_estudio_daily_proposals` (**sin migración nueva**) |
 | **Firma** | **unsigned** (anotado, sin GPG) |
-| **Alcance del sello** | **5 commits**, **42 ficheros**, +1 271/−62 |
+| **Alcance del sello** | **5 commits**, **44 ficheros**, +1 484/−66 (`git diff --shortstat 13362515 00f321bb`) |
 
 > **Nota:** el tag apunta al commit de **re-anclaje** `00f321bb`, posterior a `803613db` (`068b3fae`) y a la corrección `fb18d729`, porque el bump mueve `apps` (los `meta.bump` viven en `apps/api-python/scripts`) y `packages` (el `venue` nullable de `@bolsa/shared`), y el `window:freeze` del job `shared` es **fail-closed**. Los dos tree hashes del pin (`apps 927c2298…`, `packages 41e0afa8…`) son los del árbol del sello.
 >
-> **Nota de publicación:** el tag se creó primero sobre `068b3fae`; su CI salió **rojo** en `playwright (mock E2E)` porque `gp-e2e-v290` afirmaba el literal `INCONCLUSIVE` que `O-4` retira. Se corrigió la prueba (`fb18d729`), se re-ancló el pin y el tag/release se **movieron** al árbol corregido el mismo día, antes de citar ningún resultado verde.
+> **Nota de publicación:** el tag se creó primero sobre `068b3fae` (objeto de tag `e62b2b7b…`, hoy **retirado** de la ref pero conservado como antecedente auditable); su CI salió **rojo** en `playwright (mock E2E)` porque `gp-e2e-v290` afirmaba el literal `INCONCLUSIVE` que `O-4` retira. Se corrigió la prueba (`fb18d729`), se re-ancló el pin y el tag/release se **movieron** al árbol corregido el mismo día, antes de citar ningún resultado verde. Identidad vigente: objeto `2f3cb376…` → `00f321bb`; identidad previa: objeto `e62b2b7b…` → `068b3fae`. Ambas se conservan en este documento.
 
-> **Nota de versiones del pack (léela antes de auditar).** El blob que vive en el árbol del tag, `v2.88.165-beta:docs/engineering/audit-pack-v2.88.165-beta-2026-10-27.md`, es el **snapshot escrito antes de mover el tag**: su línea `Commit apuntado` dice `068b3fae` y su §4 dice que el run «acaba de encolarse». Ambas cosas quedaron **superadas**. Un tag no puede citar el resultado de su propio CI —y tampoco su propio commit—, así que la versión autoritativa de este pack es la del **commit POST-TAG** en la rama `audit/c1-c4-integrity-fold-2026-10-25` y el cuerpo del Release, que sí citan el run verde. La identidad real se verifica siempre con `git rev-parse v2.88.165-beta^{commit}` (imprime `00f321bb…`), nunca leyendo un sha escrito en un documento.
+> **Nota de versiones del pack (léela antes de auditar).** El blob que vive en el árbol del tag, `v2.88.165-beta:docs/engineering/audit-pack-v2.88.165-beta-2026-10-27.md`, es el **snapshot escrito antes de mover el tag**: su §0 manda `git checkout 068b3fae`, su línea `Commit apuntado` dice `068b3fae`, su §7 afirma que el tag apunta a ese commit y su §4 dice que el run «acaba de encolarse». Esas cuatro cosas quedaron **superadas** y **no deben seguirse**. Un tag no puede citar el resultado de su propio CI —y tampoco su propio commit—, así que la versión autoritativa de este pack es la del **commit POST-TAG** en la rama `audit/c1-c4-integrity-fold-2026-10-25` y el cuerpo del Release, que sí citan el run verde. La identidad real se verifica siempre con `git rev-parse v2.88.165-beta^{commit}` (imprime `00f321bb…`), nunca leyendo un sha escrito en un documento.
 
 ---
 
@@ -56,13 +57,15 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 
 ## 3. Evidencia — qué leer, en orden
 
+> **Aviso de ref:** los enlaces de esta tabla apuntan a la rama `audit/c1-c4-integrity-fold-2026-10-25`, que es la versión **autoritativa**. Sustituye `audit/c1-c4-integrity-fold-2026-10-25` por `v2.88.165-beta` y obtendrás los mismos documentos **sin** el cierre POST-TAG: los de `CHANGELOG.md`, `PROJECT_STATE.md` y `evidence/v2.88.165/README.md` dentro del tag son anteriores a la publicación, y el pack del tag (§0, §1, §4 y §7) quedó superado. Lo que **sí** es inmutable en el tag es el código y el `CHANGELOG`/docs del sello `803613db`.
+
 | # | Documento | Qué responde |
 | --- | --- | --- |
-| 1 | [`evidence/v2.88.165/README.md`](https://github.com/jvelasca/Bolsa_V1/blob/v2.88.165-beta/docs/engineering/evidence/v2.88.165/README.md) | Los cinco frentes, la tabla de gates y la falsabilidad |
-| 2 | [`CHANGELOG.md` §`2.11.165-beta`](https://github.com/jvelasca/Bolsa_V1/blob/v2.88.165-beta/CHANGELOG.md) | Nota de release: alcance, deltas, verificación y límites |
-| 3 | [`PROJECT_STATE.md` AsOf `V2.88.165-beta`](https://github.com/jvelasca/Bolsa_V1/blob/v2.88.165-beta/docs/engineering/PROJECT_STATE.md) | Estado vivo y qué queda abierto |
-| 4 | [`auditoria-deteccion-compras-ventas-entorno-diario-2026-10-26.md`](https://github.com/jvelasca/Bolsa_V1/blob/v2.88.165-beta/docs/engineering/auditoria-deteccion-compras-ventas-entorno-diario-2026-10-26.md) | Los 21 hallazgos; **§9.12** con los cinco cierres y la matriz de trazabilidad a **21/21** |
-| 5 | [`verificacion-auditoria-deteccion-compras-ventas-2026-10-26.md`](https://github.com/jvelasca/Bolsa_V1/blob/v2.88.165-beta/docs/engineering/verificacion-auditoria-deteccion-compras-ventas-2026-10-26.md) | Verificación independiente del bloque |
+| 1 | [`evidence/v2.88.165/README.md`](https://github.com/jvelasca/Bolsa_V1/blob/audit/c1-c4-integrity-fold-2026-10-25/docs/engineering/evidence/v2.88.165/README.md) | Los cinco frentes, la tabla de gates, la falsabilidad y la verificación independiente del run |
+| 2 | [`CHANGELOG.md` §`2.11.165-beta`](https://github.com/jvelasca/Bolsa_V1/blob/audit/c1-c4-integrity-fold-2026-10-25/CHANGELOG.md) | Nota de release: alcance, deltas, verificación y límites |
+| 3 | [`PROJECT_STATE.md` AsOf `V2.88.165-beta`](https://github.com/jvelasca/Bolsa_V1/blob/audit/c1-c4-integrity-fold-2026-10-25/docs/engineering/PROJECT_STATE.md) | Estado vivo y qué queda abierto |
+| 4 | [`auditoria-deteccion-compras-ventas-entorno-diario-2026-10-26.md`](https://github.com/jvelasca/Bolsa_V1/blob/audit/c1-c4-integrity-fold-2026-10-25/docs/engineering/auditoria-deteccion-compras-ventas-entorno-diario-2026-10-26.md) | Los 21 hallazgos; **§9.12** con los cinco cierres y la matriz de trazabilidad a **21/21** |
+| 5 | [`verificacion-auditoria-deteccion-compras-ventas-2026-10-26.md`](https://github.com/jvelasca/Bolsa_V1/blob/audit/c1-c4-integrity-fold-2026-10-25/docs/engineering/verificacion-auditoria-deteccion-compras-ventas-2026-10-26.md) | Verificación independiente del bloque |
 
 ---
 
@@ -72,7 +75,7 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 
 > **Artefacto de certificación:** [`release-tag-ci-summary`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40541828291/artifacts/12753290915) (id `12753290915`, 435 B) declara `status: GREEN`, `tag: v2.88.165-beta`, `sha: 00f321bb…`, `asOf: 2026-10-27T16:57:02Z` y los **12** jobs obligatorios en `success`.
 >
-> **Intento previo (rojo, retirado):** el tag se creó primero sobre `068b3fae`; el run [**40516676602**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40516676602) dio **12 de 13 jobs verdes** y **rojo** en `playwright (mock E2E)`: `gp-e2e-v290` afirmaba el literal `INCONCLUSIVE` que `O-4` retira. No se citó como verde; se corrigió la prueba (`fb18d729`), se re-ancló el pin (`00f321bb`) y se movió el tag. El intento queda documentado, no borrado.
+> **Intento previo (rojo, retirado):** el tag se creó primero sobre `068b3fae` (objeto de tag `e62b2b7b31ef4fe54921fe51d3dcb71042ae7c65`); el run [**40516676602**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40516676602) terminó en **`failure`** con, exactamente, **12 `success`, 2 `failure` y 1 `skipped`** sobre 15 entradas: rojo en `playwright (mock E2E)` —`gp-e2e-v290` afirmaba el literal `INCONCLUSIVE` que `O-4` retira— y, por agregación, en `certify`, que arrastra el fallo (`11/12` obligatorios verdes, no `12/13`). No se citó como verde; se corrigió la prueba (`fb18d729`), se re-ancló el pin (`00f321bb`) y se movió el tag. El intento queda documentado, no borrado: `git cat-file -p v2.88.165-beta` da hoy el objeto nuevo, y el anterior se recupera por su SHA de objeto de tag.
 
 | Job | Conclusión | Evidencia medida en este run |
 | --- | --- | --- |
@@ -81,7 +84,7 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 | `python (ruff/imports/mypy/pytest offline)` | success | **`5570 passed, 62 skipped`** (113 s); `mypy` **573** ficheros; `Contracts: 4 kept, 0 broken` |
 | `lifecycle-pg (Alembic + auth + golden restart)` | success | **176** + **225** + **45** + **3** + **7** + **23** + **2** + **3** + **2** + **2** + **1** passed |
 | `playwright (mock E2E)` | success | **`139 passed (13.7m)`** — incluido `gp-e2e-v290` con el veredicto del gate |
-| `playwright (live AUTO daily chain)` | success | **`2 passed (40.3s)`** |
+| `playwright (live AUTO daily chain)` | success (**no** está en `certify.needs`) | **`2 passed (40.3s)`** |
 | `playwright (integrated AUTO S5)` | success | **`8 passed (1.6m)`** |
 | `playwright (integrated axe)` | success | **`32 passed (3.0m)`** |
 | `replay-repro` | success | **`REPRODUCIDO`** `sha256 E9B7376B…F5625` ⇒ **`Δ decisión = 0`** |
@@ -90,6 +93,8 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 | `security (gitleaks)` / `dr-verify` | success | gitleaks limpio / batería DB_DR · TCP |
 | `certify (aggregate + artifact)` | success | agrega y **certifica** (`GREEN`) |
 | `playwright (integrated E2E, opt-in)` | **skipped** (opt-in por diseño) | **no certifica** |
+
+**Qué bloquea el sello.** `certify` agrega exactamente **12** jobs (`security`, `shared`, `spine`, `frontend`, `python`, `playwright-mock`, `playwright-integrated-auto-s5`, `playwright-integrated-axe`, `lifecycle-pg`, `replay-repro`, `dr-verify`, `a7-gate`). Los **12** están en `success` y su `status: GREEN` es literal en el artefacto. `playwright (live AUTO daily chain)` corre en este workflow pero **no** está en `needs`: su verde es informativo y este documento no lo cuenta entre los obligatorios.
 
 **Artefactos descargables** (pestaña *Artifacts* del run):
 
@@ -145,6 +150,7 @@ Cierra los **cinco** criterios que el sello `.164` dejó como *criterio escrito 
 | 10 | La cadencia está fijada. | `test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar` falla si hay más de una decisión fresca por barra o si los trozos de fill no comparten `logical_order_id`. |
 | 11 | El CI del tag es verde. | El run citado tiene algún job obligatorio en `failure` o `certify` rojo. El intento rojo de §4 queda documentado, no borrado. |
 | 12 | El E2E mide el veredicto real. | `gp-e2e-v290` pasa si se le devuelve a la vista el literal `INCONCLUSIVE`: la prueba deja de comprobar `data-verdict`. |
+| 13 | El tag anterior y su CI rojo quedan trazables, no borrados. | `git cat-file -p e62b2b7b31ef4fe54921fe51d3dcb71042ae7c65` no resuelve, o apunta a un commit distinto de `068b3fae`; `gh api .../actions/runs/40516676602` no da `failure`. |
 
 ---
 

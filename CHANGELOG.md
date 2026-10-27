@@ -71,9 +71,21 @@ en 25m08s, artefacto `release-tag-ci-summary` con `status: GREEN`: `freeze OK (0
 **139 passed** · `live AUTO daily` **2** · `integrated AUTO S5` **8** · `axe` **32** ·
 `lifecycle-pg` **176+225+45+3+7+23+2+3+2+2+1** · `replay-repro` **`REPRODUCIDO`**
 (`E9B7376B…F5625`) · `a7-gate` **7** · `decision-spine` **622** · `certify` green.
+Los **12** obligatorios son los de `certify.needs`: `live AUTO daily` corre en el workflow pero **no**
+bloquea el sello.
 El primer intento del tag (sobre `068b3fae`, run `40516676602`) quedó **rojo** en `playwright
-(mock E2E)` porque `gp-e2e-v290` afirmaba el literal `INCONCLUSIVE` que `O-4` retira; se corrigió
-la prueba (`fb18d729`), se re-ancló el pin (`00f321bb`) y el tag se movió antes de citar nada verde.
+(mock E2E)` porque `gp-e2e-v290` afirmaba el literal `INCONCLUSIVE` que `O-4` retira —y, por
+agregación, en `certify` (12 `success`, 2 `failure`, 1 `skipped`)—; se corrigió la prueba
+(`fb18d729`), se re-ancló el pin (`00f321bb`) y el tag se movió antes de citar nada verde.
+
+**Identidad del tag:** objeto vigente `2f3cb376…` → `00f321bb`; objeto previo retirado
+`e62b2b7b31ef4fe54921fe51d3dcb71042ae7c65` → `068b3fae` (el árbol que produjo el run rojo).
+Ambos se conservan como antecedente auditable. Alcance real del sello: **5 commits**, **44
+ficheros**, +1 484/−66 (`git diff --shortstat 13362515 00f321bb`).
+Los documentos que viven **dentro** de la ref del tag (pack, `PROJECT_STATE`, esta nota y
+`evidence/v2.88.165/README.md`) son el snapshot **pre-publicación**: el pack del tag manda
+`git checkout 068b3fae` y declara el CI «no certificado». La versión autoritativa es la de este
+commit POST-TAG y el cuerpo del Release.
 
 **Límites:** AUTO **OFF**; PAPER virtual; la ventana sigue **`INCONCLUSIVE`** por sus propios números
 (`episodios 0/2`, `ciclos 0/32`) — la UI ahora lo **lee**, y si el gate no mide dice `NO MEDIDO` en
