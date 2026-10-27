@@ -591,9 +591,9 @@ certificaba la equivalencia con F5.
 >
 > **Lo que la equivalencia NO toca, y se declara.** `TIME_STOP` sigue **fuera** de `_is_protective`:
 > con datos rancios o mercado cerrado F5 lo vuelve a denegar. Alinearse en accionabilidad no lo
-> convierte en una emergencia de riesgo — esa asimetría es S-2. Y `check_exit_permission` sigue sin
-> consultarse en el worker AUTO (S-6): lo que se ha igualado es el **veredicto sobre el mismo plan**,
-> no el cableado.
+> convierte en una emergencia de riesgo — esa asimetría es S-2. Y `check_exit_permission` no se
+> consultaba todavía desde el worker AUTO (S-6, cerrado después en §9.10): lo que se igualó aquí es
+> el **veredicto sobre el mismo plan**, no el cableado.
 
 ### 5.4 Hallazgo S-2 · `THESIS_INVALIDATION` fuera del conjunto protector
 
@@ -699,6 +699,13 @@ que no son protectoras en F5. El modo stale sí veta **aperturas** (`:2823-2824`
 
 **Veredicto: PARCIAL.** No es un bypass accidental; es una decisión de arquitectura que no está
 declarada como tal en la UI ni en el journal.
+
+> **Resuelto el 2026-10-27 (S-6).** El worker AUTO **consulta** F5 antes de cada salida, sobre el
+> mismo `ExitPlan` que produjo la decisión (`PositionManagerResult.exit_plan`). El veredicto sigue
+> **sin bloquear** la salida —una salida protectora reduce riesgo y el venue es el simulador paper—,
+> pero deja de ser mudo: un `DENY` viaja al journal (`exit_permission`) con sus motivos, el contexto
+> JIT declarado (`marketClosed: null` = **no medido**) y la exención `auto_sim_exit_precedence`.
+> El contador `TurnReport.exit_permission_denied` publica la misma cifra en caliente. Ver §9.10.
 
 ### 5.9 Venta sin posición
 
@@ -1012,9 +1019,10 @@ restantes describen qué habría que observar para dar el hallazgo por cerrado.
 > (§9.8): **8 implementadas** (`B-1`, `B-2`, `B-3`, `B-4`, `B-6`, `O-1`, `O-2`, `O-5`) y **13** con
 > criterio sin prueba ejecutada. Evidencia **E1**.
 >
-> **Actualización 2026-10-27 (T-1/T-2).** El arranque del scan deja de ser invisible (§9.9):
-> **10 implementadas** (`B-1`, `B-2`, `B-3`, `B-4`, `B-6`, `O-1`, `O-2`, `O-5`, `T-1`, `T-2`) y
-> **11** con criterio sin prueba ejecutada. Evidencia **E1** (+ **E2** parcial en T-1).
+> **Actualización 2026-10-27 (T-1/T-2/S-6).** El arranque del scan deja de ser invisible (§9.9) y la
+> salida AUTO deja de serlo también (§9.10): **11 implementadas** (`B-1`, `B-2`, `B-3`, `B-4`,
+> `B-6`, `O-1`, `O-2`, `O-5`, `T-1`, `T-2`, `S-6`) y **10** con criterio sin prueba ejecutada.
+> Evidencia **E1** (+ **E2** parcial en T-1).
 
 | ID | Nombre de prueba propuesto | Aserción falsable |
 |---|---|---|
@@ -1029,7 +1037,7 @@ restantes describen qué habría que observar para dar el hallazgo por cerrado.
 | S-3 | `test_exit_pending_requires_emitted_order` | Tras un turno con `primary=THESIS_INVALIDATION` y `CRITICAL`, si no hay `SELL`, el `PositionState.exit_status` **no** es `EXIT_PENDING`. |
 | S-4 | `test_thesis_exit_reachable_with_declared_invalidation_price` | Un plan con `invalidationPrice > stop` produce `primary_reason == "THESIS_INVALIDATION"` sin `STRUCTURAL_STOP`. Fija que el caso es alcanzable **o** que se retira del contrato. |
 | S-5 | `test_unadopted_position_is_declared_in_journal` | Posición sin `PositionState` ni adopción ⇒ fila `position_unmanaged` con su símbolo (hoy `None` silencioso). |
-| S-6 | `test_auto_exit_ignores_stale_data_by_contract` | Con `data_stale=True`, una salida `TARGET_1` sigue emitiéndose y el journal lo declara. Fija la decisión de arquitectura (hoy no está escrita). |
+| S-6 | `test_auto_exit_ignores_stale_data_by_contract` | Con `data_stale=True`, una salida `TARGET_1` sigue emitiéndose y el journal lo declara. **Implementado 2026-10-27** (§9.10): el worker consulta F5 sobre el mismo `ExitPlan` y publica `exit_permission` con el `DENY`, el contexto JIT y la exención `auto_sim_exit_precedence`; la salida sigue emitiéndose (`blocksExit: false`, declarado y probado). |
 | O-1 | `test_settle_failure_is_counted` | `exec_store` que lanza ⇒ el informe del día incrementa `settlementFailures` (hoy solo log). **Implementado 2026-10-27** (§9.8): cuenta, journaliza `settlement_failed` y lo declara en `errors`. |
 | O-2 | `test_structural_settlement_is_published` | Con `finance_applier=None`, la operación se marca `structural` en el journal (hoy no se publica). **Implementado 2026-10-27** (§9.8): orden, liquidación de ciclo y fila del día. |
 | O-3 | `test_absent_measurement_is_not_rendered_as_zero` | `oos=null` ⇒ la UI muestra "NO MEDIDO", no `0` (hoy `?? 0`). |
@@ -1324,8 +1332,8 @@ stop), así que la tabla no relaja ningún otro camino.
 **Lo que la equivalencia NO toca, y se declara.** `TIME_STOP` sigue **fuera** de `_is_protective`:
 con `data_stale` o `market_closed`, F5 lo vuelve a denegar. Alinearse en accionabilidad no lo
 convierte en emergencia de riesgo — esa asimetría es **S-2**, y sigue abierta. Y
-`check_exit_permission` **sigue sin consultarse** en el worker AUTO (**S-6**): lo que se ha igualado
-es el veredicto sobre el mismo plan, no el cableado.
+`check_exit_permission` no se consultaba todavía desde el worker AUTO (**S-6**, cerrado después en
+§9.10): lo que se igualó aquí es el veredicto sobre el mismo plan, no el cableado.
 
 **Pruebas (E1).** En `packages/py/analytics/tests/test_exit_permission.py`:
 
@@ -1358,8 +1366,9 @@ sobre `b48cc407` ⇒ **`success`**: `quality` y los cuatro jobs PG (`auto-v2-dur
 `grammar-discovery-pg`, `lifecycle-pg`, `paper-forward-pg`) en verde. `paper-forward-pg` importa
 especialmente: es la ruta PAPER que consume F5 sobre posiciones reales de simulación.
 
-**Lo que NO se ha hecho.** No se hace que el AUTO consulte F5 (eso es S-6 y es un cambio de
-cableado, no de veredicto). No se cambia el status de `TIME_STOP` a `TRIGGERED`: `HINT` es correcto
+**Lo que NO se ha hecho.** No se hace que el AUTO consulte F5 en este paso (eso es S-6, un cambio de
+cableado y no de veredicto; se cierra después en §9.10). No se cambia el status de `TIME_STOP` a
+`TRIGGERED`: `HINT` es correcto
 —no es un disparador duro de riesgo— y cambiarlo alteraría la precedencia visible en la UI. La
 evidencia es **E1**. Sin sello, sin tag y sin bump.
 
@@ -1462,9 +1471,10 @@ y [`Fase 2 scientific`](https://github.com/jvelasca/Bolsa_V1/actions/runs/404701
 sobre `a4a29e59`, cuyo código es el mismo salvo el orden de `import`.
 
 **Lo que NO se ha hecho.** No se cambia el FSM: sigue siendo forward-only y
-`EXIT_FILLED`/`CLOSED` no se tocan. No se cierra **S-6** (el AUTO sigue sin consultar F5) ni se
-corrige el `hold` de `TIME_STOP` bajo `CRITICAL`, que es la política de S-2 y ahora se **declara** en
-vez de fingir una salida. La evidencia es **E1**; sin sello, sin tag y sin bump.
+`EXIT_FILLED`/`CLOSED` no se tocan. El cableado de F5 en el worker (**S-6**) quedó fuera de este
+cambio y se cierra después en §9.10; tampoco se corrige el `hold` de `TIME_STOP` bajo `CRITICAL`, que
+es la política de S-2 y ahora se **declara** en vez de fingir una salida. La evidencia es **E1**; sin
+sello, sin tag y sin bump.
 
 ### 9.8 O-1/O-2 aplicados: el settle fallido se cuenta y el modo estructural se publica
 
@@ -1558,6 +1568,61 @@ sigue abierto). La evidencia es **E1** + **E2** parcial; sin sello, sin tag y si
 **`success`** (`quality` **5531 passed**/50 skipped, mypy 572 ficheros; `lifecycle-pg` **17 passed**
 con `SCAN_QUEUE_PG_REQUIRED=1` y **0 skips** ⇒ `test_scan_queue_health_pg` corre en PG real).
 
+### 9.10 S-6 aplicado: el AUTO consulta F5 antes de una salida (y lo declara)
+
+**El fallo, en una frase.** `check_exit_permission` se invocaba en el desk paper, en
+`evaluate_exit_plan` y en las pruebas, **no** en el worker AUTO: `data_stale`, `market_closed`,
+`portfolio_drift` y `paper_auto_env_blocked` no tenían efecto **ni rastro** sobre una salida AUTO.
+Para las salidas protectoras es deliberado («reducir riesgo no espera»), pero aplicaba también a
+`TARGET_1`/`TARGET_2`/`TIME_STOP`, y no estaba escrito en ningún sitio.
+
+**Arreglo: consultar y declarar, sin cambiar el veredicto.**
+
+| Pieza | Cambio |
+|---|---|
+| `position_decision.build_position_decision_and_plan` (nuevo) | devuelve `(PositionDecision, ExitPlan)`. `build_position_decision` conserva su firma delegando: la firma histórica no se toca |
+| `position_manager.PositionManagerResult.exit_plan` | el plan que produjo la intención viaja con ella (campo aditivo, `to_dict` publica `exitPlanId`/`exitPlanStatus`) |
+| `application/auto_exit_gate.py` (nuevo) | `review_auto_exit(plan, data_stale=…, portfolio_drift=…, market_closed=None, paper_d_execute=True)` ⇒ `AutoExitReview`; `blocks_exit` es **siempre** `False` y un `DENY` lleva `exemption = "auto_sim_exit_precedence"` |
+| `auto_reason_codes.EXIT_PERMISSION` | dueño único del literal (`exit_permission`), en `POSITION_LIFECYCLE_REASONS` ⇒ `POSITION_ATTRIBUTION_REASONS`: atribución de gestión, **nunca** veto de entrada (no engorda `vetoCounted`) |
+| `AutoSimulationWorker` (rama SELL) | consulta F5 **antes** de reservar/emitir, journaliza `exit_permission` con el veredicto, el contexto JIT y la exención, y cuenta `TurnReport.exit_permission_denied` |
+| Camino legacy (sin `PositionState`) | F5 responde `missing_exit_plan` y así se declara: **no** se fabrica un plan para poder decir `ALLOW` |
+
+**Por qué el veredicto no bloquea (el contrato que faltaba).** Tres razones explícitas, y ninguna
+nueva: (1) una salida protectora reduce riesgo — vetarla empeora el riesgo, el invariante de la casa;
+(2) el venue es el simulador paper, así que `market_closed`/`portfolio_drift` de F5 no describen una
+orden real contra un bróker; (3) bloquear un objetivo por dato rancio cambiaría la serie de fills del
+simulador sin reducir exposición. La decisión se escribe en el docstring del módulo, en el journal
+(`blocksExit: false`) y en su prueba, para que no se reabra por accidente ni se lea como un bypass.
+
+**Lo que se mide y lo que no.** `data_stale` se toma del **mismo** predicado con el que el motor veta
+aperturas (`FreshnessAssessment.blocks_new_entry`: stale **o** sin fechar); `portfolio_drift` sólo de
+un `DIVERGENT` conocido (`_v2_recon_status == "drift"`), nunca de `UNKNOWN`. `market_closed` no se
+mide aquí: viaja como `null` (**no medido**), jamás como «mercado abierto».
+
+**Pruebas (E1).**
+
+| Fichero | Qué fija |
+|---|---|
+| `test_auto_exit_gate.py::test_target_exit_is_clicked_by_f5_and_still_emitted_by_contract` | `TARGET_1` + `data_stale` ⇒ `DENY`/`data_stale`, `protective=False`, `exemption` declarada, `blocks_exit=False`, y la intención sigue en `reduce` (el criterio `test_auto_exit_ignores_stale_data_by_contract`) |
+| `test_auto_exit_gate.py::test_protective_exit_is_allowed_even_with_stale_data` | control positivo: el stop con el **mismo** dato rancio ⇒ `ALLOW` (sin este caso, un `DENY` constante pasaría el test anterior) |
+| `test_auto_exit_gate.py::test_missing_plan_is_confessed_not_invented` | sin plan ⇒ `missing_exit_plan` + exención; no se inventa un `ALLOW` |
+| `test_auto_exit_gate.py::test_drift_denies_only_non_protective_exits` | el drift veta el objetivo y no el stop (la asimetría de S-2 se conserva) |
+| `test_auto_exit_gate.py::test_manager_exposes_the_plan_that_produced_the_decision` | el plan juzgado es el de la decisión (`primary_reason`/`position_id` coinciden) |
+| `test_auto_exit_gate.py::test_the_permission_code_is_a_position_attribution_not_an_entry_veto` | `exit_permission` está en `POSITION_ATTRIBUTION_REASONS` y **no** en `VETO_BUCKET_BY_REASON`: la fila no se cuenta como apertura vetada |
+| `test_auto_exit_permission_s6.py::test_target_exit_sells_under_stale_data_and_declares_the_f5_deny` | de extremo a extremo en el worker: la posición se reduce igual, `exit_permission_denied >= 1`, la fila `exit_permission` declara `DENY`/`data_stale`/exención y `jit.marketClosed is None` |
+| `test_auto_exit_permission_s6.py::test_protective_exit_is_allowed_and_declares_no_exemption` | de extremo a extremo: stop con dato rancio ⇒ `ALLOW`, `exemption=None`, contador a **0** |
+
+**Gates ejecutados** (2026-10-27): `apps/api-python` completo ⇒ **1412 passed**;
+`packages/py/application` completo ⇒ **2922 passed**; `analytics` (`position_decision`/`exit_plan`/
+`exit_permission`) ⇒ **59 passed**; `ruff` ⇒ limpio; `mypy` (application + api, gate de CI) ⇒
+**411 ficheros sin issues**.
+
+**Lo que NO se ha hecho.** No se bloquea ninguna salida: el cambio es de **observabilidad y
+contrato**, no de ejecución (bloquear sería otra decisión y otro riesgo). `market_closed` sigue sin
+medirse en el worker (`null` declarado). El camino legacy `AUTO_ENGINE_SIM_V2=0` no tiene
+`PositionState` y su salida se declara `missing_exit_plan` en vez de recibir un plan sintético. La
+evidencia es **E1**; sin sello, sin tag y sin bump.
+
 ---
 
 ## 10. Backlog priorizado
@@ -1581,9 +1646,10 @@ con `SCAN_QUEUE_PG_REQUIRED=1` y **0 skips** ⇒ `test_scan_queue_health_pg` cor
    accionable~~ — **`TIME_STOP` aplicado en §9.5 (S-1)**: F5 lo resuelve como `full_exit`, igual
    que la sugerencia del AUTO, y sigue sin ser protector ante datos rancios. **`THESIS_INVALIDATION`
    aplicado en §9.6 (S-2)**: una única tabla `PROTECTIVE_EXIT_REASONS` compartida por las dos capas,
-   así que bajo `CRITICAL` la tesis invalidada vende. Queda abierto el cableado de F5 en el worker
-   (**S-6**). El `EXIT_PENDING` sin orden (**S-3**) queda **aplicado en §9.7**: el estado sólo se
-   escribe cuando la venta existe.
+   así que bajo `CRITICAL` la tesis invalidada vende. **Cableado de F5 en el worker aplicado en
+   §9.10 (S-6)**: el AUTO consulta F5 sobre el mismo plan y declara el veredicto; la exención de las
+   salidas protectoras deja de ser un hueco y pasa a ser contrato. El `EXIT_PENDING` sin orden
+   (**S-3**) queda **aplicado en §9.7**: el estado sólo se escribe cuando la venta existe.
 5. **Declarar por qué la ACTIVE no opera.** `ACTIVE_STRATEGY=1` con `SIGNAL=0` hoy produce `HOLD`
    mudo: el journal debe distinguir `active_signal_disabled`, `no_executable` y `no_snapshot`
    (**B-5**). Sin ese motivo, «no operó» y «no quiso operar» son la misma fila.
@@ -1645,7 +1711,7 @@ E3.**
 | S-3 | P1-6 | S-3 + §9.7 | `test_exit_pending_requires_emitted_order` | **E1** (sin venta el `lifecycleState` no es `EXIT_PENDING` y el journal dice `exit_not_emitted`; con venta, `time_exit` se journaliza) |
 | S-4 | P2-13 | S-4 | `test_thesis_exit_reachable_with_declared_invalidation_price` | E0 + E1 parcial |
 | S-5 | P1-9 | S-5 | `test_unadopted_position_is_declared_in_journal` | E0 |
-| S-6 | P0-4 | S-6 | `test_auto_exit_ignores_stale_data_by_contract` | E0 |
+| S-6 | P0-4 | S-6 + §9.10 | `test_auto_exit_ignores_stale_data_by_contract` (implementada como `test_target_exit_is_clicked_by_f5_and_still_emitted_by_contract` + `test_target_exit_sells_under_stale_data_and_declares_the_f5_deny`) | **E1** (`TARGET_1` con `data_stale` ⇒ `DENY` declarado y la salida se emite igual; el stop con el mismo dato ⇒ `ALLOW`, control positivo; `blocksExit: false`) |
 | O-1 | P1-7 | O-1 + §9.8 | `test_settle_failure_is_counted` | **E1** (excepción ⇒ `settlementFailures >= 1`, `settlement_failed` en `errors`, ninguna posición abierta) |
 | O-2 | P1-7 | O-2 + §9.8 | `test_structural_settlement_is_published` | **E1** (sin `finance_applier` ⇒ `structural: true` en la orden y `structuralOrders` en el día) |
 | O-3 | P1-10 | O-3 | `test_absent_measurement_is_not_rendered_as_zero` | E0 |
@@ -1658,12 +1724,12 @@ E3.**
 
 **Cobertura:** 21 hallazgos · **22** entradas de backlog (las 21 con ID + P1-12b, que cubre el
 silencio de la UI del scan descrito en §7.4) · 21 criterios · 21
-pruebas propuestas · **14 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
-`S-1` en §9.5, `S-2` en §9.6, `S-3` en §9.7, `O-1` y `O-2` en §9.8, `T-1` y `T-2` en §9.9, `B-2`,
-`B-4` y `O-5`). `B-1`,
+pruebas propuestas · **15 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
+`S-1` en §9.5, `S-2` en §9.6, `S-3` en §9.7, `O-1` y `O-2` en §9.8, `T-1`, `T-2` y `S-6` en §9.9–
+§9.10, `B-2`, `B-4` y `O-5`). `B-1`,
 `B-2`, `B-4` y `O-5`
 entran con el sello `2.11.162-beta`; `B-6`, el cierre de `B-1`, `B-3`, `O-6`, `S-1`, `S-2`, `S-3`,
-`O-1`, `O-2`, `T-1` y `T-2`
+`O-1`, `O-2`, `T-1`, `T-2` y `S-6`
 son **posteriores** al sello `2.11.163-beta` y viven en el commit de trabajo. Las filas
 que en una lectura anterior quedaban huérfanas (`B-5`, `B-6`, `O-5`, `O-6`, `T-3`) tienen ahora
 backlog, criterio y prueba; su evidencia sigue siendo E0/E1/E2 y **no** se eleva por tener criterio

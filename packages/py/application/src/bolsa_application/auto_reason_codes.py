@@ -115,6 +115,9 @@ RECONCILIATION_REQUIRED = "reconciliation_required"
 # un ``EXIT_REQUESTED`` genérico en el journal.
 TIME_EXIT = "time_exit"
 THESIS_EXIT = "thesis_exit"
+#: S-6 — para qué sirve el literal: el AUTO consultó F5 antes de emitir la salida. Es una
+#: ATRIBUCIÓN de gestión (``exit_permission``), nunca un veto de entrada: la salida se emitió.
+EXIT_PERMISSION = "exit_permission"
 #: S-3 (cierre 2026-10-27) — hubo intención de salir y **no salió orden**. Antes el FSM
 #: avanzaba a ``EXIT_PENDING`` al decidir (antes de los gates), así que un ``hold`` del
 #: manager —p. ej. ``TIME_STOP`` degradado a ``REVIEW`` bajo reconciliación ``CRITICAL``—
@@ -216,6 +219,8 @@ POSITION_LIFECYCLE_REASONS: frozenset[str] = frozenset(
         THESIS_EXIT,
         EXIT_NOT_EMITTED,
         ATR_GEOMETRY,
+        # S-6: la consulta de F5 acompaña a una salida EMITIDA ⇒ atribución de gestión.
+        EXIT_PERMISSION,
     }
 )
 
@@ -298,6 +303,7 @@ __all__ = [
     "DAY_EXIT_REASON_UNDECLARED",
     "DAY_EXIT_REASONS",
     "EXIT_NOT_EMITTED",
+    "EXIT_PERMISSION",
     "EXIT_QTY_OVER_POSITION",
     "FILL_NOT_MATERIALIZED",
     "FILL_PARTIALLY_MATERIALIZED",

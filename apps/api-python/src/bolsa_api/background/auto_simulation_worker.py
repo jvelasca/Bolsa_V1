@@ -67,6 +67,7 @@ from bolsa_analytics.cognitive.exit_order import (
     new_exit_order_id,
 )
 from bolsa_analytics.cognitive.exit_plan import (
+    ExitPlan,
     is_thesis_invalidated,
     protective_fill_price,
 )
@@ -172,6 +173,11 @@ from bolsa_application.auto_engine_state_store import (
     AutoEngineSnapshot,
     AutoEngineStore,
     AutoEngineTickInput,
+)
+from bolsa_application.auto_exit_gate import (
+    AUTO_EXIT_PERMISSION_EVENT,
+    AutoExitReview,
+    review_auto_exit,
 )
 from bolsa_application.auto_operational_audit import (
     REASON_GRACE_WINDOW_KEEP,
@@ -834,6 +840,9 @@ class TurnReport:
     opened: int = 0
     closed: int = 0
     venue: str = "paper"
+    #: S-6 — salidas emitidas en las que F5 (``ExitPermission``) negó y la exención
+    #: declarada las dejó pasar. El contador no veta: hace visible la asimetría.
+    exit_permission_denied: int = 0
 
     def merge(self, other: TurnReport) -> None:
         self.decided += other.decided
@@ -843,6 +852,7 @@ class TurnReport:
         self.fills += other.fills
         self.opened += other.opened
         self.closed += other.closed
+        self.exit_permission_denied += other.exit_permission_denied
         if other.venue:
             self.venue = other.venue
 
@@ -1394,6 +1404,13 @@ class AutoSimulationWorker:
         # cerrar (se RECOGE, no se calibra: la calibración stop/T1/trailing es AUTO-7).
         self._v2_operation_measurements: list[OperationMeasurement] = []
         self._v2_last_exit_reasons: dict[str, tuple[str, ...]] = {}
+        # S-6 — el ``ExitPlan`` que produjo la gestión del símbolo en ESTE turno. Es el
+        # objeto sobre el que se consulta F5 al emitir la salida: se guarda aquí para no
+        # reconstruirlo aguas abajo (misma condición ⇒ mismo plan en las dos capas).
+        self._v2_last_exit_plans: dict[str, ExitPlan | None] = {}
+        # S-6 — veredicto F5 de cada salida emitida (para el informe del turno y las
+        # pruebas; el journal es la fuente durable).
+        self._v2_last_exit_reviews: dict[str, AutoExitReview] = {}
         # V2.42 slice 2c: etiqueta del DÍA del motivo de cierre (``time_exit``/...), la que
         # viaja en la fila ``position_close``. Se deriva del motivo DECISORIO del plan, así
         # que un stop-out no se cuenta como salida por tesis.
@@ -6624,6 +6641,7 @@ class AutoSimulationWorker:
             # construible). Antes el motivo se perdía y el libro de motivos del símbolo
             # quedaba vacío, indistinguible de "sin gestión pendiente".
             self._v2_last_exit_reasons[symbol] = (outcome.reason,)
+            self._v2_last_exit_plans[symbol] = None
             logger.warning(
                 "auto_sim v2 position skip symbol=%s reason=%s detail=%s",
                 symbol,
@@ -6635,6 +6653,12 @@ class AutoSimulationWorker:
             )
             return None
         self._v2_last_exit_reasons[symbol] = outcome.exit_reasons if outcome is not None else ()
+        # S-6 — el plan que produjo la decisión queda disponible para F5. ``None`` cuando
+        # no hay gestión (hold benigno): la salida no existe, así que no hay nada que
+        # autorizar y no se inventa un plan.
+        self._v2_last_exit_plans[symbol] = (
+            outcome.exit_plan if outcome is not None else None
+        )
         # V2.44 — AUTO-3 slice 2: si el motivo DECISORIO es un exit de gobernador
         # (``RISK_EXIT``/``REGIME_EXIT``/``KILL_SWITCH``) se journaliza como evento de
         # gestión propio, con el detalle de la decisión, para que el operador vea POR QUÉ
@@ -7046,6 +7070,51 @@ class AutoSimulationWorker:
                         },
                     )
 
+    def _consult_exit_permission(self, symbol: str, *, at: str) -> AutoExitReview:
+        """S-6 — consulta F5 antes de emitir la salida del símbolo (no la bloquea).
+
+        El plan es el que produjo la gestión de ESTE turno (``_v2_last_exit_plans``); si
+        no hay (camino legacy sin ``PositionState``), F5 responde ``missing_exit_plan`` y
+        se declara así: un plan inventado sería peor que un hueco confesado.
+
+        El veredicto **no** se usa para vetar (contrato en ``auto_exit_gate``): se
+        journaliza, se cuenta y se publica. Antes, estas condiciones no tenían ningún
+        efecto **ni** rastro en AUTO (auditoría 2026-10-26 §5.8).
+        """
+        plan = self._v2_last_exit_plans.get(symbol)
+        freshness = self._v2_data_freshness()
+        # ``blocks_new_entry`` = mercado stale **o** sin fechar: es el mismo criterio con
+        # el que el motor veta aperturas, así que F5 no juzga las salidas con otra vara.
+        data_stale = bool(freshness.blocks_new_entry)
+        portfolio_drift = self._v2_recon_status(symbol) == "drift"
+        review = review_auto_exit(
+            plan,
+            data_stale=data_stale,
+            portfolio_drift=portfolio_drift,
+            kill_switch=self._kill_active(),
+            at=at,
+        )
+        self._v2_last_exit_reviews[symbol] = review
+        self._journal_position_event(
+            symbol,
+            AUTO_EXIT_PERMISSION_EVENT,
+            at=at,
+            detail={
+                **review.to_dict(),
+                "exitPlanId": plan.exit_plan_id if plan is not None else None,
+                "primaryReason": plan.primary_reason if plan is not None else None,
+                # Contexto JIT declarado: lo que el worker SÍ mide y lo que no. Un
+                # ``marketClosed=None`` se lee "no medido", nunca "mercado abierto".
+                "jit": {
+                    "dataStale": data_stale,
+                    "marketDataStale": bool(freshness.market_data_stale),
+                    "marketClosed": None,
+                    "portfolioDrift": portfolio_drift,
+                },
+            },
+        )
+        return review
+
     def _journal_position_event(
         self,
         symbol: str,
@@ -7329,6 +7398,10 @@ class AutoSimulationWorker:
         self._v2_last_exit_reasons = {}
         self._v2_last_exit_label = {}
         self._v2_pending_exit = {}
+        # S-6: el plan y el veredicto F5 son POR TURNO. Un plan del turno anterior no
+        # puede autorizar una salida de éste (el mark y los motivos han cambiado).
+        self._v2_last_exit_plans = {}
+        self._v2_last_exit_reviews = {}
         if self._v2_enabled and not kill and venue_ok and not account_required:
             # W2 · Fase A: con el dato de barra ya cargado, el turno REUTILIZA ese dato y
             # se ahorra el I/O redundante (régimen, espejo de consumo, contexto de cartera,
@@ -7524,6 +7597,15 @@ class AutoSimulationWorker:
                 # fila ya inflada dimensiona la venta por encima de lo propio. No se corrige
                 # aquí (no hay reparto determinable): requiere reconciliación de operador.
                 reasons.append(POSITION_ROW_UNRECONCILED)
+            # S-6 (auditoría 2026-10-26 §5.8) — la salida CONSULTA F5 antes de emitirse,
+            # sobre el mismo ``ExitPlan`` que la decidió, y declara el veredicto. No la
+            # bloquea (contrato en ``auto_exit_gate``: la salida protectora reduce riesgo y
+            # el venue es el simulador), pero deja de ser un hueco mudo: un DENY queda en
+            # el journal con sus motivos y con la exención aplicada.
+            if action == "SELL":
+                review = self._consult_exit_permission(symbol, at=self._v2_instant())
+                if review.denied:
+                    report.exit_permission_denied += 1
             report.proposals += 1
             # V2.28/A10 (P1-02 real): atribuye el fill a la versión ACTIVE. La apertura
             # aporta la versión desde el ``source`` de la propuesta; el CIERRE (venta de

@@ -280,6 +280,58 @@ def build_position_decision(
     bar_low: float | None = None,
     bar_high: float | None = None,
 ) -> PositionDecision | None:
+    """Proyección operativa de la posición (sin exponer el ``ExitPlan``)."""
+    built = build_position_decision_and_plan(
+        position,
+        mark_price=mark_price,
+        exit_policy=exit_policy,
+        template_id=template_id,
+        portfolio_recon_status=portfolio_recon_status,
+        thesis_invalid=thesis_invalid,
+        at=at,
+        now=now,
+        expires_at=expires_at,
+        trail_hint=trail_hint,
+        trail_stop=trail_stop,
+        portfolio_risk=portfolio_risk,
+        manual=manual,
+        risk_exit=risk_exit,
+        regime_exit=regime_exit,
+        kill_switch=kill_switch,
+        bar_low=bar_low,
+        bar_high=bar_high,
+    )
+    return None if built is None else built[0]
+
+
+def build_position_decision_and_plan(
+    position: PositionState | None,
+    *,
+    mark_price: float | None = None,
+    exit_policy: ExitPolicy | None = None,
+    template_id: str | None = None,
+    portfolio_recon_status: str | None = None,
+    thesis_invalid: bool = False,
+    at: str | None = None,
+    now: str | None = None,
+    expires_at: str | None = None,
+    trail_hint: bool = False,
+    trail_stop: float | None = None,
+    portfolio_risk: bool = False,
+    manual: bool = False,
+    risk_exit: bool = False,
+    regime_exit: bool = False,
+    kill_switch: bool = False,
+    bar_low: float | None = None,
+    bar_high: float | None = None,
+) -> tuple[PositionDecision, ExitPlan] | None:
+    """S-6 — la MISMA decisión con el ``ExitPlan`` que la produjo.
+
+    El permiso de salida (F5) se juzga sobre el plan, no sobre una reconstrucción: si el
+    llamante volviera a construir el plan por su cuenta, F5 y la decisión podrían mirar
+    dos objetos distintos (el drift que S-1 cerró sobre el veredicto y que aquí se cierra
+    sobre el objeto). ``build_position_decision`` conserva la firma histórica.
+    """
     if position is None:
         return None
     if position.direction not in ("long", "short"):
@@ -350,7 +402,7 @@ def build_position_decision(
     # de ``EXIT_REASON_PRECEDENCE`` que fija ``_collect_reasons``.
     secondary = tuple(r for r in exit_plan.reasons if r != primary)
 
-    return PositionDecision(
+    decision = PositionDecision(
         position_id=position.position_id,
         trade_plan_id=position.trade_plan_id,
         action=action,
@@ -369,3 +421,4 @@ def build_position_decision(
         expires_at=None,
         secondary_reasons=secondary,
     )
+    return decision, exit_plan

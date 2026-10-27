@@ -504,7 +504,7 @@ commit** de lo que sigue pendiente. Nada se ha publicado.
 | P0 | Validar el warmup del preset ACTIVE contra `AUTO_ENGINE_SIM_SIGNAL_BARS`, con rechazo explícito | B-1, B-6 | **pendiente** |
 | P0 | Unificar la procedencia de la feature: OHLCV real en decisor y alertas, o `featureSource` declarado | B-2, B-4, O-6 | **aplicado** en decisor y alertas (`signal_feature_context.py`) + contrato 16/16; `featureSource` en journal **pendiente** (O-6) |
 | P0 | Resolver el contrato `gated`/`raw`: el gating no puede reiniciarse en cada llamada | B-3 | **pendiente**, con prueba de caracterización |
-| P0 | Unificar el conjunto de motivos accionables entre F5 y AUTO, o consultar F5 | S-1, S-2, S-6 | **aplicado** F5+AUTO (§12.12, §12.13); **S-6** (cableado en el worker) sigue **pendiente** |
+| P0 | Unificar el conjunto de motivos accionables entre F5 y AUTO, o consultar F5 | S-1, S-2, S-6 | **aplicado** F5+AUTO (§12.12, §12.13) y **S-6** cableado en el worker (§12.17) |
 | P1 | `EXIT_PENDING` solo tras orden emitida | S-3 | **aplicado** (§12.14) |
 | P1 | Contador durable de settlement fallido y publicación de `structural` | O-1, O-2 | **aplicado** (§12.15) |
 | P1 | Declarar la posición no adoptada en el journal | S-5 | **pendiente** |
@@ -1095,8 +1095,8 @@ la tabla no relaja otros caminos.
 
 **Lo que la equivalencia NO toca.** `TIME_STOP` sigue **fuera** de `_is_protective`: con datos
 rancios o mercado cerrado F5 lo vuelve a denegar. Esa asimetría es **S-2** y sigue abierta. Y
-`check_exit_permission` sigue sin consultarse en el worker AUTO (**S-6**): se ha igualado el
-veredicto sobre el mismo plan, no el cableado.
+`check_exit_permission` seguía sin consultarse en el worker AUTO (**S-6**): se había igualado el
+veredicto sobre el mismo plan, no el cableado (cerrado después en §12.17).
 
 **Verificación (E1).**
 
@@ -1216,7 +1216,7 @@ El caso positivo —la venta real— ya estaba cubierto y sigue journalizando `t
 
 - **No** se cambia la política que produce el `hold`: `TIME_STOP` bajo `CRITICAL` sigue degradando a
   `REVIEW` (es S-2 y está probado). Ahora se **declara** en vez de fingir una salida.
-- **No** se consulta F5 desde el AUTO (**S-6**).
+- **No** se consulta F5 desde el AUTO en este paso (**S-6**, cerrado después en §12.17).
 - **Sin sello, sin tag y sin bump.** La evidencia es **E1**.
 
 ### 12.15 O-1/O-2: el settle fallido se cuenta y el modo estructural se publica
@@ -1328,4 +1328,46 @@ sobre `bc8c60ab` ⇒ **`success`**. `quality` corrió el offline completo: **553
 y **0 skips**, así que `test_scan_queue_health_pg` se midió contra PostgreSQL real (E2) y no quedó
 fuera del veredicto. `Fase 2 scientific`
 ([`40479567203`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40479567203)) ⇒ `success`.
+
+### 12.17 S-6: el AUTO consulta F5 antes de una salida (y el veredicto deja de ser mudo)
+
+> **Cierra el ítem S-6** de §5.8 y §6 de la auditoría, y el criterio `S-6` de §9.
+
+**Qué se implementó.**
+
+| Pieza | Antes | Ahora |
+|---|---|---|
+| Consulta de F5 en el AUTO | **0** apariciones de `check_exit_permission` en el worker | el worker llama `review_auto_exit(...)` en **cada** salida, antes de reservar/emitir |
+| Objeto juzgado | no existía (el plan vivía dentro de `build_position_decision`) | el **mismo** `ExitPlan` de la decisión viaja en `PositionManagerResult.exit_plan` |
+| Declaración del veredicto | nada | fila `exit_permission` en el journal con `verdict`, `reasons`, `protective`, `exemption`, `exitPlanId`, `primaryReason` y el contexto JIT (incluido `marketClosed: null` = **no medido**) |
+| Efecto sobre la salida | (no había consulta) | **ninguno**: `blocksExit: false` es contrato declarado y probado; el contador `TurnReport.exit_permission_denied` publica cuántas salidas salieron con un `DENY` |
+| Camino legacy sin `PositionState` | — | F5 responde `missing_exit_plan` y así queda escrito: no se fabrica un plan para poder decir `ALLOW` |
+
+**Decisión de arquitectura, ahora escrita.** El AUTO **no** bloquea salidas por F5: (1) una salida
+protectora reduce riesgo; (2) el venue es el simulador paper; (3) vetar un objetivo por dato rancio
+cambia la serie de fills sin reducir exposición. Lo que cambia no es el veredicto, es que **se
+publica** con su exención (`auto_sim_exit_precedence`).
+
+**Verificación (E1).**
+
+| Gate | Resultado |
+|---|---|
+| `packages/py/application/tests/test_auto_exit_gate.py` (nuevo, 7) | **7 passed** — objetivo con dato rancio ⇒ `DENY`/`data_stale` + exención y la intención sigue en `reduce`; stop con el **mismo** dato ⇒ `ALLOW` (control positivo); sin plan ⇒ `missing_exit_plan`; drift veta objetivo y no stop; el plan expuesto es el de la decisión; `exit_permission` es atribución y no veto |
+| `apps/api-python/tests/test_auto_exit_permission_s6.py` (nuevo, 2) | **2 passed** — de extremo a extremo: `TARGET_1` con `_v2_data_timestamps` rancio se vende igual, `exit_permission_denied >= 1` y la fila declara `DENY`/`data_stale`/`auto_sim_exit_precedence`/`jit.marketClosed = null`; el stop con el mismo dato declara `ALLOW` y deja el contador en **0** |
+| `apps/api-python` completo | **1412 passed** |
+| `packages/py/application` completo | **2922 passed** |
+| `analytics` (`position_decision`/`exit_plan`/`exit_permission`) | **59 passed** |
+| `ruff` / `mypy` (gate de CI: application + api-python) | limpio / **411 ficheros sin issues** |
+
+El control positivo es la pieza que hace falsable el test: sin él, un `review_auto_exit` que
+devolviera siempre `DENY` pasaría el caso de S-6 sin haber consultado nada.
+
+**Lo que NO se ha hecho, y queda declarado.**
+
+- **No** se bloquea ninguna salida: bloquear sería otro cambio de arquitectura (y otro riesgo), y no
+  es lo que el hallazgo pedía. El contrato está en un punto único (`AutoExitReview.blocks_exit`).
+- `market_closed` sigue **sin medirse** en el worker: se publica `null`, no `false`.
+- El camino `AUTO_ENGINE_SIM_V2=0` no tiene `PositionState`; su salida declara `missing_exit_plan`
+  en vez de recibir un plan sintético.
+- **Sin sello, sin tag y sin bump.** La evidencia es **E1**; pendiente de certificación en CI.
 
