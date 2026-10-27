@@ -66,6 +66,32 @@ era (`S-6`, `T-1`, `T-3`). La ventana PAPER sigue **`INCONCLUSIVE`** por sus pro
 | `mypy` (gate de CI) | **573 ficheros sin issues** |
 | Guardián de bump | **2 passed** |
 
+## 5-bis. Cierre POST-TAG — CI público del sello (medido)
+
+`Release tag CI` del tag `v2.88.165-beta` sobre `00f321bb6e05332b677e7c880ba23442af9486cf`:
+[run **40541828291**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40541828291) — **`success`**,
+25m08s (2026-10-27T16:31:57Z → 16:57:05Z), `run_attempt 1`, artefacto `release-tag-ci-summary`
+(id `12753290915`) con `status: GREEN` y los **12** jobs obligatorios verdes.
+
+| Job | Medido |
+| --- | --- |
+| `shared` | **`freeze OK (00f321bb)`** · `window:test` **50 passed** · **99 ficheros** |
+| `frontend` | `contract:check` verde · **319 ficheros** |
+| `python` | **`5570 passed, 62 skipped`** (113 s) · `mypy` **573** · `Contracts: 4 kept, 0 broken` |
+| `lifecycle-pg` | **176** + **225** + **45** + **3** + **7** + **23** + **2** + **3** + **2** + **2** + **1** |
+| `playwright (mock E2E)` | **139 passed (13.7m)** — incluye `gp-e2e-v290` leyendo el veredicto del gate |
+| `playwright (live AUTO daily)` / `integrated AUTO S5` / `integrated axe` | **2** / **8** / **32** passed |
+| `replay-repro` | **`REPRODUCIDO`** `sha256 E9B7376B…F5625` ⇒ **`Δ decisión = 0`** |
+| `a7-gate` / `decision-spine` / `security` / `dr-verify` | **7 passed** / **622 passed** / gitleaks limpio / DB_DR·TCP |
+| `certify (aggregate + artifact)` | `success` (GREEN) |
+| `playwright (integrated E2E, opt-in)` | `skipped` por diseño — **no certifica** |
+
+**Intento previo, rojo y retirado:** el tag se creó primero sobre `068b3fae`; el run
+[**40516676602**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40516676602) dio 12 de 13 jobs
+verdes y **rojo** en `playwright (mock E2E)` porque `gp-e2e-v290` afirmaba el literal `INCONCLUSIVE`
+que `O-4` retira. Se corrigió la prueba (`fb18d729`), se re-ancló el pin (`00f321bb`, `freeze OK`) y
+el tag se movió. El intento se documenta; no se cita como verde.
+
 ## 6. Falsabilidad — cómo un auditor rompe cada afirmación
 
 | # | Afirmación | Cómo se falsa |

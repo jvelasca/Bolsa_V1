@@ -64,6 +64,17 @@ a **E3**: la evidencia es **E1**, con **E2** parcial donde ya lo era (`S-6`, `T-
 avisos preexistentes); `contract:gen`/`contract:check` **OK**; `ruff` limpio; `mypy` **573 ficheros
 sin issues**; guardián de bump **2 passed**.
 
+**Cierre POST-TAG (CI público):** `Release tag CI` del tag `v2.88.165-beta` sobre `00f321bb`
+⇒ [run **40541828291**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40541828291) **`success`**
+en 25m08s, artefacto `release-tag-ci-summary` con `status: GREEN`: `freeze OK (00f321bb)` ·
+`python` **`5570 passed, 62 skipped`** · `frontend` **319 ficheros** · `playwright (mock E2E)`
+**139 passed** · `live AUTO daily` **2** · `integrated AUTO S5` **8** · `axe` **32** ·
+`lifecycle-pg` **176+225+45+3+7+23+2+3+2+2+1** · `replay-repro` **`REPRODUCIDO`**
+(`E9B7376B…F5625`) · `a7-gate` **7** · `decision-spine` **622** · `certify` green.
+El primer intento del tag (sobre `068b3fae`, run `40516676602`) quedó **rojo** en `playwright
+(mock E2E)` porque `gp-e2e-v290` afirmaba el literal `INCONCLUSIVE` que `O-4` retira; se corrigió
+la prueba (`fb18d729`), se re-ancló el pin (`00f321bb`) y el tag se movió antes de citar nada verde.
+
 **Límites:** AUTO **OFF**; PAPER virtual; la ventana sigue **`INCONCLUSIVE`** por sus propios números
 (`episodios 0/2`, `ciclos 0/32`) — la UI ahora lo **lee**, y si el gate no mide dice `NO MEDIDO` en
 lugar de suponer. Un CI verde **no** certifica la ventana ni la rentabilidad. `Δ decisión = 0`; el

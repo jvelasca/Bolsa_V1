@@ -25,7 +25,7 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 | Elemento | Valor |
 | --- | --- |
 | **Tag (anotado)** | `v2.88.165-beta` |
-| **Objeto de tag** | se cita en el **commit POST-TAG** (el tag debe contener este pack, así que su objeto no puede citarse aquí); `git cat-file -p v2.88.165-beta` lo imprime |
+| **Objeto de tag** | `2f3cb37665dc0bb06cef2812882237bac70436c8` |
 | **Commit apuntado** | `00f321bb6e05332b677e7c880ba23442af9486cf` (**re-anclaje del pin** PAPER) |
 | **Commit del sello** | `803613db` (código + pruebas + docs + bump + contrato) |
 | **Corrección del E2E** | `fb18d729` (`gp-e2e-v290` lee el veredicto del gate; ver §5.6) |
@@ -38,6 +38,8 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 > **Nota:** el tag apunta al commit de **re-anclaje** `00f321bb`, posterior a `803613db` (`068b3fae`) y a la corrección `fb18d729`, porque el bump mueve `apps` (los `meta.bump` viven en `apps/api-python/scripts`) y `packages` (el `venue` nullable de `@bolsa/shared`), y el `window:freeze` del job `shared` es **fail-closed**. Los dos tree hashes del pin (`apps 927c2298…`, `packages 41e0afa8…`) son los del árbol del sello.
 >
 > **Nota de publicación:** el tag se creó primero sobre `068b3fae`; su CI salió **rojo** en `playwright (mock E2E)` porque `gp-e2e-v290` afirmaba el literal `INCONCLUSIVE` que `O-4` retira. Se corrigió la prueba (`fb18d729`), se re-ancló el pin y el tag/release se **movieron** al árbol corregido el mismo día, antes de citar ningún resultado verde.
+
+> **Nota de versiones del pack (léela antes de auditar).** El blob que vive en el árbol del tag, `v2.88.165-beta:docs/engineering/audit-pack-v2.88.165-beta-2026-10-27.md`, es el **snapshot escrito antes de mover el tag**: su línea `Commit apuntado` dice `068b3fae` y su §4 dice que el run «acaba de encolarse». Ambas cosas quedaron **superadas**. Un tag no puede citar el resultado de su propio CI —y tampoco su propio commit—, así que la versión autoritativa de este pack es la del **commit POST-TAG** en la rama `audit/c1-c4-integrity-fold-2026-10-25` y el cuerpo del Release, que sí citan el run verde. La identidad real se verifica siempre con `git rev-parse v2.88.165-beta^{commit}` (imprime `00f321bb…`), nunca leyendo un sha escrito en un documento.
 
 ---
 
@@ -66,23 +68,37 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 
 ## 4. CI público (citable)
 
-**`Release tag CI` del tag:** se cita en el **commit POST-TAG**, sobre `00f321bb6e05332b677e7c880ba23442af9486cf`.
+**`Release tag CI` del tag (VERDE):** [run **40541828291**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40541828291) — `success` en **25m08s** (2026-10-27T16:31:57Z → 16:57:05Z), sobre `00f321bb6e05332b677e7c880ba23442af9486cf`, `run_attempt 1`.
 
-> **Estado al publicar este pack:** el run del tag definitivo acaba de encolarse. Su resultado se cita en el **commit POST-TAG** que actualiza este documento y el cuerpo del Release, igual que en los sellos `.163` y `.164`. Mientras no esté citado, **la afirmación «CI verde» NO está certificada para `.165`**: lo que sí está medido es la verificación local de §8 y el intento previo descrito en §1.
+> **Artefacto de certificación:** [`release-tag-ci-summary`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40541828291/artifacts/12753290915) (id `12753290915`, 435 B) declara `status: GREEN`, `tag: v2.88.165-beta`, `sha: 00f321bb…`, `asOf: 2026-10-27T16:57:02Z` y los **12** jobs obligatorios en `success`.
 >
-> **Intento previo (rojo, retirado):** el tag se creó primero sobre `068b3fae`; el run [**40516676602**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40516676602) dio **12 de 13 jobs verdes** —`shared` (`freeze OK (068b3fae)`), `python`, `frontend`, `lifecycle-pg`, `replay-repro` (`REPRODUCIDO`), `a7-gate`, `decision-spine`, `security`, `dr-verify` y los tres `playwright` integrados— y **rojo** en `playwright (mock E2E)`: `gp-e2e-v290` afirmaba el literal `INCONCLUSIVE` que `O-4` retira. No se citó como verde; se corrigió la prueba y se movió el tag.
+> **Intento previo (rojo, retirado):** el tag se creó primero sobre `068b3fae`; el run [**40516676602**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40516676602) dio **12 de 13 jobs verdes** y **rojo** en `playwright (mock E2E)`: `gp-e2e-v290` afirmaba el literal `INCONCLUSIVE` que `O-4` retira. No se citó como verde; se corrigió la prueba (`fb18d729`), se re-ancló el pin (`00f321bb`) y se movió el tag. El intento queda documentado, no borrado.
 
-| Job | Qué gatea | Referencia del sello anterior (`.164`) |
+| Job | Conclusión | Evidencia medida en este run |
 | --- | --- | --- |
-| `shared (build/typecheck/test)` | `freeze` del pin + `window:test` + `@bolsa/shared` | `freeze OK (13362515)` + **50 passed** + **99 ficheros** |
-| `frontend (typecheck/lint/test/build + contract:check)` | contrato sincronizado + `vitest` | `Contract check (no gen)` + **317 ficheros** |
-| `python (ruff/imports/mypy/pytest offline)` | calidad + suite hermética | **`5567 passed, 62 skipped`**; `mypy` **573** |
-| `lifecycle-pg` | Alembic + auth + bancos PG | **176** + **45** + **3** + **7** + **23** + … |
-| `playwright (live AUTO daily chain)` / `mock E2E` / `integrated AUTO S5` / `integrated axe` | rutas y a11y | **2** / **139** / **8** / **32** passed |
-| `replay-repro` | el artefacto congelado se regenera byte a byte | **`REPRODUCIDO`** (`E9B7376B…F5625`) ⇒ `Δ decisión = 0` |
-| `a7-gate` / `decision-spine` / `security` / `dr-verify` | invariantes | **7** / **621** / gitleaks / dr |
-| `certify (aggregate + artifact)` | agrega y certifica | `success` |
-| `playwright (integrated E2E, opt-in)` | **no** es gate | `skipped` por diseño |
+| `shared (build/typecheck/test)` | success | **`freeze OK (00f321bb)`** + `window:test` **50 passed** + **99 ficheros** |
+| `frontend (typecheck/lint/test/build + contract:check)` | success | `contract:check` verde + **`319 passed (319)`** ficheros |
+| `python (ruff/imports/mypy/pytest offline)` | success | **`5570 passed, 62 skipped`** (113 s); `mypy` **573** ficheros; `Contracts: 4 kept, 0 broken` |
+| `lifecycle-pg (Alembic + auth + golden restart)` | success | **176** + **225** + **45** + **3** + **7** + **23** + **2** + **3** + **2** + **2** + **1** passed |
+| `playwright (mock E2E)` | success | **`139 passed (13.7m)`** — incluido `gp-e2e-v290` con el veredicto del gate |
+| `playwright (live AUTO daily chain)` | success | **`2 passed (40.3s)`** |
+| `playwright (integrated AUTO S5)` | success | **`8 passed (1.6m)`** |
+| `playwright (integrated axe)` | success | **`32 passed (3.0m)`** |
+| `replay-repro` | success | **`REPRODUCIDO`** `sha256 E9B7376B…F5625` ⇒ **`Δ decisión = 0`** |
+| `a7-gate` | success | **`7 passed`** (8.35 s) |
+| `decision-spine` | success | **`622 passed`** |
+| `security (gitleaks)` / `dr-verify` | success | gitleaks limpio / batería DB_DR · TCP |
+| `certify (aggregate + artifact)` | success | agrega y **certifica** (`GREEN`) |
+| `playwright (integrated E2E, opt-in)` | **skipped** (opt-in por diseño) | **no certifica** |
+
+**Artefactos descargables** (pestaña *Artifacts* del run):
+
+| Artefacto | Tamaño | Id |
+| --- | --- | --- |
+| `release-tag-ci-summary` | 435 B | `12753290915` |
+| `replay-oos-durable-v2.88.7` | 277 164 B | `12749949784` |
+| `playwright-live-auto-daily` | 5 983 B | `12750538311` |
+| `playwright-integrated-auto-s5-timings` | 26 678 B | `12750538411` |
 
 ---
 
