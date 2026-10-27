@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from bolsa_analytics.cognitive.exit_plan import (
+    PROTECTIVE_EXIT_REASONS,
     ExitPlan,
     ExitPlanStatus,
     build_exit_plan_from_position,
@@ -70,25 +71,17 @@ def attention_to_urgency(attention: PositionAttention) -> PositionUrgency:
 
 #: Salidas PROTECTORAS: deshacer riesgo no espera a la reconciliación (invariante de oro
 #: del roadmap AUTO-2 §6.4). Con el libro sin verificar, ``CRITICAL`` degrada a ``REVIEW``
-#: **salvo** cuando el plan pide reducir riesgo ya (stop rebasado, trail alcanzado, riesgo
-#: de cartera): en ese caso manda la salida. Cualquier otro motivo (objetivos, manual,
-#: tesis, tiempo) sigue vetado: tomar beneficio puede esperar, no cubrirse no.
-#: ``TIME_STOP`` NO entra (una salida por tiempo no es cubrirse), ``THESIS_INVALIDATION``
-#: tampoco (decisión D2 de 2b: vende cuando la reconciliación lo permite, y su veto bajo
-#: ``CRITICAL`` se declara en vez de silenciarse) y ``MANUAL`` tampoco (una orden humana
-#: no es una cobertura automática). V2.44: las tres salidas del GOBERNADOR sí entran —
-#: un kill switch, un permiso exit-only o un ``RISK_OFF`` reducen riesgo y no pueden
-#: quedar bloqueados por un libro en drift.
-_PROTECTIVE_EXIT_REASONS: frozenset[str] = frozenset(
-    {
-        "STRUCTURAL_STOP",
-        "TRAIL",
-        "PORTFOLIO_RISK",
-        "RISK_EXIT",
-        "REGIME_EXIT",
-        "KILL_SWITCH",
-    }
-)
+#: **salvo** cuando el plan pide reducir riesgo ya.
+#:
+#: El conjunto es ÚNICO y vive en ``exit_plan.PROTECTIVE_EXIT_REASONS`` (S-2). Antes había
+#: dos copias —esta y ``exit_permission._is_protective``— y ya habían divergido: F5 trataba
+#: la invalidación de tesis como protectora mientras esta capa la vetaba. Con dos copias el
+#: drift es cuestión de tiempo; con una, no puede haberlo.
+#:
+#: ``TIME_STOP`` no entra (una salida por tiempo no es cubrirse: el plan vence, no hay
+#: pérdida en curso), ``MANUAL`` tampoco (una orden humana no es una cobertura automática)
+#: y los objetivos tampoco (tomar beneficio puede esperar a que el libro cuadre).
+_PROTECTIVE_EXIT_REASONS: frozenset[str] = frozenset(PROTECTIVE_EXIT_REASONS)
 
 
 def _max_attention(a: PositionAttention, b: PositionAttention) -> PositionAttention:

@@ -606,8 +606,36 @@ conjunto degrada a `REVIEW` (`:193-201`).
 `CRITICAL` no vende; y como tampoco está en `_is_protective` de F5 (`exit_permission.py:91-96` sí la
 incluye, pero F5 no se consulta en AUTO), el resultado es un `REVIEW` que no emite orden.
 
-**Veredicto: PARCIAL.** El código lo declara ("el veto de reconciliación está declarado, no
-silenciado"), pero la asimetría entre `position_decision` y `exit_permission` es real.
+**Veredicto original: PARCIAL.** El código lo declaraba («el veto de reconciliación está declarado, no
+silenciado»), pero la asimetría entre `position_decision` y `exit_permission` era real.
+
+> **Resuelto el 2026-10-27 (S-2).** Había **dos** conjuntos de salidas protectoras y ya habían
+> divergido: `exit_permission._is_protective` trataba la invalidación de tesis como protectora y
+> `position_decision._PROTECTIVE_EXIT_REASONS` la degradaba a `REVIEW` bajo `CRITICAL`. Con dos
+> copias el drift es cuestión de tiempo — cualquier motivo nuevo entra en una y no en la otra.
+>
+> Ahora hay **una sola tabla**, `exit_plan.PROTECTIVE_EXIT_REASONS`, consumida por las dos capas:
+>
+> | Entra | Por qué |
+> |---|---|
+> | `STRUCTURAL_STOP`, `TRAIL`, `PORTFOLIO_RISK` | cobertura directa de la posición |
+> | `KILL_SWITCH`, `REGIME_EXIT`, `RISK_EXIT` | las tres del gobernador: permisos de deshacer riesgo (V2.44) |
+> | `THESIS_INVALIDATION` | la razón para mantener la posición ha dejado de existir: seguir dentro es exposición **sin tesis**, no una espera |
+>
+> | No entra | Por qué |
+> |---|---|
+> | `TIME_STOP` | el plan vence, no hay pérdida en curso: no es cubrirse |
+> | `MANUAL` | una orden humana no es una cobertura automática |
+> | `TARGET_1`/`TARGET_2` | tomar beneficio puede esperar a que el libro cuadre |
+>
+> **Efecto declarado en F5, no lateral.** Al unificar, `check_exit_permission` pasa a eximir también
+> `TRAIL`, `RISK_EXIT`, `REGIME_EXIT` y `KILL_SWITCH` de los vetos JIT (datos rancios, mercado
+> cerrado, drift). No es una relajación accidental: esos cuatro motivos **ya** estaban declarados
+> como «deshacer riesgo no espera» en la capa de decisión, y F5 era la que discrepaba. Un `ALLOW`
+> de salida no autoriza ninguna apertura.
+>
+> El flag de *halt* del sistema (`kill_switch=True` en `check_exit_permission`) es **otra cosa** y no
+> se toca: sigue denegando según la asimetría intencional H2.
 
 ### 5.5 Hallazgo S-3 · `EXIT_PENDING` sin orden emitida
 
@@ -1301,6 +1329,55 @@ cableado, no de veredicto). No se cambia el status de `TIME_STOP` a `TRIGGERED`:
 —no es un disparador duro de riesgo— y cambiarlo alteraría la precedencia visible en la UI. La
 evidencia es **E1**. Sin sello, sin tag y sin bump.
 
+### 9.6 S-2 aplicado: una sola tabla de salidas protectoras
+
+**El fallo, en una frase.** Había **dos** listas de «salidas que deshacen riesgo» y ya habían
+divergido: `exit_permission._is_protective` incluía `THESIS_INVALIDATION`; `position_decision.
+_PROTECTIVE_EXIT_REASONS` no. La misma condición era «cubre riesgo» para F5 y «espera» para la
+decisión de posición — y bajo `CRITICAL` la posición **sobrevivía a su propia invalidación**.
+
+**Arreglo estructural, no de una línea.** El conjunto pasa a vivir en un solo sitio,
+`exit_plan.PROTECTIVE_EXIT_REASONS`, y ambas capas lo consumen. El contenido se decide una vez:
+
+| Entra | Por qué |
+|---|---|
+| `STRUCTURAL_STOP`, `TRAIL`, `PORTFOLIO_RISK` | cobertura directa |
+| `KILL_SWITCH`, `REGIME_EXIT`, `RISK_EXIT` | el gobernador pide deshacer riesgo (V2.44) |
+| `THESIS_INVALIDATION` | la razón para mantener la posición ya no existe: seguir dentro es exposición **sin tesis** |
+
+| No entra | Por qué |
+|---|---|
+| `TIME_STOP` | el plan vence, no hay pérdida en curso: no es cubrirse |
+| `MANUAL` | una orden humana no es una cobertura automática |
+| `TARGET_1`/`TARGET_2` | tomar beneficio puede esperar a que el libro cuadre |
+
+**Efecto declarado en F5.** Al unificar, `check_exit_permission` exime también `TRAIL`, `RISK_EXIT`,
+`REGIME_EXIT` y `KILL_SWITCH` de los vetos JIT (`data_stale`, `market_closed`, `portfolio_drift`).
+No es una relajación lateral: esos cuatro ya estaban declarados como «deshacer riesgo no espera» en
+la capa de decisión y F5 era la que discrepaba. Un `ALLOW` de **salida** no autoriza ninguna
+apertura, y el flag de *halt* del sistema (`kill_switch=True`) es otra cosa: sigue denegando según la
+asimetría intencional H2.
+
+**Pruebas (E1).**
+
+| Fichero | Qué fija |
+|---|---|
+| `test_position_decision.py` | `THESIS_INVALIDATION` bajo `CRITICAL` ⇒ **`EXIT`**; `TIME_STOP` y `TARGET_2` bajo `CRITICAL` ⇒ **`REVIEW`** (controles negativos); **identidad** de la tabla entre las dos capas (`is`, no `==`) |
+| `test_exit_permission.py` | F5 con datos rancios: `THESIS_INVALIDATION` ⇒ `ALLOW`/`full_exit`; `TRAIL` y la salida del gobernador ⇒ `ALLOW`; `TIME_STOP` y `MANUAL` ⇒ `data_stale` (siguen vetados) |
+| `test_position_manager.py` | de extremo a extremo: el manager **vende** la tesis invalidada con el libro en drift |
+
+Dos pruebas que codificaban la decisión anterior (`test_decision_thesis_invalidated_under_drift_reviews`
+y `test_thesis_invalidation_under_recon_drift_reviews_not_sells`, ambas «D2») se sustituyen por su
+contraria; el cambio de veredicto es el objetivo, no un efecto colateral.
+
+**Gates ejecutados** (2026-10-27): `analytics` + `application` ⇒ **4281 passed**;
+`ruff` ⇒ limpio; `lint-imports` ⇒ 4 contratos; `mypy` (gate CI, sin `analytics`) ⇒ **571 ficheros**.
+
+**Lo que NO se ha hecho.** No se toca `TIME_STOP`/`MANUAL`/objetivos: su exclusión está declarada y
+probada, y meterlos cambiaría el sentido de «proteger». No se cierra **S-3**: sigue habiendo motivos
+(`TIME_STOP` bajo `CRITICAL`) que producen `hold` y pueden dejar `EXIT_PENDING` sin orden. La
+evidencia es **E1**; sin sello, sin tag y sin bump.
+
 ---
 
 ## 10. Backlog priorizado
@@ -1322,8 +1399,10 @@ evidencia es **E1**. Sin sello, sin tag y sin bump.
    `raw` queda como está porque responde a otra pregunta. Queda abierto el frente `S-1`.
 4. **Cerrar la asimetría TIME_STOP/THESIS.** ~~El AUTO vende por `TIME_STOP` y F5 lo declaraba no
    accionable~~ — **`TIME_STOP` aplicado en §9.5 (S-1)**: F5 lo resuelve como `full_exit`, igual
-   que la sugerencia del AUTO, y sigue sin ser protector ante datos rancios. Queda abierto
-   `THESIS_INVALIDATION` (**S-2**) y el cableado de F5 en el worker (**S-6**).
+   que la sugerencia del AUTO, y sigue sin ser protector ante datos rancios. **`THESIS_INVALIDATION`
+   aplicado en §9.6 (S-2)**: una única tabla `PROTECTIVE_EXIT_REASONS` compartida por las dos capas,
+   así que bajo `CRITICAL` la tesis invalidada vende. Queda abierto el cableado de F5 en el worker
+   (**S-6**) y el `EXIT_PENDING` sin orden (**S-3**).
 5. **Declarar por qué la ACTIVE no opera.** `ACTIVE_STRATEGY=1` con `SIGNAL=0` hoy produce `HOLD`
    mudo: el journal debe distinguir `active_signal_disabled`, `no_executable` y `no_snapshot`
    (**B-5**). Sin ese motivo, «no operó» y «no quiso operar» son la misma fila.
@@ -1373,7 +1452,7 @@ E3.**
 | B-5 | P0-5 | B-5 | `test_active_signal_flag_off_blocks_buy_explicitly` | E0 + E1 parcial (`test_auto_sim_active_strategy_seam`; falta el motivo) |
 | B-6 | P0-1 | B-6 + §9.1 | `test_scan_rejects_preset_below_warmup` (implementada en `test_scan_preset_warmup.py`) | **E1** (`bar_limit = 120` ⇒ `skipped` con `warmup_insufficient`; 200 ⇒ `>= 201`) |
 | S-1 | P0-4 | S-1 + §9.5 | `test_time_stop_permission_matches_auto_execution` (implementada como `test_time_stop_permission_matches_the_auto_suggestion`) | **E1** (`TIME_STOP` ⇒ `ALLOW`/`full_exit` en F5, igual que la sugerencia del AUTO; `HINT` con `protect`/`hold` sigue denegado) |
-| S-2 | P0-4 | S-2 | `test_thesis_invalidation_is_protective_under_critical_recon` | E0 + E1 parcial |
+| S-2 | P0-4 | S-2 + §9.6 | `test_thesis_invalidation_is_protective_under_critical_recon` | **E1** (`THESIS_INVALIDATION` ⇒ `EXIT`/`sell` bajo `CRITICAL` y `ALLOW` en F5 con datos rancios; `TIME_STOP`/`MANUAL`/objetivos siguen degradando) |
 | S-3 | P1-6 | S-3 | `test_exit_pending_requires_emitted_order` | E0 |
 | S-4 | P2-13 | S-4 | `test_thesis_exit_reachable_with_declared_invalidation_price` | E0 + E1 parcial |
 | S-5 | P1-9 | S-5 | `test_unadopted_position_is_declared_in_journal` | E0 |
@@ -1390,9 +1469,9 @@ E3.**
 
 **Cobertura:** 21 hallazgos · **22** entradas de backlog (las 21 con ID + P1-12b, que cubre el
 silencio de la UI del scan descrito en §7.4) · 21 criterios · 21
-pruebas propuestas · **8 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
-`S-1` en §9.5, `B-2`, `B-4` y `O-5`). `B-1`, `B-2`, `B-4` y `O-5` entran con el sello
-`2.11.162-beta`; `B-6`, el cierre de `B-1`, `B-3`, `O-6` y `S-1` son **posteriores** al sello
+pruebas propuestas · **9 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
+`S-1` en §9.5, `S-2` en §9.6, `B-2`, `B-4` y `O-5`). `B-1`, `B-2`, `B-4` y `O-5` entran con el sello
+`2.11.162-beta`; `B-6`, el cierre de `B-1`, `B-3`, `O-6`, `S-1` y `S-2` son **posteriores** al sello
 `2.11.163-beta` y viven en el commit de trabajo. Las filas
 que en una lectura anterior quedaban huérfanas (`B-5`, `B-6`, `O-5`, `O-6`, `T-3`) tienen ahora
 backlog, criterio y prueba; su evidencia sigue siendo E0/E1/E2 y **no** se eleva por tener criterio

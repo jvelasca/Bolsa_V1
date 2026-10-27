@@ -65,9 +65,12 @@ def test_thesis_invalidation_sells_full_position() -> None:
     assert "thesis_invalidation" in result.exit_reasons
 
 
-def test_thesis_invalidation_under_recon_drift_reviews_not_sells() -> None:
-    # El veto de reconciliación sigue declarado: ``THESIS_INVALIDATION`` NO es una salida
-    # protectora (D2), así que con el libro en drift la venta no se autoriza a ciegas.
+def test_thesis_invalidation_under_recon_drift_sells() -> None:
+    # S-2: ``THESIS_INVALIDATION`` ES una salida protectora (``PROTECTIVE_EXIT_REASONS``).
+    # La tesis rota significa que la razón para mantener la posición ya no existe: seguir
+    # dentro es exposición sin tesis, así que con el libro en drift se vende igual que con
+    # el libro limpio. Antes se degradaba a ``REVIEW``/``hold`` (D2) mientras F5 ya la
+    # trataba como protectora: dos capas respondiendo distinto a la misma condición.
     result = manage_position(
         _open_long(),
         mark_price=101.0,
@@ -76,8 +79,8 @@ def test_thesis_invalidation_under_recon_drift_reviews_not_sells() -> None:
         portfolio_recon_status="drift",
     )
     assert result is not None
-    assert result.order_action == "hold"
-    assert result.decision.action == "REVIEW"
+    assert result.order_action == "sell"
+    assert result.decision.action == "EXIT"
 
 
 def test_regime_exit_only_forces_full_sell() -> None:

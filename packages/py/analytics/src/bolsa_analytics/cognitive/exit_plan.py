@@ -69,6 +69,37 @@ _HARD_TRIGGER: frozenset[ExitReason] = frozenset(
     }
 )
 
+#: Salidas PROTECTORAS: deshacer riesgo **no** espera a que el libro esté verificado.
+#:
+#: Fuente ÚNICA (S-2). Antes había dos conjuntos distintos —`exit_permission._is_protective`
+#: y `position_decision._PROTECTIVE_EXIT_REASONS`— y habían divergido: F5 trataba la
+#: invalidación de tesis como protectora y la decisión de posición la degradaba a `REVIEW`
+#: bajo reconciliación `CRITICAL`. Con dos copias, ese drift es cuestión de tiempo: cualquier
+#: motivo nuevo se añade a una y no a la otra.
+#:
+#: Qué entra y por qué: el stop (`STRUCTURAL_STOP`), el trail y el riesgo de cartera son
+#: cobertura directa; las tres salidas del gobernador (`KILL_SWITCH`, `REGIME_EXIT`,
+#: `RISK_EXIT`) son permisos de deshacer riesgo; y `THESIS_INVALIDATION` es una salida REAL
+#: de capital —la razón para mantener la posición ha dejado de existir, así que seguir dentro
+#: es exposición sin tesis, no una espera—.
+#:
+#: Qué NO entra, declarado para que no se reabra por accidente:
+#:   * ``TIME_STOP`` no es cubrirse: el plan vence, no hay pérdida en curso (su
+#:     accionabilidad en F5 es S-1; su protección es otra pregunta).
+#:   * ``MANUAL`` es una orden humana, no una cobertura automática.
+#:   * ``TARGET_1``/``TARGET_2`` toman beneficio: puede esperar a que el libro cuadre.
+PROTECTIVE_EXIT_REASONS: frozenset[ExitReason] = frozenset(
+    {
+        "STRUCTURAL_STOP",
+        "TRAIL",
+        "PORTFOLIO_RISK",
+        "RISK_EXIT",
+        "REGIME_EXIT",
+        "KILL_SWITCH",
+        "THESIS_INVALIDATION",
+    }
+)
+
 
 def _finite(value: object) -> float | None:
     """Número finito (admite signo). ``nan``/``inf`` no son hechos utilizables."""

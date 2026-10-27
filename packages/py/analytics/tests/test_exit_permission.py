@@ -291,3 +291,70 @@ def test_jit_does_not_apply_to_semi() -> None:
         t1, data_stale=True, market_closed=True, portfolio_drift=True
     )
     assert perm.verdict == "ALLOW"
+
+
+# ── S-2: un solo conjunto de salidas protectoras ────────────────────────────────
+
+
+def test_thesis_invalidation_is_protective_under_critical_recon() -> None:
+    """S-2: la invalidación de tesis cubre riesgo y no espera al libro.
+
+    La decisión de posición ya no la degrada a ``REVIEW`` bajo reconciliación ``CRITICAL``;
+    esta prueba fija la otra mitad del criterio: F5, con datos rancios, **tampoco** la veta.
+    Antes las dos capas tenían listas distintas y respondían distinto a la misma condición.
+    """
+    plan = build_exit_plan_from_position(_open_long(), thesis_invalid=True)
+    assert plan is not None
+    assert plan.primary_reason == "THESIS_INVALIDATION"
+    assert plan.suggested_action == "full_exit"
+
+    perm = check_exit_permission(plan, auto_execute=True, paper_d_execute=True, data_stale=True)
+    assert perm.verdict == "ALLOW"
+    assert perm.action == "full_exit"
+
+
+def test_trail_and_governor_exits_are_protective_too() -> None:
+    """La tabla única trae a F5 los motivos que ya estaban declarados en la decisión.
+
+    Es una AMPLIACIÓN declarada, no un efecto lateral: ``TRAIL`` y las tres salidas del
+    gobernador ya constaban como «deshacer riesgo no espera» en
+    ``position_decision._PROTECTIVE_EXIT_REASONS`` (V2.44). Con las listas separadas, F5
+    las seguía vetando por datos rancios mientras la decisión las dejaba pasar.
+    """
+    trail = build_exit_plan_from_position(_open_long(), trail_hint=True, trail_stop=101.0)
+    assert trail is not None
+    assert trail.primary_reason == "TRAIL"
+    assert trail.status == "ARMED"
+    assert check_exit_permission(
+        trail, auto_execute=True, paper_d_execute=True, data_stale=True
+    ).verdict == "ALLOW"
+
+    kill = build_exit_plan_from_position(_open_long(), kill_switch=True)
+    assert kill is not None
+    # ``kill_switch`` aquí es el MOTIVO de salida del plan (el gobernador pide deshacer),
+    # no el flag de halt del sistema: ese se prueba aparte y sigue denegando.
+    assert check_exit_permission(
+        kill, auto_execute=True, paper_d_execute=True, data_stale=True
+    ).verdict == "ALLOW"
+
+
+def test_time_stop_and_manual_stay_outside_the_protective_set() -> None:
+    """Control negativo: no todo es protector.
+
+    ``TIME_STOP`` no es cubrirse (el plan vence, no hay pérdida en curso) y ``MANUAL`` es
+    una orden humana, no una cobertura automática. Si alguno entra en la tabla, con datos
+    rancios F5 lo dejaría pasar y esta prueba lo detecta.
+    """
+    expired = build_exit_plan_from_position(
+        _open_long(), now="2026-08-26T00:00:00Z", expires_at="2026-08-25T23:00:00Z"
+    )
+    assert expired is not None
+    assert check_exit_permission(
+        expired, auto_execute=True, paper_d_execute=True, data_stale=True
+    ).reasons == ("data_stale",)
+
+    manual = build_exit_plan_from_position(_open_long(), manual=True)
+    assert manual is not None
+    assert check_exit_permission(
+        manual, auto_execute=True, paper_d_execute=True, data_stale=True
+    ).reasons == ("data_stale",)

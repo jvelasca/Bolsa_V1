@@ -1123,3 +1123,45 @@ sobre `b48cc407` ⇒ **`success`** (`quality` + los cuatro jobs PG).
   las pruebas, no por tipos.
 - **Sin sello, sin tag y sin bump.** La evidencia es **E1**.
 
+### 12.13 S-2: una sola tabla de salidas protectoras
+
+> **Cierra el ítem S-2** de §5.4 y §10 de la auditoría, y el criterio `S-2` de §9.
+
+**Qué se implementó.** El conjunto de «salidas que deshacen riesgo» pasa a tener **un solo origen**,
+`exit_plan.PROTECTIVE_EXIT_REASONS`, consumido por `position_decision` y por
+`exit_permission._is_protective`. Antes había dos copias y ya habían divergido: F5 incluía
+`THESIS_INVALIDATION`, la decisión de posición no, así que bajo `CRITICAL` la posición sobrevivía a
+su propia invalidación.
+
+| Entra | No entra |
+|---|---|
+| `STRUCTURAL_STOP`, `TRAIL`, `PORTFOLIO_RISK`, `KILL_SWITCH`, `REGIME_EXIT`, `RISK_EXIT`, `THESIS_INVALIDATION` | `TIME_STOP` (vencer no es cubrirse), `MANUAL` (orden humana), `TARGET_1`/`TARGET_2` (tomar beneficio puede esperar) |
+
+**Efecto declarado en F5.** `check_exit_permission` pasa a eximir también `TRAIL`, `RISK_EXIT`,
+`REGIME_EXIT` y `KILL_SWITCH` de los vetos JIT. No es lateral: esos cuatro ya estaban declarados como
+protectores en la capa de decisión y F5 era la que discrepaba. Un `ALLOW` de salida no autoriza
+ninguna apertura, y el flag de *halt* del sistema sigue denegando según H2.
+
+**Verificación (E1).**
+
+| Gate | Resultado |
+|---|---|
+| `test_position_decision.py` | **12 passed** (4 nuevas/reemplazadas) |
+| `test_exit_permission.py` | **26 passed** (3 nuevas) |
+| `test_position_manager.py` | **22 passed** (1 reemplazada) |
+| `analytics` + `application` + 4 suites de salida api | **4281 passed** |
+| `ruff` / `lint-imports` / `mypy` (gate CI) | limpio / 4 contratos / **571 ficheros** |
+
+La prueba estructural compara la tabla por **identidad** (`is`), no por contenido: si alguien
+reintroduce una lista local en cualquiera de las dos capas, se rompe antes de que vuelvan a
+discrepar. Los controles negativos fijan lo que **no** debe entrar: `TIME_STOP` y `MANUAL` siguen
+vetados por datos rancios, y `TIME_STOP`/`TARGET_2` siguen degradando a `REVIEW` bajo `CRITICAL`.
+
+**Lo que NO se ha hecho, y queda declarado.**
+
+- **No** se mete `TIME_STOP` ni `MANUAL` ni los objetivos en la tabla: su exclusión está declarada y
+  probada.
+- **No** se cierra **S-3**: siguen existiendo caminos que producen `hold` (p. ej. `TIME_STOP` bajo
+  `CRITICAL`) y pueden dejar `EXIT_PENDING` sin orden.
+- **Sin sello, sin tag y sin bump.** La evidencia es **E1**.
+

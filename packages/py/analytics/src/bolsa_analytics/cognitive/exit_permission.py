@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from typing import Literal, cast
 
 from bolsa_analytics.cognitive.execution_plan import ExecutionPlan
-from bolsa_analytics.cognitive.exit_plan import ExitPlan
+from bolsa_analytics.cognitive.exit_plan import PROTECTIVE_EXIT_REASONS, ExitPlan
 
 ExitPermissionVerdict = Literal["ALLOW", "DENY"]
 ExitPermissionReason = Literal[
@@ -104,8 +104,13 @@ def _deny(
 
 
 def _is_protective(exit_plan: ExitPlan, immediate_risk: bool) -> bool:
-    reason = exit_plan.primary_reason
-    if reason in ("STRUCTURAL_STOP", "THESIS_INVALIDATION", "PORTFOLIO_RISK"):
+    """¿La salida deshace riesgo ya? (exención de contexto JIT).
+
+    Comparte el conjunto con la decisión de posición (``PROTECTIVE_EXIT_REASONS``, S-2):
+    si las dos capas respondieran distinto, la misma condición sería «protectora» para una
+    y «no protectora» para la otra, que es exactamente lo que no puede pasar.
+    """
+    if exit_plan.primary_reason in PROTECTIVE_EXIT_REASONS:
         return True
     return immediate_risk
 
