@@ -132,6 +132,21 @@ from bolsa_analytics.cognitive.position_state import (
 )
 from bolsa_analytics.cognitive.signal_identity import bar_window
 from bolsa_analytics.cognitive.trade_context import TradeContext
+from bolsa_api.background.auto_price_provider import (
+    OhlcvPriceSource,
+    PriceSource,
+    price_source_kind,
+)
+from bolsa_api.background.estudio_watch import SessionScopedEstudioList
+from bolsa_api.background.paper_auto_engine_worker import (
+    DecisionProvider,
+    _effective_venue,
+    _kill_switch_env_on,
+    _watch_from_estudio_enabled,
+    _watch_symbols,
+    refresh_watch_from_estudio,
+    sync_decider_watch,
+)
 from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.adaptive_gate_store import AdaptiveGateStore, sink_failures_from_state
 from bolsa_application.applied_fills import read_applied_fill_facts
@@ -274,22 +289,6 @@ from bolsa_application.simulated_settlement import (
 from bolsa_application.top3_opportunities import (
     HISTORICAL_SCORING_NO_CHAMPION,
     select_top3_records,
-)
-
-from bolsa_api.background.auto_price_provider import (
-    OhlcvPriceSource,
-    PriceSource,
-    price_source_kind,
-)
-from bolsa_api.background.estudio_watch import SessionScopedEstudioList
-from bolsa_api.background.paper_auto_engine_worker import (
-    DecisionProvider,
-    _effective_venue,
-    _kill_switch_env_on,
-    _watch_from_estudio_enabled,
-    _watch_symbols,
-    refresh_watch_from_estudio,
-    sync_decider_watch,
 )
 
 logger = logging.getLogger(__name__)

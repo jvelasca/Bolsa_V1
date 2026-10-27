@@ -21,6 +21,11 @@ from decimal import Decimal
 from typing import Protocol
 
 import pytest
+
+from bolsa_api.background.auto_simulation_worker import (
+    AutoSimulationWorker,
+    step_minute_clock,
+)
 from bolsa_application.auto_reason_codes import (
     ATR_GEOMETRY,
     ATR_SOURCE_FALLBACK,
@@ -31,11 +36,6 @@ from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
 from bolsa_application.exit_order_store import InMemoryExitOrderStore
 from bolsa_application.reservation_store import InMemoryReservationStore
-
-from bolsa_api.background.auto_simulation_worker import (
-    AutoSimulationWorker,
-    step_minute_clock,
-)
 
 _SYMBOLS = ["AAA"]
 #: Plantilla de salida por defecto del motor V2 (``V2Tunables.exit_template``).
