@@ -207,6 +207,7 @@ from bolsa_application.auto_reason_codes import (
     LIFECYCLE_TRANSITION_REJECTED,
     OPPORTUNITY_TRADED,
     POSITION_ROW_UNRECONCILED,
+    POSITION_UNMANAGED,
     PROTECT_REQUESTED,
     PROTECTION_MISSING,
     RECONCILIATION_REQUIRED,
@@ -1298,6 +1299,11 @@ class AutoSimulationWorker:
         self._v2_bar_pending = False
         #: Turnos que reutilizaron el dato de barra (instrumentación; 0 en hermético).
         self._v2_bar_short_circuit_ticks = 0
+        #: S-5 — símbolos ya declarados ``position_unmanaged`` en la barra corriente. La
+        #: posición sigue sin gestión mientras exista, así que la declaración se repite una
+        #: vez por barra (no una vez por tick de 60 s): es un hecho del día, no un latido.
+        self._v2_unmanaged_bar: str = ""
+        self._v2_unmanaged_symbols: set[str] = set()
         self._v2_positions: dict[str, Any] = {}
         # V2.40.4 — libro de órdenes PENDIENTES (fills no materializados) del último
         # refresco, con su estado de medición. Por defecto vacío y COMPLETO (sin espejo
@@ -6623,6 +6629,50 @@ class AutoSimulationWorker:
         )
         return position
 
+    def _v2_declare_unmanaged_position(self, symbol: str, price: Decimal) -> None:
+        """S-5 — la posición está VIVA y AUTO **no la gestiona**: se declara, no se calla.
+
+        El caso es fail-safe por diseño: sin ``PositionState`` y con la adopción imposible
+        (sin base de coste, sin ATR o con un plan ilegible) el worker NO inventa una venta.
+        Lo que no era aceptable es que el hueco fuese indistinguible de «no hay nada que
+        hacer»: ``_v2_position_package`` devolvía ``None`` y el turno lo contaba como
+        ``hold_no_op``. La causa ya viaja por su propio motivo (``reconciliation_required``
+        / ``protection_missing``); esta fila publica la CONSECUENCIA —el símbolo queda fuera
+        del motor V2 y sólo una intervención humana lo devuelve— con la cantidad y el precio
+        medidos en el instante.
+
+        Una vez por símbolo y barra: la condición persiste, así que repetirla cada 60 s
+        convertiría el journal en un latido. El set se reinicia al cambiar de barra: si la
+        posición sigue sin gestión, el día siguiente vuelve a declararlo.
+        """
+        bar = self._v2_current_bar_start()
+        if bar != self._v2_unmanaged_bar:
+            self._v2_unmanaged_bar = bar
+            self._v2_unmanaged_symbols.clear()
+        if symbol in self._v2_unmanaged_symbols:
+            return
+        self._v2_unmanaged_symbols.add(symbol)
+        at = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        held = self._open.get(symbol, Decimal("0"))
+        self._journal_position_event(
+            symbol,
+            POSITION_UNMANAGED,
+            at=at,
+            detail={
+                "held": str(held),
+                "price": float(price),
+                "bar": bar,
+                "reason": "no_position_state",
+                "management": "none",
+                "attention": "high",
+            },
+        )
+        logger.warning(
+            "auto_sim v2 position unmanaged symbol=%s held=%s (sin estado V2 y sin adopción)",
+            symbol,
+            held,
+        )
+
     async def _v2_position_package(
         self,
         symbol: str,
@@ -6662,6 +6712,12 @@ class AutoSimulationWorker:
                 symbol, price, ledger_cost_ambiguous=ledger_cost_ambiguous
             )
             if position is None:
+                # S-5 — la causa (sin base de coste, sin ATR, plan ilegible) ya la declara
+                # ``_v2_adopt_position``; lo que faltaba era la CONSECUENCIA: la posición
+                # queda FUERA de la gestión V2. Sin esta fila el turno la contaba como un
+                # ``hold_no_op`` benigno y la UI mostraba una posición abierta que AUTO no
+                # iba a vender. Fail-safe igual (no se inventa una venta), pero ya no mudo.
+                self._v2_declare_unmanaged_position(symbol, price)
                 return None
             degraded = derive_lifecycle_state(position) in (
                 "RECONCILIATION_REQUIRED",

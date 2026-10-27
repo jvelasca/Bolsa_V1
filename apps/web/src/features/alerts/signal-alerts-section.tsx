@@ -491,7 +491,9 @@ function SignalAlertRow({
         {subscription.lastTriggeredAt && subscription.lastSignalKind ? (
           <>
             {SIGNAL_KIND_LABELS[subscription.lastSignalKind]} ·{" "}
-            {formatPrice(subscription.lastSignalPrice ?? 0)}
+            {subscription.lastSignalPrice == null
+              ? absentDataLabel()
+              : formatPrice(subscription.lastSignalPrice)}
             <br />
             {formatDateTime(subscription.lastTriggeredAt)}
           </>

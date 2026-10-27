@@ -43,6 +43,7 @@ from bolsa_analytics.cognitive.position_state import (
 )
 from bolsa_api.background import auto_simulation_worker as worker_module
 from bolsa_application.applied_fills import CanonicalPositions
+from bolsa_application.auto_reason_codes import POSITION_UNMANAGED
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.kill_switch_store import InMemoryKillSwitchStore, KillState
@@ -1123,3 +1124,58 @@ def test_the_hermetic_bench_still_uses_the_stable_default_engine() -> None:
     stores = _Stores()
     w = _restart(stores, minute=0)
     assert w._engine_id == ENGINE_ID  # noqa: SLF001
+
+
+# ---------------------------------------------------------------------------
+# S-5 — la posición que AUTO no puede gestionar se declara (no queda muda)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_unadopted_position_is_declared_in_journal(v2_env: None) -> None:
+    """Posición VIVA sin ``PositionState`` y sin adopción ⇒ fila ``position_unmanaged``.
+
+    Antes: ``_v2_position_package`` devolvía ``None`` y el turno la contaba como un
+    ``hold_no_op`` benigno. La posición seguía abierta en el libro y la UI podía mostrarla
+    como gestionada, sin una sola fila que dijese que AUTO no iba a venderla. El resultado
+    fail-safe se conserva (no se inventa una venta); lo que cambia es que el hueco se
+    declara con el símbolo y la cantidad medidos.
+    """
+    stores = _Stores()
+    w = _restart(stores, minute=0)
+    # Posición viva en el libro del MOTOR, sin estado V2 y sin base de coste (ni espejo ni
+    # libro canónico): la adopción no es posible.
+    w._open[_SYMBOL] = Decimal("100")  # noqa: SLF001 — el libro del tick.
+    w._entry_price.pop(_SYMBOL, None)  # noqa: SLF001
+
+    assert await w._v2_position_package(_SYMBOL, Decimal("100")) is None, (  # noqa: SLF001
+        "sin estado y sin adopción no hay gestión: fail-safe"
+    )
+
+    entries = [
+        entry
+        for entry in w._v2_journal  # noqa: SLF001
+        if entry.event_type == "auto_position_management"
+        and POSITION_UNMANAGED in (entry.payload or {}).get("reasonCodes", [])
+    ]
+    assert len(entries) == 1, "la posición no gestionada se declara UNA vez por barra"
+    assert entries[0].instrument_id == _SYMBOL, "la fila lleva SU símbolo"
+    assert entries[0].payload["held"] == "100"
+    assert entries[0].payload["reason"] == "no_position_state"
+    assert entries[0].payload["management"] == "none"
+
+    # La fila del día (la que el informe agrega de verdad) también lo declara: sin ella el
+    # motivo viviría en una lista que nadie consume.
+    rows = [row for row in w.journal_pairs() if row.reason == POSITION_UNMANAGED]
+    assert len(rows) == 1
+    assert rows[0].kind == "position_management"
+    assert rows[0].execution_id == f"{POSITION_UNMANAGED}:{_SYMBOL}"
+
+    # El tick siguiente (misma barra) NO repite el hecho: la condición persiste, así que
+    # repetirla cada 60 s sería un latido, no información.
+    assert await w._v2_position_package(_SYMBOL, Decimal("100")) is None  # noqa: SLF001
+    assert len([r for r in w.journal_pairs() if r.reason == POSITION_UNMANAGED]) == 1
+
+    # Y sigue sin emitirse ninguna venta: declarar no es operar.
+    assert not [row for row in w.journal_pairs() if row.kind == "order"]
+    assert w._open[_SYMBOL] == Decimal("100")  # noqa: SLF001

@@ -246,9 +246,13 @@ function DiaDReplayLaunch({
 function DiaDLevelOneSummary({ detail }: { detail: DiaDAutoReplayDto }) {
   const steps = detail.steps ?? [];
   const measured = steps.filter((row) => row.measurement === "COMPLETE").length;
-  const closed = detail.oos?.closedCount ?? 0;
-  const open = detail.oos?.openCount ?? 0;
-  const insufficient = steps.length === 0 || measured === 0 || closed === 0;
+  // O-3 — `null` NO es `0`: un `oos` ausente es un hueco de medición y se lee como tal.
+  // Antes `?? 0` lo pintaba como «0 cerrados», que es una afirmación que el artefacto no
+  // hizo: la misma suciedad que rellenar un precio no medido con 0.
+  const closed = detail.oos?.closedCount ?? null;
+  const open = detail.oos?.openCount ?? null;
+  const insufficient =
+    steps.length === 0 || measured === 0 || closed === null || closed === 0;
   const verdict = detail.summary?.verdict ?? "NOT_MEASURED";
   const meta = detail.meta ?? {};
 
@@ -294,7 +298,8 @@ function DiaDLevelOneSummary({ detail }: { detail: DiaDAutoReplayDto }) {
           : ""}
       </p>
       <p className="text-[10px] tabular-nums text-muted-foreground">
-        muestra OOS: {closed} cerrados · {open} vivos · R{" "}
+        muestra OOS: {formatDiaDValue(closed)} cerrados ·{" "}
+        {formatDiaDValue(open)} vivos · R{" "}
         {formatDiaDValue(detail.oos?.realizedRTotal)} ·{" "}
         {detail.oos?.unmeasuredCount ?? 0} sin medir ·{" "}
         {detail.limits?.length ?? 0} límites declarados

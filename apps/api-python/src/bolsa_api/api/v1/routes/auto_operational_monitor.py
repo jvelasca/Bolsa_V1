@@ -191,7 +191,11 @@ class AutoMonitorHeaderDto(BaseModel):
 
     engineId: str | None = None
     state: str = "UNKNOWN"
-    venue: str = "paper"
+    venue: str | None = None
+    #: O-3 — medición del venue del encabezado: ``COMPLETE`` si el snapshot del motor lo
+    #: declaró, ``UNKNOWN`` si no. Sin esta marca la UI no podía distinguir «paper» de
+    #: «no declarado» (el defecto anterior lo rellenaba).
+    venueMeasurement: str = "UNKNOWN"
     granularity: dict[str, Any] = Field(default_factory=dict)
     decisionClock: str = "CLOSED BAR"
     executionDeclared: str | None = None

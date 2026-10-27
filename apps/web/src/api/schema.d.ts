@@ -4805,11 +4805,13 @@ export interface components {
              * @default UNKNOWN
              */
             state: string;
+            /** Venue */
+            venue?: string | null;
             /**
-             * Venue
-             * @default paper
+             * Venuemeasurement
+             * @default UNKNOWN
              */
-            venue: string;
+            venueMeasurement: string;
         };
         /** AutoMonitorReconciliationDto */
         AutoMonitorReconciliationDto: {

@@ -558,8 +558,92 @@ describe("EstudioDailyOpsPanel", () => {
     ).toBeTruthy();
 
     const global = screen.getByTestId("estudio-daily-global-validation");
-    expect(global.textContent).toContain("INCONCLUSIVE");
+    // O-4: la ventana publica lo que el gate declaró en el DTO; no es texto fijo.
+    expect(global.getAttribute("data-verdict")).toBe("MIXED");
+    expect(global.textContent).toContain("MIXED");
+    expect(global.textContent).toContain("1 de 1 valores");
     expect(global.textContent).not.toContain("CONFIRMED ");
+  });
+
+  // O-4 — el veredicto de la ventana es DATO del gate, no una constante de la vista.
+  it("lee el veredicto de la ventana del gate y cambia cuando el gate cambia", async () => {
+    const withVerdict = (verdict: string) => {
+      const audit = structuredClone(AUDIT);
+      audit.audit.values = [audit.audit.values[0]];
+      audit.audit.values[0].resultR.verdict = verdict;
+      return audit;
+    };
+
+    vi.mocked(api.getAutoEstudioAudit).mockResolvedValueOnce(
+      withVerdict("INCONCLUSIVE") as never,
+    );
+    renderPanel();
+    const measured = await screen.findByTestId(
+      "estudio-daily-global-validation",
+    );
+    expect(measured.getAttribute("data-verdict")).toBe("INCONCLUSIVE");
+    expect(measured.textContent).toContain("INCONCLUSIVE");
+    expect(measured.textContent).not.toContain("READY");
+
+    cleanup();
+
+    vi.mocked(api.getAutoEstudioAudit).mockResolvedValueOnce(
+      withVerdict("READY") as never,
+    );
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen
+          .getByTestId("estudio-daily-global-validation")
+          .getAttribute("data-verdict"),
+      ).toBe("READY"),
+    );
+    expect(
+      screen.getByTestId("estudio-daily-global-validation").textContent,
+    ).not.toContain("INCONCLUSIVE");
+  });
+
+  it("sin veredicto medido declara NO MEDIDO y no asume el veredicto del gate", async () => {
+    const unmeasured = structuredClone(AUDIT);
+    unmeasured.audit.values = [unmeasured.audit.values[0]];
+    unmeasured.audit.values[0].resultR.measured = false;
+
+    vi.mocked(api.getAutoEstudioAudit).mockResolvedValueOnce(
+      unmeasured as never,
+    );
+    renderPanel();
+
+    const global = await screen.findByTestId("estudio-daily-global-validation");
+    expect(global.getAttribute("data-verdict")).toBe("NOT_MEASURED");
+    expect(global.getAttribute("data-verdict-measurement")).toBe("UNKNOWN");
+    expect(global.textContent).toContain("NO MEDIDO");
+    expect(global.textContent).toContain("Sin medición");
+    expect(global.textContent).not.toContain("INCONCLUSIVE");
+  });
+
+  it("el veredicto del bloque de cadena también se lee del gate", async () => {
+    renderPanel();
+
+    const verdicts = await screen.findAllByTestId(
+      "estudio-chain-global-validation",
+    );
+    const measured = verdicts.find(
+      (element) => element.getAttribute("data-verdict") === "MIXED",
+    );
+    expect(measured).toBeTruthy();
+    expect(measured?.textContent).toContain("MIXED");
+    expect(measured?.textContent).not.toContain("INCONCLUSIVE");
+    expect(measured?.textContent).not.toContain("global de la ventana");
+
+    // Un valor sin medición declara el hueco: no hereda el veredicto del vecino.
+    const gaps = verdicts.filter(
+      (element) => element.getAttribute("data-verdict") === "NOT_MEASURED",
+    );
+    expect(gaps.length).toBeGreaterThan(0);
+    for (const gap of gaps) {
+      expect(gap.textContent).toContain("Sin dato todavía");
+      expect(gap.textContent).not.toContain("MIXED");
+    }
   });
 
   it("declara la identidad real y no atribuye el histórico por ticker", async () => {
@@ -1380,7 +1464,9 @@ describe("EstudioDailyOpsPanel", () => {
     expect(legend.textContent).toContain("Clasificación ≠ validación");
     const separation = screen.getByTestId("estudio-daily-legend-separation");
     expect(separation.textContent).toContain("ranking del día");
-    expect(separation.textContent).toContain("INCONCLUSIVE");
+    // O-4: la leyenda explica la separación; NO escribe el veredicto del gate.
+    expect(separation.textContent).toContain("lo emite el gate");
+    expect(separation.textContent).not.toContain("INCONCLUSIVE");
   });
 
   it("publica la cobertura reconciliable con los ausentes y su motivo", async () => {

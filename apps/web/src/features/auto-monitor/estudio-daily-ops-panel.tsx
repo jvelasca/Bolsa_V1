@@ -31,6 +31,10 @@ import {
   normalizeEstudioChain,
   useEstudioChain,
 } from "@/features/auto-monitor/use-estudio-chain";
+import {
+  describeWindowVerdict,
+  readWindowVerdict,
+} from "@/features/auto-monitor/window-verdict";
 import { EstudioChainEvidence } from "@/features/auto-monitor/estudio-chain-evidence";
 import { useAutoEstudioAudit } from "@/features/auto-monitor/use-auto-dia-d-feedback";
 import { AutoTechnicalDetail } from "@/features/auto/auto-technical-detail";
@@ -702,6 +706,11 @@ export function EstudioDailyOpsPanel() {
         : null;
   const values = report?.values ?? [];
   const auditWindow = auditQuery.data?.window ?? null;
+  // O-4: el veredicto de la ventana se LEE del gate (DTO de auditoría). Sin medición no hay
+  // veredicto: la pantalla declara el hueco en vez de escribir la constante histórica.
+  const windowVerdict = readWindowVerdict(
+    auditQuery.data?.audit?.values ?? null,
+  );
   // Un fallo de la auditoría NO es «este valor no existe»: se declara como error.
   const auditFailed = auditQuery.isError;
   const universeCount = report?.universeCount ?? null;
@@ -873,8 +882,8 @@ export function EstudioDailyOpsPanel() {
             <strong>Clasificación ≠ validación.</strong> «#1 de la foto» o
             «mejor puntuada» describe el <em>ranking del día</em> (una posición
             en la lista); no afirma que la operativa esté validada ni que sea
-            rentable. La validación se lee con su K y su ventana — mientras no
-            se demuestre lo contrario, sigue <code>INCONCLUSIVE</code>.
+            rentable. La validación se lee con su K y su ventana — el veredicto
+            lo emite el gate y esta leyenda no lo escribe.
           </p>
           <p
             className="mt-1 text-[10px] text-muted-foreground"
@@ -1130,11 +1139,23 @@ export function EstudioDailyOpsPanel() {
 
             <p
               data-testid="estudio-daily-global-validation"
+              data-verdict={windowVerdict.verdict ?? "NOT_MEASURED"}
+              data-verdict-measurement={windowVerdict.measurement}
               className="text-[10px] text-muted-foreground"
             >
-              Validación global de la ventana PAPER:{" "}
-              <strong>INCONCLUSIVE</strong> hasta cumplir la ventana. Esta vista
-              no emite <code>CONFIRMED</code>.{" "}
+              Validación de la ventana PAPER
+              {auditWindow ? ` ${auditWindow}` : ""}:{" "}
+              <strong>
+                {describeWindowVerdict(windowVerdict, "NO MEDIDO")}
+              </strong>{" "}
+              — {windowVerdict.measuredValues} de {windowVerdict.totalValues}{" "}
+              valores con veredicto medido en el gate.{" "}
+              {windowVerdict.measurement === "UNKNOWN"
+                ? "Sin medición no se asume el veredicto del gate."
+                : windowVerdict.measurement === "PARTIAL"
+                  ? "La ventana no tiene un veredicto único: se publica el recuento."
+                  : "Cada valor conserva su propio veredicto."}{" "}
+              Esta vista no emite <code>CONFIRMED</code>.{" "}
               <Link
                 to="/auto-monitor?mode=dia-d"
                 className="underline hover:text-primary"

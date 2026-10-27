@@ -55,7 +55,13 @@ export function AutoMonitorHeader({ header }: { header: AutoMonitorHeaderV1 }) {
           value={header.state}
           data-testid="auto-monitor-state"
         />
-        <Field label="Venue" value={header.venue} />
+        <Field
+          label="Venue"
+          // O-3 — un venue no declarado por el motor NO se asume: el «paper» por defecto
+          // era una afirmación sobre la composición que el snapshot no hizo.
+          value={header.venue ?? NO_MEASUREMENT_LABEL}
+          data-testid="auto-monitor-venue"
+        />
         <Field
           label="Decisión (reloj)"
           value={header.decisionClock}

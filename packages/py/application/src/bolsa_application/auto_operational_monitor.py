@@ -1294,10 +1294,18 @@ def _header(
         if last_decision_at is not None and interval_seconds is not None
         else None
     )
+    venue_declared = _get(engine, "venue")
     return {
         "engineId": _get(engine, "engine_id", "engineId"),
         "state": _get(engine, "state") or "UNKNOWN",
-        "venue": _get(engine, "venue") or "paper",
+        # O-3 — el venue es un HECHO del snapshot: si el motor no lo declara, la ausencia
+        # viaja como ``None`` con su medición ``UNKNOWN``. Rellenarlo con «paper» era una
+        # afirmación sobre la composición que el dato no sostenía (misma doctrina que el
+        # resto de huecos: ``None`` nunca se colapsa a un valor plausible).
+        "venue": venue_declared if venue_declared else None,
+        "venueMeasurement": (
+            MEASUREMENT_COMPLETE if venue_declared else MEASUREMENT_UNKNOWN
+        ),
         "granularity": dict(granularity),
         "decisionClock": "CLOSED BAR",
         "executionDeclared": granularity.get("executionDeclared"),

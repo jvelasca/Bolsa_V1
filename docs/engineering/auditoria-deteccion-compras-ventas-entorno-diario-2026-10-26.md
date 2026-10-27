@@ -680,6 +680,15 @@ invalide la tesis también toca el stop ⇒ el motivo decisorio será `STRUCTURA
 **Veredicto: PARCIAL.** La rama existe y está probada, pero en la práctica solo se alcanzaría con un
 plan que declare un nivel de invalidación **por encima** del stop, y hoy nadie lo produce.
 
+> **Resuelto el 2026-10-27 (S-4).** La prueba de contrato
+> `test_thesis_exit_reachable_with_declared_invalidation_price`
+> ([`test_exit_plan.py`](../../packages/py/analytics/tests/test_exit_plan.py)) declara un
+> `invalidationPrice` **por encima** del stop y fija que un precio intermedio produce
+> `primary_reason == "THESIS_INVALIDATION"` con `reasons == ("THESIS_INVALIDATION",)` —sin
+> `STRUCTURAL_STOP`—. El hallazgo queda acotado a lo que era: la **precedencia** no hace inalcanzable
+> la rama cuando el plan declara el nivel; que hoy ningún productor lo emita sigue siendo backlog
+> (`P2-13`), no un defecto de la decisión. Ver §9.12.
+
 ### 5.7 Hallazgo S-5 · Adopción de posiciones: protegida, pero no siempre gestionable
 
 Al arrancar, `readopt_positions` rehidrata el plan durable; sin plan, reconstruye geometría y la
@@ -693,6 +702,15 @@ resultado es fail-safe (no se inventa una venta), pero es un **punto ciego decla
 mostrar una posición abierta que AUTO no gestiona.
 
 **Veredicto: PARCIAL / hueco declarado.**
+
+> **Resuelto el 2026-10-27 (S-5).** El punto ciego deja de ser **mudo**: `POSITION_UNMANAGED` (código de
+> motivo nuevo, en `POSITION_LIFECYCLE_REASONS`) y `_v2_declare_unmanaged_position`
+> ([`auto_simulation_worker.py`](../../apps/api-python/src/bolsa_api/background/auto_simulation_worker.py))
+> escriben **una fila de journal por barra y símbolo** cuando la posición no se puede adoptar, **sin**
+> abrir ni vender, con el símbolo, la cantidad (`held`) y el precio del tick, marcada `attention: high`.
+> `test_unadopted_position_is_declared_in_journal`
+> lo fija. La posición sigue sin gestión V2 (fail-safe); lo que cambia es que la consecuencia se declara.
+> Ver §9.12.
 
 ### 5.8 Hallazgo S-6 · El worker no consulta el permiso de salida F5
 
@@ -768,6 +786,15 @@ de **decisión** es diaria; la de **ejecución** es de 60 s dentro de la barra.
 procesos estaban vivos, ni la latencia del primer scan, ni la cobertura real de la cola. Lo que sí
 está certificado es el diseño (T-3) y la separación de procesos.
 
+> **Resuelto el 2026-10-27 (T-3, contrato de cadencia).** El diseño pasa a **prueba ejecutada**:
+> `test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar`
+> ([`test_auto_v2_bar_short_circuit.py`](../../apps/api-python/tests/test_auto_v2_bar_short_circuit.py))
+> fija la barra cerrada y ejecuta varios ticks de 60 s: produce **una sola** decisión fresca con
+> identidad de barra (`bar_tick`) y los reintentos intrabarra comparten **la misma** identidad lógica
+> de orden —los trozos de fill referencian un único `logical_order_id`—, sin segunda ejecución. Lo que
+> **sigue** sin certificarse es la cadencia en producción (procesos vivos, latencia del primer tick,
+> cobertura de la cola): eso es observación operativa, no contrato. Ver §9.12.
+
 ---
 
 ## 7. Observabilidad y honestidad
@@ -837,6 +864,19 @@ En DÍA-D el titular sí es honesto (si `closed === 0`, muestra "Evidencia insuf
 texto de la muestra puede decir "0 cerrados" cuando el dato es **ausente**. En alertas, un precio
 no medido se pinta como `0`.
 
+> **Resuelto el 2026-10-27 (O-3).** Las tres superficies dejan de rellenar ceros:
+>
+> - **DÍA-D**: `closedCount`/`openCount` se pintan con `formatDiaDValue()` y `closed === null` degrada a
+>   `insufficient`; lo ausente se rotula, no se numera (`test_absent_measurement_is_not_rendered_as_zero`,
+>   [`dia-d-auto-panel.test.tsx`](../../apps/web/src/features/auto-monitor/dia-d-auto-panel.test.tsx)).
+> - **Alertas**: `lastSignalPrice == null` ⇒ `absentDataLabel()` («Sin dato todavía»), nunca `0.00`
+>   (`signal-alerts-section.test.tsx`).
+> - **Monitor operativo**: `venue` viaja `None` cuando el snapshot del motor no lo declara y
+>   `venueMeasurement = "UNKNOWN"`; el DTO deja de tener el default `"paper"` (`openapi.json`/`schema.d.ts`
+>   regenerados) y la cabecera pinta el hueco (`auto-monitor-header.test.tsx`).
+>
+> Ver §9.12.
+
 **Silencio del scan: qué distingue la UI.** El panel de resultados sí lista los instrumentos
 omitidos con su motivo, en un bloque **colapsado** (`result.skipped.length` + `item.reason`,
 `apps/web/src/features/screeners/scan-results-panel.tsx:219`, `:346-358`). El titular, en cambio,
@@ -882,6 +922,15 @@ diga otra cosa, la UI seguirá diciendo `INCONCLUSIVE`.
 
 **Veredicto: PARCIAL.** Es el reverso del problema de los ceros: un pesimismo hardcodeado también es
 un dato no medido.
+
+> **Resuelto el 2026-10-27 (O-4).** La UI deja de escribir el veredicto. `window-verdict.ts` **lee** lo
+> que el gate declaró por valor en el DTO de auditoría y sólo agrega: un veredicto medido ⇒ ese
+> veredicto; veredictos distintos ⇒ «SIN VEREDICTO ÚNICO» con el recuento; nada medido ⇒ **NO MEDIDO**
+> (jamás `INCONCLUSIVE` de relleno). `test_window_verdict_is_read_from_gate` cambia el veredicto del
+> gate en el mock (`INCONCLUSIVE` → `READY`) y exige que el texto cambie; el bloque de cadena publica
+> el veredicto **del valor** y declara que no se generaliza a la ventana ni a la cartera. La leyenda de
+> «clasificación ≠ validación» deja de afirmar un veredicto: dice quién lo emite. Los DTO no cambian
+> (§9.12).
 
 ### 7.6 Hallazgo O-5 · Vigía de ventana: corregido, pero el efecto no está observado
 
@@ -1691,8 +1740,82 @@ del mercado. Con el evento propio el motivo es visible y el censo no se toca; un
 
 **Lo que NO se ha hecho.** No se enciende la señal de la ACTIVE ni se altera su veredicto
 (`SIGNAL=0` sigue en `HOLD`, fail-closed de V2.31). El motivo vive en el journal duradero; el panel
-web no gana columna nueva en este paso (la lectura del gate es **O-3/O-4**, aún abierta). La
+web no gana columna nueva en este paso (la lectura del gate es **O-3/O-4**, cerrada en §9.12). La
 evidencia es **E1**; sin sello, sin tag y sin bump.
+
+---
+
+### 9.12 S-4, S-5, O-3, O-4 y T-3 aplicados: los cinco criterios que quedaban sin prueba ejecutada
+
+Los cinco hallazgos que el sello `2.11.164-beta` dejó como **criterio escrito sin prueba ejecutada**
+pasan a **prueba ejecutada** (E1) sin tocar el motor de decisión salvo en el caso que el propio
+hallazgo describe.
+
+| ID | Qué se cierra | Dónde | Qué lo fija |
+|---|---|---|---|
+| **S-4** | La precedencia stop→tesis **no** hace inalcanzable la tesis cuando el plan declara el nivel | `exit_plan.py` (sin cambios) | `test_exit_plan.py::test_thesis_exit_reachable_with_declared_invalidation_price` |
+| **S-5** | Una posición no adoptable deja de ser un `None` silencioso | `auto_reason_codes.py` (`POSITION_UNMANAGED`), `auto_simulation_worker.py` (`_v2_declare_unmanaged_position`) | `test_auto_v2_audit_regressions.py::test_unadopted_position_is_declared_in_journal` |
+| **O-3** | Ninguna superficie rellena un dato ausente con `0`/`"paper"` | `dia-d-auto-panel.tsx`, `signal-alerts-section.tsx`, `auto-monitor-header.tsx`, `auto_operational_monitor.py` (ruta + caso de uso), `auto-operational-monitor.ts` (shared) | `test_absent_measurement_is_not_rendered_as_zero` · `signal-alerts-section.test.tsx` · `auto-monitor-header.test.tsx` |
+| **O-4** | El veredicto de la ventana es **dato**, no texto | `window-verdict.ts` (nuevo), `estudio-daily-ops-panel.tsx`, `estudio-chain-evidence.tsx` | `test_window_verdict_is_read_from_gate` · `window-verdict.test.ts` |
+| **T-3** | La cadencia del AUTO de 60 s sobre señal D1 queda fijada por prueba | (sin cambio de producción) | `test_auto_v2_bar_short_circuit.py::test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar` |
+
+**S-4 · la rama de tesis es alcanzable.** El hallazgo era correcto en el diagnóstico (nadie produce
+un `invalidationPrice` distinto del stop) pero su consecuencia no lo era: con `invalidationPrice >
+stop`, un precio entre el stop y el nivel de invalidación produce
+`primary_reason == "THESIS_INVALIDATION"` y `reasons == ("THESIS_INVALIDATION",)` — **sin**
+`STRUCTURAL_STOP`—. La prueba construye el plan, no lee una rama muerta; la deuda que queda es de
+**producto** (ningún productor declara el nivel), no de la decisión.
+
+**S-5 · la consecuencia se declara.** Cuando `_v2_adopt_position` no puede rehidratar la posición
+(falta base de coste o ATR), `_v2_position_package` seguía devolviendo `None`: la posición quedaba
+abierta, sin gestión V2 y **sin rastro**. Ahora se escribe una fila `position_unmanaged` en el
+journal con el símbolo, la cantidad (`held`) y el precio del tick, marcada `attention: high` —una por
+barra y símbolo, sin abrir ni vender nada—. El estado sigue siendo fail-safe; lo que cambia es que
+deja de ser mudo.
+
+**O-3 · los cuatro huecos de medición.** `closedCount`/`openCount` del bloque DÍA-D se pintan con
+`formatDiaDValue()` y `closed === null` degrada el nivel a `insufficient`; `lastSignalPrice`
+ausente se rotula en vez de valer `0`; y el `venue` del monitor viaja `None` con
+`venueMeasurement = "UNKNOWN"` cuando el snapshot del motor no lo declara —el DTO pierde el default
+`"paper"` y el contrato se regenera (aditivo, ver más abajo)—. La cabecera pinta entonces la
+etiqueta de hueco.
+
+**O-4 · el veredicto se lee.** `window-verdict.ts` agrega **sólo** lo que el gate declaró por valor
+en el DTO de auditoría: un veredicto ⇒ ese veredicto; varios ⇒ «SIN VEREDICTO ÚNICO» con recuento;
+ninguno medido ⇒ **NO MEDIDO**. La prueba cambia el veredicto del mock (`INCONCLUSIVE` → `READY`) y
+exige que la pintura cambie: si el texto volviera a ser una constante, **falla**. El bloque de
+cadena publica el veredicto **del valor** y declara explícitamente que no se generaliza a la ventana
+ni a la cartera; la leyenda de «clasificación ≠ validación» deja de afirmar un veredicto y dice quién
+lo emite.
+
+**T-3 · el contrato de cadencia.** Con la barra cerrada fija se ejecutan varios ticks de 60 s: hay
+**una sola** decisión fresca con identidad `bar_tick` y los reintentos intrabarra producen trozos de
+fill que comparten **un único** `logical_order_id`, sin segunda ejecución. Lo que sigue sin
+certificarse es la cadencia **en producción** (procesos vivos, latencia del primer tick, cobertura de
+la cola): eso es observación operativa, no contrato.
+
+**Delta de contrato.** El único cambio de contrato es el de O-3: `AutoMonitorHeaderDto.venue` pasa a
+`string | null` (sin default) y aparece `venueMeasurement` con default `UNKNOWN`.
+`openapi.json`/`schema.d.ts` regenerados y `contract:check` en verde. **No hay migración.**
+
+**Lo que NO cambia.** La ventana PAPER sigue `INCONCLUSIVE` por sus propios números (`episodios
+0/2`, `ciclos 0/32`); la UI ahora lo **lee** en vez de escribirlo, y si el gate no mide, dice
+`NO MEDIDO` en lugar de suponer. `Δ decisión = 0`; `Δ motor = 0` salvo el journal de S-5 (que no
+opera).
+
+**Gates ejecutados (2026-10-27, sobre este árbol).**
+
+| Comprobación | Resultado |
+|---|---|
+| `pytest` (domain + market + application + analytics + api-python) | **5930 passed** (11:04) |
+| Suites tocadas (`test_exit_plan`, `test_auto_v2_audit_regressions`, `test_auto_v2_bar_short_circuit`, `test_auto_estudio_audit_route`) | **65 passed** |
+| `apps/web` (`vitest`) | **2383 passed / 319 ficheros** |
+| `packages/shared` (`vitest`) | **855 passed / 99 ficheros** (+1 todo) |
+| `pnpm --filter @bolsa/web typecheck` | **OK** |
+| `pnpm --filter @bolsa/web lint` | **0 errores**, 23 avisos preexistentes |
+| `contract:gen` / `contract:check` | **OK** (aditivo: `venue` nullable + `venueMeasurement`) |
+| `ruff` | **All checks passed** |
+| `mypy` (gate de CI) | **573 ficheros sin issues** |
 
 ---
 
@@ -1741,8 +1864,13 @@ evidencia es **E1**; sin sello, sin tag y sin bump.
 8. Journal con `featureSource` (`real`/`synthetic`) y `signalWindowBars` (**O-6**). **Aplicado
    2026-10-27:** claves aditivas del `payload` JSONB, declaradas también en el `HOLD` y omitidas si
    no hay dato (§7.7).
-9. Declarar la posición no adoptada en el journal (S-5).
+9. Declarar la posición no adoptada en el journal (S-5). **Aplicado 2026-10-27 (§9.12):** una
+   posición sin `PositionState` ni adopción escribe `position_unmanaged` (una por barra y símbolo),
+   sin abrir ni vender; ya no es un `None` silencioso.
 10. Sustituir los `?? 0` y el `INCONCLUSIVE` estático por lecturas del gate (O-3, O-4).
+    **Aplicado 2026-10-27 (§9.12):** DÍA-D y alertas rotulan lo ausente en vez de pintar `0`; el
+    `venue` del monitor viaja `None` (contrato regenerado, sin default) y la ventana publica el
+    veredicto que el gate declaró —o `NO MEDIDO`— en lugar de una constante.
 11. Arranque del scan: proceso dedicado verificado o primer tick sin esperar 24 h (T-1, T-2).
     **Aplicado 2026-10-27 (§9.9):** el arranque del scheduler declara la autoridad de la cola y
     publica `scan_queue_stalled` si hay `pending` envejecidos; el scan diario corre su primer tick
@@ -1760,11 +1888,16 @@ evidencia es **E1**; sin sello, sin tag y sin bump.
 ### P2 — deuda declarada, no bloqueante
 
 13. `invalidationPrice` distinto del stop, o retirar `THESIS_EXIT` del contrato visible (S-4).
+    **Decisión cerrada 2026-10-27 (§9.12):** el contrato se mantiene y la rama queda probada como
+    alcanzable cuando el plan declara el nivel. **Sigue abierto el productor**: hoy nadie emite un
+    `invalidationPrice` distinto del stop; es deuda de producto, no de la decisión.
 14. Flag por cuenta para AUTO (hoy es de proceso) (§4.5).
 15. Cuantificar liquidaciones por `UNKNOWN` de régimen (§4.4).
 16. **Fijar la cadencia de ejecución como contrato.** `T-3` describe una decisión diaria y una
     ejecución de 60 s; falta una prueba que lo fije (una decisión por barra cerrada y settlement
     intrabarra idempotente). No es un defecto, es un contrato sin prueba.
+    **Aplicado 2026-10-27 (§9.12):** la prueba ejecuta N ticks sobre la barra cerrada y fija una
+    sola decisión fresca y un único `logical_order_id` para los trozos de fill.
 
 ### Trazabilidad hallazgo → backlog → criterio → prueba → evidencia
 
@@ -1784,31 +1917,31 @@ E3.**
 | S-1 | P0-4 | S-1 + §9.5 | `test_time_stop_permission_matches_auto_execution` (implementada como `test_time_stop_permission_matches_the_auto_suggestion`) | **E1** (`TIME_STOP` ⇒ `ALLOW`/`full_exit` en F5, igual que la sugerencia del AUTO; `HINT` con `protect`/`hold` sigue denegado) |
 | S-2 | P0-4 | S-2 + §9.6 | `test_thesis_invalidation_is_protective_under_critical_recon` | **E1** (`THESIS_INVALIDATION` ⇒ `EXIT`/`sell` bajo `CRITICAL` y `ALLOW` en F5 con datos rancios; `TIME_STOP`/`MANUAL`/objetivos siguen degradando) |
 | S-3 | P1-6 | S-3 + §9.7 | `test_exit_pending_requires_emitted_order` | **E1** (sin venta el `lifecycleState` no es `EXIT_PENDING` y el journal dice `exit_not_emitted`; con venta, `time_exit` se journaliza) |
-| S-4 | P2-13 | S-4 | `test_thesis_exit_reachable_with_declared_invalidation_price` | E0 + E1 parcial |
-| S-5 | P1-9 | S-5 | `test_unadopted_position_is_declared_in_journal` | E0 |
+| S-4 | P2-13 | S-4 + §9.12 | `test_thesis_exit_reachable_with_declared_invalidation_price` | **E1** (con `invalidationPrice > stop`, un precio intermedio ⇒ `reasons == ("THESIS_INVALIDATION",)` y sin `STRUCTURAL_STOP`) |
+| S-5 | P1-9 | S-5 + §9.12 | `test_unadopted_position_is_declared_in_journal` | **E1** (posición sin `PositionState` y sin base de coste ⇒ fila `position_unmanaged` con símbolo y precio; una por barra; sin apertura ni venta) |
 | S-6 | P0-4 | S-6 + §9.10 | `test_auto_exit_ignores_stale_data_by_contract` (implementada como `test_target_exit_is_clicked_by_f5_and_still_emitted_by_contract` + `test_target_exit_sells_under_stale_data_and_declares_the_f5_deny`) | **E1** (`TARGET_1` con `data_stale` ⇒ `DENY` declarado y la salida se emite igual; el stop con el mismo dato ⇒ `ALLOW`, control positivo; `blocksExit: false`) + **E2** (CI [`40484067176`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40484067176): 5541 passed, 573 ficheros mypy, 4 bancos PG sin skips) |
 | O-1 | P1-7 | O-1 + §9.8 | `test_settle_failure_is_counted` | **E1** (excepción ⇒ `settlementFailures >= 1`, `settlement_failed` en `errors`, ninguna posición abierta) |
 | O-2 | P1-7 | O-2 + §9.8 | `test_structural_settlement_is_published` | **E1** (sin `finance_applier` ⇒ `structural: true` en la orden y `structuralOrders` en el día) |
-| O-3 | P1-10 | O-3 | `test_absent_measurement_is_not_rendered_as_zero` | E0 |
-| O-4 | P1-10 | O-4 | `test_window_verdict_is_read_from_gate` | E0 |
+| O-3 | P1-10 | O-3 + §9.12 | `test_absent_measurement_is_not_rendered_as_zero` (+ `signal-alerts-section.test.tsx`, `auto-monitor-header.test.tsx`) | **E1** (`closedCount`/`openCount` y `lastSignalPrice` ausentes ⇒ etiqueta de hueco, sin `0`; `venue` viaja `None` y el DTO ya no default a `"paper"`) |
+| O-4 | P1-10 | O-4 + §9.12 | `test_window_verdict_is_read_from_gate` (+ `window-verdict.test.ts`, bloque de cadena) | **E1** (el veredicto del gate viaja al texto: `INCONCLUSIVE`→`READY` cambia la pintura; sin medición ⇒ `NO MEDIDO`; veredictos distintos ⇒ recuento) |
 | O-5 | P1-12 | O-5 | `test_day_watch_alerts_on_measured_inconclusive_day` | **E1** (54 tests del vigía, uno con fila real `20261019` en `tmp_path`) + E2 parcial (el scheduler arranca el vigía, ya aislado); efecto sobre la ventana real no observado |
 | O-6 | P1-8 | O-6 + §9.4 | `test_journal_records_feature_source_and_window_bars` (implementada como `test_plan_v2_tick_seals_feature_source_and_window_bars` + `test_active_strategy_feature_provenance.py`) | **E1** (el payload sella `featureSource`/`signalWindowBars` y los omite sin dato; la procedencia se clasifica sobre la ventana real de barras) |
 | T-1 | P1-11 | T-1 + §9.9 | `test_scan_worker_is_started_by_scheduler_or_its_own_process` (implementada como `test_scheduler_no_embebe_scan_ni_optimize` + `test_scheduler_declares_the_scan_queue_authority` + `test_stalled_scan_queue_is_an_error_with_actionable_reason`) | **E1** + **E2** (`test_scan_queue_health_pg` con el gate `SCAN_QUEUE_PG_REQUIRED`) |
 | T-2 | P1-11 | T-2 + §9.9 | `test_daily_scan_runs_immediately_when_due` | **E1** (primer evento = `run`, antes del `sleep`; reinicio con discovery del día ⇒ 0 encolados) |
-| T-3 | P2-16 | T-3 | `test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar` | E0 + E2 (e2e PG valida fronteras de barra) |
+| T-3 | P2-16 | T-3 + §9.12 | `test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar` | **E1** (N ticks de 60 s con la barra cerrada ⇒ 1 decisión fresca; los trozos de fill comparten un único `logical_order_id`; sin segunda ejecución) + **E2** parcial (fronteras de barra en el banco PG) |
 
 **Cobertura:** 21 hallazgos · **22** entradas de backlog (las 21 con ID + P1-12b, que cubre el
 silencio de la UI del scan descrito en §7.4) · 21 criterios · 21
-pruebas propuestas · **16 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
+pruebas propuestas · **21 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
 `S-1` en §9.5, `S-2` en §9.6, `S-3` en §9.7, `O-1` y `O-2` en §9.8, `T-1`, `T-2`, `S-6` y `B-5`
-en §9.9–§9.11, `B-2`, `B-4` y `O-5`). `B-1`,
+en §9.9–§9.11, `B-2`, `B-4` y `O-5`, y los cinco últimos —`S-4`, `S-5`, `O-3`, `O-4`, `T-3`— en
+§9.12). `B-1`,
 `B-2`, `B-4` y `O-5`
 entran con el sello `2.11.162-beta`; `B-6`, el cierre de `B-1`, `B-3`, `O-6`, `S-1`, `S-2`, `S-3`,
 `O-1`, `O-2`, `T-1`, `T-2`, `S-6` y `B-5`
-son **posteriores** al sello `2.11.163-beta` y viven en el commit de trabajo. Las filas
-que en una lectura anterior quedaban huérfanas (`B-6`, `O-5`, `O-6`, `T-3`) tienen ahora
-backlog, criterio y prueba; su evidencia sigue siendo E0/E1/E2 y **no** se eleva por tener criterio
-escrito.
+son **posteriores** al sello `2.11.163-beta` y viven en el commit de trabajo. Los cinco de §9.12
+(`S-4`, `S-5`, `O-3`, `O-4`, `T-3`) son **posteriores al sello `2.11.164-beta`**. Ninguna fila
+queda huérfana: las 21 tienen backlog, criterio y prueba ejecutada, y ninguna llega a **E3**.
 
 ---
 

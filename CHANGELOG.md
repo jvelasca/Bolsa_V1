@@ -2,6 +2,73 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.165-beta] — **los cinco criterios que quedaban de la auditoría pasan a prueba ejecutada: la tesis es alcanzable, la posición no gestionada se declara, y la UI lee el veredicto del gate en vez de escribirlo** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO (`venue` nullable + `venueMeasurement`) · AUTO OFF · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** sello de **cierre** posterior y acotado a `2.11.164-beta`. Aplica los **cinco**
+criterios que la auditoría de detección dejó como *criterio escrito sin prueba ejecutada*
+(`S-4`, `S-5`, `O-3`, `O-4`, `T-3`) sin tocar el motor de decisión, el reloj de barras ni la
+cadencia del AUTO. **Sin migración nueva** (`head` sigue `058_estudio_daily_proposals`). **Bump**
+`2.11.164-beta` → `2.11.165-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard` **2 passed**). **Contrato HTTP aditivo**: `AutoMonitorHeaderDto.venue` pasa
+a `string | null` (sin default `"paper"`) y entra `venueMeasurement` (`"UNKNOWN"` por defecto);
+`openapi.json`/`schema.d.ts` regenerados y `contract:check` en verde.
+
+**W-165-1 · S-4 — `THESIS_INVALIDATION` es alcanzable cuando el plan declara su nivel.** El hallazgo
+era correcto en el diagnóstico (ningún productor emite un `invalidationPrice` distinto del stop),
+pero su consecuencia no: con `invalidationPrice > stop` hay un hueco real y la tesis dispara
+**antes**. `test_thesis_exit_reachable_with_declared_invalidation_price`
+(`packages/py/analytics/tests/test_exit_plan.py`) lo fija en dos mitades: mark `96` con nivel `96.5`
+y stop `95` ⇒ `primary_reason == "THESIS_INVALIDATION"` con
+`reasons == ("THESIS_INVALIDATION",)` —el stop **no** viaja como motivo—; y el mismo plan con mark
+`94` ⇒ `STRUCTURAL_STOP`, para que la precedencia **no** se rompa. La brecha que sigue abierta es de
+**producto** (nadie declara el nivel), no de la decisión.
+
+**W-165-2 · S-5 — la posición que AUTO no gestiona deja de ser un `None` silencioso.**
+`auto_reason_codes.POSITION_UNMANAGED` (dentro de `POSITION_LIFECYCLE_REASONS`) y
+`_v2_declare_unmanaged_position` (`auto_simulation_worker.py`) escriben **una fila de journal por
+barra y símbolo** cuando `_v2_adopt_position` no puede rehidratar la posición: símbolo, `held`,
+precio del tick, `reason: "no_position_state"`, `management: "none"` y `attention: "high"`. No abre,
+no vende y no repite el hecho dentro de la misma barra; el tick siguiente vuelve a declararlo. El
+resultado sigue siendo fail-safe: lo que cambia es que la consecuencia es **auditable**.
+
+**W-165-3 · O-3 — ningún hueco se pinta como `0` ni como `"paper"`.** DÍA-D pinta
+`closedCount`/`openCount` con `formatDiaDValue()` y `closed === null` degrada el nivel 1 a
+`insufficient`; `lastSignalPrice` ausente se rotula (`absentDataLabel()`), nunca `0.00`; y el
+`venue` del monitor operativo viaja `None` con `venueMeasurement = "UNKNOWN"` cuando el snapshot del
+motor no lo declara —el DTO pierde el default `"paper"`—, con la cabecera pintando la etiqueta de
+hueco. Pruebas: `test_absent_measurement_is_not_rendered_as_zero`,
+`signal-alerts-section.test.tsx` y `auto-monitor-header.test.tsx`.
+
+**W-165-4 · O-4 — el veredicto de la ventana es DATO, no texto.** Nuevo
+`apps/web/src/features/auto-monitor/window-verdict.ts`: agrega **sólo** lo que el gate declaró por
+valor en el DTO de auditoría —un veredicto ⇒ ese veredicto; varios ⇒ «SIN VEREDICTO ÚNICO» con
+recuento; ninguno medido ⇒ **NO MEDIDO**—. `test_window_verdict_is_read_from_gate` cambia el
+veredicto del gate en el mock (`INCONCLUSIVE` → `READY`) y exige que la pintura cambie: si el texto
+volviera a ser una constante, **falla**. El bloque de cadena publica el veredicto **del valor** y
+declara que no se generaliza a la ventana ni a la cartera; la leyenda «clasificación ≠ validación»
+deja de afirmar un veredicto y dice quién lo emite.
+
+**W-165-5 · T-3 — la cadencia del AUTO queda fijada por prueba.**
+`test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar`
+(`apps/api-python/tests/test_auto_v2_bar_short_circuit.py`) ejecuta varios ticks de 60 s con la barra
+cerrada fija: **una sola** decisión fresca con identidad `bar_tick` y, en el reintento intrabarra,
+trozos de fill que comparten **un único** `logical_order_id`, sin segunda ejecución. Lo que **no**
+certifica es la cadencia en producción (procesos vivos, latencia del primer tick, cobertura de la
+cola): eso es observación operativa.
+
+**Trazabilidad:** **21 de 21** criterios con prueba ejecutada (§9.12 de la auditoría). Ninguno llega
+a **E3**: la evidencia es **E1**, con **E2** parcial donde ya lo era (`S-6`, `T-1`, `T-3`).
+**Verificación (medida):** `pytest` (domain + market + application + analytics + api-python) ⇒
+**5930 passed** (11:04); suites tocadas ⇒ **65 passed**; `web` ⇒ **2383 passed / 319 ficheros**;
+`shared` ⇒ **855 passed / 99 ficheros** (+1 todo); `typecheck` **OK**; `lint` **0 errores** (23
+avisos preexistentes); `contract:gen`/`contract:check` **OK**; `ruff` limpio; `mypy` **573 ficheros
+sin issues**; guardián de bump **2 passed**.
+
+**Límites:** AUTO **OFF**; PAPER virtual; la ventana sigue **`INCONCLUSIVE`** por sus propios números
+(`episodios 0/2`, `ciclos 0/32`) — la UI ahora lo **lee**, y si el gate no mide dice `NO MEDIDO` en
+lugar de suponer. Un CI verde **no** certifica la ventana ni la rentabilidad. `Δ decisión = 0`; el
+único efecto en el motor es el journal de S-5, que **no opera**.
+
 ## [2.11.164-beta] — **la auditoría de detección cierra 16 de sus 21 criterios: el warmup se mide sobre la serie real, el estado `gated` sale del libro, la salida declara su permiso y la ACTIVE dice por qué no operó** (**`Δ motor ≠ 0` acotado a evaluación de señal y decisión de salida · `Δ decisión ≠ 0` en el camino ACTIVE y en posiciones con tesis invalidada · contrato HTTP ADITIVO · AUTO OFF · SIN migración nueva · head `058_estudio_daily_proposals` · cubre 25 commits**)
 
 **Naturaleza:** sello de **remediación** posterior y acotado a `2.11.163-beta`. Cubre **25 commits**

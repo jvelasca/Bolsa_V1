@@ -241,7 +241,13 @@ export type AutoMonitorConcurrencyV1 = {
 export type AutoMonitorHeaderV1 = {
   engineId?: string | null;
   state: string;
-  venue: string;
+  /**
+   * O-3 — venue DECLARADO por el snapshot del motor. ``null`` = no medido (antes el API
+   * rellenaba «paper», que es una afirmación sobre la composición, no un hecho del motor).
+   */
+  venue: string | null;
+  /** ``COMPLETE`` si el snapshot declaró el venue; ``UNKNOWN`` si es un hueco. */
+  venueMeasurement?: string;
   granularity?: Record<string, unknown>;
   decisionClock: string;
   executionDeclared?: string | null;

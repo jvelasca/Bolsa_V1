@@ -341,3 +341,62 @@ def test_thesis_invalidated_for_short_direction() -> None:
     assert short.invalidation_price == 105.0
     assert is_thesis_invalidated(short, mark_price=104.0) is False
     assert is_thesis_invalidated(short, mark_price=105.0) is True
+
+
+def test_thesis_exit_reachable_with_declared_invalidation_price() -> None:
+    """S-4: ``THESIS_INVALIDATION`` es alcanzable si el plan declara un nivel de tesis.
+
+    El hallazgo S-4 decía que la rama era *estructuralmente* inalcanzable: como
+    ``invalidation_price`` se congela en el stop cuando el plan no declara uno, cualquier
+    precio que invalidase la tesis tocaba también el stop y —por precedencia— el motivo
+    decisorio salía ``STRUCTURAL_STOP``. Con un nivel DECLARADO por encima del stop (para
+    un largo) el hueco entre ambos es real y la tesis dispara primero.
+
+    Qué fija esta prueba, y por qué las dos mitades importan:
+
+    * **Alcanzable**: mark 96 con nivel 96.5 y stop 95 ⇒ ``THESIS_INVALIDATION``, y el stop
+      NO viaja como motivo secundario (no se disparó).
+    * **La precedencia no se rompe**: el mismo plan con mark 94 ⇒ ``STRUCTURAL_STOP``. Sin
+      esta mitad, un cambio que hiciera ganar siempre a la tesis pasaría la primera.
+
+    Límite DECLARADO: hoy ningún productor de entrada manda un ``invalidationPrice``
+    distinto del stop (DÍA-D lo publica como ``nivel_igual_stop``). La rama es alcanzable
+    por CONTRATO —un plan puede declararlo y el JSONB lo conserva al rehidratar—, no por el
+    planificador actual; esa brecha de producción es otra pregunta y no se disfraza aquí.
+    """
+    position = build_position_state_from_fill(
+        _plan(invalidationPrice=96.5),
+        fill_price=100.0,
+        fill_quantity=10.0,
+        position_id="pos-s4",
+    )
+    assert position is not None
+    assert position.invalidation_price == 96.5
+    assert position.invalidation_price > position.current_stop, (
+        "el caso exige un nivel de tesis POR ENCIMA del stop: si coinciden, la precedencia "
+        "estructural lo convierte en STRUCTURAL_STOP y el test no mide nada"
+    )
+
+    thesis = build_exit_plan_from_position(
+        position,
+        mark_price=96.0,
+        # El mismo eslabón que usa el worker: la confirmación se DERIVA de hechos
+        # persistidos (nivel congelado + peor adverso) y viaja como dato al plan.
+        thesis_invalid=is_thesis_invalidated(position, mark_price=96.0),
+    )
+    assert thesis is not None
+    assert thesis.primary_reason == "THESIS_INVALIDATION"
+    assert thesis.reasons == ("THESIS_INVALIDATION",), (
+        f"el stop (95) no se tocó: no puede viajar como motivo múltiple ({thesis.reasons})"
+    )
+
+    stop_out = build_exit_plan_from_position(
+        position,
+        mark_price=94.0,
+        thesis_invalid=is_thesis_invalidated(position, mark_price=94.0),
+    )
+    assert stop_out is not None
+    assert stop_out.primary_reason == "STRUCTURAL_STOP", (
+        "la precedencia del stop se conserva: por debajo del stop manda él"
+    )
+

@@ -7,7 +7,7 @@
  *   3. qué señal/vela la originó (`planId`/`signalId`, `asOfBarDate`, hora de cálculo);
  *   4. qué entrada/salida tenía (todo de `TradePlan`, nunca inferido del gráfico);
  *   5. qué pasó realmente (9 etapas; un hueco es «Sin dato todavía», jamás `0`);
- *   6. qué evidencia DÍA-D y suficiencia hay (veredicto, K, expectancy; `INCONCLUSIVE`).
+ *   6. qué evidencia DÍA-D y suficiencia hay (veredicto del gate, K, expectancy).
  *
  * La cadena es HISTÓRICA del valor: se rotula como no atribuida salvo identidad estable.
  */
@@ -709,10 +709,22 @@ export function EstudioChainEvidence({
                 {resultR?.verdictReason ? ` (${resultR.verdictReason})` : ""}.
               </p>
             )}
-            <p className="text-[10px] text-muted-foreground">
-              Veredicto global de la ventana PAPER:{" "}
-              <strong>INCONCLUSIVE</strong>. Esta vista no emite{" "}
-              <code>CONFIRMED</code>: eso es OPERACIÓN, no software.
+            <p
+              className="text-[10px] text-muted-foreground"
+              data-testid="estudio-chain-global-validation"
+              data-verdict={
+                resultR?.measured === true && verdict ? verdict : "NOT_MEASURED"
+              }
+            >
+              Veredicto del gate para este valor
+              {auditWindow ? ` en la ventana ${auditWindow}` : ""}:{" "}
+              <strong>
+                {resultR?.measured === true && verdict
+                  ? verdict
+                  : absentDataLabel()}
+              </strong>
+              . No se generaliza a la ventana ni a la cartera. Esta vista no
+              emite <code>CONFIRMED</code>: eso es OPERACIÓN, no software.
             </p>
           </section>
         </div>

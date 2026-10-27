@@ -128,6 +128,14 @@ THESIS_EXIT = "thesis_exit"
 #: S-6 — para qué sirve el literal: el AUTO consultó F5 antes de emitir la salida. Es una
 #: ATRIBUCIÓN de gestión (``exit_permission``), nunca un veto de entrada: la salida se emitió.
 EXIT_PERMISSION = "exit_permission"
+#: S-5 (cierre 2026-10-27) — la posición está VIVA en el libro pero AUTO **no la gestiona**:
+#: no hay ``PositionState`` y la adopción no fue posible (sin base de coste / sin ATR). Antes
+#: ``_v2_position_package`` devolvía ``None`` y el turno lo trataba como un ``hold_no_op``
+#: benigno: la UI mostraba una posición abierta que ningún motor iba a vender, sin una sola
+#: fila que lo dijera. El hecho es la CONSECUENCIA de una causa ya declarada
+#: (``reconciliation_required``/``protection_missing``); aquí se declara el resultado: el
+#: símbolo queda fuera de la gestión V2 y sólo una intervención humana lo devuelve.
+POSITION_UNMANAGED = "position_unmanaged"
 #: S-3 (cierre 2026-10-27) — hubo intención de salir y **no salió orden**. Antes el FSM
 #: avanzaba a ``EXIT_PENDING`` al decidir (antes de los gates), así que un ``hold`` del
 #: manager —p. ej. ``TIME_STOP`` degradado a ``REVIEW`` bajo reconciliación ``CRITICAL``—
@@ -231,6 +239,8 @@ POSITION_LIFECYCLE_REASONS: frozenset[str] = frozenset(
         ATR_GEOMETRY,
         # S-6: la consulta de F5 acompaña a una salida EMITIDA ⇒ atribución de gestión.
         EXIT_PERMISSION,
+        # S-5: la posición que AUTO no puede gestionar se declara (consecuencia, no veto).
+        POSITION_UNMANAGED,
     }
 )
 
@@ -391,6 +401,7 @@ __all__ = [
     "POSITION_MARK_REJECTED",
     "POSITION_ROW_UNRECONCILED",
     "POSITION_SKIP_REASONS",
+    "POSITION_UNMANAGED",
     "PROTECTION_MISSING",
     "PROTECT_REQUESTED",
     "RECONCILIATION_REQUIRED",

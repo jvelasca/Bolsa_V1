@@ -312,4 +312,51 @@ describe("DiaDAutoPanel", () => {
         .getAttribute("aria-selected"),
     ).toBe("true");
   });
+
+  it("test_absent_measurement_is_not_rendered_as_zero", async () => {
+    // O-3 — `oos` AUSENTE (no `closedCount: 0`, que sería un cero MEDIDO) no puede
+    // pintarse como «0 cerrados»: esa cifra la UI la estaría inventando. Se rotula el
+    // hueco y, además, la muestra se declara insuficiente (un hueco no es una aprobación).
+    const mock = vi.mocked(api.getAutoDiaDReplay);
+    const original = mock.getMockImplementation();
+    mock.mockResolvedValueOnce({
+      available: true,
+      readOnly: true,
+      day: "2026-09-30",
+      artifactModifiedAt: "2026-10-18T20:00:00+00:00",
+      schemaVersion: "dia-d-auto-v1",
+      summary: {
+        verdict: "PARTIAL",
+        match: 1,
+        divergent: 0,
+        notMeasured: 1,
+        steps: 2,
+      },
+      steps: [
+        {
+          step: "SIGNAL",
+          declared: 1,
+          executed: 1,
+          verdict: "MATCH",
+          measurement: "COMPLETE",
+        },
+      ],
+      // El artefacto NO publicó la muestra OOS: hueco, no cero.
+      oos: null,
+      meta: { account: "acc-1", versionA: "v283-window-a", watchSize: 12 },
+      limits: [],
+      executedDetail: {},
+      notes: [],
+    } as never);
+
+    renderPanel();
+
+    const summary = await screen.findByTestId("dia-d-auto-level1");
+    expect(summary.textContent).toContain("muestra OOS: NO MEDIDO cerrados");
+    expect(summary.textContent).toContain("NO MEDIDO vivos");
+    expect(summary.textContent).not.toContain("0 cerrados");
+    expect(summary.getAttribute("data-insufficient")).toBe("true");
+
+    if (original) mock.mockImplementation(original);
+  });
 });
