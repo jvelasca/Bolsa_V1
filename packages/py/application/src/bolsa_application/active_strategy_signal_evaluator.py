@@ -35,6 +35,7 @@ from bolsa_application.decision_contract import (
     DecisionPackage,
     format_active_strategy_source,
 )
+from bolsa_application.signal_feature_context import feature_source
 
 logger = logging.getLogger(__name__)
 
@@ -98,17 +99,36 @@ def _to_decision(
     signal_kind: str,
     lot_qty: float,
     source: str,
+    feature_source: str | None = None,
+    signal_window_bars: int | None = None,
 ) -> DecisionPackage:
     """Traduce el tipo de señal a ``DecisionPackage`` (lote acotado al de la ACTIVE)."""
     if signal_kind == "entry_long":
         return DecisionPackage(
-            action="BUY", instrument_id=symbol, quantity=lot_qty, source=source
+            action="BUY",
+            instrument_id=symbol,
+            quantity=lot_qty,
+            source=source,
+            feature_source=feature_source,
+            signal_window_bars=signal_window_bars,
         )
     if signal_kind == "exit":
         return DecisionPackage(
-            action="SELL", instrument_id=symbol, quantity=lot_qty, source=source
+            action="SELL",
+            instrument_id=symbol,
+            quantity=lot_qty,
+            source=source,
+            feature_source=feature_source,
+            signal_window_bars=signal_window_bars,
         )
-    return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0, source=source)
+    return DecisionPackage(
+        action="HOLD",
+        instrument_id=symbol,
+        quantity=0,
+        source=source,
+        feature_source=feature_source,
+        signal_window_bars=signal_window_bars,
+    )
 
 
 def make_active_strategy_decider(
@@ -165,6 +185,12 @@ def make_active_strategy_decider(
         except Exception:  # noqa: BLE001 — una evaluación fallida no rompe el motor.
             logger.debug("signal evaluator failed for %s", symbol, exc_info=True)
             return _hold(symbol)
+        # O-6: la procedencia de la feature y el tamaño de la ventana se declaran en TODA
+        # decisión que llegue a evaluar barras —incluido el HOLD—, porque es justo el HOLD
+        # el que hoy no se puede leer: «no había señal» y «la ventana no alcanza» eran la
+        # misma fila. Sin barras no se declara nada: no se evaluó, y eso no es "synthetic".
+        declared_source = feature_source(bars)
+        window_bars = len(bars)
         if warmup_reason is not None:
             # B-1: la ventana no alcanza el warmup del preset. Se sigue en HOLD
             # (fail-closed), pero el motivo viaja en ``memo``: un HOLD por falta de
@@ -177,12 +203,26 @@ def make_active_strategy_decider(
                 quantity=0,
                 source=source,
                 memo=warmup_reason,
+                feature_source=declared_source,
+                signal_window_bars=window_bars,
             )
         if signal_kind is None:
-            return _hold(symbol)
+            return DecisionPackage(
+                action="HOLD",
+                instrument_id=symbol,
+                quantity=0,
+                source=source,
+                feature_source=declared_source,
+                signal_window_bars=window_bars,
+            )
         effective = _bounded_lot(signal_kind, effective_lot)
         return _to_decision(
-            symbol=symbol, signal_kind=signal_kind, lot_qty=effective, source=source
+            symbol=symbol,
+            signal_kind=signal_kind,
+            lot_qty=effective,
+            source=source,
+            feature_source=declared_source,
+            signal_window_bars=window_bars,
         )
 
     return _decide
@@ -226,7 +266,6 @@ def _evaluate_last_signal(
         evaluate_strategy_last_bar,
     )
     from bolsa_application.signal_feature_context import build_signal_indicator_context
-
     bar_inputs = [
         StrategyBarInput(timestamp=str(getattr(b, "timestamp", "")), close=float(b.close))
         for b in bars

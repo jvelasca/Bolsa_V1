@@ -295,6 +295,67 @@ def test_plan_v2_tick_seals_strategy_preset_key_when_present() -> None:
     assert "strategyPresetKey" not in approved.payload
 
 
+def test_plan_v2_tick_seals_feature_source_and_window_bars() -> None:
+    """O-6 — la procedencia de la feature y la ventana viajan al journal (o se omiten).
+
+    Sin estas claves, un ``HOLD`` por SMA200 ausente y un ``HOLD`` por mercado lateral eran
+    la MISMA fila: el journal sabía qué se decidió, no con qué dato. Se sellan como claves
+    JSONB aditivas (sin migración) y se OMITEN cuando la señal no las declara.
+    """
+    declared = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[
+            _signal(
+                "AAA",
+                edge=0.9,
+                feature_source="real",
+                signal_window_bars=120,
+            )
+        ],
+        regime="BULL_TREND",
+    )
+    approved = next(
+        e
+        for e in declared.journal_entries
+        if e.instrument_id == "AAA" and e.payload.get("approved")
+    )
+    assert approved.payload["featureSource"] == "real"
+    assert approved.payload["signalWindowBars"] == 120
+
+    undeclared = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=0.9)],
+        regime="BULL_TREND",
+    )
+    approved = next(
+        e
+        for e in undeclared.journal_entries
+        if e.instrument_id == "AAA" and e.payload.get("approved")
+    )
+    assert "featureSource" not in approved.payload
+    assert "signalWindowBars" not in approved.payload
+
+
+def test_plan_v2_tick_does_not_publish_an_empty_window() -> None:
+    """Una ventana de 0 barras no es una ventana: la clave se omite, no se escribe ``0``.
+
+    ``signalWindowBars = 0`` sería un dato inventado con el que se podría leer «evaluado
+    con cero barras»; la verdad es que no se evaluó, y eso es la ausencia de clave.
+    """
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=0.9, feature_source="synthetic", signal_window_bars=0)],
+        regime="BULL_TREND",
+    )
+    approved = next(
+        e
+        for e in plan.journal_entries
+        if e.instrument_id == "AAA" and e.payload.get("approved")
+    )
+    assert approved.payload["featureSource"] == "synthetic"
+    assert "signalWindowBars" not in approved.payload
+
+
 def test_plan_v2_tick_evidence_components_reorder_ranking() -> None:
     """V2.88 — la evidencia LAB (robustness/regime_fit) reordena el ranking del TOP.
 

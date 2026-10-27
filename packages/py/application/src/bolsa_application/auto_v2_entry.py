@@ -643,6 +643,12 @@ class V2Signal:
     # journal de decisión (``strategyPresetKey``). ``None`` cuando la fuente no la declara:
     # la ausencia es información, jamás un relleno.
     strategy_preset_key: str | None = None
+    # O-6 — PROCEDENCIA de la feature que sostuvo la señal: ``"real"`` (OHLCV completo) o
+    # ``"synthetic"`` (ventana close-only), y el número de barras evaluadas. Aterrizan en
+    # el journal como ``featureSource``/``signalWindowBars``. ``None`` cuando el productor
+    # no lo declara: misma doctrina que ``strategy_preset_key``, la ausencia es información.
+    feature_source: str | None = None
+    signal_window_bars: int | None = None
     # Identidad/frescura de la señal (``signal_identity``): evita que la MISMA señal
     # sobre la MISMA barra se re-emita en cada turno (worker 60s vs señal D1).
     signal_id: str = ""
@@ -1584,6 +1590,9 @@ def plan_v2_tick(
                 strategy_version=signal.strategy_version,
                 # H1 — la identidad EXACTA de la estrategia aterriza en el payload durable.
                 strategy_preset_key=signal.strategy_preset_key,
+                # O-6 — procedencia de la feature y tamaño de la ventana evaluada.
+                feature_source=signal.feature_source,
+                signal_window_bars=signal.signal_window_bars,
                 cycle_id=cycle_id,
                 # V2.88.99 — identidad de la oportunidad: la señal que la originó y el
                 # ranking que la situó, para que ``SIGNAL``/``TOP_N`` sean demostrables
@@ -2443,6 +2452,8 @@ def _journal_entry(
     as_of: str,
     strategy_version: str | None = None,
     strategy_preset_key: str | None = None,
+    feature_source: str | None = None,
+    signal_window_bars: int | None = None,
     cycle_id: str | None = None,
     signal_id: str | None = None,
     opportunity_id: str | None = None,
@@ -2485,6 +2496,15 @@ def _journal_entry(
     # información, jamás un relleno (misma doctrina que ``strategyVersion``).
     if str(strategy_preset_key or "").strip():
         payload["strategyPresetKey"] = str(strategy_preset_key)
+    # O-6 — PROCEDENCIA de la feature y tamaño de la ventana: claves ADITIVAS (JSONB, sin
+    # migración). Son lo que separa un HOLD por «no había señal» de un HOLD por «la ventana
+    # no alcanza el warmup» o por «la feature venía close-only»: sin ellas las tres filas
+    # son la misma. Se OMITEN si no hay dato (la ausencia es información, no un relleno), y
+    # ``signalWindowBars = 0`` no se publica porque una ventana de cero no es una ventana.
+    if str(feature_source or "").strip():
+        payload["featureSource"] = str(feature_source)
+    if signal_window_bars is not None and signal_window_bars > 0:
+        payload["signalWindowBars"] = int(signal_window_bars)
     # V2.47 — el ciclo financiero viaja en el payload (JSONB, sin migración): es el hilo
     # que une esta decisión con su reserva, su orden, su fill, su posición y su PnL.
     if str(cycle_id or "").strip():

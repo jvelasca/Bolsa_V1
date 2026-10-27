@@ -3032,6 +3032,11 @@ class AutoSimulationWorker:
                     trade_context=context,
                     strategy_version=version,
                     strategy_preset_key=preset,
+                    # O-6 — la procedencia viaja con la señal hasta el journal: es lo que
+                    # permite leer «HOLD por no haber señal» distinto de «HOLD porque la
+                    # ventana no alcanzaba» sin abrir el motor.
+                    feature_source=getattr(pkg, "feature_source", None),
+                    signal_window_bars=getattr(pkg, "signal_window_bars", None),
                     signal_id=signal_id,
                     bar_timestamp=identity.bar_timestamp if identity is not None else "",
                     valid_until=identity.valid_until if identity is not None else "",

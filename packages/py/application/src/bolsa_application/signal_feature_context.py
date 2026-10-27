@@ -28,8 +28,15 @@ from bolsa_analytics.signals.rules_engine import build_indicator_context
 __all__ = [
     "bar_field",
     "build_signal_indicator_context",
+    "feature_source",
     "to_ohlcv_bars",
 ]
+
+#: La barra traía OHLCV: la feature se calculó con el dato real.
+FEATURE_SOURCE_REAL = "real"
+
+#: La barra venía close-only: el motor usó ``open = high = low = close`` y ``volume = 0``.
+FEATURE_SOURCE_SYNTHETIC = "synthetic"
 
 
 def bar_field(bar: Any, name: str) -> Any:
@@ -92,3 +99,27 @@ def build_signal_indicator_context(
     if not specs or not bars:
         return {}
     return build_indicator_context(to_ohlcv_bars(bars), specs)
+
+
+def feature_source(bars: Sequence[Any]) -> str | None:
+    """Procedencia de la feature: ``"real"``, ``"synthetic"`` o ``None`` sin barras (O-6).
+
+    Una ventana es ``real`` solo si **todas** sus barras declaran ``open``/``high``/``low``
+    y ``volume``: una sola barra close-only obliga a sintetizar rango y volumen para esa
+    barra, y los indicadores de rango o volumen de la ventana entera dejan de ser el dato.
+    De ahí que sea ``all`` y no ``any`` — la ventana se evalúa como un todo.
+
+    ``None`` (no ``"synthetic"``) cuando no hay barras: no se evaluó nada, y afirmar una
+    procedencia sería inventar el hecho. La ausencia es información, no un relleno.
+    """
+    if not bars:
+        return None
+    for bar in bars:
+        if (
+            _as_float(bar_field(bar, "open")) is None
+            or _as_float(bar_field(bar, "high")) is None
+            or _as_float(bar_field(bar, "low")) is None
+            or _as_float(bar_field(bar, "volume")) is None
+        ):
+            return FEATURE_SOURCE_SYNTHETIC
+    return FEATURE_SOURCE_REAL

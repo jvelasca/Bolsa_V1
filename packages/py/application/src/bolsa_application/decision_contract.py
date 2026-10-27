@@ -84,6 +84,15 @@ class DecisionPackage:
     source: str = "id_used_to_propose"
     proposed_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     memo: str = ""
+    # O-6 — PROCEDENCIA de la feature que sostiene la propuesta. Aditivas: ``None`` en los
+    # productores que no la declaran, y ``None`` se OMITE al aterrizar en el journal (la
+    # ausencia es información, jamás un relleno). ``feature_source`` es ``"real"`` (OHLCV
+    # completo) o ``"synthetic"`` (ventana close-only: ``volume = 0`` y rango = cierre) —los
+    # presets de rango o volumen no valen lo mismo en cada caso—; ``signal_window_bars`` es
+    # el número de barras realmente evaluadas, el dato que distingue «no había señal» de
+    # «la ventana no alcanza el warmup».
+    feature_source: str | None = None
+    signal_window_bars: int | None = None
 
     @property
     def is_execution_intent(self) -> bool:

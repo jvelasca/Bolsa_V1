@@ -337,3 +337,41 @@ async def test_signal_enabled_reads_the_book_at_decision_time(
     assert decider("AAA").action == "BUY"
     book["AAA"] = True
     assert decider("AAA").action == "HOLD"
+
+
+@pytest.mark.asyncio
+async def test_signal_enabled_declares_feature_provenance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """O-6: la procedencia llega hasta ``V2Signal``, que es quien la sella en el journal.
+
+    El paquete puede llevarla, pero si el worker no la copia a la señal del tick el journal
+    sigue ciego. Se fija aquí el eslabón ``DecisionPackage → V2Signal``.
+    """
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL", "1")
+    from bolsa_application.strategy_lifecycle_store import (
+        ActiveStrategyRecord,
+        InMemoryStrategyLifecycleStore,
+    )
+
+    store = InMemoryStrategyLifecycleStore()
+    await store.save_active(
+        ActiveStrategyRecord(active=_active_with_executable(), promoted_at="2026-09-10")
+    )
+    factory, StoreCls, sls = _stub_session_factory(store)
+    monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
+
+    decider = await w.load_active_strategy_decider(
+        factory,
+        instrument_id="AAA",
+        watch=("AAA",),
+        signal_enabled=True,
+        ohlcv=_FakeOhlcv([10.0] * 7 + [20.0]),
+    )
+    assert decider is not None
+    prop = decider("AAA")
+    assert prop.action == "BUY"
+    # Barras OHLCV completas ⇒ ``real``, y la ventana es la que el decoder entregó.
+    assert prop.feature_source == "real"
+    assert prop.signal_window_bars == 8

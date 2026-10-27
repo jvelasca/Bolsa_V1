@@ -1031,3 +1031,38 @@ warmup, «Instrumento no encontrado» y el filtro fundamental **no** son «no ev
   produce; el componente solo lo pinta.
 - **Sin sello, sin tag y sin bump.** La evidencia es **E1**.
 
+### 12.11 O-6: el journal declara `featureSource` y `signalWindowBars`
+
+> **Cierra el ítem P1-8** de §7.7 y §10 de la auditoría, y el criterio `O-6` de §9.
+
+**Qué se implementó.** Dos claves aditivas del `payload` JSONB del journal —sin migración, sin
+columna, sin tocar `openapi.json`—, siguiendo la doctrina ya establecida por `strategyPresetKey`:
+
+| Clave | Valores | Omisión |
+|---|---|---|
+| `featureSource` | `real` / `synthetic` | si el productor no la declara |
+| `signalWindowBars` | entero > 0 | si no hay dato **o** la ventana es 0 |
+
+Cadena: `feature_source(bars)` (puro) → `DecisionPackage` → `V2Signal` → `_journal_entry` →
+`payload`. Se declara **también en el `HOLD`**, que es la fila que el hallazgo señalaba como
+indistinguible.
+
+**Verificación (E1, herméticas).**
+
+| Gate | Resultado |
+|---|---|
+| `test_active_strategy_feature_provenance.py` | **9 passed** |
+| `test_auto_v2_entry.py` (+2 de O-6) | **71 passed** |
+| `test_auto_sim_active_strategy_seam.py` (+1 de O-6) | **10 passed** |
+| `application` + `analytics` | **4232 passed** |
+| `application` + 4 suites de worker AUTO | **2996 passed** |
+| `ruff` / `lint-imports` / `mypy` | limpio / 4 contratos / **571 ficheros sin issues** |
+
+**Lo que NO se ha hecho, y queda declarado.**
+
+- **No se publica en el DTO del monitor ni en `openapi.json`.** Las claves viven en el `payload` que
+  el journal ya expone; elevarlas a campo de primera clase obliga a regenerar `schema.d.ts` y a
+  versionar la API. La lectura en la UI queda como deuda declarada.
+- **No se relee ninguna ventana real** con las claves: E1, no E2/E3.
+- **Sin sello, sin tag y sin bump.**
+

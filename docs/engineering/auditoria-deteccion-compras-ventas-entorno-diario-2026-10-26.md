@@ -815,15 +815,30 @@ salida (`primary_reason`/`secondary_reasons`), pero **no** registra si la señal
 reales o sintéticas, ni si la ventana tenía 120 o 250 barras. Un `HOLD` por SMA200 ausente y un
 `HOLD` por mercado lateral son la misma fila.
 
-**Veredicto: HUECO DECLARADO.** El journal es rico en decisión y pobre en **procedencia de la
-feature**.
+**Veredicto original: HUECO DECLARADO.** El journal era rico en decisión y pobre en **procedencia de
+la feature**.
 
 **Matiz (2026-10-26, tarde).** La procedencia ya está **centralizada en código**
 (`signal_feature_context.py`: de OHLCV real a `indicator_context`, con fallback declarado a cierre y
-volumen 0), y decisor y alertas consumen la misma función. Lo que sigue faltando es **publicarla**:
-el journal no escribe `featureSource` ni `signalWindowBars`, así que un `HOLD` por SMA200 ausente
-sigue siendo indistinguible de un `HOLD` por mercado lateral. El contrato de datos está escrito; la
-propagación al journal es la entrada P1-8.
+volumen 0), y decisor y alertas consumen la misma función. Lo que seguía faltando era **publicarla**.
+
+> **Resuelto el 2026-10-27 (O-6).** La procedencia ya aterriza en el journal, como claves **aditivas**
+> del `payload` JSONB (sin migración ni columna nueva, misma doctrina que `strategyPresetKey`):
+>
+> - `featureSource`: `"real"` (la ventana trae OHLCV completo) o `"synthetic"` (alguna barra
+>   close-only ⇒ el motor usa `open = high = low = close` y `volume = 0`). Es `all`, no `any`: una
+>   sola barra fabricada contamina los indicadores de rango y volumen de toda la ventana.
+> - `signalWindowBars`: barras realmente evaluadas. Es el número que separa «no había señal» de «la
+>   ventana no alcanza el warmup».
+>
+> Se declaran **en toda decisión evaluada**, incluido el `HOLD`, que es justo la fila que no se podía
+> leer; y se **omiten** si no hay dato (`None`, y `0` barras no se publica como `0`). Con las dos
+> claves, un `HOLD` con `featureSource=synthetic` y `signalWindowBars=120` deja de ser la misma fila
+> que un `HOLD` con `featureSource=real` y `signalWindowBars=250`.
+
+**Contrato de lectura: no se toca.** No se añade campo al DTO del monitor ni a `openapi.json`: las
+claves viven en el `payload` que el journal ya expone. Publicarlas como campo de primera clase en la
+API es una decisión de contrato aparte.
 
 ---
 
@@ -934,7 +949,7 @@ restantes describen qué habría que observar para dar el hallazgo por cerrado.
 | O-3 | `test_absent_measurement_is_not_rendered_as_zero` | `oos=null` ⇒ la UI muestra "NO MEDIDO", no `0` (hoy `?? 0`). |
 | O-4 | `test_window_verdict_is_read_from_gate` | La UI pinta el veredicto del gate y falla el test si el texto es una constante. |
 | O-5 | `test_day_watch_alerts_on_measured_inconclusive_day` | Una fila real del ledger con `status=MEDIDO` y `gate={verdict: INCONCLUSIVE, cycles: 0}` ⇒ `evaluate_day_watch` devuelve `verdict=INCONCLUSIVE`, `severity=alert`, `reason=gate_inconclusive`; `write_status` lo persiste en un directorio **temporal** y el árbol de trabajo no cambia (hoy: sin evidencia de disparo). |
-| O-6 | `test_journal_records_feature_source_and_window_bars` | La entrada de journal de una decisión ACTIVE lleva `featureSource` (`real`/`synthetic`) y `signalWindowBars`; un `HOLD` por SMA200 ausente **no** produce la misma fila que un `HOLD` por mercado lateral (hoy: indistinguibles). |
+| O-6 | `test_journal_records_feature_source_and_window_bars` | La entrada de journal de una decisión ACTIVE lleva `featureSource` (`real`/`synthetic`) y `signalWindowBars`; un `HOLD` por SMA200 ausente **no** produce la misma fila que un `HOLD` por mercado lateral. **Cubierto 2026-10-27** por `test_plan_v2_tick_seals_feature_source_and_window_bars` y `test_active_strategy_feature_provenance.py`. |
 | T-1 | `test_scan_worker_is_started_by_scheduler_or_its_own_process` | El arranque del scheduler expone el hecho de que `queue_poll_worker` está vivo, o falla con motivo accionable. |
 | T-2 | `test_daily_scan_runs_immediately_when_due` | Reloj en hora de ejecución ⇒ el primer `_run_opportunity_daily_once` ocurre **sin** esperar 24 h. |
 | T-3 | `test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar` | Con la barra cerrada fija, N ticks de 60 s producen **como máximo una** decisión con nueva identidad de barra (`bar_tick`) y el reintento intrabarra es idempotente (mismo `execution_id`, sin segunda ejecución). |
@@ -1138,6 +1153,59 @@ es **E1**: ninguna ventana real se ha mirado con esto.
 
 ---
 
+### 9.4 O-6 aplicado: el journal declara con qué dato se decidió
+
+**El fallo, en una frase.** El journal sabía **qué** se decidió y **por qué**, pero no **con qué
+dato**: un `HOLD` porque la SMA200 no existía en la ventana y un `HOLD` porque el mercado estaba
+lateral eran la misma fila.
+
+**Qué se declaró, y dónde.** Dos claves **aditivas** del `payload` JSONB (sin migración ni columna,
+misma doctrina que `strategyPresetKey`):
+
+| Clave | Valores | Qué separa |
+|---|---|---|
+| `featureSource` | `real` / `synthetic` | OHLCV completo vs. ventana con alguna barra close-only (`volume = 0`, rango = cierre) |
+| `signalWindowBars` | entero > 0 | 120 barras no son 250: distingue «no había señal» de «la ventana no llegaba» |
+
+**`real` es `all`, no `any`.** Una sola barra close-only obliga al motor a sintetizar esa barra, y
+los indicadores de rango y volumen se calculan sobre la ventana **entera**: etiquetar de `real` una
+ventana con una barra inventada sería afirmar una procedencia que no existió. Lo mismo con la
+ausencia: sin barras la procedencia es `None`, **no** `synthetic` —no se evaluó, y eso no es un dato—.
+
+**Se declara también en el `HOLD`.** Es el punto del hallazgo: el `HOLD` es la fila que no se podía
+leer. La procedencia se adjunta a toda decisión que llegue a evaluar barras —warmup, sin señal,
+`BUY`, `SELL`—; solo queda fuera lo que nunca miró una barra.
+
+**Cadena completa, con un eslabón por capa.** `feature_source(bars)` en
+`signal_feature_context.py` (puro) → `DecisionPackage.feature_source`/`signal_window_bars`
+(`decision_contract.py`) → `V2Signal.feature_source`/`signal_window_bars`
+(`auto_v2_entry.py`, copiados por el worker en `_v2_signals`) → `_journal_entry` →
+`payload.featureSource`/`payload.signalWindowBars`. Un eslabón roto deja el journal ciego, así que
+cada uno tiene su prueba.
+
+**Una ventana de cero no es una ventana.** `signalWindowBars = 0` **no** se publica: sería un dato
+inventado del que se podría leer «evaluado con cero barras». La clave se omite, que es la verdad.
+
+**Pruebas (E1, herméticas).**
+
+| Fichero | Qué fija |
+|---|---|
+| `packages/py/application/tests/test_active_strategy_feature_provenance.py` (**9**) | `real`/`synthetic`/`None`; una barra close-only contamina la ventana; el `HOLD` declara; el warmup lleva motivo **y** ventana; `BUY` también declara; sin barras no se declara nada |
+| `packages/py/application/tests/test_auto_v2_entry.py` (+2) | el payload sella ambas claves y las **omite** sin dato; `0` barras no se publica |
+| `apps/api-python/tests/test_auto_sim_active_strategy_seam.py` (+1) | el eslabón `DecisionPackage → V2Signal` a través del decisor real cargado del store |
+
+**Gates ejecutados** (2026-10-27): `application` + `analytics` ⇒ **4232 passed**;
+`application` + `test_auto_simulation_worker.py` + `test_auto_v2_worker_integration.py` +
+`test_auto_sim_active_strategy_seam.py` + `test_auto_v2_bar_short_circuit.py` ⇒ **2996 passed**;
+`ruff` ⇒ limpio; `lint-imports` ⇒ 4 contratos intactos; `mypy` ⇒ **571 ficheros sin issues**.
+
+**Lo que NO se ha hecho, y por qué.** No se publica en el DTO del monitor ni en `openapi.json`: las
+claves ya viajan en el `payload` y elevarlas a campo de primera clase es una decisión de contrato
+aparte (obligaría a regenerar `schema.d.ts` y a versionar la API). La exposición en la UI queda
+como deuda declarada. La evidencia es **E1**: ninguna ventana real se ha releído con las claves.
+
+---
+
 ## 10. Backlog priorizado
 
 ### P0 — afecta a la validez de lo que se concluya de la ventana
@@ -1165,8 +1233,9 @@ es **E1**: ninguna ventana real se ha mirado con esto.
 
 6. `EXIT_PENDING` solo si hay orden emitida (S-3).
 7. Contador durable de `settlement_failures` y publicación del modo `structural` (O-1, O-2).
-8. Journal con `featureSource` (`real`/`synthetic`) y `signalWindowBars` (**O-6**; entrada propia
-   para que la referencia no quede colgando del §9).
+8. Journal con `featureSource` (`real`/`synthetic`) y `signalWindowBars` (**O-6**). **Aplicado
+   2026-10-27:** claves aditivas del `payload` JSONB, declaradas también en el `HOLD` y omitidas si
+   no hay dato (§7.7).
 9. Declarar la posición no adoptada en el journal (S-5).
 10. Sustituir los `?? 0` y el `INCONCLUSIVE` estático por lecturas del gate (O-3, O-4).
 11. Arranque del scan: proceso dedicado verificado o primer tick sin esperar 24 h (T-1, T-2).
@@ -1215,16 +1284,17 @@ E3.**
 | O-3 | P1-10 | O-3 | `test_absent_measurement_is_not_rendered_as_zero` | E0 |
 | O-4 | P1-10 | O-4 | `test_window_verdict_is_read_from_gate` | E0 |
 | O-5 | P1-12 | O-5 | `test_day_watch_alerts_on_measured_inconclusive_day` | **E1** (54 tests del vigía, uno con fila real `20261019` en `tmp_path`) + E2 parcial (el scheduler arranca el vigía, ya aislado); efecto sobre la ventana real no observado |
-| O-6 | P1-8 | O-6 | `test_journal_records_feature_source_and_window_bars` | E0 (no hay campo) |
+| O-6 | P1-8 | O-6 + §9.4 | `test_journal_records_feature_source_and_window_bars` (implementada como `test_plan_v2_tick_seals_feature_source_and_window_bars` + `test_active_strategy_feature_provenance.py`) | **E1** (el payload sella `featureSource`/`signalWindowBars` y los omite sin dato; la procedencia se clasifica sobre la ventana real de barras) |
 | T-1 | P1-11 | T-1 | `test_scan_worker_is_started_by_scheduler_or_its_own_process` | E0 |
 | T-2 | P1-11 | T-2 | `test_daily_scan_runs_immediately_when_due` | E0 |
 | T-3 | P2-16 | T-3 | `test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar` | E0 + E2 (e2e PG valida fronteras de barra) |
 
 **Cobertura:** 21 hallazgos · **22** entradas de backlog (las 21 con ID + P1-12b, que cubre el
 silencio de la UI del scan descrito en §7.4) · 21 criterios · 21
-pruebas propuestas · **6 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `B-2`, `B-4` y
-`O-5`). `B-1`, `B-2`, `B-4` y `O-5` entran con el sello `2.11.162-beta`; `B-6`, el cierre de `B-1` y
-`B-3` son **posteriores** al sello `2.11.163-beta` y viven en el commit de trabajo. Las cinco filas
+pruebas propuestas · **7 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
+`B-2`, `B-4` y `O-5`). `B-1`, `B-2`, `B-4` y `O-5` entran con el sello `2.11.162-beta`; `B-6`, el
+cierre de `B-1`, `B-3` y `O-6` son **posteriores** al sello `2.11.163-beta` y viven en el commit de
+trabajo. Las filas
 que en una lectura anterior quedaban huérfanas (`B-5`, `B-6`, `O-5`, `O-6`, `T-3`) tienen ahora
 backlog, criterio y prueba; su evidencia sigue siendo E0/E1/E2 y **no** se eleva por tener criterio
 escrito.
