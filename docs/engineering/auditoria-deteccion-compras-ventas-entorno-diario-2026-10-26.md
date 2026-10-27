@@ -1496,7 +1496,8 @@ diff toca esquema. Ver §12.15 de la verificación.
 journal del día (del que se deriva) y en el worker; persistirlo entre procesos exigiría migración y
 no cambia el criterio (`settlementFailures` del informe). No se cambia el modo estructural ni se
 exige `finance_applier`: sigue siendo el modo smoke declarado. La evidencia es **E1**; sin sello, sin
-tag y sin bump.
+tag y sin bump. CI [`40472943847`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40472943847)
+sobre `18f59fdc` ⇒ **`success`** (`quality` + cuatro jobs PG).
 
 ---
 

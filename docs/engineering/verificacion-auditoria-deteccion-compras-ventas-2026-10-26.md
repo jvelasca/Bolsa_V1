@@ -1269,3 +1269,9 @@ fichero del diff toca esquema ni migraciones.
   ahora **declarado** en cada fila.
 - **Sin sello, sin tag y sin bump.** La evidencia es **E1**.
 
+**CI por commit** [`40472943847`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40472943847)
+sobre `18f59fdc` ⇒ **`success`** (`quality` + los cuatro jobs PG). `Optimize lab`
+([`40472943891`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40472943891)) y `Fase 2 scientific`
+([`40472943856`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40472943856)) ⇒ `success` sobre el
+mismo commit.
+
