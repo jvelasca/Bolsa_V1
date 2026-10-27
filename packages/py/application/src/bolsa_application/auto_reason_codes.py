@@ -79,6 +79,11 @@ POSITION_DECISION_UNAVAILABLE = "decision_unavailable"
 FILL_NOT_MATERIALIZED = "fill_not_materialized"
 FILL_PARTIALLY_MATERIALIZED = "fill_partially_materialized"
 EXIT_QTY_OVER_POSITION = "exit_qty_over_position"
+#: O-1 (cierre 2026-10-27) — el settlement LANZÓ: la orden quedó confirmada por el schedule
+#: pero el apply no llegó a materializar nada. Antes sólo quedaba una línea de log, así que
+#: el día no distinguía «no hubo fill» de «el fill falló». Es un motivo de MATERIALIZACIÓN
+#: (la orden no quedó contabilizada), no un veto de entrada.
+SETTLEMENT_FAILED = "settlement_failed"
 #: R-2 (cierre 2026-10-26) — la cantidad de la fila NO está reconciliada con el libro.
 #: Con más de un motor vivo sobre el mismo símbolo el total de la CUENTA no identifica a
 #: esta fila: el cierre se permite (reducir no empeora el riesgo) pero se declara, porque
@@ -174,7 +179,12 @@ POSITION_SKIP_REASONS: frozenset[str] = frozenset(
 
 # Motivos de materialización: la orden no quedó contabilizada como posición.
 MATERIALIZATION_REASONS: frozenset[str] = frozenset(
-    {FILL_NOT_MATERIALIZED, FILL_PARTIALLY_MATERIALIZED, EXIT_QTY_OVER_POSITION}
+    {
+        FILL_NOT_MATERIALIZED,
+        FILL_PARTIALLY_MATERIALIZED,
+        EXIT_QTY_OVER_POSITION,
+        SETTLEMENT_FAILED,
+    }
 )
 
 # AUTO-1 — motivos del ciclo de vida de una reserva.
@@ -335,6 +345,7 @@ __all__ = [
     "RESERVATION_RELEASED_RESTART",
     "RESERVATION_RELEASED_ROLLBACK",
     "RESERVATION_UNMEASURABLE",
+    "SETTLEMENT_FAILED",
     "STOP_RATCHET_APPLIED",
     "STOP_RATCHET_REJECTED",
     "THESIS_EXIT",

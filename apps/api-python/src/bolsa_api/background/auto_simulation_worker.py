@@ -205,6 +205,7 @@ from bolsa_application.auto_reason_codes import (
     RECONCILIATION_REQUIRED,
     RESERVATION_ALREADY_LIVE,
     RESERVATION_UNMEASURABLE,
+    SETTLEMENT_FAILED,
     STOP_RATCHET_APPLIED,
     STOP_RATCHET_REJECTED,
     THESIS_EXIT,
@@ -798,6 +799,9 @@ class _Settlement:
     unapplied: tuple[FillObservation, ...] = ()
     outcomes: Mapping[str, str] = field(default_factory=dict)
     structural: bool = False
+    #: O-1 (cierre 2026-10-27) — el settlement LANZÓ. Se distingue de «no hubo fill»: la
+    #: orden quedó confirmada por el schedule pero nada se materializó (o no se sabe).
+    failed: bool = False
 
     @property
     def applied_qty(self) -> Decimal:
@@ -1397,6 +1401,8 @@ class AutoSimulationWorker:
         # S-3: salidas DECIDIDAS que aún no han emitido orden (``EXIT_PENDING`` no se
         # escribe hasta que la venta existe; ver ``_v2_note_exit_intent``).
         self._v2_pending_exit: dict[str, PendingExitIntent] = {}
+        # O-1: settlements que lanzaron (contador del proceso; el día lo deriva del journal).
+        self._settlement_failures: int = 0
         # H-2 (§9 del pack): un ``PROTECT`` que NO mueve el stop y NO cambia el estado
         # quedaba mudo para siempre. Se journaliza UNA vez por (símbolo, stop) para no
         # inundar el journal en cada tick de un trailing ya en régimen permanente.
@@ -2185,6 +2191,15 @@ class AutoSimulationWorker:
         """W4: nº de lecturas con precio AUSENTE por símbolo (observabilidad del fail-closed)."""
         return dict(self._v2_price_missing)
 
+    @property
+    def settlement_failures(self) -> int:
+        """O-1: nº de settlements que LANZARON en este proceso (no solo en el log).
+
+        Es el contador que el informe del día publica como ``settlementFailures``; cada fallo
+        deja además su fila de journal (``settlement_failed``), que es la fuente del conteo.
+        """
+        return self._settlement_failures
+
     def _v2_price_source_kind(self) -> str | None:
         """v2.88.25 — la FUENTE canónica que construye el precio del tick, o ``None``.
 
@@ -2283,12 +2298,29 @@ class AutoSimulationWorker:
                 # (configuración) como si fuera el precio de ESTA operación.
                 price_source=self._v2_price_source_kind(),
             )
-        except Exception:  # noqa: BLE001 — un fallo de settlement no tumba el motor.
+        except Exception as exc:  # noqa: BLE001 — un fallo de settlement no tumba el motor.
             # Fail-closed: un problema al persistir contexto/aplicar dinero NO debe
             # romper el turno AUTOnomo (se degrada a "sin fill este tick"). El motor
             # reintentará; jamás se fabrica una posición sin settlement confirmado.
+            #
+            # O-1 (cierre 2026-10-27): el fallo deja de vivir SOLO en el log. Se cuenta en el
+            # día (``settlementFailures``) y se journaliza con su motivo, para que «no hubo
+            # fill» y «el fill falló» no sean la misma fila.
             logger.exception("auto_sim settle failed symbol=%s side=%s", symbol, side)
-            return _Settlement(requested_qty=qty, structural=structural)
+            self._settlement_failures += 1
+            self._journal_position_event(
+                symbol,
+                SETTLEMENT_FAILED,
+                at=self._v2_instant(),
+                detail={
+                    "side": side,
+                    "requestedQty": str(qty),
+                    "venue": venue,
+                    "structural": structural,
+                    "error": type(exc).__name__,
+                },
+            )
+            return _Settlement(requested_qty=qty, structural=structural, failed=True)
         if not result.fills:
             return _Settlement(
                 requested_qty=qty, outcomes=dict(outcomes or {}), structural=structural
@@ -2368,6 +2400,7 @@ class AutoSimulationWorker:
         *,
         reason: str = "",
         strategy_version: str | None = None,
+        structural: bool = False,
     ) -> SimJournalRow:
         row = SimJournalRow(
             kind=kind,
@@ -2380,6 +2413,8 @@ class AutoSimulationWorker:
             # apertura la aporta la propuesta y el cierre la hereda de la posición. Sin
             # versión la fila NO se atribuye (la ausencia es información).
             strategy_version=str(strategy_version or ""),
+            # O-2 — la fila declara si el settlement fue ESTRUCTURAL (sin caja).
+            structural=structural,
         )
         self._journal.append(row)
         return row
@@ -3709,6 +3744,7 @@ class AutoSimulationWorker:
         applied_qty: Any,
         partial: bool,
         cycle_id: str | None,
+        structural: bool = False,
     ) -> None:
         """(``M2``) sella la ORDEN DE ENTRADA emitida y materializada (v2.88.25).
 
@@ -3730,6 +3766,7 @@ class AutoSimulationWorker:
             actor=self._engine_id,
             as_of=self._v2_instant(),
             account_id=self._account_id,
+            structural=structural,
         )
         await self._v2_audit_emit(
             self._v2_seal_audit_identity(entry), label="entry_order"
@@ -3776,6 +3813,7 @@ class AutoSimulationWorker:
         closed_qty: Any,
         cycle_id: str | None,
         exit_reason: str | None,
+        structural: bool = False,
     ) -> None:
         """(``M2``) sella el HECHO durable de liquidación de un ciclo cerrado (v2.88.25).
 
@@ -3803,6 +3841,7 @@ class AutoSimulationWorker:
             actor=self._engine_id,
             as_of=self._v2_instant(),
             account_id=self._account_id,
+            structural=structural,
         )
         await self._v2_audit_emit(
             self._v2_seal_audit_identity(entry), label="cycle_settlement"
@@ -7565,7 +7604,9 @@ class AutoSimulationWorker:
             # el instante del cierre solo se conoce en la rama SELL.
             closed_cycle_id: str | None = None
             close_reason: str | None = None
-            self._emit("order", venue, None, action.lower(), exec_qty)
+            self._emit(
+                "order", venue, None, action.lower(), exec_qty, structural=settlement.structural
+            )
             # S-3 — la orden de salida ya EXISTE (materializada arriba): sólo ahora el FSM
             # puede declarar ``EXIT_PENDING``. Antes se escribía al decidir, así que un
             # ``hold`` del manager o un veto posterior dejaba la posición «pedida» sin venta.
@@ -7584,9 +7625,18 @@ class AutoSimulationWorker:
                     applied_qty=applied_qty,
                     partial=settlement.is_partial,
                     cycle_id=cycle_id,
+                    # O-2: el hecho durable declara si se liquidó sin caja.
+                    structural=settlement.structural,
                 )
             for o in settlement.applied:
-                self._emit("fill", o.venue, o.execution_id, o.side, o.qty)
+                self._emit(
+                    "fill",
+                    o.venue,
+                    o.execution_id,
+                    o.side,
+                    o.qty,
+                    structural=settlement.structural,
+                )
                 self._record_applied_event(symbol, o, realized_price)
             first_execution_id = settlement.applied[0].execution_id
             if action == "BUY":
@@ -7728,6 +7778,8 @@ class AutoSimulationWorker:
                         closed_qty=applied_qty,
                         cycle_id=closed_cycle_id,
                         exit_reason=close_reason,
+                        # O-2: el settlement declara si se cerró sin mover caja.
+                        structural=settlement.structural,
                     )
             report.orders += 1
             report.fills += len(settlement.applied)

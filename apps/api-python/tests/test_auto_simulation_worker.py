@@ -618,3 +618,92 @@ async def test_sin_reservas_que_persistir_el_espejo_ausente_no_veta_nada() -> No
     await worker._v2_persist_tick_reservations(SimpleNamespace(reservations=()))
 
     assert worker._v2_reservation_blocked == frozenset()
+
+
+# ── O-1/O-2: el settle fallido se cuenta y el modo estructural se publica ─────────────
+
+
+class _Collector:
+    """Sink de auditoría de mentira: registra lo que el worker publica."""
+
+    def __init__(self) -> None:
+        self.entries: list[object] = []
+
+    async def __call__(self, entry: object) -> None:
+        self.entries.append(entry)
+
+
+@pytest.mark.asyncio
+async def test_settle_failure_is_counted(
+    auto_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """O-1: un settlement que LANZA deja de ser una línea de log.
+
+    Antes el día no distinguía «no hubo fill» de «el fill falló»: el ``except`` devolvía un
+    settlement vacío y sólo se escribía en el log. Ahora el contador del worker y el
+    ``settlementFailures`` del informe del día lo declaran, y el journal guarda el motivo.
+    """
+    import bolsa_api.background.auto_simulation_worker as worker_module
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("store de ejecución caído")
+
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _boom)
+
+    worker = AutoSimulationWorker(exec_store=InMemoryExecutionEventStore())
+    worker._decider = _buy_decider(set(), set(_SYMBOLS))
+    await worker.auto_turn()
+
+    assert worker.settlement_failures >= 1, "el fallo debe contarse en el worker"
+    assert not worker.open_symbols, "un settle fallido NO fabrica posición"
+
+    day = build_auto_daily_report(
+        rows=worker.journal_pairs(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+    )
+    assert day.settlement_failures == worker.settlement_failures
+    assert day.as_dict()["settlementFailures"] == day.settlement_failures
+    assert "settlement_failed" in day.errors, "un settle fallido no es un día sano"
+    assert any(
+        row.reason == "settlement_failed" for row in worker.journal_pairs()
+    ), "el journal debe declarar el motivo, no sólo el log"
+
+
+@pytest.mark.asyncio
+async def test_structural_settlement_is_published(auto_env: None) -> None:
+    """O-2: sin ``finance_applier`` la operación se declara ``structural``.
+
+    El modo estructural (smoke: la confirmación del schedule es el único hecho, no se mueve
+    caja) era indistinguible de un settlement con dinero. Ahora viaja en el hecho durable de
+    la orden y en la fila del día, que el informe agrega como ``structuralOrders``.
+    """
+    from bolsa_application.auto_operational_monitor import AUTO_ENTRY_ORDER_EVENT
+
+    sink = _Collector()
+    worker = AutoSimulationWorker(
+        exec_store=InMemoryExecutionEventStore(),
+        operational_audit_sink=sink,
+    )
+    worker._decider = _buy_decider(set(), set(_SYMBOLS))
+    await worker.auto_turn()
+
+    assert worker.open_symbols, "la entrada se materializa (en modo estructural)"
+    orders = [
+        entry
+        for entry in sink.entries
+        if getattr(entry, "event_type", "") == AUTO_ENTRY_ORDER_EVENT
+    ]
+    assert orders, "la orden de entrada debe dejar su hecho durable"
+    payloads = [getattr(entry, "payload", None) or {} for entry in orders]
+    assert all(
+        payload.get("structural") is True for payload in payloads
+    ), f"el hecho durable debe declarar el modo: {payloads}"
+
+    day = build_auto_daily_report(
+        rows=worker.journal_pairs(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+    )
+    assert day.structural_orders == len(worker.open_symbols)
+    assert day.as_dict()["structuralOrders"] == day.structural_orders

@@ -359,6 +359,7 @@ def build_entry_order_entry(
     actor: str,
     as_of: str | None,
     account_id: str | None = None,
+    structural: bool = False,
 ) -> DecisionJournalEntryRecord | None:
     """(PURA) entrada append-only de la ORDEN DE ENTRADA emitida y materializada.
 
@@ -366,6 +367,10 @@ def build_entry_order_entry(
     ``auto_exit_orders``): el monitor declaraba ``entry_order_not_durable``. Esta entrada la
     sella por ``cycle_id`` con la cantidad PEDIDA y la MATERIALIZADA (que difieren con un fill
     parcial) y la FUENTE de precio usada. Sin orden/instrumento no se finge una: ``None``.
+
+    O-2 (cierre 2026-10-27): ``structural=True`` publica que la orden se liquidó **sin
+    ``finance_applier``** — no se movió caja; el hecho es la confirmación del schedule. Antes
+    ese modo era indistinguible de un settlement con dinero.
     """
     oid = _text(order_id)
     instrument = _text(instrument_id)
@@ -385,6 +390,8 @@ def build_entry_order_entry(
         "priceSource": usable_price_source(price_source),
         "cycleIdDerived": derived,
     }
+    if structural:
+        payload["structural"] = True
     if cycle is not None:
         payload["cycleId"] = cycle
     return DecisionJournalEntryRecord(
@@ -464,6 +471,7 @@ def build_cycle_settlement_entry(
     actor: str,
     as_of: str | None,
     account_id: str | None = None,
+    structural: bool = False,
 ) -> DecisionJournalEntryRecord | None:
     """(PURA) entrada append-only del HECHO durable de liquidación de un ciclo.
 
@@ -472,6 +480,9 @@ def build_cycle_settlement_entry(
     paso ``SETTLEMENT``. El PnL viaja con su medición: si la evidencia del ciclo está truncada
     el valor es ``None`` con ``PARTIAL`` — jamás una cifra sobre un subconjunto. Sin ciclo no
     se finge un settlement: ``None``.
+
+    O-2 (cierre 2026-10-27): ``structural=True`` publica que el cierre se liquidó **sin
+    ``finance_applier``** (no se movió caja).
     """
     cycle = _text(cycle_id)
     if cycle is None:
@@ -500,6 +511,8 @@ def build_cycle_settlement_entry(
         "cycleIdDerived": derived,
         "cycleId": cycle,
     }
+    if structural:
+        payload["structural"] = True
     return DecisionJournalEntryRecord(
         id=f"JNL-{uuid4().hex[:12]}",
         decision_id=decision_id,

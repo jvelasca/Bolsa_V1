@@ -780,6 +780,12 @@ fill". El reintento es correcto; la observabilidad, no.
 
 **Veredicto: PARCIAL.**
 
+> **Resuelto el 2026-10-27 (O-1).** El `except` ya no vuelve mudo: incrementa
+> `worker.settlement_failures`, journaliza `settlement_failed` con lado, cantidad, venue, modo
+> estructural y tipo de error, y el informe del día publica `settlementFailures` (además de
+> declararlo en `errors`, porque una orden confirmada sin materializar no es un día sano).
+> Ver §9.8.
+
 ### 7.3 Hallazgo O-2 · Modo estructural indistinguible del dinero
 
 Sin `finance_applier`, `_settle` declara `structural=True` y considera **aplicado** todo fill
@@ -788,6 +794,12 @@ código corre en un despliegue mal compuesto: la posición existiría sin que se
 El modo no se publica en el journal de la operación.
 
 **Veredicto: PARCIAL.**
+
+> **Resuelto el 2026-10-27 (O-2).** El modo se publica en tres sitios coherentes: el hecho
+> durable de la orden de entrada (`payload.structural = true`), el hecho de liquidación del ciclo
+> (mismo campo) y la fila del día (`SimJournalRow.structural`), que el informe agrega como
+> `structuralOrders`. Sin `structural` en el payload cuando el modo es con dinero: Δ = 0 en el
+> camino normal. Ver §9.8.
 
 ### 7.4 Hallazgo O-3 · Lectores que devuelven vacío y UI que rellena con 0
 
@@ -987,6 +999,10 @@ restantes describen qué habría que observar para dar el hallazgo por cerrado.
 > **Actualización 2026-10-26 (cierre de B-3).** `B-3` también queda **implementado** con prueba en
 > verde (§9.2): **6 implementadas** (`B-1`, `B-2`, `B-3`, `B-4`, `B-6`, `O-5`) y **15** con criterio
 > sin prueba ejecutada. La evidencia sigue siendo **E1**: herméticas, sin ventana ni operación real.
+>
+> **Actualización 2026-10-27 (O-1/O-2).** Los dos silencios del settlement dejan de ser propuestas
+> (§9.8): **8 implementadas** (`B-1`, `B-2`, `B-3`, `B-4`, `B-6`, `O-1`, `O-2`, `O-5`) y **13** con
+> criterio sin prueba ejecutada. Evidencia **E1**.
 
 | ID | Nombre de prueba propuesto | Aserción falsable |
 |---|---|---|
@@ -1002,8 +1018,8 @@ restantes describen qué habría que observar para dar el hallazgo por cerrado.
 | S-4 | `test_thesis_exit_reachable_with_declared_invalidation_price` | Un plan con `invalidationPrice > stop` produce `primary_reason == "THESIS_INVALIDATION"` sin `STRUCTURAL_STOP`. Fija que el caso es alcanzable **o** que se retira del contrato. |
 | S-5 | `test_unadopted_position_is_declared_in_journal` | Posición sin `PositionState` ni adopción ⇒ fila `position_unmanaged` con su símbolo (hoy `None` silencioso). |
 | S-6 | `test_auto_exit_ignores_stale_data_by_contract` | Con `data_stale=True`, una salida `TARGET_1` sigue emitiéndose y el journal lo declara. Fija la decisión de arquitectura (hoy no está escrita). |
-| O-1 | `test_settle_failure_is_counted` | `exec_store` que lanza ⇒ el informe del día incrementa `settlementFailures` (hoy solo log). |
-| O-2 | `test_structural_settlement_is_published` | Con `finance_applier=None`, la operación se marca `structural` en el journal (hoy no se publica). |
+| O-1 | `test_settle_failure_is_counted` | `exec_store` que lanza ⇒ el informe del día incrementa `settlementFailures` (hoy solo log). **Implementado 2026-10-27** (§9.8): cuenta, journaliza `settlement_failed` y lo declara en `errors`. |
+| O-2 | `test_structural_settlement_is_published` | Con `finance_applier=None`, la operación se marca `structural` en el journal (hoy no se publica). **Implementado 2026-10-27** (§9.8): orden, liquidación de ciclo y fila del día. |
 | O-3 | `test_absent_measurement_is_not_rendered_as_zero` | `oos=null` ⇒ la UI muestra "NO MEDIDO", no `0` (hoy `?? 0`). |
 | O-4 | `test_window_verdict_is_read_from_gate` | La UI pinta el veredicto del gate y falla el test si el texto es una constante. |
 | O-5 | `test_day_watch_alerts_on_measured_inconclusive_day` | Una fila real del ledger con `status=MEDIDO` y `gate={verdict: INCONCLUSIVE, cycles: 0}` ⇒ `evaluate_day_watch` devuelve `verdict=INCONCLUSIVE`, `severity=alert`, `reason=gate_inconclusive`; `write_status` lo persiste en un directorio **temporal** y el árbol de trabajo no cambia (hoy: sin evidencia de disparo). |
@@ -1438,6 +1454,50 @@ sobre `a4a29e59`, cuyo código es el mismo salvo el orden de `import`.
 corrige el `hold` de `TIME_STOP` bajo `CRITICAL`, que es la política de S-2 y ahora se **declara** en
 vez de fingir una salida. La evidencia es **E1**; sin sello, sin tag y sin bump.
 
+### 9.8 O-1/O-2 aplicados: el settle fallido se cuenta y el modo estructural se publica
+
+**Los fallos, en una frase.** Dos silencios del mismo `except`/del mismo booleano: un settlement que
+lanzaba sólo dejaba una línea de log (el día no distinguía «no hubo fill» de «el fill falló»), y el
+modo estructural —el que existe porque **no** hay `finance_applier` y por tanto no se mueve caja— no
+viajaba a ningún sitio, así que un despliegue mal compuesto se leería igual que dinero real.
+
+**Arreglo (aditivo, sin migración).**
+
+| Pieza | Cambio |
+|---|---|
+| `auto_reason_codes.SETTLEMENT_FAILED` | motivo de **materialización** (`settlement_failed`), en `MATERIALIZATION_REASONS` ⇒ entra en `POSITION_ATTRIBUTION_REASONS` (atribución de gestión, nunca veto de entrada) |
+| `AutoSimulationWorker._settle` | en el `except`: cuenta `settlement_failures`, journaliza el motivo con lado/cantidad/venue/modo/tipo de error y devuelve `_Settlement(failed=True)` |
+| `AutoDailyReport` | `settlementFailures` (desde las filas `position_management`+`settlement_failed`) y `structuralOrders` (filas `order` con `structural`); `errors` incluye `settlement_failed` |
+| `SimJournalRow` | campo aditivo `structural` (lo escribe `_emit(..., structural=...)`) |
+| `build_entry_order_entry` / `build_cycle_settlement_entry` | `structural=True` ⇒ `payload["structural"] = True`; **omitido** con dinero (Δ = 0) |
+
+El informe del día **no** se lee de un campo del worker que pueda divergir: se deriva de las filas
+del journal, que es lo que el día agrega. El contador del worker (`settlement_failures`) existe para
+que la misma cifra sea legible en caliente y la prueba pueda cruzarlas.
+
+**Pruebas (E1).**
+
+| Fichero | Qué fija |
+|---|---|
+| `test_auto_simulation_worker.py::test_settle_failure_is_counted` | `submit_simulated_order` que lanza ⇒ `worker.settlement_failures >= 1`, **ninguna** posición abierta, `settlementFailures` igual en el informe, `settlement_failed` en `errors` y fila con ese motivo |
+| `test_auto_simulation_worker.py::test_structural_settlement_is_published` | sin `finance_applier`: el hecho durable de la orden declara `structural: true` y el día cuenta `structuralOrders == nº de posiciones abiertas` |
+
+**Gates ejecutados** (2026-10-27): `test_auto_simulation_worker` ⇒ **25 passed**;
+`test_auto_daily_journal` + `test_auto_operational_audit` + `test_auto_m2_operational_audit_seam` +
+`test_auto_v2_golden_day_evidence` + `test_auto_v2_worker_integration` +
+`test_auto_engine_full_day_zero_human_intervention` ⇒ **123 passed**; `application` + `analytics` ⇒
+**4241 passed**; `ruff` ⇒ limpio; `mypy` (api + application) ⇒ **409 ficheros sin issues**. La suite
+completa de `api-python` (**1261 passed, 71 failed**) **no** se puede certificar en esta máquina por
+la base de desarrollo (head `035` en vez de `058` y 1580 atributos *dropped* en
+`signal_alert_subscriptions` ⇒ `TooManyColumns` en la 054), no por este cambio: ningún fichero del
+diff toca esquema. Ver §12.15 de la verificación.
+
+**Lo que NO se ha hecho.** El contador **no** es una columna PG acumulada entre días: vive en el
+journal del día (del que se deriva) y en el worker; persistirlo entre procesos exigiría migración y
+no cambia el criterio (`settlementFailures` del informe). No se cambia el modo estructural ni se
+exige `finance_applier`: sigue siendo el modo smoke declarado. La evidencia es **E1**; sin sello, sin
+tag y sin bump.
+
 ---
 
 ## 10. Backlog priorizado
@@ -1474,6 +1534,9 @@ vez de fingir una salida. La evidencia es **E1**; sin sello, sin tag y sin bump.
    anota al decidir y la transición se sella tras materializar la venta; lo que no salió se declara
    como `exit_not_emitted`, nunca como salida pedida.
 7. Contador durable de `settlement_failures` y publicación del modo `structural` (O-1, O-2).
+   **Aplicado 2026-10-27 (§9.8):** el `except` del settle ya no es mudo (cuenta, journaliza
+   `settlement_failed` y el informe declara `settlementFailures`) y el modo sin caja viaja a la orden,
+   a la liquidación del ciclo y a la fila del día (`structuralOrders`).
 8. Journal con `featureSource` (`real`/`synthetic`) y `signalWindowBars` (**O-6**). **Aplicado
    2026-10-27:** claves aditivas del `payload` JSONB, declaradas también en el `HOLD` y omitidas si
    no hay dato (§7.7).
@@ -1520,8 +1583,8 @@ E3.**
 | S-4 | P2-13 | S-4 | `test_thesis_exit_reachable_with_declared_invalidation_price` | E0 + E1 parcial |
 | S-5 | P1-9 | S-5 | `test_unadopted_position_is_declared_in_journal` | E0 |
 | S-6 | P0-4 | S-6 | `test_auto_exit_ignores_stale_data_by_contract` | E0 |
-| O-1 | P1-7 | O-1 | `test_settle_failure_is_counted` | E0 |
-| O-2 | P1-7 | O-2 | `test_structural_settlement_is_published` | E0 |
+| O-1 | P1-7 | O-1 + §9.8 | `test_settle_failure_is_counted` | **E1** (excepción ⇒ `settlementFailures >= 1`, `settlement_failed` en `errors`, ninguna posición abierta) |
+| O-2 | P1-7 | O-2 + §9.8 | `test_structural_settlement_is_published` | **E1** (sin `finance_applier` ⇒ `structural: true` en la orden y `structuralOrders` en el día) |
 | O-3 | P1-10 | O-3 | `test_absent_measurement_is_not_rendered_as_zero` | E0 |
 | O-4 | P1-10 | O-4 | `test_window_verdict_is_read_from_gate` | E0 |
 | O-5 | P1-12 | O-5 | `test_day_watch_alerts_on_measured_inconclusive_day` | **E1** (54 tests del vigía, uno con fila real `20261019` en `tmp_path`) + E2 parcial (el scheduler arranca el vigía, ya aislado); efecto sobre la ventana real no observado |
@@ -1532,9 +1595,11 @@ E3.**
 
 **Cobertura:** 21 hallazgos · **22** entradas de backlog (las 21 con ID + P1-12b, que cubre el
 silencio de la UI del scan descrito en §7.4) · 21 criterios · 21
-pruebas propuestas · **10 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
-`S-1` en §9.5, `S-2` en §9.6, `S-3` en §9.7, `B-2`, `B-4` y `O-5`). `B-1`, `B-2`, `B-4` y `O-5`
-entran con el sello `2.11.162-beta`; `B-6`, el cierre de `B-1`, `B-3`, `O-6`, `S-1`, `S-2` y `S-3`
+pruebas propuestas · **12 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
+`S-1` en §9.5, `S-2` en §9.6, `S-3` en §9.7, `O-1` y `O-2` en §9.8, `B-2`, `B-4` y `O-5`). `B-1`,
+`B-2`, `B-4` y `O-5`
+entran con el sello `2.11.162-beta`; `B-6`, el cierre de `B-1`, `B-3`, `O-6`, `S-1`, `S-2`, `S-3`,
+`O-1` y `O-2`
 son **posteriores** al sello `2.11.163-beta` y viven en el commit de trabajo. Las filas
 que en una lectura anterior quedaban huérfanas (`B-5`, `B-6`, `O-5`, `O-6`, `T-3`) tienen ahora
 backlog, criterio y prueba; su evidencia sigue siendo E0/E1/E2 y **no** se eleva por tener criterio

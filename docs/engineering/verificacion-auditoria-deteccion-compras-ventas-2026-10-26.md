@@ -506,7 +506,7 @@ commit** de lo que sigue pendiente. Nada se ha publicado.
 | P0 | Resolver el contrato `gated`/`raw`: el gating no puede reiniciarse en cada llamada | B-3 | **pendiente**, con prueba de caracterización |
 | P0 | Unificar el conjunto de motivos accionables entre F5 y AUTO, o consultar F5 | S-1, S-2, S-6 | **aplicado** F5+AUTO (§12.12, §12.13); **S-6** (cableado en el worker) sigue **pendiente** |
 | P1 | `EXIT_PENDING` solo tras orden emitida | S-3 | **aplicado** (§12.14) |
-| P1 | Contador durable de settlement fallido y publicación de `structural` | O-1, O-2 | **pendiente** |
+| P1 | Contador durable de settlement fallido y publicación de `structural` | O-1, O-2 | **aplicado** (§12.15) |
 | P1 | Declarar la posición no adoptada en el journal | S-5 | **pendiente** |
 | P1 | Sustituir `?? 0` y el `INCONCLUSIVE` estático por lecturas del gate | O-3, O-4 | **pendiente** |
 | P1 | Aislar el estado del vigía en pruebas (el banco no debe escribir el repo) | O-5 | **aplicado** (`WINDOW_DAY_WATCH_DIR`, `WINDOW_DAY_WATCH_ENABLED=0`, guarda de sesión) |
@@ -1217,5 +1217,55 @@ El caso positivo —la venta real— ya estaba cubierto y sigue journalizando `t
 - **No** se cambia la política que produce el `hold`: `TIME_STOP` bajo `CRITICAL` sigue degradando a
   `REVIEW` (es S-2 y está probado). Ahora se **declara** en vez de fingir una salida.
 - **No** se consulta F5 desde el AUTO (**S-6**).
+- **Sin sello, sin tag y sin bump.** La evidencia es **E1**.
+
+### 12.15 O-1/O-2: el settle fallido se cuenta y el modo estructural se publica
+
+> **Cierra los ítems O-1 y O-2** de §7.2/§7.3 y §10 de la auditoría, y los criterios `O-1`/`O-2`
+> de §9.
+
+**Qué se implementó.**
+
+| Silencio | Antes | Ahora |
+|---|---|---|
+| Settlement que lanza | `except Exception` ⇒ log; el día no lo distinguía de «no hubo fill» | cuenta `settlement_failures`, journaliza `settlement_failed` (lado, cantidad, venue, modo, tipo de error) y el informe publica `settlementFailures` + `settlement_failed` en `errors` |
+| Modo sin caja | `structural=True` sólo en memoria | `payload.structural = true` en la orden de entrada y en la liquidación del ciclo; `SimJournalRow.structural` en el día y `structuralOrders` en el informe |
+
+`settlement_failed` entra en `MATERIALIZATION_REASONS` (⇒ atribución de gestión), no en las causas
+de veto de entrada. Las claves son **aditivas**: sin `structural` cuando hay `finance_applier`, así
+que el camino normal no cambia de payload (Δ = 0) y no hay migración.
+
+**Verificación (E1).**
+
+| Gate | Resultado |
+|---|---|
+| `test_auto_simulation_worker.py` | **25 passed** (incluye `test_settle_failure_is_counted` y `test_structural_settlement_is_published`) |
+| `test_auto_daily_journal` · `test_auto_operational_audit` · `test_auto_m2_operational_audit_seam` · `test_auto_v2_golden_day_evidence` · `test_auto_v2_worker_integration` · `test_auto_engine_full_day_zero_human_intervention` | **123 passed** |
+| `application` + `analytics` | **4241 passed** |
+| `ruff` / `mypy` (api + application) | limpio / **409 ficheros sin issues** |
+
+Las dos pruebas son de **control negativo**: la de O-1 hace fallar `submit_simulated_order` y exige
+que el día lo diga (y que **no** quede posición abierta a medias); la de O-2 corre sin
+`finance_applier` y exige que el hecho durable declare el modo. Ninguna de las dos eleva el modo
+estructural a «modo válido de producción».
+
+**La suite completa de `api-python` no se puede certificar en esta máquina, y no por este cambio.**
+`pytest -m "not integration"` ⇒ **1261 passed, 71 failed, 55 skipped**; los 71 fallos están todos en
+ficheros que necesitan PostgreSQL (`*_pg`, `test_workspaces*`, `test_health`, `test_lifecycle_golden*`)
+y la causa raíz es la **base de desarrollo**, no el código: quedó en `035_paper_forward_evidence`
+cuando el código espera `058_estudio_daily_proposals` (una corrida anterior murió a mitad de un
+`roundtrip` de migraciones), y `signal_alert_subscriptions` arrastra **1580 atributos *dropped***
+(los cuenta PostgreSQL aunque `information_schema` sólo muestre 17 columnas vivas), así que el
+primer `ADD COLUMN` de la 054 revienta con `TooManyColumns`. Es el mismo desgaste ya descrito en
+[`evidence/v2.88.136`](./evidence/v2.88.136/README.md) §«límites»; el remedio conocido es
+**recrear** la BD (dump → drop/create → `upgrade head`), que **no** se ha ejecutado aquí. Ningún
+fichero del diff toca esquema ni migraciones.
+
+**Lo que NO se ha hecho, y queda declarado.**
+
+- El contador **no** se acumula en PostgreSQL entre procesos: se deriva del journal del día (que es
+  lo que el informe agrega). Persistirlo exigiría migración y no cambia el criterio.
+- **No** se exige `finance_applier` ni se prohíbe el modo estructural: sigue siendo el modo smoke,
+  ahora **declarado** en cada fila.
 - **Sin sello, sin tag y sin bump.** La evidencia es **E1**.
 
