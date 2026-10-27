@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from bolsa_api.api.dependencies import get_enqueue_scan_job_use_case
 from bolsa_application.opportunity_daily_discovery import (
     DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
+    OPPORTUNITY_DISCOVERY_PAYLOAD_KEY,
     EnqueueOpportunityDailyScan,
     account_wants_daily_scan,
     clamp_daily_ops_list_id,
@@ -28,6 +29,9 @@ from bolsa_application.opportunity_daily_discovery import (
 from bolsa_infrastructure.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+#: Motivo de journal/log cuando el tick de hoy ya estaba encolado (T-2, dedupe durable).
+SCAN_DAILY_ALREADY_ENQUEUED = "scan_daily_already_enqueued"
 
 _last_ran_day_key: str | None = None
 
@@ -104,6 +108,38 @@ async def _resolve_targets(session: AsyncSession) -> list[dict[str, Any]]:
     return targets
 
 
+async def _targets_already_enqueued_today(session: AsyncSession) -> set[tuple[str, str | None]]:
+    """Pares ``(listId, accountId)`` de discovery ya encolados hoy (dedupe durable).
+
+    T-2 hace el primer tick **inmediato**, así que un reinicio no puede re-encolar el mismo
+    universo el mismo día: el guard en memoria (``_last_ran_day_key``) muere con el proceso,
+    la fila de ``scan_jobs`` no.
+    """
+    from bolsa_infrastructure.database.repositories.scan_job_repository import (
+        SqlAlchemyScanJobRepository,
+    )
+
+    day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    payloads = await SqlAlchemyScanJobRepository(session).list_payloads_since(
+        since=day_start,
+        payload_key=OPPORTUNITY_DISCOVERY_PAYLOAD_KEY,
+    )
+    done: set[tuple[str, str | None]] = set()
+    for payload in payloads:
+        universe = payload.get("universe")
+        raw_list = payload.get("listId") or (
+            universe.get("listId") if isinstance(universe, dict) else None
+        )
+        account = payload.get("opportunityAccountId")
+        done.add(
+            (
+                clamp_daily_ops_list_id(str(raw_list or DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID)),
+                str(account) if account else None,
+            )
+        )
+    return done
+
+
 async def _run_opportunity_daily_once(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> str | None:
@@ -115,9 +151,19 @@ async def _run_opportunity_daily_once(
     async with session_factory() as session:
         try:
             targets = await _resolve_targets(session)
+            already = await _targets_already_enqueued_today(session)
             enqueue_uc = get_enqueue_scan_job_use_case(session)
             discovery = EnqueueOpportunityDailyScan(enqueue_uc)
             for target in targets:
+                key = (str(target["listId"]), target.get("accountId"))
+                if key in already:
+                    logger.info(
+                        "Opportunity daily scan ya encolado hoy — reason=%s list=%s account=%s",
+                        SCAN_DAILY_ALREADY_ENQUEUED,
+                        target["listId"],
+                        target.get("accountId"),
+                    )
+                    continue
                 job = await discovery.execute(
                     list_id=str(target["listId"]),
                     account_id=target.get("accountId"),
@@ -143,16 +189,20 @@ async def opportunity_daily_scan_worker_loop(
     settings = get_settings()
     interval = max(300, int(settings.opportunity_daily_scan_interval_seconds))
     logger.info(
-        "Worker OPPORTUNITY_DAILY_SCAN iniciado — intervalo %ds · list=%s",
+        "Worker OPPORTUNITY_DAILY_SCAN iniciado — intervalo %ds · list=%s · primer tick "
+        "inmediato",
         interval,
         clamp_daily_ops_list_id(settings.opportunity_daily_universe_list_id),
     )
+    # T-2: el primer intento es YA. Dormir el intervalo antes del primer trabajo dejaba al
+    # proceso recién arrancado sin escanear hasta el día siguiente (24 h por defecto), que es
+    # lo que el operador lee como «el scan no corre».
     while True:
-        await asyncio.sleep(interval)
         try:
             await _run_opportunity_daily_once(session_factory)
         except Exception:
             logger.exception("Error en worker Opportunity daily scan")
+        await asyncio.sleep(interval)
 
 
 def start_opportunity_daily_scan_worker(

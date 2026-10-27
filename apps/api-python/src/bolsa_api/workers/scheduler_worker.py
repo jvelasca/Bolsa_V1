@@ -54,6 +54,7 @@ from bolsa_api.background.paper_auto_engine_worker import start_paper_auto_engin
 from bolsa_api.background.paper_evidence_snapshot_worker import (
     start_paper_evidence_snapshot_worker,
 )
+from bolsa_api.background.scan_queue_health import report_scan_queue_health
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
 from bolsa_api.background.window_day_watch_worker import start_window_day_watch
@@ -137,6 +138,10 @@ async def _run_scheduler(
     # cuentas UNA vez al arranque, serializadas con el resto de procesos (workers
     # FastAPI con --workers N) mediante advisory lock, fuera del path de petición.
     await database_bootstrap(engine=engine, session_factory=session_factory)
+
+    # T-1: este proceso NO drena ``scan_jobs`` (R12-SCHED, una autoridad por concern). Se
+    # declara quién lo hace y se avisa con motivo accionable si la cola está atascada.
+    await report_scan_queue_health(session_factory)
 
     tasks = _start_workers(_event_loop_starters(), session_factory)
 

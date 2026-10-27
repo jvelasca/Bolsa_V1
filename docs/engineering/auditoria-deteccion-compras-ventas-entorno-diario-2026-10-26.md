@@ -719,7 +719,7 @@ una señal `exit` sobre un símbolo sin posición: es información de la estrate
 |---|---|---|---|
 | `scheduler_worker` | continuo | 20 starters de crons (alertas, custodia, ESTUDIO EOD, AUTO ops, vigía…) | `apps/api-python/src/bolsa_api/workers/scheduler_worker.py:68-104` |
 | `queue_poll_worker` | 5 s (`scan_worker.py:16`) | drena la cola de scans/optimización (proceso **dedicado**, no en el scheduler) | `queue_poll_worker.py:32-39`; `scripts/run-dev.mjs:384-405` |
-| `OPPORTUNITY_DAILY_SCAN` | 24 h, **duerme antes del primer trabajo** | encola el scan diario de oportunidades | `opportunity_daily_scan_worker.py:140-152` |
+| `OPPORTUNITY_DAILY_SCAN` | 24 h, **primer tick inmediato** | encola el scan diario de oportunidades | `opportunity_daily_scan_worker.py:140-163` |
 | `ESTUDIO_EOD_OPINION` | 1 h | encola **un** job diario si no existe | `estudio_eod_opinion_worker.py:51-90`; `config.py:217-222` |
 | `AUTO SIM` | 60 s | `runtime.run_tick()` → decisión + settlement | `auto_simulation_worker.py:8722-8767` (bucle `auto_sim_loop`); `:9268-9281` es el helper `_sim_interval_seconds` |
 | `window_day_watch` | 20:00 local | vigía read-only del ledger | `config.py:102-117`; `scheduler_worker.py:100-102` |
@@ -728,11 +728,19 @@ una señal `exit` sobre un símbolo sin posición: es información de la estrate
 `_event_loop_starters()`; se arranca desde `queue_poll_worker` (`:36-39`) o desde `run-dev.mjs`
 (`:403`). Si el despliegue no levanta ese proceso, los jobs de scan se encolan y **no se ejecutan**.
 
+> **Resuelto el 2026-10-27 (T-1).** El scheduler sigue **sin** drenar la cola (una autoridad por
+> concern), pero deja de callar: declara `authority=` al arrancar y publica `scan_queue_stalled` con
+> la acción concreta cuando hay `pending` envejecidos (§9.9).
+
 **Hallazgo T-2 · El scan diario duerme 24 h antes de su primer intento.**
 `opportunity_daily_scan_worker_loop` hace `await asyncio.sleep(interval)` antes de
 `_run_opportunity_daily_once` (`:150-152`); con el default de 86 400 s, un proceso recién arrancado
 no ejecuta el primer scan hasta el día siguiente. Además el flag está **OFF por defecto**
 (`config.py:244-250`).
+
+> **Resuelto el 2026-10-27 (T-2).** El primer tick es inmediato y el dedupe del día pasa a ser
+> **durable** (`scan_daily_already_enqueued` sobre `scan_jobs`), para que un reinicio no encole dos
+> veces el mismo universo (§9.9). El flag sigue OFF por defecto: esto no lo enciende.
 
 **Hallazgo T-3 · El bucle AUTO es de 60 s sobre una señal D1.** El worker reevalúa cada minuto la
 misma ventana cerrada (`B-1`), con dedupe durable por barra (`auto_simulation_worker.py:4770-4830`).
@@ -1003,6 +1011,10 @@ restantes describen qué habría que observar para dar el hallazgo por cerrado.
 > **Actualización 2026-10-27 (O-1/O-2).** Los dos silencios del settlement dejan de ser propuestas
 > (§9.8): **8 implementadas** (`B-1`, `B-2`, `B-3`, `B-4`, `B-6`, `O-1`, `O-2`, `O-5`) y **13** con
 > criterio sin prueba ejecutada. Evidencia **E1**.
+>
+> **Actualización 2026-10-27 (T-1/T-2).** El arranque del scan deja de ser invisible (§9.9):
+> **10 implementadas** (`B-1`, `B-2`, `B-3`, `B-4`, `B-6`, `O-1`, `O-2`, `O-5`, `T-1`, `T-2`) y
+> **11** con criterio sin prueba ejecutada. Evidencia **E1** (+ **E2** parcial en T-1).
 
 | ID | Nombre de prueba propuesto | Aserción falsable |
 |---|---|---|
@@ -1024,8 +1036,8 @@ restantes describen qué habría que observar para dar el hallazgo por cerrado.
 | O-4 | `test_window_verdict_is_read_from_gate` | La UI pinta el veredicto del gate y falla el test si el texto es una constante. |
 | O-5 | `test_day_watch_alerts_on_measured_inconclusive_day` | Una fila real del ledger con `status=MEDIDO` y `gate={verdict: INCONCLUSIVE, cycles: 0}` ⇒ `evaluate_day_watch` devuelve `verdict=INCONCLUSIVE`, `severity=alert`, `reason=gate_inconclusive`; `write_status` lo persiste en un directorio **temporal** y el árbol de trabajo no cambia (hoy: sin evidencia de disparo). |
 | O-6 | `test_journal_records_feature_source_and_window_bars` | La entrada de journal de una decisión ACTIVE lleva `featureSource` (`real`/`synthetic`) y `signalWindowBars`; un `HOLD` por SMA200 ausente **no** produce la misma fila que un `HOLD` por mercado lateral. **Cubierto 2026-10-27** por `test_plan_v2_tick_seals_feature_source_and_window_bars` y `test_active_strategy_feature_provenance.py`. |
-| T-1 | `test_scan_worker_is_started_by_scheduler_or_its_own_process` | El arranque del scheduler expone el hecho de que `queue_poll_worker` está vivo, o falla con motivo accionable. |
-| T-2 | `test_daily_scan_runs_immediately_when_due` | Reloj en hora de ejecución ⇒ el primer `_run_opportunity_daily_once` ocurre **sin** esperar 24 h. |
+| T-1 | `test_scan_worker_is_started_by_scheduler_or_its_own_process` | El arranque del scheduler expone el hecho de que `queue_poll_worker` está vivo, o falla con motivo accionable. **Implementado 2026-10-27** (§9.9): `authority=queue_poll_worker` en el arranque y `scan_queue_stalled` con `pending` envejecidos. |
+| T-2 | `test_daily_scan_runs_immediately_when_due` | Reloj en hora de ejecución ⇒ el primer `_run_opportunity_daily_once` ocurre **sin** esperar 24 h. **Implementado 2026-10-27** (§9.9): primer tick inmediato + dedupe durable del día. |
 | T-3 | `test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar` | Con la barra cerrada fija, N ticks de 60 s producen **como máximo una** decisión con nueva identidad de barra (`bar_tick`) y el reintento intrabarra es idempotente (mismo `execution_id`, sin segunda ejecución). |
 
 ### 9.1 B-1 / B-6 implementados: el warmup se mide sobre la serie, no sobre el periodo
@@ -1490,7 +1502,10 @@ que la misma cifra sea legible en caliente y la prueba pueda cruzarlas.
 completa de `api-python` (**1261 passed, 71 failed**) **no** se puede certificar en esta máquina por
 la base de desarrollo (head `035` en vez de `058` y 1580 atributos *dropped* en
 `signal_alert_subscriptions` ⇒ `TooManyColumns` en la 054), no por este cambio: ningún fichero del
-diff toca esquema. Ver §12.15 de la verificación.
+diff toca esquema. **La BD se reconstruyó** (dump `db-backups/bolsa_v1-20261027-094148-256.sql` →
+drop/create → `alembic upgrade head` → `pnpm db:seed`) y la suite completa volvió a
+**1390 passed, 7 failed** — los 7, de interferencia de los *roundtrip* de migraciones sobre la BD
+compartida, y **verdes en aislamiento**; ver §12.15 de la verificación.
 
 **Lo que NO se ha hecho.** El contador **no** es una columna PG acumulada entre días: vive en el
 journal del día (del que se deriva) y en el worker; persistirlo entre procesos exigiría migración y
@@ -1498,6 +1513,47 @@ no cambia el criterio (`settlementFailures` del informe). No se cambia el modo e
 exige `finance_applier`: sigue siendo el modo smoke declarado. La evidencia es **E1**; sin sello, sin
 tag y sin bump. CI [`40472943847`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40472943847)
 sobre `18f59fdc` ⇒ **`success`** (`quality` + cuatro jobs PG).
+
+### 9.9 T-1/T-2 aplicados: quién drena la cola se declara y el scan diario no espera 24 h
+
+**Los fallos, en una frase.** El scheduler arranca veinte crons pero **no** drena `scan_jobs` (es
+correcto: una autoridad por concern), y nadie lo decía: con el proceso dedicado apagado, los scans
+se encolaban y morían en silencio. Y el worker del scan diario dormía el intervalo **antes** del
+primer trabajo, así que un proceso recién arrancado no escaneaba hasta el día siguiente.
+
+**Arreglo (sin migración, sin tocar la cadencia del motor).**
+
+| Pieza | Cambio |
+|---|---|
+| `background/scan_queue_health.py` (nuevo) | `scan_queue_authority(backend)` ⇒ `arq_worker` \| `queue_poll_worker`; `inspect_scan_queue` cuenta `pending` y la antigüedad del más viejo; `report_scan_queue_health` publica `scan_queue_healthy` / `scan_queue_stalled` / `scan_queue_unknown` |
+| `scheduler_worker._run_scheduler` | tras el bootstrap declara la autoridad y, si hay `pending` ≥ 300 s, publica `scan_queue_stalled` con la acción (`bolsa-queue-poll-worker`) |
+| `queue_poll_worker._run_queue_poll` | declara el hecho positivo: `authority=queue_poll_worker backend=… starters=…` |
+| `opportunity_daily_scan_worker` | primer tick **inmediato** (el `sleep` pasa al final del bucle) y dedupe **durable** del día (`scan_daily_already_enqueued`) |
+| `SqlAlchemyScanJobRepository.list_payloads_since` | filtra en SQL por `payload[opportunityDiscovery] = true` y `created_at >=` corte, para que el dedupe aguante reinicios |
+
+El dedupe es necesario **porque** el primer tick es inmediato: el guard anterior era una variable de
+módulo (`_last_ran_day_key`) que muere con el proceso. La fila de `scan_jobs` no.
+
+**Pruebas (E1 + E2 parcial).**
+
+| Fichero | Qué fija |
+|---|---|
+| `test_scheduler_worker.py::test_scheduler_declares_the_scan_queue_authority` | backend inline ⇒ INFO `authority=queue_poll_worker` · `reason=scan_queue_healthy` |
+| `test_scheduler_worker.py::test_stalled_scan_queue_is_an_error_with_actionable_reason` | un `pending` de 60 min ⇒ **ERROR** `reason=scan_queue_stalled` y la acción `bolsa-queue-poll-worker` en el mensaje |
+| `test_scheduler_worker.py::test_unreadable_scan_queue_is_declared_and_does_not_abort` | cola ilegible ⇒ WARNING `scan_queue_unknown` y `None` (no aborta el arranque) |
+| `test_opportunity_daily_scan_worker.py::test_daily_scan_runs_immediately_when_due` | el primer evento del bucle es `run`, **antes** de cualquier `sleep`; después duerme el intervalo completo |
+| `test_opportunity_daily_scan_worker.py::test_restart_does_not_reenqueue_the_same_day` | con un discovery de hoy ya encolado ⇒ **0** encolados y el día queda sellado |
+| `test_scan_queue_health_pg.py` (job `lifecycle-pg`, gate `SCAN_QUEUE_PG_REQUIRED=1`) | el SQL real: cuenta `pending`/antigüedad, no cuenta cerrados, y el filtro JSONB del dedupe sólo ve discovery desde el corte |
+
+**Gates ejecutados** (2026-10-27): `test_queue_poll_worker` + `test_scheduler_worker` +
+`test_opportunity_daily_scan_worker` + `test_logging_redaction` ⇒ **51 passed**;
+`test_scan_queue_health_pg` ⇒ **3 passed** (PG real, gate activo); `ruff` ⇒ limpio; `mypy` (api +
+application + el repositorio) ⇒ **411 ficheros sin issues**.
+
+**Lo que NO se ha hecho.** El scheduler **sigue** sin drenar la cola: no se duplica la autoridad
+(sería un segundo consumidor sobre la misma tabla). El umbral de atasco es una constante del módulo
+(300 s), no un flag de configuración. No se toca la cadencia del AUTO ni el reloj de barras (T-3
+sigue abierto). La evidencia es **E1** + **E2** parcial; sin sello, sin tag y sin bump.
 
 ---
 
@@ -1544,6 +1600,9 @@ sobre `18f59fdc` ⇒ **`success`** (`quality` + cuatro jobs PG).
 9. Declarar la posición no adoptada en el journal (S-5).
 10. Sustituir los `?? 0` y el `INCONCLUSIVE` estático por lecturas del gate (O-3, O-4).
 11. Arranque del scan: proceso dedicado verificado o primer tick sin esperar 24 h (T-1, T-2).
+    **Aplicado 2026-10-27 (§9.9):** el arranque del scheduler declara la autoridad de la cola y
+    publica `scan_queue_stalled` si hay `pending` envejecidos; el scan diario corre su primer tick
+    ya y el dedupe del día es durable.
 12. **Aislar el estado del vigía en pruebas.** El banco PG que arranca
     `bolsa_api.workers.scheduler_worker` reescribía `day-watch.json`/`day-watch.jsonl` porque el
     vigía es on-by-default. **Aplicado en el sello `2.11.162-beta`:** `WINDOW_DAY_WATCH_DIR` +
@@ -1590,17 +1649,18 @@ E3.**
 | O-4 | P1-10 | O-4 | `test_window_verdict_is_read_from_gate` | E0 |
 | O-5 | P1-12 | O-5 | `test_day_watch_alerts_on_measured_inconclusive_day` | **E1** (54 tests del vigía, uno con fila real `20261019` en `tmp_path`) + E2 parcial (el scheduler arranca el vigía, ya aislado); efecto sobre la ventana real no observado |
 | O-6 | P1-8 | O-6 + §9.4 | `test_journal_records_feature_source_and_window_bars` (implementada como `test_plan_v2_tick_seals_feature_source_and_window_bars` + `test_active_strategy_feature_provenance.py`) | **E1** (el payload sella `featureSource`/`signalWindowBars` y los omite sin dato; la procedencia se clasifica sobre la ventana real de barras) |
-| T-1 | P1-11 | T-1 | `test_scan_worker_is_started_by_scheduler_or_its_own_process` | E0 |
-| T-2 | P1-11 | T-2 | `test_daily_scan_runs_immediately_when_due` | E0 |
+| T-1 | P1-11 | T-1 + §9.9 | `test_scan_worker_is_started_by_scheduler_or_its_own_process` (implementada como `test_scheduler_no_embebe_scan_ni_optimize` + `test_scheduler_declares_the_scan_queue_authority` + `test_stalled_scan_queue_is_an_error_with_actionable_reason`) | **E1** + **E2** (`test_scan_queue_health_pg` con el gate `SCAN_QUEUE_PG_REQUIRED`) |
+| T-2 | P1-11 | T-2 + §9.9 | `test_daily_scan_runs_immediately_when_due` | **E1** (primer evento = `run`, antes del `sleep`; reinicio con discovery del día ⇒ 0 encolados) |
 | T-3 | P2-16 | T-3 | `test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar` | E0 + E2 (e2e PG valida fronteras de barra) |
 
 **Cobertura:** 21 hallazgos · **22** entradas de backlog (las 21 con ID + P1-12b, que cubre el
 silencio de la UI del scan descrito en §7.4) · 21 criterios · 21
-pruebas propuestas · **12 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
-`S-1` en §9.5, `S-2` en §9.6, `S-3` en §9.7, `O-1` y `O-2` en §9.8, `B-2`, `B-4` y `O-5`). `B-1`,
+pruebas propuestas · **14 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
+`S-1` en §9.5, `S-2` en §9.6, `S-3` en §9.7, `O-1` y `O-2` en §9.8, `T-1` y `T-2` en §9.9, `B-2`,
+`B-4` y `O-5`). `B-1`,
 `B-2`, `B-4` y `O-5`
 entran con el sello `2.11.162-beta`; `B-6`, el cierre de `B-1`, `B-3`, `O-6`, `S-1`, `S-2`, `S-3`,
-`O-1` y `O-2`
+`O-1`, `O-2`, `T-1` y `T-2`
 son **posteriores** al sello `2.11.163-beta` y viven en el commit de trabajo. Las filas
 que en una lectura anterior quedaban huérfanas (`B-5`, `B-6`, `O-5`, `O-6`, `T-3`) tienen ahora
 backlog, criterio y prueba; su evidencia sigue siendo E0/E1/E2 y **no** se eleva por tener criterio

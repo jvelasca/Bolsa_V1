@@ -88,6 +88,31 @@ class SqlAlchemyScanJobRepository:
         result = await self._session.execute(stmt)
         return [self._to_record(row) for row in result.scalars().all()]
 
+    async def list_payloads_since(
+        self,
+        *,
+        since: datetime,
+        payload_key: str,
+        limit: int = 500,
+    ) -> list[dict[str, Any]]:
+        """Payloads de jobs con ``payload[payload_key]`` verdadero creados desde ``since``.
+
+        Sirve al dedupe *durable* del scan diario (T-2): un reinicio del proceso no debe
+        volver a encolar el mismo universo el mismo día. Filtra en SQL (JSONB) para no
+        depender de cuántos scans manuales haya habido.
+        """
+        stmt = (
+            select(ScanJobRow.payload)
+            .where(
+                ScanJobRow.created_at >= since,
+                ScanJobRow.payload[payload_key].astext == "true",
+            )
+            .order_by(ScanJobRow.created_at.desc())
+            .limit(limit)
+        )
+        result = await self._session.execute(stmt)
+        return [payload for payload in result.scalars().all() if isinstance(payload, dict)]
+
     async def claim_next(self) -> ScanJobRecord | None:
         stmt = (
             select(ScanJobRow)

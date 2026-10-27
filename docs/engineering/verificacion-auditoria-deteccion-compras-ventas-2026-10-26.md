@@ -1249,17 +1249,31 @@ que el día lo diga (y que **no** quede posición abierta a medias); la de O-2 c
 `finance_applier` y exige que el hecho durable declare el modo. Ninguna de las dos eleva el modo
 estructural a «modo válido de producción».
 
-**La suite completa de `api-python` no se puede certificar en esta máquina, y no por este cambio.**
-`pytest -m "not integration"` ⇒ **1261 passed, 71 failed, 55 skipped**; los 71 fallos están todos en
-ficheros que necesitan PostgreSQL (`*_pg`, `test_workspaces*`, `test_health`, `test_lifecycle_golden*`)
-y la causa raíz es la **base de desarrollo**, no el código: quedó en `035_paper_forward_evidence`
+**La suite completa de `api-python` no se podía certificar en esta máquina, y no por este cambio.**
+`pytest -m "not integration"` ⇒ **1261 passed, 71 failed, 55 skipped**; los 71 fallos estaban todos
+en ficheros que necesitan PostgreSQL (`*_pg`, `test_workspaces*`, `test_health`, `test_lifecycle_golden*`)
+y la causa raíz era la **base de desarrollo**, no el código: quedó en `035_paper_forward_evidence`
 cuando el código espera `058_estudio_daily_proposals` (una corrida anterior murió a mitad de un
-`roundtrip` de migraciones), y `signal_alert_subscriptions` arrastra **1580 atributos *dropped***
-(los cuenta PostgreSQL aunque `information_schema` sólo muestre 17 columnas vivas), así que el
-primer `ADD COLUMN` de la 054 revienta con `TooManyColumns`. Es el mismo desgaste ya descrito en
-[`evidence/v2.88.136`](./evidence/v2.88.136/README.md) §«límites»; el remedio conocido es
-**recrear** la BD (dump → drop/create → `upgrade head`), que **no** se ha ejecutado aquí. Ningún
-fichero del diff toca esquema ni migraciones.
+`roundtrip` de migraciones), y `signal_alert_subscriptions` arrastraba **1580 atributos *dropped***
+(los cuenta PostgreSQL aunque `information_schema` sólo muestre 17 columnas vivas), así que el primer
+`ADD COLUMN` de la 054 reventaba con `TooManyColumns` — el desgaste ya descrito en
+[`evidence/v2.88.136`](./evidence/v2.88.136/README.md) §«límites». **Decisión del owner aplicada:**
+la BD se **reconstruyó** con el respaldo previo
+(`db-backups/bolsa_v1-20261027-094148-256.sql`) ⇒ drop/create → `alembic upgrade head` (`058`) →
+`pnpm db:seed` (35 instrumentos + catálogo IBEX + portfolio virtual). Tras la reconstrucción:
+`test_signal_alerts_v111_pg` + `test_workspaces*` + `test_unique_natural_keys_pg` +
+`test_trackers_policies_isolation` ⇒ **35 passed**; `test_lists.py` + `tests/integration` ⇒
+**48 passed**; suite completa (`-m "not integration"`) ⇒ **1390 passed, 7 failed, 1 skipped,
+12 deselected** (6 min 37 s). Los **7** fallos son de **interferencia en la BD de desarrollo
+compartida**, no del código: los tests de *roundtrip* de migraciones **mutan** el esquema que el
+resto de ficheros asume (el log muestra `DuplicateColumn: column "reference_mid" … already exists`),
+y la propia corrida deja `sim_fill_finance_context` con **87 atributos *dropped*** (el desgaste de
+§v2.88.136). Los siete, re-ejecutados **en aislamiento**, pasan: **6 passed** (`test_auth`,
+`test_auto_dia_d_trace_pg`, `test_auto_v88_28_protection_exactly_once_pg`), **2 passed**
+(`chaos/live_a7` C3b + `test_auto_v46_multiprocess_pg`) y **1 passed**
+(`test_auto_daily_chain_full_real_e2e_pg`). En CI esos ficheros corren en jobs PG dedicados sobre
+BD **recién creada**, que es justo lo que evita el acoplamiento. Ningún fichero del diff toca
+esquema ni migraciones.
 
 **Lo que NO se ha hecho, y queda declarado.**
 
@@ -1274,4 +1288,37 @@ sobre `18f59fdc` ⇒ **`success`** (`quality` + los cuatro jobs PG). `Optimize l
 ([`40472943891`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40472943891)) y `Fase 2 scientific`
 ([`40472943856`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40472943856)) ⇒ `success` sobre el
 mismo commit.
+
+### 12.16 T-1/T-2: la cola de scan se declara y el scan diario no espera 24 h
+
+> **Cierra los ítems T-1 y T-2** de §6.1 y §10 de la auditoría, y los criterios `T-1`/`T-2` de §9.
+
+**Qué se implementó.**
+
+| Silencio | Antes | Ahora |
+|---|---|---|
+| Nadie decía quién drena `scan_jobs` | el scheduler arrancaba 20 crons y callaba | declara `authority=` al arrancar (`arq_worker` \| `queue_poll_worker`) |
+| Cola atascada | invisible | `scan_queue_stalled` (ERROR) con `pending`, antigüedad y la acción `bolsa-queue-poll-worker`; si no se puede leer ⇒ `scan_queue_unknown` (WARNING, no aborta) |
+| Primer tick del scan diario | `sleep(86 400)` **antes** de trabajar | primer tick **inmediato**; el `sleep` va al final del bucle |
+| Reinicio del worker | el dedupe era una variable de módulo | dedupe **durable** por día UTC sobre `scan_jobs` (`opportunityDiscovery`) |
+
+**Verificación (E1 + E2 parcial).**
+
+| Gate | Resultado |
+|---|---|
+| `test_queue_poll_worker` + `test_scheduler_worker` + `test_opportunity_daily_scan_worker` + `test_logging_redaction` | **51 passed** |
+| `test_scan_queue_health_pg` (PG real, `SCAN_QUEUE_PG_REQUIRED=1`) | **3 passed** |
+| `ruff` / `mypy` (api + application + repositorio) | limpio / **411 ficheros sin issues** |
+
+El test de T-2 es de **orden de eventos**: registra `run` y `sleep` y exige que el primer evento sea
+`run` y que el `sleep` posterior sea el intervalo completo. El de T-1 es de **nivel y contenido**:
+ERROR con `reason=scan_queue_stalled` y la cadena `bolsa-queue-poll-worker` en el mensaje, para que
+el operador sepa qué arrancar y no sólo que algo va mal.
+
+**Lo que NO se ha hecho, y queda declarado.**
+
+- El scheduler **sigue sin** drenar la cola: duplicar la autoridad sería un segundo consumidor.
+- El umbral de atasco (300 s) es constante del módulo, no un flag.
+- **No** se toca la cadencia del AUTO ni el reloj de barras (**T-3** sigue abierto).
+- **Sin sello, sin tag y sin bump.** La evidencia es **E1** + **E2** parcial.
 

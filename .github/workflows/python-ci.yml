@@ -455,6 +455,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_ops_job_attempt_cap_pg.py
           --ignore=apps/api-python/tests/test_dia_d_cycle_verification_pg.py
           --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
+          --ignore=apps/api-python/tests/test_scan_queue_health_pg.py
           --ignore=apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
@@ -532,6 +533,8 @@ jobs:
       LIFECYCLE_PG_REQUIRED: '1'
       AUTO_ORCHESTRATOR_PG_REQUIRED: '1'
       STRATEGY_LIFECYCLE_PG_REQUIRED: '1'
+      # T-1/T-2: salud de ``scan_jobs`` y dedupe durable del scan diario (JSONB real).
+      SCAN_QUEUE_PG_REQUIRED: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -550,6 +553,7 @@ jobs:
           uv run pytest
           apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
           apps/api-python/tests/test_strategy_lifecycle_pg.py
+          apps/api-python/tests/test_scan_queue_health_pg.py
           packages/py/application/tests/test_sim_strategy_attribution.py
           -q
           --tb=short

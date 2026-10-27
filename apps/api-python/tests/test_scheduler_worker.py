@@ -7,6 +7,9 @@ loops periódicos y que **nunca** embeba scan/optimize (autoridad de colas:
 
 from __future__ import annotations
 
+import asyncio
+from datetime import UTC, datetime, timedelta
+
 from bolsa_api.background.alert_delivery_worker import (  # type: ignore[import-untyped]
     start_alert_delivery_worker,
 )
@@ -166,3 +169,110 @@ def test_auto_identity_failure_does_not_take_down_the_other_workers(monkeypatch)
             account_id="00000000-0000-0000-0000-000000000001",
             interval_seconds=60.0,
         )
+
+
+# ── T-1: quién drena ``scan_jobs`` y qué pasa si nadie lo hace ────────────────────
+
+
+class _StubResult:
+    def __init__(self, rows: list[object]) -> None:
+        self._rows = rows
+
+    def scalars(self) -> _StubResult:
+        return self
+
+    def all(self) -> list[object]:
+        return list(self._rows)
+
+
+class _StubSession:
+    def __init__(self, created_at: list[object]) -> None:
+        self._created_at = created_at
+
+    async def __aenter__(self) -> _StubSession:
+        return self
+
+    async def __aexit__(self, *_exc: object) -> bool:
+        return False
+
+    async def execute(self, _stmt: object) -> _StubResult:
+        return _StubResult(self._created_at)
+
+
+def _factory(created_at: list[object]):
+    return lambda: _StubSession(created_at)
+
+
+def test_scheduler_declares_the_scan_queue_authority(monkeypatch, caplog) -> None:
+    """T-1: el arranque dice QUIÉN drena la cola (inline ⇒ proceso dedicado)."""
+    from bolsa_api.background.scan_queue_health import report_scan_queue_health
+
+    monkeypatch.setattr(
+        "bolsa_api.background.scan_queue_health.get_settings",
+        lambda: type("S", (), {"scan_queue_backend": "inline"})(),
+    )
+    with caplog.at_level("INFO", logger="bolsa_api.background.scan_queue_health"):
+        health = asyncio.run(report_scan_queue_health(_factory([])))
+
+    assert health is not None
+    assert health.authority == "queue_poll_worker"
+    assert health.reason == "scan_queue_healthy"
+    record = caplog.records[-1]
+    assert record.levelname == "INFO"
+    assert "authority=queue_poll_worker" in record.getMessage()
+    assert "reason=scan_queue_healthy" in record.getMessage()
+
+
+def test_arq_backend_names_the_other_authority(monkeypatch, caplog) -> None:
+    from bolsa_api.background.scan_queue_health import report_scan_queue_health
+
+    monkeypatch.setattr(
+        "bolsa_api.background.scan_queue_health.get_settings",
+        lambda: type("S", (), {"scan_queue_backend": "arq"})(),
+    )
+    with caplog.at_level("INFO", logger="bolsa_api.background.scan_queue_health"):
+        health = asyncio.run(report_scan_queue_health(_factory([])))
+
+    assert health is not None
+    assert health.authority == "arq_worker"
+
+
+def test_stalled_scan_queue_is_an_error_with_actionable_reason(monkeypatch, caplog) -> None:
+    """T-1: un ``pending`` viejo ⇒ ERROR con ``scan_queue_stalled`` y la acción concreta."""
+    from bolsa_api.background.scan_queue_health import report_scan_queue_health
+
+    sixty_minutes_ago = datetime.now(UTC) - timedelta(minutes=60)
+    monkeypatch.setattr(
+        "bolsa_api.background.scan_queue_health.get_settings",
+        lambda: type("S", (), {"scan_queue_backend": "inline"})(),
+    )
+    with caplog.at_level("INFO", logger="bolsa_api.background.scan_queue_health"):
+        health = asyncio.run(report_scan_queue_health(_factory([sixty_minutes_ago])))
+
+    assert health is not None
+    assert health.pending == 1
+    assert health.stalled is True
+    error = caplog.records[-1]
+    assert error.levelname == "ERROR"
+    message = error.getMessage()
+    assert "reason=scan_queue_stalled" in message
+    assert "bolsa-queue-poll-worker" in message
+
+
+def test_unreadable_scan_queue_is_declared_and_does_not_abort(monkeypatch, caplog) -> None:
+    """T-1: si la cola no se puede leer, se declara ``scan_queue_unknown`` y se sigue."""
+    from bolsa_api.background.scan_queue_health import report_scan_queue_health
+
+    def _boom():
+        raise RuntimeError("db caída")
+
+    monkeypatch.setattr(
+        "bolsa_api.background.scan_queue_health.get_settings",
+        lambda: type("S", (), {"scan_queue_backend": "inline"})(),
+    )
+    with caplog.at_level("INFO", logger="bolsa_api.background.scan_queue_health"):
+        health = asyncio.run(report_scan_queue_health(_boom))  # type: ignore[arg-type]
+
+    assert health is None
+    assert caplog.records[-1].levelname == "WARNING"
+    assert "reason=scan_queue_unknown" in caplog.records[-1].getMessage()

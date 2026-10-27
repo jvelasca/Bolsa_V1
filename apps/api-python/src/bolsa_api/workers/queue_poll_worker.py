@@ -57,6 +57,14 @@ async def _run_queue_poll(
             "Ningún queue poll activo — SCAN_QUEUE_BACKEND=%s (esperado no-arq)",
             get_settings().scan_queue_backend,
         )
+    else:
+        # T-1: el hecho positivo de que la autoridad de ``scan_jobs`` está viva en ESTE proceso.
+        logger.info(
+            "Autoridad de cola de scan en este proceso — authority=queue_poll_worker "
+            "backend=%s starters=%d",
+            get_settings().scan_queue_backend,
+            len(tasks),
+        )
 
     loop = asyncio.get_running_loop()
     stop = asyncio.Event()
