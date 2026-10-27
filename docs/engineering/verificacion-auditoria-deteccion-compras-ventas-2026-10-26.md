@@ -1369,5 +1369,15 @@ devolviera siempre `DENY` pasaría el caso de S-6 sin haber consultado nada.
 - `market_closed` sigue **sin medirse** en el worker: se publica `null`, no `false`.
 - El camino `AUTO_ENGINE_SIM_V2=0` no tiene `PositionState`; su salida declara `missing_exit_plan`
   en vez de recibir un plan sintético.
-- **Sin sello, sin tag y sin bump.** La evidencia es **E1**; pendiente de certificación en CI.
+- **Sin sello, sin tag y sin bump.** La evidencia es **E1** + **E2** en CI.
+
+**CI por commit** [`40484067176`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40484067176)
+sobre `4d4060e8` ⇒ **`success`**. `quality` corrió el offline completo: **5541 passed, 50 skipped**
+(mypy **573 ficheros** sin issues, `ruff` limpio, import-linter **4 kept / 0 broken**). Los cuatro
+bancos PG por commit pasaron sin skips: `lifecycle-pg` **17 passed**, `grammar-discovery-pg` **21
+passed**, `auto-v2-durable-pg` **7 + 1 passed**, `paper-forward-pg` **2 passed**. El banco durable ejecuta el worker AUTO contra PostgreSQL real
+(arranque, tick y reinicio), pero **no** fuerza un `data_stale` sobre una salida: ese caso lo fija la prueba E1 de arriba, no el banco. Lo que sí certifica es que el worker con F5 consultado arranca, opera y reinicia sin romper la cadena.
+`Fase 2 scientific` ([`40484067190`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40484067190))
+y `Optimize lab` ([`40484067256`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40484067256)) ⇒
+`success`.
 

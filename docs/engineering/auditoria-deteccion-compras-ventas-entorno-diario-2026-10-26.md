@@ -1615,13 +1615,17 @@ mide aquí: viaja como `null` (**no medido**), jamás como «mercado abierto».
 **Gates ejecutados** (2026-10-27): `apps/api-python` completo ⇒ **1412 passed**;
 `packages/py/application` completo ⇒ **2922 passed**; `analytics` (`position_decision`/`exit_plan`/
 `exit_permission`) ⇒ **59 passed**; `ruff` ⇒ limpio; `mypy` (application + api, gate de CI) ⇒
-**411 ficheros sin issues**.
+**411 ficheros sin issues**. CI por commit
+[`40484067176`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40484067176) sobre `4d4060e8` ⇒
+**`success`**: `quality` **5541 passed**/50 skipped con mypy **573 ficheros**, `ruff` limpio e
+import-linter **4 kept / 0 broken**; los cuatro bancos PG por commit, sin skips (`lifecycle-pg` 17,
+`grammar-discovery-pg` 21, `auto-v2-durable-pg` 7 + 1, `paper-forward-pg` 2).
 
 **Lo que NO se ha hecho.** No se bloquea ninguna salida: el cambio es de **observabilidad y
 contrato**, no de ejecución (bloquear sería otra decisión y otro riesgo). `market_closed` sigue sin
 medirse en el worker (`null` declarado). El camino legacy `AUTO_ENGINE_SIM_V2=0` no tiene
 `PositionState` y su salida se declara `missing_exit_plan` en vez de recibir un plan sintético. La
-evidencia es **E1**; sin sello, sin tag y sin bump.
+evidencia es **E1** + **E2**; sin sello, sin tag y sin bump.
 
 ---
 
@@ -1711,7 +1715,7 @@ E3.**
 | S-3 | P1-6 | S-3 + §9.7 | `test_exit_pending_requires_emitted_order` | **E1** (sin venta el `lifecycleState` no es `EXIT_PENDING` y el journal dice `exit_not_emitted`; con venta, `time_exit` se journaliza) |
 | S-4 | P2-13 | S-4 | `test_thesis_exit_reachable_with_declared_invalidation_price` | E0 + E1 parcial |
 | S-5 | P1-9 | S-5 | `test_unadopted_position_is_declared_in_journal` | E0 |
-| S-6 | P0-4 | S-6 + §9.10 | `test_auto_exit_ignores_stale_data_by_contract` (implementada como `test_target_exit_is_clicked_by_f5_and_still_emitted_by_contract` + `test_target_exit_sells_under_stale_data_and_declares_the_f5_deny`) | **E1** (`TARGET_1` con `data_stale` ⇒ `DENY` declarado y la salida se emite igual; el stop con el mismo dato ⇒ `ALLOW`, control positivo; `blocksExit: false`) |
+| S-6 | P0-4 | S-6 + §9.10 | `test_auto_exit_ignores_stale_data_by_contract` (implementada como `test_target_exit_is_clicked_by_f5_and_still_emitted_by_contract` + `test_target_exit_sells_under_stale_data_and_declares_the_f5_deny`) | **E1** (`TARGET_1` con `data_stale` ⇒ `DENY` declarado y la salida se emite igual; el stop con el mismo dato ⇒ `ALLOW`, control positivo; `blocksExit: false`) + **E2** (CI [`40484067176`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40484067176): 5541 passed, 573 ficheros mypy, 4 bancos PG sin skips) |
 | O-1 | P1-7 | O-1 + §9.8 | `test_settle_failure_is_counted` | **E1** (excepción ⇒ `settlementFailures >= 1`, `settlement_failed` en `errors`, ninguna posición abierta) |
 | O-2 | P1-7 | O-2 + §9.8 | `test_structural_settlement_is_published` | **E1** (sin `finance_applier` ⇒ `structural: true` en la orden y `structuralOrders` en el día) |
 | O-3 | P1-10 | O-3 | `test_absent_measurement_is_not_rendered_as_zero` | E0 |
