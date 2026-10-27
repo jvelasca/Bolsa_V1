@@ -27,6 +27,7 @@ from bolsa_application.active_strategy_signal_evaluator import make_active_strat
 from bolsa_application.auto_orchestrator import active_strategy_decider
 from bolsa_application.auto_reason_codes import (
     ACTIVE_EVALUATION_FAILED,
+    ACTIVE_GATED_UNAVAILABLE,
     ACTIVE_HOLD_REASONS,
     ACTIVE_NO_EXECUTABLE,
     ACTIVE_NO_SIGNAL,
@@ -284,6 +285,7 @@ def test_every_declared_reason_belongs_to_the_closed_vocabulary() -> None:
         ACTIVE_EVALUATION_FAILED,
         ACTIVE_NO_SIGNAL,
         ACTIVE_WARMUP_UNMEASURABLE,
+        ACTIVE_GATED_UNAVAILABLE,
         WARMUP_INSUFFICIENT,
     } == set(ACTIVE_HOLD_REASONS)
 
@@ -303,7 +305,12 @@ def _snapshot() -> Any:
     )
 
 
-def _hold(*, reason: str | None, bar: str = "2026-09-15T00:00:00Z") -> V2Signal:
+def _hold(
+    *,
+    reason: str | None,
+    bar: str = "2026-09-15T00:00:00Z",
+    gated_state: Any = None,
+) -> V2Signal:
     return V2Signal(
         instrument_id=SYMBOL,
         action="HOLD",
@@ -311,6 +318,7 @@ def _hold(*, reason: str | None, bar: str = "2026-09-15T00:00:00Z") -> V2Signal:
         strategy_version="ver-b5",
         hold_reason=reason,
         bar_timestamp=bar,
+        gated_state=gated_state,
     )
 
 
@@ -462,3 +470,157 @@ def test_every_reason_survives_the_journal_round_trip(reason: str) -> None:
     )
 
     assert entry.payload["reasonCodes"] == [reason]
+
+
+# ── ADR-048 — el estado ``gated`` declara el LIBRO, y el journal lo sella ─────────────
+
+
+def test_the_book_is_the_source_of_the_gated_state() -> None:
+    """Con libro legible, ``holdsLong`` declara su valor y el origen es ``book``."""
+    decider = make_active_strategy_decider(
+        active=_active("sma_crossover"),
+        watch=(SYMBOL,),
+        bars_by_symbol=lambda _s: _bars(120),
+        long_by_symbol=lambda _s: False,
+    )
+
+    decision = decider(SYMBOL)
+
+    assert decision.gated_state is not None
+    assert decision.gated_state.holds_long is False
+    assert decision.gated_state.source == "book"
+    assert decision.gated_state.exit_evaluated == "last_bar"
+
+
+def test_an_open_position_asks_for_the_exit_and_never_buys() -> None:
+    """B-3/ADR-048: libro largo ⇒ la pregunta es de NIVEL, y un BUY queda prohibido."""
+    decider = make_active_strategy_decider(
+        active=_active("golden_cross"),
+        watch=(SYMBOL,),
+        bars_by_symbol=lambda _s: _bars(201),
+        long_by_symbol=lambda _s: True,
+    )
+
+    decision = decider(SYMBOL)
+
+    assert decision.action in {"HOLD", "SELL"}
+    assert decision.action != "BUY"
+    assert decision.gated_state is not None
+    assert decision.gated_state.holds_long is True
+
+
+def test_a_readopted_position_is_declared_on_the_first_tick() -> None:
+    """Reinicio: el libro readoptado ya está largo ANTES del primer tick ⇒ sin BUY."""
+    book = {SYMBOL: True}
+    decider = make_active_strategy_decider(
+        active=_active("sma_crossover"),
+        watch=(SYMBOL,),
+        bars_by_symbol=lambda _s: _bars(120),
+        long_by_symbol=lambda symbol: book[symbol],
+    )
+
+    decision = decider(SYMBOL)
+
+    assert decision.action != "BUY"
+    assert decision.gated_state is not None
+    assert decision.gated_state.holds_long is True
+
+
+def test_an_unreadable_book_fails_closed_and_declares_gated_unavailable() -> None:
+    """Libro ilegible ≠ libro vacío: HOLD declarado, ``holdsLong=null``, sin comprar."""
+    calls: list[str] = []
+
+    def _boom(symbol: str) -> bool:
+        calls.append(symbol)
+        raise RuntimeError("el libro no se pudo leer")
+
+    def _loader(_symbol: str) -> list[Any]:
+        # Si se llegara a evaluar, sería un BUY: la prueba demuestra que NO se llega.
+        return _bars(120)
+
+    decider = make_active_strategy_decider(
+        active=_active("sma_crossover"),
+        watch=(SYMBOL,),
+        bars_by_symbol=_loader,
+        long_by_symbol=_boom,
+    )
+
+    decision = decider(SYMBOL)
+
+    assert decision.action == "HOLD"
+    assert decision.quantity == 0
+    assert decision.hold_reason == ACTIVE_GATED_UNAVAILABLE
+    assert decision.gated_state is not None
+    assert decision.gated_state.holds_long is None
+    assert decision.gated_state.source == "unavailable"
+    assert calls == [SYMBOL]
+
+
+def test_a_readable_book_is_the_positive_control_for_gated_unavailable() -> None:
+    """El mismo decisor con libro legible NO declara ``gated_unavailable``."""
+    decider = make_active_strategy_decider(
+        active=_active("sma_crossover"),
+        watch=(SYMBOL,),
+        bars_by_symbol=lambda _s: _bars(120),
+        long_by_symbol=lambda _s: False,
+    )
+
+    assert decider(SYMBOL).hold_reason != ACTIVE_GATED_UNAVAILABLE
+
+
+def test_without_a_book_reader_the_gated_state_is_omitted() -> None:
+    """Sin lector de libro no se declara estado: la ausencia es información, no un ``false``."""
+    decider = make_active_strategy_decider(
+        active=_active("sma_crossover"), watch=(SYMBOL,), bars_by_symbol=lambda _s: _bars(120)
+    )
+
+    assert decider(SYMBOL).gated_state is None
+
+
+def test_the_gated_state_lands_in_the_hold_journal() -> None:
+    """El estado del libro se sella en el evento propio del HOLD (JSONB, sin migración)."""
+    from bolsa_application.decision_contract import GATED_SOURCE_UNAVAILABLE, GatedState
+
+    hold = active_strategy_holds(
+        [
+            _hold(
+                reason=ACTIVE_GATED_UNAVAILABLE,
+                gated_state=GatedState(
+                    holds_long=None, source=GATED_SOURCE_UNAVAILABLE
+                ),
+            )
+        ]
+    )[0]
+
+    entry = build_active_strategy_hold_journal_entry(
+        hold, actor="auto-2.0", as_of="2026-09-15T09:00:00Z"
+    )
+
+    assert entry.payload["gatedState"] == {
+        "holdsLong": None,
+        "source": "unavailable",
+        "exitEvaluated": "last_bar",
+    }
+
+
+def test_the_gated_state_is_omitted_when_it_was_not_measured() -> None:
+    """Sin estado no se escribe la clave: un ``holdsLong`` de relleno volvería a mentir."""
+    hold = active_strategy_holds([_hold(reason=ACTIVE_NO_SIGNAL)])[0]
+
+    entry = build_active_strategy_hold_journal_entry(
+        hold, actor="auto-2.0", as_of="2026-09-15T09:00:00Z"
+    )
+
+    assert "gatedState" not in entry.payload
+
+
+def test_the_gated_state_rejects_an_incoherent_combination() -> None:
+    """`holdsLong=null` ⟺ `source='unavailable'`: la coherencia se exige al construir."""
+    from bolsa_application.decision_contract import GatedState
+
+    with pytest.raises(ValueError):
+        GatedState(holds_long=None, source="book")
+    with pytest.raises(ValueError):
+        GatedState(holds_long=False, source="unavailable")
+    with pytest.raises(ValueError):
+        GatedState(holds_long=True, source="inventado")

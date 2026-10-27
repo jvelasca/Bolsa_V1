@@ -199,3 +199,39 @@ async def test_execute_full_auto_inform_only_also_retired(
     with pytest.raises(LabExitExecuteRetiredError):
         await use_case.execute("acc1", execute_trades=True)
     router.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_the_policy_route_feeds_real_ohlcv_to_the_exit_rule(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR-048 — la ruta de política pasa las barras REALES, no reconstruye close-only.
+
+    Antes se llamaba ``evaluate_exit_last_bar_gated(resolved, timestamps, closes)`` y la
+    función sintetizaba ``open = high = low = close`` con ``volume = 0``: un preset de
+    volumen/rango decidía su salida sobre una serie que el scan nunca publicó. Este test
+    fija el eslabón ``barras cargadas → regla de salida``.
+    """
+    captured: dict[str, object] = {}
+
+    def _spy(
+        _resolved: object,
+        _timestamps: list[str],
+        _closes: list[float],
+        **kwargs: object,
+    ) -> SignalEvent | None:
+        captured.update(kwargs)
+        return None
+
+    monkeypatch.setattr(
+        "bolsa_application.position_exit_evaluator.evaluate_exit_last_bar_gated", _spy
+    )
+    use_case = _build_use_case(router=AsyncMock())
+
+    result = await use_case.execute("acc1", execute_trades=False)
+
+    assert result.results[0].status == "no_signal"
+    bars = captured.get("bars")
+    assert bars is not None
+    assert [bar.volume for bar in bars] == [1, 1]  # type: ignore[union-attr]
+    assert [(bar.high, bar.low) for bar in bars] == [(1.0, 1.0), (1.0, 1.0)]  # type: ignore[union-attr]

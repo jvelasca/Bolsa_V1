@@ -33,6 +33,7 @@ from typing import Any, Protocol
 
 from bolsa_application.auto_reason_codes import (
     ACTIVE_EVALUATION_FAILED,
+    ACTIVE_GATED_UNAVAILABLE,
     ACTIVE_NO_EXECUTABLE,
     ACTIVE_NO_SIGNAL,
     ACTIVE_NO_SNAPSHOT,
@@ -40,7 +41,10 @@ from bolsa_application.auto_reason_codes import (
     WARMUP_INSUFFICIENT,
 )
 from bolsa_application.decision_contract import (
+    GATED_SOURCE_BOOK,
+    GATED_SOURCE_UNAVAILABLE,
     DecisionPackage,
+    GatedState,
     format_active_strategy_source,
 )
 from bolsa_application.signal_feature_context import feature_source
@@ -111,6 +115,7 @@ def _to_decision(
     signal_window_bars: int | None = None,
     warmup_bars: int | None = None,
     signal_window_source: str | None = None,
+    gated_state: GatedState | None = None,
 ) -> DecisionPackage:
     """Traduce el tipo de señal a ``DecisionPackage`` (lote acotado al de la ACTIVE)."""
     if signal_kind == "entry_long":
@@ -123,6 +128,7 @@ def _to_decision(
             signal_window_bars=signal_window_bars,
             warmup_bars=warmup_bars,
             signal_window_source=signal_window_source,
+            gated_state=gated_state,
         )
     if signal_kind == "exit":
         return DecisionPackage(
@@ -134,6 +140,7 @@ def _to_decision(
             signal_window_bars=signal_window_bars,
             warmup_bars=warmup_bars,
             signal_window_source=signal_window_source,
+            gated_state=gated_state,
         )
     return DecisionPackage(
         action="HOLD",
@@ -144,6 +151,7 @@ def _to_decision(
         signal_window_bars=signal_window_bars,
         warmup_bars=warmup_bars,
         signal_window_source=signal_window_source,
+        gated_state=gated_state,
     )
 
 
@@ -201,7 +209,11 @@ def make_active_strategy_decider(
 
         measured_warmup = measured_warmup_bars(executable)
 
-    def _hold(symbol: str, reason: str | None = None) -> DecisionPackage:
+    def _hold(
+        symbol: str,
+        reason: str | None = None,
+        gated: GatedState | None = None,
+    ) -> DecisionPackage:
         # B-5: el HOLD que NO viene de una señal evaluada declara su causa (configuración,
         # definición o datos). ``reason=None`` sólo queda para un símbolo FUERA del watch de
         # la ACTIVE: no es una decisión sobre él y por eso no se declara nada.
@@ -213,6 +225,7 @@ def make_active_strategy_decider(
             hold_reason=reason,
             warmup_bars=measured_warmup,
             signal_window_source=signal_window_source,
+            gated_state=gated,
         )
 
     def _decide(symbol: str) -> DecisionPackage:
@@ -228,17 +241,32 @@ def make_active_strategy_decider(
         if bars_by_symbol is None:
             # Sin cargador de barras no hay ventana que evaluar: es un problema de DATOS.
             return _hold(symbol, ACTIVE_NO_SNAPSHOT)
+        # ADR-048: el estado ``gated`` sale del LIBRO, y se lee en el instante de decidir
+        # (el libro cambia dentro del turno). Un libro ilegible NO se sustituye por «sin
+        # posición»: se declara ``unavailable`` y se falla cerrado sin comprar ni vender.
+        gated: GatedState | None = None
+        assume_long = False
+        if long_by_symbol is not None:
+            try:
+                assume_long = bool(long_by_symbol(symbol))
+            except Exception:  # noqa: BLE001 — el libro ilegible es un hecho declarable.
+                logger.warning("position book unavailable for %s", symbol, exc_info=True)
+                return _hold(
+                    symbol,
+                    ACTIVE_GATED_UNAVAILABLE,
+                    gated=GatedState(holds_long=None, source=GATED_SOURCE_UNAVAILABLE),
+                )
+            gated = GatedState(holds_long=assume_long, source=GATED_SOURCE_BOOK)
         try:
             bars = bars_by_symbol(symbol)
             if not bars:
-                return _hold(symbol, ACTIVE_NO_SNAPSHOT)
-            assume_long = bool(long_by_symbol(symbol)) if long_by_symbol is not None else False
+                return _hold(symbol, ACTIVE_NO_SNAPSHOT, gated=gated)
             signal_kind, warmup_reason = _evaluate_last_signal(
                 executable, bars, symbol, assume_long=assume_long
             )
         except Exception:  # noqa: BLE001 — una evaluación fallida no rompe el motor.
             logger.debug("signal evaluator failed for %s", symbol, exc_info=True)
-            return _hold(symbol, ACTIVE_EVALUATION_FAILED)
+            return _hold(symbol, ACTIVE_EVALUATION_FAILED, gated=gated)
         # O-6: la procedencia de la feature y el tamaño de la ventana se declaran en TODA
         # decisión que llegue a evaluar barras —incluido el HOLD—, porque es justo el HOLD
         # el que hoy no se puede leer: «no había señal» y «la ventana no alcanza» eran la
@@ -262,6 +290,7 @@ def make_active_strategy_decider(
                 signal_window_bars=window_bars,
                 warmup_bars=measured_warmup,
                 signal_window_source=signal_window_source,
+                gated_state=gated,
             )
         if signal_kind is None:
             return DecisionPackage(
@@ -276,6 +305,7 @@ def make_active_strategy_decider(
                 signal_window_bars=window_bars,
                 warmup_bars=measured_warmup,
                 signal_window_source=signal_window_source,
+                gated_state=gated,
             )
         effective = _bounded_lot(signal_kind, effective_lot)
         return _to_decision(
@@ -287,6 +317,7 @@ def make_active_strategy_decider(
             signal_window_bars=window_bars,
             warmup_bars=measured_warmup,
             signal_window_source=signal_window_source,
+            gated_state=gated,
         )
 
     return _decide

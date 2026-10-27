@@ -2,6 +2,70 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.167-beta] — **un solo estado `gated` y una sola semántica de salida: el libro es la fuente y la última barra se evalúa con OHLCV real** (**`Δ motor = 0` · `Δ decisión ≠ 0` sólo en la ruta de política para presets de volumen/rango y con el libro ilegible · AUTO OFF · SIN contrato HTTP · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** segundo sello del bloque funcional posterior a `2.11.165-beta`. Cierra el frente
+**`gated`** con [ADR-048](../adr/048-estado-gated-contrato.md): la palabra `gated` respondía a **dos
+preguntas** con **dos formas de dato**. El decisor ACTIVE preguntaba «¿qué tiene el libro ahora?»
+sobre OHLCV real; la ruta de política preguntaba «¿se cumple la salida?» sobre barras
+**reconstruidas** (`open = high = low = close`, `volume = 0`). En presets de volumen o rango el VWAP
+desaparece (`cum_vol = 0`) y la **misma posición** podía recibir dos respuestas según quién
+preguntara. **Sin migración** (`head` sigue `058_estudio_daily_proposals`). **Sin cambio de contrato
+HTTP.** **Bump** `2.11.166-beta` → `2.11.167-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard`).
+
+**W-167-1 · ADR-048 — una sola fuente de estado: el LIBRO.** El estado `gated` **es** el libro real
+(`_open`, readoptado del espejo canónico en el arranque); **no** se persiste un segundo estado en el
+journal ni en `PositionState` —dos verdades del mismo hecho divergen el día que una no se
+actualiza—. `holdsLong = true` **no** significa «la señal quiere comprar»: significa que la pregunta
+de la última barra es **de nivel** (¿procede cerrar?), y un `BUY` con el libro largo sigue prohibido
+por construcción.
+
+**W-167-2 · `GatedState` — el estado viaja con su procedencia.** Nuevo value object en
+`decision_contract.py`: `holds_long`, `source` (`book` | `unavailable`) y `exit_evaluated`
+(`last_bar`), con la coherencia exigida **al construir** (`holdsLong = null` ⟺
+`source = 'unavailable'`; `source` fuera del vocabulario cerrado ⇒ `ValueError`). Campo **aditivo** de
+`DecisionPackage` → `V2Signal` → `ActiveStrategyHold`, y clave **aditiva** `gatedState` en
+`auto_entry_decision` y `auto_active_strategy_hold` (JSONB, sin migración). Se **omite** cuando el
+productor no declara libro: un `false` de relleno volvería a convertir «no pude leer» en «sin
+posición». Pruebas: `test_the_book_is_the_source_of_the_gated_state`,
+`test_without_a_book_reader_the_gated_state_is_omitted`,
+`test_the_gated_state_lands_in_the_hold_journal`, `test_the_gated_state_rejects_an_incoherent_combination`.
+
+**W-167-3 · Libro ilegible ⇒ fail-closed declarado.** `auto_reason_codes.ACTIVE_GATED_UNAVAILABLE`
+(`gated_unavailable`) entra en `ACTIVE_HOLD_REASONS`. Si el lector del libro lanza, el decisor
+devuelve **HOLD** con ese motivo, `holdsLong = null` y `source = "unavailable"` **sin consultar el
+cargador de barras**: sin libro no se compra (podría doblar una posición existente) ni se vende
+(podría vender lo que no hay). Es distinto de `no_snapshot` (faltan **barras**, no libro). Pruebas:
+`test_an_unreadable_book_fails_closed_and_declares_gated_unavailable` (con control positivo
+`test_a_readable_book_is_the_positive_control_for_gated_unavailable`),
+`test_an_unreadable_book_never_sells_either`.
+
+**W-167-4 · Readoptar antes de decidir, fijado con prueba.** `_v2_tick` ya readoptaba antes de
+decidir; `test_the_decider_sees_the_readopted_book_before_deciding` lo fija en el **orden
+observable**: el decisor recibe `holds_long` como callable y en el primer tick de un proceso
+reiniciado ve el libro **ya** readoptado (`seen["AAA"] is True`). Si la readopción llegara tarde, ese
+primer tick decidiría con el libro vacío.
+
+**W-167-5 · Una sola semántica de salida: última barra con OHLCV REAL.**
+`evaluate_exit_last_bar_gated(definition, timestamps, closes, *, bars=...)` acepta el **OHLCV real** y
+construye el `indicator_context` con él; una ventana desalineada (`len(bars) != len(timestamps)`)
+falla cerrado en vez de indexar torcido. La ruta de política pasa las barras que ya carga
+(`position_exit_evaluator` → `to_ohlcv_bars`), sin llamada nueva a repositorio. El **wrapper
+close-only** se conserva para llamantes históricos y se declara como tal: **no** es la ruta de
+producto. Medido: `test_the_real_ohlcv_path_can_emit_an_exit_the_close_only_path_cannot` (el mismo
+preset y la misma barra cierran con OHLCV real y **no** con `volume = 0`),
+`test_the_close_only_wrapper_keeps_the_historical_signal`,
+`test_active_and_policy_paths_agree_on_real_ohlcv` (paridad, dos escenarios) y
+`test_the_policy_route_feeds_real_ohlcv_to_the_exit_rule` (el eslabón barras → regla).
+
+**Deltas.** **`Δ motor = 0`**: no cambia ninguna regla, indicador ni umbral. **`Δ decisión ≠ 0` sólo**
+en (a) la ruta de política con presets que dependen de volumen o rango —ahora evalúa la serie que el
+scan publica— y (b) el caso de libro ilegible, que pasa a HOLD declarado en vez de evaluar como si no
+hubiera posición. **AUTO sigue OFF**; operativa **100 % PAPER virtual**; la ventana sigue
+**`INCONCLUSIVE`** (`episodios 0/2`, `ciclos 0/32`). Este sello **no demuestra rentabilidad** ni mueve
+el pin.
+
 ## [2.11.166-beta] — **la ventana de la señal se DERIVA del warmup medido del preset: `AUTO_ENGINE_SIM_SIGNAL_BARS` pasa a ser suelo, y un warmup que no se puede medir falla cerrado** (**`Δ motor = 0` · `Δ decisión ≠ 0` sólo en presets antes no evaluables por ventana · AUTO OFF · SIN contrato HTTP · SIN migración nueva · head `058_estudio_daily_proposals`**)
 
 **Naturaleza:** primer sello del bloque funcional posterior a `2.11.165-beta`. Cierra **B-1** en la

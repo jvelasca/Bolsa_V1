@@ -311,6 +311,10 @@ ACTIVE_NO_SIGNAL = "no_signal"
 #: ``warmup_insufficient`` (se midió y la ventana no llega): aquí no hay número que exigir,
 #: así que subir barras a ciegas sería inventar una ventana.
 ACTIVE_WARMUP_UNMEASURABLE = "warmup_unmeasurable"
+#: ADR-048 — el LIBRO no se pudo leer: no se sabe si hay posición abierta. Sin libro no se
+#: compra (podría doblar una posición existente) y no se vende (podría vender lo que no hay).
+#: Es fail-closed declarado, distinto de ``no_snapshot`` (faltan BARRAS, no libro).
+ACTIVE_GATED_UNAVAILABLE = "gated_unavailable"
 
 #: Vocabulario CERRADO de motivos de HOLD de la ACTIVE. ``warmup_insufficient`` se importa de
 #: su dueño (el evaluador de presets del scan) para no duplicar el literal: la ventana que no
@@ -323,6 +327,7 @@ ACTIVE_HOLD_REASONS: frozenset[str] = frozenset(
         ACTIVE_EVALUATION_FAILED,
         ACTIVE_NO_SIGNAL,
         ACTIVE_WARMUP_UNMEASURABLE,
+        ACTIVE_GATED_UNAVAILABLE,
         WARMUP_INSUFFICIENT,
     }
 )
@@ -356,6 +361,7 @@ OPTIMIZER_REASONS: frozenset[str] = frozenset(
 
 __all__ = [
     "ACTIVE_EVALUATION_FAILED",
+    "ACTIVE_GATED_UNAVAILABLE",
     "ACTIVE_HOLD_REASONS",
     "ACTIVE_NO_EXECUTABLE",
     "ACTIVE_NO_SIGNAL",

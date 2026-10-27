@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Literal
 
 from bolsa_analytics.indicators.compute import (
@@ -700,8 +701,25 @@ def evaluate_exit_last_bar_gated(
     definition: dict[str, Any],
     timestamps: list[str],
     closes: list[float],
+    *,
+    bars: Sequence[OhlcvBar] | None = None,
 ) -> SignalEvent | None:
-    """Evalúa reglas de salida solo en la última barra — posición ya abierta (P7)."""
+    """Evalúa reglas de salida solo en la última barra — posición ya abierta (P7).
+
+    **ADR-048.** Acepta el **OHLCV real** de la ventana en ``bars`` y construye el
+    ``indicator_context`` con él, que es el mismo dato que usan el scan y el decisor ACTIVE.
+    Antes esta función **reconstruía** barras ``open = high = low = close`` y ``volume = 0``,
+    así que un preset de volumen o rango decidía su salida sobre una serie que el scan nunca
+    publicó: la misma posición podía recibir una salida distinta según quién preguntara.
+
+    El **wrapper close-only** se conserva cuando ``bars`` es ``None`` (llamantes históricos y
+    pruebas) y se declara como tal: no es la ruta de producto. ``timestamps`` y ``closes``
+    siguen siendo la referencia de índices y precio, de modo que el evento emitido no cambia
+    de forma.
+
+    Coherencia: si se pasan ``bars`` y su longitud no casa con ``timestamps``, se falla
+    cerrado (``None``) — una ventana desalineada no es una ventana.
+    """
     if not timestamps:
         return None
 
@@ -709,11 +727,17 @@ def evaluate_exit_last_bar_gated(
     if not rule_group_has_rules(resolved.get("exits")):
         return None
 
-    bars = [
-        OhlcvBar(timestamp=ts, open=close, high=close, low=close, close=close, volume=0.0)
-        for ts, close in zip(timestamps, closes, strict=True)
-    ]
-    context = build_indicator_context(bars, resolved.get("indicatorSpecs") or [])
+    if bars is not None:
+        if len(bars) != len(timestamps):
+            return None
+        context_bars: Sequence[OhlcvBar] = bars
+    else:
+        # Wrapper close-only declarado: comportamiento histórico, geometría sintética.
+        context_bars = [
+            OhlcvBar(timestamp=ts, open=close, high=close, low=close, close=close, volume=0.0)
+            for ts, close in zip(timestamps, closes, strict=True)
+        ]
+    context = build_indicator_context(list(context_bars), resolved.get("indicatorSpecs") or [])
     last_index = len(timestamps) - 1
     exit_kind = evaluate_rules_bar(
         resolved,

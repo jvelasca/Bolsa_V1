@@ -3129,6 +3129,8 @@ class AutoSimulationWorker:
                     # B-1 — la ventana efectiva viaja con la señal hasta el journal.
                     warmup_bars=getattr(pkg, "warmup_bars", None),
                     signal_window_source=getattr(pkg, "signal_window_source", None),
+                    # ADR-048 — el estado ``gated`` del libro viaja con la señal.
+                    gated_state=getattr(pkg, "gated_state", None),
                     # B-5 — el motivo del HOLD viaja con la señal: sin este eslabón el
                     # paquete lo declaraba y el plan del tick nunca lo veía.
                     hold_reason=getattr(pkg, "hold_reason", None),
@@ -3168,6 +3170,7 @@ class AutoSimulationWorker:
             signal_window_bars=getattr(pkg, "signal_window_bars", None),
             warmup_bars=getattr(pkg, "warmup_bars", None),
             signal_window_source=getattr(pkg, "signal_window_source", None),
+            gated_state=getattr(pkg, "gated_state", None),
             hold_reason=str(getattr(pkg, "hold_reason", None) or "").strip() or None,
             hold_detail=str(getattr(pkg, "memo", "") or ""),
             signal_id=identity.signal_id if identity is not None else "",

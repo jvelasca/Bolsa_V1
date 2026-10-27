@@ -102,7 +102,7 @@ from bolsa_application.auto_reason_codes import (
     OPPORTUNITY_TRADED,
     RESERVATION_FAILED,
 )
-from bolsa_application.decision_contract import DecisionPackage
+from bolsa_application.decision_contract import DecisionPackage, GatedState
 from bolsa_application.discovery_market_regime import (
     MATH_VERSION_MARKET_REGIME_V0,
     MATH_VERSION_MARKET_REGIME_V1,
@@ -656,6 +656,9 @@ class V2Signal:
     # ``preset_warmup``). Se omiten en el journal si no hay dato (misma doctrina que O-6).
     warmup_bars: int | None = None
     signal_window_source: str | None = None
+    # ADR-048 — el estado ``gated`` declarado (libro real o ``unavailable``). ``None`` cuando
+    # el productor no declara libro: la ausencia viaja como ausencia, nunca como ``False``.
+    gated_state: GatedState | None = None
     # B-5 — MOTIVO del HOLD que declaró el decisor (``DecisionPackage.hold_reason``). Viaja con
     # la señal para que el plan del tick pueda publicarlo: sin este eslabón el motivo moría en
     # el paquete y el journal volvía a ser mudo. ``None`` cuando el decisor no lo declara.
@@ -706,6 +709,8 @@ class ActiveStrategyHold:
     #: en el payload si no hay dato).
     warmup_bars: int | None = None
     signal_window_source: str | None = None
+    #: ADR-048 — estado ``gated`` declarado (libro real o ``unavailable``); se omite sin dato.
+    gated_state: GatedState | None = None
     #: Frase completa del decisor cuando la hay (p. ej. el warmup con la serie y las barras).
     detail: str = ""
 
@@ -750,6 +755,10 @@ def build_active_strategy_hold_journal_entry(
         payload["warmupBars"] = int(hold.warmup_bars)
     if str(hold.signal_window_source or "").strip():
         payload["signalWindowSource"] = str(hold.signal_window_source)
+    if hold.gated_state is not None:
+        # ADR-048 — el estado del libro se declara con su procedencia. Sin él, «HOLD» no
+        # distingue «evalué y no había señal» de «no pude leer si tenía posición».
+        payload["gatedState"] = hold.gated_state.to_dict()
     if str(hold.detail or "").strip():
         payload["holdDetail"] = str(hold.detail)
 
@@ -789,6 +798,7 @@ def active_strategy_holds(signals: Sequence[V2Signal]) -> tuple[ActiveStrategyHo
             signal_window_bars=signal.signal_window_bars,
             warmup_bars=signal.warmup_bars,
             signal_window_source=signal.signal_window_source,
+            gated_state=signal.gated_state,
             detail=str(signal.hold_detail or "").strip(),
         )
         if hold.dedupe_key in seen:
@@ -1732,6 +1742,8 @@ def plan_v2_tick(
                 # B-1 — warmup medido del preset y origen de la ventana efectiva.
                 warmup_bars=signal.warmup_bars,
                 signal_window_source=signal.signal_window_source,
+                # ADR-048 — estado ``gated`` del libro, con su procedencia.
+                gated_state=signal.gated_state,
                 cycle_id=cycle_id,
                 # V2.88.99 — identidad de la oportunidad: la señal que la originó y el
                 # ranking que la situó, para que ``SIGNAL``/``TOP_N`` sean demostrables
@@ -2596,6 +2608,7 @@ def _journal_entry(
     signal_window_bars: int | None = None,
     warmup_bars: int | None = None,
     signal_window_source: str | None = None,
+    gated_state: GatedState | None = None,
     cycle_id: str | None = None,
     signal_id: str | None = None,
     opportunity_id: str | None = None,
@@ -2654,6 +2667,11 @@ def _journal_entry(
         payload["warmupBars"] = int(warmup_bars)
     if str(signal_window_source or "").strip():
         payload["signalWindowSource"] = str(signal_window_source)
+    # ADR-048 — estado ``gated`` con procedencia (JSONB, sin migración). Se OMITE sin dato:
+    # un ``holdsLong = false`` inventado volvería a convertir «no pude leer el libro» en «sin
+    # posición», que es exactamente la confusión que este campo existe para evitar.
+    if gated_state is not None:
+        payload["gatedState"] = gated_state.to_dict()
     # V2.47 — el ciclo financiero viaja en el payload (JSONB, sin migración): es el hilo
     # que une esta decisión con su reserva, su orden, su fill, su posición y su PnL.
     if str(cycle_id or "").strip():

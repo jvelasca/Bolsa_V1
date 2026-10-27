@@ -148,6 +148,51 @@ async def test_readopt_prevents_second_buy_after_crash(auto_env: None) -> None:
 
 
 @pytest.mark.asyncio
+async def test_the_decider_sees_the_readopted_book_before_deciding(auto_env: None) -> None:
+    """ADR-048 — el libro readoptado se ve en el INSTANTE de decidir, no después.
+
+    ``_v2_tick`` readopta antes de decidir; el decisor recibe ``holds_long`` como callable.
+    Si la readopción llegara tarde, el primer tick de un proceso reiniciado decidiría con el
+    libro vacío y podría comprar lo que ya tiene. Este test fija el orden observable.
+    """
+    from bolsa_application.decision_contract import DecisionPackage
+    from bolsa_application.sim_durable_store import InMemorySimAutoPositionStore
+
+    store = InMemoryExecutionEventStore()
+    pos_store = InMemorySimAutoPositionStore()
+    account_id = "acc-readopt-adr48"
+
+    _s1, clock1 = step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))
+    w1 = AutoSimulationWorker(
+        clock=clock1, exec_store=store, position_store=pos_store, account_id=account_id
+    )
+    w1._decider = _buy_decider(set(), {"AAA"})
+    await w1.auto_turn()
+    assert w1._open.get("AAA", Decimal("0")) > 0
+
+    _s2, clock2 = step_minute_clock(datetime(2026, 9, 9, 9, 1, tzinfo=UTC))
+    w2 = AutoSimulationWorker(
+        clock=clock2, exec_store=store, position_store=pos_store, account_id=account_id
+    )
+    seen: dict[str, bool] = {}
+
+    def _observer(symbol: str) -> DecisionPackage:
+        seen[symbol] = w2.holds_long(symbol)
+        return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0)
+
+    w2._decider = _observer
+    await w2.real_turn(
+        exec_store=store,
+        auto_store=None,
+        finance_applier=None,
+        account_id=account_id,
+        position_store=pos_store,
+    )
+
+    assert seen.get("AAA") is True, "el decisor debe ver el libro YA readoptado"
+
+
+@pytest.mark.asyncio
 async def test_protective_stop_closes_position(auto_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
     """Bloque 6 (G8): caída ≥stop% desde la entrada ⇒ SELL de protección."""
     monkeypatch.setenv("AUTO_ENGINE_SIM_PROTECTION", "1")
