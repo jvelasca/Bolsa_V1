@@ -21,11 +21,6 @@ from decimal import Decimal
 from typing import Protocol
 
 import pytest
-
-from bolsa_api.background.auto_simulation_worker import (
-    AutoSimulationWorker,
-    step_minute_clock,
-)
 from bolsa_application.auto_reason_codes import (
     ATR_GEOMETRY,
     ATR_SOURCE_FALLBACK,
@@ -36,6 +31,11 @@ from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
 from bolsa_application.exit_order_store import InMemoryExitOrderStore
 from bolsa_application.reservation_store import InMemoryReservationStore
+
+from bolsa_api.background.auto_simulation_worker import (
+    AutoSimulationWorker,
+    step_minute_clock,
+)
 
 _SYMBOLS = ["AAA"]
 #: Plantilla de salida por defecto del motor V2 (``V2Tunables.exit_template``).
@@ -268,6 +268,45 @@ async def test_v2_stop_out_is_not_declared_as_thesis_exit(v2_env: None) -> None:
     codes = _journal_codes(worker)
     assert "thesis_exit" not in codes, "un stop-out no es una salida por tesis"
     assert "time_exit" not in codes
+
+
+@pytest.mark.asyncio
+async def test_exit_pending_requires_emitted_order(v2_env: None) -> None:
+    """S-3 — sin venta emitida NO se declara ``EXIT_PENDING`` (pero tampoco se calla).
+
+    ``TIME_STOP`` bajo reconciliación ``CRITICAL`` se degrada a ``REVIEW`` (control
+    negativo de S-2): el manager devuelve ``hold`` y no hay orden. Antes de S-3 el FSM ya
+    había avanzado a ``EXIT_PENDING`` al DECIDIR —antes de los gates—, así que la posición
+    quedaba marcada como «salida pedida» sin ninguna venta: un fantasma que sobrevivía a
+    reinicios. Ahora conserva su estado real y el turno declara ``exit_not_emitted`` con el
+    motivo decisorio, para no confundir «no quiso salir» con «quiso y no pudo».
+    """
+    from bolsa_analytics.cognitive.position_lifecycle import derive_lifecycle_state
+    from bolsa_application.sim_reconciliation import POSITION_PROJECTION_DIVERGENT
+
+    holder, clock = _clock_holder(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    worker = _worker(clock=clock)
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+    assert worker._open.get("AAA", Decimal("0")) > 0, "la entrada se ejecuta"
+
+    holder["now"] = datetime(2026, 11, 1, 9, 0, tzinfo=UTC)  # pasado el techo
+    worker._reconciliation = {"AAA": POSITION_PROJECTION_DIVERGENT}  # CRITICAL ⇒ REVIEW
+    worker._decider = _hold()
+    await worker.auto_turn()
+
+    position = worker._v2_positions.get("AAA")
+    assert position is not None, "sin venta la posición sigue viva"
+    assert worker._open.get("AAA", Decimal("0")) > 0, "no se emitió ninguna orden"
+    assert derive_lifecycle_state(position) != "EXIT_PENDING", (
+        "``EXIT_PENDING`` afirma que hay una salida pedida: sin orden es falso"
+    )
+
+    codes = _journal_codes(worker)
+    assert "exit_not_emitted" in codes, (
+        f"la salida decidida y NO emitida debe declararse (visto: {sorted(set(codes))})"
+    )
+    assert "time_exit" not in codes, "no hubo venta: la etiqueta de salida no se reclama"
 
 
 @pytest.mark.asyncio

@@ -110,6 +110,13 @@ RECONCILIATION_REQUIRED = "reconciliation_required"
 # un ``EXIT_REQUESTED`` genérico en el journal.
 TIME_EXIT = "time_exit"
 THESIS_EXIT = "thesis_exit"
+#: S-3 (cierre 2026-10-27) — hubo intención de salir y **no salió orden**. Antes el FSM
+#: avanzaba a ``EXIT_PENDING`` al decidir (antes de los gates), así que un ``hold`` del
+#: manager —p. ej. ``TIME_STOP`` degradado a ``REVIEW`` bajo reconciliación ``CRITICAL``—
+#: dejaba la posición marcada como «salida pedida» sin ninguna venta emitida. Ahora
+#: ``EXIT_PENDING`` sólo se sella cuando la orden sale de verdad y el caso contrario se
+#: declara con este motivo: la posición conserva su estado real y el operador ve el porqué.
+EXIT_NOT_EMITTED = "exit_not_emitted"
 ATR_GEOMETRY = "atr_geometry"
 #: Valores de ``atrSource`` (procedencia del ATR que construyó la geometría).
 ATR_SOURCE_REAL = "real"
@@ -197,6 +204,7 @@ POSITION_LIFECYCLE_REASONS: frozenset[str] = frozenset(
         LIFECYCLE_RESOLUTION_MISSING,
         TIME_EXIT,
         THESIS_EXIT,
+        EXIT_NOT_EMITTED,
         ATR_GEOMETRY,
     }
 )
@@ -279,6 +287,7 @@ __all__ = [
     "ATR_SOURCE_REAL",
     "DAY_EXIT_REASON_UNDECLARED",
     "DAY_EXIT_REASONS",
+    "EXIT_NOT_EMITTED",
     "EXIT_QTY_OVER_POSITION",
     "FILL_NOT_MATERIALIZED",
     "FILL_PARTIALLY_MATERIALIZED",

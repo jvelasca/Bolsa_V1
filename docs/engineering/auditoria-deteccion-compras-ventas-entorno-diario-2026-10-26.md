@@ -650,6 +650,12 @@ de S-2, o un `hold` defensivo), `position_manager_package` devuelve `None`
 reporta para `DIVERGENT`: `auto_simulation_worker.py:5871-5886`), pero no imposible y sin prueba que
 lo cubra.
 
+> **Resuelto el 2026-10-27 (S-3).** El FSM ya no avanza al **decidir**: `_v2_note_exit_intent`
+> conserva el motivo y `_v2_confirm_exit_emitted` lo convierte en `EXIT_PENDING` sólo cuando la orden
+> de venta ha salido de verdad (después de materializar el settlement). El turno que decidió salir y
+> no emitió orden declara `exit_not_emitted` con el motivo decisorio, y la posición conserva su
+> estado real. Ver §9.7.
+
 ### 5.6 Hallazgo S-4 · `THESIS_EXIT` es estructuralmente inalcanzable como motivo decisorio
 
 `invalidation_price` se congela al nacer como el nivel declarado por el plan **o, si no hay, el
@@ -1381,9 +1387,48 @@ sobre `e82ff02d` ⇒ **`success`** (`quality` + los cuatro jobs PG). En la misma
 posiciones de simulación, no una prueba aislada de la tabla.
 
 **Lo que NO se ha hecho.** No se toca `TIME_STOP`/`MANUAL`/objetivos: su exclusión está declarada y
-probada, y meterlos cambiaría el sentido de «proteger». No se cierra **S-3**: sigue habiendo motivos
-(`TIME_STOP` bajo `CRITICAL`) que producen `hold` y pueden dejar `EXIT_PENDING` sin orden. La
+probada, y meterlos cambiaría el sentido de «proteger». La
 evidencia es **E1**; sin sello, sin tag y sin bump.
+
+### 9.7 S-3 aplicado: `EXIT_PENDING` sólo cuando la orden existe
+
+**El fallo, en una frase.** `EXIT_PENDING` afirma «hay una salida pedida», y se escribía **al
+decidir**, antes de los gates y antes de que existiera ninguna venta; si el `PositionManager`
+devolvía `hold` (o un gate vetaba), la posición quedaba «pedida» para siempre.
+
+**Arreglo estructural.** El turno se parte en dos actos, como ya estaba partido el de la orden:
+
+1. `_v2_note_exit_intent` (al decidir) **no toca el FSM**: guarda `PendingExitIntent` (el evento
+   `TIME_EXIT`/`THESIS_EXIT`/`EXIT_REQUESTED`, el motivo decisorio y los `exitReasons`).
+2. `_v2_confirm_exit_emitted` (en la rama SELL, **después** de materializar el settlement y emitir la
+   orden) aplica la transición, sella la `revision_id` de protección y journaliza el motivo con
+   `emitted: true`.
+3. `_v2_flush_unemitted_exits` (cierre del turno) declara con **`exit_not_emitted`** las intenciones
+   que no produjeron orden, con `primaryReason`, `plannedEvent` y el `lifecycle` real. La posición no
+   cambia de estado.
+
+`exit_not_emitted` vive en `auto_reason_codes.py` dentro de `POSITION_LIFECYCLE_REASONS` ⇒ entra en
+`POSITION_ATTRIBUTION_REASONS`: es una **atribución de gestión**, nunca un veto de entrada. Silenciar
+el caso habría reintroducido el defecto por la puerta de atrás («no quiso salir» y «quiso y no pudo»
+volverían a ser la misma fila).
+
+**Pruebas (E1).**
+
+| Fichero | Qué fija |
+|---|---|
+| `test_auto_v2_lifecycle_clock_thesis.py` | `test_exit_pending_requires_emitted_order`: techo vencido + reconciliación `DIVERGENT` (`TIME_STOP` degradado a `REVIEW`, control negativo de S-2) ⇒ **no hay venta**, el `lifecycleState` **no** es `EXIT_PENDING` y el journal dice `exit_not_emitted`; `time_exit` **no** aparece |
+| el mismo fichero (existente) | control positivo: cuando el techo vende de verdad, `time_exit` se journaliza — el arreglo no silencia las salidas reales |
+
+**Gates ejecutados** (2026-10-27): `test_auto_v2_lifecycle_clock_thesis` ⇒ **12 passed**;
+`test_auto_v2_worker_integration` + `test_auto_simulation_worker` + `test_auto_v44_exit_governance` +
+`test_auto_v2_golden_day_evidence` + `test_auto_sim_active_strategy_seam` ⇒ **90 passed**;
+`test_auto_operational_monitor` + `test_auto_v2_entry` ⇒ **143 passed**; `ruff` ⇒ limpio;
+`mypy` (api + application) ⇒ **409 ficheros sin issues**.
+
+**Lo que NO se ha hecho.** No se cambia el FSM: sigue siendo forward-only y
+`EXIT_FILLED`/`CLOSED` no se tocan. No se cierra **S-6** (el AUTO sigue sin consultar F5) ni se
+corrige el `hold` de `TIME_STOP` bajo `CRITICAL`, que es la política de S-2 y ahora se **declara** en
+vez de fingir una salida. La evidencia es **E1**; sin sello, sin tag y sin bump.
 
 ---
 
@@ -1409,14 +1454,17 @@ evidencia es **E1**; sin sello, sin tag y sin bump.
    que la sugerencia del AUTO, y sigue sin ser protector ante datos rancios. **`THESIS_INVALIDATION`
    aplicado en §9.6 (S-2)**: una única tabla `PROTECTIVE_EXIT_REASONS` compartida por las dos capas,
    así que bajo `CRITICAL` la tesis invalidada vende. Queda abierto el cableado de F5 en el worker
-   (**S-6**) y el `EXIT_PENDING` sin orden (**S-3**).
+   (**S-6**). El `EXIT_PENDING` sin orden (**S-3**) queda **aplicado en §9.7**: el estado sólo se
+   escribe cuando la venta existe.
 5. **Declarar por qué la ACTIVE no opera.** `ACTIVE_STRATEGY=1` con `SIGNAL=0` hoy produce `HOLD`
    mudo: el journal debe distinguir `active_signal_disabled`, `no_executable` y `no_snapshot`
    (**B-5**). Sin ese motivo, «no operó» y «no quiso operar» son la misma fila.
 
 ### P1 — degrada la observabilidad o deja estados fantasma
 
-6. `EXIT_PENDING` solo si hay orden emitida (S-3).
+6. `EXIT_PENDING` solo si hay orden emitida (S-3). **Aplicado 2026-10-27 (§9.7):** la intención se
+   anota al decidir y la transición se sella tras materializar la venta; lo que no salió se declara
+   como `exit_not_emitted`, nunca como salida pedida.
 7. Contador durable de `settlement_failures` y publicación del modo `structural` (O-1, O-2).
 8. Journal con `featureSource` (`real`/`synthetic`) y `signalWindowBars` (**O-6**). **Aplicado
    2026-10-27:** claves aditivas del `payload` JSONB, declaradas también en el `HOLD` y omitidas si
@@ -1460,7 +1508,7 @@ E3.**
 | B-6 | P0-1 | B-6 + §9.1 | `test_scan_rejects_preset_below_warmup` (implementada en `test_scan_preset_warmup.py`) | **E1** (`bar_limit = 120` ⇒ `skipped` con `warmup_insufficient`; 200 ⇒ `>= 201`) |
 | S-1 | P0-4 | S-1 + §9.5 | `test_time_stop_permission_matches_auto_execution` (implementada como `test_time_stop_permission_matches_the_auto_suggestion`) | **E1** (`TIME_STOP` ⇒ `ALLOW`/`full_exit` en F5, igual que la sugerencia del AUTO; `HINT` con `protect`/`hold` sigue denegado) |
 | S-2 | P0-4 | S-2 + §9.6 | `test_thesis_invalidation_is_protective_under_critical_recon` | **E1** (`THESIS_INVALIDATION` ⇒ `EXIT`/`sell` bajo `CRITICAL` y `ALLOW` en F5 con datos rancios; `TIME_STOP`/`MANUAL`/objetivos siguen degradando) |
-| S-3 | P1-6 | S-3 | `test_exit_pending_requires_emitted_order` | E0 |
+| S-3 | P1-6 | S-3 + §9.7 | `test_exit_pending_requires_emitted_order` | **E1** (sin venta el `lifecycleState` no es `EXIT_PENDING` y el journal dice `exit_not_emitted`; con venta, `time_exit` se journaliza) |
 | S-4 | P2-13 | S-4 | `test_thesis_exit_reachable_with_declared_invalidation_price` | E0 + E1 parcial |
 | S-5 | P1-9 | S-5 | `test_unadopted_position_is_declared_in_journal` | E0 |
 | S-6 | P0-4 | S-6 | `test_auto_exit_ignores_stale_data_by_contract` | E0 |
@@ -1476,10 +1524,10 @@ E3.**
 
 **Cobertura:** 21 hallazgos · **22** entradas de backlog (las 21 con ID + P1-12b, que cubre el
 silencio de la UI del scan descrito en §7.4) · 21 criterios · 21
-pruebas propuestas · **9 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
-`S-1` en §9.5, `S-2` en §9.6, `B-2`, `B-4` y `O-5`). `B-1`, `B-2`, `B-4` y `O-5` entran con el sello
-`2.11.162-beta`; `B-6`, el cierre de `B-1`, `B-3`, `O-6`, `S-1` y `S-2` son **posteriores** al sello
-`2.11.163-beta` y viven en el commit de trabajo. Las filas
+pruebas propuestas · **10 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
+`S-1` en §9.5, `S-2` en §9.6, `S-3` en §9.7, `B-2`, `B-4` y `O-5`). `B-1`, `B-2`, `B-4` y `O-5`
+entran con el sello `2.11.162-beta`; `B-6`, el cierre de `B-1`, `B-3`, `O-6`, `S-1`, `S-2` y `S-3`
+son **posteriores** al sello `2.11.163-beta` y viven en el commit de trabajo. Las filas
 que en una lectura anterior quedaban huérfanas (`B-5`, `B-6`, `O-5`, `O-6`, `T-3`) tienen ahora
 backlog, criterio y prueba; su evidencia sigue siendo E0/E1/E2 y **no** se eleva por tener criterio
 escrito.

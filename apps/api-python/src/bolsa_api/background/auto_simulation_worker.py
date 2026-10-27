@@ -132,21 +132,6 @@ from bolsa_analytics.cognitive.position_state import (
 )
 from bolsa_analytics.cognitive.signal_identity import bar_window
 from bolsa_analytics.cognitive.trade_context import TradeContext
-from bolsa_api.background.auto_price_provider import (
-    OhlcvPriceSource,
-    PriceSource,
-    price_source_kind,
-)
-from bolsa_api.background.estudio_watch import SessionScopedEstudioList
-from bolsa_api.background.paper_auto_engine_worker import (
-    DecisionProvider,
-    _effective_venue,
-    _kill_switch_env_on,
-    _watch_from_estudio_enabled,
-    _watch_symbols,
-    refresh_watch_from_estudio,
-    sync_decider_watch,
-)
 from bolsa_application.account_drawdown import EquityMarkBook
 from bolsa_application.adaptive_gate_store import AdaptiveGateStore, sink_failures_from_state
 from bolsa_application.applied_fills import read_applied_fill_facts
@@ -193,6 +178,7 @@ from bolsa_application.auto_reason_codes import (
     ATR_SOURCE_FALLBACK,
     ATR_SOURCE_MISSING,
     ATR_SOURCE_REAL,
+    EXIT_NOT_EMITTED,
     EXIT_QTY_OVER_POSITION,
     FILL_NOT_MATERIALIZED,
     FILL_PARTIALLY_MATERIALIZED,
@@ -288,6 +274,22 @@ from bolsa_application.simulated_settlement import (
 from bolsa_application.top3_opportunities import (
     HISTORICAL_SCORING_NO_CHAMPION,
     select_top3_records,
+)
+
+from bolsa_api.background.auto_price_provider import (
+    OhlcvPriceSource,
+    PriceSource,
+    price_source_kind,
+)
+from bolsa_api.background.estudio_watch import SessionScopedEstudioList
+from bolsa_api.background.paper_auto_engine_worker import (
+    DecisionProvider,
+    _effective_venue,
+    _kill_switch_env_on,
+    _watch_from_estudio_enabled,
+    _watch_symbols,
+    refresh_watch_from_estudio,
+    sync_decider_watch,
 )
 
 logger = logging.getLogger(__name__)
@@ -567,6 +569,19 @@ class FillObservation:
     execution_id: str
     order_id: str
     qty: Decimal
+
+
+#: S-3 (cierre 2026-10-27) — una salida DECIDIDA que todavía no ha emitido orden.
+#: ``EXIT_PENDING`` afirma «hay una venta pedida»; hasta que la orden sale de verdad (tras
+#: kill/venue/RiskGate/reserva/materialización) esa afirmación sería falsa. El motivo se
+#: guarda aquí y sólo se convierte en transición cuando la venta existe.
+@dataclass(frozen=True, slots=True)
+class PendingExitIntent:
+    event: str
+    reason_code: str
+    primary_reason: str
+    thesis_invalid: bool
+    exit_reasons: tuple[str, ...]
 
 
 # V2.28 / A10 (P1-02 real): prefijo con que ``active_strategy_decider`` marca el
@@ -1380,6 +1395,9 @@ class AutoSimulationWorker:
         # viaja en la fila ``position_close``. Se deriva del motivo DECISORIO del plan, así
         # que un stop-out no se cuenta como salida por tesis.
         self._v2_last_exit_label: dict[str, str] = {}
+        # S-3: salidas DECIDIDAS que aún no han emitido orden (``EXIT_PENDING`` no se
+        # escribe hasta que la venta existe; ver ``_v2_note_exit_intent``).
+        self._v2_pending_exit: dict[str, PendingExitIntent] = {}
         # H-2 (§9 del pack): un ``PROTECT`` que NO mueve el stop y NO cambia el estado
         # quedaba mudo para siempre. Se journaliza UNA vez por (símbolo, stop) para no
         # inundar el journal en cada tick de un trailing ya en régimen permanente.
@@ -6624,28 +6642,31 @@ class AutoSimulationWorker:
             trailing_armed=armed,
             degraded=degraded,
         )
-        await self._v2_journal_exit_request(
-            symbol, position, outcome, at=at, thesis_invalid=thesis_invalid
-        )
+        # S-3: se anota la INTENCIÓN, no la transición. ``EXIT_PENDING`` sólo se sella
+        # cuando la orden de venta sale de verdad (``_v2_confirm_exit_emitted``).
+        self._v2_note_exit_intent(symbol, outcome, thesis_invalid=thesis_invalid)
         return position_manager_package(outcome)
 
-    async def _v2_journal_exit_request(
+    def _v2_note_exit_intent(
         self,
         symbol: str,
-        position: PositionState,
         outcome: PositionManagerResult | None,
         *,
-        at: str,
         thesis_invalid: bool,
     ) -> None:
-        """V2.42 slice 2b (E1/E3): declara POR QUÉ se pidió salir y avanza el FSM.
+        """S-3 — registra la INTENCIÓN de salir sin tocar el FSM.
 
-        El spine ya emite la orden de venta; lo que faltaba era (a) que el FSM registrara
-        ``TIME_EXIT``/``THESIS_EXIT`` (hasta ahora cualquier salida era indistinguible de
-        un ``EXIT_REQUESTED`` genérico) y (b) que la invalidación de tesis tuviera una
-        traza propia. Sin esto, una salida por tiempo o por tesis era invisible al operador.
+        ``EXIT_PENDING`` significa «hay una orden de salida viva», así que no puede
+        escribirse al DECIDIR: entre la decisión y la orden están los gates (kill,
+        venue, RiskGate, reserva durable, materialización), y el manager puede incluso
+        devolver ``hold`` (p. ej. ``TIME_STOP`` degradado a ``REVIEW`` bajo
+        reconciliación ``CRITICAL``). Antes el FSM avanzaba aquí, antes de esos gates, y
+        una salida sin venta dejaba la posición marcada como «salida pedida» para
+        siempre: el fantasma de S-3.
 
-        No vende nada aquí: la orden es del ``DecisionPackage`` que devuelve el llamante.
+        Aquí sólo se conserva el motivo. ``_v2_confirm_exit_emitted`` lo convierte en
+        transición cuando la orden ha salido de verdad, y ``_v2_flush_unemitted_exits``
+        declara al cerrar el turno lo que no salió (``exit_not_emitted``).
         """
         if outcome is None:
             return
@@ -6666,9 +6687,59 @@ class AutoSimulationWorker:
             event, reason_code = "EXIT_REQUESTED", primary.lower()
         else:
             return
+        self._v2_pending_exit[symbol] = PendingExitIntent(
+            event=event,
+            reason_code=reason_code,
+            primary_reason=primary,
+            thesis_invalid=thesis_invalid,
+            exit_reasons=tuple(outcome.exit_reasons),
+        )
+
+    def _v2_flush_unemitted_exits(self) -> None:
+        """S-3 — el turno termina sin orden: se declara la salida que NO se emitió.
+
+        La posición conserva su estado real (no hay ``EXIT_PENDING``) y el operador ve
+        por qué: el motivo decisorio y el evento que se habría aplicado. Silenciarlo
+        volvería a confundir «no quiso salir» con «quiso y no pudo».
+        """
+        if not self._v2_pending_exit:
+            return
+        at = self._v2_instant()
+        for symbol, intent in sorted(self._v2_pending_exit.items()):
+            current = self._v2_positions.get(symbol)
+            self._journal_position_event(
+                symbol,
+                EXIT_NOT_EMITTED,
+                at=at,
+                detail={
+                    "primaryReason": intent.primary_reason,
+                    "plannedEvent": intent.event,
+                    "thesisInvalid": intent.thesis_invalid,
+                    "exitReasons": list(intent.exit_reasons),
+                    "lifecycle": (
+                        derive_lifecycle_state(current) if current is not None else None
+                    ),
+                    "emitted": False,
+                },
+            )
+        self._v2_pending_exit.clear()
+
+    async def _v2_confirm_exit_emitted(self, symbol: str, *, at: str) -> None:
+        """S-3 — la orden de salida YA salió: ahora sí se sella ``EXIT_PENDING``.
+
+        Se llama en el camino SELL, después de materializar la venta. Sin intención
+        pendiente es un no-op: una salida por stop/objetivo no pasa por aquí (su FSM lo
+        escribe el propio cierre).
+        """
+        intent = self._v2_pending_exit.pop(symbol, None)
+        if intent is None:
+            return
         # Partimos de la posición VIVA (el ratchet pudo reescribir el JSONB): si se usara
         # la copia previa, el evento pisaría el stop recién ratcheado.
-        current = self._v2_positions.get(symbol) or position
+        current = self._v2_positions.get(symbol)
+        if current is None:
+            return
+        event = intent.event
         advanced, transition = advance_lifecycle(current, event, at=at)
         # v2.88.28 — toda transición de protección lleva una ``revision_id`` durable para
         # derivar un ``dedupe_key`` determinista (antes esta salida pedida viajaba sin ella y
@@ -6691,15 +6762,16 @@ class AutoSimulationWorker:
             )
         self._journal_position_event(
             symbol,
-            reason_code,
+            intent.reason_code,
             at=at,
             detail={
-                "primaryReason": primary,
+                "primaryReason": intent.primary_reason,
                 "lifecycle": transition.to_state,
                 "deadline": current.holding_deadline_at,
                 "invalidationPrice": current.invalidation_price,
-                "thesisInvalid": thesis_invalid,
-                "exitReasons": list(outcome.exit_reasons),
+                "thesisInvalid": intent.thesis_invalid,
+                "exitReasons": list(intent.exit_reasons),
+                "emitted": True,
             },
         )
         # v2.88.26 — HECHO durable de la salida pedida (cierra ``protection_not_durable``
@@ -7218,6 +7290,7 @@ class AutoSimulationWorker:
         # sigue pasando por el MISMO spine (kill/sim-gate/RiskGate/settlement).
         self._v2_last_exit_reasons = {}
         self._v2_last_exit_label = {}
+        self._v2_pending_exit = {}
         if self._v2_enabled and not kill and venue_ok and not account_required:
             # W2 · Fase A: con el dato de barra ya cargado, el turno REUTILIZA ese dato y
             # se ahorra el I/O redundante (régimen, espejo de consumo, contexto de cartera,
@@ -7494,6 +7567,11 @@ class AutoSimulationWorker:
             closed_cycle_id: str | None = None
             close_reason: str | None = None
             self._emit("order", venue, None, action.lower(), exec_qty)
+            # S-3 — la orden de salida ya EXISTE (materializada arriba): sólo ahora el FSM
+            # puede declarar ``EXIT_PENDING``. Antes se escribía al decidir, así que un
+            # ``hold`` del manager o un veto posterior dejaba la posición «pedida» sin venta.
+            if action == "SELL" and self._v2_enabled:
+                await self._v2_confirm_exit_emitted(symbol, at=self._v2_instant())
             # v2.88.25 — la ORDEN DE ENTRADA deja de vivir sólo en el journal RAM: con el
             # sumidero M2 (flag ``AUTO_OPERATIONAL_AUDIT``) se sella como hecho durable por
             # ciclo, con la cantidad PEDIDA vs MATERIALIZADA y la FUENTE de precio real. Sin
@@ -7654,6 +7732,9 @@ class AutoSimulationWorker:
                     )
             report.orders += 1
             report.fills += len(settlement.applied)
+        # S-3 — las salidas decididas que no emitieron orden se declaran aquí: la posición
+        # conserva su estado real (nunca ``EXIT_PENDING`` sin venta) y el motivo no se pierde.
+        self._v2_flush_unemitted_exits()
         await self._v2_flush_position_journal()
         self._v2_bar_note_settlement()
         self._last_gate_reason = tuple(dict.fromkeys(reasons))

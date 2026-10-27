@@ -504,8 +504,8 @@ commit** de lo que sigue pendiente. Nada se ha publicado.
 | P0 | Validar el warmup del preset ACTIVE contra `AUTO_ENGINE_SIM_SIGNAL_BARS`, con rechazo explícito | B-1, B-6 | **pendiente** |
 | P0 | Unificar la procedencia de la feature: OHLCV real en decisor y alertas, o `featureSource` declarado | B-2, B-4, O-6 | **aplicado** en decisor y alertas (`signal_feature_context.py`) + contrato 16/16; `featureSource` en journal **pendiente** (O-6) |
 | P0 | Resolver el contrato `gated`/`raw`: el gating no puede reiniciarse en cada llamada | B-3 | **pendiente**, con prueba de caracterización |
-| P0 | Unificar el conjunto de motivos accionables entre F5 y AUTO, o consultar F5 | S-1, S-2, S-6 | **pendiente** |
-| P1 | `EXIT_PENDING` solo tras orden emitida | S-3 | **pendiente** |
+| P0 | Unificar el conjunto de motivos accionables entre F5 y AUTO, o consultar F5 | S-1, S-2, S-6 | **aplicado** F5+AUTO (§12.12, §12.13); **S-6** (cableado en el worker) sigue **pendiente** |
+| P1 | `EXIT_PENDING` solo tras orden emitida | S-3 | **aplicado** (§12.14) |
 | P1 | Contador durable de settlement fallido y publicación de `structural` | O-1, O-2 | **pendiente** |
 | P1 | Declarar la posición no adoptada en el journal | S-5 | **pendiente** |
 | P1 | Sustituir `?? 0` y el `INCONCLUSIVE` estático por lecturas del gate | O-3, O-4 | **pendiente** |
@@ -1167,7 +1167,44 @@ en verde sobre la misma cabecera.
 
 - **No** se mete `TIME_STOP` ni `MANUAL` ni los objetivos en la tabla: su exclusión está declarada y
   probada.
-- **No** se cierra **S-3**: siguen existiendo caminos que producen `hold` (p. ej. `TIME_STOP` bajo
-  `CRITICAL`) y pueden dejar `EXIT_PENDING` sin orden.
+- **No** se cierra aquí **S-3**: siguen existiendo caminos que producen `hold` (p. ej. `TIME_STOP` bajo
+  `CRITICAL`); se cierra en §12.14 (el estado deja de fingirse, aunque la política no cambia).
+- **Sin sello, sin tag y sin bump.** La evidencia es **E1**.
+
+### 12.14 S-3: `EXIT_PENDING` sólo cuando la orden existe
+
+> **Cierra el ítem S-3** de §5.5 y §10 de la auditoría, y el criterio `S-3` de §9.
+
+**Qué se implementó.** El turno separa **intención** de **transición**, igual que ya separaba
+decisión de orden:
+
+| Momento | Antes | Ahora |
+|---|---|---|
+| Al decidir salir | `advance_lifecycle` a `EXIT_PENDING` | `_v2_note_exit_intent` guarda `PendingExitIntent` y **no toca el FSM** |
+| Al materializar la venta | — | `_v2_confirm_exit_emitted` aplica la transición, sella la `revision_id` y journaliza el motivo con `emitted: true` |
+| Turno sin orden | silencio (estado fantasma) | `_v2_flush_unemitted_exits` declara `exit_not_emitted` con motivo y `plannedEvent` |
+
+`exit_not_emitted` se añadió a `POSITION_LIFECYCLE_REASONS` (⇒ `POSITION_ATTRIBUTION_REASONS`): es
+atribución de gestión, nunca veto de entrada.
+
+**Verificación (E1).**
+
+| Gate | Resultado |
+|---|---|
+| `test_auto_v2_lifecycle_clock_thesis.py` | **12 passed** (incluye `test_exit_pending_requires_emitted_order`) |
+| `test_auto_v2_worker_integration` · `test_auto_simulation_worker` · `test_auto_v44_exit_governance` · `test_auto_v2_golden_day_evidence` · `test_auto_sim_active_strategy_seam` | **90 passed** |
+| `test_auto_operational_monitor` · `test_auto_v2_entry` (application) | **143 passed** |
+| `ruff` / `mypy` (api + application) | limpio / **409 ficheros sin issues** |
+
+La prueba es un **control negativo de S-2** en el mismo turno: techo vencido (`TIME_STOP`) con
+reconciliación `DIVERGENT` ⇒ `CRITICAL` ⇒ `REVIEW` ⇒ `hold`. Se afirma que (a) no hubo venta, (b) el
+`lifecycleState` **no** es `EXIT_PENDING` y (c) el journal dice `exit_not_emitted` y **no** `time_exit`.
+El caso positivo —la venta real— ya estaba cubierto y sigue journalizando `time_exit`.
+
+**Lo que NO se ha hecho, y queda declarado.**
+
+- **No** se cambia la política que produce el `hold`: `TIME_STOP` bajo `CRITICAL` sigue degradando a
+  `REVIEW` (es S-2 y está probado). Ahora se **declara** en vez de fingir una salida.
+- **No** se consulta F5 desde el AUTO (**S-6**).
 - **Sin sello, sin tag y sin bump.** La evidencia es **E1**.
 
