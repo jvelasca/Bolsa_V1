@@ -87,7 +87,14 @@ def test_deny_idle() -> None:
     assert perm.reasons == ("not_actionable",)
 
 
-def test_deny_hint() -> None:
+def test_time_stop_is_actionable_and_matches_the_auto_decision() -> None:
+    """S-1: un plan VENCIDO (``TIME_STOP``/``HINT``) sí es accionable.
+
+    Antes ``_resolve_action`` exigía ``TRIGGERED``, así que F5 denegaba con
+    ``not_actionable`` mientras el AUTO vendía la posición completa por el mismo motivo
+    (``suggestion_from_exit_policy`` cae en ``full_exit``). El status dice *cuán urgente*
+    es la salida, no *si* hay salida: el plan ya declara ``full_exit``.
+    """
     hint = build_exit_plan_from_position(
         _open_long(),
         now="2026-08-26T00:00:00Z",
@@ -95,8 +102,76 @@ def test_deny_hint() -> None:
     )
     assert hint is not None
     assert hint.status == "HINT"
+    assert hint.primary_reason == "TIME_STOP"
+    assert hint.suggested_action == "full_exit"
+
     perm = check_exit_permission(hint)
-    assert perm.reasons == ("not_actionable",)
+    assert perm.verdict == "ALLOW"
+    assert perm.allowed is True
+    assert perm.action == "full_exit"
+    assert perm.reasons == ()
+
+
+def test_hint_without_a_sell_suggestion_stays_not_actionable() -> None:
+    """Control negativo: ``HINT`` no es un permiso en blanco.
+
+    Solo se resuelve la sugerencia que el plan declara como venta. ``protect`` exige
+    ``ARMED`` (proteger sin stop de trailing sería una acción sin argumento) y ``hold`` no
+    es accionable en ningún estado.
+    """
+    hint = build_exit_plan_from_position(
+        _open_long(),
+        now="2026-08-26T00:00:00Z",
+        expires_at="2026-08-25T23:00:00Z",
+    )
+    assert hint is not None
+
+    protect = replace(hint, suggested_action="protect")
+    assert check_exit_permission(protect).reasons == ("not_actionable",)
+
+    hold = replace(hint, suggested_action="hold")
+    assert check_exit_permission(hold).reasons == ("not_actionable",)
+
+
+def test_a_time_stop_is_not_protective_against_stale_data() -> None:
+    """La equivalencia es sobre ACCIONABILIDAD, no sobre protección (esa es S-2).
+
+    ``TIME_STOP`` no está en ``_is_protective``: con datos rancios F5 lo sigue denegando.
+    Sellarlo accionable no lo convierte en una emergencia de riesgo.
+    """
+    hint = build_exit_plan_from_position(
+        _open_long(),
+        now="2026-08-26T00:00:00Z",
+        expires_at="2026-08-25T23:00:00Z",
+    )
+    stale = check_exit_permission(hint, auto_execute=True, paper_d_execute=True, data_stale=True)
+    assert stale.reasons == ("data_stale",)
+
+
+def test_time_stop_permission_matches_the_auto_suggestion() -> None:
+    """La MISMA condición, el MISMO veredicto en F5 y en la propuesta del AUTO.
+
+    Es la prueba del criterio S-1: se comparan las dos capas sobre el mismo plan, sin
+    interposición de ninguna otra.
+    """
+    from bolsa_analytics.cognitive.exit_policy import suggestion_from_exit_policy
+
+    hint = build_exit_plan_from_position(
+        _open_long(),
+        now="2026-08-26T00:00:00Z",
+        expires_at="2026-08-25T23:00:00Z",
+    )
+    assert hint is not None
+
+    perm = check_exit_permission(hint)
+    suggestion, quantity, _ = suggestion_from_exit_policy(
+        hint.primary_reason, 10.0, None
+    )
+    assert perm.action == suggestion == "full_exit"
+    assert quantity == 10.0
+    # Y el plan ya decía lo mismo: F5 no inventa una acción, la lee del plan.
+    assert hint.suggested_action == perm.action
+    assert hint.suggested_qty == quantity
 
 
 def test_deny_position_closed() -> None:

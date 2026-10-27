@@ -1072,3 +1072,51 @@ y sus aserciones siguen pasando.
 - **No se relee ninguna ventana real** con las claves: E1, no E2/E3.
 - **Sin sello, sin tag y sin bump.**
 
+### 12.12 S-1: un plan vencido es accionable en F5, igual que en el AUTO
+
+> **Cierra el ítem S-1** de §5.3 y §10 de la auditoría, y el criterio `S-1` de §9.
+
+**Qué se implementó.** `_resolve_action` de `check_exit_permission` resolvía la acción **por el
+status** y exigía `TRIGGERED`. Un plan vencido es `HINT` —no es un disparador duro de riesgo— pero
+el propio plan ya declara `suggested_action = full_exit`, así que F5 lo denegaba con
+`not_actionable` mientras el worker AUTO vendía la posición completa por el mismo motivo.
+
+Se resuelve ahora por una tabla explícita `_ACTIONABLE_BY_STATUS`:
+
+| Estado | Sugerencias que se resuelven |
+|---|---|
+| `TRIGGERED` | `full_exit`, `reduce` |
+| `ARMED` | `protect` |
+| `HINT` | `full_exit`, `reduce` |
+
+`protect` sigue exigiendo `ARMED` y `hold` no es accionable en ningún estado: el `HINT` no se
+convierte en permiso en blanco. `TIME_STOP` es hoy el único motivo que produce `HINT`, de modo que
+la tabla no relaja otros caminos.
+
+**Lo que la equivalencia NO toca.** `TIME_STOP` sigue **fuera** de `_is_protective`: con datos
+rancios o mercado cerrado F5 lo vuelve a denegar. Esa asimetría es **S-2** y sigue abierta. Y
+`check_exit_permission` sigue sin consultarse en el worker AUTO (**S-6**): se ha igualado el
+veredicto sobre el mismo plan, no el cableado.
+
+**Verificación (E1).**
+
+| Gate | Resultado |
+|---|---|
+| `test_exit_permission.py` | **23 passed** (4 nuevas; `test_deny_hint` codificaba el defecto y se retira) |
+| `analytics` + `application` | **4235 passed** |
+| Suites de salida de `apps/api-python` | **63 passed** |
+| `ruff` / `lint-imports` / `mypy` (gate CI) | limpio / 4 contratos / **571 ficheros** |
+
+Las dos pruebas que importan son la del criterio —`perm.action == suggestion_from_exit_policy(...)`
+sobre el **mismo** plan— y los dos controles negativos: `HINT` + `protect`/`hold` sigue denegado, y
+`TIME_STOP` con datos rancios sigue denegado.
+
+**Lo que NO se ha hecho, y queda declarado.**
+
+- **No** se hace que el AUTO consulte F5: es **S-6**, cambio de cableado y no de veredicto.
+- **No** se cambia `TIME_STOP` a `TRIGGERED`: `HINT` es correcto y cambiarlo alteraría la precedencia
+  visible en la UI.
+- **El gate de mypy no cubre `packages/py/analytics`**: el cambio queda sostenido por `ruff` y por
+  las pruebas, no por tipos.
+- **Sin sello, sin tag y sin bump.** La evidencia es **E1**.
+

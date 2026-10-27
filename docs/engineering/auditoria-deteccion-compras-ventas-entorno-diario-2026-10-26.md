@@ -566,10 +566,34 @@ worker). Convierte el resultado del `PositionManager` directamente en propuesta
 `full_exit` por el fallback (`exit_policy.py:165`). Resultado: **la misma condición es "no
 accionable" para PAPER_D y vende la posición completa en AUTO**.
 
-**Veredicto: PARCIAL / inconsistencia entre capas.** La prueba
+**Veredicto original: PARCIAL / inconsistencia entre capas.** La prueba
 `test_v2_time_exit_sells_and_journals_time_exit`
 (`apps/api-python/tests/test_auto_v2_lifecycle_clock_thesis.py:170`) certifica el lado AUTO; nadie
-certifica la equivalencia con F5.
+certificaba la equivalencia con F5.
+
+> **Resuelto el 2026-10-27 (S-1).** `_resolve_action` de F5 resolvía la acción **por el status** y
+> exigía `TRIGGERED`, así que un plan vencido (`TIME_STOP` ⇒ `HINT`, con
+> `suggested_action = full_exit` ya declarado por `suggestion_from_exit_policy`) caía en
+> `not_actionable`. El status dice **cuán urgente** es la salida, no **si** hay salida.
+>
+> La resolución pasa a una tabla explícita `_ACTIONABLE_BY_STATUS`:
+>
+> | Estado | Sugerencias que se resuelven |
+> |---|---|
+> | `TRIGGERED` | `full_exit`, `reduce` |
+> | `ARMED` | `protect` |
+> | `HINT` | `full_exit`, `reduce` |
+>
+> Es deliberadamente estrecha: `protect` **sigue** exigiendo `ARMED` (proteger sin stop de trailing
+> sería una acción sin argumento) y `hold` no es accionable en ningún estado. Como `TIME_STOP` es
+> hoy el **único** motivo que produce `HINT` (`_HARD_TRIGGER` cubre el resto y `TRAIL` es `ARMED`
+> cuando hay stop), la tabla no relaja ningún otro camino.
+>
+> **Lo que la equivalencia NO toca, y se declara.** `TIME_STOP` sigue **fuera** de `_is_protective`:
+> con datos rancios o mercado cerrado F5 lo vuelve a denegar. Alinearse en accionabilidad no lo
+> convierte en una emergencia de riesgo — esa asimetría es S-2. Y `check_exit_permission` sigue sin
+> consultarse en el worker AUTO (S-6): lo que se ha igualado es el **veredicto sobre el mismo plan**,
+> no el cableado.
 
 ### 5.4 Hallazgo S-2 · `THESIS_INVALIDATION` fuera del conjunto protector
 
@@ -938,7 +962,7 @@ restantes describen qué habría que observar para dar el hallazgo por cerrado.
 | B-4 | `test_the_alert_evaluates_with_the_ohlcv_context` | Misma definición, mismas barras: la alerta entrega al motor un `indicator_context` construido desde OHLCV (con VWAP real) y no evalúa sobre barras sintéticas. |
 | B-5 | `test_active_signal_flag_off_blocks_buy_explicitly` | `ACTIVE_STRATEGY=1`, `SIGNAL=0` ⇒ `HOLD` **y** un motivo de journal `active_signal_disabled` (hoy: `HOLD` sin motivo). |
 | B-6 | `test_scan_rejects_preset_below_warmup` | `bar_limit < 200` + `golden_cross` ⇒ `ScanSkippedInstrument` con motivo `warmup_insufficient` (hoy: 0 hits silenciosos). |
-| S-1 | `test_time_stop_permission_matches_auto_execution` | `check_exit_permission(plan TIME_STOP).allowed` y `position_manager_package(outcome).action` deben coincidir; hoy `False` vs `SELL`. |
+| S-1 | `test_time_stop_permission_matches_auto_execution` | `check_exit_permission(plan TIME_STOP).allowed` y `position_manager_package(outcome).action` deben coincidir. **Cubierto 2026-10-27** por `test_time_stop_permission_matches_the_auto_suggestion` (§5.3): `full_exit` en ambas capas. |
 | S-2 | `test_thesis_invalidation_is_protective_under_critical_recon` | Con `CRITICAL` + `THESIS_INVALIDATION`, el `PositionManagerResult.order_action == "sell"` (hoy `hold`/`REVIEW`). Alternativa aceptada: documentar que no vende. |
 | S-3 | `test_exit_pending_requires_emitted_order` | Tras un turno con `primary=THESIS_INVALIDATION` y `CRITICAL`, si no hay `SELL`, el `PositionState.exit_status` **no** es `EXIT_PENDING`. |
 | S-4 | `test_thesis_exit_reachable_with_declared_invalidation_price` | Un plan con `invalidationPrice > stop` produce `primary_reason == "THESIS_INVALIDATION"` sin `STRUCTURAL_STOP`. Fija que el caso es alcanzable **o** que se retira del contrato. |
@@ -1211,6 +1235,65 @@ como deuda declarada. La evidencia es **E1**: ninguna ventana real se ha releíd
 
 ---
 
+### 9.5 S-1 aplicado: un plan vencido es una salida, no un aviso
+
+**El fallo, en una frase.** La **misma** condición —tesis vencida— era «no accionable» para F5
+(`check_exit_permission` denegaba con `not_actionable`) y una venta completa para el AUTO.
+
+**Por qué pasaba.** `build_exit_plan_from_position` marca `TIME_STOP` con `status = "HINT"` (no es
+un disparador duro de riesgo) pero **sí** le da `suggested_action = "full_exit"` a través de
+`suggestion_from_exit_policy`. `_resolve_action` de F5 filtraba **por el status** y exigía
+`TRIGGERED`, con lo que el `HINT` caía en `none` — mientras el worker AUTO leía la sugerencia y
+vendía. El status dice **cuán urgente** es la salida; la sugerencia dice **si la hay**.
+
+**Arreglo.** Tabla explícita `_ACTIONABLE_BY_STATUS` en `exit_permission.py`:
+
+| Estado | Sugerencias que se resuelven |
+|---|---|
+| `TRIGGERED` | `full_exit`, `reduce` |
+| `ARMED` | `protect` |
+| `HINT` | `full_exit`, `reduce` |
+
+Es deliberadamente estrecha: `protect` **sigue** exigiendo `ARMED` —proteger sin stop de trailing
+sería una acción sin argumento— y `hold` no es accionable en ningún estado. `TIME_STOP` es hoy el
+**único** motivo que produce `HINT` (`_HARD_TRIGGER` cubre el resto; `TRAIL` es `ARMED` cuando hay
+stop), así que la tabla no relaja ningún otro camino.
+
+**Lo que la equivalencia NO toca, y se declara.** `TIME_STOP` sigue **fuera** de `_is_protective`:
+con `data_stale` o `market_closed`, F5 lo vuelve a denegar. Alinearse en accionabilidad no lo
+convierte en emergencia de riesgo — esa asimetría es **S-2**, y sigue abierta. Y
+`check_exit_permission` **sigue sin consultarse** en el worker AUTO (**S-6**): lo que se ha igualado
+es el veredicto sobre el mismo plan, no el cableado.
+
+**Pruebas (E1).** En `packages/py/analytics/tests/test_exit_permission.py`:
+
+- `test_time_stop_is_actionable_and_matches_the_auto_decision` — `ALLOW` / `full_exit` / sin
+  `reasons`, con el plan afirmando `HINT` + `TIME_STOP` + `full_exit` (el hallazgo, fijado).
+- `test_time_stop_permission_matches_the_auto_suggestion` — el criterio literal: compara F5 con
+  `suggestion_from_exit_policy` sobre el mismo plan; `perm.action == suggestion == "full_exit"` y la
+  cantidad coincide. Es «la misma condición, el mismo veredicto».
+- `test_hint_without_a_sell_suggestion_stays_not_actionable` — control negativo: `HINT` +
+  `protect` y `HINT` + `hold` **siguen** denegados. Un `HINT` no es un permiso en blanco.
+- `test_a_time_stop_is_not_protective_against_stale_data` — control negativo: con datos rancios
+  sigue denegando; el arreglo no suplanta a S-2.
+
+La prueba anterior `test_deny_hint` codificaba el defecto (afirmaba `not_actionable` para un plan
+vencido) y se sustituye por las cuatro de arriba.
+
+**Gates ejecutados** (2026-10-27): `analytics` + `application` ⇒ **4235 passed**; suites de salida de
+`apps/api-python` (`test_auto_v2_lifecycle_clock_thesis`, `test_auto_v44_exit_crash_matrix`,
+`test_auto_v44_exit_governance`, `test_paper_auto_engine_worker`, `test_auto_simulation_worker`) ⇒
+**63 passed**; `ruff` ⇒ limpio; `lint-imports` ⇒ 4 contratos intactos; `mypy` (gate de CI, **sin**
+`analytics`) ⇒ **571 ficheros sin issues**. El gate de mypy no cubre `packages/py/analytics`, así
+que el cambio de `exit_permission.py` queda sostenido por `ruff` y por las pruebas, no por tipos.
+
+**Lo que NO se ha hecho.** No se hace que el AUTO consulte F5 (eso es S-6 y es un cambio de
+cableado, no de veredicto). No se cambia el status de `TIME_STOP` a `TRIGGERED`: `HINT` es correcto
+—no es un disparador duro de riesgo— y cambiarlo alteraría la precedencia visible en la UI. La
+evidencia es **E1**. Sin sello, sin tag y sin bump.
+
+---
+
 ## 10. Backlog priorizado
 
 ### P0 — afecta a la validez de lo que se concluya de la ventana
@@ -1228,8 +1311,10 @@ como deuda declarada. La evidencia es **E1**: ninguna ventana real se ha releíd
    la ventana, el gating no puede reiniciarse en cada llamada (B-3, S-1). **Aplicado en §9.2:** el
    decisor recibe el libro real (`holds_long`) y la salida se decide por nivel en la última barra;
    `raw` queda como está porque responde a otra pregunta. Queda abierto el frente `S-1`.
-4. **Cerrar la asimetría TIME_STOP/THESIS.** O el AUTO consulta F5, o F5 y el AUTO comparten el
-   mismo conjunto de motivos accionables (S-1, S-2, S-6).
+4. **Cerrar la asimetría TIME_STOP/THESIS.** ~~El AUTO vende por `TIME_STOP` y F5 lo declaraba no
+   accionable~~ — **`TIME_STOP` aplicado en §9.5 (S-1)**: F5 lo resuelve como `full_exit`, igual
+   que la sugerencia del AUTO, y sigue sin ser protector ante datos rancios. Queda abierto
+   `THESIS_INVALIDATION` (**S-2**) y el cableado de F5 en el worker (**S-6**).
 5. **Declarar por qué la ACTIVE no opera.** `ACTIVE_STRATEGY=1` con `SIGNAL=0` hoy produce `HOLD`
    mudo: el journal debe distinguir `active_signal_disabled`, `no_executable` y `no_snapshot`
    (**B-5**). Sin ese motivo, «no operó» y «no quiso operar» son la misma fila.
@@ -1278,7 +1363,7 @@ E3.**
 | B-4 | P0-2 | B-4 | `test_the_alert_evaluates_with_the_ohlcv_context` | **E1** (el motor recibe `indicator_context` con VWAP real) |
 | B-5 | P0-5 | B-5 | `test_active_signal_flag_off_blocks_buy_explicitly` | E0 + E1 parcial (`test_auto_sim_active_strategy_seam`; falta el motivo) |
 | B-6 | P0-1 | B-6 + §9.1 | `test_scan_rejects_preset_below_warmup` (implementada en `test_scan_preset_warmup.py`) | **E1** (`bar_limit = 120` ⇒ `skipped` con `warmup_insufficient`; 200 ⇒ `>= 201`) |
-| S-1 | P0-4 | S-1 | `test_time_stop_permission_matches_auto_execution` | E0 + E1 parcial |
+| S-1 | P0-4 | S-1 + §9.5 | `test_time_stop_permission_matches_auto_execution` (implementada como `test_time_stop_permission_matches_the_auto_suggestion`) | **E1** (`TIME_STOP` ⇒ `ALLOW`/`full_exit` en F5, igual que la sugerencia del AUTO; `HINT` con `protect`/`hold` sigue denegado) |
 | S-2 | P0-4 | S-2 | `test_thesis_invalidation_is_protective_under_critical_recon` | E0 + E1 parcial |
 | S-3 | P1-6 | S-3 | `test_exit_pending_requires_emitted_order` | E0 |
 | S-4 | P2-13 | S-4 | `test_thesis_exit_reachable_with_declared_invalidation_price` | E0 + E1 parcial |
@@ -1296,10 +1381,10 @@ E3.**
 
 **Cobertura:** 21 hallazgos · **22** entradas de backlog (las 21 con ID + P1-12b, que cubre el
 silencio de la UI del scan descrito en §7.4) · 21 criterios · 21
-pruebas propuestas · **7 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
-`B-2`, `B-4` y `O-5`). `B-1`, `B-2`, `B-4` y `O-5` entran con el sello `2.11.162-beta`; `B-6`, el
-cierre de `B-1`, `B-3` y `O-6` son **posteriores** al sello `2.11.163-beta` y viven en el commit de
-trabajo. Las filas
+pruebas propuestas · **8 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
+`S-1` en §9.5, `B-2`, `B-4` y `O-5`). `B-1`, `B-2`, `B-4` y `O-5` entran con el sello
+`2.11.162-beta`; `B-6`, el cierre de `B-1`, `B-3`, `O-6` y `S-1` son **posteriores** al sello
+`2.11.163-beta` y viven en el commit de trabajo. Las filas
 que en una lectura anterior quedaban huérfanas (`B-5`, `B-6`, `O-5`, `O-6`, `T-3`) tienen ahora
 backlog, criterio y prueba; su evidencia sigue siendo E0/E1/E2 y **no** se eleva por tener criterio
 escrito.

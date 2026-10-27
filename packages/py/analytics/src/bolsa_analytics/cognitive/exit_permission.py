@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Literal, cast
 
 from bolsa_analytics.cognitive.execution_plan import ExecutionPlan
 from bolsa_analytics.cognitive.exit_plan import ExitPlan
@@ -61,16 +61,30 @@ class ExitPermission:
         }
 
 
+#: Qué sugerencia del plan convierte en ACCIÓN ejecutable según su estado.
+#:
+#: ``HINT`` admite ``full_exit``/``reduce`` porque un plan **vencido** (``TIME_STOP``) es una
+#: instrucción de salida real y no un aviso: el propio plan ya declara ``suggested_action =
+#: full_exit``. Antes se exigía ``TRIGGERED`` y la misma condición se leía «no accionable» en F5
+#: mientras el AUTO vendía la posición completa (S-1): el status dice *cuán urgente* es la
+#: salida, no *si* hay salida.
+#:
+#: La tabla es deliberadamente estrecha: ``protect`` sigue exigiendo ``ARMED`` —proteger sin
+#: stop de trailing sería una acción sin argumento— y ``hold`` no es accionable en ningún estado.
+_ACTIONABLE_BY_STATUS: dict[str, frozenset[str]] = {
+    "TRIGGERED": frozenset({"full_exit", "reduce"}),
+    "ARMED": frozenset({"protect"}),
+    "HINT": frozenset({"full_exit", "reduce"}),
+}
+
+
 def _resolve_action(exit_plan: ExitPlan | None) -> ExitPermissionAction:
     if exit_plan is None:
         return "none"
-    if exit_plan.status == "TRIGGERED" and exit_plan.suggested_action == "full_exit":
-        return "full_exit"
-    if exit_plan.status == "TRIGGERED" and exit_plan.suggested_action == "reduce":
-        return "reduce"
-    if exit_plan.status == "ARMED" and exit_plan.suggested_action == "protect":
-        return "protect"
-    return "none"
+    allowed = _ACTIONABLE_BY_STATUS.get(exit_plan.status)
+    if allowed is None or exit_plan.suggested_action not in allowed:
+        return "none"
+    return cast("ExitPermissionAction", exit_plan.suggested_action)
 
 
 def _deny(
