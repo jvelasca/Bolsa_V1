@@ -33,6 +33,7 @@ from bolsa_application.auto_reason_codes import (
     ACTIVE_NO_SNAPSHOT,
     ACTIVE_SIGNAL_DISABLED,
     ACTIVE_STRATEGY_HOLD_EVENT,
+    ACTIVE_WARMUP_UNMEASURABLE,
     WARMUP_INSUFFICIENT,
 )
 from bolsa_application.auto_v2_entry import (
@@ -175,6 +176,94 @@ def test_the_warmup_shortfall_reuses_the_scan_literal() -> None:
     assert decision.memo.startswith(WARMUP_INSUFFICIENT)
 
 
+# ── B-1 (ventana derivada): el warmup medido viaja con la decisión ────────────────────
+
+
+def test_the_measured_warmup_travels_with_every_decision() -> None:
+    """El número que dimensiona la ventana es un HECHO declarado, no un cálculo interno.
+
+    Con 201 barras (la ventana que el worker debe pedir) el preset es evaluable y la
+    decisión no es un HOLD por warmup, pero sigue declarando cuánto exige.
+    """
+    decider = make_active_strategy_decider(
+        active=_active("golden_cross"),
+        watch=(SYMBOL,),
+        bars_by_symbol=lambda _s: _bars(201),
+        signal_window_source="preset_warmup",
+    )
+
+    decision = decider(SYMBOL)
+
+    assert decision.warmup_bars == 201
+    assert decision.signal_window_source == "preset_warmup"
+    assert decision.hold_reason != WARMUP_INSUFFICIENT
+
+
+def test_a_light_preset_declares_its_single_bar_warmup() -> None:
+    """``vwap_reclaim`` pide una barra: la ventana del entorno (120) ya la cubre."""
+    decider = make_active_strategy_decider(
+        active=_active("vwap_reclaim"),
+        watch=(SYMBOL,),
+        bars_by_symbol=lambda _s: _bars(120),
+        signal_window_source="env",
+    )
+
+    decision = decider(SYMBOL)
+
+    assert decision.warmup_bars == 1
+    assert decision.signal_window_source == "env"
+
+
+def test_an_unmeasurable_warmup_fails_closed_and_declares_it() -> None:
+    """Un warmup que no se puede medir NO produce una ventana inventada.
+
+    Se falla cerrado (``HOLD``, cantidad 0) y el motivo es ``warmup_unmeasurable``. El
+    cargador de barras ni se consulta: sin número no hay ventana que pedir.
+    """
+    calls: list[str] = []
+
+    def _loader(symbol: str) -> list[Any]:
+        calls.append(symbol)
+        return _bars(500)
+
+    definition: dict[str, Any] = {
+        "lot_qty": 100.0,
+        "watch": [SYMBOL],
+        "executable": {
+            "indicatorSpecs": [{"definitionId": "sma", "parameters": {"period": 5000}}],
+            "entries": {
+                "operator": "all",
+                "rules": [
+                    {
+                        "type": "indicator_compare",
+                        "leftSpec": {"definitionId": "sma", "parameters": {"period": 5000}},
+                        "operator": "gt",
+                        "rightValue": 0,
+                        "signalKind": "entry_long",
+                    }
+                ],
+            },
+        },
+    }
+    active = ActiveStrategy(
+        version_id="ver-b1",
+        candidate_id="cand-b1",
+        instrument_id=SYMBOL,
+        name="warmup-no-medible",
+        definition=definition,
+    )
+
+    decision = make_active_strategy_decider(
+        active=active, watch=(SYMBOL,), bars_by_symbol=_loader
+    )(SYMBOL)
+
+    assert decision.action == "HOLD"
+    assert decision.quantity == 0
+    assert decision.hold_reason == ACTIVE_WARMUP_UNMEASURABLE
+    assert decision.warmup_bars is None
+    assert calls == []
+
+
 def test_an_evaluated_hold_is_declared_as_no_signal() -> None:
     """Se evaluó y no había señal: el HOLD legítimo, distinguible de los anteriores."""
     decider = make_active_strategy_decider(
@@ -194,6 +283,7 @@ def test_every_declared_reason_belongs_to_the_closed_vocabulary() -> None:
         ACTIVE_NO_SNAPSHOT,
         ACTIVE_EVALUATION_FAILED,
         ACTIVE_NO_SIGNAL,
+        ACTIVE_WARMUP_UNMEASURABLE,
         WARMUP_INSUFFICIENT,
     } == set(ACTIVE_HOLD_REASONS)
 

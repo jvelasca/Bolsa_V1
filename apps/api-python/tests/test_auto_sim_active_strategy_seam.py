@@ -375,3 +375,141 @@ async def test_signal_enabled_declares_feature_provenance(
     # Barras OHLCV completas ⇒ ``real``, y la ventana es la que el decoder entregó.
     assert prop.feature_source == "real"
     assert prop.signal_window_bars == 8
+
+
+# ── B-1 (ventana derivada): la env es SUELO, el warmup del preset puede subirla ───────
+
+
+def _sma_cross_executable(period: int) -> dict[str, Any]:
+    """Cruce ``sma(period)`` alcista/bajista con el warmup que corresponda."""
+    spec = {"definitionId": "sma", "parameters": {"period": period}}
+    fast = {"definitionId": "ema", "parameters": {"period": 2}}
+    return {
+        "presetKey": "sma_crossover",
+        "indicatorSpecs": [spec, fast],
+        "entries": {
+            "operator": "all",
+            "rules": [
+                {
+                    "type": "indicator_cross",
+                    "leftSpec": spec,
+                    "rightSpec": fast,
+                    "direction": "bullish",
+                    "signalKind": "entry_long",
+                }
+            ],
+        },
+        "exits": {
+            "operator": "all",
+            "rules": [
+                {
+                    "type": "indicator_cross",
+                    "leftSpec": spec,
+                    "rightSpec": fast,
+                    "direction": "bearish",
+                    "signalKind": "exit",
+                }
+            ],
+        },
+    }
+
+
+def test_signal_window_raises_the_env_to_the_measured_warmup() -> None:
+    """env 120 + SMA200 ⇒ la ventana efectiva es 201 y el origen lo declara."""
+    limit, warmup, source = w._signal_window(_sma_cross_executable(200), env_limit=120)
+
+    assert warmup == 201
+    assert limit == 201
+    assert source == w.SIGNAL_WINDOW_SOURCE_PRESET
+
+
+def test_signal_window_keeps_the_env_as_floor() -> None:
+    """Si el preset no pide más, la env manda: no se encoge la ventana configurada."""
+    limit, warmup, source = w._signal_window(_sma_cross_executable(4), env_limit=120)
+
+    assert warmup == 5
+    assert limit == 120
+    assert source == w.SIGNAL_WINDOW_SOURCE_ENV
+
+
+def test_signal_window_never_invents_a_window_when_unmeasurable() -> None:
+    """Sin medición se devuelve la env y ``None``: el decisor fallará cerrado."""
+    limit, warmup, source = w._signal_window(_sma_cross_executable(5000), env_limit=120)
+
+    assert warmup is None
+    assert limit == 120
+    assert source == w.SIGNAL_WINDOW_SOURCE_ENV
+
+
+@pytest.mark.asyncio
+async def test_signal_enabled_requests_the_preset_warmup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El loader pide 201 barras (no 120) para un preset que exige SMA200.
+
+    Es el cambio que evita un HOLD declarado pero inevitable: la ventana se dimensiona
+    ANTES de pedir barras.
+    """
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY_SIGNAL", "1")
+    monkeypatch.setenv("AUTO_ENGINE_SIM_SIGNAL_BARS", "120")
+    from bolsa_application.strategy_lifecycle_store import (
+        ActiveStrategyRecord,
+        InMemoryStrategyLifecycleStore,
+    )
+    from bolsa_domain.entities.strategy_lifecycle import ActiveStrategy
+
+    requested: list[Any] = []
+
+    class _RecordingOhlcv:
+        async def get_bars(
+            self, instrument_id: str, *, timeframe: Any = None, limit: Any = None
+        ) -> list[Any]:
+            from bolsa_domain.entities.ohlcv_bar import OhlcvBar
+
+            requested.append(limit)
+            closes = [100.0 + 0.1 * index for index in range(int(limit or 0))]
+            return [
+                OhlcvBar(
+                    timestamp=f"2026-01-{i + 1:02d}",
+                    open=close,
+                    high=close + 0.5,
+                    low=close - 0.5,
+                    close=close,
+                    volume=1000,
+                )
+                for i, close in enumerate(closes)
+            ]
+
+    store = InMemoryStrategyLifecycleStore()
+    await store.save_active(
+        ActiveStrategyRecord(
+            active=ActiveStrategy(
+                version_id="ver-b1",
+                candidate_id="cand-b1",
+                instrument_id="AAA",
+                name="golden_cross",
+                definition={
+                    "lot_qty": 10.0,
+                    "watch": ["AAA"],
+                    "executable": _sma_cross_executable(200),
+                },
+            ),
+            promoted_at="2026-10-27",
+        )
+    )
+    factory, StoreCls, sls = _stub_session_factory(store)
+    monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
+
+    decider = await w.load_active_strategy_decider(
+        factory,
+        instrument_id="AAA",
+        watch=("AAA",),
+        signal_enabled=True,
+        ohlcv=_RecordingOhlcv(),
+    )
+
+    assert decider is not None
+    assert requested == [201]
+    prop = decider("AAA")
+    assert prop.warmup_bars == 201
+    assert prop.signal_window_source == w.SIGNAL_WINDOW_SOURCE_PRESET
+    assert prop.hold_reason != "warmup_insufficient"

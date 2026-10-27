@@ -3126,6 +3126,9 @@ class AutoSimulationWorker:
                     # ventana no alcanzaba» sin abrir el motor.
                     feature_source=getattr(pkg, "feature_source", None),
                     signal_window_bars=getattr(pkg, "signal_window_bars", None),
+                    # B-1 — la ventana efectiva viaja con la señal hasta el journal.
+                    warmup_bars=getattr(pkg, "warmup_bars", None),
+                    signal_window_source=getattr(pkg, "signal_window_source", None),
                     # B-5 — el motivo del HOLD viaja con la señal: sin este eslabón el
                     # paquete lo declaraba y el plan del tick nunca lo veía.
                     hold_reason=getattr(pkg, "hold_reason", None),
@@ -3163,6 +3166,8 @@ class AutoSimulationWorker:
             strategy_preset_key=preset,
             feature_source=getattr(pkg, "feature_source", None),
             signal_window_bars=getattr(pkg, "signal_window_bars", None),
+            warmup_bars=getattr(pkg, "warmup_bars", None),
+            signal_window_source=getattr(pkg, "signal_window_source", None),
             hold_reason=str(getattr(pkg, "hold_reason", None) or "").strip() or None,
             hold_detail=str(getattr(pkg, "memo", "") or ""),
             signal_id=identity.signal_id if identity is not None else "",
@@ -8963,6 +8968,33 @@ def _signal_snapshot_limit() -> int:
     return value if value > 0 else 120
 
 
+#: B-1 — de dónde salió la ventana EFECTIVA de la señal (clave aditiva del journal).
+SIGNAL_WINDOW_SOURCE_ENV = "env"
+SIGNAL_WINDOW_SOURCE_PRESET = "preset_warmup"
+
+
+def _signal_window(executable: Any, *, env_limit: int) -> tuple[int, int | None, str]:
+    """Ventana EFECTIVA de barras: ``(barras, warmup medido | None, origen)``.
+
+    ``AUTO_ENGINE_SIM_SIGNAL_BARS`` deja de ser un TECHO y pasa a ser un **suelo**: la env
+    fija el mínimo que el operador quiere precargar, y el warmup del preset (medido sobre la
+    serie, no por aritmética de periodos) puede subirlo. Antes el worker pedía la env y el
+    preset de SMA200 devolvía siempre un HOLD por warmup: declarado, pero inevitable.
+
+    ``None`` en el warmup significa que **no se pudo medir**; entonces no se inventa una
+    ventana: se devuelve la env y el decisor falla cerrado con ``warmup_unmeasurable``. Un
+    preset sin series devuelve ``0`` y no sube nada.
+    """
+    from bolsa_analytics.signals.preset_evaluability import measured_warmup_bars
+
+    warmup = measured_warmup_bars(executable) if isinstance(executable, dict) else None
+    if warmup is None:
+        return env_limit, None, SIGNAL_WINDOW_SOURCE_ENV
+    if warmup > env_limit:
+        return warmup, warmup, SIGNAL_WINDOW_SOURCE_PRESET
+    return env_limit, warmup, SIGNAL_WINDOW_SOURCE_ENV
+
+
 async def load_active_strategy_decider(
     session_factory: Any,
     *,
@@ -9069,7 +9101,28 @@ async def _build_signal_decider(
     symbols = tuple(str(s) for s in (record.active.definition.get("watch") or watch)) or (
         instrument_id,
     )
-    limit = _signal_snapshot_limit()
+    # B-1 — la ventana se DIMENSIONA antes de pedir barras: la env es el suelo y el warmup
+    # medido del preset puede subirla. Si no se puede medir, el decisor hará HOLD declarado
+    # (``warmup_unmeasurable``) en vez de inventar una ventana.
+    executable = (getattr(record.active, "definition", None) or {}).get("executable")
+    env_limit = _signal_snapshot_limit()
+    limit, measured_warmup, window_source = _signal_window(executable, env_limit=env_limit)
+    if measured_warmup is None:
+        logger.warning(
+            "auto_sim signal warmup no medible (preset=%s): la ACTIVE fallará cerrado "
+            "con %s y la ventana se queda en %s",
+            getattr(record.active, "preset_key", None),
+            "warmup_unmeasurable",
+            limit,
+        )
+    elif window_source == SIGNAL_WINDOW_SOURCE_PRESET:
+        logger.info(
+            "auto_sim signal window raised for preset=%s: env=%s required=%s effective=%s",
+            getattr(record.active, "preset_key", None),
+            env_limit,
+            measured_warmup,
+            limit,
+        )
     refresh = (
         make_closed_bar_loader(ohlcv, symbols, as_of, limit=limit)
         if as_of is not None
@@ -9090,6 +9143,7 @@ async def _build_signal_decider(
         bars_by_symbol=_bars_for,
         lot_qty=lot_qty,
         long_by_symbol=long_by_symbol,
+        signal_window_source=window_source,
     )
 
 

@@ -31,6 +31,7 @@ from bolsa_analytics.signals.preset_catalog import load_preset_catalog
 from bolsa_analytics.signals.preset_evaluability import (
     WARMUP_INSUFFICIENT,
     evaluability_reason,
+    measured_warmup_bars,
     required_spec_depth,
     unevaluable_specs,
 )
@@ -213,3 +214,85 @@ def test_the_declared_depth_marks_crosses_as_two_bars() -> None:
 
     assert set(required_spec_depth(cross).values()) == {2}
     assert set(required_spec_depth(compare).values()) == {1}
+
+
+# --- B-1 (ventana derivada): el warmup se mide ANTES de pedir barras -------------------
+#
+# ``evaluability_reason`` diagnostica después; ``measured_warmup_bars`` dimensiona antes.
+# Si las dos mediciones no coinciden, la ventana que el worker pide y el motivo que luego
+# publica se contradicen. Estas pruebas fijan esa igualdad.
+
+
+@pytest.mark.parametrize("preset", _preset_keys())
+def test_measured_warmup_matches_the_series_threshold_for_every_preset(preset: str) -> None:
+    """El número que dimensiona la ventana es EL MISMO que el que diagnostica el scan."""
+    definition = strategy_definition_from_preset(preset, [SYMBOL])
+
+    assert measured_warmup_bars(definition) == _threshold(preset)
+
+
+@pytest.mark.parametrize("preset", _preset_keys())
+def test_measured_warmup_is_evaluable_at_its_own_number(preset: str) -> None:
+    """Anti-falso-positivo: pedir ``measured_warmup_bars`` barras basta para evaluar."""
+    definition = strategy_definition_from_preset(preset, [SYMBOL])
+    required = measured_warmup_bars(definition)
+
+    assert required is not None
+    assert _reason(preset, required) is None
+
+
+def test_a_definition_without_rules_pays_no_warmup() -> None:
+    """Un preset sin series no paga ventana: ``0`` y la env manda."""
+    assert measured_warmup_bars({"exits": {"rules": []}}) == 0
+    assert measured_warmup_bars({}) == 0
+
+
+def test_measured_warmup_is_none_when_a_spec_never_defines() -> None:
+    """Una serie que la sonda no define no produce un número inventado: ``None``.
+
+    ``None`` obliga al llamante a fallar cerrado y declararlo; devolver ``probe`` a ojo
+    convertiría «no se puede medir» en una ventana falsa.
+    """
+    definition = {
+        "indicatorSpecs": [{"definitionId": "sma", "parameters": {"period": 5000}}],
+        "entries": {
+            "operator": "all",
+            "rules": [
+                {
+                    "type": "indicator_compare",
+                    "leftSpec": {"definitionId": "sma", "parameters": {"period": 5000}},
+                    "operator": "gt",
+                    "rightValue": 0,
+                    "signalKind": "entry_long",
+                }
+            ],
+        },
+    }
+
+    assert measured_warmup_bars(definition) is None
+
+
+def test_measured_warmup_is_none_for_an_undeclared_spec() -> None:
+    """Una spec referenciada y no declarada es una definición incompleta, no warmup medible."""
+    definition = {
+        "indicatorSpecs": [{"definitionId": "sma", "parameters": {"period": 50}}],
+        "entries": {
+            "operator": "all",
+            "rules": [
+                {
+                    "type": "indicator_compare",
+                    "leftSpec": {"definitionId": "rsi", "parameters": {"period": 14}},
+                    "operator": "lt",
+                    "rightValue": 30,
+                    "signalKind": "entry_long",
+                }
+            ],
+        },
+    }
+
+    assert measured_warmup_bars(definition) is None
+
+
+def test_measured_warmup_enriches_a_definition_that_only_carries_the_preset() -> None:
+    """Sin reglas propias se enriquece desde ``presetKey``: medir sin reglas daría ``0``."""
+    assert measured_warmup_bars({"presetKey": "golden_cross"}) == 201

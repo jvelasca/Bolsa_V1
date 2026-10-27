@@ -36,6 +36,7 @@ from bolsa_application.auto_reason_codes import (
     ACTIVE_NO_EXECUTABLE,
     ACTIVE_NO_SIGNAL,
     ACTIVE_NO_SNAPSHOT,
+    ACTIVE_WARMUP_UNMEASURABLE,
     WARMUP_INSUFFICIENT,
 )
 from bolsa_application.decision_contract import (
@@ -108,6 +109,8 @@ def _to_decision(
     source: str,
     feature_source: str | None = None,
     signal_window_bars: int | None = None,
+    warmup_bars: int | None = None,
+    signal_window_source: str | None = None,
 ) -> DecisionPackage:
     """Traduce el tipo de señal a ``DecisionPackage`` (lote acotado al de la ACTIVE)."""
     if signal_kind == "entry_long":
@@ -118,6 +121,8 @@ def _to_decision(
             source=source,
             feature_source=feature_source,
             signal_window_bars=signal_window_bars,
+            warmup_bars=warmup_bars,
+            signal_window_source=signal_window_source,
         )
     if signal_kind == "exit":
         return DecisionPackage(
@@ -127,6 +132,8 @@ def _to_decision(
             source=source,
             feature_source=feature_source,
             signal_window_bars=signal_window_bars,
+            warmup_bars=warmup_bars,
+            signal_window_source=signal_window_source,
         )
     return DecisionPackage(
         action="HOLD",
@@ -135,6 +142,8 @@ def _to_decision(
         source=source,
         feature_source=feature_source,
         signal_window_bars=signal_window_bars,
+        warmup_bars=warmup_bars,
+        signal_window_source=signal_window_source,
     )
 
 
@@ -145,6 +154,7 @@ def make_active_strategy_decider(
     bars_by_symbol: Callable[[str], list[Any]] | None = None,
     lot_qty: float = 100.0,
     long_by_symbol: Callable[[str], bool] | None = None,
+    signal_window_source: str | None = None,
 ) -> Callable[[str], DecisionPackage]:
     """``DecisionProvider`` que evalúa la señal real de la ACTIVE (SIM-only).
 
@@ -165,9 +175,17 @@ def make_active_strategy_decider(
     **B-5.** Cada HOLD declara su motivo (``hold_reason``) dentro del vocabulario cerrado de
     ``auto_reason_codes.ACTIVE_HOLD_REASONS``: ``no_executable`` (la definición no trae
     ``executable``), ``no_snapshot`` (sin cargador o sin barras), ``evaluation_failed`` (la
-    evaluación lanzó), ``warmup_insufficient`` (la ventana no alcanza) y ``no_signal`` (se
-    evaluó y no había señal). El worker los journaliza con su propio evento; así «no pudo
-    evaluar» deja de ser indistinguible de «no quiso operar».
+    evaluación lanzó), ``warmup_insufficient`` (la ventana no alcanza), ``no_signal`` (se
+    evaluó y no había señal) y ``warmup_unmeasurable`` (el warmup no se pudo medir, así que
+    la ventana no se puede dimensionar). El worker los journaliza con su propio evento; así
+    «no pudo evaluar» deja de ser indistinguible de «no quiso operar».
+
+    **B-1 (ventana derivada).** El warmup del preset se mide UNA vez, al construir el
+    decisor, con ``preset_evaluability.measured_warmup_bars``. El número viaja en toda
+    decisión (``warmup_bars``) y ``signal_window_source`` declara de dónde salió la ventana
+    efectiva que cargó el worker. Si no se puede medir, el decisor NO inventa una ventana:
+    devuelve HOLD con ``warmup_unmeasurable``. Un preset sin series (``0`` barras de
+    warmup) no paga nada y su ventana es la del entorno.
     """
     definition = dict(getattr(active, "definition", None) or {})
     executable = definition.get("executable")
@@ -176,6 +194,12 @@ def make_active_strategy_decider(
     source = format_active_strategy_source(version_id, getattr(active, "preset_key", None))
     effective_lot = float(definition.get("lot_qty", lot_qty) or lot_qty)
     effective_watch = tuple(str(s) for s in (definition.get("watch") or watch))
+    # B-1: se mide UNA vez por decisor (no por símbolo ni por tick). ``None`` = no medible.
+    measured_warmup: int | None = None
+    if isinstance(executable, dict):
+        from bolsa_analytics.signals.preset_evaluability import measured_warmup_bars
+
+        measured_warmup = measured_warmup_bars(executable)
 
     def _hold(symbol: str, reason: str | None = None) -> DecisionPackage:
         # B-5: el HOLD que NO viene de una señal evaluada declara su causa (configuración,
@@ -187,6 +211,8 @@ def make_active_strategy_decider(
             quantity=0,
             source=source,
             hold_reason=reason,
+            warmup_bars=measured_warmup,
+            signal_window_source=signal_window_source,
         )
 
     def _decide(symbol: str) -> DecisionPackage:
@@ -195,6 +221,10 @@ def make_active_strategy_decider(
         if not isinstance(executable, dict):
             # Sin estrategia ejecutable: no se opera (no se delega en el spine).
             return _hold(symbol, ACTIVE_NO_EXECUTABLE)
+        if measured_warmup is None:
+            # B-1: el warmup no se pudo medir. Subir barras «a ojo» sería inventar la
+            # ventana; se falla cerrado y se declara, sin pedir ni evaluar el snapshot.
+            return _hold(symbol, ACTIVE_WARMUP_UNMEASURABLE)
         if bars_by_symbol is None:
             # Sin cargador de barras no hay ventana que evaluar: es un problema de DATOS.
             return _hold(symbol, ACTIVE_NO_SNAPSHOT)
@@ -230,6 +260,8 @@ def make_active_strategy_decider(
                 hold_reason=WARMUP_INSUFFICIENT,
                 feature_source=declared_source,
                 signal_window_bars=window_bars,
+                warmup_bars=measured_warmup,
+                signal_window_source=signal_window_source,
             )
         if signal_kind is None:
             return DecisionPackage(
@@ -242,6 +274,8 @@ def make_active_strategy_decider(
                 hold_reason=ACTIVE_NO_SIGNAL,
                 feature_source=declared_source,
                 signal_window_bars=window_bars,
+                warmup_bars=measured_warmup,
+                signal_window_source=signal_window_source,
             )
         effective = _bounded_lot(signal_kind, effective_lot)
         return _to_decision(
@@ -251,6 +285,8 @@ def make_active_strategy_decider(
             source=source,
             feature_source=declared_source,
             signal_window_bars=window_bars,
+            warmup_bars=measured_warmup,
+            signal_window_source=signal_window_source,
         )
 
     return _decide

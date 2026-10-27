@@ -100,6 +100,14 @@ class DecisionPackage:
     # «no operó». El literal vive en ``auto_reason_codes.ACTIVE_HOLD_REASONS`` y el worker lo
     # journaliza; ``None`` (sin motivo) es el HOLD legítimo de una señal que se evaluó y no entró.
     hold_reason: str | None = None
+    # B-1 (ventana derivada) — ADITIVAS. ``warmup_bars`` es el warmup que el preset exige,
+    # **medido sobre la serie** (``preset_evaluability.measured_warmup_bars``); ``None``
+    # significa que no se pudo medir, y entonces la decisión es un HOLD declarado
+    # (``warmup_unmeasurable``), nunca una ventana inventada. ``signal_window_source`` dice
+    # de dónde salió la ventana efectiva: ``"env"`` (el suelo configurado) o
+    # ``"preset_warmup"`` (se subió para cubrir el warmup del preset). Se omite si no hay dato.
+    warmup_bars: int | None = None
+    signal_window_source: str | None = None
 
     @property
     def is_execution_intent(self) -> bool:

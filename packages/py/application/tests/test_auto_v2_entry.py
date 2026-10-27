@@ -10,11 +10,13 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
     build_reservation,
 )
 from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
+from bolsa_application.auto_reason_codes import WARMUP_INSUFFICIENT
 from bolsa_application.auto_v2_entry import (
     V2_ENGINE_ENV,
     V2Signal,
     V2Tunables,
     _working_snapshot,
+    build_active_strategy_hold_journal_entry,
     build_worker_snapshot,
     plan_v2_position_decision,
     plan_v2_tick,
@@ -334,6 +336,57 @@ def test_plan_v2_tick_seals_feature_source_and_window_bars() -> None:
     )
     assert "featureSource" not in approved.payload
     assert "signalWindowBars" not in approved.payload
+
+
+def test_plan_v2_tick_seals_the_measured_warmup_and_the_window_source() -> None:
+    """B-1 — la ventana EFECTIVA se puede auditar desde el journal.
+
+    ``warmupBars`` es lo que el preset exige (medido sobre la serie) y
+    ``signalWindowSource`` de dónde salió la ventana. Sin estas claves no se distingue «la
+    env ya cubría» de «se subió para cubrirlo», que es justo el cambio de este sello.
+    """
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[
+            _signal(
+                "AAA",
+                edge=0.9,
+                feature_source="real",
+                signal_window_bars=201,
+                warmup_bars=201,
+                signal_window_source="preset_warmup",
+            )
+        ],
+        regime="BULL_TREND",
+    )
+    approved = next(
+        e
+        for e in plan.journal_entries
+        if e.instrument_id == "AAA" and e.payload.get("approved")
+    )
+
+    assert approved.payload["warmupBars"] == 201
+    assert approved.payload["signalWindowSource"] == "preset_warmup"
+
+
+def test_the_hold_journal_declares_the_measured_warmup() -> None:
+    """B-1 — el evento de HOLD también declara el warmup y el origen de la ventana."""
+    from bolsa_application.auto_v2_entry import ActiveStrategyHold
+
+    entry = build_active_strategy_hold_journal_entry(
+        ActiveStrategyHold(
+            instrument_id="AAA",
+            reason=WARMUP_INSUFFICIENT,
+            warmup_bars=201,
+            signal_window_source="preset_warmup",
+            signal_window_bars=120,
+        ),
+        actor="test",
+        as_of="2026-10-27T00:00:00Z",
+    )
+
+    assert entry.payload["warmupBars"] == 201
+    assert entry.payload["signalWindowSource"] == "preset_warmup"
 
 
 def test_plan_v2_tick_does_not_publish_an_empty_window() -> None:

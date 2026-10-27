@@ -306,6 +306,11 @@ ACTIVE_NO_SNAPSHOT = "no_snapshot"
 ACTIVE_EVALUATION_FAILED = "evaluation_failed"
 #: La señal SÍ se evaluó y no dijo nada: el HOLD legítimo (el que no necesita explicación).
 ACTIVE_NO_SIGNAL = "no_signal"
+#: El warmup del preset **no se pudo medir** ni con la sonda: la ventana no se puede
+#: dimensionar y la ACTIVE falla cerrado declarándolo. Es distinto de
+#: ``warmup_insufficient`` (se midió y la ventana no llega): aquí no hay número que exigir,
+#: así que subir barras a ciegas sería inventar una ventana.
+ACTIVE_WARMUP_UNMEASURABLE = "warmup_unmeasurable"
 
 #: Vocabulario CERRADO de motivos de HOLD de la ACTIVE. ``warmup_insufficient`` se importa de
 #: su dueño (el evaluador de presets del scan) para no duplicar el literal: la ventana que no
@@ -317,6 +322,7 @@ ACTIVE_HOLD_REASONS: frozenset[str] = frozenset(
         ACTIVE_NO_SNAPSHOT,
         ACTIVE_EVALUATION_FAILED,
         ACTIVE_NO_SIGNAL,
+        ACTIVE_WARMUP_UNMEASURABLE,
         WARMUP_INSUFFICIENT,
     }
 )
@@ -356,6 +362,7 @@ __all__ = [
     "ACTIVE_NO_SNAPSHOT",
     "ACTIVE_SIGNAL_DISABLED",
     "ACTIVE_STRATEGY_HOLD_EVENT",
+    "ACTIVE_WARMUP_UNMEASURABLE",
     "ADAPTIVE_STRATEGY_PAUSED",
     "ATR_GEOMETRY",
     "ATR_SOURCES",

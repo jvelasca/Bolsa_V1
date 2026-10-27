@@ -162,3 +162,27 @@ async def test_a_light_preset_is_evaluable_at_the_scan_minimum() -> None:
     result = await _scan(preset="vwap_reclaim", bar_count=50)
 
     assert _warmup_reasons(result) == []
+
+
+def test_the_scan_default_window_covers_every_preset() -> None:
+    """B-1 — guardián: la ventana por defecto del scan (500) cubre el warmup de TODO preset.
+
+    El scan no se toca en el sello de la ventana derivada, pero si mañana un preset
+    entrara con un warmup mayor que el defecto, el scan volvería a omitirlo en silencio.
+    Este guardián rota el test en vez de degradar la cobertura sin avisar.
+    """
+    from inspect import signature
+
+    from bolsa_analytics.research.manifest import strategy_definition_from_preset
+    from bolsa_analytics.signals.preset_catalog import load_preset_catalog
+    from bolsa_analytics.signals.preset_evaluability import measured_warmup_bars
+
+    default_bar_limit = signature(RunScan.execute).parameters["bar_limit"].default
+    assert default_bar_limit == 500
+
+    offenders = {}
+    for preset in sorted(load_preset_catalog()["presets"]):
+        required = measured_warmup_bars(strategy_definition_from_preset(preset, [SYMBOL]))
+        if required is None or required > default_bar_limit:
+            offenders[preset] = required
+    assert offenders == {}

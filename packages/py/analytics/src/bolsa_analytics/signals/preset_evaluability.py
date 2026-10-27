@@ -24,10 +24,15 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from typing import Any
 
-from bolsa_analytics.indicators.compute import instance_spec_key
+from bolsa_analytics.indicators.compute import OhlcvBar, instance_spec_key
 
 #: Prefijo estable del motivo. La API y los tests no deben depender del texto libre.
 WARMUP_INSUFFICIENT = "warmup_insufficient"
+
+#: Sonda por defecto con la que se mide el warmup de un preset **antes** de pedir barras.
+#: Es la ventana máxima que el catálogo necesita (201) con holgura: la medición se hace
+#: sobre la serie, no sobre una aritmética de periodos que se desincronice.
+PROBE_BARS = 500
 
 _CROSS_RULE = "indicator_cross"
 
@@ -120,6 +125,72 @@ def unevaluable_specs(
         if len(series) < depth or any(value is None for value in series[-depth:]):
             problems.append((key, required_bars_for(series, depth)))
     return problems
+
+
+def _probe_bars(count: int) -> list[OhlcvBar]:
+    """Serie OHLCV determinista para medir el warmup sin tocar BD ni ficheros.
+
+    Sólo importa el ORDEN y que la geometría sea coherente (``high >= close >= low``,
+    ``volume > 0``): los indicadores se calculan sobre la serie, no sobre las fechas.
+    """
+    return [
+        OhlcvBar(
+            timestamp=f"2000-01-{1 + index % 28:02d}",
+            open=100.0 + 0.1 * index - 0.2,
+            high=100.0 + 0.1 * index + 0.5,
+            low=100.0 + 0.1 * index - 0.5,
+            close=100.0 + 0.1 * index,
+            volume=1000.0,
+        )
+        for index in range(count)
+    ]
+
+
+def measured_warmup_bars(
+    definition: dict[str, Any],
+    *,
+    probe_bars: int = PROBE_BARS,
+) -> int | None:
+    """Barras que el preset necesita para que **todas** sus series estén definidas.
+
+    Esta es la función que **dimensiona la ventana antes de pedir barras**. Hasta ahora el
+    warmup sólo se diagnosticaba *después* (``evaluability_reason``): el worker pedía
+    ``AUTO_ENGINE_SIM_SIGNAL_BARS`` barras y, con un preset de SMA200, publicaba un HOLD
+    declarado pero inevitable. Aquí la misma medición se usa para pedir lo que hace falta.
+
+    Devuelve ``0`` si el preset no referencia ninguna serie (no paga warmup), el número
+    exacto de barras si la sonda la define, y ``None`` cuando **no se puede medir**: o la
+    serie no se define ni con ``probe_bars``, o la definición referencia una spec que no
+    declaró. ``None`` no es «0 barras»: el llamante debe fallar cerrado y declararlo
+    (``warmup_unmeasurable``), nunca asumir una ventana.
+
+    La definición se enriquece con las reglas del preset cuando sólo trae ``presetKey``:
+    medir sobre una definición sin reglas daría «no paga warmup» y es justo el silencio
+    que este módulo existe para evitar.
+    """
+    from bolsa_analytics.signals.preset_catalog import enrich_definition_with_preset_rules
+    from bolsa_analytics.signals.rules_engine import build_indicator_context
+
+    resolved = enrich_definition_with_preset_rules(definition)
+    depth = required_spec_depth(resolved)
+    if not depth:
+        return 0
+    specs = list(resolved.get("indicatorSpecs") or [])
+    if not specs:
+        return None
+    context = build_indicator_context(_probe_bars(probe_bars), specs)
+    required = 0
+    for key, needed in depth.items():
+        series = context.get(key)
+        if series is None:
+            # La definición referencia una spec que no declaró: no es «faltan barras»,
+            # es una definición incompleta. No se puede dimensionar y se declara.
+            return None
+        bars = required_bars_for(series, needed)
+        if bars is None:
+            return None
+        required = max(required, bars)
+    return required
 
 
 def evaluability_reason(

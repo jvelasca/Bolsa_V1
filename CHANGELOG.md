@@ -2,6 +2,62 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.166-beta] — **la ventana de la señal se DERIVA del warmup medido del preset: `AUTO_ENGINE_SIM_SIGNAL_BARS` pasa a ser suelo, y un warmup que no se puede medir falla cerrado** (**`Δ motor = 0` · `Δ decisión ≠ 0` sólo en presets antes no evaluables por ventana · AUTO OFF · SIN contrato HTTP · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** primer sello del bloque funcional posterior a `2.11.165-beta`. Cierra **B-1** en la
+ruta de producto del AUTO: el worker pedía siempre `AUTO_ENGINE_SIM_SIGNAL_BARS` (120 por defecto) y,
+con un preset de SMA200 o un cruce 50/200, publicaba un HOLD **declarado pero inevitable** —la
+ventana no alcanzaba el warmup y no había forma de que lo alcanzara—. Ahora la ventana se
+**dimensiona antes de pedir barras** a partir del warmup **medido sobre la serie**.
+**Sin migración** (`head` sigue `058_estudio_daily_proposals`). **Sin cambio de contrato HTTP.**
+**Bump** `2.11.165-beta` → `2.11.166-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard`).
+
+**W-166-1 · B-1 — `measured_warmup_bars` mide el warmup para DIMENSIONAR, no sólo para diagnosticar.**
+`preset_evaluability.measured_warmup_bars(definition, *, probe_bars=500)` construye una serie OHLCV
+determinista de 500 barras, llama a `build_indicator_context` y devuelve
+`max(first_defined + depth)` reutilizando `required_spec_depth`/`required_bars_for`. Devuelve **`0`**
+si el preset no referencia series, **`None`** si una serie no se define ni con la sonda o si la
+definición referencia una spec que no declaró (nunca un número por aritmética de periodos) y
+enriquece desde `presetKey` cuando la definición sólo lo trae. Los **21** presets se fijan con
+umbral exacto (`golden_cross`/`death_cross` **201**, `ma_stack_bullish`/`price_above_sma200` **200**,
+`ichimoku_tk_cross` **78**, `sma_crossover` **51**, `vwap_reclaim` **1**) y con la prueba de que
+pedir ese número basta para evaluar (`test_measured_warmup_matches_the_series_threshold_for_every_preset`,
+`test_measured_warmup_is_evaluable_at_its_own_number`).
+
+**W-166-2 · B-1 — la ventana efectiva es `max(env, warmup)` y se declara una vez.**
+`_signal_window` (`auto_simulation_worker.py`) devuelve `(barras, warmup, origen)`:
+`AUTO_ENGINE_SIM_SIGNAL_BARS` sigue siendo el **suelo** configurado y el warmup del preset puede
+subirlo; el origen viaja como `env` o `preset_warmup`. `_build_signal_decider` pide el snapshot con
+esa ventana y deja **un** log de arranque con `preset`, `env`, `required` y `effective` (o el aviso de
+warmup no medible). Pruebas: `test_signal_window_raises_the_env_to_the_measured_warmup`,
+`test_signal_window_keeps_the_env_as_floor`, `test_signal_enabled_requests_the_preset_warmup`
+(el loader pide **201**, no 120) y `test_signal_window_never_invents_a_window_when_unmeasurable`.
+
+**W-166-3 · HOLD fail-closed cuando el warmup no se puede medir.**
+`auto_reason_codes.ACTIVE_WARMUP_UNMEASURABLE` (`warmup_unmeasurable`) entra en el vocabulario cerrado
+`ACTIVE_HOLD_REASONS`. El decisor mide el warmup **una vez** al construirse; si es `None` devuelve
+HOLD con ese motivo **sin consultar el cargador de barras**: subir la ventana «a ojo» sería inventar
+el número que el módulo se niega a inventar (`test_an_unmeasurable_warmup_fails_closed_and_declares_it`).
+
+**W-166-4 · El journal declara con qué ventana se decidió.** `warmupBars` y `signalWindowSource`
+viajan como claves **aditivas** (JSONB, sin migración) en `auto_entry_decision` y en
+`auto_active_strategy_hold`, y como campos aditivos de `DecisionPackage`, `V2Signal` y
+`ActiveStrategyHold`; se **omiten** cuando no hay dato. Con `signalWindowBars` (O-6) la ventana queda
+auditable: cuántas barras se evaluaron, cuántas exige el preset y de dónde salió el número.
+Pruebas: `test_plan_v2_tick_seals_the_measured_warmup_and_the_window_source` y
+`test_the_hold_journal_declares_the_measured_warmup`.
+
+**W-166-5 · Guardián del scan.** El scan **no se toca** (su `bar_limit` por defecto es 500 y ya cubre
+el máximo medido, 201), pero `test_the_scan_default_window_covers_every_preset` rota si un preset
+entrara con un warmup mayor que el defecto: el silencio no vuelve por la puerta de atrás.
+
+**Deltas.** **`Δ motor = 0`**: no cambia ninguna regla, indicador ni umbral de señal. **`Δ decisión
+≠ 0` sólo** en los presets que antes no se evaluaban por ventana (ahora pueden emitir su señal real) y
+en el caso de warmup no medible (HOLD declarado, sin orden). **AUTO sigue OFF**; operativa **100 %
+PAPER virtual**; la ventana sigue **`INCONCLUSIVE`** (`episodios 0/2`, `ciclos 0/32`). Este sello **no
+demuestra rentabilidad** ni mueve el pin.
+
 ## [2.11.165-beta] — **los cinco criterios que quedaban de la auditoría pasan a prueba ejecutada: la tesis es alcanzable, la posición no gestionada se declara, y la UI lee el veredicto del gate en vez de escribirlo** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO (`venue` nullable + `venueMeasurement`) · AUTO OFF · SIN migración nueva · head `058_estudio_daily_proposals`**)
 
 **Naturaleza:** sello de **cierre** posterior y acotado a `2.11.164-beta`. Aplica los **cinco**
