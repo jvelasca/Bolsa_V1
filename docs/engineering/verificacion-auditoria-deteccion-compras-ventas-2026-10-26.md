@@ -1009,10 +1009,13 @@ mezclaba dos universos en una sola frase.
 | Gate | Resultado |
 |---|---|
 | `apps/web/src/lib/scan-silence.test.ts` | **14 passed** |
-| `vitest run src/lib` (suite de utilidades web) | **84 passed** |
+| `vitest run` (suite completa de `apps/web`) | **2371 passed / 317 ficheros** |
 | `pnpm --filter @bolsa/web typecheck` | limpio |
 | `pnpm --filter @bolsa/web lint` | **0 errores** (23 warnings preexistentes, ajenos al cambio) |
 | `pnpm --filter @bolsa/shared lint` | limpio |
+
+**CI por commit** [`40421274862`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40421274862)
+sobre `e5192326` ⇒ **`success`** (`Frontend CI` → `quality`).
 
 Las pruebas fijan explícitamente los **falsos positivos** que importan: «Menos de 50 barras» **no** es
 warmup, «Instrumento no encontrado» y el filtro fundamental **no** son «no evaluable», y la palabra

@@ -1120,10 +1120,15 @@ fundamental van a `other` sin disfrazarse de no evaluable; singular/plural; recu
 titular de siempre cuando no hay omitidos.
 
 **Gates ejecutados** (2026-10-27, árbol de trabajo): `vitest run src/lib` ⇒ **84 passed** (14 de
-`scan-silence`); `pnpm --filter @bolsa/web typecheck` ⇒ limpio; `pnpm --filter @bolsa/web lint` ⇒
-**0 errores** (23 warnings preexistentes en otros ficheros); `pnpm --filter @bolsa/shared lint` ⇒
-limpio. La UI no tiene pruebas de render en este repo, así que el titular se fija en la función pura
-que lo produce; el componente solo la pinta.
+`scan-silence`); suite completa de `apps/web` ⇒ **2371 passed / 317 ficheros**;
+`pnpm --filter @bolsa/web typecheck` ⇒ limpio; `pnpm --filter @bolsa/web lint` ⇒ **0 errores**
+(23 warnings preexistentes en otros ficheros); `pnpm --filter @bolsa/shared lint` y
+`pnpm --filter @bolsa/shared test` ⇒ verdes.
+
+**CI por commit** [`40421274862`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40421274862)
+sobre `e5192326` ⇒ **`success`** (`Frontend CI` → `quality`: build de `shared`, typecheck, lint, test
+y build de `web`). El job construye `packages/shared` **antes** de tipar `web`, que es lo que hace
+visible el export nuevo.
 
 **Lo que NO se ha hecho, y por qué.** No se añade un campo `cause` al DTO de `skipped`: obligaría a
 regenerar `openapi.json` y `schema.d.ts` y a versionar el contrato para un dato que el prefijo ya
