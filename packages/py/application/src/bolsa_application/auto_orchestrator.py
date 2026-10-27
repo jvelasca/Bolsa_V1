@@ -747,6 +747,7 @@ def active_strategy_decider(
     fallback: Any,
     watch: Sequence[str],
     lot_qty: float = 100.0,
+    hold_reason: str | None = None,
 ) -> Callable[[str], Any]:
     """``DecisionProvider`` que expone la estrategia ACTIVE al AUTO (SIM-only).
 
@@ -758,6 +759,12 @@ def active_strategy_decider(
 
     ``kind == "deterministic_sma"`` (o sin ``kind``) usa la lógica del spine; el
     ``definition`` puede aportar ``lot_qty``/``watch`` sin cambiar la seguridad.
+
+    **B-5.** ``hold_reason`` (opcional) es el motivo con el que este decisor declara sus
+    HOLD. El worker lo rellena con ``active_signal_disabled`` cuando la ACTIVE está
+    cargada pero su señal propia está apagada: sin él, el motor devolvía un HOLD mudo y
+    «no operó» no se distinguía de «no quiso operar». ``None`` (default) conserva el
+    comportamiento histórico byte a byte para los llamantes que no lo declaran.
     """
     from bolsa_application.decision_contract import (
         DecisionPackage,
@@ -772,12 +779,22 @@ def active_strategy_decider(
 
     def _decide(symbol: str) -> DecisionPackage:
         if symbol not in effective_watch:
-            return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0, source=source)
+            return DecisionPackage(
+                action="HOLD",
+                instrument_id=symbol,
+                quantity=0,
+                source=source,
+                hold_reason=hold_reason,
+            )
         try:
             proposal = fallback(symbol)
         except Exception:  # noqa: BLE001 — una estrategia nunca rompe el motor.
             return DecisionPackage(
-                action="HOLD", instrument_id=symbol, quantity=0, source=source
+                action="HOLD",
+                instrument_id=symbol,
+                quantity=0,
+                source=source,
+                hold_reason=hold_reason,
             )
         # Reescala la propuesta del spine al lote de la estrategia activa, sin alterar
         # la acción: la ejecución sigue gobernada por los gates y el settlement SIM.

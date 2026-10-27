@@ -93,6 +93,13 @@ class DecisionPackage:
     # «la ventana no alcanza el warmup».
     feature_source: str | None = None
     signal_window_bars: int | None = None
+    # B-5 — MOTIVO TIPIFICADO de un ``HOLD`` que no es «la señal dijo no». Una estrategia
+    # promovida puede quedarse fuera del mercado por configuración (``active_signal_disabled``),
+    # por falta de definición ejecutable (``no_executable``) o por no tener barras
+    # (``no_snapshot``); los tres casos producían la MISMA fila —ninguna— y el operador solo veía
+    # «no operó». El literal vive en ``auto_reason_codes.ACTIVE_HOLD_REASONS`` y el worker lo
+    # journaliza; ``None`` (sin motivo) es el HOLD legítimo de una señal que se evaluó y no entró.
+    hold_reason: str | None = None
 
     @property
     def is_execution_intent(self) -> bool:

@@ -94,6 +94,8 @@ from bolsa_analytics.indicators.compute import compute_atr
 from bolsa_application.auto_daily_journal import OpportunityRow
 from bolsa_application.auto_investment_system import trade_plan_to_decision_package
 from bolsa_application.auto_reason_codes import (
+    ACTIVE_HOLD_REASONS,
+    ACTIVE_STRATEGY_HOLD_EVENT,
     ADAPTIVE_STRATEGY_PAUSED,
     OPPORTUNITY_EXPIRED,
     OPPORTUNITY_REJECTED,
@@ -649,6 +651,13 @@ class V2Signal:
     # no lo declara: misma doctrina que ``strategy_preset_key``, la ausencia es información.
     feature_source: str | None = None
     signal_window_bars: int | None = None
+    # B-5 — MOTIVO del HOLD que declaró el decisor (``DecisionPackage.hold_reason``). Viaja con
+    # la señal para que el plan del tick pueda publicarlo: sin este eslabón el motivo moría en
+    # el paquete y el journal volvía a ser mudo. ``None`` cuando el decisor no lo declara.
+    hold_reason: str | None = None
+    #: Frase completa del decisor para ese HOLD (``DecisionPackage.memo``), cuando la declara:
+    #: es lo que añade la serie y las barras que faltan a ``warmup_insufficient``.
+    hold_detail: str = ""
     # Identidad/frescura de la señal (``signal_identity``): evita que la MISMA señal
     # sobre la MISMA barra se re-emita en cada turno (worker 60s vs señal D1).
     signal_id: str = ""
@@ -668,6 +677,110 @@ class V2Signal:
     # Si se aporta, manda sobre ``sector``/``liquidity_notional`` sueltos: es la vía por
     # la que el worker comunica KNOWN/STALE/CONFLICTING/UNKNOWN sin perder información.
     trade_context: TradeContext | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ActiveStrategyHold:
+    """B-5 — un HOLD de la estrategia ACTIVE **con motivo declarado**.
+
+    No es una oportunidad ni un veto de mercado: es la constancia de que la estrategia
+    promovida estaba cargada y **no llegó a decidir** (señal apagada, sin definición
+    ejecutable, sin barras, evaluación fallida). El worker la journaliza con su propio
+    evento (``auto_reason_codes.ACTIVE_STRATEGY_HOLD_EVENT``) una sola vez por
+    ``(símbolo, motivo, barra)``: el mismo hecho no se repite en cada tick de 60 s.
+    """
+
+    instrument_id: str
+    reason: str
+    strategy_version: str | None = None
+    strategy_preset_key: str | None = None
+    bar_timestamp: str = ""
+    feature_source: str | None = None
+    signal_window_bars: int | None = None
+    #: Frase completa del decisor cuando la hay (p. ej. el warmup con la serie y las barras).
+    detail: str = ""
+
+    @property
+    def dedupe_key(self) -> tuple[str, str, str]:
+        """Clave de no-repetición: el mismo HOLD de la misma barra se declara una vez."""
+        return (self.instrument_id, self.reason, self.bar_timestamp)
+
+
+def build_active_strategy_hold_journal_entry(
+    hold: ActiveStrategyHold,
+    *,
+    actor: str,
+    as_of: str,
+) -> DecisionJournalEntryRecord:
+    """B-5 — journal duradero de un HOLD con motivo de la estrategia ACTIVE.
+
+    Evento PROPIO (``auto_active_strategy_hold``), no ``auto_entry_decision``: el censo de
+    operabilidad de entrada sólo cuenta este último, así que declarar «la ACTIVE no llegó a
+    evaluar» no puede inflar ``vetoCounted``. Las claves de procedencia (``featureSource``/
+    ``signalWindowBars``) siguen la doctrina de O-6: se omiten si no hay dato.
+    """
+    from uuid import uuid4
+
+    payload: dict[str, Any] = {
+        "event": ACTIVE_STRATEGY_HOLD_EVENT,
+        "instrumentId": hold.instrument_id,
+        "action": "HOLD",
+        "reasonCodes": [hold.reason],
+    }
+    if str(hold.strategy_version or "").strip():
+        payload["strategyVersion"] = str(hold.strategy_version)
+    if str(hold.strategy_preset_key or "").strip():
+        payload["strategyPresetKey"] = str(hold.strategy_preset_key)
+    if str(hold.bar_timestamp or "").strip():
+        payload["barTimestamp"] = str(hold.bar_timestamp)
+    if str(hold.feature_source or "").strip():
+        payload["featureSource"] = str(hold.feature_source)
+    if hold.signal_window_bars is not None and hold.signal_window_bars > 0:
+        payload["signalWindowBars"] = int(hold.signal_window_bars)
+    if str(hold.detail or "").strip():
+        payload["holdDetail"] = str(hold.detail)
+
+    return DecisionJournalEntryRecord(
+        id=f"JNL-{uuid4().hex[:12]}",
+        decision_id=f"HLD-{uuid4().hex[:12]}",
+        event_type=ACTIVE_STRATEGY_HOLD_EVENT,
+        actor=actor,
+        created_at=_stamp(as_of),
+        instrument_id=hold.instrument_id,
+        payload=payload,
+    )
+
+
+def active_strategy_holds(signals: Sequence[V2Signal]) -> tuple[ActiveStrategyHold, ...]:
+    """B-5 — extrae las declaraciones de HOLD con motivo de las señales del tick.
+
+    Sólo entran los HOLD cuyo motivo pertenece al vocabulario cerrado
+    (``ACTIVE_HOLD_REASONS``): un motivo inventado por un decisor ajeno no se publica como si
+    estuviera catalogado. El orden es el de las señales (determinista, como el resto del tick).
+    """
+    holds: list[ActiveStrategyHold] = []
+    seen: dict[tuple[str, str, str], ActiveStrategyHold] = {}
+    for signal in signals:
+        if str(signal.action or "").upper() != "HOLD":
+            continue
+        reason = str(signal.hold_reason or "").strip()
+        if reason not in ACTIVE_HOLD_REASONS:
+            continue
+        hold = ActiveStrategyHold(
+            instrument_id=str(signal.instrument_id),
+            reason=reason,
+            strategy_version=signal.strategy_version,
+            strategy_preset_key=signal.strategy_preset_key,
+            bar_timestamp=str(signal.bar_timestamp or ""),
+            feature_source=signal.feature_source,
+            signal_window_bars=signal.signal_window_bars,
+            detail=str(signal.hold_detail or "").strip(),
+        )
+        if hold.dedupe_key in seen:
+            continue
+        seen[hold.dedupe_key] = hold
+        holds.append(hold)
+    return tuple(holds)
 
 
 @dataclass(frozen=True, slots=True)
@@ -711,6 +824,10 @@ class V2TickPlan:
     # V2.48/AUTO-8 — recomendación Adaptive del tick (rotación + asignación). ``None`` con
     # el flag OFF ⇒ el payload del tick es byte-idéntico al histórico.
     adaptive: AdaptivePlan | None = None
+    # B-5 — declaraciones de HOLD de la estrategia ACTIVE con motivo (configuración, definición
+    # o datos). Se publican aparte del embudo: no son oportunidades (nadie las evaluó) y no son
+    # vetos de entrada. Sin HOLD que declarar la tupla va vacía y el tick es byte-idéntico.
+    active_strategy_holds: tuple[ActiveStrategyHold, ...] = ()
 
     @property
     def approved_symbols(self) -> tuple[str, ...]:
@@ -1151,6 +1268,10 @@ def plan_v2_tick(
     vio en pantalla. Con ``None`` (o sin entrada) el tick es byte-idéntico al histórico.
     """
     cfg = tunables if tunables is not None else V2Tunables()
+    # B-5 — los HOLD con motivo de la ACTIVE se declaran APARTE del embudo: no compiten, no
+    # se rankean y no consumen presupuesto. Se calculan sobre las señales del tick (incluidas
+    # las que no son BUY) antes de que el pipeline filtre las de entrada.
+    hold_declarations = active_strategy_holds(signals)
     declared_regime = cfg.regime_override if cfg.regime_override is not None else regime
     resolved_regime = _coerce_operational_regime(declared_regime)
     symbol_regimes: dict[str, str] | None = (
@@ -1676,6 +1797,7 @@ def plan_v2_tick(
         seen_signals=len(deduped),
         cycles=tuple(cycles),
         adaptive=adaptive,
+        active_strategy_holds=hold_declarations,
     )
 
 
@@ -2971,10 +3093,13 @@ __all__ = [
     "SIGNAL_STALE",
     "SIGNAL_SUPERSEDED_BY_CANDIDATE",
     "AUTO_ENTRY_DIRECTION",
+    "ActiveStrategyHold",
     "V2Signal",
     "V2TickPlan",
     "V2Tunables",
+    "active_strategy_holds",
     "aggregate_trial_regime",
+    "build_active_strategy_hold_journal_entry",
     "build_worker_snapshot",
     "candidate_key",
     "canonical_candidate_key",

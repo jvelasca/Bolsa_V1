@@ -48,6 +48,12 @@ son la razón por la que una candidata del conjunto no entró en la combinación
 (``optimizer_not_selected`` o una infeasibilidad concreta) y la razón por la que el
 optimizador no llegó a decidir (``optimizer_enumeration_cap_exceeded``). El literal vive en
 ``portfolio_optimizer`` (analytics) y se re-exporta aquí para el journal.
+
+B-5 (cierre 2026-10-27) añade el vocabulario del **HOLD de la estrategia ACTIVE**
+(``ACTIVE_HOLD_REASONS``): por qué la estrategia promovida no operó —señal apagada, sin
+definición ejecutable, sin barras, evaluación fallida, sin señal o warmup insuficiente—. No son
+vetos de mercado ni oportunidades: se publican con su propio evento
+(``ACTIVE_STRATEGY_HOLD_EVENT``), que el censo de operabilidad no cuenta.
 """
 
 from __future__ import annotations
@@ -72,6 +78,10 @@ from bolsa_analytics.cognitive.position_lifecycle import (
     LIFECYCLE_STATE_UNVERIFIED,
     LIFECYCLE_TRANSITION_REJECTED,
 )
+
+# B-5 — el motivo de warmup lo posee el evaluador de presets del scan; se re-exporta aquí
+# para que el HOLD de la ACTIVE no escriba el literal por su cuenta.
+from bolsa_analytics.signals.preset_evaluability import WARMUP_INSUFFICIENT
 
 NO_MARK_DATA = "no_mark_data"
 POSITION_MARK_REJECTED = "mark_rejected"
@@ -272,6 +282,41 @@ MAE_MFE_UNMEASURED = "mae_mfe_unmeasured"
 # el detalle dice POR QUÉ). La casa única del literal es este módulo.
 ADAPTIVE_STRATEGY_PAUSED = "adaptive_strategy_paused"
 
+# B-5 (cierre 2026-10-27) — por qué la estrategia ACTIVE **no operó** cuando ya está cargada
+# en el hot path. La ACTIVE necesita dos flags (``AUTO_ENGINE_SIM_ACTIVE_STRATEGY`` y
+# ``..._ACTIVE_STRATEGY_SIGNAL``); sin el segundo el decisor devolvía ``HOLD`` y NADA lo
+# declaraba, así que «no operó» y «no quiso operar» eran la misma fila (y ninguna de las dos
+# existía). Estos códigos son la declaración de un HOLD **explicable por configuración o por
+# datos**, no un veto de mercado: se publican con su propio evento
+# (``ACTIVE_STRATEGY_HOLD_EVENT``) y no engordan el censo de vetos de entrada.
+ACTIVE_SIGNAL_DISABLED = "active_signal_disabled"
+ACTIVE_NO_EXECUTABLE = "no_executable"
+ACTIVE_NO_SNAPSHOT = "no_snapshot"
+#: La evaluación LANZÓ: no se sabe si había señal. Se declara, no se disfraza de ``no_signal``.
+ACTIVE_EVALUATION_FAILED = "evaluation_failed"
+#: La señal SÍ se evaluó y no dijo nada: el HOLD legítimo (el que no necesita explicación).
+ACTIVE_NO_SIGNAL = "no_signal"
+
+#: Vocabulario CERRADO de motivos de HOLD de la ACTIVE. ``warmup_insufficient`` se importa de
+#: su dueño (el evaluador de presets del scan) para no duplicar el literal: la ventana que no
+#: alcanza el warmup es la misma causa en las dos capas.
+ACTIVE_HOLD_REASONS: frozenset[str] = frozenset(
+    {
+        ACTIVE_SIGNAL_DISABLED,
+        ACTIVE_NO_EXECUTABLE,
+        ACTIVE_NO_SNAPSHOT,
+        ACTIVE_EVALUATION_FAILED,
+        ACTIVE_NO_SIGNAL,
+        WARMUP_INSUFFICIENT,
+    }
+)
+
+#: Evento del spine durable con el que la ACTIVE declara su HOLD. Es DISTINTO de
+#: ``auto_entry_decision`` a propósito: una estrategia que no evaluó ninguna entrada no es una
+#: oportunidad vetada, y el censo de operabilidad (``market_operability``) sólo cuenta aquel
+#: evento. Así el motivo es visible sin inflar ``vetoCounted``.
+ACTIVE_STRATEGY_HOLD_EVENT = "auto_active_strategy_hold"
+
 # V2.44/AUTO-4 — motivos del optimizador de cartera: por qué una candidata del conjunto no
 # entró en la combinación elegida (``optimizer_not_selected`` o una infeasibilidad concreta)
 # o por qué el optimizador no llegó a decidir (``optimizer_enumeration_cap_exceeded``).
@@ -294,6 +339,13 @@ OPTIMIZER_REASONS: frozenset[str] = frozenset(
 )
 
 __all__ = [
+    "ACTIVE_EVALUATION_FAILED",
+    "ACTIVE_HOLD_REASONS",
+    "ACTIVE_NO_EXECUTABLE",
+    "ACTIVE_NO_SIGNAL",
+    "ACTIVE_NO_SNAPSHOT",
+    "ACTIVE_SIGNAL_DISABLED",
+    "ACTIVE_STRATEGY_HOLD_EVENT",
     "ADAPTIVE_STRATEGY_PAUSED",
     "ATR_GEOMETRY",
     "ATR_SOURCES",
@@ -356,5 +408,6 @@ __all__ = [
     "STOP_RATCHET_REJECTED",
     "THESIS_EXIT",
     "TIME_EXIT",
+    "WARMUP_INSUFFICIENT",
     "day_exit_reason",
 ]

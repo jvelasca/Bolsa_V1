@@ -195,6 +195,7 @@ from bolsa_application.auto_operational_audit import (
 )
 from bolsa_application.auto_operational_monitor import AUTO_CYCLE_SETTLEMENT_EVENT
 from bolsa_application.auto_reason_codes import (
+    ACTIVE_SIGNAL_DISABLED,
     ATR_GEOMETRY,
     ATR_SOURCE_FALLBACK,
     ATR_SOURCE_MISSING,
@@ -232,6 +233,7 @@ from bolsa_application.auto_v2_entry import (
     EdgeReportSource,
     V2Signal,
     V2Tunables,
+    build_active_strategy_hold_journal_entry,
     build_position_management_journal_entry,
     build_worker_snapshot,
     plan_v2_position_outcome,
@@ -1437,6 +1439,10 @@ class AutoSimulationWorker:
         # el memo, un universo sin barras escribiría una entrada por candidata y por
         # turno, y el journal del día (que es evidencia de decisiones) se ahogaría.
         self._v2_atr_journaled: dict[str, str] = {}
+        # B-5 — el HOLD de la ACTIVE con motivo se declara UNA vez por (símbolo, motivo,
+        # barra): es un hecho de la barra, no del tick. Sin esta memo el mismo «la señal está
+        # apagada» se escribiría cada 60 s y ahogaría el journal de decisiones.
+        self._v2_active_hold_journaled: set[tuple[str, str, str]] = set()
         self._v2_atr_source = atr_source
         # V2.43/AUTO-3 — drawdown MEDIDO para el gobernador de riesgo y mercado. La serie
         # de equity del proceso es la MISMA cuenta (marca día/semana desde el primer
@@ -3023,6 +3029,14 @@ class AutoSimulationWorker:
                 # Antes ``... or 0`` producía un ``Decimal("0")`` del que sólo el
                 # ``signal.price > 0`` aguas abajo impedía una geometría con stop en 0.
                 self._v2_note_price_missing(symbol)
+                # B-5: un HOLD CON MOTIVO no depende del precio —no ejecuta ni marca—. Si se
+                # callara aquí, «la señal de la ACTIVE está apagada» desaparecería justo en el
+                # caso en que el operador más necesita leerlo. Se declara con precio 0 y sin
+                # geometría; el precio ausente sigue declarándose por su propio canal (W4).
+                if str(getattr(pkg, "action", "HOLD")).upper() == "HOLD" and str(
+                    getattr(pkg, "hold_reason", None) or ""
+                ).strip():
+                    signals.append(self._v2_hold_signal(symbol, pkg))
                 continue
             price = Decimal(str(raw_price))
             action = str(getattr(pkg, "action", "HOLD")).upper()
@@ -3106,12 +3120,49 @@ class AutoSimulationWorker:
                     # ventana no alcanzaba» sin abrir el motor.
                     feature_source=getattr(pkg, "feature_source", None),
                     signal_window_bars=getattr(pkg, "signal_window_bars", None),
+                    # B-5 — el motivo del HOLD viaja con la señal: sin este eslabón el
+                    # paquete lo declaraba y el plan del tick nunca lo veía.
+                    hold_reason=getattr(pkg, "hold_reason", None),
+                    hold_detail=str(getattr(pkg, "memo", "") or ""),
                     signal_id=signal_id,
                     bar_timestamp=identity.bar_timestamp if identity is not None else "",
                     valid_until=identity.valid_until if identity is not None else "",
                 )
             )
         return signals
+
+    def _v2_hold_signal(self, symbol: str, pkg: Any) -> V2Signal:
+        """B-5 — señal HOLD con motivo para un símbolo SIN precio.
+
+        Un HOLD declarado no ejecuta ni marca, así que su motivo no depende del precio. Se
+        emite con ``price=0`` y SIN geometría (nada aguas abajo construye una entrada con
+        ella: el plan sólo la lee para declarar el motivo). La identidad de barra se calcula
+        igual que en el resto, para que la declaración sea una por barra y no una por turno.
+        """
+        action = "HOLD"
+        version = _strategy_version_from_source(getattr(pkg, "source", None))
+        preset = _strategy_preset_from_source(getattr(pkg, "source", None))
+        identity = signal_identity_for_bar(
+            instrument_id=symbol,
+            action=action,
+            strategy_version=version or "unversioned",
+            timeframe=self._v2_granularity.decision.timeframe,
+            moment=self._time,
+        )
+        return V2Signal(
+            instrument_id=symbol,
+            action=action,
+            price=0.0,
+            strategy_version=version,
+            strategy_preset_key=preset,
+            feature_source=getattr(pkg, "feature_source", None),
+            signal_window_bars=getattr(pkg, "signal_window_bars", None),
+            hold_reason=str(getattr(pkg, "hold_reason", None) or "").strip() or None,
+            hold_detail=str(getattr(pkg, "memo", "") or ""),
+            signal_id=identity.signal_id if identity is not None else "",
+            bar_timestamp=identity.bar_timestamp if identity is not None else "",
+            valid_until=identity.valid_until if identity is not None else "",
+        )
 
     def _v2_sector(self, symbol: str, pkg: Any) -> str | None:
         """Sector del candidato para el gate de concentración sectorial.
@@ -3716,6 +3767,28 @@ class AutoSimulationWorker:
             if entry is None:
                 continue
             await self._v2_audit_emit(self._v2_seal_audit_identity(entry), label="entry_decision")
+
+    def _v2_declare_active_strategy_holds(self, plan: Any) -> list[Any]:
+        """B-5 — entradas de journal de los HOLD con motivo de la estrategia ACTIVE.
+
+        El plan del tick trae las declaraciones (``active_strategy_holds``) y aquí se filtran
+        por ``(símbolo, motivo, barra)`` para no reescribir el mismo hecho en cada turno. No
+        son decisiones de entrada: viajan con el evento propio
+        ``auto_active_strategy_hold``, que el censo de operabilidad no cuenta.
+        """
+        entries: list[Any] = []
+        at = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        for hold in tuple(getattr(plan, "active_strategy_holds", ()) or ()):
+            key = hold.dedupe_key
+            if key in self._v2_active_hold_journaled:
+                continue
+            self._v2_active_hold_journaled.add(key)
+            entries.append(
+                build_active_strategy_hold_journal_entry(
+                    hold, actor=self._engine_id, as_of=at
+                )
+            )
+        return entries
 
     def _v2_seal_audit_identity(self, entry: Any) -> Any:
         """(``M2``) sella ``account_id`` (si falta), ``payload.engineId`` (si falta) y la
@@ -5032,6 +5105,13 @@ class AutoSimulationWorker:
         # sólo en RAM. Con el flag ON se persiste en el spine y ``SIGNAL``/``TOP_N``/``RISK``
         # pasan a ser enlazables por ``decision_id``/``cycleId``. Sin sink es un no-op.
         await self._v2_journal_entry_decisions(plan.journal_entries)
+        # B-5 — el HOLD de la ACTIVE con motivo se declara con su PROPIO evento (no es una
+        # oportunidad vetada: nadie la evaluó). Una sola vez por (símbolo, motivo, barra); el
+        # mismo hecho no se reescribe en cada turno de 60 s de la misma barra diaria.
+        hold_entries = self._v2_declare_active_strategy_holds(plan)
+        if hold_entries:
+            self._v2_journal.extend(hold_entries)
+            await self._v2_journal_entry_decisions(hold_entries)
         # V2.45/AUTO-5 — embudo del día. El precio posterior de las rechazadas de ticks
         # ANTERIORES se mide con el tick corriente (es su primer precio DESPUÉS del
         # descarte); las filas de ESTE tick se incorporan después, porque una oportunidad no
@@ -8894,6 +8974,9 @@ async def load_active_strategy_decider(
             fallback=None,
             watch=watch,
             lot_qty=lot_qty,
+            # B-5 — sin el flag de señal propia la ACTIVE **no opera** (fail-closed V2.31);
+            # aquí es donde se declara POR QUÉ, en vez de devolver un HOLD mudo.
+            hold_reason=ACTIVE_SIGNAL_DISABLED,
         )
     except Exception:  # noqa: BLE001 — sin activa fiable se conserva el spine seguro.
         logger.exception("auto_sim active-strategy load failed (se usa el spine)")

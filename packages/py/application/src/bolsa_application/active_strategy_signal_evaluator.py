@@ -31,6 +31,13 @@ import logging
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 
+from bolsa_application.auto_reason_codes import (
+    ACTIVE_EVALUATION_FAILED,
+    ACTIVE_NO_EXECUTABLE,
+    ACTIVE_NO_SIGNAL,
+    ACTIVE_NO_SNAPSHOT,
+    WARMUP_INSUFFICIENT,
+)
 from bolsa_application.decision_contract import (
     DecisionPackage,
     format_active_strategy_source,
@@ -154,6 +161,13 @@ def make_active_strategy_decider(
 
     Un fallo de ``long_by_symbol`` cae en el mismo ``except`` que los demás: **HOLD**,
     nunca una venta inventada ni una venta silenciada.
+
+    **B-5.** Cada HOLD declara su motivo (``hold_reason``) dentro del vocabulario cerrado de
+    ``auto_reason_codes.ACTIVE_HOLD_REASONS``: ``no_executable`` (la definición no trae
+    ``executable``), ``no_snapshot`` (sin cargador o sin barras), ``evaluation_failed`` (la
+    evaluación lanzó), ``warmup_insufficient`` (la ventana no alcanza) y ``no_signal`` (se
+    evaluó y no había señal). El worker los journaliza con su propio evento; así «no pudo
+    evaluar» deja de ser indistinguible de «no quiso operar».
     """
     definition = dict(getattr(active, "definition", None) or {})
     executable = definition.get("executable")
@@ -163,28 +177,38 @@ def make_active_strategy_decider(
     effective_lot = float(definition.get("lot_qty", lot_qty) or lot_qty)
     effective_watch = tuple(str(s) for s in (definition.get("watch") or watch))
 
-    def _hold(symbol: str) -> DecisionPackage:
+    def _hold(symbol: str, reason: str | None = None) -> DecisionPackage:
+        # B-5: el HOLD que NO viene de una señal evaluada declara su causa (configuración,
+        # definición o datos). ``reason=None`` sólo queda para un símbolo FUERA del watch de
+        # la ACTIVE: no es una decisión sobre él y por eso no se declara nada.
         return DecisionPackage(
-            action="HOLD", instrument_id=symbol, quantity=0, source=source
+            action="HOLD",
+            instrument_id=symbol,
+            quantity=0,
+            source=source,
+            hold_reason=reason,
         )
 
     def _decide(symbol: str) -> DecisionPackage:
         if symbol not in effective_watch:
             return _hold(symbol)
-        if not isinstance(executable, dict) or bars_by_symbol is None:
+        if not isinstance(executable, dict):
             # Sin estrategia ejecutable: no se opera (no se delega en el spine).
-            return _hold(symbol)
+            return _hold(symbol, ACTIVE_NO_EXECUTABLE)
+        if bars_by_symbol is None:
+            # Sin cargador de barras no hay ventana que evaluar: es un problema de DATOS.
+            return _hold(symbol, ACTIVE_NO_SNAPSHOT)
         try:
             bars = bars_by_symbol(symbol)
             if not bars:
-                return _hold(symbol)
+                return _hold(symbol, ACTIVE_NO_SNAPSHOT)
             assume_long = bool(long_by_symbol(symbol)) if long_by_symbol is not None else False
             signal_kind, warmup_reason = _evaluate_last_signal(
                 executable, bars, symbol, assume_long=assume_long
             )
         except Exception:  # noqa: BLE001 — una evaluación fallida no rompe el motor.
             logger.debug("signal evaluator failed for %s", symbol, exc_info=True)
-            return _hold(symbol)
+            return _hold(symbol, ACTIVE_EVALUATION_FAILED)
         # O-6: la procedencia de la feature y el tamaño de la ventana se declaran en TODA
         # decisión que llegue a evaluar barras —incluido el HOLD—, porque es justo el HOLD
         # el que hoy no se puede leer: «no había señal» y «la ventana no alcanza» eran la
@@ -203,6 +227,7 @@ def make_active_strategy_decider(
                 quantity=0,
                 source=source,
                 memo=warmup_reason,
+                hold_reason=WARMUP_INSUFFICIENT,
                 feature_source=declared_source,
                 signal_window_bars=window_bars,
             )
@@ -212,6 +237,9 @@ def make_active_strategy_decider(
                 instrument_id=symbol,
                 quantity=0,
                 source=source,
+                # B-5: aquí SÍ se evaluó y no hubo señal. Es el HOLD legítimo, y se distingue
+                # del que no pudo evaluar (``no_snapshot``/``no_executable``/``warmup``).
+                hold_reason=ACTIVE_NO_SIGNAL,
                 feature_source=declared_source,
                 signal_window_bars=window_bars,
             )

@@ -505,6 +505,7 @@ commit** de lo que sigue pendiente. Nada se ha publicado.
 | P0 | Unificar la procedencia de la feature: OHLCV real en decisor y alertas, o `featureSource` declarado | B-2, B-4, O-6 | **aplicado** en decisor y alertas (`signal_feature_context.py`) + contrato 16/16; `featureSource` en journal **pendiente** (O-6) |
 | P0 | Resolver el contrato `gated`/`raw`: el gating no puede reiniciarse en cada llamada | B-3 | **pendiente**, con prueba de caracterización |
 | P0 | Unificar el conjunto de motivos accionables entre F5 y AUTO, o consultar F5 | S-1, S-2, S-6 | **aplicado** F5+AUTO (§12.12, §12.13) y **S-6** cableado en el worker (§12.17) |
+| P0 | Declarar por qué la ACTIVE no opera (`SIGNAL=0` ⇒ HOLD mudo) | B-5 | **aplicado** 2026-10-27: `hold_reason` tipificado + evento `auto_active_strategy_hold` (§12.18) |
 | P1 | `EXIT_PENDING` solo tras orden emitida | S-3 | **aplicado** (§12.14) |
 | P1 | Contador durable de settlement fallido y publicación de `structural` | O-1, O-2 | **aplicado** (§12.15) |
 | P1 | Declarar la posición no adoptada en el journal | S-5 | **pendiente** |
@@ -1380,4 +1381,58 @@ passed**, `auto-v2-durable-pg` **7 + 1 passed**, `paper-forward-pg` **2 passed**
 `Fase 2 scientific` ([`40484067190`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40484067190))
 y `Optimize lab` ([`40484067256`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40484067256)) ⇒
 `success`.
+
+---
+
+### 12.18 B-5: la ACTIVE declara en el journal POR QUÉ no operó
+
+> **Cierra el ítem B-5** de §3.7 de la auditoría y el criterio `B-5` de §9.
+
+**Qué se implementó.**
+
+| Pieza | Antes | Ahora |
+|---|---|---|
+| Motivo del HOLD | no existía: el decisor devolvía `HOLD` y nadie sabía por qué | `DecisionPackage.hold_reason` (aditivo) con un vocabulario **cerrado** en `auto_reason_codes.ACTIVE_HOLD_REASONS` |
+| Caso `SIGNAL=0` | `HOLD` mudo: «no operó» indistinguible de «no quiso operar» | `active_signal_disabled` declarado |
+| Definición sin `executable` | `HOLD` mudo | `no_executable` |
+| Sin cargador de barras / sin barras | `HOLD` mudo | `no_snapshot` |
+| La evaluación lanzó | `HOLD` mudo | `evaluation_failed` (no se disfraza de «no había señal») |
+| La señal se evaluó y no dijo nada | `HOLD` mudo | `no_signal` — el HOLD legítimo, ahora distinguible |
+| Ventana corta | `memo` con `warmup_insufficient` (B-1) | mismo literal de su dueño, **también** como `hold_reason` |
+| Dónde se publica | — | evento propio `auto_active_strategy_hold` en el spine durable, con `reasonCodes`, `strategyVersion`, `strategyPresetKey`, `barTimestamp` y (si se midió) `featureSource`/`signalWindowBars`/`holdDetail` |
+
+**Por qué un evento propio y no `auto_entry_decision`.** El censo de operabilidad cuenta
+**sólo** las decisiones de entrada (`market_operability.ENTRY_DECISION_EVENT`). Una estrategia
+que no llegó a evaluar no es una oportunidad vetada por el mercado: publicarla como veto habría
+inflado `vetoCounted` y habría hecho que «el motor no pudo evaluar» se leyera como «el mercado
+rechazó». El evento propio conserva el motivo **sin** tocar el censo — y una prueba lo fija.
+
+**Una declaración por barra.** El HOLD se memoiza por `(símbolo, motivo, barra)`
+(`ActiveStrategyHold.dedupe_key`): el worker replanifica cada 60 s y, sin esta memo, el mismo
+«la señal está apagada» se escribiría ~1 440 veces al día por símbolo. Es un hecho de la barra,
+no del turno.
+
+**Un HOLD no necesita precio.** El camino de precio ausente cortaba la señal antes de existir;
+un HOLD declarado no ejecuta ni marca, así que se publica igualmente (con `price = 0` y sin
+geometría). El precio ausente sigue declarándose por su propio canal (W4,
+`price_missing_counts`).
+
+**Verificación (E1).**
+
+| Gate | Resultado |
+|---|---|
+| `packages/py/application/tests/test_active_strategy_hold_reasons.py` (nuevo, 21) | **21 passed** — `SIGNAL=0` ⇒ `active_signal_disabled`; sin `executable` ⇒ `no_executable`; sin cargador / ventana vacía ⇒ `no_snapshot`; evaluación que lanza ⇒ `evaluation_failed`; warmup ⇒ el literal del scan; evaluado sin señal ⇒ `no_signal`; el plan publica la declaración **fuera** del embudo (`seen_signals == 0`, `opportunities == ()`, `journal_entries == ()`); una por `(símbolo, motivo, barra)`; un motivo no catalogado **no** se publica; el evento del journal es propio y omite lo no medido |
+| `apps/api-python/tests/test_auto_active_strategy_hold_b5.py` (nuevo, 5) | **5 passed** — el criterio `test_active_signal_flag_off_blocks_buy_explicitly`: `ACTIVE_STRATEGY=1` + `SIGNAL=0` ⇒ no se abre nada y el journal declara `active_signal_disabled`; dos turnos en la misma barra ⇒ **1** declaración; el censo de entrada no la cuenta; sin barras ⇒ `no_snapshot`; control positivo: con barras y señal la ACTIVE entra al pipeline de decisión y **no** declara HOLD |
+| `packages/py/application` completo | **2944 passed** |
+| `apps/api-python` offline (`-m "not integration"`) | **1405 passed**, 12 deseleccionadas |
+| `ruff` / `mypy` (gate de CI) / import-linter | limpio / **573 ficheros sin issues** / **4 kept, 0 broken** |
+
+**Lo que NO se ha hecho, y queda declarado.**
+
+- **No** se enciende la señal de la ACTIVE ni se cambia el veredicto: el caso `SIGNAL=0` sigue
+  siendo **HOLD** (fail-closed de V2.31). Lo que cambia es que deja de ser mudo.
+- El motivo se publica en el **journal duradero** (spine `decision_journal_entries`); el panel
+  web no gana una columna nueva en este paso (O-3/O-4 siguen abiertos para la lectura del gate).
+- Sin sello, sin tag y sin bump.
+
 

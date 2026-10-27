@@ -390,6 +390,15 @@ sobre el spine", como podría sugerir el nombre; **no opera nada** y no lo decla
 **Veredicto: HUECO DECLARADO.** El código lo dice en el docstring ("fail-closed a NO TRADE") y la
 prueba `test_auto_sim_active_strategy_seam.py` lo fija, pero el operador solo ve HOLD.
 
+> **Resuelto el 2026-10-27 (B-5, §9.11).** El HOLD deja de ser mudo: `DecisionPackage.hold_reason`
+> transporta un motivo **tipificado** (`active_signal_disabled` cuando falta el segundo flag,
+> `no_executable` sin definición ejecutable, `no_snapshot` sin barras, `evaluation_failed` si la
+> evaluación lanza, `no_signal` cuando sí se evaluó y no había señal, `warmup_insufficient` con el
+> literal del scan) y el worker lo journaliza con el evento propio `auto_active_strategy_hold`, una
+> vez por `(símbolo, motivo, barra)`. **No** se enciende la señal ni se cambia el veredicto: el caso
+> `SIGNAL=0` sigue sin operar; lo que cambia es que se puede leer por qué. El evento no es
+> `auto_entry_decision`, así que no infla `vetoCounted`.
+
 ### 3.8 Hallazgo B-6 · El scan exige 50 barras, no el warmup del preset
 
 `MIN_SCAN_BARS = 50` (`packages/py/domain/src/bolsa_domain/platform_kernel.py:10`) y el scan salta
@@ -1030,7 +1039,7 @@ restantes describen qué habría que observar para dar el hallazgo por cerrado.
 | B-2 | `test_decider_matches_the_gated_projection_of_the_same_signal` | Para `stoch_oversold`/`vwap_reclaim` (y los otros dos presets), la acción del decisor **coincide** con la proyección `gated` de la misma feature OHLCV, en los 4 escenarios. Añadido: el Δ frente al camino close-only queda fijado (5/16). |
 | B-3 | `test_held_position_exits_without_an_entry_in_the_window` | 120 barras sin entrada en la ventana + posición en el libro ⇒ el decisor emite `SELL`. **Implementado 2026-10-26** (§9.2); la versión propuesta en este documento se llamaba `test_gated_exit_is_reachable_without_entry_in_window` y hoy vive en el motor, con el caso de nivel en el decisor. |
 | B-4 | `test_the_alert_evaluates_with_the_ohlcv_context` | Misma definición, mismas barras: la alerta entrega al motor un `indicator_context` construido desde OHLCV (con VWAP real) y no evalúa sobre barras sintéticas. |
-| B-5 | `test_active_signal_flag_off_blocks_buy_explicitly` | `ACTIVE_STRATEGY=1`, `SIGNAL=0` ⇒ `HOLD` **y** un motivo de journal `active_signal_disabled` (hoy: `HOLD` sin motivo). |
+| B-5 | `test_active_signal_flag_off_blocks_buy_explicitly` | `ACTIVE_STRATEGY=1`, `SIGNAL=0` ⇒ `HOLD` **y** un motivo de journal `active_signal_disabled` (hoy: `HOLD` sin motivo). **Implementado 2026-10-27** (§9.11): `hold_reason` tipificado + evento `auto_active_strategy_hold`, una vez por `(símbolo, motivo, barra)`. |
 | B-6 | `test_scan_rejects_preset_below_warmup` | `bar_limit < 200` + `golden_cross` ⇒ `ScanSkippedInstrument` con motivo `warmup_insufficient` (hoy: 0 hits silenciosos). |
 | S-1 | `test_time_stop_permission_matches_auto_execution` | `check_exit_permission(plan TIME_STOP).allowed` y `position_manager_package(outcome).action` deben coincidir. **Cubierto 2026-10-27** por `test_time_stop_permission_matches_the_auto_suggestion` (§5.3): `full_exit` en ambas capas. |
 | S-2 | `test_thesis_invalidation_is_protective_under_critical_recon` | Con `CRITICAL` + `THESIS_INVALIDATION`, el `PositionManagerResult.order_action == "sell"` (hoy `hold`/`REVIEW`). Alternativa aceptada: documentar que no vende. |
@@ -1627,6 +1636,60 @@ medirse en el worker (`null` declarado). El camino legacy `AUTO_ENGINE_SIM_V2=0`
 `PositionState` y su salida se declara `missing_exit_plan` en vez de recibir un plan sintético. La
 evidencia es **E1** + **E2**; sin sello, sin tag y sin bump.
 
+### 9.11 B-5 aplicado: la ACTIVE declara por qué no operó (y el HOLD deja de ser mudo)
+
+**El fallo, en una frase.** Con `AUTO_ENGINE_SIM_ACTIVE_STRATEGY=1` y
+`..._ACTIVE_STRATEGY_SIGNAL=0` el decisor devolvía `HOLD` y **nada** lo declaraba: el operador solo
+veía «no operó», y «no operó» / «no quiso operar» / «no pudo evaluar» eran la misma (ausencia de)
+fila.
+
+**Arreglo: motivo tipificado + evento propio, sin cambiar el veredicto.**
+
+| Pieza | Cambio |
+|---|---|
+| `DecisionPackage.hold_reason` (aditivo) | el decisor declara el motivo del HOLD; `None` = no declara nada |
+| `auto_reason_codes.ACTIVE_HOLD_REASONS` (dueño único) | `active_signal_disabled`, `no_executable`, `no_snapshot`, `evaluation_failed`, `no_signal` y el `warmup_insufficient` **re-exportado de su dueño** |
+| `auto_orchestrator.active_strategy_decider(hold_reason=…)` | el worker le pasa `active_signal_disabled` cuando la ACTIVE está cargada y su señal propia está apagada; con `None` el comportamiento histórico es byte-idéntico |
+| `active_strategy_signal_evaluator` | `no_executable` (sin definición ejecutable), `no_snapshot` (sin cargador o sin barras), `evaluation_failed` (la evaluación lanzó) y `no_signal` (se evaluó y no había señal); el `memo` del warmup (B-1) conserva su frase |
+| `V2Signal.hold_reason/hold_detail` | el motivo viaja con la señal del tick: sin este eslabón moría en el paquete |
+| `plan_v2_tick` → `active_strategy_holds` | publica las declaraciones **aparte** del embudo: no son oportunidades, no cuentan como vistas y no consumen presupuesto |
+| `build_active_strategy_hold_journal_entry` | evento propio `auto_active_strategy_hold` con `reasonCodes`, identidad de estrategia (`strategyVersion`/`strategyPresetKey`), `barTimestamp` y —si se midió— `featureSource`/`signalWindowBars`/`holdDetail`. Lo no medido se omite (O-6) |
+| `AutoSimulationWorker` | journaliza en el spine con dedupe por `(símbolo, motivo, barra)`; un HOLD con motivo se declara **también sin precio** (no ejecuta ni marca) |
+
+**Por qué un evento propio.** El censo de operabilidad cuenta sólo `auto_entry_decision`
+(`market_operability.ENTRY_DECISION_EVENT`). Declarar «la estrategia no llegó a evaluar» como
+decisión de entrada habría inflado `vetoCounted` y habría hecho pasar la configuración por un veto
+del mercado. Con el evento propio el motivo es visible y el censo no se toca; una prueba lo fija.
+
+**Pruebas (E1).**
+
+| Fichero | Qué fija |
+|---|---|
+| `test_active_strategy_hold_reasons.py::test_the_disabled_signal_declares_its_reason_instead_of_a_mute_hold` | `SIGNAL=0` ⇒ `HOLD` con `active_signal_disabled` (el criterio de la auditoría) |
+| …`::test_the_classic_decider_stays_silent_when_no_reason_is_declared` | control negativo: sin `hold_reason` no se inventa motivo (Δ = 0 para otros llamantes) |
+| …`::test_a_definition_without_executable_declares_no_executable` · `::test_no_bar_loader_declares_no_snapshot` · `::test_an_empty_window_declares_no_snapshot` | los tres motivos que pedía el hallazgo, cada uno por su causa |
+| …`::test_a_failed_evaluation_is_declared_not_dressed_as_no_signal` | una evaluación que lanza **no** se disfraza de «no había señal» |
+| …`::test_the_warmup_shortfall_reuses_the_scan_literal` | el warmup usa el literal de su dueño (`preset_evaluability`), no una copia |
+| …`::test_an_evaluated_hold_is_declared_as_no_signal` | el HOLD legítimo sigue siendo distinguible |
+| …`::test_the_plan_publishes_the_hold_apart_from_the_funnel` | la declaración existe y NO entra al embudo (`seen_signals == 0`, `opportunities == ()`) |
+| …`::test_a_repeated_hold_on_the_same_bar_is_declared_once` | una por `(símbolo, motivo, barra)` |
+| …`::test_an_uncatalogued_reason_is_not_published_as_if_it_were_known` | un motivo ajeno al vocabulario no se publica como catalogado |
+| `test_auto_active_strategy_hold_b5.py::test_active_signal_flag_off_blocks_buy_explicitly` | de extremo a extremo en el worker: no se abre nada y el journal declara `active_signal_disabled` |
+| …`::test_the_declaration_is_one_per_bar` | dos turnos en la misma barra ⇒ **1** declaración |
+| …`::test_the_declaration_is_not_counted_as_an_entry_veto` | el censo de entrada (`auto_entry_decision`) no la cuenta |
+| …`::test_without_bars_the_reason_is_no_snapshot_not_a_mute_hold` | control positivo del motivo: con señal y sin barras cambia a `no_snapshot` |
+| …`::test_with_bars_the_active_buys_and_declares_no_hold` | anti-falso-positivo: con barras y señal, la ACTIVE entra al pipeline y **no** declara HOLD |
+
+**Gates ejecutados** (2026-10-27): `packages/py/application` completo ⇒ **2944 passed**;
+`apps/api-python` offline ⇒ **1405 passed** (12 deseleccionadas); `ruff` ⇒ limpio; `mypy`
+(application + api, gate de CI) ⇒ **573 ficheros sin issues**; `import-linter` ⇒ **4 kept /
+0 broken**.
+
+**Lo que NO se ha hecho.** No se enciende la señal de la ACTIVE ni se altera su veredicto
+(`SIGNAL=0` sigue en `HOLD`, fail-closed de V2.31). El motivo vive en el journal duradero; el panel
+web no gana columna nueva en este paso (la lectura del gate es **O-3/O-4**, aún abierta). La
+evidencia es **E1**; sin sello, sin tag y sin bump.
+
 ---
 
 ## 10. Backlog priorizado
@@ -1657,6 +1720,10 @@ evidencia es **E1** + **E2**; sin sello, sin tag y sin bump.
 5. **Declarar por qué la ACTIVE no opera.** `ACTIVE_STRATEGY=1` con `SIGNAL=0` hoy produce `HOLD`
    mudo: el journal debe distinguir `active_signal_disabled`, `no_executable` y `no_snapshot`
    (**B-5**). Sin ese motivo, «no operó» y «no quiso operar» son la misma fila.
+   **Aplicado 2026-10-27 (§9.11):** el decisor declara `hold_reason` con un vocabulario cerrado
+   (los tres motivos pedidos más `evaluation_failed`, `no_signal` y `warmup_insufficient`) y el
+   worker lo journaliza con su propio evento, una vez por `(símbolo, motivo, barra)`. El veredicto
+   **no** cambia: con la señal apagada se sigue sin operar.
 
 ### P1 — degrada la observabilidad o deja estados fantasma
 
@@ -1708,7 +1775,7 @@ E3.**
 | B-2 | P0-2 | B-2 | `test_decider_matches_the_gated_projection_of_the_same_signal` (16 pares) | **E1** (16/16 gated; Δ 5/16 frente a close-only) |
 | B-3 | P0-3 | B-3 + §9.2 | `test_held_position_exits_without_an_entry_in_the_window` · `test_assume_long_does_not_reenter_after_an_in_window_exit` | **E1** (`HOLD`→`SELL` con libro; `BUY`→`HOLD` con posición; libro ilegible ⇒ `HOLD`) |
 | B-4 | P0-2 | B-4 | `test_the_alert_evaluates_with_the_ohlcv_context` | **E1** (el motor recibe `indicator_context` con VWAP real) |
-| B-5 | P0-5 | B-5 | `test_active_signal_flag_off_blocks_buy_explicitly` | E0 + E1 parcial (`test_auto_sim_active_strategy_seam`; falta el motivo) |
+| B-5 | P0-5 | B-5 + §9.11 | `test_active_signal_flag_off_blocks_buy_explicitly` | **E1** (`ACTIVE_STRATEGY=1` + `SIGNAL=0` ⇒ sin apertura y journal `active_signal_disabled`; una declaración por barra; censo de entrada intacto; control positivo con barras ⇒ `no_snapshot` / sin HOLD) |
 | B-6 | P0-1 | B-6 + §9.1 | `test_scan_rejects_preset_below_warmup` (implementada en `test_scan_preset_warmup.py`) | **E1** (`bar_limit = 120` ⇒ `skipped` con `warmup_insufficient`; 200 ⇒ `>= 201`) |
 | S-1 | P0-4 | S-1 + §9.5 | `test_time_stop_permission_matches_auto_execution` (implementada como `test_time_stop_permission_matches_the_auto_suggestion`) | **E1** (`TIME_STOP` ⇒ `ALLOW`/`full_exit` en F5, igual que la sugerencia del AUTO; `HINT` con `protect`/`hold` sigue denegado) |
 | S-2 | P0-4 | S-2 + §9.6 | `test_thesis_invalidation_is_protective_under_critical_recon` | **E1** (`THESIS_INVALIDATION` ⇒ `EXIT`/`sell` bajo `CRITICAL` y `ALLOW` en F5 con datos rancios; `TIME_STOP`/`MANUAL`/objetivos siguen degradando) |
@@ -1728,14 +1795,14 @@ E3.**
 
 **Cobertura:** 21 hallazgos · **22** entradas de backlog (las 21 con ID + P1-12b, que cubre el
 silencio de la UI del scan descrito en §7.4) · 21 criterios · 21
-pruebas propuestas · **15 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
-`S-1` en §9.5, `S-2` en §9.6, `S-3` en §9.7, `O-1` y `O-2` en §9.8, `T-1`, `T-2` y `S-6` en §9.9–
-§9.10, `B-2`, `B-4` y `O-5`). `B-1`,
+pruebas propuestas · **16 implementadas** (`B-1` y `B-6` en §9.1, `B-3` en §9.2, `O-6` en §9.4,
+`S-1` en §9.5, `S-2` en §9.6, `S-3` en §9.7, `O-1` y `O-2` en §9.8, `T-1`, `T-2`, `S-6` y `B-5`
+en §9.9–§9.11, `B-2`, `B-4` y `O-5`). `B-1`,
 `B-2`, `B-4` y `O-5`
 entran con el sello `2.11.162-beta`; `B-6`, el cierre de `B-1`, `B-3`, `O-6`, `S-1`, `S-2`, `S-3`,
-`O-1`, `O-2`, `T-1`, `T-2` y `S-6`
+`O-1`, `O-2`, `T-1`, `T-2`, `S-6` y `B-5`
 son **posteriores** al sello `2.11.163-beta` y viven en el commit de trabajo. Las filas
-que en una lectura anterior quedaban huérfanas (`B-5`, `B-6`, `O-5`, `O-6`, `T-3`) tienen ahora
+que en una lectura anterior quedaban huérfanas (`B-6`, `O-5`, `O-6`, `T-3`) tienen ahora
 backlog, criterio y prueba; su evidencia sigue siendo E0/E1/E2 y **no** se eleva por tener criterio
 escrito.
 
