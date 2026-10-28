@@ -8,41 +8,46 @@
 
 ## 0. Qué se mueve y qué no
 
-| Se mueve (presentación) | NO se mueve |
-| --- | --- |
-| Orden, agrupación y jerarquía tipográfica de bloques ya existentes | Motor, decisión, umbrales, sizing ni el pin PAPER |
-| Dónde se declara un hecho que ya está en el árbol (cabecera vs pie) | Qué hechos existen y cómo se calculan (`@bolsa/shared`) |
+| Se mueve (presentación)                                                | NO se mueve                                                                        |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Orden, agrupación y jerarquía tipográfica de bloques ya existentes     | Motor, decisión, umbrales, sizing ni el pin PAPER                                  |
+| Dónde se declara un hecho que ya está en el árbol (cabecera vs pie)    | Qué hechos existen y cómo se calculan (`@bolsa/shared`)                            |
 | Rótulos de modo (`AUTO`/`SEMI`/`MANUAL`) junto a bloques ya existentes | El selector de modo: sigue **solo** en `demo-book-mode-panel` (`UI5-17`, `UI5-21`) |
-| Enlaces cruzados entre superficies ya existentes | Rutas, `?view=`, `cycleId` ni `AUTO_NAV` (`UI5-03`) |
+| Enlaces cruzados entre superficies ya existentes                       | Rutas, `?view=`, `cycleId` ni `AUTO_NAV` (`UI5-03`)                                |
 
 ## 1. Inventario actual
 
 ### 1.1 `Hoy` — `apps/web/src/features/mesa/mesa-hoy-page.tsx`
 
-| # | Bloque | Origen |
-| --- | --- | --- |
-| 1 | `h1` «Hoy» + fecha/cuenta + pregunta + `MesaDatosChip` | propio |
-| 2 | Acciones: `Actualizar` + menú `Avanzado` (`MesaHoyDetailsMenu`) | propio |
-| 3 | Aviso de error al consultar incidentes | propio |
-| 4 | Sección de incidentes (banner + frase + enlace a Consola) | `MesaIncidentBanner` |
-| 5 | Inbox de cuatro cubos (`requiere_accion`, `proteger`, `posiciones`, `oportunidades`, `no_operar`) | `DailyDeskInbox` |
-| 6 | Pie: «Estado: …» + copy explicativo + enlace a Oportunidades | propio |
+| #   | Bloque                                                                                | Origen               |
+| --- | ------------------------------------------------------------------------------------- | -------------------- |
+| 1   | `h1` «Hoy» + fecha/cuenta + pregunta + `MesaDatosChip`                                | propio               |
+| 2   | Acciones: `Actualizar` + menú `Avanzado` (`MesaHoyDetailsMenu`)                       | propio               |
+| 3   | Aviso de error al consultar incidentes                                                | propio               |
+| 4   | Sección de incidentes (banner + frase + enlace a Consola)                             | `MesaIncidentBanner` |
+| 5   | Inbox de cuatro cubos (`requiere_accion`, `oportunidades`, `posiciones`, `no_operar`) | `DailyDeskInbox`     |
+| 6   | Pie: «Estado: …» + copy explicativo + enlace a Oportunidades                          | propio               |
 
-**Problema de lectura:** el estado operativo —el hecho que decide si hoy se puede operar— vive en el
-**pie**, debajo de todo lo demás, mientras la cabecera no lo declara. Es el único hecho de primer
-nivel que está en el sitio equivocado (`UI5-01`, `RT-01`).
+**Problema de lectura 1:** el estado operativo —el hecho que decide si hoy se puede operar— vive
+en el **pie**, debajo de todo lo demás, mientras la cabecera no lo declara. Es el único hecho de
+primer nivel que está en el sitio equivocado (`UI5-01`, `RT-01`).
+
+**Problema de lectura 2:** en `?view=posiciones`, la vista pinta **dos `h2` con el mismo rótulo**
+«Posiciones» —`MesaPositionsSummary` (lista con una acción por posición) y `MesaLibroPanel`
+(protección · cifras · pendientes)—, de modo que el mismo nombre designa dos secciones distintas
+(`UI5-04`, `UI5-20`).
 
 ### 1.2 `AUTO · Resumen` — `apps/web/src/features/auto/auto-home-page.tsx`
 
-| # | Bloque | `data-testid` |
-| --- | --- | --- |
-| 1 | Estado del motor | `auto-home-state` |
-| 2 | Oportunidades (TOP3 compacto) | `auto-home-opportunities` |
-| 3 | Decisión de cartera (hueco declarado) | `auto-home-decision` |
-| 4 | Por qué no operó (HOLD) | `auto-home-silence` |
-| 5 | Operación (contador + tarjetas) | `auto-home-operations` |
-| 6 | Dinero (cifras) | `auto-home-account-figures` |
-| 7 | `<details>` «Ver actividad» | `auto-home-activity` |
+| #   | Bloque                                | `data-testid`               |
+| --- | ------------------------------------- | --------------------------- |
+| 1   | Estado del motor                      | `auto-home-state`           |
+| 2   | Oportunidades (TOP3 compacto)         | `auto-home-opportunities`   |
+| 3   | Decisión de cartera (hueco declarado) | `auto-home-decision`        |
+| 4   | Por qué no operó (HOLD)               | `auto-home-silence`         |
+| 5   | Operación (contador + tarjetas)       | `auto-home-operations`      |
+| 6   | Dinero (cifras)                       | `auto-home-account-figures` |
+| 7   | `<details>` «Ver actividad»           | `auto-home-activity`        |
 
 **Problema de lectura:** (3) y (4) son **la misma pregunta** —¿por qué no hay una compra?— partida
 en dos bloques consecutivos, y (5) y (6) son **la misma pregunta** —¿qué tengo en marcha?— también
@@ -50,10 +55,10 @@ partida. Siete bloques para cinco hechos (`UI5-04`, `RT-03`).
 
 ### 1.3 `AUTO · Operar` — `apps/web/src/features/auto/auto-operar-page.tsx`
 
-| # | Bloque |
-| --- | --- |
-| 1 | Oportunidades (TOP3 completo + copy + enlace a Actividad) |
-| 2 | Operaciones (lista o vacío + HOLD + enlace de diagnóstico) |
+| #   | Bloque                                                     |
+| --- | ---------------------------------------------------------- |
+| 1   | Oportunidades (TOP3 completo + copy + enlace a Actividad)  |
+| 2   | Operaciones (lista o vacío + HOLD + enlace de diagnóstico) |
 
 **Problema de lectura:** el HOLD aparece en **tres** sitios distintos según el estado (bloque de
 vacío, línea suelta con operaciones, y otra vez en `Actividad`). El mismo hecho, tres posiciones.
@@ -64,23 +69,42 @@ vacío, línea suelta con operaciones, y otra vez en `Actividad`). El mismo hech
 
 ```text
 Hoy · 28 oct 2026 · <cuenta> — ¿Qué requiere mi atención?
-[Datos al día/día de baja calidad]        [Estado: ENTRADA PERMITIDA] [Actualizar] [Avanzado]
+[Datos al día/día de baja calidad]   [Estado: ENTRADA PERMITIDA] [Actualizar] [Avanzado]
 
 ⚠ incidentes (solo si hay; banner + frase + Consola)
 
-🔴 Requiere tu acción      (n)     ← propuestas a firmar, con chip SEMI · SIMULADO
-🟠 Proteger                (n)
-🟢 Posiciones              (n)
-🔵 Oportunidades           (n)
-⚪ Sin acción              (n)
+🔴 Requiere atención   (n)  ← cubo donde se firma: chip SEMI · SIMULADO
+🔵 Oportunidades       (n)
+🟢 Posiciones          (n)
+⚪ Sin acción          (n)
 
-[Oportunidades (n) →]  [Posiciones →]
+[Posiciones →]  [Oportunidades (n) →]
 ```
 
+- El **orden de los cubos no cambia**: lo fija `DAILY_DESK_BUCKET_ORDER` en `@bolsa/shared`
+  (`requiere_accion → oportunidades → posiciones → no_operar`) y lo verifica
+  `daily-desk-inbox.test.ts` (`UI5-01`). `proteger` existe como etiqueta, pero **no** es cubo de
+  chrome.
 - El **estado operativo** sube del pie a la cabecera como chip de información (no interactivo).
 - El **pie** se queda solo con los enlaces cruzados; desaparece el copy que repetía lo que ya dicen
   los cubos.
 - **No** se añaden pestañas: el mecanismo único de profundidad sigue siendo `Avanzado` (`RT-04`).
+
+### 2.1b `Hoy · ?view=posiciones` (segundo nivel)
+
+```text
+← Volver a Hoy
+Posiciones                                   [Ver en Cartera]
+  · AAPL · reducir · P&L · siguiente acción · chip AUTO/SEMI
+
+Plan y pendientes            [protección · Historial · No operar hoy]
+  abiertas · patrimonio · P&L no realizado
+  Posiciones y pendientes  (tabla)
+```
+
+- **Un solo `h2` «Posiciones»**: el bloque de detalle pasa a `Plan y pendientes`, porque su sujeto
+  real es la protección y las órdenes pendientes, no la lista.
+- Sin ruta nueva ni `?view=` nuevo: la vista ya existe y la alcanzan el pie de `Hoy` y «Avanzado».
 
 ### 2.2 `AUTO · Resumen`
 
@@ -137,25 +161,26 @@ el modo (`UI5-17`, `UI5-21`); el CTA sigue siendo el mismo botón que abre Confi
 
 ## 4. Matriz de no-cambios
 
-| Elemento | Se conserva |
-| --- | --- |
-| Rutas y `?view=` | Idénticas (`/mesa`, `?view=posiciones|oportunidades|decisiones|journal`) |
-| `AUTO_NAV` y sus cuatro puertas | Idénticas (`UI5-03`) |
-| `data-testid` existentes | Todos, para no romper `web` ni E2E |
-| Estados de ausencia | `queryCollectionState`, `CollectionAbsence`, `MeasurementValue` intactos (`UI5-14`, `UI5-16`) |
-| Nivel 1 sin jerga | `first-level-gate.ts` sigue verde (`R-G1`) |
-| Un solo `h1` por pantalla | `heading-order` sigue verde |
-| Modo de operativa | Se sigue cambiando **solo** en `demo-book-mode-panel` |
+| Elemento                        | Se conserva                                                                                   |
+| ------------------------------- | --------------------------------------------------------------------------------------------- | ------------- | ---------- | --------- |
+| Rutas y `?view=`                | Idénticas (`/mesa`, `?view=posiciones                                                         | oportunidades | decisiones | journal`) |
+| `AUTO_NAV` y sus cuatro puertas | Idénticas (`UI5-03`)                                                                          |
+| `data-testid` existentes        | Todos, para no romper `web` ni E2E                                                            |
+| Orden de los cubos de `Hoy`     | `DAILY_DESK_BUCKET_ORDER` (`@bolsa/shared`), verificado por `UI5-01`                          |
+| Estados de ausencia             | `queryCollectionState`, `CollectionAbsence`, `MeasurementValue` intactos (`UI5-14`, `UI5-16`) |
+| Nivel 1 sin jerga               | `first-level-gate.ts` sigue verde (`R-G1`)                                                    |
+| Un solo `h1` por pantalla       | `heading-order` sigue verde                                                                   |
+| Modo de operativa               | Se sigue cambiando **solo** en `demo-book-mode-panel`                                         |
 
 ## 5. Riesgos y gates
 
-| Riesgo | Mitigación |
-| --- | --- |
-| Mover un bloque y duplicar un hecho (`UI5-04`) | Cada hecho se pinta una vez; el test de la superficie lo fija |
+| Riesgo                                               | Mitigación                                                                     |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Mover un bloque y duplicar un hecho (`UI5-04`)       | Cada hecho se pinta una vez; el test de la superficie lo fija                  |
 | Añadir un segundo mecanismo de profundidad (`RT-04`) | No se añaden pestañas; el disclosure sigue siendo `Avanzado` / «Ver actividad» |
-| Romper tests por `data-testid` | Los `data-testid` se conservan; solo cambia su contenedor |
-| Introducir jerga en primer nivel (`R-G1`) | `first-level-gate` + revisión de los literales nuevos |
-| Cambiar comportamiento por «limpiar» | No se tocan queries, handlers ni payloads; solo JSX de presentación |
+| Romper tests por `data-testid`                       | Los `data-testid` se conservan; solo cambia su contenedor                      |
+| Introducir jerga en primer nivel (`R-G1`)            | `first-level-gate` + revisión de los literales nuevos                          |
+| Cambiar comportamiento por «limpiar»                 | No se tocan queries, handlers ni payloads; solo JSX de presentación            |
 
 ## 6. Checkpoint
 

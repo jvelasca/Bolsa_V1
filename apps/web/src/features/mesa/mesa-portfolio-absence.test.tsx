@@ -152,4 +152,21 @@ describe("Mesa · P2-04 · cifras ausentes del Libro", () => {
     expect(screen.queryByText("—")).toBeNull();
     expect(panel).not.toHaveTextContent("0.00");
   });
+
+  it("UI5-04: el detalle no repite el rótulo «Posiciones» de la lista", () => {
+    render(
+      <MemoryRouter>
+        <MesaLibroPanel summary={summaryWithoutFigures} />
+      </MemoryRouter>,
+    );
+
+    // En `?view=posiciones` conviven la lista (`MesaPositionsSummary`) y este detalle:
+    // si ambos se titulan «Posiciones», el mismo nombre designa dos secciones.
+    const headings = screen.getAllByRole("heading", { level: 2 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0]?.textContent).toBe("Plan y pendientes");
+    expect(
+      screen.queryByRole("heading", { level: 2, name: "Posiciones" }),
+    ).toBeNull();
+  });
 });

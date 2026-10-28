@@ -40,9 +40,12 @@ export function MesaLibroPanel({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">Posiciones</h2>
+          {/* `UI5-04` — la vista `?view=posiciones` ya tiene su `h2 «Posiciones»`
+              (resumen con una acción por posición); este bloque es el nivel de detalle
+              (protección · cifras · pendientes), así que no repite el mismo rótulo. */}
+          <h2 className="text-base font-semibold">Plan y pendientes</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Plan persistido y pendientes — CTAs encolan Confirm
+            Protección, cifras y órdenes pendientes · CTAs encolan Confirm
             {accountName ? ` · ${accountName}` : ""}
           </p>
         </div>
