@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { LedgerEntryDto, TransactionDto } from "@bolsa/shared";
-import { formatLedgerEntryLabel } from "@bolsa/shared";
+import { formatLedgerEntryLabel, ledgerAmountTone } from "@bolsa/shared";
 import {
   Card,
   CardContent,
@@ -62,45 +62,53 @@ function MovementsTable({ entries }: { entries: LedgerEntryDto[] }) {
           </tr>
         </thead>
         <tbody>
-          {entries.map((entry) => (
-            <tr
-              key={entry.id}
-              className="border-b border-border/50 hover:bg-accent/20"
-            >
-              <td className="px-2 py-2 whitespace-nowrap text-xs text-muted-foreground">
-                {formatDateTime(entry.executedAt)}
-              </td>
-              <td className="px-2 py-2">
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase">
-                  {movementTypeLabel(entry)}
-                </span>
-              </td>
-              <td className="px-2 py-2 text-xs">
-                {entry.symbol && (
-                  <span className="font-medium">{entry.symbol}</span>
-                )}
-                {entry.quantity != null && entry.price != null && (
-                  <span className="ml-1 text-muted-foreground">
-                    {entry.quantity} × {formatPrice(entry.price)}
-                  </span>
-                )}
-                {entry.description && (
-                  <p className="text-muted-foreground">{entry.description}</p>
-                )}
-              </td>
-              <td
-                className={cn(
-                  "px-2 py-2 text-right tabular-nums",
-                  entry.amount >= 0 ? "text-emerald-400" : "text-red-400",
-                )}
+          {entries.map((entry) => {
+            // P1-04 — el tono declara el papel del movimiento (coste / entrada /
+            // neutral); el importe conserva su signo, el color no lo recalcula.
+            const tone = ledgerAmountTone(entry);
+            return (
+              <tr
+                key={entry.id}
+                className="border-b border-border/50 hover:bg-accent/20"
               >
-                {formatPrice(entry.amount)} {entry.currency}
-              </td>
-              <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
-                {formatPrice(entry.balanceAfter)}
-              </td>
-            </tr>
-          ))}
+                <td className="px-2 py-2 whitespace-nowrap text-xs text-muted-foreground">
+                  {formatDateTime(entry.executedAt)}
+                </td>
+                <td className="px-2 py-2">
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase">
+                    {movementTypeLabel(entry)}
+                  </span>
+                </td>
+                <td className="px-2 py-2 text-xs">
+                  {entry.symbol && (
+                    <span className="font-medium">{entry.symbol}</span>
+                  )}
+                  {entry.quantity != null && entry.price != null && (
+                    <span className="ml-1 text-muted-foreground">
+                      {entry.quantity} × {formatPrice(entry.price)}
+                    </span>
+                  )}
+                  {entry.description && (
+                    <p className="text-muted-foreground">{entry.description}</p>
+                  )}
+                </td>
+                <td
+                  data-tone={tone}
+                  className={cn(
+                    "px-2 py-2 text-right tabular-nums",
+                    tone === "cost" && "text-red-400",
+                    tone === "in" && "text-emerald-400",
+                    tone === "neutral" && "text-foreground",
+                  )}
+                >
+                  {formatPrice(entry.amount)} {entry.currency}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
+                  {formatPrice(entry.balanceAfter)}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

@@ -12,7 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { formatLedgerEntryLabel } from "@bolsa/shared";
+import { formatLedgerEntryLabel, ledgerAmountTone } from "@bolsa/shared";
 import {
   Card,
   CardContent,
@@ -280,32 +280,39 @@ function RecentLedgerCard() {
         )}
         {entries.length > 0 && (
           <ul className="space-y-2 text-sm">
-            {entries.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex items-center justify-between gap-2 border-b border-border/60 pb-2 last:border-0"
-              >
-                <span className="min-w-0 truncate">
-                  <span className="font-medium">
-                    {formatLedgerEntryLabel(entry)}
-                  </span>
-                  {entry.symbol ? (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {entry.symbol}
-                    </span>
-                  ) : null}
-                </span>
-                <span
-                  className={cn(
-                    "shrink-0 tabular-nums",
-                    entry.amount >= 0 ? "text-emerald-400" : "text-red-400",
-                  )}
+            {entries.map((entry) => {
+              // P1-04 — coste/entrada/neutral por papel del asiento.
+              const tone = ledgerAmountTone(entry);
+              return (
+                <li
+                  key={entry.id}
+                  className="flex items-center justify-between gap-2 border-b border-border/60 pb-2 last:border-0"
                 >
-                  {formatPrice(entry.amount)}
-                </span>
-              </li>
-            ))}
+                  <span className="min-w-0 truncate">
+                    <span className="font-medium">
+                      {formatLedgerEntryLabel(entry)}
+                    </span>
+                    {entry.symbol ? (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {entry.symbol}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span
+                    data-tone={tone}
+                    className={cn(
+                      "shrink-0 tabular-nums",
+                      tone === "cost" && "text-red-400",
+                      tone === "in" && "text-emerald-400",
+                      tone === "neutral" && "text-foreground",
+                    )}
+                  >
+                    {formatPrice(entry.amount)}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>

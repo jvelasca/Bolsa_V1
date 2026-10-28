@@ -106,6 +106,45 @@ export function formatLedgerEntryLabel(entry: {
   return CASH_MOVEMENT_LABELS[classifyCashMovement(entry)] ?? entry.type;
 }
 
+/**
+ * Signo visual de un asiento del libro mayor para el primer nivel (P1-04).
+ *
+ * El color no puede salir de `amount >= 0`: una **comisión** con importe negativo
+ * se pintaba igual que una compra (ambas rojas/verdes según el signo), y una
+ * **compra** (salida de caja) no es una pérdida. El tono declara el papel del
+ * movimiento en el patrimonio:
+ *
+ * - `cost` — coste explícito o salida de capital: comisión, custodia, retirada.
+ * - `in` — entrada de capital o rendimiento: venta, dividendo, ingreso/depósito.
+ * - `neutral` — movimiento sin juicio de resultado: compra, transferencia, ajuste.
+ *
+ * El importe conserva su signo: el tono es color, no aritmética.
+ */
+export type LedgerAmountTone = "cost" | "in" | "neutral";
+
+export function ledgerAmountTone(entry: {
+  type: LedgerEntryType;
+  referenceType: string | null;
+  amount: number;
+}): LedgerAmountTone {
+  if (entry.referenceType === "custody") return "cost";
+  // Una transferencia mueve efectivo entre carteras: no entra ni sale capital.
+  if (entry.referenceType === "transfer") return "neutral";
+  switch (entry.type) {
+    case "fee":
+    case "withdrawal":
+      return "cost";
+    case "sell":
+    case "dividend":
+    case "deposit":
+      return "in";
+    case "buy":
+      return "neutral";
+    default:
+      return "neutral";
+  }
+}
+
 /** Breve explicación del movimiento para la UI de ayuda contextual. */
 export function ledgerEntryHint(entry: {
   type: LedgerEntryType;

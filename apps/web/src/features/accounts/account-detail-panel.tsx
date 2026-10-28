@@ -20,7 +20,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { createIdempotencyKey } from "@bolsa/shared";
 import type { InvestmentAccountDto, LedgerEntryDto } from "@bolsa/shared";
-import { formatLedgerEntryLabel, ledgerEntryHint } from "@bolsa/shared";
+import {
+  formatLedgerEntryLabel,
+  ledgerAmountTone,
+  ledgerEntryHint,
+} from "@bolsa/shared";
 import {
   Card,
   CardContent,
@@ -713,6 +717,8 @@ export function AccountDetailPanel({
 
 export function LedgerMovementRow({ entry }: { entry: LedgerEntryDto }) {
   const hint = ledgerEntryHint(entry);
+  // P1-04 — coste/entrada/neutral por papel del asiento, no por signo del importe.
+  const tone = ledgerAmountTone(entry);
   return (
     <li
       className="flex items-start justify-between gap-3 border-b border-border/40 py-2"
@@ -747,9 +753,11 @@ export function LedgerMovementRow({ entry }: { entry: LedgerEntryDto }) {
         )}
       </div>
       <span
+        data-tone={tone}
         className={cn(
           "shrink-0 tabular-nums",
-          entry.amount >= 0 ? "text-success" : "text-destructive",
+          tone === "cost" && "text-destructive",
+          tone === "in" && "text-success",
         )}
       >
         {formatPrice(entry.amount)}
