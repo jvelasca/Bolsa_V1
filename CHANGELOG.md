@@ -2,6 +2,54 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.169-beta] — **la matriz de regresión de fechas ISO imposibles queda simétrica** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · `Δ contrato HTTP = 0` · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** sello de **seguimiento** posterior a `2.11.168-beta`. No abre frente funcional:
+cierra la única observación que dejó abierta la auditoría externa del commit `3f25b2b2` sobre el
+defecto de normalización de fechas ISO imposibles —hallazgo **P2 de fechas**, ya **cerrado** en ese
+commit—. **`Δ motor = 0`** (ninguna regla, indicador ni umbral cambia) · **`Δ decisión = 0`** (no se
+decide distinto) · **AUTO OFF** · **`Δ contrato HTTP = 0`** (`contract:check` verde;
+`openapi.json`/`schema.d.ts` sin tocar) · **SIN migración nueva** (`head` sigue
+`058_estudio_daily_proposals`) · **bump** `2.11.168-beta` → `2.11.169-beta` (+ `meta.bump` de los
+**13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**). **El único cambio de código de producto
+es test-only**: la implementación del sello anterior se conserva íntegra.
+
+**W-169-1 · la cobertura deja de ser asimétrica.** La corrección de `3f25b2b2` es correcta y
+compartida —`hasIsoDayPrefix` + `isoDay` hacen que `formatHoldInstant` y `formatHoldBarDay` conserven
+crudo el sello con forma ISO y día imposible en vez de pintar el día que `new Date` habría
+inferido—, pero la **matriz de regresión** no lo era: `formatHoldInstant` sólo probaba febrero
+(`2026-02-31`), mientras que abril (`2026-04-31`) aparecía únicamente en las pruebas de
+`formatHoldBarDay`. La implementación ya rechazaba abril por el mismo camino, así que el hueco era de
+cobertura, no de comportamiento: una regresión futura que sólo rompiera abril en `formatHoldInstant`
+no habría hecho fallar ninguna prueba. Se añade el caso
+`un mes de 30 días no se desborda al mes siguiente` con tres asertos: el sello con hora
+(`2026-04-31T00:00:00Z`) se devuelve **byte a byte**, el sello de sólo día (`2026-04-31`) se conserva
+crudo, y un **control negativo** exige que el texto no contenga `may` —si una regresión volviera a
+delegar en `new Date`, la prueba falla por el valor esperado **y** por el control—. La matriz queda
+simétrica: febrero y abril, con hora y sin hora, en **las dos** funciones de formato.
+
+**Verificación (medida, dirigida por decisión del propietario):** `vitest run
+auto-hold-declarations` **49 passed / 2 ficheros** (`auto-hold-declarations.test.ts` **35**,
+`auto-hold-declarations-panel.test.tsx` **14**) · `pnpm --filter @bolsa/web typecheck` **OK** ·
+`pnpm --filter @bolsa/web lint` **0 errores** (23 avisos preexistentes) · `pytest
+test_dia_d_bump_guard.py` **2 passed** · `pnpm window:test` **50 passed** · `pnpm contract:check`
+**OK**. Las suites completas (`web`, `shared`, `pytest`) las ejecuta el `Release tag CI` del tag y su
+resultado se cita en el audit pack §4; este documento **no** adelanta cifras que no se hayan medido.
+
+**Continuidad publicada.** `2.11.166-beta`, `2.11.167-beta` y `2.11.168-beta` viajan en el árbol con
+su `CHANGELOG`, su evidencia y sus commits, pero **no se publicaron como tag ni como audit pack**: el
+último tip certificado antes de este sello es `v2.88.165-beta`. Este sello es el primero con tag desde
+entonces y **no** retrocertifica ese bloque; lo incluye como árbol, con sus pruebas y su evidencia. El
+pin PAPER se re-ancla al árbol del sello **antes** del tag (el bump mueve `apps`), de modo que
+`window:freeze` corre **fail-closed** sobre el árbol correcto y los días anteriores quedan **`STALE`**.
+
+**Límites:** AUTO **OFF**, operativa **100 % PAPER virtual**, ventana **`INCONCLUSIVE`**
+(`episodios 0/2`, `ciclos 0/32`): este sello **no la mueve** ni **demuestra rentabilidad**; la prueba
+fija el **formato**, no la fuente —que un `barTimestamp` llegue imposible es un defecto del
+productor—; añadir abril a `formatHoldInstant` **no** amplía el alcance de `withoutBarDay`. Detalle:
+[`docs/engineering/evidence/v2.88.169/README.md`](docs/engineering/evidence/v2.88.169/README.md) y
+[`docs/engineering/audit-pack-v2.88.169-beta-2026-10-28.md`](docs/engineering/audit-pack-v2.88.169-beta-2026-10-28.md).
+
 ## [2.11.168-beta] — **el monitor publica el motivo del HOLD y la UI distingue «no evaluable» de «sin señal»** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · contrato HTTP ADITIVO (`signalHolds`) · SIN migración nueva · head `058_estudio_daily_proposals`**)
 
 **Naturaleza:** tercer sello del bloque funcional posterior a `2.11.165-beta` y **cierre** del bloque.

@@ -43,6 +43,16 @@ describe("formatHoldInstant", () => {
     expect(formatHoldInstant("2026-02-31")).toBe("2026-02-31");
   });
 
+  it("un mes de 30 días no se desborda al mes siguiente", () => {
+    // `new Date("2026-04-31")` la normaliza al 1 de mayo: tampoco aquí se inventa un instante.
+    expect(formatHoldInstant("2026-04-31T00:00:00Z")).toBe(
+      "2026-04-31T00:00:00Z",
+    );
+    expect(formatHoldInstant("2026-04-31")).toBe("2026-04-31");
+    // Control negativo: el sello no se pinta con el día que `new Date` habría inferido.
+    expect(formatHoldInstant("2026-04-31T00:00:00Z")).not.toContain("may");
+  });
+
   it("sin sello no hay etiqueta (y no se rellena con la fecha de hoy)", () => {
     expect(formatHoldInstant(null)).toBeNull();
     expect(formatHoldInstant("   ")).toBeNull();
