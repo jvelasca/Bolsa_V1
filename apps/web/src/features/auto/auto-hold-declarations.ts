@@ -179,6 +179,19 @@ function hasValue(value: unknown): boolean {
   return true;
 }
 
+/** Prefijo de día ISO (`YYYY-MM-DD`), exista el día o no. */
+const ISO_DAY_PREFIX = /^(\d{4})-(\d{2})-(\d{2})/;
+
+/**
+ * `true` si el texto tiene forma de fecha ISO, aunque el día no exista (`2026-02-31`).
+ *
+ * Distingue «fecha ISO corrupta» de «otro formato de fecha»: sólo la primera se conserva cruda,
+ * porque `new Date` la normalizaría a un día distinto en lugar de rechazarla.
+ */
+function hasIsoDayPrefix(text: string): boolean {
+  return ISO_DAY_PREFIX.test(text);
+}
+
 /**
  * Día `YYYY-MM-DD` de un sello, sin desplazarlo de zona horaria.
  *
@@ -188,7 +201,7 @@ function hasValue(value: unknown): boolean {
 function isoDay(value: string | null | undefined): string | null {
   const text = nonEmpty(value);
   if (!text) return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
+  const match = ISO_DAY_PREFIX.exec(text);
   if (!match) return null;
   const year = Number(match[1]);
   const month = Number(match[2]);
@@ -206,7 +219,9 @@ function isoDay(value: string | null | undefined): string | null {
 
 /**
  * Instante legible es-ES (`dd mm yyyy, hh:mm`) para el sello de la declaración. Un sello no
- * parseable se devuelve tal cual: se prefiere el original a una fecha inventada.
+ * parseable se devuelve tal cual: se prefiere el original a una fecha inventada. Una fecha ISO
+ * con día imposible (`2026-02-31T00:00:00Z`) también se conserva cruda, porque `new Date` la
+ * normaliza al 3 de marzo en vez de rechazarla.
  */
 export function formatHoldInstant(
   value: string | null | undefined,
@@ -215,6 +230,9 @@ export function formatHoldInstant(
   if (!text) return null;
   const parsed = new Date(text);
   if (Number.isNaN(parsed.getTime())) return text;
+  // Con forma ISO, un `new Date` válido sobre un día que `isoDay` rechaza sólo puede venir de
+  // una normalización (31 de febrero -> 3 de marzo): no se pinta como si fuera un instante real.
+  if (hasIsoDayPrefix(text) && isoDay(text) === null) return text;
   return formatDateTimeCompact(parsed);
 }
 
@@ -222,6 +240,9 @@ export function formatHoldInstant(
  * Día legible de la barra (`dd mm yyyy`). Se lee el prefijo `YYYY-MM-DD` y se formatea en UTC:
  * una barra diaria no debe cambiar de día por la zona horaria del navegador. Un sello que no
  * empieza por un día válido se intenta parsear; si tampoco lo es, se conserva crudo.
+ *
+ * Un sello con forma ISO pero día imposible no se normaliza: `2026-02-31` se queda tal cual (no
+ * se convierte en el 3 de marzo). El parseo alternativo sólo cubre formatos que no son ISO.
  */
 export function formatHoldBarDay(
   value: string | null | undefined,
@@ -243,6 +264,8 @@ export function formatHoldBarDay(
       },
     );
   }
+  // Día ISO rechazado (`2026-02-31`): se conserva el sello original, sin normalizarlo.
+  if (hasIsoDayPrefix(text)) return text;
   const parsed = new Date(text);
   if (Number.isNaN(parsed.getTime())) return text;
   return formatDate(parsed);

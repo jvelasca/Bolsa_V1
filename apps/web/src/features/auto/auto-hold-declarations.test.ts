@@ -35,6 +35,14 @@ describe("formatHoldInstant", () => {
     expect(formatHoldInstant("no-es-fecha")).toBe("no-es-fecha");
   });
 
+  it("una fecha ISO imposible se conserva cruda en lugar de normalizarse", () => {
+    // `new Date("2026-02-31")` la normaliza al 3 de marzo: se prefiere el sello original.
+    expect(formatHoldInstant("2026-02-31T00:00:00Z")).toBe(
+      "2026-02-31T00:00:00Z",
+    );
+    expect(formatHoldInstant("2026-02-31")).toBe("2026-02-31");
+  });
+
   it("sin sello no hay etiqueta (y no se rellena con la fecha de hoy)", () => {
     expect(formatHoldInstant(null)).toBeNull();
     expect(formatHoldInstant("   ")).toBeNull();
@@ -62,6 +70,22 @@ describe("formatHoldBarDay", () => {
   it("un sello no parseable se conserva crudo", () => {
     expect(formatHoldBarDay("no-es-fecha")).toBe("no-es-fecha");
     expect(formatHoldBarDay("2026-13-45")).toBe("2026-13-45");
+  });
+
+  it("un día ISO imposible se conserva crudo y no se normaliza a otro día", () => {
+    // `new Date("2026-02-31")` -> 3 de marzo: nunca se pinta ese día inventado.
+    expect(formatHoldBarDay("2026-02-31")).toBe("2026-02-31");
+    expect(formatHoldBarDay("2026-02-31T00:00:00Z")).toBe(
+      "2026-02-31T00:00:00Z",
+    );
+    expect(formatHoldBarDay("2026-04-31")).toBe("2026-04-31");
+    expect(formatHoldBarDay("2026-04-31T00:00:00Z")).not.toContain("may");
+  });
+
+  it("un formato de fecha que no es ISO sigue formateándose", () => {
+    // El parseo alternativo se mantiene para sellos que no empiezan por `YYYY-MM-DD`.
+    expect(formatHoldBarDay("2026/09/30")).toContain("2026");
+    expect(formatHoldBarDay("2026/09/30")).not.toBe("2026/09/30");
   });
 
   it("sin sello no hay etiqueta", () => {
@@ -409,5 +433,40 @@ describe("buildAutoHoldDeclarations · alcance temporal", () => {
     expect(result.rows).toEqual([]);
     expect(result.excludedByDay).toBe(0);
     expect(result.withoutBarDay).toBe(1);
+  });
+
+  it("un día ISO imposible no se atribuye al día en que lo normalizaría `new Date`", () => {
+    // `2026-02-31T00:00:00Z` se normaliza al 3 de marzo: ese día no declara la vela.
+    const normalized = {
+      instrumentId: "GGG",
+      barTimestamp: "2026-02-31T00:00:00Z",
+      at: "2026-03-03T10:00:00Z",
+      reason: "no_signal",
+      facts: [],
+    };
+
+    const result = buildAutoHoldDeclarations([normalized], {
+      day: "2026-03-03",
+    });
+
+    expect(result.rows).toEqual([]);
+    expect(result.excludedByDay).toBe(0);
+    expect(result.withoutBarDay).toBe(1);
+  });
+
+  it("sin filtro, la etiqueta de una barra imposible es el sello crudo", () => {
+    const corrupted = {
+      instrumentId: "HHH",
+      barTimestamp: "2026-02-31T00:00:00Z",
+      reason: "no_signal",
+      facts: [],
+    };
+
+    const { rows, withoutBarDay } = buildAutoHoldDeclarations([corrupted]);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.barLabel).toBe("2026-02-31T00:00:00Z");
+    // Sin día explicado no hay contador de huecos (mismo criterio que el resto del read-model).
+    expect(withoutBarDay).toBe(0);
   });
 });
