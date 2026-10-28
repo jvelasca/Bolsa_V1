@@ -11,20 +11,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { formatPrice } from "@/features/charts/chart-utils";
+import { formatPriceOrAbsent } from "@/features/charts/chart-utils";
 import { OperationsPanel } from "@/features/trading/operations-panel";
 import { NoTradeSessionButton } from "@/features/operations/no-trade-session-button";
 import type { MesaProtectionKpiV1, PortfolioSummaryDto } from "@bolsa/shared";
 import { MesaProteccionKpi } from "@/features/mesa/mesa-proteccion-kpi";
+import type { CollectionReadState } from "@/components/query-absence";
 
 export function MesaLibroPanel({
   summary,
   accountName,
   protectionKpi,
+  protectionState,
 }: {
   summary: PortfolioSummaryDto | null | undefined;
   accountName?: string | null;
   protectionKpi?: MesaProtectionKpiV1 | null;
+  /** P1-06 — estado de lectura de la cartera para el KPI de protección. */
+  protectionState?: CollectionReadState;
 }) {
   const positionsCount = summary?.positions.length ?? 0;
 
@@ -44,7 +48,11 @@ export function MesaLibroPanel({
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           {protectionKpi ? (
-            <MesaProteccionKpi kpi={protectionKpi} compact />
+            <MesaProteccionKpi
+              kpi={protectionKpi}
+              compact
+              absenceState={protectionState}
+            />
           ) : null}
           <NoTradeSessionButton />
           <Link
@@ -71,7 +79,7 @@ export function MesaLibroPanel({
             <CardHeader className="pb-1">
               <CardDescription>Patrimonio</CardDescription>
               <CardTitle className="text-2xl tabular-nums">
-                {formatPrice(summary.totalEquity)}
+                {formatPriceOrAbsent(summary.totalEquity)}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -79,7 +87,7 @@ export function MesaLibroPanel({
             <CardHeader className="pb-1">
               <CardDescription>P&amp;L no realizado</CardDescription>
               <CardTitle className="text-2xl tabular-nums">
-                {formatPrice(summary.totalUnrealizedPnl)}
+                {formatPriceOrAbsent(summary.totalUnrealizedPnl)}
               </CardTitle>
             </CardHeader>
           </Card>

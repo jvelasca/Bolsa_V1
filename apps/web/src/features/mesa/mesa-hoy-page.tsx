@@ -45,6 +45,7 @@ import { MesaDatosChip } from "@/features/mesa/mesa-datos-chip";
 import { DailyDeskInbox } from "@/features/mesa/daily-desk-inbox";
 import { MesaPositionsSummary } from "@/features/mesa/mesa-positions-summary";
 import { MesaLibroPanel } from "@/features/mesa/mesa-libro-panel";
+import { queryCollectionState } from "@/components/query-absence";
 import { DecisionSpineDetailPanel } from "@/features/mesa/decision-spine-detail-panel";
 import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
 import { parseHoyView } from "@/features/mesa/mesa-hoy-view";
@@ -234,6 +235,16 @@ export function MesaHoyPage() {
   );
 
   const positions = portfolio?.positions ?? [];
+  /**
+   * P1-06 — una cartera caída no es una cartera vacía: ni «sin posiciones» ni
+   * «no hay stop que confirmar». Un `portfolio` presente con `positions` vacías
+   * sí es un cero medido.
+   */
+  const portfolioState = queryCollectionState({
+    isError: portfolioQuery.isError,
+    isLoading: portfolioQuery.isLoading,
+    count: portfolio ? portfolio.positions.length : null,
+  });
 
   const mesaFreshnessInstrumentId = positions[0]?.instrumentId ?? null;
   const mesaDataStatusQuery = useQuery({
@@ -692,11 +703,13 @@ export function MesaHoyPage() {
               studiesByInstrument={studiesMap}
               studiesByDecisionId={studiesByDecision}
               portfolioReconStatus={portfolioReconStatus}
+              portfolioState={portfolioState}
             />
             <MesaLibroPanel
               summary={portfolio}
               accountName={account?.name}
               protectionKpi={protectionKpi}
+              protectionState={portfolioState}
             />
           </div>
         ) : null}
