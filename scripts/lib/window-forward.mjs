@@ -769,10 +769,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-28 — pin del arbol re-anclado a `cc00b735`
+ * (`apps` `becfc7562883ec8c2f6ab6d5457fe1bccc15805b` / `packages` `7dafa4009de1995a7f25b191122b27d626edf5a6`).
+ * Motivo: sello v2.88.170 (cierre de los seis P1 de representacion de UI y del comodin P2-04; el bump mueve apps).
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '1f084f18',
-  appsHash: '6bdf5f25c095f3abbecf35e09fa7eb7ca541e98d',
-  packagesHash: 'ca2b288f9a3038590baa010cabc83adb8f468da0',
+  commit: 'cc00b735',
+  appsHash: 'becfc7562883ec8c2f6ab6d5457fe1bccc15805b',
+  packagesHash: '7dafa4009de1995a7f25b191122b27d626edf5a6',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
