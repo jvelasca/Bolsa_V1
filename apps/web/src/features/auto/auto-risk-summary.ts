@@ -90,7 +90,17 @@ function riskVerdict(input: {
       sentence: VERDICT_COPY.unknown,
     };
   }
-  const issues = input.fillLinkIssuesCount ?? 0;
+  // P2-02 — «Controlado» es una afirmación sobre TRES componentes: el estado
+  // operativo, el cuadre de cartera y el recuento de incidencias. Un `?? 0`
+  // convertía un recuento sin leer en «no hay incidencias activas». El hueco
+  // nunca afirma salud: si falta cualquiera de los tres, el veredicto es
+  // «Sin dato todavía». Solo las señales medidas (bloqueo, degradación,
+  // desajuste, incidencias > 0) siguen mandando, porque afirman un problema.
+  const issuesMeasured =
+    input.fillLinkIssuesCount !== null &&
+    input.fillLinkIssuesCount !== undefined;
+  const issues = issuesMeasured ? (input.fillLinkIssuesCount as number) : 0;
+  const portfolioMeasured = portfolioStatusKnown(input.portfolioStatus);
   let tone: AutoHomeRiskTone;
   if (input.stateTone === "blocked" || input.portfolioStatus === "blocked") {
     tone = "blocked";
@@ -100,7 +110,11 @@ function riskVerdict(input: {
     issues > 0
   ) {
     tone = "attention";
-  } else if (input.stateTone === "unknown") {
+  } else if (
+    input.stateTone === "unknown" ||
+    !portfolioMeasured ||
+    !issuesMeasured
+  ) {
     tone = "unknown";
   } else {
     tone = "ok";
