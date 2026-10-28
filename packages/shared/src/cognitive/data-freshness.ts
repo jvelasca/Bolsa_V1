@@ -21,6 +21,14 @@ export type DataFreshnessV1 = {
 
 export const DATA_FRESHNESS_THRESHOLD_MINUTES = 5 * 24 * 60;
 
+/**
+ * Rótulo de primer nivel para una frescura **no medida** (`unknown`/`invalid`).
+ *
+ * El comodín `—` se reserva al nivel 3: en primer nivel un hueco se declara con la frase
+ * oficial (`UI5-14`), de modo que el usuario lea «no medido» y no un guion ambiguo.
+ */
+export const DATA_FRESHNESS_ABSENT_LABEL = "Sin dato todavía";
+
 export function buildDataFreshness(input: {
   lastBarDate?: string | null;
   queryFailed?: boolean;
@@ -67,7 +75,7 @@ export function buildDataFreshness(input: {
         ageMinutes: null,
         status: "unknown",
         thresholdMinutes,
-        label: "—",
+        label: DATA_FRESHNESS_ABSENT_LABEL,
       };
     } else {
       const ts = new Date(raw);
@@ -78,7 +86,7 @@ export function buildDataFreshness(input: {
           ageMinutes: null,
           status: "invalid",
           thresholdMinutes,
-          label: "—",
+          label: DATA_FRESHNESS_ABSENT_LABEL,
         };
       } else {
         const now = input.now ?? new Date();
@@ -128,7 +136,7 @@ function applyPartialSampleLabel(
   }
   const tag = `muestra parcial (${partialSample.probed}/${partialSample.total})`;
   const label =
-    !freshness.label || freshness.label === "—"
+    !freshness.label || freshness.label === DATA_FRESHNESS_ABSENT_LABEL
       ? tag
       : `${freshness.label} · ${tag}`;
   // Una sola muestra fresca ≠ cartera fresca — no verde por omisión.

@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MesaOperationalBar } from "@/features/operations/mesa-operational-bar";
+import { api } from "@/lib/api";
 
 vi.mock("@/features/accounts/use-active-account", () => ({
   useActiveAccount: () => ({ effectiveAccountId: "acc-1" }),
@@ -169,5 +170,20 @@ describe("MesaOperationalBar P4.2", () => {
       expect(chip.textContent ?? "").toMatch(/PAPER_DEGRADED/);
     });
     expect(chip.textContent ?? "").not.toMatch(/%/);
+  });
+
+  it("P2-04 · con la cartera caída el recuento es un hueco, no «Posiciones 0»", async () => {
+    // Falsable: con `positions.length ?? 0`, un fallo de `/api/portfolio` se leía
+    // como «0 posiciones» — una medición inventada. El hueco se declara y no
+    // aparece el comodín `—`.
+    vi.mocked(api.getPortfolio).mockRejectedValueOnce(new Error("network"));
+
+    renderBar();
+    const bar = await screen.findByTestId("mesa-operational-bar");
+    await waitFor(() => {
+      expect(bar.textContent ?? "").toMatch(/Posiciones\s+Sin dato todavía/i);
+    });
+    expect(bar.textContent ?? "").not.toMatch(/Posiciones\s+0/i);
+    expect(bar.textContent ?? "").not.toContain("—");
   });
 });

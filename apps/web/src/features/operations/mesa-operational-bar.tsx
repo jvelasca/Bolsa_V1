@@ -80,7 +80,8 @@ export function MesaOperationalBar({
   const cash = summaryQuery.data?.data?.cash;
   const portfolio = portfolioQuery.data?.data;
   const board = boardQuery.data?.data;
-  const positionsCount = positionsCountProp ?? portfolio?.positions.length ?? 0;
+  // P2-04 — sin lectura de cartera el recuento es un hueco declarado, nunca `0`.
+  const positionsCount = positionsCountProp ?? portfolio?.positions.length;
   const equity = portfolio?.totalEquity ?? summaryQuery.data?.data?.totalEquity;
   const unrealized =
     portfolio?.totalUnrealizedPnl ??
@@ -156,7 +157,7 @@ export function MesaOperationalBar({
         <span className="text-muted-foreground">
           Posiciones{" "}
           <span className="font-medium tabular-nums text-foreground">
-            {positionsCount}
+            {positionsCount ?? absentDataLabel()}
           </span>
         </span>
         <div

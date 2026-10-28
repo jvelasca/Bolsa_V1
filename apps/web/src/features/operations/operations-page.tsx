@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
-import { formatPrice } from "@/features/charts/chart-utils";
+import { formatPriceOrAbsent } from "@/features/charts/chart-utils";
 import { OperationsPanel } from "@/features/trading/operations-panel";
 import { MesaOperationalBar } from "@/features/operations/mesa-operational-bar";
 import { MesaEntryQueuePanel } from "@/features/operations/mesa-entry-queue-panel";
@@ -31,7 +31,9 @@ export function OperationsPage() {
   const { entriesBlocked } = useMesaEntriesBlocked();
 
   const summary = portfolioQuery.data?.data;
-  const positionsCount = summary?.positions.length ?? 0;
+  // P2-04 — un fallo de lectura no es «0 posiciones»: el hueco viaja `undefined`
+  // hasta la barra, que declara «Sin dato todavía» en vez de inventar un cero.
+  const positionsCount = summary?.positions.length;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -78,7 +80,7 @@ export function OperationsPage() {
             <CardHeader className="pb-1">
               <CardDescription>Patrimonio</CardDescription>
               <CardTitle className="text-2xl tabular-nums">
-                {formatPrice(summary.totalEquity)}
+                {formatPriceOrAbsent(summary.totalEquity)}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -86,7 +88,7 @@ export function OperationsPage() {
             <CardHeader className="pb-1">
               <CardDescription>P&amp;L no realizado</CardDescription>
               <CardTitle className="text-2xl tabular-nums">
-                {formatPrice(summary.totalUnrealizedPnl)}
+                {formatPriceOrAbsent(summary.totalUnrealizedPnl)}
               </CardTitle>
             </CardHeader>
           </Card>

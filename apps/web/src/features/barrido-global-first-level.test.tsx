@@ -265,6 +265,8 @@ const DASH_SURFACES: string[] = [
   "features/screeners/fundamental-screener-panel.tsx",
   "features/screeners/paper-d-propose-panel.tsx",
   "features/operations/mesa-operational-bar.tsx",
+  // P2-04 — cifras de primer nivel del Libro de Operaciones (`formatPriceOrAbsent`).
+  "features/operations/operations-page.tsx",
   "features/mesa/mesa-daily-header.tsx",
   "features/mesa/mesa-what-if-panel.tsx",
   "features/mesa/operational-plan-view.tsx",

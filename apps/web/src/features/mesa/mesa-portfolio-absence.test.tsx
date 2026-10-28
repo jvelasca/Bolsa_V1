@@ -9,6 +9,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
+import type { PortfolioSummaryDto } from "@bolsa/shared";
 import { MesaProteccionKpi } from "@/features/mesa/mesa-proteccion-kpi";
 import { MesaPositionsSummary } from "@/features/mesa/mesa-positions-summary";
 import { MesaLibroPanel } from "@/features/mesa/mesa-libro-panel";
@@ -127,5 +128,28 @@ describe("Mesa · Posiciones con la cartera caída", () => {
 
     expect(screen.getByText("Sin posiciones")).toBeTruthy();
     expect(screen.queryByTestId("mesa-positions-absence")).toBeNull();
+  });
+});
+
+describe("Mesa · P2-04 · cifras ausentes del Libro", () => {
+  const summaryWithoutFigures = {
+    positions: [],
+    totalEquity: null,
+    totalUnrealizedPnl: null,
+  } as unknown as PortfolioSummaryDto;
+
+  it("patrimonio y P&L sin medir se declaran como texto, nunca con el comodín —", () => {
+    render(
+      <MemoryRouter>
+        <MesaLibroPanel summary={summaryWithoutFigures} />
+      </MemoryRouter>,
+    );
+
+    const panel = screen.getByTestId("mesa-libro-panel");
+    expect(panel).toHaveTextContent("Sin dato todavía");
+    // El comodín prohibido es el nodo de texto suelto; la prosa del panel puede
+    // usar la raya como puntuación (`— CTAs encolan Confirm`).
+    expect(screen.queryByText("—")).toBeNull();
+    expect(panel).not.toHaveTextContent("0.00");
   });
 });
