@@ -11,6 +11,7 @@ import {
   studiesByInstrumentMap,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
+import { PNL_TONE_CLASS, pnlTone } from "@/lib/pnl-tone";
 
 import { api } from "@/lib/api";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
@@ -284,7 +285,8 @@ export function OperationsPanel({
 
               <tbody>
                 {positions.map((pos) => {
-                  const pnlUp = (pos.unrealizedPnl ?? 0) >= 0;
+                  // P2-01 — sin mark observable no hay color afirmado.
+                  const pnlToneValue = pnlTone(pos.unrealizedPnl);
                   const operational = pos.operational ?? null;
                   const study = studiesMap.get(pos.instrumentId) ?? null;
                   const showRoute = mesaPositionShowsRoute(pos, study);
@@ -376,10 +378,11 @@ export function OperationsPanel({
                         </td>
 
                         <td
+                          data-testid={`ops-pnl-${pos.symbol}`}
+                          data-tone={pnlToneValue}
                           className={cn(
                             "px-2 py-1 text-right tabular-nums",
-
-                            pnlUp ? "text-emerald-400" : "text-red-400",
+                            PNL_TONE_CLASS[pnlToneValue],
                           )}
                         >
                           {formatPriceOrAbsent(pos.unrealizedPnl)}

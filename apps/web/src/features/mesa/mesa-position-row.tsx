@@ -23,6 +23,7 @@ import {
 } from "@bolsa/shared";
 import type { PositionDto } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
+import { PNL_TONE_CLASS, pnlTone } from "@/lib/pnl-tone";
 import { formatPriceOrAbsent } from "@/features/charts/chart-utils";
 import { absentDataLabel } from "@/components/absent-data";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
@@ -277,7 +278,9 @@ export function MesaPositionRow({
   portfolioReconStatus?: string | null;
 }) {
   const operational = position.operational ?? null;
-  const pnlUp = (position.unrealizedPnl ?? 0) >= 0;
+  // P2-01 — el tono solo se afirma si el P&L está medido: un `null` no es una
+  // ganancia y un `0,00 €` medido es plano, no positivo.
+  const pnlToneValue = pnlTone(position.unrealizedPnl);
   // V1.91 — stage comes from portfolio DTO (no per-row GET snapshot).
   const lifecycleStage = operational?.lifecycleStage ?? null;
   const dims = mapMesaStatusDimensions({
@@ -403,10 +406,9 @@ export function MesaPositionRow({
           {distPct != null ? ` · ${distPct}% al stop` : ""}
         </div>
         <div
-          className={cn(
-            "text-xs tabular-nums",
-            pnlUp ? "text-emerald-600 dark:text-emerald-400" : "text-red-500",
-          )}
+          data-testid={`mesa-position-pnl-${position.symbol}`}
+          data-tone={pnlToneValue}
+          className={cn("text-xs tabular-nums", PNL_TONE_CLASS[pnlToneValue])}
         >
           {formatPriceOrAbsent(position.unrealizedPnl)}
         </div>
