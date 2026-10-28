@@ -2,6 +2,95 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.170-beta] — **la UI deja de afirmar lo que no midió y lo que no se ejecutó** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · contrato HTTP ADITIVO (`tradeFeesTotal`) · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** sello de **corrección de representación** posterior a `2.11.169-beta`. Responde al
+[acta de auditoría profunda de UI operativa](docs/engineering/auditoria-ui-operativa-profunda-2026-10-28.md)
+—POST-TAG y read-only, con el tag `v2.88.169-beta` (`d31df9b3` → `3ce94048`) intacto— y cierra sus
+**seis P1** y el hallazgo del comodín **P2-04**. **`Δ motor = 0`** (ninguna regla, indicador, umbral,
+peso, sizing ni salida cambia) · **`Δ decisión = 0`** (no se decide distinto: cambia lo que la UI
+**afirma** sobre lo ya decidido) · **AUTO OFF** · **contrato HTTP ADITIVO**: `tradeFeesTotal` en
+`LedgerResponseDto`, con `openapi.json`/`schema.d.ts` regenerados y `contract:check` verde · **SIN
+migración nueva** (`head` sigue `058_estudio_daily_proposals`) · **sin tag nuevo** · **bump**
+`2.11.169-beta` → `2.11.170-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard` **2 passed**). Siete commits, uno por hallazgo, y **51 ficheros**
+(+2 381/−254).
+
+**W-170-1 · un error de lectura no es una colección vacía (P1-01).** Seis superficies colapsaban
+tres estados con `query.data ?? []`: *medido y vacío*, *no se pudo leer* y *no consta*. Las dos
+últimas no autorizan la frase «no hay nada», así que un 5xx se leía como «Sin movimientos» o «Aún no
+hay sesiones». Nuevo helper puro `apps/web/src/components/query-absence.ts` con precedencia
+**`error` > `loading` > `unavailable` > `empty` > `ready`** (un refetch fallido con datos previos
+sigue siendo `error`), `<CollectionAbsence />` para declarar el hueco, y `useInstrumentOrderPending`
+pasa a **tri-estado**: `null` = no se pudo leer, que se propaga como `reconLookupFailed` y termina
+en `unknown` —nunca en «sin orden pendiente»—. Superficies: Historial (movimientos y operaciones),
+Operativa/sesiones, Mesa/posiciones, DÍA-D/trades, Monitor/DÍA-D y Consola/incidentes.
+
+**W-170-2 · `skipped` y `unknown` no son «ejecutada» (P1-02).** `POST /api/pending-orders/:id/fill`
+devuelve seis desenlaces y **solo uno** mueve dinero. El monitor anunciaba «ejecutada @ precio» para
+todos, borraba la orden y reintentaba cada 15 s. Nuevo resolutor puro
+`features/trading/pending-order-fill.ts`: **sin `transactionId` no hay ejecución** (`executed` sin
+transacción degrada a `unknown`, igual que un estado fuera del vocabulario); solo `executed` y
+`expired` retiran la orden; `rejected_by_gate`, `skipped` y `unknown` **no** la borran, **no**
+re-lintan el enlace de mandato y **no** se reintentan en la sesión, y se invalida `pending-orders`
+para espejar la verdad del servidor. El precio se sigue rotulando como **precio límite**.
+
+**W-170-3 · las comisiones son el histórico, no la página (P1-03).** «Comisiones acumuladas» sumaba
+las filas `fee` de los 100 movimientos cargados y lo presentaba como total. El agregado pasa al
+servidor: `total_trade_fees` en `ListLedgerEntries` delega en `total_fees_for_account` (todo el
+histórico, **sin custodia**, por diseño) y viaja como campo **aditivo** `tradeFeesTotal`; la tarjeta
+se rotula **«Comisiones de operaciones (histórico)»**, pinta `0,00 €` cuando el cero está medido y
+declara `Sin dato todavía`/`No disponible` cuando no consta o la lectura falló. Prueba de
+aplicación con 150 filas y página de 100 ⇒ total completo, y prueba de render que fija que la cifra
+**no** depende del tamaño de página.
+
+**W-170-4 · el color del asiento declara su papel (P1-04).** El color salía de `amount >= 0`: una
+comisión (negativa) se pintaba como una compra y una compra (salida de caja) se leía como pérdida.
+`ledgerAmountTone` clasifica `cost` (comisión, custodia, retirada), `in` (venta, dividendo,
+ingreso/depósito) y `neutral` (compra, transferencia, ajuste); el importe **conserva su signo** —el
+tono es color, no aritmética— y la fila expone `data-tone`. Aplicado en Historial, Cartera y
+Dashboard.
+
+**W-170-5 · el universo «0» solo si se midió (P1-05).** Sin ranking, la Mesa pintaba `Universo 0`,
+`Operables 0` y el CTA acusatorio «Tu universo de análisis es pequeño»: un diagnóstico sobre el
+usuario que el sistema no había medido. La página deriva `rankingUnavailable`/`rankingLoading` y el
+panel declara el hueco, **suprimiendo** el aviso de universo pequeño y el de día de baja calidad
+mientras no haya medición. Un scan completo con `0` hits sigue diciendo `0`, porque ahí sí se midió.
+
+**W-170-6 · cartera caída ≠ «sin posiciones ni stops» (P1-06).** `positions = portfolio?.positions ??
+[]` con `open === 0` producía «Sin posiciones abiertas — no hay stop que confirmar»: una afirmación
+de **seguridad** sobre un dato que no se leyó. El KPI de protección recibe `absenceState` y en
+`error`/`loading`/`unavailable` dice «No disponible — no se pudo leer la cartera; no hay recuento de
+stops» (o «Cargando la cartera…»), el resumen de posiciones dice «No disponible» y el Libro usa
+`formatPriceOrAbsent`. `error` y `empty` siguen siendo estados **distintos**.
+
+**W-170-7 · el comodín se prueba sobre el texto renderizado (P2-04).** El gate
+`findFirstLevelDashes` lee el código fuente; un `—` compuesto o un `formatPrice(null)` no lo
+disparan. La columna **Saldo** del Historial, el **Patrimonio** y el **P&L** de Operaciones usan
+`formatPriceOrAbsent`, el recuento de posiciones viaja como hueco (`undefined`) en vez de `?? 0` —la
+barra operativa declara `Sin dato todavía`, nunca `Posiciones 0`— y la frescura de datos deja de
+rotular `unknown`/`invalid` con `—`: pasa a **`Sin dato todavía`** (constante exportada
+`DATA_FRESHNESS_ABSENT_LABEL`). Las pruebas nuevas afirman la **celda renderizada** y la ausencia del
+nodo `—`; el gate de fuente se conserva como complemento rápido.
+
+**Verificación (medida, local):** `web` **2525 passed / 335 ficheros** · `shared` **861 passed /
+100 ficheros** (+1 `todo`) · `typecheck` **4/4** · `lint` **0 errores** (23 avisos preexistentes) ·
+`contract:check` **OK** · `pytest packages/py/application/tests -k "ledger or fees"` **48 passed** ·
+`pytest apps/api-python/tests -k "ledger or tax"` **30 passed** · `test_dia_d_bump_guard` **2
+passed** · `window:test` **50 passed** · `window:freeze` **`freeze OK`** tras el re-anclaje del pin.
+Las suites completas (`web`, `shared`, `pytest`) las ejecuta el `Release tag CI`; este documento
+**no** adelanta cifras que no se hayan medido.
+
+**Límites:** AUTO **OFF**, operativa **100 % PAPER virtual**, ventana **`INCONCLUSIVE`**
+(`episodios 0/2`, `ciclos 0/32`) — este sello **no la mueve** ni **demuestra rentabilidad**; corregir
+la representación **no** corrige la fuente (un `unknown` de fill sigue siendo un desconocimiento real
+del bróker y una cartera ilegible sigue siendo ilegible); el gate `FALSE_ZERO_SURFACES` **no** se
+amplía a Mesa/Mercado/AUTO porque quedan `?? 0` de nivel 2 que alimentan cálculos, no cifras de
+primer nivel; los **P2 restantes** y los **P3** siguen abiertos y declarados; `—` sigue permitido
+como puntuación en prosa y como valor de nivel 3. Detalle:
+[`docs/engineering/evidence/v2.88.170/README.md`](docs/engineering/evidence/v2.88.170/README.md) y
+[`docs/engineering/respuesta-auditoria-ui-operativa-2026-10-28.md`](docs/engineering/respuesta-auditoria-ui-operativa-2026-10-28.md).
+
 ## [2.11.169-beta] — **la matriz de regresión de fechas ISO imposibles queda simétrica** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · `Δ contrato HTTP = 0` · SIN migración nueva · head `058_estudio_daily_proposals`**)
 
 **Naturaleza:** sello de **seguimiento** posterior a `2.11.168-beta`. No abre frente funcional:
