@@ -317,6 +317,36 @@ function describeProbe(probe: AccountProbe): string {
     : `status=${String(probe.status)}, type=${String(probe.type)}`;
 }
 
+/**
+ * Sondea hasta ver la cuenta borrada (V2.88.169).
+ *
+ * La sesión de la API comitea en la salida de su dependencia con `yield`, es decir **después** de
+ * responder: un `204` no garantiza que la fila ya no exista en la siguiente lectura. Medido en el
+ * CI del sello `v2.88.169-beta`: `DELETE` respondió `204` y un `GET` 4 ms después devolvió la
+ * cuenta todavía `closed`, lo que convertía el teardown en un rojo falso. Aquí se sondea con
+ * reintentos **acotados**: un borrado que de verdad no ocurre sigue fallando (residuo = rojo), pero
+ * una carrera de commit no se reporta como defecto de producto.
+ */
+const GONE_PROBE_ATTEMPTS = 6;
+const GONE_PROBE_DELAY_MS = 250;
+
+async function probeAccountUntilGone(
+  request: APIRequestContext,
+  baseURL: string,
+  accountId: string,
+): Promise<AccountProbe> {
+  let probe = await probeAccount(request, baseURL, accountId);
+  for (
+    let attempt = 1;
+    attempt < GONE_PROBE_ATTEMPTS && probe.kind !== "gone";
+    attempt += 1
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, GONE_PROBE_DELAY_MS));
+    probe = await probeAccount(request, baseURL, accountId);
+  }
+  return probe;
+}
+
 /** Cuentas extra del S5-07 (se crean dentro del test y se limpian en el `afterAll`). */
 const extraAccounts: string[] = [];
 
@@ -379,7 +409,9 @@ async function readDiaDArtifact(
  * 1. sondea el estado real antes de actuar (una cuenta ya borrada es el estado deseado, no un rojo);
  * 2. cierra y RE-VERIFICA (con un reintento) que quedó `closed` antes de borrar;
  * 3. borra con un reintento y, si falla, adjunta el cuerpo de la respuesta + el estado observado;
- * 4. comprueba al final que la cuenta NO sobrevive (residuo = rojo).
+ * 4. SONDEO con reintentos acotados antes de concluir: la sesión de la API comitea después de
+ *    responder, así que un `204` no prueba por sí solo que la fila ya no exista;
+ * 5. comprueba al final que la cuenta NO sobrevive (residuo = rojo, aunque tarde unos ms en verse).
  * Nunca lanza: acumula los motivos en `failures` para que el `afterAll` decida.
  */
 async function disposeEphemeralAccount(
@@ -420,15 +452,17 @@ async function disposeEphemeralAccount(
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const delRes = await request.delete(accountUrl);
-      if (delRes.ok() || delRes.status() === 404) break;
-      const detail = await delRes.text();
-      const after = await probeAccount(request, baseURL, accountId);
-      // El `400` puede llegar con el borrado YA efectivo: el sondeo manda, no el código.
+      // El `204` no es prueba de borrado: la sesión comitea al salir de la dependencia, así que
+      // se sondea con reintentos acotados antes de concluir algo (ver `probeAccountUntilGone`).
+      const after = await probeAccountUntilGone(request, baseURL, accountId);
       if (after.kind === "gone") break;
+      // El `400` puede llegar con el borrado YA efectivo: el sondeo manda, no el código.
+      const detail =
+        delRes.ok() || delRes.status() === 404
+          ? `DELETE /api/accounts/${accountId} respondió ${delRes.status()} y la cuenta sigue visible`
+          : `DELETE /api/accounts/${accountId} falló (${delRes.status()}): ${await delRes.text()}`;
       if (attempt === 2) {
-        failures.push(
-          `DELETE /api/accounts/${accountId} falló (${delRes.status()}): ${detail} [tras el intento: ${describeProbe(after)}]`,
-        );
+        failures.push(`${detail} [tras el intento: ${describeProbe(after)}]`);
         break;
       }
     }
@@ -441,7 +475,7 @@ async function disposeEphemeralAccount(
 
   // Residuo = rojo: la cuenta efímera no puede sobrevivir al teardown.
   try {
-    const finalProbe = await probeAccount(request, baseURL, accountId);
+    const finalProbe = await probeAccountUntilGone(request, baseURL, accountId);
     if (finalProbe.kind !== "gone") {
       failures.push(
         `la cuenta efímera ${accountId} sigue existiendo tras el teardown (${describeProbe(finalProbe)}).`,

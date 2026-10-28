@@ -11,8 +11,8 @@ commit—. **`Δ motor = 0`** (ninguna regla, indicador ni umbral cambia) · **`
 decide distinto) · **AUTO OFF** · **`Δ contrato HTTP = 0`** (`contract:check` verde;
 `openapi.json`/`schema.d.ts` sin tocar) · **SIN migración nueva** (`head` sigue
 `058_estudio_daily_proposals`) · **bump** `2.11.168-beta` → `2.11.169-beta` (+ `meta.bump` de los
-**13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**). **El único cambio de código de producto
-es test-only**: la implementación del sello anterior se conserva íntegra.
+**13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**). **Los dos cambios de código son
+test-only**: la implementación del sello anterior se conserva íntegra.
 
 **W-169-1 · la cobertura deja de ser asimétrica.** La corrección de `3f25b2b2` es correcta y
 compartida —`hasIsoDayPrefix` + `isoDay` hacen que `formatHoldInstant` y `formatHoldBarDay` conserven
@@ -27,6 +27,20 @@ no habría hecho fallar ninguna prueba. Se añade el caso
 crudo, y un **control negativo** exige que el texto no contenga `may` —si una regresión volviera a
 delegar en `new Date`, la prueba falla por el valor esperado **y** por el control—. La matriz queda
 simétrica: febrero y abril, con hora y sin hora, en **las dos** funciones de formato.
+
+**W-169-2 · el primer CI del tag destapó un rojo falso del teardown del S5.** El primer `Release tag
+CI` de este sello (run [`40677571486`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40677571486),
+sobre `c04b9e3c`) salió **rojo**: **12** jobs `success`, **1** `failure` (`playwright (integrated
+AUTO S5)`) y `certify` arrastrando el fallo. El log de la API lo desmiente en el orden exacto en que
+ocurrió —`DELETE /api/accounts/{id}` → **`204 No Content`** y, **4 ms** después, `GET
+/api/accounts/{id}` → **`200 OK`**—: la sesión comitea al **salir** de su dependencia con `yield`,
+o sea **después** de responder, así que el teardown del spec, que sondeaba **una vez**, trataba una
+carrera de commit como **residuo de producto**. (El mismo run tuvo además un `flaky` por el `sync`
+de **Yahoo Finance**, proveedor **externo** al repo, que devolvió `0` barras en el primer intento; ese
+punto **no** fue la causa del rojo y queda declarado como límite, no maquillado.) Corrección
+**test-only**: `probeAccountUntilGone` sondea con **reintentos acotados** (6 × 250 ms) tras cada
+`DELETE` y en la comprobación final; **no** se relaja el gate —si el borrado no ocurre, el residuo
+sigue siendo **rojo**—. Ningún cambio de producto, de contrato ni de motor.
 
 **Verificación (medida, dirigida por decisión del propietario):** `vitest run
 auto-hold-declarations` **49 passed / 2 ficheros** (`auto-hold-declarations.test.ts` **35**,

@@ -78,6 +78,16 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 **`Release tag CI` del tag:** se cita en el commit **POST-TAG** (run id, `headSha`, duración,
 `run_attempt` y artefacto `release-tag-ci-summary` con `status: GREEN`).
 
+**Intento previo (rojo, documentado y no borrado).** El tag se creó primero sobre `c04b9e3c`; su run
+[**40677571486**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40677571486) terminó en
+**`failure`** con **12** jobs `success`, **1** `failure` (`playwright (integrated AUTO S5)`) y
+`certify` arrastrando el fallo. Causa, medida en el artefacto `playwright-integrated-auto-s5-timings`:
+el teardown declaró residuo sobre una cuenta que la API **sí** había borrado —`DELETE` → `204 No
+Content`, `GET` → `200 OK` **4 ms** después— porque la sesión comitea **después** de responder. Se
+corrigió el fixture (sondeo con reintentos acotados, ver §5.8), se re-ancló el pin y el tag se movió
+al árbol corregido **antes** de citar ningún resultado verde. El mismo run tuvo un `flaky` por el
+`sync` de **Yahoo Finance** (proveedor externo, `0` barras en el primer intento), declarado en §6.
+
 **Qué bloquea el sello.** `certify` agrega exactamente **12** jobs
 (`[release-tag-ci.yml`](../../.github/workflows/release-tag-ci.yml), `needs` de `certify`):
 `security`, `shared`, `spine`, `frontend`, `python`, `playwright-mock`,
@@ -113,6 +123,11 @@ sin cambios de comportamiento; `replay-repro` debe seguir dando **`REPRODUCIDO`*
 6. **Sin migración**: `head` sigue `058_estudio_daily_proposals`.
 7. **Freeze re-anclado**: el pin PAPER se re-ancla al árbol del sello **antes** del tag, de modo que
    `window:freeze` del job `shared` corre **fail-closed** sobre el árbol correcto.
+8. **El teardown del E2E S5 no confunde una carrera de commit con un residuo.** `DELETE` responde
+   `204` y la sesión comitea **después** (dependencia con `yield`): `probeAccountUntilGone` sondea
+   con **reintentos acotados** (6 × 250 ms) y el residuo sigue siendo **rojo** si el borrado no
+   ocurre. Es **test-only**: no cambia la API ni la regla de borrado (que exige cuenta `closed` y
+   `type = simulated`, en `delete_simulated_account`).
 
 **Deltas:** `Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · sin migración.
 
@@ -129,10 +144,14 @@ sin cambios de comportamiento; `replay-repro` debe seguir dando **`REPRODUCIDO`*
 4. **La verificación local es dirigida** (vitest del módulo, `typecheck`, `lint`, guardián de bump,
    `window:test`, `contract:check`). Las suites completas las ejecuta el CI del tag; este pack cita
    **lo que el run diga**, no una estimación.
-5. **`.166`–`.168` no se retrocertifican**: entran como árbol dentro de este sello (ver §1). Si el
+5. **El E2E integrado AUTO S5 depende de un proveedor externo (Yahoo Finance).** Si el `sync` no
+   devuelve barras, el fixture lo declara como fallo de precondición **de datos** (no lo convierte en
+   `skipped`); con los reintentos de Playwright puede quedar `flaky`. El repo **no** controla ese
+   proveedor ni siembra barras sintéticas en CI para este job.
+6. **`.166`–`.168` no se retrocertifican**: entran como árbol dentro de este sello (ver §1). Si el
    auditor quiere un tip intermedio, `a982f45c` es auditable por código y pruebas, pero **sin** run
    de CI de tag.
-6. **Un CI verde no certifica una versión de producto**: certifica **este árbol** con estas pruebas.
+7. **Un CI verde no certifica una versión de producto**: certifica **este árbol** con estas pruebas.
 
 ---
 
@@ -151,6 +170,8 @@ sin cambios de comportamiento; `replay-repro` debe seguir dando **`REPRODUCIDO`*
 | 9 | El freeze del tag es OK. | `node scripts/window-pin.mjs --check` sobre el commit del tag da `TREE_MOVED`. |
 | 10 | El CI del tag es verde. | el run citado tiene algún job obligatorio en `failure`, o `certify` rojo, o el artefacto no dice `GREEN`. |
 | 11 | `.166`–`.168` no están retrocertificados. | aparece un tag `v2.88.166/167/168` en `origin` sin pack ni run citado por este documento. |
+| 12 | El teardown del S5 no tolera residuo real. | con `probeAccountUntilGone` agotado (6 × 250 ms) el `afterAll` sigue lanzando si la cuenta sobrevive a la API. |
+| 13 | El rojo del primer intento queda trazable, no borrado. | `gh api .../actions/runs/40677571486` no da `failure` sobre `c04b9e3c`, o el job S5 no aparece en `failure`. |
 
 ---
 
