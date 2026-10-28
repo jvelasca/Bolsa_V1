@@ -1,25 +1,24 @@
-# Respuesta a la auditoría de UI operativa (2026-10-28) — cierre de los seis P1 y del comodín P2-04
+# Respuesta a la auditoría de UI operativa (2026-10-28) — cierre de los seis P1, del comodín P2-04 y de P2-01/P2-02
 
-> **Naturaleza:** documento **POST-TAG** de **respuesta**. El [acta](./auditoria-ui-operativa-profunda-2026-10-28.md)
+> **Naturaleza:** documento de **respuesta**. El [acta](./auditoria-ui-operativa-profunda-2026-10-28.md)
 > **no se reescribe**: se conserva tal como se publicó en `e421186e`, con su dictamen, sus
 > referencias y sus límites. Aquí se registra, hallazgo por hallazgo, **qué cambió, con qué prueba
 > y qué queda fuera**.
 >
-> El tag `v2.88.169-beta` (`d31df9b3` → `3ce94048`) **no se mueve** y **no se reabre**; este slice
-> viaja **después** de él, sin tag nuevo. La ventana PAPER sigue **`INCONCLUSIVE`** (`0/2`, `0/32`):
-> corregir la representación **no demuestra rentabilidad**.
+> El tag `v2.88.169-beta` (`d31df9b3` → `3ce94048`) **no se mueve** y **no se reabre**: este slice
+> viaja **después** de él y se publica con su propio sello `v2.88.170-beta`. La ventana PAPER sigue
+> **`INCONCLUSIVE`** (`0/2`, `0/32`): corregir la representación **no demuestra rentabilidad**.
 
 ## 0. Alcance medido
 
 | Métrica | Valor |
 | --- | --- |
-| Commits del slice | **7** (`31974c6c`…`e7131edf`), uno por hallazgo, más el acta `e421186e` |
-| Ficheros | **51** (+2 381 / −254) desde `e421186e` |
+| Commits del slice | **9** de corrección (`31974c6c` … `81e8b9aa`), uno por hallazgo, más el acta `e421186e` |
 | `Δ contrato HTTP` | **ADITIVO**: `tradeFeesTotal` en `LedgerResponseDto` (P1-03) |
 | `Δ motor` / `Δ decisión` | **0** — ninguna regla, umbral, peso, sizing ni salida cambia |
 | Migración | **ninguna** (`head` sigue `058_estudio_daily_proposals`) |
 | Bump | `2.11.169-beta` → `2.11.170-beta` (+ **13** `meta.bump`; guardián **2 passed**) |
-| TAG | **sin tag nuevo**; `v2.88.169-beta` intacto |
+| TAG | `v2.88.170-beta` (anotado); `v2.88.169-beta` intacto |
 
 ## 1. P1-01 · un error de lectura no es una colección vacía
 
@@ -189,31 +188,77 @@ exactamente `Sin dato todavía` y no hay nodo `—`; con saldo medido se conserv
 (`TechnicalDetail`); las aserciones buscan el nodo de texto suelto (`queryByText("—")`), no la raya
 dentro de una frase.
 
-## 8. Verificación medida (local, sobre este árbol)
+## 8. P2-01 · un P&L no medido no se colorea como ganancia
+
+**Causa.** `(unrealizedPnl ?? 0) >= 0` decidía el color en `mesa/mesa-position-row.tsx`,
+`trading/operations-panel.tsx` y `mesa/mesa-daily-header.tsx`. `unrealizedPnl` es `null` cuando la
+posición no tiene mark observable, así que un hueco y un `0,00 €` medido se leían igual y ambos
+salían **verdes**. El texto ya declaraba el hueco (`formatPriceOrAbsent`), pero el color —la lectura
+dominante en una tabla de dinero— afirmaba lo contrario.
+
+**Cambio.**
+
+- Helper puro `apps/web/src/lib/pnl-tone.ts`: `pnlTone(value)` → `positive` | `negative` |
+  `neutral`, con `null`/`undefined`/`NaN`/`±Infinity` y **cero exacto** en `neutral`; y
+  `PNL_TONE_CLASS` con `neutral` en color de primer plano apagado (ni verde ni rojo).
+- Las tres superficies pintan con `PNL_TONE_CLASS[pnlTone(...)]` y exponen `data-tone` para que la
+  prueba no dependa de clases de Tailwind. El importe **conserva su signo y su formato**: el tono es
+  color, no aritmética.
+
+**Prueba.** `pnl-tone.test.ts` (tabla de valores), `mesa-position-row.test.tsx` (bloque P2-01:
+`null` ⇒ `Sin dato todavía` + `neutral` sin verde, `0` ⇒ `neutral`, `±50` ⇒ su signo),
+`mesa-daily-header-pnl-tone.test.tsx` y `operations-panel-pnl-tone.test.tsx` (render con la cartera
+mockeada: `unrealizedPnl: null` ⇒ `neutral`, `-12,5` ⇒ `negative`).
+
+**Límite.** Un `neutral` no distingue «no medido» de «cero medido» por color: la distinción la hace
+el **texto** (`Sin dato todavía` frente a `0.00`), que es donde la vara `UI5-14` la exige.
+
+## 9. P2-02 · «El riesgo está controlado» exige sus tres componentes medidos
+
+**Causa.** `auto/auto-risk-summary.ts` hacía `const issues = fillLinkIssuesCount ?? 0`; con el
+estado operativo sano y el cuadre de cartera sano, un recuento de incidencias **sin leer** caía en el
+veredicto `ok` y emitía «El riesgo está controlado. No hay bloqueos ni incidencias activas». El
+propio helper ya sabía declarar el hueco en la **celda** (`fillLinkIssuesAvailable`), pero no en el
+**titular**, que es la afirmación de primer nivel.
+
+**Cambio.** `riskVerdict` conserva la precedencia de las señales medidas (`blocked` > `attention`) y
+añade, **antes** de `ok`, la condición de que estado, cuadre y recuento estén medidos; si falta
+cualquiera, el veredicto es `Sin dato todavía`. Una señal medida (bloqueo, degradación, desajuste,
+incidencias > 0) sigue mandando sobre el hueco de otro componente, porque afirma un problema y no
+una salud.
+
+**Prueba.** `auto-risk-summary.test.ts` (bloque P2-02): `OK`+`clean`+`null` ⇒ `Sin dato todavía` y
+la frase **no** contiene «controlado» ni «No hay»; `OK`+`null`+`0` ⇒ `Sin dato todavía`; y el caso
+medido `OK`+`clean`+`0` **sigue** siendo `Controlado` (el hueco no contagia a la afirmación
+soportada).
+
+**Límite.** El veredicto agrega tres señales; no mide el riesgo por posición, que sigue declarado
+como no materializado (`positionRiskAvailable: false`).
+
+## 10. Verificación medida (local, sobre este árbol)
 
 | Comprobación | Resultado |
 | --- | --- |
-| `pnpm --filter @bolsa/web test` | **2525 passed / 335 ficheros** |
+| `pnpm --filter @bolsa/web test` | **2539 passed / 338 ficheros** |
 | `pnpm --filter @bolsa/shared test` | **861 passed / 100 ficheros** (+1 `todo`) |
 | `pnpm typecheck` | **4/4 OK** (`tsc -b --noEmit`, sin salida) |
 | `pnpm lint` | **0 errores** / 23 avisos preexistentes |
 | `pnpm contract:check` | **OK** — `openapi.json` y `schema.d.ts` coinciden |
-| `pytest packages/py/application/tests -k "ledger or fees"` | **48 passed**, 2927 deselected |
-| `pytest apps/api-python/tests -k "ledger or tax"` | **30 passed**, 1394 deselected |
-| `pytest test_dia_d_bump_guard.py` | **2 passed** |
+| `pytest test_list_ledger_total_fees.py + test_dia_d_bump_guard.py` | **4 passed** |
+| `pytest apps/api-python/tests/integration/test_accounts.py` | **5 passed** |
 | `pnpm window:test` | **50 passed** |
 | `pnpm window:freeze` | **`freeze OK`** tras el re-anclaje del pin |
 
-Las suites completas de Python las ejecuta el CI; este documento **no** adelanta cifras que no se
-hayan medido.
+Las suites completas de Python las ejecuta el `Release tag CI`; este documento **no** adelanta
+cifras que no se hayan medido.
 
-## 9. Lo que este cierre NO hace
+## 11. Lo que este cierre NO hace
 
-- **No** emite tag nuevo ni mueve `v2.88.169-beta`; la auditoría se responde **encima** del sello.
+- **No** mueve `v2.88.169-beta`: la auditoría se responde **encima** de ese sello, que queda
+  inmóvil; el slice se publica con su propio tag `v2.88.170-beta`.
 - **No** reescribe el acta ni sus hallazgos: la trazabilidad exige que el dictamen original quede
   como estaba, con sus P1 abiertos en la fecha en que se redactó.
-- **No** cierra los P2 restantes (P2-01 verde con P&L nulo, P2-02, P2-03, P2-05…P2-12) ni los P3:
-  siguen declarados y abiertos.
+- **No** cierra los P2 restantes (P2-03, P2-05…P2-12) ni los P3: siguen declarados y abiertos.
 - **No** cambia motor, umbrales, AUTO, PAPER ni migraciones; el único Δ de contrato es el campo
   aditivo `tradeFeesTotal`.
 - **No** demuestra rentabilidad: AUTO **OFF**, operativa **100 % PAPER virtual**, ventana

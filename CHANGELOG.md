@@ -7,14 +7,14 @@ All notable releases of Bolsa V1.
 **Naturaleza:** sello de **corrección de representación** posterior a `2.11.169-beta`. Responde al
 [acta de auditoría profunda de UI operativa](docs/engineering/auditoria-ui-operativa-profunda-2026-10-28.md)
 —POST-TAG y read-only, con el tag `v2.88.169-beta` (`d31df9b3` → `3ce94048`) intacto— y cierra sus
-**seis P1** y el hallazgo del comodín **P2-04**. **`Δ motor = 0`** (ninguna regla, indicador, umbral,
-peso, sizing ni salida cambia) · **`Δ decisión = 0`** (no se decide distinto: cambia lo que la UI
-**afirma** sobre lo ya decidido) · **AUTO OFF** · **contrato HTTP ADITIVO**: `tradeFeesTotal` en
-`LedgerResponseDto`, con `openapi.json`/`schema.d.ts` regenerados y `contract:check` verde · **SIN
-migración nueva** (`head` sigue `058_estudio_daily_proposals`) · **sin tag nuevo** · **bump**
+**seis P1**, el hallazgo del comodín **P2-04** y los dos P2 que seguían contradiciendo los criterios
+de cierre (**P2-01**, **P2-02**). **`Δ motor = 0`** (ninguna regla, indicador, umbral, peso, sizing
+ni salida cambia) · **`Δ decisión = 0`** (no se decide distinto: cambia lo que la UI **afirma** sobre
+lo ya decidido) · **AUTO OFF** · **contrato HTTP ADITIVO**: `tradeFeesTotal` en `LedgerResponseDto`,
+con `openapi.json`/`schema.d.ts` regenerados y `contract:check` verde · **SIN migración nueva**
+(`head` sigue `058_estudio_daily_proposals`) · **tag anotado `v2.88.170-beta`** · **bump**
 `2.11.169-beta` → `2.11.170-beta` (+ `meta.bump` de los **13** CLIs; guardián
-`test_dia_d_bump_guard` **2 passed**). Siete commits, uno por hallazgo, y **51 ficheros**
-(+2 381/−254).
+`test_dia_d_bump_guard` **2 passed**). Nueve commits, uno por hallazgo.
 
 **W-170-1 · un error de lectura no es una colección vacía (P1-01).** Seis superficies colapsaban
 tres estados con `query.data ?? []`: *medido y vacío*, *no se pudo leer* y *no consta*. Las dos
@@ -73,11 +73,29 @@ rotular `unknown`/`invalid` con `—`: pasa a **`Sin dato todavía`** (constante
 `DATA_FRESHNESS_ABSENT_LABEL`). Las pruebas nuevas afirman la **celda renderizada** y la ausencia del
 nodo `—`; el gate de fuente se conserva como complemento rápido.
 
-**Verificación (medida, local):** `web` **2525 passed / 335 ficheros** · `shared` **861 passed /
+**W-170-8 · un P&L no medido no se colorea como ganancia (P2-01).** `(unrealizedPnl ?? 0) >= 0`
+decidía el color en la fila de posición de Mesa, en la tabla de Operaciones y en la cabecera de Hoy:
+un hueco (posición sin mark observable) y un `0,00 €` medido se leían igual y ambos salían en verde.
+Nuevo helper puro `apps/web/src/lib/pnl-tone.ts`: `pnlTone(value)` → `positive` | `negative` |
+`neutral` —`null`/`undefined`/`NaN`/`±Infinity` y **cero exacto** son `neutral`— con
+`PNL_TONE_CLASS` (el neutral no es verde). Las tres superficies exponen `data-tone` y el importe
+**conserva su signo y su formato**: el tono es color, no aritmética. Pruebas: `pnl-tone.test.ts`,
+`mesa-position-row.test.tsx`, `mesa-daily-header-pnl-tone.test.tsx` y
+`operations-panel-pnl-tone.test.tsx`.
+
+**W-170-9 · «El riesgo está controlado» exige sus tres componentes medidos (P2-02).**
+`riskVerdict` hacía `fillLinkIssuesCount ?? 0`; con el estado operativo y el cuadre de cartera sanos,
+un recuento de incidencias **sin leer** caía en `ok` y afirmaba «No hay bloqueos ni incidencias
+activas». El veredicto conserva la precedencia de las señales medidas (`blocked` > `attention`) y
+añade, antes de `ok`, la exigencia de que estado, cuadre y recuento estén medidos; si falta
+cualquiera, el veredicto es `Sin dato todavía`. El caso medido (`OK` + `clean` + `0`) **sigue** siendo
+`Controlado`: el hueco no contagia a la afirmación soportada. Prueba: `auto-risk-summary.test.ts`.
+
+**Verificación (medida, local):** `web` **2539 passed / 338 ficheros** · `shared` **861 passed /
 100 ficheros** (+1 `todo`) · `typecheck` **4/4** · `lint` **0 errores** (23 avisos preexistentes) ·
-`contract:check` **OK** · `pytest packages/py/application/tests -k "ledger or fees"` **48 passed** ·
-`pytest apps/api-python/tests -k "ledger or tax"` **30 passed** · `test_dia_d_bump_guard` **2
-passed** · `window:test` **50 passed** · `window:freeze` **`freeze OK`** tras el re-anclaje del pin.
+`contract:check` **OK** · `test_list_ledger_total_fees` + `test_dia_d_bump_guard` **4 passed** ·
+`integration/test_accounts.py` **5 passed** · `window:test` **50 passed** · `window:freeze`
+**`freeze OK`** tras el re-anclaje del pin.
 Las suites completas (`web`, `shared`, `pytest`) las ejecuta el `Release tag CI`; este documento
 **no** adelanta cifras que no se hayan medido.
 
@@ -86,8 +104,8 @@ Las suites completas (`web`, `shared`, `pytest`) las ejecuta el `Release tag CI`
 la representación **no** corrige la fuente (un `unknown` de fill sigue siendo un desconocimiento real
 del bróker y una cartera ilegible sigue siendo ilegible); el gate `FALSE_ZERO_SURFACES` **no** se
 amplía a Mesa/Mercado/AUTO porque quedan `?? 0` de nivel 2 que alimentan cálculos, no cifras de
-primer nivel; los **P2 restantes** y los **P3** siguen abiertos y declarados; `—` sigue permitido
-como puntuación en prosa y como valor de nivel 3. Detalle:
+primer nivel; los **P2 restantes** (P2-03, P2-05…P2-12) y los **P3** siguen abiertos y declarados;
+`—` sigue permitido como puntuación en prosa y como valor de nivel 3. Detalle:
 [`docs/engineering/evidence/v2.88.170/README.md`](docs/engineering/evidence/v2.88.170/README.md) y
 [`docs/engineering/respuesta-auditoria-ui-operativa-2026-10-28.md`](docs/engineering/respuesta-auditoria-ui-operativa-2026-10-28.md).
 
