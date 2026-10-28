@@ -82,6 +82,13 @@ Los siete commits anteriores (`31974c6c`…`033af182`) cierran los seis P1 y el 
 
 **Referencia de la base** `v2.88.169-beta`: `Release tag CI` [run `40680699713`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40680699713) — `success`.
 
+> **Nota sobre el commit POST-TAG (`e77246d2`).** Ese commit es **solo `docs/`** y no dispara workflows: los
+> cuatro workflows de rama filtran por `paths` (`apps/web/**`, `packages/shared/**`, `package.json`,
+> `pnpm-lock.yaml`, `turbo.json`, `eslint.config.js`, el módulo de calibración y el propio workflow; Python y
+> los demás, análogamente). La ausencia de run para ese SHA es **por diseño del filtro**, no un hueco de
+> cobertura; el objeto certificado sigue siendo `babfe228`, y su árbol de `apps`/`packages` es **idéntico**
+> al de `e77246d2` (`window:freeze` sigue `OK` con los mismos dos hashes).
+
 ---
 
 ## 5. Qué **certifica** esta versión

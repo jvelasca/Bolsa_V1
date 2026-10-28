@@ -45,6 +45,11 @@ que la identidad no depende de anotar un SHA en un documento.
 El artefacto declara `sha: "babfe228…"` y `tag: "v2.88.170-beta"`: el CI certifica **exactamente** el commit
 apuntado por el tag, no otro.
 
+**Sobre el commit POST-TAG (`e77246d2`, solo `docs/`):** no dispara ningún workflow porque los cuatro de rama
+están filtrados por `paths` y `docs/**` no está en la lista. No es un hueco de cobertura: el objeto certificado
+es `babfe228` y su árbol de `apps`/`packages` es idéntico al de `e77246d2` — `window:freeze` sigue `OK` con los
+mismos `appsHash` (`920f21c1…`) y `packagesHash` (`7dafa400…`) después del commit de docs.
+
 ## 3. Los tres criterios, uno por uno
 
 ### 3.1 Criterio 1 — ausencia de datos frente a error
