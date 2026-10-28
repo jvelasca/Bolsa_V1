@@ -217,6 +217,26 @@ class AutoMonitorHeaderDto(BaseModel):
     asOf: str
 
 
+class AutoMonitorSignalHoldDto(BaseModel):
+    """B-5 / ADR-048 — declaración durable de un HOLD de la ACTIVE con su procedencia.
+
+    ``reason`` es el motivo del vocabulario cerrado tal cual lo selló el productor
+    (``holdReason`` en ``facts``); el lector **no** lo reinterpreta. Los campos de procedencia
+    (``featureSource``/``signalWindowBars``/``warmupBars``/``gatedState``/``holdDetail``) viajan
+    como hechos con su medición y se **omiten** cuando el productor no los declaró: un hueco se
+    rotula, no se rellena.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    instrumentId: str | None = None
+    barTimestamp: str | None = None
+    at: str | None = None
+    reason: str | None = None
+    measurement: str = "UNKNOWN"
+    facts: list[AutoMonitorFactDto] = Field(default_factory=list)
+
+
 class AutoOperationalMonitorDto(BaseModel):
     """DTO canónico del monitor: header + ciclos + reservas + concurrencia + huecos."""
 
@@ -229,6 +249,9 @@ class AutoOperationalMonitorDto(BaseModel):
     header: AutoMonitorHeaderDto
     cycles: list[AutoMonitorCycleDto] = Field(default_factory=list)
     reservations: list[AutoMonitorReservationDto] = Field(default_factory=list)
+    # B-5 / ADR-048 — HOLD declarados de la ACTIVE (motivo + procedencia + estado del libro).
+    # ``[]`` = no hubo declaraciones en la ventana; NO significa «no hubo HOLD».
+    signalHolds: list[AutoMonitorSignalHoldDto] = Field(default_factory=list)
     concurrency: AutoMonitorConcurrencyDto
     # H5 — filtro por instrumento APLICADO en la lectura (eco honesto del `instrumentId`
     # solicitado); `None` = ventana global de la cuenta. Con el filtro activo y sin ciclos, el

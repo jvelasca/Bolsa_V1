@@ -1553,6 +1553,69 @@
         "title": "AutoMonitorReservationDto",
         "type": "object"
       },
+      "AutoMonitorSignalHoldDto": {
+        "description": "B-5 / ADR-048 — declaración durable de un HOLD de la ACTIVE con su procedencia.\n\n``reason`` es el motivo del vocabulario cerrado tal cual lo selló el productor\n(``holdReason`` en ``facts``); el lector **no** lo reinterpreta. Los campos de procedencia\n(``featureSource``/``signalWindowBars``/``warmupBars``/``gatedState``/``holdDetail``) viajan\ncomo hechos con su medición y se **omiten** cuando el productor no los declaró: un hueco se\nrotula, no se rellena.",
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "barTimestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bartimestamp"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/AutoMonitorFactDto"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "instrumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentid"
+          },
+          "measurement": {
+            "default": "UNKNOWN",
+            "title": "Measurement",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "AutoMonitorSignalHoldDto",
+        "type": "object"
+      },
       "AutoMonitorStepDto": {
         "properties": {
           "at": {
@@ -1667,6 +1730,13 @@
               "$ref": "#/components/schemas/AutoMonitorReservationDto"
             },
             "title": "Reservations",
+            "type": "array"
+          },
+          "signalHolds": {
+            "items": {
+              "$ref": "#/components/schemas/AutoMonitorSignalHoldDto"
+            },
+            "title": "Signalholds",
             "type": "array"
           }
         },

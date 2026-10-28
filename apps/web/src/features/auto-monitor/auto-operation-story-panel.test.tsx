@@ -798,6 +798,69 @@ describe("AutoOperationStoryPanel", () => {
       0,
     );
   });
+
+  it("separa «no evaluable» de «sin señal» en los HOLD declarados (.168)", async () => {
+    const monitor = await api.getAutoOperationalMonitor();
+    vi.mocked(api.getAutoOperationalMonitor).mockResolvedValueOnce({
+      ...monitor,
+      signalHolds: [
+        {
+          instrumentId: "AAA",
+          barTimestamp: "2026-09-30T00:00:00Z",
+          at: "2026-09-30T00:00:01Z",
+          reason: "warmup_unmeasurable",
+          measurement: "COMPLETE",
+          facts: [],
+        },
+        {
+          instrumentId: "BBB",
+          barTimestamp: "2026-09-30T00:00:00Z",
+          at: "2026-09-30T00:00:01Z",
+          reason: "no_signal",
+          measurement: "COMPLETE",
+          facts: [],
+        },
+      ],
+    });
+
+    renderPanel();
+
+    const block = await screen.findByTestId("auto-decision-silence");
+    // El titular cuenta ambos hechos por separado: una señal evaluada y un hueco.
+    expect(
+      screen.getByTestId("auto-decision-silence-headline").textContent,
+    ).toContain("1 sin señal");
+    expect(
+      screen.getByTestId("auto-decision-silence-headline").textContent,
+    ).toContain("1 HOLD no evaluable");
+
+    const items = screen.getAllByTestId("auto-decision-silence-item");
+    expect(items.map((item) => item.getAttribute("data-cause"))).toEqual([
+      "not_evaluable",
+      "no_signal",
+    ]);
+    // El hueco se nombra con su motivo, no con prosa genérica.
+    expect(items[0]?.textContent).toContain("warmup no medible");
+    expect(items[1]?.textContent).toContain("sin señal");
+
+    // El aviso sólo lista los no evaluables (uno de dos).
+    const attention = screen.getByTestId("auto-decision-silence-attention");
+    expect(attention.textContent).toContain("1 de 2");
+    expect(attention.textContent).toContain("AAA");
+    expect(attention.textContent).not.toContain("BBB");
+    expect(block.getAttribute("data-silence-headline")).toBeTruthy();
+  });
+
+  it("sin HOLD declarados no afirma «sin señal» (declara el hueco)", async () => {
+    renderPanel();
+
+    const empty = await screen.findByTestId("auto-decision-silence-empty");
+    expect(empty.textContent).toContain("no");
+    expect(empty.textContent).toContain("consta el motivo");
+    expect(screen.queryAllByTestId("auto-decision-silence-item")).toHaveLength(
+      0,
+    );
+  });
 });
 
 describe("resolveAutoOperationSelection", () => {

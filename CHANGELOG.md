@@ -2,6 +2,69 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.168-beta] — **el monitor publica el motivo del HOLD y la UI distingue «no evaluable» de «sin señal»** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · contrato HTTP ADITIVO (`signalHolds`) · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** tercer sello del bloque funcional posterior a `2.11.165-beta` y **cierre** del bloque.
+Cierra **B-5** (el HOLD se leía como un literal mudo) y **O-6** (la UI no declaraba con qué dato se
+llegó a la señal). Hasta aquí el journal ya sellaba `auto_active_strategy_hold` con motivo y
+procedencia desde `.164`, pero **nada de eso llegaba al monitor**: la UI veía `action: "HOLD"` y
+pintaba igual un HOLD porque *el motor no llegó a evaluar* y un HOLD porque *evaluó y no había
+señal*. **`Δ motor = 0`** (ninguna regla, indicador ni umbral cambia) · **`Δ decisión = 0`** (se
+publica lo que ya se decidía; no se decide distinto) · **AUTO OFF** · **SIN migración nueva** (`head`
+sigue `058_estudio_daily_proposals`) · **contrato HTTP ADITIVO**: `signalHolds` en
+`AutoOperationalMonitorDto` (`openapi.json`/`schema.d.ts` regenerados, `contract:check` verde) ·
+**bump** `2.11.167-beta` → `2.11.168-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard`).
+
+**W-168-1 · B-5 — el HOLD viaja con su motivo, sin reinterpretarlo.** `auto_operational_monitor.py`
+proyecta los eventos `auto_active_strategy_hold` del **mismo** journal del ciclo a
+`signalHolds[]` (`_signal_holds`). El `reason` sale de `payload.reasonCodes[0]` **tal cual lo selló
+el productor**: el lector no lo traduce ni lo normaliza (el vocabulario cerrado ya se validó al
+escribir). La procedencia se eleva sólo si existe (`holdDetail`, `featureSource`,
+`signalWindowBars`, `warmupBars`, `signalWindowSource`, `gatedState`, `strategyVersion`,
+`strategyPresetKey`), y cada valor viaja como hecho con su `measurement`: un hueco se declara por
+**ausencia**, nunca con un `false`/`0` de relleno. El filtro `instrumentId` de la lectura se aplica
+igual que al resto del read-model para no mezclar símbolos, y el orden es el del journal
+(determinista). `[]` **no** significa «no hubo HOLD»: significa que no consta la declaración, y así
+lo dice la UI.
+
+**W-168-2 · O-6 — el paso SIGNAL declara con qué se llegó.** `_entry_decision_step("SIGNAL", …)`
+añade a los hechos del ciclo `featureSource` (`real`/`synthetic`), `signalWindowBars`, `warmupBars`,
+`signalWindowSource` y `gatedState` **anidado con su procedencia** (ADR-048: el libro no se deriva en
+el cliente), más `holdReason`/`holdDetail` cuando la decisión fue HOLD. Todos son **aditivos** y se
+omiten sin dato: «SIGNAL reached» deja de ser un hecho sin contexto.
+
+**W-168-3 · `decision-silence.ts` — la clasificación es del vocabulario, no de la prosa.** Nuevo
+módulo en `apps/web/src/lib` con una regla explícita: se clasifica por el **literal exacto** del
+vocabulario cerrado `ACTIVE_HOLD_REASONS`. `not_evaluable` = el motor **no pudo decidir**
+(`warmup_unmeasurable`, `no_snapshot`, `evaluation_failed`, `gated_unavailable`, más
+`warmup_insufficient` reconocido por el prefijo estable de `@bolsa/shared`); `no_signal` = evaluó y no
+había señal; `active_signal_disabled` = señal apagada por configuración; `no_executable` = sin
+definición ejecutable; y **ausente o fuera del vocabulario ⇒ `unmeasured`** —no se presenta como
+causa conocida—. El titular (`decisionSilenceSummary`) **nunca** dice «sin señal» si no se evaluó
+nada: sin declaraciones dice «Sin HOLD declarados en la ventana», y si todo lo declarado es no
+evaluable dice «Ningún HOLD con señal evaluada» con el desglose.
+
+**W-168-4 · La UI pinta el hueco como hueco.** `auto-operation-story-panel.tsx` añade la tarjeta
+`auto-decision-silence` («Decisiones sin operación (HOLD declarados)»): titular honesto, una fila por
+HOLD con `data-cause` legible (`not_evaluable`/`no_signal`/…), el motivo concreto
+(«warmup no medible», «libro no legible», «sin barras»…), la barra cuando consta y un aviso ámbar que
+**sólo** lista los no evaluables («N de M no se pudieron evaluar»). Sin declaraciones, la tarjeta
+declara que **no consta el motivo** en vez de afirmar «sin señal». El HOLD **no** se asigna a ningún
+ciclo «parecido»: es un hecho de la señal, no de una operación.
+
+**Verificación (medida):** `pytest` `application` **2968 passed** (3:09, hermético: `*_db.py`
+excluidos porque su fixture conecta a PostgreSQL real) · `analytics`+`domain`+`market` **1616 passed**
+(0:32) · `api-python` (filtro `monitor or auto`) **801 passed, 623 deselected** (3:40) · `web`
+**2399 passed / 320 ficheros** · `shared` **855 passed / 99 ficheros** · `pytest`
+`test_auto_operational_monitor` **79 passed** (7 nuevos) · `decision-silence` **14 passed** ·
+`auto-operation-story-panel` **31 passed** (2 nuevos) · `contract:check` **OK** · `typecheck` **4/4
+tareas** · `lint` **0 errores** (23 avisos preexistentes) · `ruff` limpio · `mypy` **573 ficheros** ·
+guardián de bump **2 passed**. **Límites:** AUTO **OFF**, PAPER virtual, ventana **`INCONCLUSIVE`**
+(`episodios 0/2`, `ciclos 0/32`); publicar el motivo **no** demuestra que el motivo sea correcto —eso
+lo mide la prueba del productor, no la UI—; `signalHolds` vacío no prueba que no hubiera HOLD; el
+sello **no demuestra rentabilidad**. Detalle: [`evidence/v2.88.168`](./docs/engineering/evidence/v2.88.168/README.md).
+
 ## [2.11.167-beta] — **un solo estado `gated` y una sola semántica de salida: el libro es la fuente y la última barra se evalúa con OHLCV real** (**`Δ motor = 0` · `Δ decisión ≠ 0` sólo en la ruta de política para presets de volumen/rango y con el libro ilegible · AUTO OFF · SIN contrato HTTP · SIN migración nueva · head `058_estudio_daily_proposals`**)
 
 **Naturaleza:** segundo sello del bloque funcional posterior a `2.11.165-beta`. Cierra el frente

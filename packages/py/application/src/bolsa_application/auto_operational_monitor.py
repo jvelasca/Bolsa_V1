@@ -42,6 +42,7 @@ from bolsa_analytics.cognitive.measurement import (
     coerce_measurement,
 )
 from bolsa_application.auto_cycle_journal import cycle_decision_id
+from bolsa_application.auto_reason_codes import ACTIVE_STRATEGY_HOLD_EVENT
 from bolsa_application.auto_self_evaluation_feed import cycles_from_fills
 from bolsa_application.estudio_daily_proposals import (
     ADOPTION_ABSENT_NOT_PROPOSED,
@@ -52,6 +53,7 @@ from bolsa_application.estudio_daily_proposals import (
 )
 
 __all__ = [
+    "AUTO_ACTIVE_STRATEGY_HOLD_EVENT",
     "AUTO_CYCLE_SETTLEMENT_EVENT",
     "AUTO_ENTRY_DECISION_EVENT",
     "AUTO_ENTRY_ORDER_EVENT",
@@ -109,6 +111,12 @@ AUTO_PROTECTION_EVENT = "auto_protection_event"
 #: subir con una traza append-only por operación; el espejo ``sim_auto_positions`` es por
 #: ``(cuenta, motor, símbolo)`` y se reescribe al reutilizar el símbolo, así que no es historia.
 AUTO_POSITION_MATERIALIZED_EVENT = "auto_position_materialized"
+#: B-5 / ADR-048 — la DECLARACIÓN durable de un HOLD de la estrategia ACTIVE con su motivo
+#: (``auto_reason_codes.ACTIVE_STRATEGY_HOLD_EVENT``). Vive en el journal desde ``.164``, pero
+#: hasta este sello no llegaba al DTO: un HOLD se leía «HOLD» sin poder saber si era «no había
+#: señal», «la ventana no alcanza» o «el libro no se pudo leer». El literal NO se duplica: se
+#: re-exporta desde su dueño para que no puedan divergir.
+AUTO_ACTIVE_STRATEGY_HOLD_EVENT = ACTIVE_STRATEGY_HOLD_EVENT
 
 #: Motivos de liberación que cuentan como retirada FORZADA (no por fill materializado).
 _FORCED_RELEASE_REASONS: frozenset[str] = frozenset({"cancel", "restart", "tail_dead", "rollback"})
@@ -206,6 +214,83 @@ def _journal_for_cycle(entries: Sequence[Any], cycle_id: str) -> list[Any]:
 def _entry_payload(entry: Any) -> Mapping[str, Any]:
     payload = _get(entry, "payload")
     return payload if isinstance(payload, Mapping) else {}
+
+
+#: Claves del hecho de HOLD que se elevan al DTO tal cual (aditivas, omitidas si no hay dato).
+_HOLD_PAYLOAD_KEYS: tuple[str, ...] = (
+    "holdDetail",
+    "featureSource",
+    "signalWindowBars",
+    "warmupBars",
+    "signalWindowSource",
+    "gatedState",
+    "strategyVersion",
+    "strategyPresetKey",
+)
+
+
+def _signal_holds(
+    entries: Sequence[Any],
+    *,
+    instrument_id: str | None = None,
+    limit: int = 0,
+) -> list[dict[str, Any]]:
+    """B-5 / ADR-048 — las declaraciones de HOLD de la ACTIVE, con su motivo y procedencia.
+
+    El evento ``auto_active_strategy_hold`` existía en el journal desde ``.164`` y **no** llegaba
+    al monitor: la UI veía «HOLD» sin poder distinguir «evalué y no había señal» de «no pude
+    evaluar» ni de «no pude leer el libro». Aquí se proyecta tal cual lo selló el productor:
+
+    * ``holdReason`` sale de ``payload.reasonCodes[0]`` — el vocabulario cerrado ya se validó en
+      el productor; este lector **no** lo reinterpreta ni lo traduce.
+    * las claves de procedencia se copian sólo si existen (O-6 / ADR-048): un hueco se declara
+      por ausencia, nunca con un ``false``/``0`` de relleno.
+    * ``facts`` reutiliza ``_fact`` para que cada valor viaje con su medición y la UI no tenga que
+      inventar la etiqueta.
+
+    El orden es el del journal (determinista). ``instrument_id`` filtra la ventana cuando la
+    lectura es por instrumento; ``limit`` recorta la lista ya ordenada.
+    """
+    holds: list[dict[str, Any]] = []
+    for entry in entries:
+        if _get(entry, "event_type", "eventType") != AUTO_ACTIVE_STRATEGY_HOLD_EVENT:
+            continue
+        payload = _entry_payload(entry)
+        symbol = str(
+            payload.get("instrumentId") or _get(entry, "instrument_id", "instrumentId") or ""
+        ).strip()
+        if instrument_id and symbol != instrument_id:
+            continue
+        reasons = payload.get("reasonCodes")
+        reason = (
+            str(reasons[0]).strip()
+            if isinstance(reasons, (list, tuple)) and reasons and reasons[0] is not None
+            else ""
+        )
+        facts: list[dict[str, Any]] = []
+        if reason:
+            facts.append(_fact("holdReason", reason))
+        bar = str(payload.get("barTimestamp") or "").strip()
+        if bar:
+            facts.append(_fact("barTimestamp", bar))
+        for key in _HOLD_PAYLOAD_KEYS:
+            value = payload.get(key)
+            if isinstance(value, Mapping):
+                value = dict(value)
+            if value is None or (isinstance(value, str) and not value.strip()):
+                continue
+            facts.append(_fact(key, value))
+        holds.append(
+            {
+                "instrumentId": symbol or None,
+                "barTimestamp": bar or None,
+                "at": _iso(_parse_instant(_get(entry, "created_at", "createdAt"))),
+                "reason": reason or None,
+                "measurement": MEASUREMENT_COMPLETE if facts else MEASUREMENT_UNKNOWN,
+                "facts": facts,
+            }
+        )
+    return holds[:limit] if limit > 0 else holds
 
 
 def _cycle_opportunity_id(entries: Sequence[Any]) -> str | None:
@@ -529,6 +614,21 @@ def _entry_decision_step(
             facts.append(_fact("opportunityId", payload.get("opportunityId")))
         if payload.get("opportunityScore") is not None:
             facts.append(_fact("score", payload.get("opportunityScore")))
+        # O-6 / ADR-048 — la PROCEDENCIA de la señal que decidió el ciclo: qué dato sostuvo la
+        # feature (``real``/``synthetic``), cuántas barras se evaluaron, cuál es el warmup del
+        # preset, de dónde salió la ventana y qué estado declaró el LIBRO. Sin estos hechos,
+        # «SIGNAL reached» no decía con qué se llegó; se omiten si el productor no los selló.
+        for key in ("featureSource", "signalWindowBars", "warmupBars", "signalWindowSource"):
+            if payload.get(key) is not None:
+                facts.append(_fact(key, payload.get(key)))
+        gated = payload.get("gatedState")
+        if isinstance(gated, Mapping) and gated:
+            # El estado del libro viaja ANIDADO con su procedencia: la UI lo lee, no lo deriva.
+            facts.append(_fact("gatedState", dict(gated)))
+        for key in ("holdReason", "holdDetail"):
+            text = str(payload.get(key) or "").strip()
+            if text:
+                facts.append(_fact(key, text))
     elif step_id == "TOP_N":
         # F5 — la SELECCIÓN/ranking del ciclo. Además del ``rank`` posicional se publica el
         # score combinado, el régimen y el DESGLOSE del score de ranking (los factores que
@@ -1724,6 +1824,11 @@ def build_operational_monitor(
         )
         for row in reservations
     ]
+    # B-5 / ADR-048 — las declaraciones de HOLD de la ACTIVE con su motivo y procedencia. Se
+    # leen del MISMO journal del ciclo: es un hecho durable que ya existía y no tenía proyección.
+    # Sin ``limit`` propio (es una lista corta por ventana) y con el filtro de instrumento aplicado
+    # igual que el resto del read-model, para que filtrar no mezcle símbolos.
+    signal_holds = _signal_holds(journal, instrument_id=instrument_id)
 
     decision_entries = (
         journal if header_decision_entries is None else header_decision_entries
@@ -1772,6 +1877,9 @@ def build_operational_monitor(
         "header": header,
         "cycles": cycles,
         "reservations": reservation_views,
+        # B-5 / ADR-048 — HOLD declarados de la ACTIVE (motivo + procedencia + estado del libro).
+        # Lista vacía = no hubo declaraciones en la ventana; NO es «no hubo HOLD».
+        "signalHolds": signal_holds,
         "concurrency": concurrency,
         "filterInstrumentId": instrument_id,
         "notes": notes,

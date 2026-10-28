@@ -4885,6 +4885,33 @@ export interface components {
             /** State */
             state: string;
         };
+        /**
+         * AutoMonitorSignalHoldDto
+         * @description B-5 / ADR-048 — declaración durable de un HOLD de la ACTIVE con su procedencia.
+         *
+         *     ``reason`` es el motivo del vocabulario cerrado tal cual lo selló el productor
+         *     (``holdReason`` en ``facts``); el lector **no** lo reinterpreta. Los campos de procedencia
+         *     (``featureSource``/``signalWindowBars``/``warmupBars``/``gatedState``/``holdDetail``) viajan
+         *     como hechos con su medición y se **omiten** cuando el productor no los declaró: un hueco se
+         *     rotula, no se rellena.
+         */
+        AutoMonitorSignalHoldDto: {
+            /** At */
+            at?: string | null;
+            /** Bartimestamp */
+            barTimestamp?: string | null;
+            /** Facts */
+            facts?: components["schemas"]["AutoMonitorFactDto"][];
+            /** Instrumentid */
+            instrumentId?: string | null;
+            /**
+             * Measurement
+             * @default UNKNOWN
+             */
+            measurement: string;
+            /** Reason */
+            reason?: string | null;
+        };
         /** AutoMonitorStepDto */
         AutoMonitorStepDto: {
             /** At */
@@ -4923,6 +4950,8 @@ export interface components {
             readOnly: boolean;
             /** Reservations */
             reservations?: components["schemas"]["AutoMonitorReservationDto"][];
+            /** Signalholds */
+            signalHolds?: components["schemas"]["AutoMonitorSignalHoldDto"][];
         };
         /** AutoOpsJobCreateDto */
         AutoOpsJobCreateDto: {

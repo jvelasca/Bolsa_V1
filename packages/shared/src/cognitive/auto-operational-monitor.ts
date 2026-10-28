@@ -269,6 +269,21 @@ export type AutoMonitorHeaderV1 = {
   asOf: string;
 };
 
+/** B-5 / ADR-048 — declaración durable de un HOLD de la ACTIVE, con motivo y procedencia.
+ *
+ * `reason` es el motivo del vocabulario cerrado tal cual lo selló el productor; la UI **no** lo
+ * reinterpreta (`decision-silence.ts` lo clasifica para pintar el hueco). Los campos de
+ * procedencia viajan como hechos con su medición y `null`/ausente = no declarado.
+ */
+export type AutoMonitorSignalHoldV1 = {
+  instrumentId?: string | null;
+  barTimestamp?: string | null;
+  at?: string | null;
+  reason?: string | null;
+  measurement: string;
+  facts: AutoMonitorFactV1[];
+};
+
 export type AutoOperationalMonitorV1 = {
   key: string;
   readOnly: boolean;
@@ -277,6 +292,9 @@ export type AutoOperationalMonitorV1 = {
   header: AutoMonitorHeaderV1;
   cycles: AutoMonitorCycleV1[];
   reservations: AutoMonitorReservationV1[];
+  // B-5 / ADR-048 — HOLD declarados de la ACTIVE. `[]` = sin declaraciones en la ventana;
+  // NO es «no hubo HOLD».
+  signalHolds?: AutoMonitorSignalHoldV1[];
   concurrency: AutoMonitorConcurrencyV1;
   notes?: string[];
 };

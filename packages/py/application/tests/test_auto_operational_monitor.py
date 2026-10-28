@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from bolsa_application.auto_operational_monitor import (
+    AUTO_ACTIVE_STRATEGY_HOLD_EVENT,
     AUTO_CYCLE_SETTLEMENT_EVENT,
     AUTO_ENTRY_DECISION_EVENT,
     AUTO_ENTRY_ORDER_EVENT,
@@ -85,6 +86,10 @@ def _step(steps: list[dict[str, Any]], step_id: str) -> dict[str, Any]:
 
 def _fact(step: dict[str, Any], key: str) -> dict[str, Any]:
     return next(fact for fact in step["facts"] if fact["key"] == key)
+
+
+def _hold_fact(hold: dict[str, Any], key: str) -> dict[str, Any]:
+    return next(fact for fact in hold["facts"] if fact["key"] == key)
 
 
 def test_step_order_is_canonical() -> None:
@@ -1706,3 +1711,154 @@ def test_closed_cycle_reads_direction_and_version_from_the_entry_reservation() -
     reservation_step = _step(cycle["steps"], "RESERVATION")
     assert _fact(reservation_step, "side")["value"] == "buy"
     assert _fact(reservation_step, "reservedRisk")["value"] == 50.0
+
+
+# ── B-5 / ADR-048 — el HOLD declarado y la procedencia de la señal llegan al DTO ─────────
+
+
+def _hold_entry(
+    *,
+    reason: str = "no_signal",
+    symbol: str = "AAPL",
+    bar: str = "2026-01-02T00:00:00Z",
+    **payload_extra: Any,
+) -> Any:
+    payload: dict[str, Any] = {
+        "event": AUTO_ACTIVE_STRATEGY_HOLD_EVENT,
+        "instrumentId": symbol,
+        "action": "HOLD",
+        "reasonCodes": [reason],
+        "barTimestamp": bar,
+    }
+    payload.update(payload_extra)
+    return SimpleNamespace(
+        decision_id=f"HLD-{symbol}",
+        event_type=AUTO_ACTIVE_STRATEGY_HOLD_EVENT,
+        created_at="2026-01-02T09:00:00Z",
+        session_id="sess-a",
+        payload=payload,
+    )
+
+
+def test_the_hold_declaration_reaches_the_dto_with_its_reason() -> None:
+    """El evento existía en el journal y NO tenía proyección: el monitor no podía explicarlo."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        journal=[_hold_entry(reason="no_snapshot")],
+    )
+
+    holds = dto["signalHolds"]
+    assert len(holds) == 1
+    assert holds[0]["reason"] == "no_snapshot"
+    assert holds[0]["instrumentId"] == "AAPL"
+    assert holds[0]["barTimestamp"] == "2026-01-02T00:00:00Z"
+    assert _hold_fact(holds[0], "holdReason")["value"] == "no_snapshot"
+
+
+def test_the_hold_projection_omits_the_fields_the_producer_did_not_declare() -> None:
+    """O-6 / ADR-048: lo no medido se OMITE; un ``false`` de relleno volvería a mentir."""
+    dto = build_operational_monitor(
+        account_id="acc-1", reservations=[_reservation()], journal=[_hold_entry()]
+    )
+
+    keys = {fact["key"] for fact in dto["signalHolds"][0]["facts"]}
+    assert keys == {"holdReason", "barTimestamp"}
+    assert "gatedState" not in keys
+    assert "featureSource" not in keys
+
+
+def test_the_hold_projection_carries_the_gated_state_and_the_window() -> None:
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        journal=[
+            _hold_entry(
+                reason="gated_unavailable",
+                featureSource="real",
+                signalWindowBars=201,
+                warmupBars=201,
+                signalWindowSource="preset_warmup",
+                gatedState={"holdsLong": None, "source": "unavailable", "exitEvaluated": "last_bar"},
+                holdDetail="gated_unavailable: el libro no se pudo leer",
+            )
+        ],
+    )
+
+    hold = dto["signalHolds"][0]
+    assert _hold_fact(hold, "featureSource")["value"] == "real"
+    assert _hold_fact(hold, "signalWindowBars")["value"] == 201
+    assert _hold_fact(hold, "warmupBars")["value"] == 201
+    assert _hold_fact(hold, "signalWindowSource")["value"] == "preset_warmup"
+    assert _hold_fact(hold, "gatedState")["value"] == {
+        "holdsLong": None,
+        "source": "unavailable",
+        "exitEvaluated": "last_bar",
+    }
+    assert _hold_fact(hold, "holdDetail")["value"].startswith("gated_unavailable")
+
+
+def test_the_hold_projection_filters_by_instrument() -> None:
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        journal=[
+            _hold_entry(symbol="AAPL"),
+            _hold_entry(symbol="MSFT", bar="2026-01-02T00:00:00Z"),
+        ],
+        instrument_id="MSFT",
+    )
+
+    assert [hold["instrumentId"] for hold in dto["signalHolds"]] == ["MSFT"]
+
+
+def test_without_hold_declarations_the_list_is_empty_not_invented() -> None:
+    dto = build_operational_monitor(account_id="acc-1", reservations=[_reservation()])
+
+    assert dto["signalHolds"] == []
+
+
+def test_the_signal_step_publishes_the_provenance_of_the_decision() -> None:
+    """``SIGNAL reached`` decía con qué se llegó; ahora lo declara (u omite si no hay dato)."""
+    entry = SimpleNamespace(
+        decision_id="dec-1",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        created_at="2026-01-01T12:00:00Z",
+        session_id="sess-a",
+        payload={
+            "cycleId": "cyc-1",
+            "instrumentId": "AAPL",
+            "featureSource": "real",
+            "signalWindowBars": 201,
+            "warmupBars": 201,
+            "signalWindowSource": "preset_warmup",
+            "gatedState": {"holdsLong": False, "source": "book", "exitEvaluated": "last_bar"},
+        },
+    )
+    dto = build_operational_monitor(
+        account_id="acc-1", reservations=[_reservation()], journal=[entry]
+    )
+
+    signal = _step(dto["cycles"][0]["steps"], "SIGNAL")
+    assert _fact(signal, "featureSource")["value"] == "real"
+    assert _fact(signal, "signalWindowBars")["value"] == 201
+    assert _fact(signal, "warmupBars")["value"] == 201
+    assert _fact(signal, "signalWindowSource")["value"] == "preset_warmup"
+    assert _fact(signal, "gatedState")["value"]["holdsLong"] is False
+
+
+def test_the_signal_step_omits_the_provenance_when_the_producer_did_not_declare_it() -> None:
+    entry = SimpleNamespace(
+        decision_id="dec-1",
+        event_type=AUTO_ENTRY_DECISION_EVENT,
+        created_at="2026-01-01T12:00:00Z",
+        session_id="sess-a",
+        payload={"cycleId": "cyc-1", "instrumentId": "AAPL"},
+    )
+    dto = build_operational_monitor(
+        account_id="acc-1", reservations=[_reservation()], journal=[entry]
+    )
+
+    keys = {fact["key"] for fact in _step(dto["cycles"][0]["steps"], "SIGNAL")["facts"]}
+    assert "featureSource" not in keys
+    assert "gatedState" not in keys

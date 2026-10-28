@@ -30,6 +30,7 @@ import {
   measurementTone,
 } from "@/components/measurement-value";
 import { cn } from "@/lib/utils";
+import { absentDataLabel } from "@/components/absent-data";
 import {
   buildAutoOperationStory,
   type AutoOperationStoryExplanationIdentity,
@@ -57,6 +58,13 @@ import { buildAutoStrategyDiaDExplanation } from "@/features/auto/auto-strategy-
 import { AUTO_OPERATION_STRATEGY_NO_DATA } from "@/features/auto/auto-operation-strategy";
 import { useDiaDVerifyLaunch } from "@/features/trading/use-dia-d-verify-launch";
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
+import {
+  decisionSilenceCause,
+  decisionSilenceLabel,
+  decisionSilenceReasonLabel,
+  decisionSilenceSummary,
+  notEvaluableHolds,
+} from "@/lib/decision-silence";
 
 type DiaDFeedbackValueDto = components["schemas"]["DiaDFeedbackValueDto"];
 type DiaDFeedbackCycleDto = components["schemas"]["DiaDFeedbackCycleDto"];
@@ -236,6 +244,12 @@ export function AutoOperationStoryPanel({
   const cycles = view?.cycles ?? [];
   const cycleParam = searchParams.get("cycle");
   const hasLoaded = !isLoading && !isError && view != null;
+  // B-5 / ADR-048 — las declaraciones de HOLD de la ACTIVE, con su motivo y su procedencia.
+  // Viven fuera del ciclo porque el HOLD es un hecho de la SEÑAL, no de una operación: no se
+  // asigna ningún HOLD a un ciclo «parecido» por símbolo ni por fecha.
+  const signalHolds = view?.signalHolds ?? [];
+  const silence = decisionSilenceSummary(signalHolds);
+  const notEvaluable = notEvaluableHolds(signalHolds);
   const {
     requestedCycleId,
     selectedCycle: selected,
@@ -523,6 +537,97 @@ export function AutoOperationStoryPanel({
           ) : null}
         </CardContent>
       </Card>
+
+      {view ? (
+        <Card
+          className="rounded-xl border border-dashed border-border bg-card"
+          data-testid="auto-decision-silence"
+          data-silence-headline={silence.headline}
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">
+              Decisiones sin operación (HOLD declarados)
+            </CardTitle>
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="auto-decision-silence-headline"
+            >
+              {silence.headline}
+              {silence.detail ? ` — ${silence.detail}` : null}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {signalHolds.length === 0 ? (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="auto-decision-silence-empty"
+              >
+                Sin declaraciones en la ventana. Esto <strong>no</strong>{" "}
+                significa que el motor no haya descartado operar: significa que
+                no consta el motivo.
+              </p>
+            ) : (
+              <ul
+                className="space-y-1"
+                data-testid="auto-decision-silence-list"
+              >
+                {signalHolds.map((hold, index) => {
+                  const causeLabel = decisionSilenceLabel(
+                    decisionSilenceCause(hold.reason),
+                  );
+                  const reasonLabel = decisionSilenceReasonLabel(hold.reason);
+                  return (
+                    <li
+                      key={`${hold.instrumentId ?? "?"}-${hold.barTimestamp ?? index}-${index}`}
+                      data-testid="auto-decision-silence-item"
+                      data-instrument-id={hold.instrumentId ?? undefined}
+                      data-cause={decisionSilenceCause(hold.reason)}
+                      className="flex flex-wrap items-baseline gap-x-2 text-sm"
+                    >
+                      <span className="font-mono">
+                        {hold.instrumentId ?? absentDataLabel()}
+                      </span>
+                      <span className="font-medium">{causeLabel}</span>
+                      {reasonLabel ? (
+                        <span className="text-muted-foreground">
+                          {reasonLabel}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {absentDataLabel()}
+                        </span>
+                      )}
+                      {hold.barTimestamp ? (
+                        <span className="tabular-nums text-muted-foreground">
+                          barra {hold.barTimestamp}
+                        </span>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            {notEvaluable.length > 0 ? (
+              <p
+                className="mt-2 text-[11px] text-amber-600 dark:text-amber-400"
+                data-testid="auto-decision-silence-attention"
+              >
+                {notEvaluable.length} de {signalHolds.length} no se pudieron
+                evaluar:
+                {notEvaluable
+                  .map(
+                    (hold) =>
+                      ` ${hold.instrumentId ?? "?"} (${
+                        decisionSilenceReasonLabel(hold.reason) ??
+                        "sin motivo medido"
+                      })`,
+                  )
+                  .join(" ·")}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {selected && strategy.view ? (
         <AutoOperationStrategyCard
