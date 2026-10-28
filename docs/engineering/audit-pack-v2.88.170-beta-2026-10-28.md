@@ -26,7 +26,7 @@ git clone --branch v2.88.170-beta --depth 1 https://github.com/jvelasca/Bolsa_V1
 | **Objeto de tag** | `3e7948417c22bf9e767848331fe0d57fc2154e98` (`git cat-file -t v2.88.170-beta` ⇒ `tag`) |
 | **Commit apuntado** | `babfe228f9d81eb2b18be787465af588b5ff170b` (`chore(window): re-ancla el pin PAPER al arbol del sello 2.11.170-beta`) |
 | **Base (tag anterior)** | `v2.88.169-beta` → objeto `d31df9b3f1bfbdae9c5f15d99ddf1280d53f425a` ⇒ commit `3ce94048b45112d66eb6e3614f2e81676a41be97` (**no se mueve**) |
-| **Versión monorepo** | `2.11.170-beta` ([`package.json`](../../../package.json)) |
+| **Versión monorepo** | `2.11.170-beta` ([`package.json`](../../package.json)) |
 | **Alembic head** | `058_estudio_daily_proposals` (**sin migración**) |
 | **Firma** | **unsigned** |
 
@@ -59,13 +59,14 @@ Los siete commits anteriores (`31974c6c`…`033af182`) cierran los seis P1 y el 
 
 | # | Documento | Qué responde |
 | --- | --- | --- |
-| 1 | [`evidence/v2.88.170/README.md`](../evidence/v2.88.170/README.md) | Evidencia del sello: los nueve hallazgos, ficheros, verificación medida y límites declarados |
-| 2 | [`CHANGELOG.md` §`2.11.170-beta`](../../../CHANGELOG.md) | Nota de release: alcance, `W-170-1`…`W-170-9`, límites |
-| 3 | [`PROJECT_STATE.md`](../PROJECT_STATE.md) (AsOf `V2.88.170-beta`) | Estado vivo + agenda funcional |
-| 4 | [`respuesta-auditoria-ui-operativa-2026-10-28.md`](../respuesta-auditoria-ui-operativa-2026-10-28.md) | Causa → cambio → prueba → límite por hallazgo |
-| 5 | [`auditoria-ui-operativa-profunda-2026-10-28.md`](../auditoria-ui-operativa-profunda-2026-10-28.md) | El acta original (**no se reescribe**: se responde encima) |
-| 6 | [`auditoria-independiente-v2.88.170-beta-2026-10-28.md`](../auditoria-independiente-v2.88.170-beta-2026-10-28.md) | Contraste **desde un clon limpio del tag** y su CI, criterio por criterio |
-| 7 | [`audit-pack-v2.88.169-beta-2026-10-28.md`](../audit-pack-v2.88.169-beta-2026-10-28.md) | Sello inmediatamente anterior (inmóvil) |
+| 1 | [`evidence/v2.88.170/README.md`](evidence/v2.88.170/README.md) | Evidencia del sello: los nueve hallazgos, ficheros, verificación medida y límites declarados |
+| 2 | [`CHANGELOG.md` §`2.11.170-beta`](../../CHANGELOG.md) | Nota de release: alcance, `W-170-1`…`W-170-9`, límites |
+| 3 | [`PROJECT_STATE.md`](PROJECT_STATE.md) (AsOf `V2.88.170-beta`) | Estado vivo + agenda funcional |
+| 4 | [`respuesta-auditoria-ui-operativa-2026-10-28.md`](respuesta-auditoria-ui-operativa-2026-10-28.md) | Causa → cambio → prueba → límite por hallazgo |
+| 5 | [`auditoria-ui-operativa-profunda-2026-10-28.md`](auditoria-ui-operativa-profunda-2026-10-28.md) | El acta original (**no se reescribe**: se responde encima) |
+| 6 | [`auditoria-independiente-v2.88.170-beta-2026-10-28.md`](auditoria-independiente-v2.88.170-beta-2026-10-28.md) | Contraste **desde un clon limpio del tag** y su CI, criterio por criterio |
+| 7 | [`dictamen-tecnico-v2.88.170-beta-2026-10-28.md`](dictamen-tecnico-v2.88.170-beta-2026-10-28.md) | **Acto de aceptación**: qué se acepta (`P2-01`, `P2-02`, signo ≠ tono) y los **cuatro límites** que la aceptación conserva |
+| 8 | [`audit-pack-v2.88.169-beta-2026-10-28.md`](audit-pack-v2.88.169-beta-2026-10-28.md) | Sello inmediatamente anterior (inmóvil) |
 
 ---
 
@@ -95,15 +96,15 @@ Los siete commits anteriores (`31974c6c`…`033af182`) cierran los seis P1 y el 
 
 Corrige la **representación** de la operativa sin tocar motor ni decisión:
 
-- **P1-01 — un error de lectura no es una colección vacía.** [`query-absence.ts`](../../../apps/web/src/components/query-absence.ts) fija la precedencia `error > loading > unavailable > empty > ready`; [`collection-absence.tsx`](../../../apps/web/src/components/collection-absence.tsx) declara el hueco; `useInstrumentOrderPending` pasa a tri-estado (`null` = no se pudo leer) y termina en `unknown`, nunca en «sin orden pendiente».
-- **P1-02 — `skipped`/`unknown` no son «ejecutada».** [`pending-order-fill.ts`](../../../apps/web/src/features/trading/pending-order-fill.ts): **sin `transactionId` no hay ejecución**; solo `executed` y `expired` retiran la orden; el resto no se borra ni se reintenta.
+- **P1-01 — un error de lectura no es una colección vacía.** [`query-absence.ts`](../../apps/web/src/components/query-absence.ts) fija la precedencia `error > loading > unavailable > empty > ready`; [`collection-absence.tsx`](../../apps/web/src/components/collection-absence.tsx) declara el hueco; `useInstrumentOrderPending` pasa a tri-estado (`null` = no se pudo leer) y termina en `unknown`, nunca en «sin orden pendiente».
+- **P1-02 — `skipped`/`unknown` no son «ejecutada».** [`pending-order-fill.ts`](../../apps/web/src/features/trading/pending-order-fill.ts): **sin `transactionId` no hay ejecución**; solo `executed` y `expired` retiran la orden; el resto no se borra ni se reintenta.
 - **P1-03 — comisiones del histórico reales.** Agregado de servidor `total_trade_fees` → campo aditivo `tradeFeesTotal`; excluye custodia por diseño; la tarjeta se rotula «Comisiones de operaciones (histórico)».
-- **P1-04 — el color declara el papel, no el signo.** `ledgerAmountTone` (`cost`/`in`/`neutral`) en [`portfolio-cash.ts`](../../../packages/shared/src/portfolio-cash.ts); el importe conserva su signo.
+- **P1-04 — el color declara el papel, no el signo.** `ledgerAmountTone` (`cost`/`in`/`neutral`) en [`portfolio-cash.ts`](../../packages/shared/src/portfolio-cash.ts); el importe conserva su signo.
 - **P1-05 — el universo «0» solo si se midió.** `rankingUnavailable`/`rankingLoading` suprimen el CTA acusatorio y los ceros fabricados.
 - **P1-06 — cartera caída ≠ «sin posiciones ni stops».** `absenceState` en el KPI de protección y «No disponible» en el resumen.
 - **P2-04 — el comodín se prueba sobre el DOM.** `formatPriceOrAbsent` en primer nivel y `DATA_FRESHNESS_ABSENT_LABEL` en vez de `—`.
-- **P2-01 — un P&L no medido no se colorea como ganancia.** [`pnl-tone.ts`](../../../apps/web/src/lib/pnl-tone.ts): `pnlTone` (`positive`/`negative`/`neutral`, con hueco/`NaN`/`±Infinity` y **cero exacto** en `neutral`) sustituye `(x ?? 0) >= 0` en Mesa (fila y cabecera) y Operaciones.
-- **P2-02 — «Controlado» exige sus tres componentes medidos.** [`auto-risk-summary.ts`](../../../apps/web/src/features/auto/auto-risk-summary.ts) deja de hacer `fillLinkIssuesCount ?? 0`; si estado, cuadre o recuento no se midieron, el veredicto es «Sin dato todavía».
+- **P2-01 — un P&L no medido no se colorea como ganancia.** [`pnl-tone.ts`](../../apps/web/src/lib/pnl-tone.ts): `pnlTone` (`positive`/`negative`/`neutral`, con hueco/`NaN`/`±Infinity` y **cero exacto** en `neutral`) sustituye `(x ?? 0) >= 0` en Mesa (fila y cabecera) y Operaciones.
+- **P2-02 — «Controlado» exige sus tres componentes medidos.** [`auto-risk-summary.ts`](../../apps/web/src/features/auto/auto-risk-summary.ts) deja de hacer `fillLinkIssuesCount ?? 0`; si estado, cuadre o recuento no se midieron, el veredicto es «Sin dato todavía».
 
 **Deltas:** `Δ motor de decisión = 0` · `Δ decisión = 0` · **sin migración** (`058_estudio_daily_proposals`) · **contrato HTTP solo aditivo** (`tradeFeesTotal`).
 
@@ -117,6 +118,7 @@ Corrige la **representación** de la operativa sin tocar motor ni decisión:
 4. **El gate `axe` integrado mide estados estructurales**: las violaciones que solo afloran con datos o en estados modales pueden quedar latentes (deuda declarada, igual que en `.169`).
 5. **NO cierra la ventana PAPER real** ni la rentabilidad: `INCONCLUSIVE` (`0/2` episodios, `0/32` ciclos). AUTO **OFF**, operativa **100 % PAPER virtual**.
 6. **El pin PAPER** se re-ancló al árbol del sello; los días anteriores quedan **`STALE`** y no se reinterpretan.
+7. **`R-170-1` · `pnpm typecheck` no es reproducible en un clon limpio.** Con `pnpm install --frozen-lockfile` y sin generar Prisma, el typecheck falla en `@bolsa/database` (`PrismaClient` no generado y `process` sin `@types/node`); `@bolsa/shared` y `@bolsa/web` **sí** pasan y el job `frontend` del CI —que genera Prisma antes— sale `success`. Es una **limitación reproducible del entorno de instalación**, declarada y abierta: **no** se corrige en este sello ni se presenta como absorbida por el CI verde. Ver [`dictamen-tecnico-v2.88.170-beta-2026-10-28.md` §4.2](dictamen-tecnico-v2.88.170-beta-2026-10-28.md).
 
 ---
 

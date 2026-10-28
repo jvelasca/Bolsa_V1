@@ -16,6 +16,9 @@ seguían contradiciendo los criterios de cierre del dictamen (**P2-01** y **P2-0
   `v2.88.169-beta` (`d31df9b3` → `3ce94048`) **no se mueve ni se reabre**. `Release tag CI` `40727162474`
   **verde** con `certify` `GREEN`; auditoría independiente del tag en
   [`auditoria-independiente-v2.88.170-beta-2026-10-28.md`](../../auditoria-independiente-v2.88.170-beta-2026-10-28.md).
+- **Aceptación:** [`dictamen-tecnico-v2.88.170-beta-2026-10-28.md`](../../dictamen-tecnico-v2.88.170-beta-2026-10-28.md)
+  — se aceptan `P2-01` y `P2-02` y se conservan **expresamente** los cuatro límites: `P2-03`/`P2-11` abiertos,
+  `R-170-1`, el alcance de `replay-repro` y AUTO **OFF** con PAPER **`INCONCLUSIVE`**.
 - **Bump** `2.11.169-beta` → `2.11.170-beta` (+ `meta.bump` de los **13** CLIs;
   `test_dia_d_bump_guard`).
 
@@ -55,7 +58,7 @@ El acta `auditoria-ui-operativa-profunda-2026-10-28.md` **no se modifica** en es
 | --- | --- |
 | `pnpm --filter @bolsa/web test` | **2539 passed / 338 ficheros** |
 | `pnpm --filter @bolsa/shared test` | **861 passed / 100 ficheros** (+1 `todo`) |
-| `pnpm typecheck` | **4/4 OK** |
+| `pnpm typecheck` | **4/4 OK** (sobre este árbol de trabajo, con el cliente Prisma ya generado; en un clon limpio ver §5 · `R-170-1`) |
 | `pnpm lint` | **0 errores** / 23 avisos preexistentes |
 | `pnpm contract:check` | **OK** |
 | `pytest test_list_ledger_total_fees.py + test_dia_d_bump_guard.py` | **4 passed** |
@@ -78,6 +81,13 @@ Las suites completas (`web`, `shared`, `pytest`) las ejecuta el `Release tag CI`
 - Los **P2 restantes** (P2-03, P2-05…P2-12) y los **P3** siguen abiertos y declarados.
 - El bump mueve `apps`, así que el pin PAPER se re-ancla **después** del commit del sello; los días
   anteriores quedan **`STALE`** y no se reinterpretan.
+- **`R-170-1` · `pnpm typecheck` no es reproducible en un clon limpio.** Instalado con
+  `pnpm install --frozen-lockfile` y sin generar Prisma, el typecheck falla en `@bolsa/database`;
+  `@bolsa/shared` y `@bolsa/web` **sí** pasan y el job `frontend` del CI (que genera Prisma antes)
+  sale `success`. Se declara como **limitación reproducible del entorno de instalación**, abierta y
+  no absorbida por el CI verde.
+- **`replay-repro` = `REPRODUCIDO`** respalda la **reproducibilidad de la decisión evaluada**
+  (`Δ decisión = 0`); **no** demuestra que la estrategia sea rentable.
 
 ## 6. Falsabilidad
 
