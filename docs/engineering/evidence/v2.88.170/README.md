@@ -12,8 +12,10 @@ seguían contradiciendo los criterios de cierre del dictamen (**P2-01** y **P2-0
 - **`Δ contrato HTTP = ADITIVO`**: `tradeFeesTotal` en `LedgerResponseDto` (P1-03), con
   `openapi.json`/`schema.d.ts` regenerados y `contract:check` verde.
 - **SIN migración nueva**: `head` sigue `058_estudio_daily_proposals`.
-- **Tag `v2.88.170-beta`** (anotado, unsigned). `v2.88.169-beta` (`d31df9b3` → `3ce94048`) **no se
-  mueve ni se reabre**.
+- **Tag `v2.88.170-beta`** (anotado, unsigned; objeto `3e794841` → commit `babfe228`).
+  `v2.88.169-beta` (`d31df9b3` → `3ce94048`) **no se mueve ni se reabre**. `Release tag CI` `40727162474`
+  **verde** con `certify` `GREEN`; auditoría independiente del tag en
+  [`auditoria-independiente-v2.88.170-beta-2026-10-28.md`](../../auditoria-independiente-v2.88.170-beta-2026-10-28.md).
 - **Bump** `2.11.169-beta` → `2.11.170-beta` (+ `meta.bump` de los **13** CLIs;
   `test_dia_d_bump_guard`).
 

@@ -18,7 +18,13 @@
 | `Δ motor` / `Δ decisión` | **0** — ninguna regla, umbral, peso, sizing ni salida cambia |
 | Migración | **ninguna** (`head` sigue `058_estudio_daily_proposals`) |
 | Bump | `2.11.169-beta` → `2.11.170-beta` (+ **13** `meta.bump`; guardián **2 passed**) |
-| TAG | `v2.88.170-beta` (anotado); `v2.88.169-beta` intacto |
+| TAG | `v2.88.170-beta` (anotado, objeto `3e794841` → commit `babfe228`); `v2.88.169-beta` intacto |
+
+**Sello publicado.** `Release tag CI` [run `40727162474`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40727162474)
+en **`success`** (`run_attempt 1`), con **14** jobs `success` —incluido el gate duro
+`playwright (integrated axe)`—, **1** `skipped` por diseño (`playwright (integrated E2E, opt-in)`) y
+artefacto `release-tag-ci-summary` con `status: GREEN`. La verificación independiente desde un clon limpio del
+tag está en [`auditoria-independiente-v2.88.170-beta-2026-10-28.md`](./auditoria-independiente-v2.88.170-beta-2026-10-28.md).
 
 ## 1. P1-01 · un error de lectura no es una colección vacía
 
