@@ -66,7 +66,7 @@ la única diferencia en `apps/` son los `meta.bump` de los CLIs de evidencia.
 | `pnpm window:freeze` | **`freeze OK`** tras el re-anclaje |
 | `pnpm typecheck` | ejecutado en local sobre este árbol (con Prisma generado); `R-170-1` sigue abierto para el clon limpio |
 | `prettier --check` sobre los ficheros tocados | sin diferencias |
-| `Release tag CI` | ver §7 (identidad del run) |
+| `Release tag CI` | **run `40756262693`** — **verde**, `certify` **`GREEN`** (12/12 jobs `success`), `asOf` `2026-10-28T19:52:34Z` |
 
 Las suites completas (`web`, `shared`, `pytest`) las ejecuta el `Release tag CI` del tag; este
 documento **no** adelanta cifras que no se hayan medido.
@@ -87,10 +87,12 @@ documento **no** adelanta cifras que no se hayan medido.
 | Dato | Valor |
 | --- | --- |
 | Tag anotado | `v2.88.171-beta` |
-| Objeto de tag | _pendiente de medición POST-TAG_ |
-| Commit | _pendiente de medición POST-TAG_ |
-| `Release tag CI` | _pendiente de medición POST-TAG_ |
-| GitHub Release | _pendiente de medición POST-TAG_ |
+| Objeto de tag | `d9dc74e387b0523e72dec1628b57d5b9cfe00e6a` |
+| Commit | `393c45fe3a835d96cd783af96cc98bca210fc2a4` (`chore(window): re-ancla el pin PAPER al arbol del sello 2.11.171-beta`) |
+| Commit de sello | `21ec1886` (`chore(release): sella 2.11.171-beta y publica el expediente para auditoria externa`) |
+| `Release tag CI` | run [`40756262693`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40756262693) — **verde**, `certify` **`GREEN`**, 12/12 jobs `success` |
+| Evidencia del CI | asset `release-tag-ci-summary.json` adjunto a la Release (`status: GREEN`, `sha 393c45fe…`) |
+| GitHub Release | <https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.171-beta> (pre-release) |
 
 ## 8. Falsabilidad
 

@@ -39,8 +39,10 @@ y `prettier --check` sobre los ficheros tocados. Las suites completas las mide e
 del tag y su resultado se cita en [`evidence/v2.88.171`](docs/engineering/evidence/v2.88.171/README.md);
 este documento **no** adelanta cifras no medidas.
 
-**Publicado:** tag anotado `v2.88.171-beta` y **GitHub Release** (pre-release) con las notas de
-auditoría externa. La identidad del tag y el run de CI se citan en `PROJECT_STATE` y en la evidencia.
+**Publicado:** tag anotado `v2.88.171-beta` (objeto `d9dc74e3` → commit `393c45fe`) y **GitHub Release**
+pre-release (<https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.171-beta>) con el artefacto
+`release-tag-ci-summary.json` adjunto. `Release tag CI` [`40756262693`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40756262693)
+**verde** con `certify` **`GREEN`** (12/12 jobs `success`).
 
 ## [2.11.170-beta] — **la UI deja de afirmar lo que no midió y lo que no se ejecutó** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · contrato HTTP ADITIVO (`tradeFeesTotal`) · SIN migración nueva · head `058_estudio_daily_proposals`**)
 

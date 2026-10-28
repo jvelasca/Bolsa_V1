@@ -157,14 +157,15 @@ reescribiendo el pasado.
 
 ## 7. Identidad y publicación (POST-TAG)
 
-| Dato                                   | Valor                            |
-| -------------------------------------- | -------------------------------- |
-| Tag anotado                            | `v2.88.171-beta`                 |
-| Objeto de tag                          | _pendiente de medición POST-TAG_ |
-| Commit                                 | _pendiente de medición POST-TAG_ |
-| `Release tag CI`                       | _pendiente de medición POST-TAG_ |
-| GitHub Release                         | _pendiente de medición POST-TAG_ |
-| Commit del corpus `.170` de referencia | `0765960b`                       |
+| Dato                                   | Valor                                                                                                                                           |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tag anotado                            | `v2.88.171-beta`                                                                                                                                |
+| Objeto de tag                          | `d9dc74e387b0523e72dec1628b57d5b9cfe00e6a`                                                                                                      |
+| Commit                                 | `393c45fe3a835d96cd783af96cc98bca210fc2a4`                                                                                                      |
+| Commit de sello                        | `21ec1886`                                                                                                                                      |
+| `Release tag CI`                       | run [`40756262693`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40756262693) — **verde**, `certify` **`GREEN`**, 12/12 jobs `success`      |
+| GitHub Release                         | <https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.171-beta> (pre-release, con `release-tag-ci-summary.json` adjunto)                      |
+| Commit del corpus `.170` de referencia | `0765960b`                                                                                                                                      |
 
 ---
 
