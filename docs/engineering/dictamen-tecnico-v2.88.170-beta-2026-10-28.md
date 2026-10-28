@@ -238,3 +238,11 @@ AUTO **OFF** con PAPER **`INCONCLUSIVE`** (`0/2`, `0/32`).
 
 Lo aceptado es la **honestidad de la interfaz** sobre lo que se midió y lo que se ejecutó. Lo que sigue pendiente
 es el **contenido** de las cifras y la **evidencia operativa**: ninguno de los dos se cierra con este dictamen.
+
+**Acto posterior de aceptación del cierre documental (2026-10-28).** El cierre documental de este dictamen se
+acepta en [`acta-cierre-documental-v2.88.170-beta-2026-10-28.md`](./acta-cierre-documental-v2.88.170-beta-2026-10-28.md),
+sobre el commit `bf1433e7` (4 ficheros, `+269/−17`, solo `docs/`). Esa aceptación se apoya en la **evidencia
+aportada** —CI del tag, `replay-repro`, recuentos de suites y comprobación de enlaces— y **no** en una
+re-verificación independiente de GitHub por parte de quien firma. Dos límites quedan fijados allí: el corpus vive
+en `ui/auto-hold-provenance-2026-10-28` y **no** en `main` (un clon por defecto no lo obtiene), y el sello **no
+certifica la operativa financiera**. Este §8 **no se reescribe**: el acto se **añade encima**.
