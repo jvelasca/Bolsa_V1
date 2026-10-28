@@ -78,13 +78,15 @@ export function MesaPositionNextActionButton({
   const { effectiveAccountId } = useActiveAccount();
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const [error, setError] = useState<string | null>(null);
+  // P1-01 — `null` = la cola de pendientes no se pudo leer (ni pendiente ni libre).
   const orderPending = useInstrumentOrderPending(position.instrumentId);
   const pot = buildPositionOperatingTruth({
     position,
     study,
     originStudy,
     portfolioReconStatus,
-    orderPending,
+    orderPending: orderPending ?? undefined,
+    reconLookupFailed: orderPending === null ? true : undefined,
     protectPlan,
   });
   // Path B (aggregate) inherits §A.8 via mapMesaNextAction — no regress.
@@ -308,7 +310,8 @@ export function MesaPositionRow({
     study,
     originStudy,
     portfolioReconStatus,
-    orderPending,
+    orderPending: orderPending ?? undefined,
+    reconLookupFailed: orderPending === null ? true : undefined,
     submitIntent,
     protectPlan,
   });
@@ -424,7 +427,7 @@ export function MesaPositionRow({
             study={study}
             originStudy={originStudy}
             portfolioReconStatus={portfolioReconStatus}
-            orderPending={orderPending}
+            orderPending={orderPending ?? undefined}
             submitIntent={submitIntent}
           />
         </div>

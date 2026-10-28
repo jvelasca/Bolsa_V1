@@ -21,8 +21,10 @@ describe("DecisionFichaPanel honesty wiring (V1.41.2)", () => {
       "utf8",
     );
     expect(src).toMatch(/PositionOperatingSummary/);
-    expect(src).toMatch(/orderPending=\{orderPending\}/);
-    expect(src).toMatch(/orderPendingFill=\{orderPending\}/);
+    // P1-01: la ficha propaga el tri-estado (`null` = cola ilegible) como
+    // «no consta», nunca como `false`.
+    expect(src).toMatch(/orderPending=\{orderPending \?\? undefined\}/);
+    expect(src).toMatch(/orderPendingFill=\{orderPending \?\? undefined\}/);
   });
 
   it("feeds submitIntent into Position/Entry summaries (V1.42 F2b)", () => {

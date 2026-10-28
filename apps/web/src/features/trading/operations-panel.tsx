@@ -25,6 +25,7 @@ import { absentDataLabel } from "@/components/absent-data";
 import { ModeBadge } from "@/components/mode-badge";
 import { operationModeForPosition } from "@/features/operations/operation-mode";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
+import { CollectionAbsence } from "@/components/collection-absence";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { mesaPositionShowsRoute } from "@/features/mesa/mesa-position-row";
 import { PositionRoutePanel } from "@/features/mesa/position-route-panel";
@@ -95,7 +96,11 @@ export function OperationsPanel({
   const [tab, setTab] = useState<OperationsTab>("open");
   const [accountWide, setAccountWide] = useState(false);
 
-  const { pendingOrders, removePendingOrder } = usePendingOrders();
+  const {
+    pendingOrders,
+    removePendingOrder,
+    isError: pendingOrdersUnreadable,
+  } = usePendingOrders();
 
   const activeInstrumentId = useWorkspaceStore((s) =>
     scopeToActiveChart
@@ -281,9 +286,12 @@ export function OperationsPanel({
                   const operational = pos.operational ?? null;
                   const study = studiesMap.get(pos.instrumentId) ?? null;
                   const showRoute = mesaPositionShowsRoute(pos, study);
-                  const orderPending = pendingOrders.some(
-                    (order) => order.instrumentId === pos.instrumentId,
-                  );
+                  // P1-01 — si la cola no se pudo leer, no se afirma «sin pendientes».
+                  const orderPending = pendingOrdersUnreadable
+                    ? null
+                    : pendingOrders.some(
+                        (order) => order.instrumentId === pos.instrumentId,
+                      );
                   const submitIntent = pickSubmitIntentForInstrument(
                     submitIntentsQuery.data?.data?.intents,
                     pos.instrumentId,
@@ -292,7 +300,8 @@ export function OperationsPanel({
                     position: pos,
                     study,
                     portfolioReconStatus,
-                    orderPending,
+                    orderPending: orderPending ?? undefined,
+                    reconLookupFailed: orderPending === null ? true : undefined,
                     submitIntent,
                   });
                   const modeBadge = operationModeForPosition(pos, surface);
@@ -400,7 +409,7 @@ export function OperationsPanel({
                               position={pos}
                               study={study}
                               portfolioReconStatus={portfolioReconStatus}
-                              orderPending={orderPending}
+                              orderPending={orderPending ?? undefined}
                               submitIntent={submitIntent}
                             />
                           </td>
@@ -417,7 +426,14 @@ export function OperationsPanel({
 
       {tab === "pending" && (
         <div className="scroll-area min-h-0 flex-1 overflow-auto" tabIndex={0}>
-          {scopedPending.length === 0 && (
+          {pendingOrdersUnreadable ? (
+            <CollectionAbsence
+              state="error"
+              subject="la cola de operaciones pendientes"
+              testId="operations-pending-absence"
+            />
+          ) : null}
+          {!pendingOrdersUnreadable && scopedPending.length === 0 && (
             <p className="p-4 text-center text-xs text-muted-foreground">
               {scopeInstrumentId
                 ? `Sin órdenes pendientes en ${activeSymbol ?? "este valor"}.`

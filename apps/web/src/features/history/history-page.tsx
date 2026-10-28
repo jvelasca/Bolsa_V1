@@ -14,6 +14,11 @@ import { AccountScopeSelector } from "@/features/accounts/account-scope-selector
 import { formatPrice } from "@/features/charts/chart-utils";
 import { api } from "@/lib/api";
 import { absentDataLabel } from "@/components/absent-data";
+import { CollectionAbsence } from "@/components/collection-absence";
+import {
+  isCollectionAbsent,
+  queryCollectionState,
+} from "@/components/query-absence";
 import { formatDateTimeCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -181,6 +186,17 @@ export function HistoryPage() {
 
   const movements = movementsQuery.data ?? [];
   const transactions = transactionsQuery.data?.data ?? [];
+  // P1-01 — el error de la API no es una colección vacía (`UI5-14`).
+  const movementsState = queryCollectionState({
+    isError: movementsQuery.isError,
+    isLoading: movementsQuery.isLoading,
+    count: movementsQuery.data?.length,
+  });
+  const transactionsState = queryCollectionState({
+    isError: transactionsQuery.isError,
+    isLoading: transactionsQuery.isLoading,
+    count: transactionsQuery.data?.data?.length,
+  });
   const feeTotal = movements
     .filter((e) => e.type === "fee")
     .reduce((sum, e) => sum + Math.abs(e.amount), 0);
@@ -264,14 +280,29 @@ export function HistoryPage() {
 
       <Card>
         <CardContent className="pt-4">
-          {(movementsQuery.isLoading || transactionsQuery.isLoading) && (
-            <p className="text-sm text-muted-foreground">Cargando historial…</p>
+          {tab === "movements" && (
+            <>
+              <CollectionAbsence
+                state={movementsState}
+                subject="el historial de movimientos"
+                testId="history-movements-absence"
+              />
+              {!isCollectionAbsent(movementsState) && (
+                <MovementsTable entries={movements} />
+              )}
+            </>
           )}
-          {tab === "movements" && !movementsQuery.isLoading && (
-            <MovementsTable entries={movements} />
-          )}
-          {tab === "trades" && !transactionsQuery.isLoading && (
-            <TradesTable transactions={transactions} />
+          {tab === "trades" && (
+            <>
+              <CollectionAbsence
+                state={transactionsState}
+                subject="el historial de operaciones"
+                testId="history-trades-absence"
+              />
+              {!isCollectionAbsent(transactionsState) && (
+                <TradesTable transactions={transactions} />
+              )}
+            </>
           )}
         </CardContent>
       </Card>

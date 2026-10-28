@@ -145,7 +145,7 @@ export function DecisionFichaPanel({
   portfolioReconStatus?: string | null;
   entriesBlocked?: boolean;
   gateStatus?: string | null;
-  orderPending?: boolean;
+  orderPending?: boolean | null;
   submitIntent?: SubmitIntentListItemV1 | null;
   inConfirmQueue?: boolean;
   /** Spine journal rows for this instrument/decision — optional thin wire. */
@@ -190,7 +190,9 @@ export function DecisionFichaPanel({
         position,
         study,
         portfolioReconStatus,
-        orderPending,
+        orderPending: orderPending ?? undefined,
+        // P1-01 — cola de pendientes ilegible ⇒ el estado de ejecución es desconocido.
+        reconLookupFailed: orderPending === null ? true : undefined,
         submitIntent,
       })
     : null;
@@ -201,7 +203,7 @@ export function DecisionFichaPanel({
           study,
           entriesBlocked,
           gateStatus,
-          orderPendingFill: orderPending,
+          orderPendingFill: orderPending ?? undefined,
           inConfirmQueue,
         })
       : null;
@@ -212,9 +214,11 @@ export function DecisionFichaPanel({
     orderPending || submitIntent
       ? buildExecutionState({
           instrumentId: study.instrumentId,
-          pendingOrder: orderPending,
+          pendingOrder: orderPending ?? false,
           submitIntent: submitIntent ?? null,
           asOf: submitIntent?.sendAttemptedAt ?? null,
+          // P1-01 — sin cola legible no se afirma un estado de ejecución limpio.
+          reconLookupFailed: orderPending === null ? true : undefined,
         })
       : null;
   const tradeStory = buildTradeStory({
@@ -435,7 +439,7 @@ export function DecisionFichaPanel({
             <PositionOperatingSummary
               pot={positionPot}
               position={position ?? undefined}
-              orderPending={orderPending}
+              orderPending={orderPending ?? undefined}
               submitIntent={submitIntent}
               portfolioReconStatus={portfolioReconStatus}
             />
@@ -458,7 +462,7 @@ export function DecisionFichaPanel({
           <>
             <EntryOperatingSummary
               truth={entryTruth}
-              orderPendingFill={orderPending}
+              orderPendingFill={orderPending ?? undefined}
               submitIntent={submitIntent}
             />
             {entryTruth.plan.hasPlan ? (

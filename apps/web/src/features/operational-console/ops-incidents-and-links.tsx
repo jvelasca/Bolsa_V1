@@ -37,7 +37,9 @@ export function OpsIncidentsSection({
         {incidentsQuery.isError ? (
           <p className="text-destructive">No se pudieron cargar incidentes.</p>
         ) : null}
-        {!incidentsQuery.isLoading && incidents.length === 0 ? (
+        {!incidentsQuery.isLoading &&
+        !incidentsQuery.isError &&
+        incidents.length === 0 ? (
           <p
             className="text-muted-foreground"
             data-testid="ops-incidents-empty"

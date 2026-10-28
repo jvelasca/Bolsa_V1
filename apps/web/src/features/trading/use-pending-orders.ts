@@ -96,16 +96,26 @@ export function usePendingOrders() {
   return {
     pendingOrders: query.data ?? [],
     isLoading: query.isLoading,
+    /** P1-01 — la cola no se ha podido leer: no se puede afirmar «sin pendientes». */
+    isError: query.isError,
     addPendingOrder: createMutation.mutateAsync,
     removePendingOrder: deleteMutation.mutateAsync,
   };
 }
 
-/** Orden en vuelo para un instrumento (OperationalTruth.orderPending). */
+/**
+ * Orden en vuelo para un instrumento (`OperationalTruth.orderPending`).
+ *
+ * P1-01 — tri-estado: `true` = hay orden pendiente, `false` = la cola se leyó y no
+ * hay ninguna, `null` = **no se pudo leer** la cola. Devolver `false` en el error
+ * afirmaba «sin orden pendiente» sobre un dato que no se tiene; el llamante lo
+ * propaga como `reconLookupFailed` y el estado de ejecución cae en `unknown`.
+ */
 export function useInstrumentOrderPending(
   instrumentId: string | null | undefined,
-): boolean {
-  const { pendingOrders } = usePendingOrders();
+): boolean | null {
+  const { pendingOrders, isError } = usePendingOrders();
   if (!instrumentId) return false;
+  if (isError) return null;
   return pendingOrders.some((order) => order.instrumentId === instrumentId);
 }
