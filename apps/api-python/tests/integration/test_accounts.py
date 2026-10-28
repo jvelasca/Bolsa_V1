@@ -132,6 +132,16 @@ async def test_create_account_with_settings_and_trade_fees() -> None:
                 types = {entry["type"] for entry in entries}
                 assert "buy" in types
                 assert "fee" in types
+                # P1-03 — el total de comisiones de operaciones lo agrega el
+                # servidor (todo el histórico, sin custodia) y viaja en el sobre.
+                trade_fees_total = ledger.json()["tradeFeesTotal"]
+                assert trade_fees_total > 0
+                page_fees = sum(
+                    abs(entry["amount"])
+                    for entry in entries
+                    if entry["type"] == "fee"
+                )
+                assert trade_fees_total == pytest.approx(page_fees)
             finally:
                 await purge_accounts(app.state.session_factory, [account_id])
 

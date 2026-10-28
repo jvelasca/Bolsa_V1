@@ -80,7 +80,7 @@ describe("Historial — error de lectura ≠ colección vacía", () => {
   });
 
   it("una colección leída y vacía sí dice «Sin movimientos contables»", async () => {
-    getAccountLedger.mockResolvedValue({ data: [] });
+    getAccountLedger.mockResolvedValue({ data: [], tradeFeesTotal: 0 });
     getTransactions.mockResolvedValue({ data: { data: [] } });
 
     renderPage();

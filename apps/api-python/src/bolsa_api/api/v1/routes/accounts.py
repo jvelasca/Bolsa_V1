@@ -909,11 +909,18 @@ async def list_ledger(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> LedgerResponseDto:
     try:
-        entries = await get_list_ledger_use_case(session).execute(
+        use_case = get_list_ledger_use_case(session)
+        entries = await use_case.execute(
             account_id,
             limit=limit,
             offset=offset,
         )
+        # P1-03 — el total de comisiones del histórico no se puede sumar sobre la
+        # página: lo agrega el servidor (excluye custodia).
+        trade_fees_total = await use_case.total_trade_fees(account_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return LedgerResponseDto(data=[to_ledger_entry_dto(e) for e in entries])
+    return LedgerResponseDto(
+        data=[to_ledger_entry_dto(e) for e in entries],
+        trade_fees_total=trade_fees_total,
+    )

@@ -2132,7 +2132,14 @@ export const api = {
     ),
 
   getAccountLedger: (accountId: string, limit = 50, offset = 0) =>
-    call<{ data: import("@bolsa/shared").LedgerEntryDto[] }>(() =>
+    call<{
+      data: import("@bolsa/shared").LedgerEntryDto[];
+      /**
+       * P1-03 — Σ de comisiones de operaciones de todo el histórico (sin custodia).
+       * La página `data` NO permite derivarlo: sumarla subestima el coste.
+       */
+      tradeFeesTotal: number;
+    }>(() =>
       client.GET("/api/accounts/{account_id}/ledger", {
         params: {
           path: { account_id: accountId },

@@ -9396,6 +9396,8 @@ export interface components {
         LedgerResponseDto: {
             /** Data */
             data: components["schemas"]["LedgerEntryDto"][];
+            /** Tradefeestotal */
+            tradeFeesTotal: number;
         };
         /** LifecycleAccountingDto */
         LifecycleAccountingDto: {

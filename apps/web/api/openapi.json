@@ -14479,10 +14479,15 @@
             },
             "title": "Data",
             "type": "array"
+          },
+          "tradeFeesTotal": {
+            "title": "Tradefeestotal",
+            "type": "number"
           }
         },
         "required": [
-          "data"
+          "data",
+          "tradeFeesTotal"
         ],
         "title": "LedgerResponseDto",
         "type": "object"

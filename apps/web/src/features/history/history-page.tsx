@@ -172,8 +172,10 @@ export function HistoryPage() {
   const movementsQuery = useQuery({
     queryKey: ["movimientos", effectiveAccountId],
     queryFn: async () => {
-      if (!effectiveAccountId) return [];
-      return (await api.getAccountLedger(effectiveAccountId, 100)).data;
+      if (!effectiveAccountId) return null;
+      // P1-03 — se guarda la respuesta completa: `tradeFeesTotal` es un agregado
+      // del servidor que la página de movimientos no puede reconstruir.
+      return await api.getAccountLedger(effectiveAccountId, 100);
     },
     enabled: Boolean(effectiveAccountId),
   });
@@ -184,22 +186,33 @@ export function HistoryPage() {
     enabled: Boolean(effectiveAccountId),
   });
 
-  const movements = movementsQuery.data ?? [];
+  const movements = movementsQuery.data?.data ?? [];
   const transactions = transactionsQuery.data?.data ?? [];
   // P1-01 — el error de la API no es una colección vacía (`UI5-14`).
   const movementsState = queryCollectionState({
     isError: movementsQuery.isError,
     isLoading: movementsQuery.isLoading,
-    count: movementsQuery.data?.length,
+    count: movementsQuery.data?.data?.length,
   });
   const transactionsState = queryCollectionState({
     isError: transactionsQuery.isError,
     isLoading: transactionsQuery.isLoading,
     count: transactionsQuery.data?.data?.length,
   });
-  const feeTotal = movements
-    .filter((e) => e.type === "fee")
-    .reduce((sum, e) => sum + Math.abs(e.amount), 0);
+  const feeTotal = movementsQuery.data?.tradeFeesTotal ?? null;
+  /**
+   * P1-03 — «Comisiones acumuladas» se calculaba sumando las filas `fee` de la
+   * página (100 movimientos), así que con más histórico la cifra estaba
+   * subestimada y aun así se presentaba como el total. El agregado lo da el
+   * servidor (`tradeFeesTotal`, todo el histórico, sin custodia) y la tarjeta
+   * declara el hueco cuando la consulta no se ha leído.
+   */
+  const feeTotalLabel =
+    feeTotal != null
+      ? formatPrice(feeTotal, movements[0]?.currency ?? null)
+      : absentDataLabel(
+          movementsState === "error" ? "not_available" : "not_measured",
+        );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -232,16 +245,18 @@ export function HistoryPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-4">
           <AccountScopeSelector />
-          {feeTotal > 0 && (
-            <div className="text-sm">
-              <p className="text-xs text-muted-foreground">
-                Comisiones acumuladas
-              </p>
-              <p className="font-medium tabular-nums">
-                {formatPrice(feeTotal)}
-              </p>
-            </div>
-          )}
+          <div className="text-sm" data-testid="history-trade-fees-total">
+            <p className="text-xs text-muted-foreground">
+              Comisiones de operaciones (histórico)
+            </p>
+            <p
+              className="font-medium tabular-nums"
+              data-fees-state={feeTotal != null ? "measured" : "absent"}
+              title="Suma de todas las comisiones de operaciones de la cuenta; la custodia se contabiliza aparte."
+            >
+              {feeTotalLabel}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
