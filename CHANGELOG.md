@@ -2,6 +2,46 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.171-beta] — **el expediente se publica para auditoría externa, sin tocar el producto** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ código = 0` salvo `meta.bump` · AUTO OFF · SIN migración · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** **acto nuevo de publicación documental**. No es un sello de corrección ni de
+funcionalidad: no cambia motor, decisión, contrato HTTP, UI, migraciones ni el pin PAPER por motivo
+funcional. **No enmienda** el [acta de cierre documental](docs/engineering/acta-cierre-documental-v2.88.170-beta-2026-10-28.md)
+de `.170`: la deja **válida para su fecha y su objeto** y añade encima un acto distinto, con otro
+propósito. **`Δ motor = 0`** · **`Δ decisión = 0`** · **`Δ código = 0`** salvo los literales
+`meta.bump` · **contrato HTTP sin cambio** · **SIN migración** (`head` sigue
+`058_estudio_daily_proposals`) · **tag anotado `v2.88.171-beta`** · **bump** `2.11.170-beta` →
+`2.11.171-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard`).
+
+**W-171-1 · por qué hacía falta un acto nuevo.** El expediente de `.170` —audit pack, dictamen,
+acta de cierre, adenda de filtros y auditoría independiente— vive **solo** en la rama
+`ui/auto-hold-provenance-2026-10-28`, y el último **GitHub Release** publicado era `v2.88.165-beta`:
+`.169` y `.170` tenían tag empujado y CI verde, pero **ninguna Release**. Un auditor externo no
+tenía ni punto de entrada ni objeto publicado con notas. Este sello publica **un** punto de entrada
+declarado y una Release que no toca el objeto certificado anterior.
+
+**W-171-2 · `main` no está alineado, y se dice en voz alta.** `origin/main` = `26250187` con
+`package.json` en **`2.11.160-beta`**: no contiene `.161`–`.170` ni este acto. Un clon por defecto
+del repositorio **no** obtiene el expediente. El documento de entrega lo declara y da el comando
+exacto (`git fetch --tags` + `git checkout v2.88.171-beta`, o `git clone --branch …`). **No** se
+abre PR ni se fusiona a `main`: alinear `main` es un trabajo distinto y no se hace por omisión aquí.
+
+**W-171-3 · lo que este sello NO certifica.** Nada nuevo sobre la operativa financiera.
+`v2.88.169-beta` (`d31df9b3` → `3ce94048`) y `v2.88.170-beta` (`3e794841` → `babfe228`) quedan
+**intactos**: no se mueven, no se anotan de nuevo y no se reescriben sus documentos. `R-170-1`
+(`pnpm typecheck` no reproducible en clon limpio), `P2-03` (base bruta/neta del P&L) y `P2-11`
+(sin conversión de divisa) siguen **abiertos**. AUTO sigue **OFF**; PAPER sigue **`INCONCLUSIVE`**
+(`episodios 0/2`, `ciclos 0/32`); **la rentabilidad no está demostrada** y este sello no la insinúa.
+
+**Verificación:** `test_dia_d_bump_guard` **2 passed**, `pnpm window:test` **50 passed**,
+`pnpm window:freeze` **`freeze OK`** tras el re-anclaje (el bump mueve `apps`), `pnpm typecheck`
+y `prettier --check` sobre los ficheros tocados. Las suites completas las mide el `Release tag CI`
+del tag y su resultado se cita en [`evidence/v2.88.171`](docs/engineering/evidence/v2.88.171/README.md);
+este documento **no** adelanta cifras no medidas.
+
+**Publicado:** tag anotado `v2.88.171-beta` y **GitHub Release** (pre-release) con las notas de
+auditoría externa. La identidad del tag y el run de CI se citan en `PROJECT_STATE` y en la evidencia.
+
 ## [2.11.170-beta] — **la UI deja de afirmar lo que no midió y lo que no se ejecutó** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · contrato HTTP ADITIVO (`tradeFeesTotal`) · SIN migración nueva · head `058_estudio_daily_proposals`**)
 
 **Naturaleza:** sello de **corrección de representación** posterior a `2.11.169-beta`. Responde al
