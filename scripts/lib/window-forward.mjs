@@ -761,9 +761,17 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-28 — pin del arbol re-anclado a `1f084f18`
+ * (`apps` `6bdf5f25c095f3abbecf35e09fa7eb7ca541e98d` / `packages` `ca2b288f9a3038590baa010cabc83adb8f468da0`).
+ * Motivo: sello v2.88.169 (correccion del teardown del S5 tras el rojo del primer tag)
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '0b6f68f3',
-  appsHash: 'dcea57014f3d59bbac78dcf0ad74c877587c7747',
+  commit: '1f084f18',
+  appsHash: '6bdf5f25c095f3abbecf35e09fa7eb7ca541e98d',
   packagesHash: 'ca2b288f9a3038590baa010cabc83adb8f468da0',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
