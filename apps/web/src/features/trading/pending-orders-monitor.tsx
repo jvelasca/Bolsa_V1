@@ -7,6 +7,7 @@ import {
   useInstrumentLiveQuotesBatch,
 } from "@/features/instruments/use-instrument-live-quotes-batch";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
+import { resolvePendingFill } from "@/features/trading/pending-order-fill";
 import { useAlertsStore } from "@/stores/alerts-store";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { linkTradeToMandate } from "@/features/platform/operating-mandate";
@@ -38,6 +39,9 @@ export function PendingOrdersMonitor() {
   const { effectiveAccountId } = useActiveAccount();
   const processing = useRef<Set<string>>(new Set());
   const errorNotified = useRef<Set<string>>(new Set());
+  // P1-02 — órdenes cuyo fill NO se resolvió (skipped/unknown/rejected) en esta
+  // sesión: no se reintentan cada 15 s contra un desenlace que no es ejecución.
+  const unresolved = useRef<Set<string>>(new Set());
   // F1 (R-10): key de idempotencia cacheada por orden pendiente (order.id). Se genera
   // la primera vez que la orden se dispara y se reutiliza en reintentos del loop, de
   // forma que un fallo seguido de re-evaluación rejuega en vez de duplicar la operación.
@@ -69,7 +73,9 @@ export function PendingOrdersMonitor() {
         if (order.expiryAt && new Date(order.expiryAt).getTime() < now) {
           return false;
         }
-        return !processing.current.has(order.id);
+        return (
+          !processing.current.has(order.id) && !unresolved.current.has(order.id)
+        );
       });
 
       for (const order of pendingOrders) {
@@ -104,18 +110,42 @@ export function PendingOrdersMonitor() {
           const fill = await api.fillPendingOrder(order.id, {
             idempotencyKey: idemKey,
           });
-          if (fill.status === "rejected_by_gate") {
-            throw new Error(fill.reason ?? "risk_veto");
-          }
-          if (fill.status === "expired") {
+          // P1-02 — el servidor declara seis desenlaces; solo `executed` con
+          // transacción mueve dinero. La copia y el efecto salen del resolutor.
+          const verdict = resolvePendingFill({
+            status: fill.status,
+            reason: fill.reason,
+            transactionId: fill.transactionId,
+            side: order.side,
+            symbol: order.symbol,
+            priceLabel: formatPrice(order.limitPrice),
+          });
+
+          if (verdict.kind === "expired") {
             orderIdemKeys.current.delete(order.id);
-            pushToast(`Orden ${order.symbol} cancelada — vencida`);
+            pushToast(verdict.copy);
             void queryClient.invalidateQueries({
               queryKey: ["pending-orders"],
             });
             continue;
           }
-          const txId = fill.transactionId;
+
+          if (!verdict.executed) {
+            // Ni ejecución ni reintento a ciegas: la orden queda declarada como no
+            // resuelta en esta sesión (el bucle de 15 s no la vuelve a disparar) y
+            // se relee la verdad del servidor.
+            unresolved.current.add(order.id);
+            if (!errorNotified.current.has(order.id)) {
+              errorNotified.current.add(order.id);
+              pushToast(verdict.copy);
+            }
+            void queryClient.invalidateQueries({
+              queryKey: ["pending-orders"],
+            });
+            continue;
+          }
+
+          const txId = verdict.transactionId;
           if (txId && effectiveAccountId) {
             linkTradeToMandate({
               transactionId: txId,
@@ -125,9 +155,8 @@ export function PendingOrdersMonitor() {
           }
           orderIdemKeys.current.delete(order.id);
           errorNotified.current.delete(order.id);
-          pushToast(
-            `Orden ${order.side === "buy" ? "compra" : "venta"} ${order.symbol} ejecutada @ ${formatPrice(order.limitPrice)}`,
-          );
+          unresolved.current.delete(order.id);
+          pushToast(verdict.copy);
           void queryClient.invalidateQueries({ queryKey: ["pending-orders"] });
           void queryClient.invalidateQueries({ queryKey: ["portfolio"] });
           void queryClient.invalidateQueries({ queryKey: ["transactions"] });
