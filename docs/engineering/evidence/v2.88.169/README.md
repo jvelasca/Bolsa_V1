@@ -100,6 +100,11 @@ Yahoo queda **declarada** como límite (§7).
 > de 4 ms de ventana; lo que se conserva es la afirmación de que la cuenta efímera **no sobrevive**
 > al teardown.
 
+**Validación del arreglo:** en el run del árbol corregido
+([`40680699713`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40680699713), commit
+`3ce94048`), el job `playwright (integrated AUTO S5)` pasó **8/8 al primer intento** (1.6 m, sin
+`skipped` ni `flaky`) y `certify` publicó el artefacto con `status: GREEN`.
+
 ## 5. Ficheros
 
 | Capa | Ficheros |
@@ -120,10 +125,12 @@ Yahoo queda **declarada** como límite (§7).
 | `pnpm window:test` | **50 passed** |
 | `pnpm contract:check` | **OK** — `openapi.json` y `schema.d.ts` coinciden |
 
-**Medido en el CI del tag (run del sello, §4 del audit pack):** `shared` **855 passed / 99
-ficheros** + `window:test` **50 passed** + `freeze OK`; `frontend` **2469 passed / 322 ficheros**,
-`lint` **0 errores / 23 avisos**; `python` con `ruff`/`mypy`/`pytest` en verde; `replay-repro`
-**`REPRODUCIDO`** ⇒ `Δ decisión = 0` medido por el CI.
+**Medido en el CI del tag** ([run `40680699713`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40680699713),
+`run_attempt 1`, `success`, artefacto `release-tag-ci-summary` `status: GREEN`): `shared` **855
+passed / 99 ficheros** + `window:test` **50 passed** + `freeze OK (3ce94048)`; `frontend` **2469
+passed / 322 ficheros**, `lint` **0 errores / 23 avisos**; `python` **5653 passed / 62 skipped**,
+`ruff` limpio, `Contracts: 4 kept, 0 broken`; `playwright (integrated AUTO S5)` **8 passed**;
+`replay-repro` **`REPRODUCIDO`** ⇒ `Δ decisión = 0` medido por el CI.
 
 ## 7. Límites declarados
 

@@ -40,7 +40,9 @@ de **Yahoo Finance**, proveedor **externo** al repo, que devolvió `0` barras en
 punto **no** fue la causa del rojo y queda declarado como límite, no maquillado.) Corrección
 **test-only**: `probeAccountUntilGone` sondea con **reintentos acotados** (6 × 250 ms) tras cada
 `DELETE` y en la comprobación final; **no** se relaja el gate —si el borrado no ocurre, el residuo
-sigue siendo **rojo**—. Ningún cambio de producto, de contrato ni de motor.
+sigue siendo **rojo**—. Ningún cambio de producto, de contrato ni de motor. **Validado:** el run del
+árbol corregido ([`40680699713`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40680699713),
+`run_attempt 1`) cerró el S5 en **8 passed al primer intento** y `certify` en **`GREEN`**.
 
 **Verificación (medida, dirigida por decisión del propietario):** `vitest run
 auto-hold-declarations` **49 passed / 2 ficheros** (`auto-hold-declarations.test.ts` **35**,

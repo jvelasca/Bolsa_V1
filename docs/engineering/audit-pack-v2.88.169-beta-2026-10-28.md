@@ -4,7 +4,13 @@
 > **Propósito:** reunir en un solo sitio **todo lo necesario para auditar esta versión desde GitHub sin credenciales**: identidad inmutable, cómo obtenerla, dónde está la evidencia, qué **certifica**, qué **NO**, y cómo **falsarlo**.
 > **Naturaleza:** sello de **seguimiento**. **`Δ motor = 0`** · **`Δ decisión = 0`** · **`Δ contrato HTTP = 0`** · **SIN migración nueva** · cambio de código **test-only**. Tag **unsigned** (anotado, sin firma GPG).
 >
-> **Estado (PRE-TAG → POST-TAG):** este documento se escribe **antes** del tag y su §1/§4 se completan en el commit **POST-TAG**, porque un tag no puede citar su propio objeto ni el resultado de su propio CI. La identidad real se verifica siempre con `git rev-parse v2.88.169-beta^{commit}`, **nunca** leyendo un sha escrito en un documento.
+> **Estado (POST-TAG):** identidad y CI **citados**. Tag anotado `v2.88.169-beta` = objeto
+> `d31df9b3f1bfbdae9c5f15d99ddf1280d53f425a` → commit `3ce94048b45112d66eb6e3614f2e81676a41be97`
+> (re-anclaje del pin PAPER), con `Release tag CI`
+> [run `40680699713`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40680699713) en **`success`**
+> (`run_attempt 1`, 14m24s) y artefacto `release-tag-ci-summary` con `status: GREEN`. La identidad
+> real se verifica siempre con `git rev-parse v2.88.169-beta^{commit}`, **nunca** leyendo un sha
+> escrito en un documento.
 
 ---
 
@@ -17,10 +23,10 @@ git clone --branch v2.88.169-beta --depth 1 https://github.com/jvelasca/Bolsa_V1
 O, más estricto (fija el **commit** exacto, no el tag):
 
 ```bash
-git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkout <SHA_DEL_SELLO>
+git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkout 3ce94048b45112d66eb6e3614f2e81676a41be97
 ```
 
-> El `<SHA_DEL_SELLO>` exacto se cita en §1 (commit **POST-TAG**).
+> El `<SHA_DEL_SELLO>` exacto es **`3ce94048b45112d66eb6e3614f2e81676a41be97`** (ver §1).
 
 ---
 
@@ -29,9 +35,9 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 | Elemento | Valor |
 | --- | --- |
 | **Tag (anotado)** | `v2.88.169-beta` — **unsigned** |
-| **Objeto de tag** | se cita en el commit POST-TAG |
-| **Commit apuntado** | se cita en el commit POST-TAG (**re-anclaje del pin** PAPER) |
-| **Commit del sello** | se cita en el commit POST-TAG (prueba + bump + docs) |
+| **Objeto de tag** | `d31df9b3f1bfbdae9c5f15d99ddf1280d53f425a` |
+| **Commit apuntado** | `3ce94048b45112d66eb6e3614f2e81676a41be97` (**re-anclaje del pin** PAPER) |
+| **Commit del sello** | `0b6f68f3` (prueba + bump + docs) y `1f084f18` (fix del teardown S5 + docs) |
 | **Base (tag anterior)** | `v2.88.165-beta` → `00f321bb6e05332b677e7c880ba23442af9486cf` |
 | **Punto de partida de la rama** | `a982f45c` (**3 commits** de distancia: `778c00a0`, `f47d548b`, `3f25b2b2`; **18 ficheros**) |
 | **Versión monorepo** | `2.11.169-beta` ([`package.json`](../../package.json)) |
@@ -55,7 +61,7 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 | Forma | Comando / enlace |
 | --- | --- |
 | Clonar el tag (recomendado) | `git clone --branch v2.88.169-beta --depth 1 https://github.com/jvelasca/Bolsa_V1.git` |
-| Fijar el commit SHA | ver §1 (commit POST-TAG) |
+| Fijar el commit SHA | `git checkout 3ce94048b45112d66eb6e3614f2e81676a41be97` |
 | Ver el árbol en la web | [tree/v2.88.169-beta](https://github.com/jvelasca/Bolsa_V1/tree/v2.88.169-beta) |
 
 ---
@@ -75,8 +81,22 @@ git clone https://github.com/jvelasca/Bolsa_V1.git && cd Bolsa_V1 && git checkou
 
 ## 4. CI público (citable)
 
-**`Release tag CI` del tag:** se cita en el commit **POST-TAG** (run id, `headSha`, duración,
-`run_attempt` y artefacto `release-tag-ci-summary` con `status: GREEN`).
+**`Release tag CI` del tag:** [**run `40680699713`**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40680699713)
+— `headSha` `3ce94048b45112d66eb6e3614f2e81676a41be97`, `ref` `refs/tags/v2.88.169-beta`,
+**`run_attempt 1`**, **`success`** (2026-10-28T11:32:07Z → 11:46:31Z, **14m24s**), artefacto
+[`release-tag-ci-summary`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40680699713/artifacts/12812694195)
+con `status: GREEN` y los **12** jobs obligatorios en `success`.
+
+**Cifras medidas en ese run** (logs públicos del run, no estimaciones):
+
+| Job | Medida |
+| --- | --- |
+| `shared` | **855 passed** / 99 ficheros (+1 `todo`); `window:test` **50 passed**; `freeze OK (3ce94048)` |
+| `frontend` | **2469 passed** / 322 ficheros; `lint` **0 errores** / 23 avisos; `contract:check` dentro del job |
+| `python` | **5653 passed**, 62 `skipped`; `ruff` **All checks passed**; `Contracts: 4 kept, 0 broken`; `mypy` |
+| `playwright (integrated AUTO S5)` | **8 passed (1.6m)**, sin `skipped`, al **primer** intento |
+| `replay-repro` | veredicto **`REPRODUCIDO`** (mismo contenido; `sha256 E9B7376BFE885C86CA4E56C0F37D79129B1EF8ECD325F2CE043A2D1AEF7F5625`) |
+| `certify` | `status: GREEN` con los **12** en `success` |
 
 **Intento previo (rojo, documentado y no borrado).** El tag se creó primero sobre `c04b9e3c`; su run
 [**40677571486**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40677571486) terminó en
@@ -201,4 +221,5 @@ pnpm --filter @bolsa/web lint
 `vitest auto-hold-declarations` **49 passed / 2 ficheros** (`auto-hold-declarations.test.ts` **35**,
 `auto-hold-declarations-panel.test.tsx` **14**) · `typecheck` **OK** · `lint` **0 errores / 23
 avisos** (preexistentes) · `test_dia_d_bump_guard` **2 passed** · `window:test` **50 passed** ·
-`contract:check` **OK**. Las cifras de las suites completas las publica el run del tag (§4).
+`contract:check` **OK**. En el CI del tag: `shared` **855**, `frontend` **2469**, `python` **5653**,
+S5 **8** (ver §4).
