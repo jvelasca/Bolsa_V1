@@ -557,4 +557,31 @@ describe("AutoHomePage", () => {
     expect(screen.getByTestId("auto-home-loading")).toBeTruthy();
     expect(screen.queryByTestId("auto-home-in-course-empty")).toBeNull();
   });
+
+  it("R-G2/UI5-04: dos preguntas, dos bloques; cada hecho sigue en su sitio", () => {
+    renderHome();
+
+    // Pregunta 1 — «¿qué ha decidido y, si no operó, por qué?»: un bloque, dos hechos.
+    const decisions = screen.getByTestId("auto-home-decisions-group");
+    expect(decisions.contains(screen.getByTestId("auto-home-decision"))).toBe(
+      true,
+    );
+    expect(decisions.contains(screen.getByTestId("auto-home-silence"))).toBe(
+      true,
+    );
+
+    // Pregunta 2 — «¿qué tengo en marcha y con cuánto?»: un bloque, dos hechos.
+    const operation = screen.getByTestId("auto-home-operation-group");
+    expect(operation.contains(screen.getByTestId("auto-home-operations"))).toBe(
+      true,
+    );
+    expect(
+      operation.contains(screen.getByTestId("auto-home-account-figures")),
+    ).toBe(true);
+
+    // La precisión semántica no se toca: la decisión no se contamina con el HOLD.
+    expect(screen.getByTestId("auto-home-decision").textContent).not.toContain(
+      "Por qué no operó",
+    );
+  });
 });

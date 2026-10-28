@@ -19,22 +19,15 @@ import { Gauge } from "lucide-react";
 import { AUTO_ROOT_PATH } from "@/features/auto/auto-nav";
 import {
   OPERATION_MODE_LABEL,
-  type OperationMode,
+  operationModeFromBookMode,
 } from "@/features/operations/operation-mode";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
-import type { DemoBookMode } from "@/features/trading/demo-book-prefs";
 import { cn } from "@/lib/utils";
-
-/** Un único casing de modo (`UI5-10`): el libro DEMO se traduce al vocabulario canónico. */
-const DEMO_BOOK_TO_OPERATION_MODE: Record<DemoBookMode, OperationMode> = {
-  manual: "MANUAL",
-  semi: "SEMI",
-  auto: "AUTO",
-};
 
 export function OperativeModeChip({ className }: { className?: string }) {
   const prefs = useDemoBookPrefs();
-  const label = OPERATION_MODE_LABEL[DEMO_BOOK_TO_OPERATION_MODE[prefs.mode]];
+  const mode = operationModeFromBookMode(prefs.mode).mode;
+  const label = mode ? OPERATION_MODE_LABEL[mode] : "MANUAL";
 
   return (
     <NavLink

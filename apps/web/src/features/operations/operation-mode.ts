@@ -50,6 +50,33 @@ export const SEMI_OPERATION_MODE: OperationModeBadgeV1 = {
   channel: "SIMULADO",
 };
 
+/** Operación abierta a mano por la persona, sin cola de propuestas. */
+export const MANUAL_OPERATION_MODE: OperationModeBadgeV1 = {
+  mode: "MANUAL",
+  channel: "SIMULADO",
+};
+
+/** Modo del libro operativo (`DemoBookMode`) traducido al vocabulario canónico. */
+const BOOK_MODE_BADGE: Record<
+  "manual" | "semi" | "auto",
+  OperationModeBadgeV1
+> = {
+  manual: MANUAL_OPERATION_MODE,
+  semi: SEMI_OPERATION_MODE,
+  auto: AUTO_OPERATION_MODE,
+};
+
+/**
+ * Insignia del modo vigente **declarado por el libro operativo**. La evidencia es la
+ * preferencia persistida (`demo-book-prefs`), no una inferencia sobre el ticker: el modo
+ * sigue cambiándose solo en su panel (`UI5-17`/`UI5-21`).
+ */
+export function operationModeFromBookMode(
+  mode: "manual" | "semi" | "auto",
+): OperationModeBadgeV1 {
+  return BOOK_MODE_BADGE[mode];
+}
+
 /** Etiqueta visible de la insignia: `AUTO · SIMULADO` o `Sin dato todavía`. */
 export function operationModeLabel(badge: OperationModeBadgeV1): string {
   return badge.mode

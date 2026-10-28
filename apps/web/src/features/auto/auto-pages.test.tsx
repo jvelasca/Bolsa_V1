@@ -237,6 +237,46 @@ describe("AutoOperarPage", () => {
     expect(screen.queryByTestId("auto-operar-hold-summary")).toBeNull();
   });
 
+  it("UI5-04: el HOLD se declara una sola vez y siempre antes de la lista", () => {
+    monitorState.signalHolds = [
+      {
+        instrumentId: "AAA",
+        reason: "gated_unavailable",
+        measurement: "COMPLETE",
+        facts: [],
+      },
+    ];
+    renderOperar();
+
+    const hold = screen.getByTestId("auto-operar-hold-summary");
+    const list = screen
+      .getAllByTestId("auto-operar-operation-link")[0]
+      ?.closest("ul");
+    expect(list).toBeTruthy();
+    expect(
+      hold.compareDocumentPosition(list!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Un hecho, una posición: no hay dos titulares de silencio en la página.
+    expect(
+      screen.getAllByTestId(/^auto-operar-(silence|hold-summary)$/),
+    ).toHaveLength(1);
+  });
+
+  it("UI5-04: sin operaciones el HOLD también va antes del vacío", () => {
+    monitorState.cycles = [];
+    monitorState.signalHolds = [];
+    renderOperar();
+
+    const silence = screen.getByTestId("auto-operar-silence");
+    const empty = screen.getByTestId("auto-operar-empty");
+    expect(
+      silence.compareDocumentPosition(empty) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      screen.getAllByTestId(/^auto-operar-(silence|hold-summary)$/),
+    ).toHaveLength(1);
+  });
+
   it("la carga se declara, no se presenta como vacío", () => {
     monitorState.isLoading = true;
     monitorState.cycles = [];

@@ -48,6 +48,7 @@ import { MesaLibroPanel } from "@/features/mesa/mesa-libro-panel";
 import { queryCollectionState } from "@/components/query-absence";
 import { DecisionSpineDetailPanel } from "@/features/mesa/decision-spine-detail-panel";
 import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
+import { operationModeFromBookMode } from "@/features/operations/operation-mode";
 import { parseHoyView } from "@/features/mesa/mesa-hoy-view";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
@@ -509,6 +510,12 @@ export function MesaHoyPage() {
     [bookPrefs.mode, autoArmed, killQuery.data?.paperDExecuteEnv],
   );
 
+  // `UI5-10` — el cubo donde se firma declara el modo vigente del libro (información, no acción).
+  const bookModeBadge = useMemo(
+    () => operationModeFromBookMode(bookPrefs.mode),
+    [bookPrefs.mode],
+  );
+
   const dailyDesk = useMemo(() => {
     const baseInput = {
       positions,
@@ -590,6 +597,15 @@ export function MesaHoyPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {/* RT-01 — el estado operativo es el hecho que decide si hoy se puede operar:
+                vive en la cabecera (información, no acción), no enterrado en el pie. */}
+            <span
+              className="inline-flex items-center rounded border border-border bg-muted/40 px-2 py-0.5 text-xs font-medium text-muted-foreground"
+              data-testid="hoy-operational-status"
+              data-status={operationalHeader.operationalStatusLabel}
+            >
+              Estado: {operationalHeader.operationalStatusLabel}
+            </span>
             <Button
               type="button"
               variant="outline"
@@ -658,23 +674,25 @@ export function MesaHoyPage() {
               inbox={dailyDesk}
               positions={positions}
               protectPlanByInstrument={protectPlanByInstrument}
+              modeBadge={bookModeBadge}
             />
 
             <div
               className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/15 px-3 py-2 text-xs"
               data-testid="daily-desk-footer"
             >
-              <div className="space-y-0.5">
-                <p className="font-medium text-foreground">
-                  Estado: {operationalHeader.operationalStatusLabel}
-                </p>
-                <p className="text-muted-foreground">
-                  Primero lo que requiere tu atención; después, oportunidades y
-                  posiciones. El detalle completo de cada bloque vive en
-                  «Avanzado».
-                </p>
-              </div>
+              <p className="text-muted-foreground">
+                El estado operativo y los avisos ya se declaran arriba; aquí
+                solo los accesos al detalle.
+              </p>
               <div className="flex flex-wrap gap-3">
+                <Link
+                  to={hoyViewHref(HOY_VIEW.posiciones)}
+                  className="text-primary hover:underline"
+                  data-testid="daily-desk-link-posiciones"
+                >
+                  Posiciones →
+                </Link>
                 <Link
                   to={hoyViewHref(HOY_VIEW.oportunidades)}
                   className="text-primary hover:underline"

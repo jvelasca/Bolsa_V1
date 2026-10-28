@@ -99,10 +99,29 @@ export function AutoOperarPage() {
         </p>
       </section>
 
-      <section className="space-y-2" aria-labelledby="auto-operar-list-heading">
+      <section
+        className="space-y-2 rounded-lg border border-border bg-card p-4"
+        aria-labelledby="auto-operar-list-heading"
+      >
         <AutoSectionBlockHeading id="auto-operar-list-heading">
           Operaciones
         </AutoSectionBlockHeading>
+
+        {/* B-5 — la señal (por qué no se abrió nada) se declara SIEMPRE en el mismo sitio: la
+            primera línea de Operaciones, antes de la lista. Un hecho, una posición, un rótulo
+            distinto solo según haya o no operaciones en la ventana. */}
+        {!isLoading && !isError && !holdNotConsulted && !hasOperations ? (
+          <AutoHoldSummaryLine
+            holds={view?.signalHolds ?? []}
+            testId="auto-operar-silence"
+          />
+        ) : null}
+        {!isLoading && !isError && hasOperations && holdsCount > 0 ? (
+          <AutoHoldSummaryLine
+            holds={view?.signalHolds ?? []}
+            testId="auto-operar-hold-summary"
+          />
+        ) : null}
 
         {isLoading ? (
           <p
@@ -139,12 +158,8 @@ export function AutoOperarPage() {
             >
               Sin operaciones en la ventana.
             </p>
-            {/* B-5 — el vacío no es mudo: se declara qué pasó con la señal (no evaluable ≠ sin
-                señal) y se ofrece el siguiente paso. El desglose completo vive en Actividad. */}
-            <AutoHoldSummaryLine
-              holds={view?.signalHolds ?? []}
-              testId="auto-operar-silence"
-            />
+            {/* B-5 — el vacío no es mudo: declara que no hay operaciones y ofrece el siguiente
+                paso. El desglose de la señal ya se declaró en la primera línea del bloque. */}
             <p className="text-sm text-muted-foreground">
               <Link
                 to={AUTO_ACTIVIDAD_PATH}
@@ -155,15 +170,6 @@ export function AutoOperarPage() {
               </Link>
             </p>
           </div>
-        ) : null}
-
-        {/* Con operaciones en curso, el silencio de la señal sigue siendo visible: no se oculta
-            porque haya actividad. El enlace a Actividad ya vive en el bloque de Oportunidades. */}
-        {!isLoading && !isError && hasOperations && holdsCount > 0 ? (
-          <AutoHoldSummaryLine
-            holds={view?.signalHolds ?? []}
-            testId="auto-operar-hold-summary"
-          />
         ) : null}
 
         {hasOperations ? (

@@ -405,4 +405,55 @@ describe("DailyDeskInbox V1.42 F6/F7", () => {
     expect(chip.textContent).toBe("Arriba en la lista no es una compra");
     expect(screen.queryByText(/Ranking ≠ BUY/)).toBeNull();
   });
+
+  it("UI5-10: el cubo donde se firma declara el modo, sin ofrecer control", () => {
+    const items = [
+      {
+        id: "pending-aapl",
+        kind: "pending_confirm" as const,
+        bucket: "requiere_accion" as const,
+        symbol: "AAPL",
+        attention: "ATTENTION" as const,
+        phrase: "Propuesta pendiente de firma",
+        reason: "#1",
+        ctaLabel: "Confirmar",
+        ctaKind: "pending_confirm" as const,
+        phaseLabel: null,
+        instrumentId: "inst-aapl",
+      },
+    ];
+    const buckets = emptyBuckets().map((b) => {
+      const bucketItems = items.filter((i) => i.bucket === b.id);
+      return { ...b, items: bucketItems, count: bucketItems.length };
+    });
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <DailyDeskInbox
+          inbox={inbox({ count: 1, items, buckets })}
+          modeBadge={{ mode: "SEMI", channel: "SIMULADO" }}
+        />
+      </MemoryRouter>,
+    );
+
+    const badge = screen.getByTestId("daily-desk-mode-requiere_accion");
+    expect(badge.textContent).toMatch(/SEMI/);
+    expect(badge.textContent).toMatch(/SIMULADO/);
+    // Información, no acción: el chip no es un control (`UI5-17`/`UI5-21`).
+    expect(badge.closest("button, a, select")).toBeNull();
+    // Un solo cubo lo declara: no se repite en los demás.
+    for (const id of DAILY_DESK_BUCKET_ORDER.filter(
+      (bucket) => bucket !== "requiere_accion",
+    )) {
+      expect(screen.queryByTestId(`daily-desk-mode-${id}`)).toBeNull();
+    }
+
+    // Sin modo declarado no se inventa uno.
+    rerender(
+      <MemoryRouter>
+        <DailyDeskInbox inbox={inbox({ count: 1, items, buckets })} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId("daily-desk-mode-requiere_accion")).toBeNull();
+  });
 });

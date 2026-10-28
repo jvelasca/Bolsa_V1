@@ -236,196 +236,218 @@ export function AutoHomePage() {
         </p>
       </section>
 
-      {/* 3 · DECISIÓN — hueco declarado: no se deduce del ranking (`UI5-12`).
+      {/* 3 · DECISIÓN — dos hechos de la MISMA pregunta en un solo bloque (`R-G2`, `UI5-04`):
+          qué ha decidido AUTO y, si no ha operado, por qué. */}
+      <div
+        className="space-y-3 rounded-lg border border-border bg-card p-4"
+        data-testid="auto-home-decisions-group"
+      >
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Decisión
+        </p>
+        {/* 3 · DECISIÓN — hueco declarado: no se deduce del ranking (`UI5-12`).
           La cadena completa es oportunidad → ranking → (decisión de cartera) → orden; AUTO todavía
           no registra una decisión de cartera duradera, así que el eslabón se declara «Sin dato
           todavía» en vez de inferirlo del TOP3. */}
-      <section
-        className="space-y-1"
-        aria-labelledby="auto-home-decision-heading"
-        data-testid="auto-home-decision"
-      >
-        <AutoSectionBlockHeading id="auto-home-decision-heading">
-          Decisión de cartera
-        </AutoSectionBlockHeading>
-        <p
-          className={cn("font-semibold", AUTO_USER_TEXT)}
-          data-testid="auto-home-decision-label"
-        >
-          {basic.decisionLabel}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          El ranking no es una decisión de compra. AUTO todavía no registra una
-          decisión de cartera (qué activo y cuánto entrar); hasta que exista,
-          este dato se declara «Sin dato todavía» y no se deduce del TOP3.
-        </p>
-      </section>
-
-      {/* 3b · POR QUÉ NO OPERÓ — el silencio de la señal tiene su propio bloque: no es la
-          decisión de cartera (que sigue siendo un hueco) ni se deduce del TOP3. */}
-      <section
-        className="space-y-1"
-        aria-labelledby="auto-home-silence-heading"
-        data-testid="auto-home-silence"
-      >
-        <AutoSectionBlockHeading id="auto-home-silence-heading">
-          Por qué no operó
-        </AutoSectionBlockHeading>
-        {summary.isLoading ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="auto-home-silence-loading"
-          >
-            Cargando las declaraciones de HOLD…
-          </p>
-        ) : null}
-        {!summary.isLoading && summary.isError ? (
-          <p
-            className="text-sm text-destructive"
-            data-testid="auto-home-silence-error"
-          >
-            No se pudieron leer las declaraciones de HOLD.
-          </p>
-        ) : null}
-        {!summary.isLoading && !summary.isError && holdNotConsulted ? (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="auto-home-silence-not-consulted"
-          >
-            {AUTO_HOLD_NOT_CONSULTED}
-          </p>
-        ) : null}
-        {!summary.isLoading && !summary.isError && !holdNotConsulted ? (
-          <>
-            <AutoHoldSummaryLine
-              holds={view?.signalHolds ?? []}
-              testId="auto-home-silence-headline"
-            />
-            <p className="text-sm text-muted-foreground">
-              <Link
-                to={AUTO_ACTIVIDAD_PATH}
-                className="underline hover:text-primary"
-                data-testid="auto-home-why-link"
-              >
-                {cycles.length > 0
-                  ? "Ver decisiones sin operación"
-                  : "Ver por qué AUTO no ha operado"}
-              </Link>
-            </p>
-          </>
-        ) : null}
-      </section>
-
-      {/* 4 · OPERACIÓN EN CURSO — un único bloque: contador + tarjetas + enlaces (UI5-04). */}
-      {!summary.isLoading && !summary.isError ? (
         <section
-          className="space-y-2"
-          aria-labelledby="auto-home-operations-heading"
-          data-testid="auto-home-operations"
+          className="space-y-1"
+          aria-labelledby="auto-home-decision-heading"
+          data-testid="auto-home-decision"
         >
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-            <AutoSectionBlockHeading id="auto-home-operations-heading">
-              Operación
-            </AutoSectionBlockHeading>
-            <span
-              className="text-xs text-muted-foreground"
-              data-testid="auto-home-tile-operations"
-            >
-              {summary.inCourseOperationsLabel}
-            </span>
-          </div>
-
-          {inCourseOperations.length > 0 ? (
-            <ul
-              className="space-y-1.5"
-              data-testid="auto-home-in-course-operations"
-            >
-              {inCourseOperations.map((operation) => (
-                <li key={operation.cycleId}>
-                  <Link
-                    to={autoOperacionHref(operation.cycleId)}
-                    data-testid="auto-home-operation-link"
-                    data-cycle-id={operation.cycleId}
-                    className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-accent hover:text-foreground"
-                  >
-                    <span className="font-medium">
-                      {operation.identity.label}
-                    </span>
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      Ver operación →
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p
-              className="text-sm text-muted-foreground"
-              data-testid="auto-home-in-course-empty"
-            >
-              Sin operaciones en curso.
-            </p>
-          )}
-
-          {cards.length > 0 ? (
-            <div
-              className="space-y-3"
-              aria-label="Tarjeta de la operación en curso"
-              data-testid="auto-home-operation-cards"
-            >
-              {cards.map((card) => (
-                <AutoOperationCardView key={card.cycleId} card={card} />
-              ))}
-            </div>
-          ) : null}
-
-          {/* El listado completo de operaciones vive en Operar: pertenece a Operación,
-              no a Oportunidades (`UI5-04`, oportunidad ≠ operación). */}
+          <AutoSectionBlockHeading id="auto-home-decision-heading">
+            Decisión de cartera
+          </AutoSectionBlockHeading>
+          <p
+            className={cn("font-semibold", AUTO_USER_TEXT)}
+            data-testid="auto-home-decision-label"
+          >
+            {basic.decisionLabel}
+          </p>
           <p className="text-sm text-muted-foreground">
-            <Link
-              to={AUTO_OPERAR_PATH}
-              className="underline hover:text-primary"
-              data-testid="auto-home-all-operations-link"
-            >
-              Ver todas las operaciones
-            </Link>{" "}
-            en Operar.
+            El ranking no es una decisión de compra. AUTO todavía no registra
+            una decisión de cartera (qué activo y cuánto entrar); hasta que
+            exista, este dato se declara «Sin dato todavía» y no se deduce del
+            TOP3.
           </p>
         </section>
-      ) : null}
 
-      {/* 5 · DINERO — cifras ya medidas de la cuenta simulada. El chip `SIMULADO` lo pinta el
+        {/* 3b · POR QUÉ NO OPERÓ — el silencio de la señal tiene su propio bloque: no es la
+          decisión de cartera (que sigue siendo un hueco) ni se deduce del TOP3. */}
+        <section
+          className="space-y-1"
+          aria-labelledby="auto-home-silence-heading"
+          data-testid="auto-home-silence"
+        >
+          <AutoSectionBlockHeading id="auto-home-silence-heading">
+            Por qué no operó
+          </AutoSectionBlockHeading>
+          {summary.isLoading ? (
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="auto-home-silence-loading"
+            >
+              Cargando las declaraciones de HOLD…
+            </p>
+          ) : null}
+          {!summary.isLoading && summary.isError ? (
+            <p
+              className="text-sm text-destructive"
+              data-testid="auto-home-silence-error"
+            >
+              No se pudieron leer las declaraciones de HOLD.
+            </p>
+          ) : null}
+          {!summary.isLoading && !summary.isError && holdNotConsulted ? (
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="auto-home-silence-not-consulted"
+            >
+              {AUTO_HOLD_NOT_CONSULTED}
+            </p>
+          ) : null}
+          {!summary.isLoading && !summary.isError && !holdNotConsulted ? (
+            <>
+              <AutoHoldSummaryLine
+                holds={view?.signalHolds ?? []}
+                testId="auto-home-silence-headline"
+              />
+              <p className="text-sm text-muted-foreground">
+                <Link
+                  to={AUTO_ACTIVIDAD_PATH}
+                  className="underline hover:text-primary"
+                  data-testid="auto-home-why-link"
+                >
+                  {cycles.length > 0
+                    ? "Ver decisiones sin operación"
+                    : "Ver por qué AUTO no ha operado"}
+                </Link>
+              </p>
+            </>
+          ) : null}
+        </section>
+      </div>
+
+      {/* 4 · OPERACIÓN EN CURSO — un único bloque: contador + tarjetas + enlaces (UI5-04). */}
+      <div
+        className="space-y-3 rounded-lg border border-border bg-card p-4"
+        data-testid="auto-home-operation-group"
+      >
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Tu operación
+        </p>
+        {!summary.isLoading && !summary.isError ? (
+          <section
+            className="space-y-2"
+            aria-labelledby="auto-home-operations-heading"
+            data-testid="auto-home-operations"
+          >
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+              <AutoSectionBlockHeading id="auto-home-operations-heading">
+                Operación
+              </AutoSectionBlockHeading>
+              <span
+                className="text-xs text-muted-foreground"
+                data-testid="auto-home-tile-operations"
+              >
+                {summary.inCourseOperationsLabel}
+              </span>
+            </div>
+
+            {inCourseOperations.length > 0 ? (
+              <ul
+                className="space-y-1.5"
+                data-testid="auto-home-in-course-operations"
+              >
+                {inCourseOperations.map((operation) => (
+                  <li key={operation.cycleId}>
+                    <Link
+                      to={autoOperacionHref(operation.cycleId)}
+                      data-testid="auto-home-operation-link"
+                      data-cycle-id={operation.cycleId}
+                      className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-accent hover:text-foreground"
+                    >
+                      <span className="font-medium">
+                        {operation.identity.label}
+                      </span>
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        Ver operación →
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="auto-home-in-course-empty"
+              >
+                Sin operaciones en curso.
+              </p>
+            )}
+
+            {cards.length > 0 ? (
+              <div
+                className="space-y-3"
+                aria-label="Tarjeta de la operación en curso"
+                data-testid="auto-home-operation-cards"
+              >
+                {cards.map((card) => (
+                  <AutoOperationCardView key={card.cycleId} card={card} />
+                ))}
+              </div>
+            ) : null}
+
+            {/* El listado completo de operaciones vive en Operar: pertenece a Operación,
+              no a Oportunidades (`UI5-04`, oportunidad ≠ operación). */}
+            <p className="text-sm text-muted-foreground">
+              <Link
+                to={AUTO_OPERAR_PATH}
+                className="underline hover:text-primary"
+                data-testid="auto-home-all-operations-link"
+              >
+                Ver todas las operaciones
+              </Link>{" "}
+              en Operar.
+            </p>
+          </section>
+        ) : null}
+
+        {/* 5 · DINERO — cifras ya medidas de la cuenta simulada. El chip `SIMULADO` lo pinta el
           semáforo de realidad del layout; aquí no se repite (`UI5-04`). Un único hueco
           declarado: si la cuenta no está medida, no se apilan cifras «Sin dato todavía». */}
-      <section
-        className="space-y-2"
-        aria-labelledby="auto-home-money-heading"
-        data-testid="auto-home-account-figures"
-      >
-        <AutoSectionBlockHeading id="auto-home-money-heading">
-          Dinero
-        </AutoSectionBlockHeading>
-        {accountMeasured ? null : (
-          <p
-            className="text-sm text-muted-foreground"
-            data-testid="auto-home-money-absent"
-          >
-            {AUTO_HOME_NO_DATA_LABEL}
-          </p>
-        )}
-        <div className="grid gap-3 sm:grid-cols-2">
-          {visibleFigures.map((figure) => (
-            <div key={figure.id} data-testid={`auto-home-figure-${figure.id}`}>
-              <p className={cn(AUTO_USER_TEXT, "text-muted-foreground")}>
-                {figure.label}
-              </p>
-              <p className={cn("mt-0.5 font-semibold", AUTO_USER_TEXT)}>
-                {figure.value}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+        <section
+          className="space-y-2"
+          aria-labelledby="auto-home-money-heading"
+          data-testid="auto-home-account-figures"
+        >
+          <AutoSectionBlockHeading id="auto-home-money-heading">
+            Dinero
+          </AutoSectionBlockHeading>
+          {accountMeasured ? null : (
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="auto-home-money-absent"
+            >
+              {AUTO_HOME_NO_DATA_LABEL}
+            </p>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {visibleFigures.map((figure) => (
+              <div
+                key={figure.id}
+                data-testid={`auto-home-figure-${figure.id}`}
+              >
+                <p className={cn(AUTO_USER_TEXT, "text-muted-foreground")}>
+                  {figure.label}
+                </p>
+                <p className={cn("mt-0.5 font-semibold", AUTO_USER_TEXT)}>
+                  {figure.value}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
 
       {/* 6 · DETALLE — todo lo demás, bajo demanda (no compite en el primer nivel). */}
       <details className="space-y-2" data-testid="auto-home-activity">

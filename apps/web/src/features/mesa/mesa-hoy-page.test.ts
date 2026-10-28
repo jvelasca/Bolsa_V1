@@ -339,4 +339,29 @@ describe("Hoy Daily Desk chrome (V1.42 F6)", () => {
     expect(src).not.toMatch(/daily-desk-link-consola/);
     expect(src).not.toMatch(/Consola\s*→/);
   });
+
+  it("RT-01 — el estado operativo se declara en la cabecera, no enterrado en el pie", () => {
+    const statusAt = src.indexOf('data-testid="hoy-operational-status"');
+    const inboxAt = src.indexOf('data-testid="hoy-inbox"');
+    expect(statusAt).toBeGreaterThan(-1);
+    expect(statusAt).toBeLessThan(inboxAt);
+
+    // Un hecho, una vez: el pie ya no repite el estado.
+    const footerAt = src.indexOf('data-testid="daily-desk-footer"');
+    expect(footerAt).toBeGreaterThan(inboxAt);
+    expect(src.slice(footerAt)).not.toMatch(/Estado:/);
+  });
+
+  it("RT-04 — un solo mecanismo de profundidad: no se añaden pestañas de vista", () => {
+    expect(src).toMatch(/<MesaHoyDetailsMenu/);
+    expect(src).not.toMatch(/role="tablist"/);
+    expect(src).not.toMatch(/hoy-view-tabs/);
+  });
+
+  it("UI5-10 — el modo vigente acompaña al cubo donde se firma, sin cambiar el modo", () => {
+    expect(src).toMatch(/modeBadge=\{bookModeBadge\}/);
+    expect(src).toMatch(/operationModeFromBookMode\(bookPrefs\.mode\)/);
+    // No se introduce un segundo selector de modo en Hoy (`UI5-17`/`UI5-21`).
+    expect(src).not.toMatch(/setMode\(/);
+  });
 });

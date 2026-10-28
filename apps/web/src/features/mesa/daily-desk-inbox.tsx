@@ -18,6 +18,8 @@ import {
   dailyDeskBucketDefaultExpanded,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
+import { ModeBadge } from "@/components/mode-badge";
+import type { OperationModeBadgeV1 } from "@/features/operations/operation-mode";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
@@ -113,12 +115,18 @@ export function DailyDeskInbox({
   inbox,
   positions,
   protectPlanByInstrument,
+  modeBadge,
   className,
 }: {
   inbox: DailyDeskInboxV1;
   /** F7 — lookup para enqueue salida → Confirm. */
   positions?: readonly PositionDto[];
   protectPlanByInstrument?: Map<string, ProtectPlanV1> | null;
+  /**
+   * `UI5-10` — modo vigente del libro operativo, para declararlo en el cubo donde se firma.
+   * Es **información**: el chip no cambia el modo (`UI5-17`/`UI5-21`).
+   */
+  modeBadge?: OperationModeBadgeV1 | null;
   className?: string;
 }) {
   const positionsById = useMemo(() => {
@@ -181,6 +189,7 @@ export function DailyDeskInbox({
             bucket={bucket}
             positionsById={positionsById}
             protectPlanByInstrument={protectPlanByInstrument}
+            modeBadge={modeBadge}
             defaultExpanded={dailyDeskBucketDefaultExpanded(bucket.id)}
           />
         ))}
@@ -193,11 +202,13 @@ function DailyDeskBucket({
   bucket,
   positionsById,
   protectPlanByInstrument,
+  modeBadge,
   defaultExpanded = true,
 }: {
   bucket: DailyDeskBucketV1;
   positionsById: Map<string, PositionDto>;
   protectPlanByInstrument?: Map<string, ProtectPlanV1> | null;
+  modeBadge?: OperationModeBadgeV1 | null;
   defaultExpanded?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -227,6 +238,13 @@ function DailyDeskBucket({
           {bucket.label}
         </h3>
         <div className="flex items-center gap-2">
+          {/* `UI5-10` — donde se firma, se declara el modo. Información, no acción. */}
+          {bucket.id === "requiere_accion" && bucket.count > 0 && modeBadge ? (
+            <ModeBadge
+              badge={modeBadge}
+              testId={`daily-desk-mode-${bucket.id}`}
+            />
+          ) : null}
           {bucket.count > 0 ? (
             <span className="text-[11px] tabular-nums text-muted-foreground">
               {bucket.count}
