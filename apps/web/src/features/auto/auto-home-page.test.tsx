@@ -27,6 +27,7 @@ vi.mock("@/features/auto/auto-reality-strip", async () => {
 const monitorState = vi.hoisted(() => ({
   header: null as Record<string, unknown> | null,
   cycles: [] as Array<Record<string, unknown>>,
+  signalHolds: [] as Array<Record<string, unknown>>,
   isLoading: false,
   isError: false,
 }));
@@ -34,7 +35,11 @@ const monitorState = vi.hoisted(() => ({
 vi.mock("@/features/auto-monitor/use-auto-operational-monitor", () => ({
   useAutoOperationalMonitor: () => ({
     view: monitorState.header
-      ? { header: monitorState.header, cycles: monitorState.cycles }
+      ? {
+          header: monitorState.header,
+          cycles: monitorState.cycles,
+          signalHolds: monitorState.signalHolds,
+        }
       : null,
     isLoading: monitorState.isLoading,
     isError: monitorState.isError,
@@ -100,6 +105,7 @@ beforeEach(() => {
     nextDecisionAt: "2026-10-06T10:00:00Z",
   };
   monitorState.cycles = [OPEN_CYCLE];
+  monitorState.signalHolds = [];
   monitorState.isLoading = false;
   monitorState.isError = false;
   financialState.operationalState = "OK";
@@ -275,6 +281,71 @@ describe("AutoHomePage", () => {
     const activityLine = screen.getByTestId("auto-home-activity-line");
     expect(activityLine.textContent).not.toContain("Esperando nueva señal");
     expect(activityLine.textContent).not.toContain("análisis");
+  });
+
+  it("«Por qué no operó» tiene su propio bloque y no se mezcla con la decisión de cartera (B-5)", () => {
+    monitorState.signalHolds = [
+      {
+        instrumentId: "AAA",
+        reason: "warmup_unmeasurable",
+        measurement: "COMPLETE",
+        facts: [],
+      },
+      {
+        instrumentId: "BBB",
+        reason: "no_signal",
+        measurement: "COMPLETE",
+        facts: [],
+      },
+    ];
+    renderHome();
+
+    // La precisión semántica se conserva: el ranking sigue sin ser una decisión de compra, y la
+    // decisión de cartera no se contamina con el estado de la señal.
+    expect(screen.getByTestId("auto-home-decision-label").textContent).toBe(
+      "Sin dato todavía",
+    );
+    const decision = screen.getByTestId("auto-home-decision");
+    expect(decision.textContent).toContain(
+      "El ranking no es una decisión de compra",
+    );
+    expect(decision.textContent).not.toContain("1 sin señal");
+
+    // El silencio vive en su propia sección, con el titular honesto y su siguiente paso.
+    const silence = screen.getByTestId("auto-home-silence");
+    expect(silence.textContent).toContain("Por qué no operó");
+    expect(
+      screen.getByTestId("auto-home-silence-headline").textContent,
+    ).toContain("1 sin señal");
+    expect(
+      screen.getByTestId("auto-home-silence-headline").textContent,
+    ).toContain("1 HOLD no evaluable");
+    const link = screen.getByTestId("auto-home-why-link");
+    expect(link.getAttribute("href")).toBe("/auto/actividad");
+    // Con operaciones en curso el enlace no afirma que AUTO no haya operado nunca.
+    expect(link.textContent).toBe("Ver decisiones sin operación");
+  });
+
+  it("sin operaciones el enlace dice por qué AUTO no ha operado", () => {
+    monitorState.cycles = [];
+    renderHome();
+
+    expect(screen.getByTestId("auto-home-why-link").textContent).toBe(
+      "Ver por qué AUTO no ha operado",
+    );
+    expect(screen.getByTestId("auto-home-silence-headline").textContent).toBe(
+      "Sin HOLD declarados en la ventana",
+    );
+  });
+
+  it("un fallo del monitor se declara como error del silencio, no como «sin HOLD»", () => {
+    monitorState.isError = true;
+    renderHome();
+
+    expect(screen.getByTestId("auto-home-silence-error").textContent).toContain(
+      "No se pudieron leer las declaraciones",
+    );
+    expect(screen.queryByTestId("auto-home-silence-headline")).toBeNull();
   });
 
   it("la fase operacional del tick se pinta sin inventar desde RUNNING", () => {

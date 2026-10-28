@@ -12,12 +12,14 @@
 
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useAutoOperationalMonitor } from "@/features/auto-monitor/use-auto-operational-monitor";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { AUTO_USER_TEXT } from "@/features/auto/auto-typography";
+import { AutoHoldDeclarationsPanel } from "@/features/auto/auto-hold-declarations-panel";
 import { autoOperacionHref } from "@/features/auto/auto-nav";
 import {
   AUTO_NO_TRADE_PANEL_DESCRIPTION,
@@ -90,7 +92,7 @@ function LayerSection({ layer }: { layer: AutoNoTradeLayerV1 }) {
       data-layer={layer.id}
       data-measured={layer.measured ? "true" : "false"}
     >
-      <p className={cn("font-medium", AUTO_USER_TEXT)}>{layer.title}</p>
+      <h3 className={cn("font-medium", AUTO_USER_TEXT)}>{layer.title}</h3>
       <p className="text-xs text-muted-foreground">{layer.honestyNote}</p>
       <ol className="space-y-1.5" data-testid="auto-no-trade-rows">
         {layer.rows.map((row) => (
@@ -132,8 +134,11 @@ function LayerSection({ layer }: { layer: AutoNoTradeLayerV1 }) {
 
 export function AutoNoTradeExplanationView({
   explanation,
+  signalSlot,
 }: {
   explanation: AutoNoTradeExplanationV1;
+  /** B-5 / O-6 — declaraciones de HOLD con su procedencia (primera capa de la explicación). */
+  signalSlot?: ReactNode;
 }) {
   return (
     <section
@@ -159,6 +164,7 @@ export function AutoNoTradeExplanationView({
           {explanation.headline}
         </p>
       </div>
+      {signalSlot}
       {explanation.layers.map((layer) => (
         <LayerSection key={layer.id} layer={layer} />
       ))}
@@ -166,15 +172,17 @@ export function AutoNoTradeExplanationView({
   );
 }
 
-export function AutoNoTradePanel() {
+export function AutoNoTradePanel({ day }: { day?: string } = {}) {
   const { effectiveAccountId } = useActiveAccount();
   const { view, isLoading, isError } = useAutoOperationalMonitor();
   const blocked = useMesaEntriesBlocked();
+  // El día explicado es UNO solo: el mismo que alimenta el informe diario, las capas y los HOLD.
+  const explainedDay = day ?? todayIso();
 
   const dailyQuery = useQuery({
     queryKey: ["paper-desk-daily-report", effectiveAccountId, "auto-actividad"],
     queryFn: () =>
-      api.getPaperDeskDailyReport(effectiveAccountId!, { asOf: todayIso() }),
+      api.getPaperDeskDailyReport(effectiveAccountId!, { asOf: explainedDay }),
     enabled: Boolean(effectiveAccountId),
     staleTime: 60_000,
   });
@@ -222,7 +230,7 @@ export function AutoNoTradePanel() {
   );
 
   const explanation = buildAutoNoTradeExplanation({
-    day: todayIso(),
+    day: explainedDay,
     discovery: {
       loaded: dailyQuery.isSuccess && daily != null,
       estudioStatus: daily?.estudioStatus ?? null,
@@ -236,5 +244,20 @@ export function AutoNoTradePanel() {
     },
   });
 
-  return <AutoNoTradeExplanationView explanation={explanation} />;
+  return (
+    <AutoNoTradeExplanationView
+      explanation={explanation}
+      signalSlot={
+        <AutoHoldDeclarationsPanel
+          holds={view?.signalHolds ?? []}
+          day={explainedDay}
+          headingLevel="h3"
+          testIdPrefix="auto-no-trade-hold"
+          title="Por qué hubo HOLD en la señal (hoy)"
+          loading={isLoading}
+          error={isError}
+        />
+      }
+    />
+  );
 }

@@ -56,6 +56,7 @@ import { AutoHumanStateBadge } from "@/features/auto/auto-human-state-badge";
 import { buildAutoStateWhy } from "@/features/auto/auto-why";
 import { AutoWhyButton } from "@/features/auto/auto-why-button";
 import { AutoTop3Panel } from "@/features/auto/auto-top3-panel";
+import { AutoHoldSummaryLine } from "@/features/auto/auto-hold-declarations-panel";
 import { useAutoTop3Opportunities } from "@/features/auto/use-auto-top3-opportunities";
 import { AUTO_USER_TEXT } from "@/features/auto/auto-typography";
 import { api } from "@/lib/api";
@@ -254,6 +255,53 @@ export function AutoHomePage() {
           decisión de cartera (qué activo y cuánto entrar); hasta que exista,
           este dato se declara «Sin dato todavía» y no se deduce del TOP3.
         </p>
+      </section>
+
+      {/* 3b · POR QUÉ NO OPERÓ — el silencio de la señal tiene su propio bloque: no es la
+          decisión de cartera (que sigue siendo un hueco) ni se deduce del TOP3. */}
+      <section
+        className="space-y-1"
+        aria-labelledby="auto-home-silence-heading"
+        data-testid="auto-home-silence"
+      >
+        <AutoSectionBlockHeading id="auto-home-silence-heading">
+          Por qué no operó
+        </AutoSectionBlockHeading>
+        {summary.isLoading ? (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="auto-home-silence-loading"
+          >
+            Cargando las declaraciones de HOLD…
+          </p>
+        ) : null}
+        {!summary.isLoading && summary.isError ? (
+          <p
+            className="text-sm text-destructive"
+            data-testid="auto-home-silence-error"
+          >
+            No se pudieron leer las declaraciones de HOLD.
+          </p>
+        ) : null}
+        {!summary.isLoading && !summary.isError ? (
+          <>
+            <AutoHoldSummaryLine
+              holds={view?.signalHolds ?? []}
+              testId="auto-home-silence-headline"
+            />
+            <p className="text-sm text-muted-foreground">
+              <Link
+                to={AUTO_ACTIVIDAD_PATH}
+                className="underline hover:text-primary"
+                data-testid="auto-home-why-link"
+              >
+                {cycles.length > 0
+                  ? "Ver decisiones sin operación"
+                  : "Ver por qué AUTO no ha operado"}
+              </Link>
+            </p>
+          </>
+        ) : null}
       </section>
 
       {/* 4 · OPERACIÓN EN CURSO — un único bloque: contador + tarjetas + enlaces (UI5-04). */}

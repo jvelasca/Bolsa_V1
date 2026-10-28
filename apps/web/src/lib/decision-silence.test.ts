@@ -5,6 +5,7 @@ import {
   decisionSilenceLabel,
   decisionSilenceReasonLabel,
   decisionSilenceSummary,
+  isNotEvaluableCause,
   notEvaluableHolds,
 } from "@/lib/decision-silence";
 
@@ -124,6 +125,12 @@ describe("decisionSilenceSummary", () => {
     expect(summary.headline).toBe("2 HOLD sin señal");
     expect(summary.detail).toBeNull();
   });
+
+  it("nombra el alcance leído cuando no es la ventana completa", () => {
+    expect(decisionSilenceSummary([], "el día explicado").headline).toBe(
+      "Sin HOLD declarados en el día explicado",
+    );
+  });
 });
 
 describe("etiquetas", () => {
@@ -158,5 +165,29 @@ describe("notEvaluableHolds", () => {
       "no_snapshot",
       null,
     ]);
+  });
+});
+
+describe("isNotEvaluableCause", () => {
+  it("es la fuente única del conjunto «hueco a resolver»", () => {
+    expect(isNotEvaluableCause("not_evaluable")).toBe(true);
+    expect(isNotEvaluableCause("unmeasured")).toBe(true);
+    // Una decisión declarada no es un hueco: la señal apagada y la no ejecutable se excluyen.
+    expect(isNotEvaluableCause("no_signal")).toBe(false);
+    expect(isNotEvaluableCause("disabled")).toBe(false);
+    expect(isNotEvaluableCause("not_executable")).toBe(false);
+  });
+
+  it("coincide con las filas que devuelve notEvaluableHolds", () => {
+    const holds = [
+      hold("no_signal"),
+      hold("no_snapshot"),
+      hold("active_signal_disabled"),
+      hold(null),
+    ];
+    const expected = holds.filter((item) =>
+      isNotEvaluableCause(decisionSilenceCause(item.reason)),
+    );
+    expect(notEvaluableHolds(holds)).toEqual(expected);
   });
 });

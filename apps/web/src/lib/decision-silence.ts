@@ -170,11 +170,13 @@ function plural(count: number, singular: string, pluralForm: string): string {
  * Titular honesto de los HOLD declarados.
  *
  * - Sin declaraciones: se dice que no consta, **no** «sin señal» (no hay hecho que lo afirme).
+ *   `windowLabel` nombra el alcance leído (`la ventana`, `el día explicado`).
  * - Si hay no evaluables, el titular los separa del resto: «N sin señal · M no evaluables».
  * - Si **todo** lo declarado es no evaluable, el titular no menciona «sin señal».
  */
 export function decisionSilenceSummary(
   holds: ReadonlyArray<{ reason?: string | null }>,
+  windowLabel = "la ventana",
 ): DecisionSilenceSummary {
   const breakdown = decisionSilenceBreakdown(holds);
   const total = holds.length;
@@ -183,7 +185,7 @@ export function decisionSilenceSummary(
     return {
       breakdown,
       total,
-      headline: "Sin HOLD declarados en la ventana",
+      headline: `Sin HOLD declarados en ${windowLabel}`,
       detail: null,
     };
   }
@@ -250,12 +252,21 @@ function describeNotEvaluable(
   return parts.length ? `${parts.join(" · ")}.` : null;
 }
 
+/**
+ * `true` si la causa es un hueco a resolver (`no evaluable` o `sin dato`), no una decisión.
+ *
+ * Fuente ÚNICA del conjunto: el panel de HOLD y el aviso ámbar lo consultan aquí en lugar de
+ * declarar su propia lista, para que monitor y Actividad no discrepen sobre qué es un hueco.
+ */
+export function isNotEvaluableCause(cause: DecisionSilenceCause): boolean {
+  return cause === "not_evaluable" || cause === "unmeasured";
+}
+
 /** Los HOLD no evaluables, para listarlos junto al titular sin abrir el journal. */
 export function notEvaluableHolds<T extends { reason?: string | null }>(
   holds: readonly T[],
 ): T[] {
-  return holds.filter((hold) => {
-    const cause = decisionSilenceCause(hold.reason);
-    return cause === "not_evaluable" || cause === "unmeasured";
-  });
+  return holds.filter((hold) =>
+    isNotEvaluableCause(decisionSilenceCause(hold.reason)),
+  );
 }

@@ -30,6 +30,7 @@ import {
 } from "@/features/auto/auto-nav";
 import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
 import { AutoTop3Panel } from "@/features/auto/auto-top3-panel";
+import { AutoHoldSummaryLine } from "@/features/auto/auto-hold-declarations-panel";
 import { AutoOperarVerifyAction } from "@/features/auto/auto-operar-verify-action";
 import { useAutoTop3Opportunities } from "@/features/auto/use-auto-top3-opportunities";
 import { AUTO_OPERATION_MODE } from "@/features/operations/operation-mode";
@@ -41,6 +42,9 @@ export function AutoOperarPage() {
   const top3 = useAutoTop3Opportunities();
   const cycles = view?.cycles ?? [];
   const hasOperations = cycles.length > 0;
+  // B-5 — declaraciones de HOLD de la ACTIVE: «no evaluable» no se presenta como «sin señal» y
+  // la ausencia de declaraciones no se presenta como «no hubo HOLD».
+  const holdsCount = view?.signalHolds?.length ?? 0;
 
   return (
     <div className="space-y-6" data-testid="auto-operar-page">
@@ -96,7 +100,7 @@ export function AutoOperarPage() {
 
         {isLoading ? (
           <p
-            className="text-xs text-muted-foreground"
+            className="text-sm text-muted-foreground"
             data-testid="auto-operar-loading"
           >
             Cargando operaciones…
@@ -113,12 +117,38 @@ export function AutoOperarPage() {
         ) : null}
 
         {!isLoading && !isError && !hasOperations ? (
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid="auto-operar-empty"
-          >
-            Sin operaciones en la ventana.
-          </p>
+          <div className="space-y-1" data-testid="auto-operar-empty-block">
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="auto-operar-empty"
+            >
+              Sin operaciones en la ventana.
+            </p>
+            {/* B-5 — el vacío no es mudo: se declara qué pasó con la señal (no evaluable ≠ sin
+                señal) y se ofrece el siguiente paso. El desglose completo vive en Actividad. */}
+            <AutoHoldSummaryLine
+              holds={view?.signalHolds ?? []}
+              testId="auto-operar-silence"
+            />
+            <p className="text-sm text-muted-foreground">
+              <Link
+                to={AUTO_ACTIVIDAD_PATH}
+                className="underline hover:text-primary"
+                data-testid="auto-operar-why-link"
+              >
+                Ver por qué AUTO no operó
+              </Link>
+            </p>
+          </div>
+        ) : null}
+
+        {/* Con operaciones en curso, el silencio de la señal sigue siendo visible: no se oculta
+            porque haya actividad. El enlace a Actividad ya vive en el bloque de Oportunidades. */}
+        {!isLoading && !isError && hasOperations && holdsCount > 0 ? (
+          <AutoHoldSummaryLine
+            holds={view?.signalHolds ?? []}
+            testId="auto-operar-hold-summary"
+          />
         ) : null}
 
         {hasOperations ? (

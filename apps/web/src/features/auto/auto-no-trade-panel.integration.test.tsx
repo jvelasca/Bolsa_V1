@@ -360,3 +360,122 @@ describe("P4 · universo unavailable ≠ empty", () => {
     });
   });
 });
+
+describe("B-5 · HOLD declarados dentro de la explicación", () => {
+  it("las declaraciones son una capa de la MISMA sección, con su procedencia", async () => {
+    state.monitor = {
+      view: {
+        cycles: [],
+        signalHolds: [
+          {
+            instrumentId: "AAA",
+            barTimestamp: `${localToday()}T00:00:00Z`,
+            at: `${localToday()}T00:00:01Z`,
+            reason: "warmup_unmeasurable",
+            measurement: "COMPLETE",
+            facts: [
+              {
+                key: "featureSource",
+                value: "real",
+                measurement: "COMPLETE",
+              },
+              {
+                key: "signalWindowBars",
+                value: 120,
+                measurement: "COMPLETE",
+              },
+              {
+                key: "warmupBars",
+                value: 201,
+                measurement: "COMPLETE",
+              },
+              {
+                key: "gatedState",
+                value: { holdsLong: null, source: "unavailable" },
+                measurement: "COMPLETE",
+              },
+            ],
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    };
+
+    renderPanel();
+
+    const panel = await screen.findByTestId("auto-no-trade-panel");
+    const holds = within(panel).getByTestId("auto-no-trade-hold");
+
+    const item = within(holds).getByTestId("auto-no-trade-hold-item");
+    expect(item.getAttribute("data-cause")).toBe("not_evaluable");
+    expect(item.textContent).toContain("AAA");
+    expect(item.textContent).toContain("warmup no medible");
+
+    const values = within(holds).getAllByTestId(
+      "auto-no-trade-hold-provenance-value",
+    );
+    expect(values[0]?.textContent).toBe("datos reales");
+    expect(values[1]?.textContent).toBe("120 barras");
+    expect(values[2]?.textContent).toBe("201 barras");
+    expect(values[3]?.textContent).toContain("libro no legible");
+
+    // El crudo sigue disponible, pero sólo en el detalle técnico de la fila.
+    const details = within(holds).getByTestId(
+      "auto-no-trade-hold-item-technical",
+    );
+    expect(
+      within(details).getByTestId("auto-no-trade-hold-technical-instrument")
+        .textContent,
+    ).toContain("AAA");
+  });
+
+  it("un fallo del monitor se declara como hueco, no como «sin HOLD»", async () => {
+    state.monitor = { view: null, isLoading: false, isError: true };
+    renderPanel();
+
+    const error = await screen.findByTestId("auto-no-trade-hold-error");
+    expect(error.textContent).toContain("No se pudieron leer");
+    expect(screen.queryByTestId("auto-no-trade-hold-empty")).toBeNull();
+  });
+
+  it("el panel de HOLD explica el día y declara lo que queda fuera de la ventana", async () => {
+    state.monitor = {
+      view: {
+        cycles: [],
+        signalHolds: [
+          {
+            instrumentId: "AAA",
+            barTimestamp: `${localToday()}T00:00:00Z`,
+            at: `${localToday()}T00:00:01Z`,
+            reason: "no_signal",
+            measurement: "COMPLETE",
+            facts: [],
+          },
+          {
+            instrumentId: "BBB",
+            barTimestamp: "2020-01-01T00:00:00Z",
+            at: "2020-01-01T00:00:01Z",
+            reason: "warmup_unmeasurable",
+            measurement: "COMPLETE",
+            facts: [],
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    };
+    renderPanel();
+
+    const holds = await screen.findByTestId("auto-no-trade-hold");
+    // Sólo el HOLD del día explicado entra en el primer nivel.
+    const items = within(holds).getAllByTestId("auto-no-trade-hold-item");
+    expect(items).toHaveLength(1);
+    expect(items[0]?.textContent).toContain("AAA");
+    expect(within(holds).queryByText("BBB")).toBeNull();
+    // Y el hueco temporal se declara, no se silencia.
+    expect(
+      within(holds).getByTestId("auto-no-trade-hold-scope").textContent,
+    ).toContain("1 declaración queda fuera");
+  });
+});
