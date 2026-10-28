@@ -35,6 +35,11 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { CollectionAbsence } from "@/components/collection-absence";
+import {
+  isCollectionAbsent,
+  type CollectionReadState,
+} from "@/components/query-absence";
 import { absentDataLabel, formatOrAbsent } from "@/components/absent-data";
 import { gateHumanLabel } from "@/components/gate-label";
 import { cn } from "@/lib/utils";
@@ -431,6 +436,8 @@ export function MesaCandidatesPanel({
   sectorByInstrumentId,
   maxSectorExposurePct,
   universeListId = DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
+  rankingUnavailable = false,
+  rankingLoading = false,
 }: {
   ranking: OpportunityRankingV1 | null;
   entriesBlocked: boolean;
@@ -444,6 +451,13 @@ export function MesaCandidatesPanel({
   /** V1.30 — EffectiveTradingPolicy del perfil activo. */
   maxSectorExposurePct?: number;
   universeListId?: string;
+  /**
+   * P1-05 — el ranking no se ha podido leer (estudios/scan/universo caídos). Sin
+   * este dato la UI NO puede afirmar «Universo 0» ni acusar de universo pequeño.
+   */
+  rankingUnavailable?: boolean;
+  /** P1-05 — el ranking todavía se está leyendo. */
+  rankingLoading?: boolean;
 }) {
   const [funnelOpen, setFunnelOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
@@ -464,12 +478,33 @@ export function MesaCandidatesPanel({
   const top = ranking?.top ?? [];
   const all = ranking?.all ?? [];
   const discovered = ranking?.discovered ?? [];
-  const maxQuality = ranking?.maxQuality ?? 0;
+  // P1-05 — sin lectura no hay diagnóstico: ni «Universo 0» ni CTA acusatorio.
+  const rankingState: CollectionReadState = rankingUnavailable
+    ? "error"
+    : rankingLoading
+      ? "loading"
+      : "ready";
+  const rankingAbsent = isCollectionAbsent(rankingState);
+  const countLabel = (value: number | null | undefined): string => {
+    const absent = absentDataLabel(
+      rankingUnavailable ? "not_available" : "not_measured",
+    );
+    // Con el ranking sin leer, ninguna cifra derivada de él es un hecho medido.
+    if (rankingAbsent || value == null) return absent;
+    return String(value);
+  };
+  const maxQuality = ranking ? ranking.maxQuality : null;
   const threshold =
     ranking?.highQualityThreshold ?? OPPORTUNITY_HIGH_QUALITY_THRESHOLD;
-  const lowQualityDay = all.length > 0 && maxQuality < threshold;
-  const smallUniverse = (funnel?.universeCount ?? 0) < 20;
-  const needsScanCta = Boolean(funnel?.scanStale || smallUniverse);
+  const lowQualityDay =
+    !rankingAbsent &&
+    maxQuality != null &&
+    all.length > 0 &&
+    maxQuality < threshold;
+  const smallUniverse =
+    !rankingAbsent && funnel != null && funnel.universeCount < 20;
+  const needsScanCta =
+    !rankingAbsent && Boolean(funnel?.scanStale || smallUniverse);
   const bands = opportunityQualityBandCounts(all);
   const updatedLabel = formatOrAbsent(funnel?.asOf, (asOf) =>
     new Date(asOf).toLocaleTimeString(undefined, {
@@ -495,15 +530,20 @@ export function MesaCandidatesPanel({
             </span>
           ) : (
             <>
-              Actualizado: {updatedLabel}
+              Actualizado:{" "}
+              {rankingAbsent
+                ? absentDataLabel(
+                    rankingUnavailable ? "not_available" : "not_measured",
+                  )
+                : updatedLabel}
               {" · "}
-              Universo {funnel?.universeCount ?? 0}
+              Universo {countLabel(funnel?.universeCount)}
               {" · "}
-              Oportunidades {all.length}
+              Oportunidades {countLabel(ranking ? all.length : null)}
               {" · "}
-              Operables {funnel?.operableCount ?? 0}
+              Operables {countLabel(funnel?.operableCount)}
               {" · "}
-              Top {top.length}
+              Top {countLabel(ranking ? top.length : null)}
             </>
           )}
           {" · "}
@@ -513,11 +553,19 @@ export function MesaCandidatesPanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {funnel ? (
+        {funnel && !rankingAbsent ? (
           <FunnelStrip
             funnel={funnel}
             expanded={funnelOpen}
             onToggle={() => setFunnelOpen((v) => !v)}
+          />
+        ) : null}
+
+        {rankingAbsent ? (
+          <CollectionAbsence
+            state={rankingState}
+            subject="el ranking de oportunidades"
+            testId="mesa-ranking-absence"
           />
         ) : null}
 
@@ -563,11 +611,12 @@ export function MesaCandidatesPanel({
           </div>
         ) : null}
 
-        {all.length === 0 ? (
+        {!rankingAbsent && all.length === 0 ? (
           <div
             className="rounded-md border border-dashed border-border/60 px-4 py-6 text-center"
             data-testid="mesa-no-operations"
           >
+            {" "}
             <p className="font-medium">Hoy no hay operaciones recomendadas</p>
             <p className="mt-1 text-sm text-muted-foreground">
               La decisión correcta puede ser no operar. Añade valores a tu
@@ -580,7 +629,7 @@ export function MesaCandidatesPanel({
               Ir a Señales →
             </Link>
           </div>
-        ) : (
+        ) : !rankingAbsent ? (
           <>
             {visibleSections.map((section) => (
               <section
@@ -633,9 +682,9 @@ export function MesaCandidatesPanel({
               </button>
             ) : null}
           </>
-        )}
+        ) : null}
 
-        {discovered.length > 0 ? (
+        {!rankingAbsent && discovered.length > 0 ? (
           <section
             className="rounded-md border border-dashed border-border/60 px-3 py-2"
             data-testid="mesa-discovered-outside-estudio"

@@ -714,6 +714,18 @@ export function MesaHoyPage() {
               cash={summaryQuery.data?.data?.cash ?? null}
               universeListId={universeListId}
               maxSectorExposurePct={maxSectorExposurePct}
+              // P1-05 — sin estudios/scan/universo legibles no se afirma «Universo 0»
+              // ni se acusa de universo pequeño: se declara el hueco.
+              rankingUnavailable={
+                studiesQuery.isError ||
+                scanJobsQuery.isError ||
+                universeListQuery.isError
+              }
+              rankingLoading={
+                studiesQuery.isLoading ||
+                scanJobsQuery.isLoading ||
+                universeListQuery.isLoading
+              }
             />
           </div>
         ) : null}
