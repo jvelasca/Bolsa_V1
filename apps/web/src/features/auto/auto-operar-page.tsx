@@ -37,14 +37,20 @@ import { AUTO_OPERATION_MODE } from "@/features/operations/operation-mode";
 import { mesaOportunidadesHref } from "@/features/mesa/mesa-nav-links";
 import { OPERATIONAL_CONSOLE_PATH } from "@/features/confirm/daily-nav";
 
+/** Sin cuenta activa la query no se ejecuta: no hay operaciones ni HOLD que afirmar. */
+const AUTO_OPERAR_NOT_CONSULTED =
+  "Sin cuenta activa: no se pudieron leer las operaciones ni las declaraciones de HOLD.";
+
 export function AutoOperarPage() {
-  const { view, isLoading, isError } = useAutoOperationalMonitor();
+  const { view, isLoading, isError, readState } = useAutoOperationalMonitor();
   const top3 = useAutoTop3Opportunities();
   const cycles = view?.cycles ?? [];
   const hasOperations = cycles.length > 0;
   // B-5 — declaraciones de HOLD de la ACTIVE: «no evaluable» no se presenta como «sin señal» y
   // la ausencia de declaraciones no se presenta como «no hubo HOLD».
   const holdsCount = view?.signalHolds?.length ?? 0;
+  // Sin cuenta activa la query no se ejecuta: ni «sin operaciones» ni «sin HOLD» son afirmables.
+  const holdNotConsulted = readState === "not_consulted";
 
   return (
     <div className="space-y-6" data-testid="auto-operar-page">
@@ -116,7 +122,16 @@ export function AutoOperarPage() {
           </p>
         ) : null}
 
-        {!isLoading && !isError && !hasOperations ? (
+        {!isLoading && !isError && holdNotConsulted ? (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="auto-operar-not-consulted"
+          >
+            {AUTO_OPERAR_NOT_CONSULTED}
+          </p>
+        ) : null}
+
+        {!isLoading && !isError && !holdNotConsulted && !hasOperations ? (
           <div className="space-y-1" data-testid="auto-operar-empty-block">
             <p
               className="text-sm text-muted-foreground"

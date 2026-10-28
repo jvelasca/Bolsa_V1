@@ -14,9 +14,10 @@
  * 4. La fecha de la barra se muestra como día (estable respecto a la zona horaria); un sello no
  *    parseable se conserva crudo en lugar de inventar una fecha. Los identificadores crudos
  *    viven en el detalle técnico.
- * 5. El alcance temporal es explícito: `buildAutoHoldDeclarations(holds, { day })` filtra las
- *    declaraciones del día explicado y declara cuántas quedan fuera. `[]` no significa «no hubo
- *    HOLD», significa que no consta la declaración.
+ * 5. El alcance temporal es explícito: `buildAutoHoldDeclarations(holds, { day })` filtra por el
+ *    día de la **vela** (`barTimestamp`, el que la fila presenta como «barra»), declara cuántas
+ *    caen fuera y cuántas no tienen fecha de barra (no se asignan a ningún día ni se cuentan como
+ *    exclusión). `[]` no significa «no hubo HOLD», significa que no consta la declaración.
  *
  * @see apps/web/src/lib/decision-silence.ts
  * @see docs/engineering/spec-auto-ui-refactor-3-0-2026-10-06.md
@@ -110,6 +111,13 @@ export type AutoHoldDeclarations = {
   excludedByDay: number;
   /** Nota de alcance temporal; `null` si no se filtró por día o nada quedó fuera. */
   scopeNote: string | null;
+  /**
+   * Declaraciones de la ventana sin día de barra utilizable: no se asignan a ningún día y
+   * **no** se cuentan como exclusión (no pertenecen a otro día; se desconoce el suyo).
+   */
+  withoutBarDay: number;
+  /** Nota propia de las declaraciones sin fecha de barra; `null` si no las hay o no se filtró. */
+  undatedNote: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -171,12 +179,29 @@ function hasValue(value: unknown): boolean {
   return true;
 }
 
-/** Día `YYYY-MM-DD` de un sello, sin desplazarlo de zona horaria. */
+/**
+ * Día `YYYY-MM-DD` de un sello, sin desplazarlo de zona horaria.
+ *
+ * Valida el día real: un sello imposible (`2026-13-45`) no produce día, igual que un sello no
+ * parseable. Así una fecha de barra corrupta no se usa para atribuir la declaración a un día.
+ */
 function isoDay(value: string | null | undefined): string | null {
   const text = nonEmpty(value);
   if (!text) return null;
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
-  return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const valid =
+    month >= 1 &&
+    month <= 12 &&
+    day >= 1 &&
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day;
+  return valid ? `${match[1]}-${match[2]}-${match[3]}` : null;
 }
 
 /**
@@ -203,27 +228,20 @@ export function formatHoldBarDay(
 ): string | null {
   const text = nonEmpty(value);
   if (!text) return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
-  if (match) {
-    const year = Number(match[1]);
-    const month = Number(match[2]);
-    const day = Number(match[3]);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    const valid =
-      month >= 1 &&
-      month <= 12 &&
-      day >= 1 &&
-      date.getUTCFullYear() === year &&
-      date.getUTCMonth() === month - 1 &&
-      date.getUTCDate() === day;
-    if (valid) {
-      return formatDateWith(date, {
+  // Mismo criterio de día válido que el filtro diario: lo que no se puede atribuir a un día
+  // tampoco se pinta como si lo fuera.
+  const day = isoDay(text);
+  if (day) {
+    const [year, month, dayOfMonth] = day.split("-");
+    return formatDateWith(
+      new Date(Date.UTC(Number(year), Number(month) - 1, Number(dayOfMonth))),
+      {
         day: "2-digit",
         month: "short",
         year: "numeric",
         timeZone: "UTC",
-      });
-    }
+      },
+    );
   }
   const parsed = new Date(text);
   if (Number.isNaN(parsed.getTime())) return text;
@@ -340,14 +358,18 @@ function buildProvenance(
   return items;
 }
 
+/**
+ * El día canónico es el de la **vela** (`barTimestamp`): es lo que la fila muestra como «barra».
+ * `at` es el sello de registro y no decide la pertenencia al día; si difiere, sigue visible en el
+ * detalle técnico pero no mueve la declaración de día.
+ */
 function matchesDay(hold: AutoHoldDeclarationInput, day: string): boolean {
-  const at = isoDay(hold.at) ?? isoDay(hold.barTimestamp);
-  // Sin sello no se puede afirmar que pertenezca al día: no se incluye ni se cuenta aparte.
-  return at === day;
+  return isoDay(hold.barTimestamp) === day;
 }
 
-function hasDay(hold: AutoHoldDeclarationInput): boolean {
-  return isoDay(hold.at) !== null || isoDay(hold.barTimestamp) !== null;
+/** `true` si la declaración tiene un día de barra utilizable (sin él no se asigna a un día). */
+function hasBarDay(hold: AutoHoldDeclarationInput): boolean {
+  return isoDay(hold.barTimestamp) !== null;
 }
 
 function toRow(
@@ -394,9 +416,13 @@ export function buildAutoHoldDeclarations(
   const all = holds ?? [];
   const day = nonEmpty(options.day);
   const scoped = day ? all.filter((hold) => matchesDay(hold, day)) : all;
+  // Sólo cuentan como exclusión las declaraciones CON día de barra que caen en otro día.
   const excludedByDay = day
-    ? all.filter((hold) => hasDay(hold) && !matchesDay(hold, day)).length
+    ? all.filter((hold) => hasBarDay(hold) && !matchesDay(hold, day)).length
     : 0;
+  // Las que no tienen día de barra no pertenecen a otro día: se desconoce el suyo. Se cuentan
+  // aparte para que el hueco de trazabilidad no desaparezca del alcance temporal.
+  const withoutBarDay = day ? all.filter((hold) => !hasBarDay(hold)).length : 0;
   const rows = scoped.map((hold, index) => toRow(hold, index));
   const summary = decisionSilenceSummary(
     scoped,
@@ -412,6 +438,17 @@ export function buildAutoHoldDeclarations(
         ? `${excludedByDay} declaraci${
             excludedByDay === 1 ? "ón queda" : "ones quedan"
           } fuera del día explicado; el monitor conserva la ventana completa.`
+        : null,
+    withoutBarDay,
+    undatedNote:
+      withoutBarDay > 0
+        ? `${withoutBarDay} declaraci${
+            withoutBarDay === 1
+              ? "ón sin fecha de barra"
+              : "ones sin fecha de barra"
+          }; ${
+            withoutBarDay === 1 ? "no se puede asignar" : "no se pueden asignar"
+          } a este día.`
         : null,
   };
 }

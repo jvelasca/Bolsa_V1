@@ -149,11 +149,18 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+const accountState = vi.hoisted(() => ({
+  effectiveAccountId: "acc-1" as string | null,
+  isLoading: false,
+}));
+
 vi.mock("@/features/accounts/use-active-account", () => ({
   useActiveAccount: () => ({
-    effectiveAccountId: "acc-1",
-    account: { id: "acc-1" },
-    isLoading: false,
+    effectiveAccountId: accountState.effectiveAccountId,
+    account: accountState.effectiveAccountId
+      ? { id: accountState.effectiveAccountId }
+      : null,
+    isLoading: accountState.isLoading,
     accounts: [],
   }),
 }));
@@ -273,12 +280,21 @@ describe("AutoMonitorPage — modo y selección en la URL", () => {
   });
 });
 
+const readStateProbe = vi.hoisted(() => ({ value: "" as string }));
+
 function DisabledProbe() {
-  useAutoOperationalMonitor({ enabled: false });
+  const { readState } = useAutoOperationalMonitor({ enabled: false });
+  readStateProbe.value = readState;
   return null;
 }
 
 describe("useAutoOperationalMonitor — enabled", () => {
+  afterEach(() => {
+    accountState.effectiveAccountId = "acc-1";
+    accountState.isLoading = false;
+    readStateProbe.value = "";
+  });
+
   it("no dispara la query con enabled=false (la pestaña DÍA-D deja de sondear)", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -289,5 +305,35 @@ describe("useAutoOperationalMonitor — enabled", () => {
       </QueryClientProvider>,
     );
     expect(api.getAutoOperationalMonitor).not.toHaveBeenCalled();
+    // Sin lectura no hay ventana vacía: el estado es «no consultado».
+    expect(readStateProbe.value).toBe("not_consulted");
+  });
+
+  it("sin cuenta activa no consulta y declara «no consultado»", () => {
+    accountState.effectiveAccountId = null;
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <DisabledProbe />
+      </QueryClientProvider>,
+    );
+    expect(api.getAutoOperationalMonitor).not.toHaveBeenCalled();
+    expect(readStateProbe.value).toBe("not_consulted");
+  });
+
+  it("mientras la cuenta se resuelve el estado es carga, no «no consultado»", () => {
+    accountState.effectiveAccountId = null;
+    accountState.isLoading = true;
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <DisabledProbe />
+      </QueryClientProvider>,
+    );
+    expect(readStateProbe.value).toBe("loading");
   });
 });

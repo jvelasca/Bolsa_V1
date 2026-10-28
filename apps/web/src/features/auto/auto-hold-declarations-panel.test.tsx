@@ -8,6 +8,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  AUTO_HOLD_NOT_CONSULTED,
   AutoHoldDeclarationsPanel,
   AutoHoldSummaryLine,
 } from "@/features/auto/auto-hold-declarations-panel";
@@ -199,6 +200,38 @@ describe("AutoHoldDeclarationsPanel", () => {
 
     expect(screen.getByTestId("auto-decision-silence-error")).toBeTruthy();
     expect(screen.queryByTestId("auto-decision-silence-empty")).toBeNull();
+  });
+
+  it("una consulta no ejecutada no se presenta como ventana vacía", () => {
+    render(<AutoHoldDeclarationsPanel holds={[]} notConsulted />);
+
+    expect(
+      screen.getByTestId("auto-decision-silence-not-consulted").textContent,
+    ).toBe(AUTO_HOLD_NOT_CONSULTED);
+    // No se afirma ni que no haya HOLD ni que no conste el motivo: no se leyó nada.
+    expect(screen.queryByTestId("auto-decision-silence-empty")).toBeNull();
+    expect(screen.queryByTestId("auto-decision-silence-headline")).toBeNull();
+    expect(
+      screen
+        .getByTestId("auto-decision-silence")
+        .getAttribute("data-silence-headline"),
+    ).toBeNull();
+  });
+
+  it("con día declarado, una declaración sin fecha de barra se declara aparte", () => {
+    render(
+      <AutoHoldDeclarationsPanel
+        day="2026-09-30"
+        holds={[HOLD, { instrumentId: "CCC", reason: "no_signal", facts: [] }]}
+      />,
+    );
+
+    expect(screen.getAllByTestId("auto-decision-silence-item")).toHaveLength(1);
+    expect(
+      screen.getByTestId("auto-decision-silence-undated").textContent,
+    ).toContain("1 declaración sin fecha de barra");
+    // No se cuenta como si perteneciera a otro día.
+    expect(screen.queryByTestId("auto-decision-silence-scope")).toBeNull();
   });
 
   it("con día declarado filtra y declara las declaraciones que quedan fuera", () => {

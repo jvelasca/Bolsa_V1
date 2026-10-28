@@ -174,7 +174,7 @@ export function AutoNoTradeExplanationView({
 
 export function AutoNoTradePanel({ day }: { day?: string } = {}) {
   const { effectiveAccountId } = useActiveAccount();
-  const { view, isLoading, isError } = useAutoOperationalMonitor();
+  const { view, isLoading, isError, readState } = useAutoOperationalMonitor();
   const blocked = useMesaEntriesBlocked();
   // El día explicado es UNO solo: el mismo que alimenta el informe diario, las capas y los HOLD.
   const explainedDay = day ?? todayIso();
@@ -249,13 +249,14 @@ export function AutoNoTradePanel({ day }: { day?: string } = {}) {
       explanation={explanation}
       signalSlot={
         <AutoHoldDeclarationsPanel
-          holds={view?.signalHolds ?? []}
+          holds={view?.signalHolds}
           day={explainedDay}
           headingLevel="h3"
           testIdPrefix="auto-no-trade-hold"
           title="Por qué hubo HOLD en la señal (hoy)"
           loading={isLoading}
           error={isError}
+          notConsulted={readState === "not_consulted"}
         />
       }
     />

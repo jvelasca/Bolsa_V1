@@ -321,6 +321,33 @@ describe("buildAutoHoldDeclarations · alcance temporal", () => {
     expect(result.rows).toHaveLength(2);
     expect(result.excludedByDay).toBe(0);
     expect(result.scopeNote).toBeNull();
+    expect(result.withoutBarDay).toBe(0);
+    expect(result.undatedNote).toBeNull();
+  });
+
+  it("el día de la barra manda sobre `at` cuando difieren", () => {
+    // La vela es del 27; el registro se escribió el 28. La fila pertenece al 27 y el 28 la
+    // declara fuera, en vez de asignarla al día de registro.
+    const lateRegistration = {
+      instrumentId: "DDD",
+      barTimestamp: "2026-10-27T00:00:00Z",
+      at: "2026-10-28T10:00:00Z",
+      reason: "no_signal",
+      facts: [],
+    };
+
+    const day27 = buildAutoHoldDeclarations([lateRegistration], {
+      day: "2026-10-27",
+    });
+    expect(day27.rows.map((row) => row.symbol)).toEqual(["DDD"]);
+    expect(day27.excludedByDay).toBe(0);
+
+    const day28 = buildAutoHoldDeclarations([lateRegistration], {
+      day: "2026-10-28",
+    });
+    expect(day28.rows).toEqual([]);
+    expect(day28.excludedByDay).toBe(1);
+    expect(day28.scopeNote).toContain("1 declaración queda fuera");
   });
 
   it("el día vacío declara el hueco del día, no el de la ventana", () => {
@@ -335,14 +362,52 @@ describe("buildAutoHoldDeclarations · alcance temporal", () => {
     expect(result.scopeNote).toContain("fuera del día explicado");
   });
 
-  it("sin sello no se atribuye a un día ni se cuenta como exclusión", () => {
+  it("sin sello no se atribuye a un día y se declara en un contador propio", () => {
     const result = buildAutoHoldDeclarations(
       [{ instrumentId: "CCC", reason: "no_signal", facts: [] }, today],
       { day: "2026-10-28" },
     );
 
+    // La primera parte se mantiene: no se le asigna un día.
     expect(result.rows.map((row) => row.symbol)).toEqual(["AAA"]);
+    // Y no se cuenta como si perteneciera a otro día.
     expect(result.excludedByDay).toBe(0);
     expect(result.scopeNote).toBeNull();
+    // Pero el hueco de trazabilidad se declara aparte.
+    expect(result.withoutBarDay).toBe(1);
+    expect(result.undatedNote).toContain("1 declaración sin fecha de barra");
+    expect(result.undatedNote).toContain("no se puede asignar a este día");
+  });
+
+  it("`at` por sí solo no asigna la declaración al día ni cuenta como exclusión", () => {
+    const onlyAt = {
+      instrumentId: "EEE",
+      at: "2026-10-28T10:00:00Z",
+      reason: "no_signal",
+      facts: [],
+    };
+
+    const result = buildAutoHoldDeclarations([onlyAt], { day: "2026-10-28" });
+
+    expect(result.rows).toEqual([]);
+    expect(result.excludedByDay).toBe(0);
+    expect(result.withoutBarDay).toBe(1);
+  });
+
+  it("una fecha de barra imposible no atribuye la declaración a ningún día", () => {
+    const corrupted = {
+      instrumentId: "FFF",
+      barTimestamp: "2026-13-45T00:00:00Z",
+      reason: "no_signal",
+      facts: [],
+    };
+
+    const result = buildAutoHoldDeclarations([corrupted], {
+      day: "2026-10-28",
+    });
+
+    expect(result.rows).toEqual([]);
+    expect(result.excludedByDay).toBe(0);
+    expect(result.withoutBarDay).toBe(1);
   });
 });

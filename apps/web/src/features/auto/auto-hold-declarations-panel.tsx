@@ -50,11 +50,20 @@ export type AutoHoldDeclarationsPanelProps = {
   loading?: boolean;
   /** Lectura fallida: se declara el fallo, no el vacío. */
   error?: boolean;
+  /**
+   * Consulta no ejecutada (sin cuenta activa o lectura deshabilitada): no se ha leído nada, así
+   * que no se puede afirmar que no haya declaraciones.
+   */
+  notConsulted?: boolean;
   className?: string;
 };
 
 export const AUTO_HOLD_PANEL_TITLE =
   "Decisiones sin operación (HOLD declarados)";
+
+/** Copy del estado «no consultado»: la lectura no se ejecutó, no es una ventana vacía. */
+export const AUTO_HOLD_NOT_CONSULTED =
+  "Sin cuenta activa: no se consultaron las declaraciones de HOLD.";
 
 function technicalMeasurement(measurement: string | null | undefined): string {
   return measurement ?? "UNKNOWN";
@@ -256,14 +265,15 @@ export function AutoHoldDeclarationsPanel({
   day = null,
   loading = false,
   error = false,
+  notConsulted = false,
   className,
 }: AutoHoldDeclarationsPanelProps) {
   const headingId = `${useId()}-hold-heading`;
-  const { rows, summary, attention, scopeNote } = buildAutoHoldDeclarations(
-    holds,
-    { day },
-  );
+  const { rows, summary, attention, scopeNote, undatedNote } =
+    buildAutoHoldDeclarations(holds, { day });
   const Heading = headingLevel;
+  // `notConsulted` gana a `loading`: no hay lectura en curso porque no se va a ejecutar.
+  const showNotConsulted = !loading && !error && notConsulted;
 
   return (
     <section
@@ -273,8 +283,8 @@ export function AutoHoldDeclarationsPanel({
       )}
       aria-labelledby={headingId}
       data-testid={testIdPrefix}
-      data-silence-headline={summary.headline}
-      data-silence-total={summary.total}
+      data-silence-headline={showNotConsulted ? undefined : summary.headline}
+      data-silence-total={showNotConsulted ? undefined : summary.total}
     >
       <Heading id={headingId} className={cn("font-semibold", AUTO_USER_TEXT)}>
         {title}
@@ -297,7 +307,16 @@ export function AutoHoldDeclarationsPanel({
         </p>
       ) : null}
 
-      {!loading && !error ? (
+      {showNotConsulted ? (
+        <p
+          className={cn("text-muted-foreground", AUTO_USER_TEXT)}
+          data-testid={`${testIdPrefix}-not-consulted`}
+        >
+          {AUTO_HOLD_NOT_CONSULTED}
+        </p>
+      ) : null}
+
+      {!loading && !error && !showNotConsulted ? (
         <>
           <p
             className={cn("text-muted-foreground", AUTO_USER_TEXT)}
@@ -341,6 +360,20 @@ export function AutoHoldDeclarationsPanel({
               data-testid={`${testIdPrefix}-scope`}
             >
               {scopeNote}
+            </p>
+          ) : null}
+
+          {/* Sin fecha de barra no se atribuye la declaración a ningún día: se declara el hueco
+              con su propio contador, sin contarlo como exclusión de otro día. */}
+          {undatedNote ? (
+            <p
+              className={cn(
+                "text-amber-600 dark:text-amber-400",
+                AUTO_TECH_TEXT,
+              )}
+              data-testid={`${testIdPrefix}-undated`}
+            >
+              {undatedNote}
             </p>
           ) : null}
 

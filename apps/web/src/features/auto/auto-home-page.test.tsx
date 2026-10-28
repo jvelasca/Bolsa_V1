@@ -30,6 +30,7 @@ const monitorState = vi.hoisted(() => ({
   signalHolds: [] as Array<Record<string, unknown>>,
   isLoading: false,
   isError: false,
+  readState: undefined as string | undefined,
 }));
 
 vi.mock("@/features/auto-monitor/use-auto-operational-monitor", () => ({
@@ -44,6 +45,7 @@ vi.mock("@/features/auto-monitor/use-auto-operational-monitor", () => ({
     isLoading: monitorState.isLoading,
     isError: monitorState.isError,
     isFetching: false,
+    readState: monitorState.readState,
     refetch: vi.fn(),
   }),
 }));
@@ -108,6 +110,7 @@ beforeEach(() => {
   monitorState.signalHolds = [];
   monitorState.isLoading = false;
   monitorState.isError = false;
+  monitorState.readState = undefined;
   financialState.operationalState = "OK";
   accountSummary.data = null;
 });
@@ -346,6 +349,21 @@ describe("AutoHomePage", () => {
       "No se pudieron leer las declaraciones",
     );
     expect(screen.queryByTestId("auto-home-silence-headline")).toBeNull();
+  });
+
+  it("una consulta no ejecutada no se declara como ventana sin HOLD", () => {
+    monitorState.header = null;
+    monitorState.cycles = [];
+    monitorState.readState = "not_consulted";
+    renderHome();
+
+    expect(
+      screen.getByTestId("auto-home-silence-not-consulted").textContent,
+    ).toContain("no se consultaron las declaraciones de HOLD");
+    expect(screen.queryByTestId("auto-home-silence-headline")).toBeNull();
+    expect(document.body.textContent).not.toContain(
+      "Sin HOLD declarados en la ventana",
+    );
   });
 
   it("la fase operacional del tick se pinta sin inventar desde RUNNING", () => {

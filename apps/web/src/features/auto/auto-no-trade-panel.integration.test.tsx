@@ -439,6 +439,21 @@ describe("B-5 · HOLD declarados dentro de la explicación", () => {
     expect(screen.queryByTestId("auto-no-trade-hold-empty")).toBeNull();
   });
 
+  it("una consulta no ejecutada se declara como hueco de lectura, no como «sin HOLD»", async () => {
+    state.monitor = {
+      view: null,
+      isLoading: false,
+      isError: false,
+      readState: "not_consulted",
+    };
+    renderPanel();
+
+    const hole = await screen.findByTestId("auto-no-trade-hold-not-consulted");
+    expect(hole.textContent).toContain("no se consultaron las declaraciones");
+    expect(screen.queryByTestId("auto-no-trade-hold-empty")).toBeNull();
+    expect(screen.queryByTestId("auto-no-trade-hold-headline")).toBeNull();
+  });
+
   it("el panel de HOLD explica el día y declara lo que queda fuera de la ventana", async () => {
     state.monitor = {
       view: {

@@ -20,17 +20,22 @@ const monitorState = vi.hoisted(() => ({
   signalHolds: [] as Array<Record<string, unknown>>,
   isLoading: false,
   isError: false,
+  readState: undefined as string | undefined,
 }));
 
 vi.mock("@/features/auto-monitor/use-auto-operational-monitor", () => ({
   useAutoOperationalMonitor: () => ({
-    view: {
-      cycles: monitorState.cycles,
-      signalHolds: monitorState.signalHolds,
-    },
+    view:
+      monitorState.readState === "not_consulted"
+        ? null
+        : {
+            cycles: monitorState.cycles,
+            signalHolds: monitorState.signalHolds,
+          },
     isLoading: monitorState.isLoading,
     isError: monitorState.isError,
     isFetching: false,
+    readState: monitorState.readState,
     refetch: vi.fn(),
   }),
 }));
@@ -81,6 +86,7 @@ beforeEach(() => {
   monitorState.signalHolds = [];
   monitorState.isLoading = false;
   monitorState.isError = false;
+  monitorState.readState = undefined;
 });
 
 afterEach(cleanup);
@@ -237,6 +243,18 @@ describe("AutoOperarPage", () => {
     renderOperar();
     expect(screen.getByTestId("auto-operar-loading")).toBeTruthy();
     expect(screen.queryByTestId("auto-operar-empty")).toBeNull();
+  });
+
+  it("una consulta no ejecutada no se presenta como ventana sin operaciones", () => {
+    monitorState.readState = "not_consulted";
+    renderOperar();
+
+    expect(
+      screen.getByTestId("auto-operar-not-consulted").textContent,
+    ).toContain("no se pudieron leer las operaciones");
+    // Ni el vacío de operaciones ni el titular de HOLD se afirman sin lectura.
+    expect(screen.queryByTestId("auto-operar-empty")).toBeNull();
+    expect(screen.queryByTestId("auto-operar-silence")).toBeNull();
   });
 });
 

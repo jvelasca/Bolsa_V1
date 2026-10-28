@@ -56,14 +56,18 @@ import { AutoHumanStateBadge } from "@/features/auto/auto-human-state-badge";
 import { buildAutoStateWhy } from "@/features/auto/auto-why";
 import { AutoWhyButton } from "@/features/auto/auto-why-button";
 import { AutoTop3Panel } from "@/features/auto/auto-top3-panel";
-import { AutoHoldSummaryLine } from "@/features/auto/auto-hold-declarations-panel";
+import {
+  AutoHoldSummaryLine,
+  AUTO_HOLD_NOT_CONSULTED,
+} from "@/features/auto/auto-hold-declarations-panel";
 import { useAutoTop3Opportunities } from "@/features/auto/use-auto-top3-opportunities";
 import { AUTO_USER_TEXT } from "@/features/auto/auto-typography";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export function AutoHomePage() {
-  const { view, isLoading, isError } = useAutoOperationalMonitor();
+  const { view, isLoading, isError, readState } = useAutoOperationalMonitor();
+  const holdNotConsulted = readState === "not_consulted";
   const { effectiveAccountId } = useActiveAccount();
   const financial = useFinancialIntegrity(effectiveAccountId);
   const summaryQuery = useQuery({
@@ -283,7 +287,15 @@ export function AutoHomePage() {
             No se pudieron leer las declaraciones de HOLD.
           </p>
         ) : null}
-        {!summary.isLoading && !summary.isError ? (
+        {!summary.isLoading && !summary.isError && holdNotConsulted ? (
+          <p
+            className="text-sm text-muted-foreground"
+            data-testid="auto-home-silence-not-consulted"
+          >
+            {AUTO_HOLD_NOT_CONSULTED}
+          </p>
+        ) : null}
+        {!summary.isLoading && !summary.isError && !holdNotConsulted ? (
           <>
             <AutoHoldSummaryLine
               holds={view?.signalHolds ?? []}

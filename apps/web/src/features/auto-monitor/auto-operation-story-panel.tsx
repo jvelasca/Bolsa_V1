@@ -229,7 +229,8 @@ export function AutoOperationStoryPanel({
   /** Sustituye la escritura de `?cycle=` (p. ej. navegar a la ruta canónica). */
   onSelectCycle?: (cycleId: string) => void;
 } = {}) {
-  const { view, isLoading, isError, accountId } = useAutoOperationalMonitor();
+  const { view, isLoading, isError, readState, accountId } =
+    useAutoOperationalMonitor();
   const feedbackList = useAutoDiaDFeedbackList();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -239,8 +240,9 @@ export function AutoOperationStoryPanel({
   const hasLoaded = !isLoading && !isError && view != null;
   // B-5 / ADR-048 — las declaraciones de HOLD de la ACTIVE, con su motivo y su procedencia.
   // Viven fuera del ciclo porque el HOLD es un hecho de la SEÑAL, no de una operación: no se
-  // asigna ningún HOLD a un ciclo «parecido» por símbolo ni por fecha.
-  const signalHolds = view?.signalHolds ?? [];
+  // asigna ningún HOLD a un ciclo «parecido» por símbolo ni por fecha. `undefined` (no `[]`)
+  // cuando no hay lectura: una consulta no ejecutada no es una ventana vacía.
+  const signalHolds = view?.signalHolds;
   const {
     requestedCycleId,
     selectedCycle: selected,
@@ -536,6 +538,7 @@ export function AutoOperationStoryPanel({
         holds={signalHolds}
         loading={isLoading}
         error={isError}
+        notConsulted={readState === "not_consulted"}
       />
 
       {selected && strategy.view ? (
