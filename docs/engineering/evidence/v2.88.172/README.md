@@ -82,12 +82,12 @@ Las suites completas (`web`, `shared`, `pytest` de API) las mide el **CI de la r
 | Dato | Valor |
 | --- | --- |
 | Rama | `fix/059-060-proveedores` (nueva en `origin`; **no** existía antes de este acto) |
+| Commit funcional | `9bd7625c` (`feat(bd)`: diagnóstico, copia bajo demanda y bump `2.11.172-beta`) |
 | HEAD del sello de código | `45246d86` (`chore(window)`: segundo re-anclaje del pin) |
 | Cierre documental | viaja en un commit **posterior** de la misma rama (docs-only; este texto) |
-| Commit funcional | `9bd7625c` (`feat(bd)`: diagnóstico, copia bajo demanda y bump `2.11.172-beta`) |
 | Tag / Release / PR | **no emitidos** |
 
-### 7.1 Commits de la rama (5, en orden)
+### 7.1 Commits del sello (5, en orden)
 
 | Commit | Qué hace |
 | --- | --- |
@@ -96,6 +96,10 @@ Las suites completas (`web`, `shared`, `pytest` de API) las mide el **CI de la r
 | `76cf9598` | `chore(window)`: primer re-anclaje del pin |
 | `3c40deaf` | `fix(bd)`: CHECK de 060 en el modelo + allowlist en `alembic/env.py` |
 | `45246d86` | `chore(window)`: segundo re-anclaje del pin |
+
+Después van los commits del **cierre documental** (docs-only, sin código): el que contiene este texto y
+el que precisa que el sello de código es `45246d86`. Ninguno dispara workflows, porque `docs/` no está
+en los `paths` de ningún workflow.
 
 ### 7.2 Runs de CI medidos
 
