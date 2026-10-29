@@ -56,7 +56,9 @@ const AUTONOMY_OPTIONS: Array<{
   },
   {
     mode: "semi",
-    label: "Asistido",
+    // `UI5-20` — el panel conserva su lenguaje llano («Asistido») pero nombra el término
+    // canónico (`OPERATION_MODE_LABEL`) para que no existan dos nombres para un modo.
+    label: "Asistido (SEMI)",
     hint: "La app propone · tú firmas en Confirm",
   },
   {

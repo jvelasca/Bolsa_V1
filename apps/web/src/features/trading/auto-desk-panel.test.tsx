@@ -166,6 +166,14 @@ describe("AutoDeskPanel V2.39 arm honesty", () => {
     }
   });
 
+  it("UI5-20 — el modo «semi» se rotula en lenguaje llano y nombra su término canónico", () => {
+    renderOpen();
+    const semi = screen.getByTestId("auto-desk-mode-semi");
+    expect(semi.textContent).toContain("Asistido");
+    // Un modo, un nombre: el término canónico viaja junto al llano, o habría dos nombres.
+    expect(semi.textContent).toContain("SEMI");
+  });
+
   it("V2.42 — A3 confirm/cancel/phrase use CABIN_TOUCH_TARGET (min-h-11)", () => {
     renderOpen();
     fireEvent.click(screen.getByTestId("auto-desk-mode-auto"));
