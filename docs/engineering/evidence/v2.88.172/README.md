@@ -82,7 +82,8 @@ Las suites completas (`web`, `shared`, `pytest` de API) las mide el **CI de la r
 | Dato | Valor |
 | --- | --- |
 | Rama | `fix/059-060-proveedores` (nueva en `origin`; **no** existía antes de este acto) |
-| HEAD del sello | `45246d86` (`chore(window)`: segundo re-anclaje del pin) |
+| HEAD del sello de código | `45246d86` (`chore(window)`: segundo re-anclaje del pin) |
+| Cierre documental | viaja en un commit **posterior** de la misma rama (docs-only; este texto) |
 | Commit funcional | `9bd7625c` (`feat(bd)`: diagnóstico, copia bajo demanda y bump `2.11.172-beta`) |
 | Tag / Release / PR | **no emitidos** |
 
@@ -140,12 +141,15 @@ lo único que toca ese último commit.
 `52f12334` (059/060) y `9bd7625c` nunca habían pasado por CI. Un sello local verde no es un sello
 verificado.
 
-### 7.4 Verificación local del HEAD (`45246d86`)
+### 7.4 Verificación local del sello (`45246d86`)
 
 | Comprobación | Resultado |
 | --- | --- |
 | `pnpm window:freeze` | **`freeze OK`** — coinciden `appsHash` (`35cd320f…`) y `packagesHash` (`3df714c5…`) |
 | `git status -sb` | `## fix/059-060-proveedores...origin/fix/059-060-proveedores` (sin `ahead`/`behind`) |
+
+El cierre documental que contiene este texto **no** toca `apps/` ni `packages/`, así que no mueve el pin:
+el `freeze` sigue siendo el mismo tras él.
 
 La etiqueta `commit` del pin dice `3c40deaf` mientras HEAD es `45246d86`; el propio
 `scripts/window-pin.mjs` declara que **el freeze real son los dos tree hashes**, y `45246d86` solo

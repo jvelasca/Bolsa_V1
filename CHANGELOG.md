@@ -72,7 +72,7 @@ con un código; no se simula) · `pg_dump` abre su propia conexión, así que el
 una conexión más mientras dura · el cerrojo es global por BD pero **no** cubre un `pnpm db:dump` lanzado
 a mano en paralelo · no hay restaurar, VACUUM ni migraciones en la UI, y **no deben añadirse sin
 diseño**: sobrescriben datos · **sin tag ni Release**: un auditor llega por la rama
-`fix/059-060-proveedores` (HEAD `45246d86`), no por `git checkout v2.88.172-beta` · este sello **no
+`fix/059-060-proveedores`, no por `git checkout v2.88.172-beta` · este sello **no
 incluye** la auditoría 2 (D-1–D-4), que sigue **sin
 commitear** en el árbol y no se certifica aquí.
 
