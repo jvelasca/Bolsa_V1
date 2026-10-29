@@ -1,0 +1,14 @@
+﻿{
+    "request":  {
+                    "method":  "POST",
+                    "url":  "/api/instruments/cmvqgdwd80007xn4gqshq1me7/sync",
+                    "body":  {
+                                 "force":  false,
+                                 "timeframe":  "1d"
+                             },
+                    "symbol":  "ACS",
+                    "note":  "Yahoo deshabilitado durante la llamada"
+                },
+    "status":  409,
+    "response":  "{\"detail\":\"Proveedor de histórico no disponible (provider_disabled:yahoo)\"}"
+}

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import pytest
-
-from bolsa_application.sync_scheduler import ProcessNextSyncQueueItem
 from bolsa_domain.value_objects.market import SyncResult
 from bolsa_infrastructure.database.repositories.sync_scheduler_repository import (
     SyncQueueItemRecord,
     SyncSettingsRecord,
 )
+
+from bolsa_application.sync_scheduler import ProcessNextSyncQueueItem
 
 
 class _FakeSchedulerRepo:
@@ -61,6 +61,8 @@ def _settings() -> SyncSettingsRecord:
         max_retries=5,
         retry_backoff_minutes=45,
         scope="lists",
+        provider_check_enabled=True,
+        provider_check_interval_seconds=60,
         updated_at="2026-08-12T00:00:00+00:00",
     )
 

@@ -1,0 +1,11 @@
+﻿{
+    "request":  {
+                    "method":  "PATCH",
+                    "url":  "/api/sync/settings",
+                    "body":  {
+                                 "scope":  "all"
+                             }
+                },
+    "status":  422,
+    "response":  "{\"detail\":[{\"type\":\"literal_error\",\"loc\":[\"body\",\"scope\"],\"msg\":\"Input should be \u0027lists\u0027 or \u0027stale\u0027\",\"input\":\"all\",\"ctx\":{\"expected\":\"\u0027lists\u0027 or \u0027stale\u0027\"}}]}"
+}

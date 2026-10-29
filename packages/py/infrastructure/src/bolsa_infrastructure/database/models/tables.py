@@ -1282,6 +1282,14 @@ class SyncSettingsRow(Base):
     max_retries: Mapped[int] = mapped_column("max_retries", Integer, default=5)
     retry_backoff_minutes: Mapped[int] = mapped_column("retry_backoff_minutes", Integer, default=45)
     scope: Mapped[str] = mapped_column(String, default="lists")
+    # Política de la comprobación periódica de proveedores (060). Es una automatización
+    # distinta de ``auto_sync_enabled`` (velas): aquí solo se mide conectividad.
+    provider_check_enabled: Mapped[bool] = mapped_column(
+        "provider_check_enabled", Boolean, default=True
+    )
+    provider_check_interval_seconds: Mapped[int] = mapped_column(
+        "provider_check_interval_seconds", Integer, default=60
+    )
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
 
@@ -1301,6 +1309,47 @@ class SyncQueueItemRow(Base):
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
     instrument: Mapped[InstrumentRow] = relationship()
+
+
+class MarketProviderSettingsRow(Base):
+    """059 — configuración durable de proveedores de datos (una fila por proveedor).
+
+    Los ``CHECK`` replican la validación del caso de uso: la base de datos es la última
+    defensa si algún camino escribe sin pasar por ``UpdateMarketProviderConfig``.
+    """
+
+    __tablename__ = "market_provider_settings"
+    __table_args__ = (
+        CheckConstraint(
+            "priority >= 0 AND priority <= 100",
+            name="market_provider_settings_priority_check",
+        ),
+        CheckConstraint(
+            "min_interval_seconds >= 0 AND min_interval_seconds <= 120",
+            name="market_provider_settings_interval_check",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    priority: Mapped[int] = mapped_column(Integer, default=10)
+    min_interval_seconds: Mapped[int] = mapped_column(
+        "min_interval_seconds", Integer, default=0
+    )
+    base_url: Mapped[str | None] = mapped_column("base_url", String, nullable=True)
+    options: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    last_check_at: Mapped[datetime | None] = mapped_column(
+        "last_check_at", DateTime(timezone=True), nullable=True
+    )
+    last_check_ok: Mapped[bool | None] = mapped_column(
+        "last_check_ok", Boolean, nullable=True
+    )
+    last_check_message: Mapped[str | None] = mapped_column(
+        "last_check_message", String, nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at", DateTime(timezone=True)
+    )
 
 
 class PendingOrderRow(Base):

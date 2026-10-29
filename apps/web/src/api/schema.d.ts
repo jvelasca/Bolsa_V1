@@ -2963,10 +2963,101 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Market Providers */
+        /**
+         * Get Market Providers
+         * @description Configuración efectiva y estado medido de cada proveedor del registro.
+         */
         get: operations["get_market_providers_api_market_providers_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/providers/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Providers Health
+         * @description Veredicto único para el icono de servidores de la barra de estado.
+         *
+         *     Si la comprobación automática está ON y el dato venció, se programa una sonda sin
+         *     bloquear esta respuesta: el campo ``probing`` lo declara y la siguiente consulta ya
+         *     devuelve la medida. Nunca se inventa un estado: sin medición es ``unverified``.
+         */
+        get: operations["get_market_providers_health_api_market_providers_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/providers/health/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Market Providers Health
+         * @description «Comprobar ahora»: mide los proveedores habilitados y persiste el resultado.
+         *
+         *     Mide aunque la comprobación automática esté OFF: apagar la cadencia no debe impedir
+         *     un diagnóstico puntual. Si el comprobador no está disponible en este proceso, se
+         *     responde 503 en vez de devolver un veredicto que no se acaba de medir.
+         */
+        post: operations["check_market_providers_health_api_market_providers_health_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/providers/{provider_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Market Provider
+         * @description Actualiza solo los campos declarados del proveedor.
+         */
+        patch: operations["update_market_provider_api_market_providers__provider_id__patch"];
+        trace?: never;
+    };
+    "/api/market/providers/{provider_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Market Provider
+         * @description Verifica el proveedor con una llamada real y persiste el resultado.
+         */
+        post: operations["test_market_provider_api_market_providers__provider_id__test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7287,12 +7378,21 @@ export interface components {
             /** Released */
             released: boolean;
         };
+        /**
+         * EnqueueStaleDataDto
+         * @description Resultado de encolar desactualizados, con el motivo declarado si no se encoló.
+         */
+        EnqueueStaleDataDto: {
+            /** Enqueued */
+            enqueued: number;
+            /** Scanned */
+            scanned: number;
+            /** Skippedreason */
+            skippedReason?: string | null;
+        };
         /** EnqueueStaleResponseDto */
         EnqueueStaleResponseDto: {
-            /** Data */
-            data: {
-                [key: string]: number;
-            };
+            data: components["schemas"]["EnqueueStaleDataDto"];
         };
         /**
          * EstudioAuditCycleDto
@@ -9827,8 +9927,23 @@ export interface components {
             /** Data */
             data: components["schemas"]["IndexHitDto"][];
         };
+        /** MarketProviderResponseDto */
+        MarketProviderResponseDto: {
+            data: components["schemas"]["MarketProviderStatusDto"];
+        };
         /** MarketProviderStatusDto */
         MarketProviderStatusDto: {
+            /** Baseurl */
+            baseUrl?: string | null;
+            /** Baseurlsource */
+            baseUrlSource?: string | null;
+            /** Capabilities */
+            capabilities?: string[];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
             /** Enabled */
             enabled: boolean;
             /** Healthy */
@@ -9837,8 +9952,29 @@ export interface components {
             id: string;
             /** Label */
             label: string;
+            /** Lastcheckat */
+            lastCheckAt?: string | null;
+            /** Lastcheckmessage */
+            lastCheckMessage?: string | null;
+            /** Lastcheckok */
+            lastCheckOk?: boolean | null;
             /** Message */
             message: string;
+            /**
+             * Minintervalseconds
+             * @default 0
+             */
+            minIntervalSeconds: number;
+            /**
+             * Priority
+             * @default 0
+             */
+            priority: number;
+            /**
+             * Verified
+             * @default false
+             */
+            verified: boolean;
         };
         /** MarketProvidersResponseDto */
         MarketProvidersResponseDto: {
@@ -10854,6 +10990,82 @@ export interface components {
             product?: string | null;
             /** Schema Revision */
             schema_revision?: string | null;
+        };
+        /**
+         * ProviderHealthEntryDto
+         * @description Estado de un proveedor dentro del veredicto agregado de la barra.
+         */
+        ProviderHealthEntryDto: {
+            /** Enabled */
+            enabled: boolean;
+            /** Healthy */
+            healthy: boolean;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Lastcheckat */
+            lastCheckAt?: string | null;
+            /** Lastcheckok */
+            lastCheckOk?: boolean | null;
+            /** Message */
+            message: string;
+            /** Verified */
+            verified: boolean;
+        };
+        /**
+         * ProviderHealthSummaryDto
+         * @description Veredicto para el icono de servidores.
+         *
+         *     ``ok`` | ``degraded`` | ``stale`` | ``unverified`` | ``none``. ``stale`` (060) es una
+         *     medición correcta que ya no se refresca al ritmo declarado; ``unverified`` es no haber
+         *     medido nunca. La política viaja con el veredicto para que la UI no la duplique.
+         */
+        ProviderHealthSummaryDto: {
+            /**
+             * Autocheckenabled
+             * @default true
+             */
+            autoCheckEnabled: boolean;
+            /**
+             * Checkintervalseconds
+             * @default 60
+             */
+            checkIntervalSeconds: number;
+            /** Measuredat */
+            measuredAt?: string | null;
+            /** Nextcheckat */
+            nextCheckAt?: string | null;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Probing
+             * @default false
+             */
+            probing: boolean;
+            /** Providers */
+            providers?: components["schemas"]["ProviderHealthEntryDto"][];
+            /** Status */
+            status: string;
+        };
+        /** ProviderHealthSummaryResponseDto */
+        ProviderHealthSummaryResponseDto: {
+            data: components["schemas"]["ProviderHealthSummaryDto"];
+        };
+        /** ProviderTestResponseDto */
+        ProviderTestResponseDto: {
+            data: components["schemas"]["ProviderTestResultDto"];
+        };
+        /** ProviderTestResultDto */
+        ProviderTestResultDto: {
+            /** Checkedat */
+            checkedAt: string;
+            /** Message */
+            message: string;
+            /** Ok */
+            ok: boolean;
+            /** Providerid */
+            providerId: string;
         };
         /** PruneBacktestsRequestDto */
         PruneBacktestsRequestDto: {
@@ -11912,6 +12124,10 @@ export interface components {
             minDelaySeconds: number;
             /** Postmarketonly */
             postMarketOnly: boolean;
+            /** Providercheckenabled */
+            providerCheckEnabled: boolean;
+            /** Providercheckintervalseconds */
+            providerCheckIntervalSeconds: number;
             /** Retrybackoffminutes */
             retryBackoffMinutes: number;
             /** Scanintervalminutes */
@@ -12241,6 +12457,23 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /**
+         * UpdateMarketProviderDto
+         * @description PATCH de un proveedor: solo se aplican los campos DECLARADOS.
+         *
+         *     ``baseUrl`` se distingue de «no declarado» con ``model_fields_set``: enviar
+         *     ``baseUrl: null`` borra la URL configurada, omitirla la deja como está.
+         */
+        UpdateMarketProviderDto: {
+            /** Baseurl */
+            baseUrl?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Minintervalseconds */
+            minIntervalSeconds?: number | null;
+            /** Priority */
+            priority?: number | null;
+        };
         /** UpdatePositionPolicyRequestDto */
         UpdatePositionPolicyRequestDto: {
             /** Executionpolicyid */
@@ -12269,12 +12502,16 @@ export interface components {
             minDelaySeconds?: number | null;
             /** Postmarketonly */
             postMarketOnly?: boolean | null;
+            /** Providercheckenabled */
+            providerCheckEnabled?: boolean | null;
+            /** Providercheckintervalseconds */
+            providerCheckIntervalSeconds?: number | null;
             /** Retrybackoffminutes */
             retryBackoffMinutes?: number | null;
             /** Scanintervalminutes */
             scanIntervalMinutes?: number | null;
             /** Scope */
-            scope?: string | null;
+            scope?: ("lists" | "stale") | null;
         };
         /** UpdateTrackerDefinitionRequestDto */
         UpdateTrackerDefinitionRequestDto: {
@@ -18284,7 +18521,10 @@ export interface operations {
     };
     get_market_providers_api_market_providers_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Ignora la caché de configuración */
+                refresh?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -18298,6 +18538,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MarketProvidersResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_market_providers_health_api_market_providers_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderHealthSummaryResponseDto"];
+                };
+            };
+        };
+    };
+    check_market_providers_health_api_market_providers_health_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderHealthSummaryResponseDto"];
+                };
+            };
+        };
+    };
+    update_market_provider_api_market_providers__provider_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMarketProviderDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketProviderResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_market_provider_api_market_providers__provider_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderTestResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

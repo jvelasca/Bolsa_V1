@@ -502,6 +502,11 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
         role: "doc",
         note: "Tablas + ciclo de vida instrumento",
       },
+      {
+        path: "docs/engineering/seguimiento-ui-proveedores-2026-10-29.md",
+        role: "doc",
+        note: "Consolidación de proveedores: casos PRV/SYN/UI, evidencias y defectos",
+      },
       { path: "docs/adr/002-yahoo-primary-xtb-secondary.md", role: "adr" },
       {
         path: "docs/adr/007-intraday-ohlcv-persistence.md",

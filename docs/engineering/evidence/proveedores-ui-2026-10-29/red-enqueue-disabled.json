@@ -1,0 +1,9 @@
+﻿{
+    "request":  {
+                    "method":  "POST",
+                    "url":  "/api/sync/queue/enqueue-stale",
+                    "body":  null
+                },
+    "status":  200,
+    "response":  "{\"data\":{\"scanned\":0,\"enqueued\":0,\"skippedReason\":\"provider_disabled:yahoo\"}}"
+}

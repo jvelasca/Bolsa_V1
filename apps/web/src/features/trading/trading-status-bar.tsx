@@ -32,15 +32,23 @@ import {
 import type { DemoBookMode } from "@/features/trading/demo-book-prefs";
 import { TradingAlarmInboxButton } from "@/features/trading/trading-alarm-inbox-button";
 import { TradingAppThreads } from "@/features/trading/trading-app-threads";
+import { TradingProviderHealthButton } from "@/features/trading/trading-provider-health-button";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
+import {
+  useSetShowProviderHealth,
+  useStatusBarPrefs,
+  useToggleStatusItem,
+} from "@/features/trading/use-status-bar-prefs";
+import {
+  STATUS_ITEM_IDS,
+  type StatusItemId,
+} from "@/features/trading/status-bar-prefs";
 
 const OPERATIVA_MODE_LABEL: Record<DemoBookMode, string> = {
   manual: "Manual",
   semi: "Semi",
   auto: DEMO_BOOK_AUTO_UI_ENABLED ? "Auto" : DEMO_BOOK_AUTO_UNAVAILABLE_LABEL,
 };
-
-type StatusItemId = "equity" | "cash" | "marketValue" | "pnl" | "positions";
 
 const STATUS_LABELS: Record<StatusItemId, string> = {
   equity: "Patrimonio",
@@ -62,8 +70,7 @@ const STATUS_LABELS_SHORT: Record<StatusItemId, string> = {
   positions: "Posiciones",
 };
 
-const DEFAULT_ITEMS: StatusItemId[] = ["marketValue", "cash", "pnl", "equity"];
-
+const STATUS_ITEM_OPTIONS: readonly StatusItemId[] = STATUS_ITEM_IDS;
 function StatusSeparator() {
   return <span aria-hidden className="mx-0.5 h-3.5 w-px shrink-0 bg-border" />;
 }
@@ -87,8 +94,10 @@ function connectionLabel(): string {
 
 export function TradingStatusBar() {
   const [configOpen, setConfigOpen] = useState(false);
-  const [visibleItems, setVisibleItems] =
-    useState<StatusItemId[]>(DEFAULT_ITEMS);
+  const prefs = useStatusBarPrefs();
+  const toggleStatusItem = useToggleStatusItem();
+  const setShowProviderHealth = useSetShowProviderHealth();
+  const visibleItems = prefs.visibleItems;
   const { account, effectiveAccountId } = useActiveAccount();
   const bookPrefs = useDemoBookPrefs();
   const endpointLabel = useMemo(() => connectionLabel(), []);
@@ -223,11 +232,12 @@ export function TradingStatusBar() {
           ))}
         </div>
 
-        {/* Derecha: rail fijo Colas + Alarmas + ajustes (no redimensiona con conteos) */}
+        {/* Derecha: rail fijo proveedores + Colas + Alarmas + ajustes (no redimensiona) */}
         <div
           className="ml-1 flex shrink-0 items-center gap-1 border-l border-border/70 pl-1.5"
           data-testid="trading-status-rail"
         >
+          {prefs.showProviderHealth ? <TradingProviderHealthButton /> : null}
           <TradingAppThreads />
           <TradingAlarmInboxButton />
           <IconButton
@@ -242,27 +252,40 @@ export function TradingStatusBar() {
         open={configOpen}
         onClose={() => setConfigOpen(false)}
         title="Barra de estado"
-        description="Indicadores del resumen de la cuenta Activa (izquierda). Derecha: colas fijas + alarmas Radar."
+        description="Indicadores del resumen de la cuenta Activa (izquierda) y servidores de datos. Derecha: colas fijas + alarmas Radar."
         className="max-w-md"
       >
         <div className="space-y-2">
-          {(Object.keys(STATUS_LABELS) as StatusItemId[]).map((id) => (
+          {STATUS_ITEM_OPTIONS.map((id) => (
             <label key={id} className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={visibleItems.includes(id)}
-                onChange={(e) => {
-                  setVisibleItems((prev) =>
-                    e.target.checked
-                      ? [...prev, id]
-                      : prev.filter((item) => item !== id),
-                  );
-                }}
+                onChange={(e) => toggleStatusItem(id, e.target.checked)}
                 className="h-3.5 w-3.5 accent-primary"
               />
               {STATUS_LABELS[id]}
             </label>
           ))}
+          <div className="mt-3 border-t border-border/70 pt-3">
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={prefs.showProviderHealth}
+                onChange={(e) => setShowProviderHealth(e.target.checked)}
+                className="mt-0.5 h-3.5 w-3.5 accent-primary"
+                data-testid="status-bar-provider-health-toggle"
+              />
+              <span>
+                Servidores de datos
+                <span className="block text-[11px] leading-snug text-muted-foreground">
+                  Icono verde si todos los proveedores habilitados responden y
+                  rojo si alguno cae. Clic en el icono → Configuración · Sync /
+                  proveedores. Se re-verifica cada 60 s.
+                </span>
+              </span>
+            </label>
+          </div>
           <p className="pt-2 text-[11px] leading-snug text-muted-foreground">
             La zona derecha reserva espacio fijo para Colas (Velas · CORE-R · F3
             · Lista AUTO) y el panel de Alarmas Radar (nº sin leer), para que la

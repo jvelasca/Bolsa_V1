@@ -66,6 +66,23 @@ export function DataSyncSummaryCard() {
               Auto-sync {settings.autoSyncEnabled ? "activo" : "inactivo"}
             </span>
 
+            {/* Automatización de SERVIDORES (060): distinta de la de velas. */}
+            <span
+              data-testid="data-sync-provider-check"
+              className={cn(
+                "rounded border px-2 py-0.5 text-xs font-medium",
+
+                settings.providerCheckEnabled
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                  : "border-border text-muted-foreground",
+              )}
+            >
+              Servidores{" "}
+              {settings.providerCheckEnabled
+                ? `cada ${settings.providerCheckIntervalSeconds} s`
+                : "sin comprobación automática"}
+            </span>
+
             <span className="text-muted-foreground">
               Escaneo cada {settings.scanIntervalMinutes} min · pausa{" "}
               {settings.minDelaySeconds}s
@@ -96,7 +113,7 @@ export function DataSyncSummaryCard() {
             onClick={() => openPlatformConfig("other")}
             className="text-primary hover:underline"
           >
-            Sincronización automática →
+            Sincronización y proveedores →
           </button>
         </div>
       </CardContent>

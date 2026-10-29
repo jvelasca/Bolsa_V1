@@ -369,6 +369,27 @@ def _isolate_auto_real_price_switch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(_AUTO_REAL_PRICE_ENV, "0")
 
 
+#: Interruptor de la sonda de proveedores al arrancar la API.
+#:
+#: En producto está ON (es lo que puebla ``market_provider_settings.last_check_*`` al
+#: reiniciar). La suite la apaga: decenas de tests entran en el ``lifespan`` y una sonda
+#: real haría peticiones de red y escribiría estado compartido en la BD, convirtiendo una
+#: suite hermética en una dependiente de Yahoo. Los tests que prueban la sonda la encienden
+#: explícitamente y sustituyen el monitor.
+_PROVIDER_HEALTH_PROBE_ENV = "PROVIDER_HEALTH_PROBE_ON_STARTUP"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_provider_health_startup_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sonda de proveedores al arrancar: OFF por defecto en la suite."""
+    monkeypatch.setenv(_PROVIDER_HEALTH_PROBE_ENV, "0")
+    from bolsa_infrastructure.config import get_settings
+
+    get_settings.cache_clear()
+
+
 #: Interruptor del vigía de ventana (``window_day_watch_worker``).
 #:
 #: Está **on-by-default** en producto, y cualquier proceso que arranque

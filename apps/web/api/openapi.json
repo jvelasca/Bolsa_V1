@@ -8309,14 +8309,40 @@
         "title": "DurableKillReleaseResponse",
         "type": "object"
       },
+      "EnqueueStaleDataDto": {
+        "description": "Resultado de encolar desactualizados, con el motivo declarado si no se encoló.",
+        "properties": {
+          "enqueued": {
+            "title": "Enqueued",
+            "type": "integer"
+          },
+          "scanned": {
+            "title": "Scanned",
+            "type": "integer"
+          },
+          "skippedReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skippedreason"
+          }
+        },
+        "required": [
+          "scanned",
+          "enqueued"
+        ],
+        "title": "EnqueueStaleDataDto",
+        "type": "object"
+      },
       "EnqueueStaleResponseDto": {
         "properties": {
           "data": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Data",
-            "type": "object"
+            "$ref": "#/components/schemas/EnqueueStaleDataDto"
           }
         },
         "required": [
@@ -16077,8 +16103,54 @@
         "title": "MarketIndicesSearchResponseDto",
         "type": "object"
       },
+      "MarketProviderResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MarketProviderStatusDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "MarketProviderResponseDto",
+        "type": "object"
+      },
       "MarketProviderStatusDto": {
         "properties": {
+          "baseUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseurl"
+          },
+          "baseUrlSource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseurlsource"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
           "enabled": {
             "title": "Enabled",
             "type": "boolean"
@@ -16095,9 +16167,57 @@
             "title": "Label",
             "type": "string"
           },
+          "lastCheckAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastcheckat"
+          },
+          "lastCheckMessage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastcheckmessage"
+          },
+          "lastCheckOk": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastcheckok"
+          },
           "message": {
             "title": "Message",
             "type": "string"
+          },
+          "minIntervalSeconds": {
+            "default": 0,
+            "title": "Minintervalseconds",
+            "type": "integer"
+          },
+          "priority": {
+            "default": 0,
+            "title": "Priority",
+            "type": "integer"
+          },
+          "verified": {
+            "default": false,
+            "title": "Verified",
+            "type": "boolean"
           }
         },
         "required": [
@@ -19191,6 +19311,182 @@
         "title": "ProvenanceDto",
         "type": "object"
       },
+      "ProviderHealthEntryDto": {
+        "description": "Estado de un proveedor dentro del veredicto agregado de la barra.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "healthy": {
+            "title": "Healthy",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "lastCheckAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastcheckat"
+          },
+          "lastCheckOk": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastcheckok"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "enabled",
+          "healthy",
+          "verified",
+          "message"
+        ],
+        "title": "ProviderHealthEntryDto",
+        "type": "object"
+      },
+      "ProviderHealthSummaryDto": {
+        "description": "Veredicto para el icono de servidores.\n\n``ok`` | ``degraded`` | ``stale`` | ``unverified`` | ``none``. ``stale`` (060) es una\nmedición correcta que ya no se refresca al ritmo declarado; ``unverified`` es no haber\nmedido nunca. La política viaja con el veredicto para que la UI no la duplique.",
+        "properties": {
+          "autoCheckEnabled": {
+            "default": true,
+            "title": "Autocheckenabled",
+            "type": "boolean"
+          },
+          "checkIntervalSeconds": {
+            "default": 60,
+            "title": "Checkintervalseconds",
+            "type": "integer"
+          },
+          "measuredAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measuredat"
+          },
+          "nextCheckAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcheckat"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "probing": {
+            "default": false,
+            "title": "Probing",
+            "type": "boolean"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderHealthEntryDto"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "ok"
+        ],
+        "title": "ProviderHealthSummaryDto",
+        "type": "object"
+      },
+      "ProviderHealthSummaryResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProviderHealthSummaryDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ProviderHealthSummaryResponseDto",
+        "type": "object"
+      },
+      "ProviderTestResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProviderTestResultDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ProviderTestResponseDto",
+        "type": "object"
+      },
+      "ProviderTestResultDto": {
+        "properties": {
+          "checkedAt": {
+            "title": "Checkedat",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "providerId": {
+            "title": "Providerid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerId",
+          "ok",
+          "message",
+          "checkedAt"
+        ],
+        "title": "ProviderTestResultDto",
+        "type": "object"
+      },
       "PruneBacktestsRequestDto": {
         "properties": {
           "keep": {
@@ -22221,6 +22517,14 @@
             "title": "Postmarketonly",
             "type": "boolean"
           },
+          "providerCheckEnabled": {
+            "title": "Providercheckenabled",
+            "type": "boolean"
+          },
+          "providerCheckIntervalSeconds": {
+            "title": "Providercheckintervalseconds",
+            "type": "integer"
+          },
           "retryBackoffMinutes": {
             "title": "Retrybackoffminutes",
             "type": "integer"
@@ -22246,6 +22550,8 @@
           "maxRetries",
           "retryBackoffMinutes",
           "scope",
+          "providerCheckEnabled",
+          "providerCheckIntervalSeconds",
           "updatedAt"
         ],
         "title": "SyncSettingsDto",
@@ -23300,6 +23606,62 @@
         "title": "UpdateListRequestDto",
         "type": "object"
       },
+      "UpdateMarketProviderDto": {
+        "description": "PATCH de un proveedor: solo se aplican los campos DECLARADOS.\n\n``baseUrl`` se distingue de «no declarado» con ``model_fields_set``: enviar\n``baseUrl: null`` borra la URL configurada, omitirla la deja como está.",
+        "properties": {
+          "baseUrl": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseurl"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "minIntervalSeconds": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minintervalseconds"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          }
+        },
+        "title": "UpdateMarketProviderDto",
+        "type": "object"
+      },
       "UpdatePositionPolicyRequestDto": {
         "properties": {
           "executionPolicyId": {
@@ -23418,6 +23780,30 @@
             ],
             "title": "Postmarketonly"
           },
+          "providerCheckEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Providercheckenabled"
+          },
+          "providerCheckIntervalSeconds": {
+            "anyOf": [
+              {
+                "maximum": 3600.0,
+                "minimum": 15.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Providercheckintervalseconds"
+          },
           "retryBackoffMinutes": {
             "anyOf": [
               {
@@ -23447,6 +23833,10 @@
           "scope": {
             "anyOf": [
               {
+                "enum": [
+                  "lists",
+                  "stale"
+                ],
                 "type": "string"
               },
               {
@@ -33075,7 +33465,22 @@
     },
     "/api/market/providers": {
       "get": {
+        "description": "Configuración efectiva y estado medido de cada proveedor del registro.",
         "operationId": "get_market_providers_api_market_providers_get",
+        "parameters": [
+          {
+            "description": "Ignora la caché de configuración",
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Ignora la caché de configuración",
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -33086,9 +33491,159 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Get Market Providers",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/providers/health": {
+      "get": {
+        "description": "Veredicto único para el icono de servidores de la barra de estado.\n\nSi la comprobación automática está ON y el dato venció, se programa una sonda sin\nbloquear esta respuesta: el campo ``probing`` lo declara y la siguiente consulta ya\ndevuelve la medida. Nunca se inventa un estado: sin medición es ``unverified``.",
+        "operationId": "get_market_providers_health_api_market_providers_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderHealthSummaryResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Market Providers Health",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/providers/health/check": {
+      "post": {
+        "description": "«Comprobar ahora»: mide los proveedores habilitados y persiste el resultado.\n\nMide aunque la comprobación automática esté OFF: apagar la cadencia no debe impedir\nun diagnóstico puntual. Si el comprobador no está disponible en este proceso, se\nresponde 503 en vez de devolver un veredicto que no se acaba de medir.",
+        "operationId": "check_market_providers_health_api_market_providers_health_check_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderHealthSummaryResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Check Market Providers Health",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/providers/{provider_id}": {
+      "patch": {
+        "description": "Actualiza solo los campos declarados del proveedor.",
+        "operationId": "update_market_provider_api_market_providers__provider_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMarketProviderDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketProviderResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Market Provider",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/providers/{provider_id}/test": {
+      "post": {
+        "description": "Verifica el proveedor con una llamada real y persiste el resultado.",
+        "operationId": "test_market_provider_api_market_providers__provider_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderTestResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Market Provider",
         "tags": [
           "market"
         ]

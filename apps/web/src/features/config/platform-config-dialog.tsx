@@ -326,24 +326,32 @@ function ConfigTabPanel({ tab }: { tab: PlatformConfigTab }) {
       return (
         <div className="space-y-6">
           <p className="text-sm text-muted-foreground">
-            Ajustes de sincronización y estado de proveedores. El flujo de datos
-            y la plataforma IA están en{" "}
-            <span className="text-foreground">Ayuda</span>. Mantenimiento
+            Automatización en dos bloques: descarga de velas (histórico) y
+            comprobación de servidores. Son cosas distintas: la comprobación
+            solo mide conectividad. El flujo de datos y la plataforma IA están
+            en <span className="text-foreground">Ayuda</span>. Mantenimiento
             PostgreSQL: <span className="text-foreground">BD</span>.
           </p>
-          <MarketProvidersStatusCard />
           <Card>
             <CardHeader>
-              <CardTitle>Sincronización automática</CardTitle>
+              <CardTitle>Automatización: velas y servidores</CardTitle>
               <CardDescription>
-                Cola con rate limiting para Yahoo — el worker respeta estos
-                valores
+                Dos automatizaciones con una sola configuración; una no hace el
+                trabajo de la otra
               </CardDescription>
             </CardHeader>
             <CardContent>
               <SyncSettingsPanel embedded />
             </CardContent>
           </Card>
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">Servidores de datos</h3>
+            <p className="text-xs text-muted-foreground">
+              Estado medido y configuración de cada proveedor. «Probar conexión»
+              mide ahora; la cadencia automática se fija arriba.
+            </p>
+            <MarketProvidersStatusCard />
+          </div>
         </div>
       );
     case "sounds":

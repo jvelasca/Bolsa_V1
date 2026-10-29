@@ -1,0 +1,11 @@
+﻿{
+    "request":  {
+                    "method":  "PATCH",
+                    "url":  "/api/market/providers/nasdaq",
+                    "body":  {
+                                 "enabled":  false
+                             }
+                },
+    "status":  404,
+    "response":  "{\"detail\":\"Proveedor desconocido: nasdaq\"}"
+}

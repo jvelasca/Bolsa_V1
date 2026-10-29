@@ -1,0 +1,11 @@
+﻿{
+    "request":  {
+                    "method":  "PATCH",
+                    "url":  "/api/market/providers/yahoo",
+                    "body":  {
+                                 "enabled":  true
+                             }
+                },
+    "status":  200,
+    "response":  "{\"data\":{\"id\":\"yahoo\",\"label\":\"Yahoo Finance\",\"enabled\":true,\"healthy\":true,\"message\":\"Yahoo respondió 18764.3000 (ref. ^IBEX, 1793268580)\",\"priority\":10,\"minIntervalSeconds\":2,\"baseUrl\":null,\"capabilities\":[\"ohlcv\",\"fundamentals\",\"fx\"],\"description\":\"Histórico diario, fundamentales y tipos de cambio.\",\"verified\":true,\"baseUrlSource\":null,\"lastCheckAt\":\"2026-10-29T10:24:45.303591+00:00\",\"lastCheckOk\":true,\"lastCheckMessage\":\"Yahoo respondió 18764.3000 (ref. ^IBEX, 1793268580)\"}}"
+}

@@ -483,6 +483,66 @@ export interface MarketProviderStatusDto {
   healthy: boolean;
   message: string;
   mode?: string | null;
+  /** 059 — configuración efectiva publicada junto al estado (claves aditivas). */
+  priority?: number;
+  minIntervalSeconds?: number;
+  baseUrl?: string | null;
+  capabilities?: string[];
+  description?: string;
+  /** `false` = nunca se ha medido: el estado no se puede afirmar. */
+  verified?: boolean;
+  baseUrlSource?: "config" | "env" | null;
+  lastCheckAt?: string | null;
+  lastCheckOk?: boolean | null;
+  lastCheckMessage?: string | null;
+}
+
+export interface UpdateMarketProviderDto {
+  enabled?: boolean;
+  priority?: number;
+  minIntervalSeconds?: number;
+  /** `null` borra la URL configurada; omitirlo la deja como está. */
+  baseUrl?: string | null;
+}
+
+export interface ProviderTestResultDto {
+  providerId: MarketDataProviderId;
+  ok: boolean;
+  message: string;
+  checkedAt: string;
+}
+
+/** Salud agregada para el icono de servidores de la barra de estado. */
+export type ProviderHealthStatus =
+  | "ok"
+  | "degraded"
+  | "stale"
+  | "unverified"
+  | "none";
+
+export interface ProviderHealthEntryDto {
+  id: MarketDataProviderId;
+  label: string;
+  enabled: boolean;
+  healthy: boolean;
+  verified: boolean;
+  message: string;
+  lastCheckAt?: string | null;
+  lastCheckOk?: boolean | null;
+}
+
+export interface ProviderHealthSummaryDto {
+  status: ProviderHealthStatus;
+  ok: boolean;
+  measuredAt?: string | null;
+  /** `true` = hay una sonda en curso; la medida llegará en la próxima consulta. */
+  probing?: boolean;
+  /** Política vigente de la comprobación automática (060); la UI no la duplica. */
+  autoCheckEnabled?: boolean;
+  checkIntervalSeconds?: number;
+  /** Próxima comprobación prevista; `null` si la automática está desactivada. */
+  nextCheckAt?: string | null;
+  providers: ProviderHealthEntryDto[];
 }
 
 export type AlertCondition = "above" | "below";

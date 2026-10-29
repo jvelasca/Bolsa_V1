@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = Field(default=8000, validation_alias="API_PYTHON_PORT")
     xtb_bridge_url: str | None = Field(default=None, validation_alias="XTB_BRIDGE_URL")
+    # Sonda real de proveedores al arrancar (Configuración → Sync / proveedores y la
+    # barra de estado del terminal la leen). Se puede apagar en entornos sin red
+    # (tests herméticos, migraciones offline): sin sonda, el estado es «sin verificar».
+    provider_health_probe_on_startup: bool = Field(
+        default=True, validation_alias="PROVIDER_HEALTH_PROBE_ON_STARTUP"
+    )
     app_password: str | None = Field(default=None, validation_alias="APP_PASSWORD")
     # R12-AUTH fase 1: id de propietario single-tenant (no JWT, no tabla users).
     # Se estampa en altas nuevas de cuenta y se usa como request.state.principal.

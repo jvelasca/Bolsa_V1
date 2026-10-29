@@ -873,6 +873,36 @@ export const api = {
       client.GET("/api/market/providers"),
     ),
 
+  /** Salud agregada de proveedores para el icono de la barra de estado (solo lectura). */
+  getProviderHealth: () =>
+    call<{ data: import("@bolsa/shared").ProviderHealthSummaryDto }>(() =>
+      client.GET("/api/market/providers/health"),
+    ),
+
+  /** «Comprobar ahora»: mide los proveedores habilitados y persiste el resultado. */
+  checkProviderHealth: () =>
+    call<{ data: import("@bolsa/shared").ProviderHealthSummaryDto }>(() =>
+      client.POST("/api/market/providers/health/check"),
+    ),
+
+  updateMarketProvider: (
+    providerId: string,
+    body: import("@bolsa/shared").UpdateMarketProviderDto,
+  ) =>
+    call<{ data: import("@bolsa/shared").MarketProviderStatusDto }>(() =>
+      client.PATCH("/api/market/providers/{provider_id}", {
+        params: { path: { provider_id: providerId } },
+        body: apiBody(body),
+      }),
+    ),
+
+  testMarketProvider: (providerId: string) =>
+    call<{ data: import("@bolsa/shared").ProviderTestResultDto }>(() =>
+      client.POST("/api/market/providers/{provider_id}/test", {
+        params: { path: { provider_id: providerId } },
+      }),
+    ),
+
   getFxRate: (from: string, to: string) =>
     call<{ data: import("@bolsa/shared").FxRateDto }>(() =>
       client.GET("/api/market/fx", {
@@ -2870,7 +2900,7 @@ export const api = {
     ),
 
   enqueueStaleInstruments: () =>
-    call<{ data: { scanned: number; enqueued: number } }>(() =>
+    call<{ data: import("@bolsa/shared").EnqueueStaleResultDto }>(() =>
       client.POST("/api/sync/queue/enqueue-stale"),
     ),
 

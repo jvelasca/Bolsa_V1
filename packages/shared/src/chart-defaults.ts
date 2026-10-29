@@ -1,48 +1,60 @@
-import type { ChartDrawing } from './chart-drawings.js';
+import type { ChartDrawing } from "./chart-drawings.js";
 import type {
   ListHubColumnId,
   ListHubColumnLayoutItem,
   ListHubSortState,
   WatchlistPanelTab,
-} from './list-hub-columns.js';
-import type { ChartListContext, ChartInstrumentSnapshot } from './chart-list-context.js';
-import type { ChartDataStripConfig } from './chart-data-strip.js';
-import type { ChartSeriesType, ChartSeriesTypeParams } from './chart-series-type.js';
+} from "./list-hub-columns.js";
+import type {
+  ChartListContext,
+  ChartInstrumentSnapshot,
+} from "./chart-list-context.js";
+import type { ChartDataStripConfig } from "./chart-data-strip.js";
+import type {
+  ChartSeriesType,
+  ChartSeriesTypeParams,
+} from "./chart-series-type.js";
 import type {
   ChartToolbarChartOverrides,
   ChartToolbarGlobalConfig,
-} from './chart-toolbar.js';
-import type { ChartDrawingTemplate } from './chart-drawing-templates.js';
-import type { IndicatorFavoriteRef, IndicatorTemplate } from './indicator-templates.js';
-import type { IndicatorPreset } from './indicator-presets.js';
-import type { ChartDrawTool } from './chart-drawings.js';
-import type { ChartTimeframe } from './chart-timeframes.js';
-import type { ChartIndicatorInstance } from './indicators-catalog.js';
-import type { ChartNewTabSeed, NewChartConfigSource } from './chart-new-tab-setup.js';
+} from "./chart-toolbar.js";
+import type { ChartDrawingTemplate } from "./chart-drawing-templates.js";
+import type {
+  IndicatorFavoriteRef,
+  IndicatorTemplate,
+} from "./indicator-templates.js";
+import type { IndicatorPreset } from "./indicator-presets.js";
+import type { ChartDrawTool } from "./chart-drawings.js";
+import type { ChartTimeframe } from "./chart-timeframes.js";
+import type { ChartIndicatorInstance } from "./indicators-catalog.js";
+import type {
+  ChartNewTabSeed,
+  NewChartConfigSource,
+} from "./chart-new-tab-setup.js";
 
 export type ListColumnId =
-  | 'symbol'
-  | 'name'
-  | 'lastClose'
-  | 'changePct'
-  | 'isin'
-  | 'syncStatus'
+  | "symbol"
+  | "name"
+  | "lastClose"
+  | "changePct"
+  | "isin"
+  | "syncStatus"
   /** Capas Lab/CORE-R/redescubrir (3 iconos). Off por defecto. */
-  | 'processStatus'
+  | "processStatus"
   /** Última pasada Lab / Finalistas. Off por defecto. */
-  | 'lastLabAt'
+  | "lastLabAt"
   /** Último juicio / encolado CORE-R. Off por defecto. */
-  | 'lastCoreRAt'
+  | "lastCoreRAt"
   /** Índice Operativo 0–100 (recomendación). Off por defecto. */
-  | 'ioScore'
+  | "ioScore"
   /** Pierna técnica 0–100. Off por defecto. */
-  | 'taScore'
+  | "taScore"
   /** Pierna fundamental 0–100. Off por defecto. */
-  | 'faScore'
+  | "faScore"
   /** ★ dictamen diario. Off por defecto. */
-  | 'dictamenStars'
+  | "dictamenStars"
   /** Postura del dictamen (buy / vigilar…). Off por defecto. */
-  | 'recStance';
+  | "recStance";
 
 export interface ChartGridConfig {
   showVertical: boolean;
@@ -54,7 +66,7 @@ export interface ChartGridConfig {
 }
 
 export interface ChartCursorConfig {
-  mode: 'crosshair' | 'magnet';
+  mode: "crosshair" | "magnet";
   showOhlcInTooltip: boolean;
   /** Etiqueta de fecha/hora al pasar sobre el eje temporal (X). */
   showTimeAxisLabel?: boolean;
@@ -101,7 +113,7 @@ export interface ListColumnLayoutItem {
 export interface ListPanelConfig {
   id: string;
   name: string;
-  source: 'catalog' | 'api' | 'virtual';
+  source: "catalog" | "api" | "virtual";
   /** ID de lista en API cuando source === 'api' */
   apiListId?: string;
   /** Columnas visibles en orden (derivado de columnLayout) */
@@ -155,7 +167,7 @@ export function resolveListRowActionsWidth(width: number | undefined): number {
 
 export interface ListSortState {
   column: ListColumnId;
-  direction: 'asc' | 'desc';
+  direction: "asc" | "desc";
 }
 
 /** Instrumento en la lista virtual Visualización (persistido en workspace). */
@@ -297,8 +309,25 @@ export interface SyncSettingsDto {
   postMarketOnly: boolean;
   maxRetries: number;
   retryBackoffMinutes: number;
-  scope: string;
+  /** Enum cerrado: `lists` (solo valores en listas) o `stale` (todos los desfasados). */
+  scope: SyncScope;
+  /**
+   * Automatización de servidores (060), distinta de `autoSyncEnabled` (velas): solo
+   * comprueba conectividad de los proveedores habilitados, no descarga datos.
+   */
+  providerCheckEnabled: boolean;
+  /** Cadencia de la comprobación de servidores, en segundos (15-3600). */
+  providerCheckIntervalSeconds: number;
   updatedAt: string;
+}
+
+export type SyncScope = "lists" | "stale";
+
+export interface EnqueueStaleResultDto {
+  scanned: number;
+  enqueued: number;
+  /** Motivo declarado cuando no se encoló nada por configuración. */
+  skippedReason: string | null;
 }
 
 export interface SyncQueueItemDto {
@@ -318,7 +347,7 @@ export interface PendingOrderDto {
   id: string;
   instrumentId: string;
   symbol: string;
-  side: 'buy' | 'sell';
+  side: "buy" | "sell";
   orderType: string;
   quantity: number;
   limitPrice: number;
@@ -327,53 +356,53 @@ export interface PendingOrderDto {
 }
 
 export const LIST_COLUMN_LABELS: Record<ListColumnId, string> = {
-  symbol: 'Símbolo',
-  name: 'Nombre',
-  lastClose: 'Último',
-  changePct: '% día',
-  isin: 'ISIN',
-  syncStatus: 'Sincro',
-  processStatus: 'Procesos',
-  lastLabAt: 'Últ. Lab',
-  lastCoreRAt: 'Últ. CORE-R',
-  ioScore: 'IO',
-  taScore: 'TA',
-  faScore: 'FA',
-  dictamenStars: '★ Dict.',
-  recStance: 'Postura',
+  symbol: "Símbolo",
+  name: "Nombre",
+  lastClose: "Último",
+  changePct: "% día",
+  isin: "ISIN",
+  syncStatus: "Sincro",
+  processStatus: "Procesos",
+  lastLabAt: "Últ. Lab",
+  lastCoreRAt: "Últ. CORE-R",
+  ioScore: "IO",
+  taScore: "TA",
+  faScore: "FA",
+  dictamenStars: "★ Dict.",
+  recStance: "Postura",
 };
 
 export const ALL_LIST_COLUMNS: ListColumnId[] = [
-  'symbol',
-  'name',
-  'lastClose',
-  'changePct',
-  'isin',
-  'syncStatus',
-  'processStatus',
-  'lastLabAt',
-  'lastCoreRAt',
-  'ioScore',
-  'taScore',
-  'faScore',
-  'dictamenStars',
-  'recStance',
+  "symbol",
+  "name",
+  "lastClose",
+  "changePct",
+  "isin",
+  "syncStatus",
+  "processStatus",
+  "lastLabAt",
+  "lastCoreRAt",
+  "ioScore",
+  "taScore",
+  "faScore",
+  "dictamenStars",
+  "recStance",
 ];
 
 /** Columnas de supervisión: visibles solo si el usuario las enciende. */
 export const ESTUDIO_OPTIONAL_LIST_COLUMNS: ListColumnId[] = [
-  'processStatus',
-  'lastLabAt',
-  'lastCoreRAt',
+  "processStatus",
+  "lastLabAt",
+  "lastCoreRAt",
 ];
 
 /** Columnas de recomendación (IO / dictamen). Off por defecto; activables en (…). */
 export const RECOMMENDATION_OPTIONAL_LIST_COLUMNS: ListColumnId[] = [
-  'ioScore',
-  'taScore',
-  'faScore',
-  'dictamenStars',
-  'recStance',
+  "ioScore",
+  "taScore",
+  "faScore",
+  "dictamenStars",
+  "recStance",
 ];
 
 export const MIN_LIST_COLUMN_WIDTH = 40;
@@ -397,11 +426,14 @@ export const DEFAULT_LIST_COLUMN_WIDTHS: Record<ListColumnId, number> = {
 };
 
 export function clampListColumnWidth(width: number): number {
-  return Math.min(MAX_LIST_COLUMN_WIDTH, Math.max(MIN_LIST_COLUMN_WIDTH, Math.round(width)));
+  return Math.min(
+    MAX_LIST_COLUMN_WIDTH,
+    Math.max(MIN_LIST_COLUMN_WIDTH, Math.round(width)),
+  );
 }
 
 export function buildDefaultColumnLayout(
-  columnIds: ListColumnId[] = ['symbol', 'lastClose', 'changePct'],
+  columnIds: ListColumnId[] = ["symbol", "lastClose", "changePct"],
 ): ListColumnLayoutItem[] {
   const visibleSet = new Set(columnIds);
   const ordered: ListColumnLayoutItem[] = [];
@@ -427,7 +459,9 @@ export function buildDefaultColumnLayout(
   return ordered;
 }
 
-export function visibleListColumns(layout: ListColumnLayoutItem[]): ListColumnId[] {
+export function visibleListColumns(
+  layout: ListColumnLayoutItem[],
+): ListColumnId[] {
   return layout.filter((column) => column.visible).map((column) => column.id);
 }
 
@@ -436,12 +470,14 @@ export function normalizeColumnLayout(
   legacyColumns?: ListColumnId[],
 ): ListColumnLayoutItem[] {
   const migrateColumnId = (id: string): ListColumnId | null => {
-    const mapped = id === 'barCount' ? 'isin' : id;
-    return ALL_LIST_COLUMNS.includes(mapped as ListColumnId) ? (mapped as ListColumnId) : null;
+    const mapped = id === "barCount" ? "isin" : id;
+    return ALL_LIST_COLUMNS.includes(mapped as ListColumnId)
+      ? (mapped as ListColumnId)
+      : null;
   };
 
   const fallback = buildDefaultColumnLayout(
-    legacyColumns?.map((id) => (String(id) === 'barCount' ? 'isin' : id)),
+    legacyColumns?.map((id) => (String(id) === "barCount" ? "isin" : id)),
   );
   if (!raw?.length) return fallback;
 
@@ -451,7 +487,9 @@ export function normalizeColumnLayout(
     if (!columnId) continue;
     byId.set(columnId, {
       id: columnId,
-      width: clampListColumnWidth(item.width ?? DEFAULT_LIST_COLUMN_WIDTHS[columnId]),
+      width: clampListColumnWidth(
+        item.width ?? DEFAULT_LIST_COLUMN_WIDTHS[columnId],
+      ),
       visible: Boolean(item.visible),
     });
   }
@@ -493,7 +531,7 @@ export function normalizeColumnLayout(
 }
 
 export const DEFAULT_CHART_CONFIG: ChartInstanceConfig = {
-  id: 'main',
+  id: "main",
   grid: {
     showVertical: true,
     showHorizontal: true,
@@ -502,21 +540,21 @@ export const DEFAULT_CHART_CONFIG: ChartInstanceConfig = {
     priceScaleZoom: 1,
   },
   cursor: {
-    mode: 'crosshair',
+    mode: "crosshair",
     showOhlcInTooltip: true,
     showTimeAxisLabel: true,
   },
   colors: {
-    upColor: '#22c55e',
-    downColor: '#ef4444',
-    gridColor: '#243044',
-    textColor: '#8b98a8',
-    volumeUpColor: 'rgba(34, 197, 94, 0.5)',
-    volumeDownColor: 'rgba(239, 68, 68, 0.5)',
-    sma20Color: '#38bdf8',
-    sma50Color: '#a78bfa',
-    ema20Color: '#fbbf24',
-    rsi14Color: '#f472b6',
+    upColor: "#22c55e",
+    downColor: "#ef4444",
+    gridColor: "#243044",
+    textColor: "#8b98a8",
+    volumeUpColor: "rgba(34, 197, 94, 0.5)",
+    volumeDownColor: "rgba(239, 68, 68, 0.5)",
+    sma20Color: "#38bdf8",
+    sma50Color: "#a78bfa",
+    ema20Color: "#fbbf24",
+    rsi14Color: "#f472b6",
   },
   display: {
     showVolume: true,
@@ -528,14 +566,20 @@ export const DEFAULT_CHART_CONFIG: ChartInstanceConfig = {
   },
 };
 
-const DEFAULT_VISIBLE_COLUMNS: ListColumnId[] = ['symbol', 'lastClose', 'changePct'];
+const DEFAULT_VISIBLE_COLUMNS: ListColumnId[] = [
+  "symbol",
+  "lastClose",
+  "changePct",
+];
 
-export const DEFAULT_COLUMN_LAYOUT = buildDefaultColumnLayout(DEFAULT_VISIBLE_COLUMNS);
+export const DEFAULT_COLUMN_LAYOUT = buildDefaultColumnLayout(
+  DEFAULT_VISIBLE_COLUMNS,
+);
 
 export const DEFAULT_LIST_CONFIG: ListPanelConfig = {
-  id: 'ibex35',
-  name: 'IBEX 35',
-  source: 'api',
+  id: "ibex35",
+  name: "IBEX 35",
+  source: "api",
   columns: DEFAULT_VISIBLE_COLUMNS,
   columnLayout: DEFAULT_COLUMN_LAYOUT,
 };

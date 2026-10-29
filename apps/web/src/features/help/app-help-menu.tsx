@@ -892,7 +892,10 @@ function HelpBody({
             Cómo entran y se guardan los datos. Los{" "}
             <strong className="text-foreground">ajustes</strong> de cola
             automática están en{" "}
-            <OpenConfigLink tab="other">Configuración → Otras</OpenConfigLink>.
+            <OpenConfigLink tab="other">
+              Configuración → Sync / proveedores
+            </OpenConfigLink>
+            .
           </p>
           <DataCaptureSection compact />
         </div>

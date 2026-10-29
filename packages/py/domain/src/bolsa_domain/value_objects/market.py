@@ -50,3 +50,16 @@ class MarketProviderStatus:
     enabled: bool
     healthy: bool
     message: str
+    # 059 — configuración efectiva publicada junto al estado (claves ADITIVAS: la UI
+    # necesita los mismos números que gobiernan el backend, no una copia en TS).
+    priority: int = 0
+    min_interval_seconds: int = 0
+    base_url: str | None = None
+    capabilities: tuple[str, ...] = ()
+    description: str = ""
+    # ``verified`` separa «medido» de «correcto»: sin verificación no se afirma nada.
+    verified: bool = False
+    base_url_source: str | None = None
+    last_check_at: str | None = None
+    last_check_ok: bool | None = None
+    last_check_message: str | None = None

@@ -7,8 +7,10 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from bolsa_application.get_instrument_data_status import GetInstrumentDataStatus
-from bolsa_application.sync_instrument import SyncInstrumentDailyBars
+from bolsa_domain.entities.market_provider import (
+    CAPABILITY_OHLCV,
+    ProviderCheckPolicy,
+)
 from bolsa_infrastructure.database.repositories.instrument_repository import (
     SqlAlchemyInstrumentRepository,
 )
@@ -17,6 +19,10 @@ from bolsa_infrastructure.database.repositories.sync_scheduler_repository import
     SyncQueueItemRecord,
     SyncSettingsRecord,
 )
+
+from bolsa_application.get_instrument_data_status import GetInstrumentDataStatus
+from bolsa_application.market_providers import MarketProviderConfigResolver
+from bolsa_application.sync_instrument import SyncInstrumentDailyBars
 
 MADRID = ZoneInfo("Europe/Madrid")
 POST_CLOSE_HOUR = 17
@@ -34,6 +40,7 @@ def is_post_market_window(now: datetime | None = None) -> bool:
 
 class GetSyncSettings:
     """Obtiene Sync Settings."""
+
     def __init__(self, repo: SqlAlchemySyncSchedulerRepository) -> None:
         self._repo = repo
 
@@ -43,6 +50,7 @@ class GetSyncSettings:
 
 class UpdateSyncSettings:
     """Actualiza Sync Settings."""
+
     def __init__(self, repo: SqlAlchemySyncSchedulerRepository) -> None:
         self._repo = repo
 
@@ -50,8 +58,28 @@ class UpdateSyncSettings:
         return await self._repo.update_settings(**kwargs)
 
 
+class GetProviderCheckPolicy:
+    """Política vigente de la comprobación periódica de proveedores.
+
+    Vive en ``sync_settings`` porque es parte de «automatización» (misma fila, misma
+    pantalla), pero es un caso de uso propio: el bucle de salud no debe arrastrar la
+    semántica de la sincronización de velas ni leer campos que no usa.
+    """
+
+    def __init__(self, repo: SqlAlchemySyncSchedulerRepository) -> None:
+        self._repo = repo
+
+    async def execute(self) -> ProviderCheckPolicy:
+        record = await self._repo.get_settings()
+        return ProviderCheckPolicy(
+            enabled=record.provider_check_enabled,
+            interval_seconds=record.provider_check_interval_seconds,
+        )
+
+
 class ListSyncQueue:
     """Lista Sync Queue."""
+
     def __init__(self, repo: SqlAlchemySyncSchedulerRepository) -> None:
         self._repo = repo
 
@@ -62,8 +90,12 @@ class ListSyncQueue:
 @dataclass(frozen=True, slots=True)
 class EnqueueStaleResult:
     """Encola Stale Result."""
+
     scanned: int
     enqueued: int
+    #: Motivo declarado cuando no se encoló nada por configuración (proveedor
+    #: deshabilitado). ``None`` = la pasada se ejecutó con normalidad.
+    skipped_reason: str | None = None
 
 
 SYNC_SCOPE_LISTS = "lists"
@@ -84,13 +116,19 @@ class EnqueueStaleInstruments:
         data_status: GetInstrumentDataStatus,
         *,
         list_member_ids: set[str] | None = None,
+        provider_resolver: MarketProviderConfigResolver | None = None,
     ) -> None:
         self._instruments = instrument_repo
         self._scheduler = scheduler_repo
         self._data_status = data_status
         self._list_member_ids = list_member_ids
+        self._provider_resolver = provider_resolver
 
     async def execute(self) -> EnqueueStaleResult:
+        if self._provider_resolver is not None:
+            resolution = await self._provider_resolver.resolve_capability(CAPABILITY_OHLCV)
+            if resolution.provider is None:
+                return EnqueueStaleResult(scanned=0, enqueued=0, skipped_reason=resolution.reason)
         settings = await self._scheduler.get_settings()
         scope = (settings.scope or SYNC_SCOPE_LISTS).strip().lower()
         items = await self._instruments.list_with_meta()
@@ -126,23 +164,36 @@ class EnqueueStaleInstruments:
 @dataclass(frozen=True, slots=True)
 class ProcessQueueResult:
     """Procesa Queue Result."""
+
     processed: bool
     instrument_id: str | None = None
     status: str | None = None
     error: str | None = None
+    #: Declarado cuando no se procesa por configuración (proveedor no usable).
+    skipped_reason: str | None = None
 
 
 class ProcessNextSyncQueueItem:
     """Procesa Next Sync Queue Item."""
+
     def __init__(
         self,
         scheduler_repo: SqlAlchemySyncSchedulerRepository,
         sync_use_case: SyncInstrumentDailyBars,
+        *,
+        provider_resolver: MarketProviderConfigResolver | None = None,
     ) -> None:
         self._scheduler = scheduler_repo
         self._sync = sync_use_case
+        self._provider_resolver = provider_resolver
 
     async def execute(self) -> ProcessQueueResult:
+        if self._provider_resolver is not None:
+            resolution = await self._provider_resolver.resolve_capability(CAPABILITY_OHLCV)
+            if resolution.provider is None:
+                # Sin proveedor usable NO se reclama el ítem: reclamarlo y fallarlo
+                # gastaría un intento por un problema de configuración, no del dato.
+                return ProcessQueueResult(processed=False, skipped_reason=resolution.reason)
         settings = await self._scheduler.get_settings()
         if settings.post_market_only and not is_post_market_window():
             return ProcessQueueResult(processed=False)
@@ -160,7 +211,9 @@ class ProcessNextSyncQueueItem:
                 backoff_minutes=settings.retry_backoff_minutes,
                 max_retries=settings.max_retries,
             )
-            return ProcessQueueResult(processed=True, instrument_id=item.instrument_id, status="failed")
+            return ProcessQueueResult(
+                processed=True, instrument_id=item.instrument_id, status="failed"
+            )
 
         if result.status == "failed":
             await self._scheduler.fail_item(
@@ -178,4 +231,6 @@ class ProcessNextSyncQueueItem:
             )
 
         await self._scheduler.complete_item(item.id)
-        return ProcessQueueResult(processed=True, instrument_id=item.instrument_id, status=result.status)
+        return ProcessQueueResult(
+            processed=True, instrument_id=item.instrument_id, status=result.status
+        )

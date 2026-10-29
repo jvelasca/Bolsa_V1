@@ -13,7 +13,8 @@ export const DATA_MARKET_SYNC = {
   dataModel: "docs/DATA_MODEL.md",
   adr: "docs/adr/002-yahoo-primary-xtb-secondary.md",
   adrIntraday: "docs/adr/007-intraday-ohlcv-persistence.md",
-  configHint: "Configuración → Otras (sync automática y estado de proveedores)",
+  configHint:
+    "Configuración → Sync / proveedores (sync automática y estado de proveedores)",
   bdHint: "Configuración → BD (conteos, huérfanos y purga)",
 } as const;
 
@@ -178,7 +179,7 @@ export const DATA_FLOW_STEPS = [
   {
     id: "modes",
     title: "4. Modos de sync",
-    body: "Manual, cola automática (worker), lazy intradía y refresh de fundamentales. Preferencias editables en Configuración → Otras.",
+    body: "Manual, cola automática (worker), lazy intradía y refresh de fundamentales. Preferencias editables en Configuración → Sync / proveedores.",
   },
   {
     id: "xtb",
@@ -200,7 +201,7 @@ export const DATA_FRESHNESS_NOTES = [
 export const DATA_UPDATE_SCOPE = {
   title: "¿Qué se actualiza solo (y cada cuánto)?",
   plain:
-    "Por defecto la cola automática mantiene frescos los valores que estánén en tus listas (universo de rastreadores), no hace falta tener el gráfico abierto. Procesa de uno en uno con pausas para no saturar Yahoo. El icono de sincronismo en cada fila de lista muestra si las diarias están al día (hover = detalle).",
+    "Por defecto la cola automática mantiene frescos los valores que están en tus listas (universo de rastreadores), no hace falta tener el gráfico abierto. Procesa de uno en uno con pausas para no saturar Yahoo. El icono de sincronismo en cada fila de lista muestra si las diarias están al día (hover = detalle).",
   rows: [
     {
       who: "Cola automática (worker)",
@@ -228,7 +229,93 @@ export const DATA_UPDATE_SCOPE = {
 export const DATA_MARKET_NEXT = [
   "Probar sync manual de un valor IBEX y revisar badge de frescura.",
   "Opcional: arrancar pnpm xtb:mock y Validar con XTB desde la ficha del instrumento.",
-  "Ajustar cola en Configuración → Otras si quieres sync solo post-cierre.",
+  "Ajustar cola en Configuración → Sync / proveedores si quieres sync solo post-cierre.",
   "Comprobar auto-sync activo antes de confiar en un rastreador masivo.",
   "Revisar Configuración → BD (conteos y huérfanos) tras limpiar listas de prueba.",
+] as const;
+
+/**
+ * Verificación SECUENCIAL de proveedores y sincronismo (Config → Sync / proveedores).
+ *
+ * Cada paso declara qué hace el usuario, qué debe ver y dónde se comprueba. Es el mismo
+ * recorrido que ejecutan las pruebas `PRV-*`, `SYN-*` y `UI-*` del documento
+ * `docs/engineering/seguimiento-ui-proveedores-2026-10-29.md`: si un paso no se cumple,
+ * el defecto se registra allí con su ID.
+ */
+export const DATA_PROVIDER_VERIFY = [
+  {
+    id: "HLP-1",
+    title: "1 · Abrir la configuración de proveedores",
+    action:
+      "Configuración → Sync / proveedores. Observa las tarjetas de Yahoo Finance y XTB Bridge.",
+    expect:
+      "Cada tarjeta muestra capacidades, prioridad, intervalo y un estado HONESTO: «Sin verificar» si nunca se ha medido, no «Disponible».",
+    check: "Pantalla · GET /api/market/providers",
+  },
+  {
+    id: "HLP-2",
+    title: "2 · Verificar XTB con el bridge simulado",
+    action: "Arranca `pnpm xtb:mock` y pulsa «Probar conexión» en XTB Bridge.",
+    expect:
+      "«Conexión OK» con el mensaje del bridge. Al recargar, la hora de última verificación sigue ahí (se ha persistido).",
+    check:
+      "Pantalla · POST /api/market/providers/xtb/test · tabla market_provider_settings",
+  },
+  {
+    id: "HLP-3",
+    title: "3 · Verificar Yahoo",
+    action:
+      "Pulsa «Probar conexión» en Yahoo Finance (hace una petición real acotada).",
+    expect:
+      "Precio de referencia de ^IBEX con su marca de tiempo, o un motivo de fallo legible si no hay red. Nunca un 500.",
+    check: "Pantalla · POST /api/market/providers/yahoo/test",
+  },
+  {
+    id: "HLP-4",
+    title: "4 · Guardar prioridad e intervalo",
+    action:
+      "Cambia la prioridad o el intervalo mínimo y pulsa «Guardar» en la tarjeta.",
+    expect:
+      "Un solo PATCH, mensaje de guardado y el valor persiste tras recargar la página. El throttle del cliente Yahoo se aplica en el siguiente tick.",
+    check:
+      "Pantalla · PATCH /api/market/providers/{id} · columna min_interval_seconds",
+  },
+  {
+    id: "HLP-5",
+    title: "5 · Deshabilitar Yahoo y comprobar el fallo cerrado",
+    action:
+      "Desmarca «Usar este proveedor» en Yahoo. Mira el aviso de Sincronización y pulsa «Encolar valores desactualizados ahora».",
+    expect:
+      "Aviso visible de proveedor deshabilitado; la respuesta declara `skippedReason=provider_disabled:yahoo` y no se encola nada. Un sync manual devuelve 409 con el mismo motivo.",
+    check:
+      "Pantalla · POST /api/sync/queue/enqueue-stale · POST /api/instruments/{id}/sync",
+  },
+  {
+    id: "HLP-6",
+    title: "6 · Rehabilitar y encolar de verdad",
+    action:
+      "Vuelve a habilitar Yahoo y pulsa «Encolar valores desactualizados ahora».",
+    expect:
+      "Se informa de escaneados/encolados y la cola muestra estados traducidos (Pendiente, Procesando, Fallido) y el último error cuando lo hay.",
+    check: "Pantalla · GET /api/sync/queue · tabla sync_queue",
+  },
+  {
+    id: "HLP-7",
+    title: "7 · Guardar la configuración de la cola",
+    action:
+      "En Sincronización automática cambia intervalo, pausa, reintentos o universo y pulsa «Guardar cambios».",
+    expect:
+      "Un único PATCH con los campos cambiados; los valores fuera de rango bloquean el guardado con mensaje; tras recargar se mantienen.",
+    check: "Pantalla · PATCH /api/sync/settings · tabla sync_settings",
+  },
+  {
+    id: "HLP-8",
+    title: "8 · Comprobar el icono de servidores en la barra de estado",
+    action:
+      "Ve a Mercado. En la barra inferior, mira el icono de servidores de datos (a la derecha) y, si quieres, apágalo desde el engranaje de esa misma barra.",
+    expect:
+      "Verde si todos los proveedores habilitados responden, rojo si alguno cae. Al reiniciar la API la medición se rehace sola. Un clic en el icono abre Configuración · Sync / proveedores; el engranaje de la barra decide si el icono se muestra.",
+    check:
+      "Pantalla · GET /api/market/providers/health · columna last_check_at de market_provider_settings",
+  },
 ] as const;

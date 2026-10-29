@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from fastapi import Depends, Header, HTTPException, Request
@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     )
 
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
-from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_application.account_blob_state import (
     GetAccountCoreRState,
     GetAccountMandates,
@@ -87,6 +86,12 @@ from bolsa_application.market import (
     GetInstrumentLiveQuotes,
     GetMarketStatus,
 )
+from bolsa_application.market_providers import (
+    ListMarketProviderConfigs,
+    MarketProviderConfigResolver,
+    TestProviderConnection,
+    UpdateMarketProviderConfig,
+)
 from bolsa_application.optimization_runs import (
     EnqueueOptimizationRun,
     GetOptimizationRun,
@@ -147,6 +152,7 @@ from bolsa_application.strategy_draft import DraftStrategyFromPrompt
 from bolsa_application.sync_instrument import SyncInstrumentDailyBars
 from bolsa_application.sync_scheduler import (
     EnqueueStaleInstruments,
+    GetProviderCheckPolicy,
     GetSyncSettings,
     ListSyncQueue,
     ProcessNextSyncQueueItem,
@@ -212,6 +218,9 @@ from bolsa_infrastructure.database.repositories.list_repository import SqlAlchem
 from bolsa_infrastructure.database.repositories.mandate_repository import (
     SqlAlchemyMandateRepository,
 )
+from bolsa_infrastructure.database.repositories.market_provider_settings_repository import (
+    SqlAlchemyMarketProviderSettingsRepository,
+)
 from bolsa_infrastructure.database.repositories.mkl_sync_repository import (
     SqlAlchemyMklSyncRepository,
 )
@@ -273,6 +282,8 @@ from bolsa_infrastructure.database.repositories.workspace_repository import (
 )
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
+
+from bolsa_api.auth.request_principal import get_request_principal
 
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
@@ -601,8 +612,6 @@ def get_portfolio_recon_lookup(session: AsyncSession) -> Any:
 
 def get_lifecycle_recon_lookup(session: AsyncSession) -> Any:
     """OR-4 V1.95 — composed financial integrity status for check_opening."""
-    from sqlalchemy import func, select
-
     from bolsa_application.lifecycle_event_store import (
         GetLifecycleSnapshot,
         PostgresLifecycleEventStore,
@@ -622,6 +631,7 @@ def get_lifecycle_recon_lookup(session: AsyncSession) -> Any:
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
+    from sqlalchemy import func, select
 
     class _OutboxAdapter:
         async def list_for_account(self, acc: str) -> list[OutboxSnap]:
@@ -1119,11 +1129,28 @@ def get_instrument_data_status_use_case(session: AsyncSession) -> GetInstrumentD
     )
 
 
+def _xtb_bridge_url_resolver(session: AsyncSession) -> Callable[[], Awaitable[str | None]]:
+    """Resuelve la URL del bridge desde la configuración efectiva (BD + entorno).
+
+    Se evalúa en cada petición: un cambio en Configuración no exige reiniciar el proceso.
+    Un proveedor deshabilitado devuelve ``None`` (no se consulta el bridge).
+    """
+
+    async def _resolve() -> str | None:
+        config = await get_market_provider_config_resolver(session).get("xtb")
+        if config is None or not config.usable:
+            return None
+        return config.base_url
+
+    return _resolve
+
+
 def get_live_quote_use_case(session: AsyncSession) -> GetInstrumentLiveQuote:
     settings = get_settings()
     return GetInstrumentLiveQuote(
         get_instrument_repository(session),
         settings.xtb_bridge_url,
+        xtb_bridge_url_resolver=_xtb_bridge_url_resolver(session),
     )
 
 
@@ -1132,11 +1159,67 @@ def get_live_quotes_use_case(session: AsyncSession) -> GetInstrumentLiveQuotes:
     return GetInstrumentLiveQuotes(
         get_instrument_repository(session),
         settings.xtb_bridge_url,
+        xtb_bridge_url_resolver=_xtb_bridge_url_resolver(session),
     )
 
 
-def get_market_status_use_case() -> GetMarketStatus:
-    return GetMarketStatus(get_settings().xtb_bridge_url)
+def get_market_provider_settings_repository(
+    session: AsyncSession,
+) -> SqlAlchemyMarketProviderSettingsRepository:
+    return SqlAlchemyMarketProviderSettingsRepository(session)
+
+
+def get_market_provider_config_resolver(
+    session: AsyncSession,
+    *,
+    refresh: bool = False,
+) -> MarketProviderConfigResolver:
+    return MarketProviderConfigResolver(
+        get_market_provider_settings_repository(session),
+        xtb_bridge_url=get_settings().xtb_bridge_url,
+    )
+
+
+def get_list_market_providers_use_case(session: AsyncSession) -> ListMarketProviderConfigs:
+    return ListMarketProviderConfigs(get_market_provider_config_resolver(session))
+
+
+def get_update_market_provider_use_case(
+    session: AsyncSession,
+) -> UpdateMarketProviderConfig:
+    return UpdateMarketProviderConfig(
+        get_market_provider_settings_repository(session),
+        xtb_bridge_url=get_settings().xtb_bridge_url,
+    )
+
+
+def get_test_provider_connection_use_case(
+    session: AsyncSession,
+) -> TestProviderConnection:
+    return TestProviderConnection(
+        get_market_provider_settings_repository(session),
+        xtb_bridge_url=get_settings().xtb_bridge_url,
+    )
+
+
+async def get_market_status_use_case(
+    session: AsyncSession,
+    *,
+    refresh: bool = False,
+    live: bool = True,
+) -> GetMarketStatus:
+    """Estado de proveedores a partir de la configuración efectiva persistida.
+
+    ``live=False`` devuelve solo lo persistido: es la lectura del icono de la barra
+    (060), para que un GET no genere tráfico a los proveedores.
+    """
+    resolver = get_market_provider_config_resolver(session)
+    return GetMarketStatus(await resolver.list_configs(refresh=refresh), live=live)
+
+
+def get_provider_check_policy_use_case(session: AsyncSession) -> GetProviderCheckPolicy:
+    """Política ON/OFF + intervalo de la comprobación periódica de proveedores."""
+    return GetProviderCheckPolicy(get_sync_scheduler_repository(session))
 
 
 def get_fx_rate_use_case() -> GetFxRate:
@@ -1836,6 +1919,7 @@ def get_enqueue_stale_use_case(session: AsyncSession) -> EnqueueStaleInstruments
         get_instrument_repository(session),
         get_sync_scheduler_repository(session),
         get_instrument_data_status_use_case(session),
+        provider_resolver=get_market_provider_config_resolver(session),
     )
 
 
@@ -1843,6 +1927,7 @@ def get_process_sync_queue_use_case(session: AsyncSession) -> ProcessNextSyncQue
     return ProcessNextSyncQueueItem(
         get_sync_scheduler_repository(session),
         get_sync_instrument_use_case(session),
+        provider_resolver=get_market_provider_config_resolver(session),
     )
 
 

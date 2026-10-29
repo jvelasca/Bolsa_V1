@@ -18,6 +18,7 @@ import {
   DATA_MARKET_NEXT,
   DATA_MARKET_SUMMARY,
   DATA_MARKET_SYNC,
+  DATA_PROVIDER_VERIFY,
   DATA_SOURCES,
   DATA_SYNC_MODES,
   DATA_UPDATE_SCOPE,
@@ -298,6 +299,42 @@ export function DataCaptureSection({ compact = false }: { compact?: boolean }) {
                 <p className="font-medium">{step.title}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {step.body}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">
+            Verificación paso a paso de proveedores
+          </CardTitle>
+          <CardDescription>
+            Qué haces, qué debes ver y dónde se comprueba — Configuración → Sync
+            / proveedores
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ol className="space-y-3 text-sm">
+            {DATA_PROVIDER_VERIFY.map((step) => (
+              <li
+                key={step.id}
+                data-testid={`provider-verify-${step.id}`}
+                className="rounded-md border border-border/70 px-3 py-2"
+              >
+                <p className="text-sm font-medium text-foreground">
+                  {step.title}
+                </p>
+                <p className="mt-1 text-xs text-foreground/90">
+                  <span className="font-medium">Haz:</span> {step.action}
+                </p>
+                <p className="mt-1 text-xs text-foreground/90">
+                  <span className="font-medium">Debes ver:</span> {step.expect}
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Comprobación: {step.check}
                 </p>
               </li>
             ))}

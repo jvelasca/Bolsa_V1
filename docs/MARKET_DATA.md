@@ -61,7 +61,7 @@ Noticias Yahoo y macro (VIX / curva) se usan en el camino cognitivo con TTL en m
 | **Gráfico abierto (1d)** | Sí, una vez si empty/stale | Atajo; no sustituye a la cola |
 | **Rastreadores** | No (OHLCV) | Usan barras en BD; híbrido puede refrescar solo fundamentales stale |
 
-Ajustes: **Configuración → Otras** (universo listas vs todos, pausas, post-cierre).  
+Ajustes: **Configuración → Sync / proveedores** (universo listas vs todos, pausas, post-cierre, proveedores).  
 Estado y mantenimiento PostgreSQL: **Configuración → BD** (conteos, huérfanos, demos cerradas, purga).  
 Ayuda → Datos de mercado → «¿Qué se actualiza solo?» / «Quitar de lista y limpiar BD».
 
@@ -86,9 +86,52 @@ API: `GET /api/instruments/{id}/removal-preview`, `POST /api/lists/{listId}/inst
 | Fund lote | Refresh concurrente de `profile_snapshot` | Escáneres / calidad |
 
 Ajustes API: `GET/PATCH /api/sync/settings`, `GET /api/sync/queue`, `POST /api/sync/queue/enqueue-stale`.  
-UI editable: **Configuración → Otras**.
+UI editable: **Configuración → Sync / proveedores**.
 
-Claves principales (`sync_settings`): `autoSyncEnabled`, `scanIntervalMinutes`, `minDelaySeconds`, `postMarketOnly`, `maxRetries`, `retryBackoffMinutes`, `scope`.
+Claves principales (`sync_settings`): `autoSyncEnabled`, `scanIntervalMinutes`, `minDelaySeconds`, `postMarketOnly`, `maxRetries`, `retryBackoffMinutes`, `scope`, `providerCheckEnabled`, `providerCheckIntervalSeconds`.
+
+## Dos automatizaciones distintas (no confundirlas)
+
+La misma fila de `sync_settings` gobierna dos automatizaciones **independientes**. Una no
+hace el trabajo de la otra:
+
+| Automatización | Campos | Qué hace | Qué NO hace |
+|----------------|--------|----------|-------------|
+| **Velas (histórico)** | `autoSyncEnabled`, `scanIntervalMinutes`, … | Escanea valores desfasados, los encola y descarga OHLCV de Yahoo | No prueba servidores |
+| **Comprobación de servidores** | `providerCheckEnabled`, `providerCheckIntervalSeconds` | Mide conectividad de los proveedores habilitados y persiste `market_provider_settings.last_check_*` | No descarga datos |
+
+```mermaid
+flowchart LR
+  Lifespan["Lifespan API"] --> Loop["Bucle comprobador (tick 10 s)"]
+  Loop -->|"ON y edad >= intervalo"| Probe["probe_now()"]
+  Manual["«Comprobar ahora» (POST)"] --> Probe
+  Probe --> DB[("last_check_at / last_check_ok")]
+  DB --> Summary["GET /market/providers/health (solo lectura)"]
+  Summary --> Bar["Icono barra de estado"]
+  Sync["auto_sync_worker (velas)"] --> Yahoo["Yahoo OHLCV"]
+  Settings["sync_settings"] --> Loop
+```
+
+**Modelo de verdad único:** el estado de un servidor es el resultado de su **última
+comprobación persistida**. `GET /api/market/providers/health` no mide en vivo (no genera
+tráfico a proveedores) y `POST /api/market/providers/health/check` es la única medición
+manual. El bucle corre en el proceso de la API y arranca con ella; con OFF no mide, pero
+un cambio a ON surte efecto sin reiniciar.
+
+Rango del intervalo: **15–3600 s** (validado en la UI, en el DTO y con `CHECK` en la BD).
+
+### Colores del icono de servidores
+
+| Estado | Color | Significado |
+|--------|-------|-------------|
+| `ok` | verde | Todos los proveedores habilitados medidos OK y medición dentro de la cadencia |
+| `degraded` | rojo | Algún proveedor habilitado medido KO |
+| `stale` | ámbar | Automática ON pero última medición más vieja que `2 × intervalo`: el bucle no corre |
+| `unverified` | ámbar | Nunca medido |
+| `none` | gris | No hay proveedores habilitados |
+
+Con la automática **OFF** no se marca `stale`: se muestra la última medición con la nota
+«comprobación automática desactivada» y `nextCheckAt = null`.
 
 ## Validación
 

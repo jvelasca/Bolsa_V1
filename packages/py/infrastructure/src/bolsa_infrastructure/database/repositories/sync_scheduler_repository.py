@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from bolsa_domain.entities.market_provider import (
+    DEFAULT_PROVIDER_CHECK_INTERVAL_SECONDS,
+    normalize_provider_check_interval,
+)
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -26,6 +30,8 @@ class SyncSettingsRecord:
     max_retries: int
     retry_backoff_minutes: int
     scope: str
+    provider_check_enabled: bool
+    provider_check_interval_seconds: int
     updated_at: str
 
 
@@ -51,9 +57,29 @@ def _settings_from_row(row: SyncSettingsRow) -> SyncSettingsRecord:
         post_market_only=row.post_market_only,
         max_retries=row.max_retries,
         retry_backoff_minutes=row.retry_backoff_minutes,
-        scope=row.scope,
+        # ``scope`` es un enum cerrado desde 2.88.172 («antes» solo vivía en la UI).
+        # Una fila antigua con un valor fuera del contrato se lee como el defecto
+        # ``lists`` en vez de propagar un valor que el consumidor no entiende.
+        scope=_normalize_scope(row.scope),
+        # Una fila anterior a la 060 no tiene valor: el defecto es ON cada 60 s (la misma
+        # cadencia que estaba fijada en código) y solo se normaliza el rango.
+        provider_check_enabled=bool(
+            getattr(row, "provider_check_enabled", True) is not False
+        ),
+        provider_check_interval_seconds=_normalize_check_interval(
+            getattr(row, "provider_check_interval_seconds", DEFAULT_PROVIDER_CHECK_INTERVAL_SECONDS)
+        ),
         updated_at=row.updated_at.isoformat(),
     )
+
+
+def _normalize_scope(value: str | None) -> str:
+    raw = str(value or "").strip().lower()
+    return raw if raw in ("lists", "stale") else "lists"
+
+
+def _normalize_check_interval(value: int | None) -> int:
+    return normalize_provider_check_interval(value)
 
 
 def _queue_from_row(row: SyncQueueItemRow) -> SyncQueueItemRecord:
@@ -90,6 +116,8 @@ class SqlAlchemySyncSchedulerRepository:
                 max_retries=5,
                 retry_backoff_minutes=45,
                 scope="lists",
+                provider_check_enabled=True,
+                provider_check_interval_seconds=DEFAULT_PROVIDER_CHECK_INTERVAL_SECONDS,
                 updated_at=now,
             )
             self._session.add(row)
@@ -106,6 +134,8 @@ class SqlAlchemySyncSchedulerRepository:
         max_retries: int | None = None,
         retry_backoff_minutes: int | None = None,
         scope: str | None = None,
+        provider_check_enabled: bool | None = None,
+        provider_check_interval_seconds: int | None = None,
     ) -> SyncSettingsRecord:
         await self.get_settings()  # ensure default row exists
         stmt = select(SyncSettingsRow).where(SyncSettingsRow.id == DEFAULT_SETTINGS_ID)
@@ -125,6 +155,10 @@ class SqlAlchemySyncSchedulerRepository:
             row.retry_backoff_minutes = retry_backoff_minutes
         if scope is not None:
             row.scope = scope
+        if provider_check_enabled is not None:
+            row.provider_check_enabled = provider_check_enabled
+        if provider_check_interval_seconds is not None:
+            row.provider_check_interval_seconds = provider_check_interval_seconds
         row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return _settings_from_row(row)
