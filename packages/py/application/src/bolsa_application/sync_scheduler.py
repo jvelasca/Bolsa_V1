@@ -7,6 +7,9 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from bolsa_application.get_instrument_data_status import GetInstrumentDataStatus
+from bolsa_application.market_providers import MarketProviderConfigResolver
+from bolsa_application.sync_instrument import SyncInstrumentDailyBars
 from bolsa_domain.entities.market_provider import (
     CAPABILITY_OHLCV,
     ProviderCheckPolicy,
@@ -19,10 +22,6 @@ from bolsa_infrastructure.database.repositories.sync_scheduler_repository import
     SyncQueueItemRecord,
     SyncSettingsRecord,
 )
-
-from bolsa_application.get_instrument_data_status import GetInstrumentDataStatus
-from bolsa_application.market_providers import MarketProviderConfigResolver
-from bolsa_application.sync_instrument import SyncInstrumentDailyBars
 
 MADRID = ZoneInfo("Europe/Madrid")
 POST_CLOSE_HOUR = 17

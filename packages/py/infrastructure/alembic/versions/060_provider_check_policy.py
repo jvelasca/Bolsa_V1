@@ -28,7 +28,6 @@ Cadena lineal: ``down_revision = "059_market_provider_settings"``.
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "060_provider_check_policy"

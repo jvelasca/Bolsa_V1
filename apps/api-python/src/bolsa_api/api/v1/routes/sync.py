@@ -2,10 +2,6 @@
 
 from typing import Annotated
 
-from bolsa_infrastructure.database.repositories.sync_scheduler_repository import (
-    SyncQueueItemRecord,
-    SyncSettingsRecord,
-)
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +20,10 @@ from bolsa_api.schemas.sync import (
     SyncSettingsDto,
     SyncSettingsResponseDto,
     UpdateSyncSettingsDto,
+)
+from bolsa_infrastructure.database.repositories.sync_scheduler_repository import (
+    SyncQueueItemRecord,
+    SyncSettingsRecord,
 )
 
 router = APIRouter()

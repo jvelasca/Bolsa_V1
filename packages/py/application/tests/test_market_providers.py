@@ -11,6 +11,17 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+
+from bolsa_application.market import GetMarketStatus
+from bolsa_application.market_providers import (
+    MarketProviderConfigResolver,
+    ProviderHealthMonitor,
+    TestProviderConnection,
+    UnknownProviderError,
+    UpdateMarketProviderConfig,
+    invalidate_provider_config_cache,
+    summarize_provider_health,
+)
 from bolsa_domain.entities.market_provider import (
     CAPABILITY_OHLCV,
     PROVIDER_XTB,
@@ -27,17 +38,6 @@ from bolsa_domain.entities.market_provider import (
 from bolsa_domain.value_objects.market import MarketProviderStatus
 from bolsa_infrastructure.database.repositories.market_provider_settings_repository import (
     MarketProviderSettingsRecord,
-)
-
-from bolsa_application.market import GetMarketStatus
-from bolsa_application.market_providers import (
-    MarketProviderConfigResolver,
-    ProviderHealthMonitor,
-    TestProviderConnection,
-    UnknownProviderError,
-    UpdateMarketProviderConfig,
-    invalidate_provider_config_cache,
-    summarize_provider_health,
 )
 
 

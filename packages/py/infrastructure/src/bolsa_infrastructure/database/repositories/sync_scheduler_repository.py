@@ -3,14 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from bolsa_domain.entities.market_provider import (
-    DEFAULT_PROVIDER_CHECK_INTERVAL_SECONDS,
-    normalize_provider_check_interval,
-)
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from bolsa_domain.entities.market_provider import (
+    DEFAULT_PROVIDER_CHECK_INTERVAL_SECONDS,
+    normalize_provider_check_interval,
+)
 from bolsa_infrastructure.database.models import (
     InstrumentListItemRow,
     SyncQueueItemRow,

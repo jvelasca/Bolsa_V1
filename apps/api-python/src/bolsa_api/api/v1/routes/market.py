@@ -3,11 +3,6 @@
 from datetime import UTC, datetime
 from typing import Annotated
 
-from bolsa_application.market_providers import (
-    ProviderConfigError,
-    UnknownProviderError,
-    summarize_provider_health,
-)
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,6 +26,11 @@ from bolsa_api.schemas.market import (
     ProviderTestResponseDto,
     ProviderTestResultDto,
     UpdateMarketProviderDto,
+)
+from bolsa_application.market_providers import (
+    ProviderConfigError,
+    UnknownProviderError,
+    summarize_provider_health,
 )
 
 router = APIRouter()

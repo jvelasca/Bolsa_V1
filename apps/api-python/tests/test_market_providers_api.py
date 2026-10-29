@@ -10,13 +10,13 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bolsa_domain.value_objects.market import MarketProviderStatus
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from bolsa_api.api.dependencies import get_db_session
 from bolsa_api.api.v1.routes import market as market_route
 from bolsa_api.api.v1.routes import sync as sync_route
+from bolsa_domain.value_objects.market import MarketProviderStatus
 
 pytestmark = pytest.mark.asyncio
 
