@@ -10,8 +10,10 @@ crear una copia ahora; el resto (VACUUM/ANALYZE, restaurar, podar sin crear, mig
 (ninguna regla, indicador, umbral, peso ni sizing cambia) · **`Δ decisión = 0`** (no se decide distinto)
 · **AUTO OFF** · **contrato HTTP ADITIVO**: `GET /api/database/maintenance` y `POST /api/database/backup`,
 con `openapi.json`/`schema.d.ts` regenerados y `contract:check` verde · **SIN migración** (`head` sigue
-`060_provider_check_policy`) · **tag anotado `v2.88.172-beta`**: **no publicado** en este acto (se empuja
-la rama y audita CI; el sello se decide con el run verde) · **bump** `2.11.171-beta` → `2.11.172-beta`
+`060_provider_check_policy`) · **sin tag y sin Release** en este acto: se empuja la rama y se audita en
+CI (**`Frontend CI`** [`40902287501`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287501) y
+**`Python CI`** [`40903120830`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40903120830) verdes) ·
+**bump** `2.11.171-beta` → `2.11.172-beta`
 (+ los **13** `meta.bump`; guardián `test_dia_d_bump_guard` **2 passed**; el literal congelado
 `2.11.0-beta` de `v2_87` no se toca).
 
@@ -49,14 +51,29 @@ Reimplementar el volcado en Python habría creado una segunda verdad sobre los b
 /api/database/backup` con `COPIAR` → **200** (`bolsa_v1-20261029-145347-232.sql`, **14 963 887 B**,
 `sha256 dcb9c49b…`, `060_provider_check_policy`, **780 ms**), fichero + `.sha256` en `db-backups/`,
 entrada nueva del manifest, la tarjeta pasa de `warning` a **`ok`** y la línea de auditoría queda
-escrita; `--dir` verificado contra un directorio temporal. Las suites completas las mide el CI de la
-rama: este documento **no** adelanta cifras no medidas.
+escrita; `--dir` verificado contra un directorio temporal. **CI de la rama (medido, no adelantado):**
+`Frontend CI` [`40902287501`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287501)
+**`success`** (job `quality`: build/typecheck/test de `shared` y typecheck/lint/test/build de `web`) ·
+`Python CI` [`40903120830`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40903120830)
+**`success`** (5/5 jobs: `quality`, `grammar-discovery-pg`, `lifecycle-pg`, `paper-forward-pg`,
+`auto-v2-durable-pg`) · `Fase 2 scientific`
+[`40902287451`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287451) /
+[`40903120882`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40903120882) y `Optimize lab`
+[`40902287549`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287549) **`success`**. **El
+primer `Python CI` de la rama** ([`40902287372`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287372))
+salió **rojo** —5 747 passed, 57 skipped, **2 failed**— y se dice: dos ficheros de la **061**
+(`models/tables.py` con el CHECK de `060` y `alembic/env.py` con la allowlist) se habían quedado **sin
+commitear**, así que el árbol local pasaba y el checkout limpio no. `3c40deaf` los añade y el run
+siguiente queda verde. El fallo **no** era del sello, pero el sello **no estaba verificado** hasta
+empujarlo.
 
 **Límites:** la acción exige `node` y `pg_dump`/Docker **en la máquina de la API** (si faltan, se dice
 con un código; no se simula) · `pg_dump` abre su propia conexión, así que el diagnóstico puede mostrar
 una conexión más mientras dura · el cerrojo es global por BD pero **no** cubre un `pnpm db:dump` lanzado
 a mano en paralelo · no hay restaurar, VACUUM ni migraciones en la UI, y **no deben añadirse sin
-diseño**: sobrescriben datos · este sello **no incluye** la auditoría 2 (D-1–D-4), que sigue **sin
+diseño**: sobrescriben datos · **sin tag ni Release**: un auditor llega por la rama
+`fix/059-060-proveedores` (HEAD `45246d86`), no por `git checkout v2.88.172-beta` · este sello **no
+incluye** la auditoría 2 (D-1–D-4), que sigue **sin
 commitear** en el árbol y no se certifica aquí.
 
 ## [2.11.171-beta] — **el expediente se publica para auditoría externa, sin tocar el producto** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ código = 0` salvo `meta.bump` · AUTO OFF · SIN migración · head `058_estudio_daily_proposals`**)

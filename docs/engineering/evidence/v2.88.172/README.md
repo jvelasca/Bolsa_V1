@@ -81,10 +81,76 @@ Las suites completas (`web`, `shared`, `pytest` de API) las mide el **CI de la r
 
 | Dato | Valor |
 | --- | --- |
-| Rama | `fix/059-060-proveedores` |
-| Commit del sello | _pendiente de medición POST-PUSH_ |
-| CI de la rama | _pendiente de medición POST-PUSH_ |
-| Tag / Release | **no emitidos** |
+| Rama | `fix/059-060-proveedores` (nueva en `origin`; **no** existía antes de este acto) |
+| HEAD del sello | `45246d86` (`chore(window)`: segundo re-anclaje del pin) |
+| Commit funcional | `9bd7625c` (`feat(bd)`: diagnóstico, copia bajo demanda y bump `2.11.172-beta`) |
+| Tag / Release / PR | **no emitidos** |
+
+### 7.1 Commits de la rama (5, en orden)
+
+| Commit | Qué hace |
+| --- | --- |
+| `afeeda9b` | `style(imports)`: ordena los imports que dejaban rojo el gate Ruff de 059/060 |
+| `9bd7625c` | `feat(bd)`: diagnóstico, copia bajo demanda y sello `2.11.172-beta` |
+| `76cf9598` | `chore(window)`: primer re-anclaje del pin |
+| `3c40deaf` | `fix(bd)`: CHECK de 060 en el modelo + allowlist en `alembic/env.py` |
+| `45246d86` | `chore(window)`: segundo re-anclaje del pin |
+
+### 7.2 Runs de CI medidos
+
+Un `git push` solo dispara `push` para el **tip** del envío, así que hay dos tandas, no cinco.
+
+| Run | Workflow | Commit | Resultado |
+| --- | --- | --- | --- |
+| [`40902287501`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287501) | `Frontend CI` | `76cf9598` | **success** — job `quality` (build/typecheck/test de `shared`, typecheck/lint/test/build de `web`) |
+| [`40902287451`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287451) | `Fase 2 scientific` | `76cf9598` | **success** |
+| [`40902287549`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287549) | `Optimize lab` | `76cf9598` | **success** |
+| [`40902287372`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287372) | `Python CI` | `76cf9598` | **failure** — ver §7.3 |
+| [`40903120830`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40903120830) | `Python CI` | `3c40deaf` | **success** — `quality`, `grammar-discovery-pg`, `lifecycle-pg`, `paper-forward-pg`, `auto-v2-durable-pg` |
+| [`40903120882`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40903120882) | `Fase 2 scientific` | `3c40deaf` | **success** |
+
+`45246d86` **no dispara ningún workflow**: toca solo `scripts/lib/window-forward.mjs`, que no está en
+los `paths` de ningún workflow (en particular no está en `.github/workflows/python-ci.yml`). El pin, en
+cambio, **sí** se verifica en el `Release tag CI`; por eso el re-anclaje se comprobó en local
+(§7.4). `3c40deaf` no dispara `Frontend CI` porque no toca `apps/web/**`, `packages/shared/**` ni
+`package.json`: el estado del frontend lo fija `40902287501`, medido sobre el mismo árbol de `web` y
+`shared` que el sello publica (el único commit posterior es Python y el pin).
+
+### 7.3 El rojo intermedio, y por qué no es del sello
+
+`Python CI` [`40902287372`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287372) salió
+`failure` con **5 747 passed, 57 skipped, 2 failed**, y los dos fallos eran de
+`packages/py/infrastructure/tests/test_schema_contract.py`:
+
+- `test_sync_settings_declares_the_060_check` → `KeyError: 'sync_settings_provider_check_interval_check'`
+- `test_contract_snapshot_covers_metadata` → la allowlist no declaraba el constraint
+
+**Causa medida:** dos ficheros de la **061** se quedaron **sin commitear** al sellar, aunque su test sí
+viajó. El árbol local pasaba; el checkout limpio de CI no. `git diff` los tenía en ` M` mientras el
+commit del sello solo llevaba el test.
+
+**Corrección:** `3c40deaf` añade exactamente esos dos ficheros —
+`packages/py/infrastructure/src/bolsa_infrastructure/database/models/tables.py` (declaración del
+`CheckConstraint`, solo metadatos) y `packages/py/infrastructure/alembic/env.py`
+(`include_object=alembic_include_object()` en las dos ramas de `configure`)—, y es el run que queda
+**verde** con los cinco jobs. Como `packages/` cambia, `45246d86` re-ancla después el pin PAPER, que es
+lo único que toca ese último commit.
+
+**Lo que esto deja dicho:** el rojo se detectó **solo** porque la rama se empujó; los commits
+`52f12334` (059/060) y `9bd7625c` nunca habían pasado por CI. Un sello local verde no es un sello
+verificado.
+
+### 7.4 Verificación local del HEAD (`45246d86`)
+
+| Comprobación | Resultado |
+| --- | --- |
+| `pnpm window:freeze` | **`freeze OK`** — coinciden `appsHash` (`35cd320f…`) y `packagesHash` (`3df714c5…`) |
+| `git status -sb` | `## fix/059-060-proveedores...origin/fix/059-060-proveedores` (sin `ahead`/`behind`) |
+
+La etiqueta `commit` del pin dice `3c40deaf` mientras HEAD es `45246d86`; el propio
+`scripts/window-pin.mjs` declara que **el freeze real son los dos tree hashes**, y `45246d86` solo
+cambia ese fichero, así que el aviso es cosmético y no se re-ancla otra vez (re-anclarlo movería el
+mismo fichero en bucle).
 
 ## 8. Falsabilidad
 
