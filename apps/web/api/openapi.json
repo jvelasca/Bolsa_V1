@@ -3294,6 +3294,226 @@
         "title": "BacktestTradeDto",
         "type": "object"
       },
+      "BackupRunDto": {
+        "properties": {
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
+          },
+          "durationMs": {
+            "default": 0,
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errorcode"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "mirrorPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mirrorpath"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pruned": {
+            "default": 0,
+            "title": "Pruned",
+            "type": "integer"
+          },
+          "schemaRevision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schemarevision"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "BackupRunDto",
+        "type": "object"
+      },
+      "BackupsStatusDto": {
+        "properties": {
+          "accessible": {
+            "title": "Accessible",
+            "type": "boolean"
+          },
+          "ageHours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agehours"
+          },
+          "checksumPresent": {
+            "title": "Checksumpresent",
+            "type": "boolean"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "directory": {
+            "title": "Directory",
+            "type": "string"
+          },
+          "latestBytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestbytes"
+          },
+          "latestCreatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestcreatedat"
+          },
+          "latestName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestname"
+          },
+          "latestSchema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestschema"
+          },
+          "mirrorConfigured": {
+            "title": "Mirrorconfigured",
+            "type": "boolean"
+          },
+          "retention": {
+            "title": "Retention",
+            "type": "integer"
+          },
+          "stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "accessible",
+          "directory",
+          "count",
+          "retention",
+          "checksumPresent",
+          "mirrorConfigured",
+          "detail"
+        ],
+        "title": "BackupsStatusDto",
+        "type": "object"
+      },
       "BeliefHistoryEntryDto": {
         "properties": {
           "belief": {
@@ -3508,6 +3728,80 @@
           "env"
         ],
         "title": "BrokerVenueResponse",
+        "type": "object"
+      },
+      "CapacityStatusDto": {
+        "properties": {
+          "databaseBytes": {
+            "title": "Databasebytes",
+            "type": "integer"
+          },
+          "databasePretty": {
+            "title": "Databasepretty",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/CapacityTableDto"
+            },
+            "title": "Tables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "databaseBytes",
+          "databasePretty",
+          "detail"
+        ],
+        "title": "CapacityStatusDto",
+        "type": "object"
+      },
+      "CapacityTableDto": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "sizeBytes": {
+            "title": "Sizebytes",
+            "type": "integer"
+          },
+          "sizePretty": {
+            "title": "Sizepretty",
+            "type": "string"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "label",
+          "rows",
+          "sizeBytes",
+          "sizePretty"
+        ],
+        "title": "CapacityTableDto",
         "type": "object"
       },
       "CashMovementResponseDto": {
@@ -4078,6 +4372,72 @@
         "title": "ConfirmIntentRequest",
         "type": "object"
       },
+      "ConnectionsStatusDto": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "idle": {
+            "title": "Idle",
+            "type": "integer"
+          },
+          "idleInTransaction": {
+            "title": "Idleintransaction",
+            "type": "integer"
+          },
+          "longestTransactionSeconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longesttransactionseconds"
+          },
+          "maxConnections": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxconnections"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "total",
+          "active",
+          "idle",
+          "idleInTransaction",
+          "detail"
+        ],
+        "title": "ConnectionsStatusDto",
+        "type": "object"
+      },
       "ConsolidationEligibilityResponseDto": {
         "properties": {
           "data": {
@@ -4560,6 +4920,55 @@
           }
         },
         "title": "CreateAccountInvestorProfileDto",
+        "type": "object"
+      },
+      "CreateDatabaseBackupRequestDto": {
+        "description": "Confirmación escrita obligatoria: el cuerpo debe traer exactamente ``COPIAR``.",
+        "properties": {
+          "confirm": {
+            "title": "Confirm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "CreateDatabaseBackupRequestDto",
+        "type": "object"
+      },
+      "CreateDatabaseBackupResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CreateDatabaseBackupResultDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "CreateDatabaseBackupResponseDto",
+        "type": "object"
+      },
+      "CreateDatabaseBackupResultDto": {
+        "description": "El intento y el estado real de las copias después (recalculado, no cacheado).",
+        "properties": {
+          "backups": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BackupsStatusDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run": {
+            "$ref": "#/components/schemas/BackupRunDto"
+          }
+        },
+        "required": [
+          "run"
+        ],
+        "title": "CreateDatabaseBackupResultDto",
         "type": "object"
       },
       "CreateExecutionPolicyRequestDto": {
@@ -5445,6 +5854,83 @@
           "message"
         ],
         "title": "DatabaseHealthDto",
+        "type": "object"
+      },
+      "DatabaseMaintenanceDto": {
+        "properties": {
+          "backups": {
+            "$ref": "#/components/schemas/BackupsStatusDto"
+          },
+          "capacity": {
+            "$ref": "#/components/schemas/CapacityStatusDto"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/MaintenanceCheckDto"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "connections": {
+            "$ref": "#/components/schemas/ConnectionsStatusDto"
+          },
+          "generatedAt": {
+            "title": "Generatedat",
+            "type": "string"
+          },
+          "integrity": {
+            "$ref": "#/components/schemas/IntegrityStatusDto"
+          },
+          "maintenance": {
+            "$ref": "#/components/schemas/MaintenanceStatusDto"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "schema": {
+            "$ref": "#/components/schemas/SchemaStatusDto"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "generatedAt",
+          "connected",
+          "message",
+          "schema",
+          "capacity",
+          "maintenance",
+          "connections",
+          "backups",
+          "integrity"
+        ],
+        "title": "DatabaseMaintenanceDto",
+        "type": "object"
+      },
+      "DatabaseMaintenanceResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DatabaseMaintenanceDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "DatabaseMaintenanceResponseDto",
         "type": "object"
       },
       "DatabaseSummaryDto": {
@@ -13511,6 +13997,37 @@
         "title": "InstrumentXtbValidationResponseDto",
         "type": "object"
       },
+      "IntegrityStatusDto": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/MaintenanceCheckDto"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "detail"
+        ],
+        "title": "IntegrityStatusDto",
+        "type": "object"
+      },
       "InvestmentAccountDto": {
         "properties": {
           "activeProfileId": {
@@ -15876,6 +16393,165 @@
           "data"
         ],
         "title": "LoginResponseDto",
+        "type": "object"
+      },
+      "MaintenanceCheckDto": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "status",
+          "detail"
+        ],
+        "title": "MaintenanceCheckDto",
+        "type": "object"
+      },
+      "MaintenanceStatusDto": {
+        "properties": {
+          "autovacuumEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autovacuumenabled"
+          },
+          "deadTuplesTotal": {
+            "title": "Deadtuplestotal",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "lastAutovacuum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastautovacuum"
+          },
+          "naptimeSeconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Naptimeseconds"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tablesWithDeadTuples": {
+            "items": {
+              "$ref": "#/components/schemas/MaintenanceTableDto"
+            },
+            "title": "Tableswithdeadtuples",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "deadTuplesTotal",
+          "detail"
+        ],
+        "title": "MaintenanceStatusDto",
+        "type": "object"
+      },
+      "MaintenanceTableDto": {
+        "properties": {
+          "deadTuples": {
+            "title": "Deadtuples",
+            "type": "integer"
+          },
+          "lastAutoanalyze": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastautoanalyze"
+          },
+          "lastAutovacuum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastautovacuum"
+          },
+          "liveTuples": {
+            "title": "Livetuples",
+            "type": "integer"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "liveTuples",
+          "deadTuples"
+        ],
+        "title": "MaintenanceTableDto",
         "type": "object"
       },
       "MandateBundleDto": {
@@ -21077,6 +21753,97 @@
           }
         },
         "title": "ScanUniverseDto",
+        "type": "object"
+      },
+      "SchemaStatusDto": {
+        "properties": {
+          "allowlisted": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowlisted",
+            "type": "array"
+          },
+          "currentRevision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentrevision"
+          },
+          "databaseTables": {
+            "title": "Databasetables",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "expectedHead": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedhead"
+          },
+          "expectedTables": {
+            "title": "Expectedtables",
+            "type": "integer"
+          },
+          "missingColumns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missingcolumns",
+            "type": "array"
+          },
+          "missingConstraints": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missingconstraints",
+            "type": "array"
+          },
+          "missingTables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missingtables",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unexpectedTables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unexpectedtables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "databaseTables",
+          "expectedTables",
+          "detail"
+        ],
+        "title": "SchemaStatusDto",
         "type": "object"
       },
       "SemiF3ViewDto": {
@@ -29541,6 +30308,48 @@
         ]
       }
     },
+    "/api/database/backup": {
+      "post": {
+        "description": "Crea una copia local de la BD (única acción de mantenimiento de la ventana BD).\n\n``pg_dump`` solo lee la BD; lo que sí escribe es un fichero con su sidecar ``.sha256``,\nel manifest y la poda por retención. Por eso no basta un clic: hay confirmación\nescrita, rol ``admin`` cuando la auth está activa, un cerrojo que impide dos copias\nsimultáneas (409) y auditoría. Si la copia no se creó, la respuesta **no** es 200.",
+        "operationId": "create_database_backup_api_database_backup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDatabaseBackupRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateDatabaseBackupResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Database Backup",
+        "tags": [
+          "database"
+        ]
+      }
+    },
     "/api/database/closed-accounts": {
       "get": {
         "operationId": "list_closed_simulated_accounts_api_database_closed_accounts_get",
@@ -29622,6 +30431,28 @@
           }
         },
         "summary": "Purge Closed Simulated Accounts",
+        "tags": [
+          "database"
+        ]
+      }
+    },
+    "/api/database/maintenance": {
+      "get": {
+        "description": "Diagnóstico read-only: esquema/head, capacidad, mantenimiento, conexiones y copias.\n\nDevuelve 200 incluso con la BD caída (``connected=false`` y checks con error), igual\nque ``/database/summary``: el panel debe poder explicar el fallo, no reventar. No hay\nninguna acción de escritura: ni VACUUM, ni ANALYZE, ni purgas, ni migraciones.",
+        "operationId": "get_database_maintenance_api_database_maintenance_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseMaintenanceResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Database Maintenance",
         "tags": [
           "database"
         ]

@@ -580,6 +580,135 @@ export interface DatabaseSummaryDto {
   instrumentOhlcv: InstrumentOhlcvBreakdownDto[];
 }
 
+/** Severidad de una comprobación del diagnóstico de BD. */
+export type MaintenanceCheckStatus = "ok" | "warning" | "error" | "unknown";
+
+export interface MaintenanceCheckDto {
+  id: string;
+  label: string;
+  status: MaintenanceCheckStatus;
+  detail: string;
+  value: string | null;
+}
+
+export interface DatabaseSchemaStatusDto {
+  status: MaintenanceCheckStatus;
+  currentRevision: string | null;
+  expectedHead: string | null;
+  databaseTables: number;
+  expectedTables: number;
+  missingTables: string[];
+  missingColumns: string[];
+  missingConstraints: string[];
+  unexpectedTables: string[];
+  /** Divergencias históricas declaradas (deuda, no borrado silencioso). */
+  allowlisted: string[];
+  detail: string;
+}
+
+export interface DatabaseCapacityTableDto {
+  table: string;
+  label: string;
+  rows: number;
+  sizeBytes: number;
+  sizePretty: string;
+}
+
+export interface DatabaseCapacityDto {
+  status: MaintenanceCheckStatus;
+  databaseBytes: number;
+  databasePretty: string;
+  tables: DatabaseCapacityTableDto[];
+  detail: string;
+}
+
+export interface DatabaseMaintenanceTableDto {
+  table: string;
+  liveTuples: number;
+  deadTuples: number;
+  lastAutovacuum: string | null;
+  lastAutoanalyze: string | null;
+}
+
+export interface DatabaseMaintenanceStatusDto {
+  status: MaintenanceCheckStatus;
+  autovacuumEnabled: boolean | null;
+  naptimeSeconds: number | null;
+  deadTuplesTotal: number;
+  tablesWithDeadTuples: DatabaseMaintenanceTableDto[];
+  lastAutovacuum: string | null;
+  detail: string;
+}
+
+export interface DatabaseConnectionsDto {
+  status: MaintenanceCheckStatus;
+  total: number;
+  active: number;
+  idle: number;
+  idleInTransaction: number;
+  maxConnections: number | null;
+  longestTransactionSeconds: number | null;
+  detail: string;
+}
+
+export interface DatabaseBackupsDto {
+  status: MaintenanceCheckStatus;
+  accessible: boolean;
+  directory: string;
+  count: number;
+  retention: number;
+  latestName: string | null;
+  latestBytes: number | null;
+  latestCreatedAt: string | null;
+  latestSchema: string | null;
+  ageHours: number | null;
+  stale: boolean | null;
+  checksumPresent: boolean;
+  mirrorConfigured: boolean;
+  detail: string;
+}
+
+export interface DatabaseIntegrityDto {
+  status: MaintenanceCheckStatus;
+  checks: MaintenanceCheckDto[];
+  detail: string;
+}
+
+/** Diagnóstico read-only de la BD (Configuración → BD). */
+export interface DatabaseMaintenanceDto {
+  status: MaintenanceCheckStatus;
+  generatedAt: string;
+  connected: boolean;
+  message: string;
+  schema: DatabaseSchemaStatusDto;
+  capacity: DatabaseCapacityDto;
+  maintenance: DatabaseMaintenanceStatusDto;
+  connections: DatabaseConnectionsDto;
+  backups: DatabaseBackupsDto;
+  integrity: DatabaseIntegrityDto;
+  checks: MaintenanceCheckDto[];
+}
+
+/** Resultado del volcado bajo demanda (`POST /api/database/backup`). */
+export interface DatabaseBackupRunDto {
+  ok: boolean;
+  file: string | null;
+  bytes: number | null;
+  sha256: string | null;
+  schemaRevision: string | null;
+  pruned: number;
+  mirrorPath: string | null;
+  durationMs: number;
+  errorCode: string | null;
+  error: string | null;
+}
+
+export interface CreateDatabaseBackupResultDto {
+  run: DatabaseBackupRunDto;
+  /** Inventario recalculado tras la copia (null si no se pudo leer). */
+  backups: DatabaseBackupsDto | null;
+}
+
 export interface ListMembershipRefDto {
   listId: string;
   listName: string;

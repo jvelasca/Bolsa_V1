@@ -2,6 +2,63 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.172-beta] — **la ventana BD deja de ser solo informativa: una acción, con cerrojo y auditoría** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · contrato HTTP ADITIVO · SIN migración · head `060_provider_check_policy`**)
+
+**Naturaleza:** sello de **funcionalidad de mantenimiento** posterior a `2.11.171-beta`. Responde a la
+pregunta «¿desde dónde se mantiene la BD?» con una respuesta acotada: **una sola acción en la UI**,
+crear una copia ahora; el resto (VACUUM/ANALYZE, restaurar, podar sin crear, migrar) sigue en CLI. **`Δ motor = 0`**
+(ninguna regla, indicador, umbral, peso ni sizing cambia) · **`Δ decisión = 0`** (no se decide distinto)
+· **AUTO OFF** · **contrato HTTP ADITIVO**: `GET /api/database/maintenance` y `POST /api/database/backup`,
+con `openapi.json`/`schema.d.ts` regenerados y `contract:check` verde · **SIN migración** (`head` sigue
+`060_provider_check_policy`) · **tag anotado `v2.88.172-beta`**: **no publicado** en este acto (se empuja
+la rama y audita CI; el sello se decide con el run verde) · **bump** `2.11.171-beta` → `2.11.172-beta`
+(+ los **13** `meta.bump`; guardián `test_dia_d_bump_guard` **2 passed**; el literal congelado
+`2.11.0-beta` de `v2_87` no se toca).
+
+**W-172-1 · por qué hacía falta, y por qué solo una acción.** El panel de `.061` respondía «¿cuál es la
+última copia?» pero no dejaba crear una: para eso había que abrir una terminal y acordarse de
+`pnpm db:dump`. Añadir *todo* el mantenimiento a la UI habría convertido un diagnóstico honesto en un
+panel de operaciones destructivas sin contexto de producción. Se elige **la acción que no escribe en
+la BD**: `pg_dump` solo lee; lo que se escribe es un fichero con su `.sha256`, el
+`backups-manifest.json` y la poda por retención.
+
+**W-172-2 · el blindaje, capa a capa.** **(1) Confirmación escrita**: el cuerpo debe traer `COPIAR`
+(422 si no); no existe el botón «de un clic». **(2) Un trabajo a la vez**: `pg_try_advisory_lock(774104254)`
+sobre una conexión dedicada del engine —clave distinta de la de migraciones (`774104253`), para que
+migrar y copiar no se bloqueen—; si está ocupado se devuelve **409** `backup_in_progress` y **no se
+encola** nada. **(3) Rol**: con `APP_PASSWORD` activo se exige claim `role=admin` (**403**); sin auth
+(local) no se bloquea porque no hay usuario que suplantar. **(4) Producción fuera**: `403` evaluado
+**antes** de tomar el cerrojo o tocar disco. **(5) Auditoría**: cada intento —éxito o fallo— escribe
+una línea en `logs/agent/db-maintenance.jsonl` con `at`, `action`, `actor`, `ok`, `file`, `bytes`,
+`durationMs` y `errorCode`; un fallo del registro no oculta la copia. **(6) Resultado honesto**:
+`NODE_MISSING`/`SCRIPT_MISSING`/`DIR_ERROR` → **503**; `DUMP_FAILED`/`TIMEOUT`/`OUTPUT_MISSING` →
+**500**; **nunca** un 200 sin fichero. `pruned` se cuenta por diferencia de listado, no parseando logs.
+
+**W-172-3 · una sola verdad de la copia.** El script gana `--dir <ruta>` y la API lo invoca con el
+mismo `DB_BACKUP_DIR` que lee el inventario: sin esto, un `DB_BACKUP_DIR` custom habría creado copias
+en un directorio que el panel no mira. La ruta ejecuta **el script canónico del repo**
+(`scripts/db-dump.mjs`) con argv constante y `shell=False`, así que la copia de la UI es la misma que
+la de `pnpm db:dump`: mismo sello, mismo `O_EXCL`, mismo checksum, mismo manifest y misma retención.
+Reimplementar el volcado en Python habría creado una segunda verdad sobre los backups.
+
+**Verificación (medida, local):** `packages/py/application/tests` **3 034 passed** ·
+`packages/py/infrastructure/tests` **238 passed** · `apps/api-python/tests/test_database_backup_api.py`
++ `test_database_maintenance_api.py` **14 passed** · panel `vitest` **5 passed** ·
+`ruff` y `mypy` (strict) **0 errores** en los ficheros tocados · `pnpm --filter @bolsa/web typecheck`
+**OK** · `pnpm contract:check` **OK** · `test_dia_d_bump_guard` **2 passed**. **En vivo:** `POST
+/api/database/backup` con `COPIAR` → **200** (`bolsa_v1-20261029-145347-232.sql`, **14 963 887 B**,
+`sha256 dcb9c49b…`, `060_provider_check_policy`, **780 ms**), fichero + `.sha256` en `db-backups/`,
+entrada nueva del manifest, la tarjeta pasa de `warning` a **`ok`** y la línea de auditoría queda
+escrita; `--dir` verificado contra un directorio temporal. Las suites completas las mide el CI de la
+rama: este documento **no** adelanta cifras no medidas.
+
+**Límites:** la acción exige `node` y `pg_dump`/Docker **en la máquina de la API** (si faltan, se dice
+con un código; no se simula) · `pg_dump` abre su propia conexión, así que el diagnóstico puede mostrar
+una conexión más mientras dura · el cerrojo es global por BD pero **no** cubre un `pnpm db:dump` lanzado
+a mano en paralelo · no hay restaurar, VACUUM ni migraciones en la UI, y **no deben añadirse sin
+diseño**: sobrescriben datos · este sello **no incluye** la auditoría 2 (D-1–D-4), que sigue **sin
+commitear** en el árbol y no se certifica aquí.
+
 ## [2.11.171-beta] — **el expediente se publica para auditoría externa, sin tocar el producto** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ código = 0` salvo `meta.bump` · AUTO OFF · SIN migración · head `058_estudio_daily_proposals`**)
 
 **Naturaleza:** **acto nuevo de publicación documental**. No es un sello de corrección ni de

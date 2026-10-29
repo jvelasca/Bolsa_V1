@@ -196,12 +196,51 @@ Catálogo reutilizable; no vive en `settings_json`.
 | Método | Ruta                                  | Descripción                                   |
 | ------ | ------------------------------------- | --------------------------------------------- |
 | GET    | `/api/database/summary`               | Conexión + conteos por tabla                  |
+| GET    | `/api/database/maintenance`           | Diagnóstico **read-only** (ver abajo)         |
+| POST   | `/api/database/backup`                | Crea una copia local (`{ confirm: "COPIAR" }`) |
 | GET    | `/api/database/orphans`               | Instrumentos sin lista persistente            |
 | POST   | `/api/database/orphans/purge`         | Purga lote huérfanos (`{ limit }`)            |
 | GET    | `/api/database/closed-accounts`       | Demos `simulated` + `closed`                  |
 | POST   | `/api/database/closed-accounts/purge` | Hard-delete lote demos cerradas (`{ limit }`) |
 
-UI: **Configuración → BD**.
+`GET /api/database/maintenance` devuelve `{ data }` con `status ∈ {ok, warning, error, unknown}`
+y seis bloques: `schema` (revisión vs head, tablas/columnas/constraints que faltan,
+`allowlisted`), `capacity` (tamaño y top de tablas), `maintenance` (autovacuum, tuplas
+muertas), `connections` (por estado vs `max_connections`), `backups` (manifest, edad,
+checksum, revisión) e `integrity` (fila única de `sync_settings`, huérfanos, duplicados).
+
+- **No escribe en la BD**: ni VACUUM/ANALYZE, ni migraciones, ni purgas. La única acción
+  que escribe algo (un fichero) es `POST /api/database/backup`.
+- Devuelve **200 incluso con la BD caída** (`connected=false` y los bloques en `unknown`),
+  para que el panel pueda explicar el fallo en vez de reventar.
+- Un dato no medido se publica `unknown` con su motivo; nunca como cero.
+
+### `POST /api/database/backup`
+
+Crea una copia con `scripts/db-dump.mjs --dir <DB_BACKUP_DIR>`: **la misma** ruta de código
+que `pnpm db:dump`, con sidecar `.sha256`, manifest y retención. `pg_dump` solo lee la BD;
+lo que se escribe es el fichero.
+
+Body: `{ "confirm": "COPIAR" }` (obligatorio; un simple clic no vale).
+
+Respuesta 200: `{ data: { run, backups } }` con `run.ok`, `run.file`, `run.bytes`,
+`run.sha256`, `run.schemaRevision`, `run.pruned`, `run.durationMs` y `backups` recalculado
+tras la copia.
+
+| Código | Cuándo                                                                 |
+| ------ | ---------------------------------------------------------------------- |
+| 403    | entorno de producción, o `APP_PASSWORD` activo sin rol `admin`         |
+| 409    | ya hay una copia en curso (`backup_in_progress`, advisory lock)        |
+| 422    | `confirm` distinto de `COPIAR`                                         |
+| 503    | falta `node`, falta el script o el directorio no es escribible         |
+| 500    | el volcado falló (`DUMP_FAILED`, `TIMEOUT`, `OUTPUT_MISSING`)          |
+
+El cuerpo de error es `{ detail: { code, message } }`. Nunca devuelve 200 si no hay
+fichero: un fallo del volcado es un fallo, no un éxito parcial. Cada intento (bueno o malo)
+deja una línea en `logs/agent/db-maintenance.jsonl` con actor, fichero, bytes y duración.
+
+UI: **Configuración → BD** (diagnóstico + botón «Crear copia ahora» con confirmación
+escrita; las purgas viven en tarjetas separadas).
 
 ## Portfolio
 

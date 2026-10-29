@@ -126,6 +126,26 @@ docker compose down -v
 
 ```
 
+## Copias de seguridad y restauración
+
+El contenedor **no** guarda copias propias: los volcados se escriben fuera, en `db-backups/`
+(gitignored), y se restauran con los scripts del repo.
+
+```bash
+pnpm db:dump                 # pg_dump -> db-backups/bolsa_v1-<sello>.sql[.gz] + prune
+pnpm db:backup:list          # lista copias y retención vigente
+pnpm db:restore --file <backup> --yes   # DESTRUCTIVO: recrea la BD y sube a Alembic head
+```
+
+- Retención: `DB_BACKUP_KEEP` (default 14). Directorio: `DB_BACKUP_DIR` (default `db-backups`).
+- Estado en vivo (edad, checksum `.sha256`, revisión y espejo): **Configuración → BD → «Copias de
+  seguridad»** o `GET /api/database/maintenance`.
+- **Crear copia desde la UI**: `POST /api/database/backup` (botón «Crear copia ahora», escribir
+  `COPIAR`): ejecuta el mismo `scripts/db-dump.mjs --dir <DB_BACKUP_DIR>` dentro de la máquina de la
+  API, así que necesita `node` y `pg_dump`/Docker disponibles ahí (si faltan, responde 503 con un
+  código; no simula éxito). El contenedor de la API **no** restaura ni hace VACUUM: eso sigue en CLI.
+- Detalle completo, incluida la tarea programada de Windows: [DEV_STARTUP.md](./DEV_STARTUP.md#copias-de-seguridad-y-recuperación-bolsa_v1-local).
+
 ## Espacio en disco
 
 El volumen Docker `bolsa_pg_data` puede crecer con cada sincronización Yahoo (miles de barras OHLCV). Ver [DATA_MODEL.md](./DATA_MODEL.md).

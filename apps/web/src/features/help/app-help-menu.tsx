@@ -226,6 +226,46 @@ function GuideContent() {
           No está en la barra superior.
         </p>
       </section>
+
+      <section>
+        <h3 className="mb-2 font-semibold">Configuración → BD (diagnóstico)</h3>
+        <p className="text-muted-foreground">
+          La pestaña <OpenConfigLink tab="bd">BD</OpenConfigLink> muestra seis
+          bloques de <strong className="text-foreground">diagnóstico</strong>:{" "}
+          <em>esquema y migraciones</em> (revisión aplicada frente al head del
+          código, tablas/columnas que faltan y divergencias históricas
+          declaradas), <em>capacidad</em> (tamaño real de la base y tablas que
+          más ocupan), <em>mantenimiento</em> (autovacuum y tuplas muertas),{" "}
+          <em>conexiones</em> (total, activas, idle y transacción más larga),{" "}
+          <em>copias de seguridad</em> (la más reciente, su edad, checksum y
+          espejo) e <em>integridad</em> (fila única de configuración, huérfanos
+          y duplicados).
+        </p>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li>
+            <strong>La única acción</strong> es «Crear copia ahora», en la
+            tarjeta de copias: pide escribir <code>COPIAR</code>, no permite dos
+            copias a la vez, exige rol <code>admin</code> cuando hay contraseña
+            de app y deja registro en{" "}
+            <code>logs/agent/db-maintenance.jsonl</code>. Usa el mismo script y
+            la misma retención que <code>pnpm db:dump</code>.
+          </li>
+          <li>
+            <strong>No hace</strong>: ni VACUUM/ANALYZE, ni migraciones, ni
+            restaurar, ni podar sin crear. El diagnóstico no escribe en la BD;
+            la copia solo lee la BD y escribe un fichero.
+          </li>
+          <li>
+            Un dato que la API no pudo medir se muestra como{" "}
+            <strong>«Sin verificar» / «No disponible»</strong> con su motivo;
+            nunca como cero ni como verde. El rojo se reserva a un fallo medido.
+          </li>
+          <li>
+            Restaurar sigue en la terminal, con <code>pnpm db:restore</code>: no
+            se hace desde la UI porque sobrescribe datos.
+          </li>
+        </ul>
+      </section>
     </div>
   );
 }

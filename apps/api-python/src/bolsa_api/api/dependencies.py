@@ -4,7 +4,7 @@ from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from fastapi import Depends, Header, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 if TYPE_CHECKING:
     from bolsa_application.daily_ops_report import GetDailyOpsReport
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     )
 
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
+from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_application.account_blob_state import (
     GetAccountCoreRState,
     GetAccountMandates,
@@ -57,6 +58,8 @@ from bolsa_application.backtests import (
 )
 from bolsa_application.daily_opinion_service import DailyOpinionService
 from bolsa_application.daily_opinion_telemetry import DailyOpinionTelemetryService
+from bolsa_application.database_backup import CreateDatabaseBackup
+from bolsa_application.database_maintenance import GetDatabaseMaintenance
 from bolsa_application.events.platform_event_bus import PlatformEventBus
 from bolsa_application.execution_policies import (
     CreateExecutionPolicy,
@@ -171,7 +174,17 @@ from bolsa_application.trackers import (
 )
 from bolsa_application.validate_instrument_xtb import ValidateInstrumentWithXtb
 from bolsa_infrastructure.cache.feature_cache_factory import get_feature_cache
-from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.config import get_settings, is_production_environment
+from bolsa_infrastructure.database.backup_inventory import (
+    BackupInventoryAdapter,
+    backup_directory,
+    backup_stale_hours,
+)
+from bolsa_infrastructure.database.backup_runner import (
+    JsonlMaintenanceAudit,
+    NodeBackupRunner,
+    PostgresMaintenanceLock,
+)
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -280,10 +293,9 @@ from bolsa_infrastructure.database.repositories.tracker_definition_repository im
 from bolsa_infrastructure.database.repositories.workspace_repository import (
     SqlAlchemyWorkspaceRepository,
 )
+from bolsa_infrastructure.database.schema_contract import SchemaContractAdapter
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
-
-from bolsa_api.auth.request_principal import get_request_principal
 
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
@@ -612,6 +624,8 @@ def get_portfolio_recon_lookup(session: AsyncSession) -> Any:
 
 def get_lifecycle_recon_lookup(session: AsyncSession) -> Any:
     """OR-4 V1.95 — composed financial integrity status for check_opening."""
+    from sqlalchemy import func, select
+
     from bolsa_application.lifecycle_event_store import (
         GetLifecycleSnapshot,
         PostgresLifecycleEventStore,
@@ -631,7 +645,6 @@ def get_lifecycle_recon_lookup(session: AsyncSession) -> Any:
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
-    from sqlalchemy import func, select
 
     class _OutboxAdapter:
         async def list_for_account(self, acc: str) -> list[OutboxSnap]:
@@ -1085,6 +1098,46 @@ def get_sync_instrument_use_case(session: AsyncSession) -> SyncInstrumentDailyBa
 
 def get_database_summary_use_case(session: AsyncSession) -> GetDatabaseSummary:
     return GetDatabaseSummary(session)
+
+
+def get_database_maintenance_use_case(session: AsyncSession) -> GetDatabaseMaintenance:
+    """Diagnóstico read-only de la BD: esquema, capacidad, mantenimiento y copias.
+
+    El head esperado sale del propio árbol de migraciones (``build_provenance``), la misma
+    autoridad que usa ``/health/ready``: una sola fuente de verdad, sin constantes a mano.
+    """
+    from bolsa_api.provenance import build_provenance
+
+    return GetDatabaseMaintenance(
+        session,
+        schema_contract=SchemaContractAdapter(),
+        backup_inventory=BackupInventoryAdapter(),
+        expected_head=build_provenance().schema_revision,
+        backup_stale_hours=backup_stale_hours(),
+    )
+
+
+def get_create_database_backup_use_case(request: Request) -> CreateDatabaseBackup:
+    """Copia de BD bajo demanda: mismo script, mismo directorio y misma regla de frescura
+    que ``pnpm db:dump`` y que el diagnóstico.
+
+    El cerrojo usa una conexión dedicada del engine de la app (no la sesión del request):
+    un advisory lock de sesión devuelto al pool quedaría tomado en una conexión reutilizable.
+    """
+    from bolsa_api.provenance import build_provenance
+
+    settings = get_settings()
+    engine = cast(AsyncEngine, request.app.state.engine)
+    return CreateDatabaseBackup(
+        runner=NodeBackupRunner(),
+        lock=PostgresMaintenanceLock(engine),
+        audit=JsonlMaintenanceAudit(),
+        backup_inventory=BackupInventoryAdapter(),
+        backup_directory=backup_directory(),
+        expected_head=build_provenance().schema_revision,
+        backup_stale_hours=backup_stale_hours(),
+        production=is_production_environment(settings.environment),
+    )
 
 
 def get_instrument_removal_preview_use_case(session: AsyncSession) -> GetInstrumentRemovalPreview:

@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { api, ApiError } from "@/lib/api";
+import { DatabaseMaintenancePanel } from "@/features/config/database-maintenance-panel";
 import { useState } from "react";
 
 export function DatabaseConfigPanel() {
@@ -125,6 +126,9 @@ export function DatabaseConfigPanel() {
               void summaryQuery.refetch();
               void orphansQuery.refetch();
               void closedAccountsQuery.refetch();
+              void queryClient.invalidateQueries({
+                queryKey: ["database-maintenance"],
+              });
             }}
           >
             <RefreshCw className="h-3 w-3" />
@@ -186,6 +190,8 @@ export function DatabaseConfigPanel() {
           )}
         </CardContent>
       </Card>
+
+      <DatabaseMaintenancePanel />
 
       <Card>
         <CardHeader>

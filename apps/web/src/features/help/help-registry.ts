@@ -507,6 +507,16 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
         role: "doc",
         note: "Consolidación de proveedores: casos PRV/SYN/UI, evidencias y defectos",
       },
+      {
+        path: "docs/engineering/handoff-061-ventana-bd-2026-10-29.md",
+        role: "doc",
+        note: "Ventana BD read-only: diagnóstico, allowlist de drift y límites",
+      },
+      {
+        path: "docs/engineering/handoff-062-ventana-bd-copia-2026-10-29.md",
+        role: "doc",
+        note: "Copia bajo demanda: COPIAR, cerrojo, auditoría y límites",
+      },
       { path: "docs/adr/002-yahoo-primary-xtb-secondary.md", role: "adr" },
       {
         path: "docs/adr/007-intraday-ohlcv-persistence.md",

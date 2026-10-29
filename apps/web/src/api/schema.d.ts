@@ -1619,6 +1619,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/database/backup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Database Backup
+         * @description Crea una copia local de la BD (única acción de mantenimiento de la ventana BD).
+         *
+         *     ``pg_dump`` solo lee la BD; lo que sí escribe es un fichero con su sidecar ``.sha256``,
+         *     el manifest y la poda por retención. Por eso no basta un clic: hay confirmación
+         *     escrita, rol ``admin`` cuando la auth está activa, un cerrojo que impide dos copias
+         *     simultáneas (409) y auditoría. Si la copia no se creó, la respuesta **no** es 200.
+         */
+        post: operations["create_database_backup_api_database_backup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/database/closed-accounts": {
         parameters: {
             query?: never;
@@ -1647,6 +1672,30 @@ export interface paths {
         put?: never;
         /** Purge Closed Simulated Accounts */
         post: operations["purge_closed_simulated_accounts_api_database_closed_accounts_purge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/database/maintenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Database Maintenance
+         * @description Diagnóstico read-only: esquema/head, capacidad, mantenimiento, conexiones y copias.
+         *
+         *     Devuelve 200 incluso con la BD caída (``connected=false`` y checks con error), igual
+         *     que ``/database/summary``: el panel debe poder explicar el fallo, no reventar. No hay
+         *     ninguna acción de escritura: ni VACUUM, ni ANALYZE, ni purgas, ni migraciones.
+         */
+        get: operations["get_database_maintenance_api_database_maintenance_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5538,6 +5587,69 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** BackupRunDto */
+        BackupRunDto: {
+            /** Bytes */
+            bytes?: number | null;
+            /**
+             * Durationms
+             * @default 0
+             */
+            durationMs: number;
+            /** Error */
+            error?: string | null;
+            /** Errorcode */
+            errorCode?: string | null;
+            /** File */
+            file?: string | null;
+            /** Mirrorpath */
+            mirrorPath?: string | null;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Pruned
+             * @default 0
+             */
+            pruned: number;
+            /** Schemarevision */
+            schemaRevision?: string | null;
+            /** Sha256 */
+            sha256?: string | null;
+        };
+        /** BackupsStatusDto */
+        BackupsStatusDto: {
+            /** Accessible */
+            accessible: boolean;
+            /** Agehours */
+            ageHours?: number | null;
+            /** Checksumpresent */
+            checksumPresent: boolean;
+            /** Count */
+            count: number;
+            /** Detail */
+            detail: string;
+            /** Directory */
+            directory: string;
+            /** Latestbytes */
+            latestBytes?: number | null;
+            /** Latestcreatedat */
+            latestCreatedAt?: string | null;
+            /** Latestname */
+            latestName?: string | null;
+            /** Latestschema */
+            latestSchema?: string | null;
+            /** Mirrorconfigured */
+            mirrorConfigured: boolean;
+            /** Retention */
+            retention: number;
+            /** Stale */
+            stale?: boolean | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+        };
         /** BeliefHistoryEntryDto */
         BeliefHistoryEntryDto: {
             /** Belief */
@@ -5616,6 +5728,35 @@ export interface components {
             updated?: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** CapacityStatusDto */
+        CapacityStatusDto: {
+            /** Databasebytes */
+            databaseBytes: number;
+            /** Databasepretty */
+            databasePretty: string;
+            /** Detail */
+            detail: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+            /** Tables */
+            tables?: components["schemas"]["CapacityTableDto"][];
+        };
+        /** CapacityTableDto */
+        CapacityTableDto: {
+            /** Label */
+            label: string;
+            /** Rows */
+            rows: number;
+            /** Sizebytes */
+            sizeBytes: number;
+            /** Sizepretty */
+            sizePretty: string;
+            /** Table */
+            table: string;
         };
         /** CashMovementResponseDto */
         CashMovementResponseDto: {
@@ -5817,6 +5958,28 @@ export interface components {
             /** Signedstop */
             signedStop?: number | null;
         };
+        /** ConnectionsStatusDto */
+        ConnectionsStatusDto: {
+            /** Active */
+            active: number;
+            /** Detail */
+            detail: string;
+            /** Idle */
+            idle: number;
+            /** Idleintransaction */
+            idleInTransaction: number;
+            /** Longesttransactionseconds */
+            longestTransactionSeconds?: number | null;
+            /** Maxconnections */
+            maxConnections?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+            /** Total */
+            total: number;
+        };
         /** ConsolidationEligibilityResponseDto */
         ConsolidationEligibilityResponseDto: {
             /** Data */
@@ -6006,6 +6169,26 @@ export interface components {
             selectedPolicyTemplateId?: string | null;
             /** Suggestedpolicytemplateid */
             suggestedPolicyTemplateId?: string | null;
+        };
+        /**
+         * CreateDatabaseBackupRequestDto
+         * @description Confirmación escrita obligatoria: el cuerpo debe traer exactamente ``COPIAR``.
+         */
+        CreateDatabaseBackupRequestDto: {
+            /** Confirm */
+            confirm: string;
+        };
+        /** CreateDatabaseBackupResponseDto */
+        CreateDatabaseBackupResponseDto: {
+            data: components["schemas"]["CreateDatabaseBackupResultDto"];
+        };
+        /**
+         * CreateDatabaseBackupResultDto
+         * @description El intento y el estado real de las copias después (recalculado, no cacheado).
+         */
+        CreateDatabaseBackupResultDto: {
+            backups?: components["schemas"]["BackupsStatusDto"] | null;
+            run: components["schemas"]["BackupRunDto"];
         };
         /** CreateExecutionPolicyRequestDto */
         CreateExecutionPolicyRequestDto: {
@@ -6311,6 +6494,32 @@ export interface components {
             message: string;
             /** Status */
             status: string;
+        };
+        /** DatabaseMaintenanceDto */
+        DatabaseMaintenanceDto: {
+            backups: components["schemas"]["BackupsStatusDto"];
+            capacity: components["schemas"]["CapacityStatusDto"];
+            /** Checks */
+            checks?: components["schemas"]["MaintenanceCheckDto"][];
+            /** Connected */
+            connected: boolean;
+            connections: components["schemas"]["ConnectionsStatusDto"];
+            /** Generatedat */
+            generatedAt: string;
+            integrity: components["schemas"]["IntegrityStatusDto"];
+            maintenance: components["schemas"]["MaintenanceStatusDto"];
+            /** Message */
+            message: string;
+            schema: components["schemas"]["SchemaStatusDto"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+        };
+        /** DatabaseMaintenanceResponseDto */
+        DatabaseMaintenanceResponseDto: {
+            data: components["schemas"]["DatabaseMaintenanceDto"];
         };
         /** DatabaseSummaryDto */
         DatabaseSummaryDto: {
@@ -9165,6 +9374,18 @@ export interface components {
         InstrumentXtbValidationResponseDto: {
             data: components["schemas"]["InstrumentXtbValidationDto"];
         };
+        /** IntegrityStatusDto */
+        IntegrityStatusDto: {
+            /** Checks */
+            checks?: components["schemas"]["MaintenanceCheckDto"][];
+            /** Detail */
+            detail: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+        };
         /** InvestmentAccountDto */
         InvestmentAccountDto: {
             /** Activeprofileid */
@@ -9846,6 +10067,55 @@ export interface components {
         /** LoginResponseDto */
         LoginResponseDto: {
             data: components["schemas"]["LoginResponseDataDto"];
+        };
+        /** MaintenanceCheckDto */
+        MaintenanceCheckDto: {
+            /** Detail */
+            detail: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+            /** Value */
+            value?: string | null;
+        };
+        /** MaintenanceStatusDto */
+        MaintenanceStatusDto: {
+            /** Autovacuumenabled */
+            autovacuumEnabled?: boolean | null;
+            /** Deadtuplestotal */
+            deadTuplesTotal: number;
+            /** Detail */
+            detail: string;
+            /** Lastautovacuum */
+            lastAutovacuum?: string | null;
+            /** Naptimeseconds */
+            naptimeSeconds?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+            /** Tableswithdeadtuples */
+            tablesWithDeadTuples?: components["schemas"]["MaintenanceTableDto"][];
+        };
+        /** MaintenanceTableDto */
+        MaintenanceTableDto: {
+            /** Deadtuples */
+            deadTuples: number;
+            /** Lastautoanalyze */
+            lastAutoanalyze?: string | null;
+            /** Lastautovacuum */
+            lastAutovacuum?: string | null;
+            /** Livetuples */
+            liveTuples: number;
+            /** Table */
+            table: string;
         };
         /**
          * MandateBundleDto
@@ -11623,6 +11893,34 @@ export interface components {
             instrumentIds?: string[] | null;
             /** Listid */
             listId?: string | null;
+        };
+        /** SchemaStatusDto */
+        SchemaStatusDto: {
+            /** Allowlisted */
+            allowlisted?: string[];
+            /** Currentrevision */
+            currentRevision?: string | null;
+            /** Databasetables */
+            databaseTables: number;
+            /** Detail */
+            detail: string;
+            /** Expectedhead */
+            expectedHead?: string | null;
+            /** Expectedtables */
+            expectedTables: number;
+            /** Missingcolumns */
+            missingColumns?: string[];
+            /** Missingconstraints */
+            missingConstraints?: string[];
+            /** Missingtables */
+            missingTables?: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+            /** Unexpectedtables */
+            unexpectedTables?: string[];
         };
         /** SemiF3ViewDto */
         SemiF3ViewDto: {
@@ -15790,6 +16088,39 @@ export interface operations {
             };
         };
     };
+    create_database_backup_api_database_backup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDatabaseBackupRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateDatabaseBackupResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_closed_simulated_accounts_api_database_closed_accounts_get: {
         parameters: {
             query?: {
@@ -15850,6 +16181,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_database_maintenance_api_database_maintenance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatabaseMaintenanceResponseDto"];
                 };
             };
         };

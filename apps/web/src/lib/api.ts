@@ -33,6 +33,20 @@ function formatApiErrorDetail(body: unknown): string | undefined {
   const record = body as Record<string, unknown>;
   if (typeof record.error === "string") return record.error;
   if (typeof record.detail === "string") return record.detail;
+  // FastAPI con ``detail`` estructurado: ``{"code": "...", "message": "..."}``. Sin esto,
+  // un error con código se degradaba a un mensaje genérico y la UI perdía el motivo.
+  if (
+    record.detail &&
+    typeof record.detail === "object" &&
+    !Array.isArray(record.detail)
+  ) {
+    const detail = record.detail as Record<string, unknown>;
+    if (typeof detail.message === "string" && detail.message.trim()) {
+      return typeof detail.code === "string" && detail.code.trim()
+        ? `${detail.code}: ${detail.message}`
+        : detail.message;
+    }
+  }
   if (Array.isArray(record.detail)) {
     return record.detail
       .map((item) => {
@@ -808,6 +822,21 @@ export const api = {
       client.GET("/api/database/summary", {
         params: instrumentId ? { query: { instrumentId } } : undefined,
       }),
+    ),
+
+  /** Diagnóstico read-only de la BD: esquema, capacidad, mantenimiento y copias. */
+  getDatabaseMaintenance: () =>
+    call<{ data: import("@bolsa/shared").DatabaseMaintenanceDto }>(() =>
+      client.GET("/api/database/maintenance"),
+    ),
+
+  /**
+   * Crea una copia local de la BD (única acción de escritura de la ventana BD).
+   * ``confirm`` debe ser exactamente ``COPIAR``: el servidor no acepta un simple clic.
+   */
+  createDatabaseBackup: (confirm: string) =>
+    call<{ data: import("@bolsa/shared").CreateDatabaseBackupResultDto }>(() =>
+      client.POST("/api/database/backup", { body: { confirm } }),
     ),
 
   getOrphanInstruments: (limit = 100) =>

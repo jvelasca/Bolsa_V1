@@ -19,7 +19,10 @@ portfolios ──┬──< positions
 ## Tablas de mercado
 
 > Detalle de ingesta / sync: [MARKET_DATA.md](./MARKET_DATA.md) · Ayuda sync **2026-07-23**.
-> Mantenimiento: **Configuración → BD** (huérfanos de instrumentos / demos cerradas / purga segura).
+> Mantenimiento: **Configuración → BD** — diagnóstico **read-only** (esquema/head, capacidad,
+> vacuum/analyze, conexiones, integridad y estado de copias) más la acción «Crear copia
+> ahora», huérfanos de instrumentos, demos cerradas y purga segura. El diagnóstico no
+> escribe: ni VACUUM ni migraciones desde la UI; la copia solo lee la BD y escribe un fichero.
 
 ```
 instruments ──┬──< ohlcv_bars
@@ -76,6 +79,63 @@ Auditoría de sincronizaciones Yahoo y validaciones XTB (`provider`, estado, men
 ### `sync_settings` / `sync_queue`
 
 Knobs de sync automática (`auto_sync_enabled`, intervalos, backoff, `post_market_only`, …) y cola de trabajo con reintentos.
+
+**Dos automatizaciones distintas (no confundirlas):**
+
+| Columna | Automatización | Qué hace |
+|---------|----------------|----------|
+| `auto_sync_enabled` | Velas OHLCV | Escanea y encola instrumentos desfasados; descarga históricos |
+| `provider_check_enabled` | Servidores (060) | Solo comprueba conectividad de los proveedores habilitados; **no** descarga datos |
+| `provider_check_interval_seconds` | Servidores (060) | Cadencia de la comprobación, segundos (CHECK 15–3600, nombre `sync_settings_provider_check_interval_check`) |
+
+La política de servidores se persiste en `sync_settings` porque es «automatización» (misma
+fila, misma pantalla), pero el bucle de salud la lee con su propio caso de uso
+(`GetProviderCheckPolicy`) y no arrastra la semántica de las velas.
+
+### `market_provider_settings` (migración 059)
+
+Registro de proveedores con configuración efectiva y **estado medido**:
+
+| Campo | Tipo | Notas |
+|-------|------|-------|
+| id | PK | `yahoo`, `xtb` (registro cerrado en dominio) |
+| enabled | bool | Deshabilitado ⇒ no se resuelve para ninguna capacidad (fail-closed) |
+| priority | int | Orden de preferencia por capacidad |
+| min_interval_seconds | int | Throttle del cliente (Yahoo) |
+| base_url | string? | Override de la URL del bridge (XTB) |
+| capabilities / description | jsonb / string | Qué sabe hacer el proveedor |
+| last_check_at | timestamptz? | **Última medición persistida** (fuente de verdad del icono) |
+| last_check_ok | bool? | Resultado de esa medición |
+| last_check_message | text? | Motivo legible |
+
+Regla del área: sin `last_check_at` el estado es «sin verificar»; un proveedor
+deshabilitado no se pinta en rojo. `GET /api/market/providers/health` lee **solo** lo
+persistido (nunca sondea); la comprobación real es el `POST .../health/check` o el monitor.
+
+## Mantenimiento e integridad (head `060_provider_check_policy`)
+
+`GET /api/database/maintenance` (Configuración → BD) publica, sin escribir:
+
+- **Esquema**: revisión de `alembic_version` frente al head del código; tablas/columnas y
+  constraints que faltan; tablas fuera del contrato y **allowlist de divergencias históricas**
+  declaradas (`bolsa_infrastructure.database.schema_contract.KNOWN_SCHEMA_DIVERGENCES`).
+  `alembic check` usa la misma lista vía `include_object`, así que vuelve a ser un gate: una
+  diferencia nueva falla.
+- **Capacidad**: `pg_database_size` + top de tablas por `pg_total_relation_size`.
+- **Mantenimiento**: `autovacuum`, `naptime`, tuplas muertas por tabla y transacciones abiertas.
+- **Conexiones**: reparto por estado frente a `max_connections`.
+- **Copias**: manifest de `db-backups/`, edad, checksum (`.sha256`) y revisión de la copia.
+- **Integridad**: fila única de `sync_settings` y `alembic_version`, velas huérfanas o
+  duplicadas, asientos sin cuenta y filas de proveedores sin medición.
+
+Un dato no medido se publica `unknown` con su motivo; nunca como cero. El diagnóstico es
+**read-only**: no ejecuta VACUUM/ANALYZE, no aplica migraciones y no restaura copias.
+
+La única acción de escritura de la ventana es **«Crear copia ahora»**
+(`POST /api/database/backup`): exige escribir `COPIAR`, admite una sola copia a la vez
+(advisory lock `774104254`), pide rol `admin` si `APP_PASSWORD` está activo y registra cada
+intento en `logs/agent/db-maintenance.jsonl`. No escribe en PostgreSQL —`pg_dump` solo
+lee— pero sí crea el fichero, su `.sha256` y poda por `DB_BACKUP_KEEP`.
 
 ## Tablas de inversión (ADR 008)
 
