@@ -25,6 +25,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from bolsa_infrastructure.database.models import Base
+from bolsa_infrastructure.database.schema_contract import alembic_include_object
 
 config = context.config
 
@@ -65,6 +66,10 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        # La allowlist es deuda declarada: ``alembic check`` y ``--autogenerate`` dejan
+        # de proponer DROP de objetos históricos que siguen en uso. Una divergencia
+        # nueva (no listada) sigue apareciendo.
+        include_object=alembic_include_object(),
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -73,7 +78,11 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     injected = config.attributes.get("connection")
     if injected is not None:
-        context.configure(connection=injected, target_metadata=target_metadata)
+        context.configure(
+            connection=injected,
+            target_metadata=target_metadata,
+            include_object=alembic_include_object(),
+        )
         with context.begin_transaction():
             context.run_migrations()
         return
@@ -91,7 +100,11 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with engine.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=alembic_include_object(),
+        )
         with context.begin_transaction():
             context.run_migrations()
     engine.dispose()

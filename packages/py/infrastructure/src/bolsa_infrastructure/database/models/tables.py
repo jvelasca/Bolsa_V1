@@ -1292,6 +1292,16 @@ class SyncSettingsRow(Base):
     )
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
+    #: Declaración explícita del CHECK que creó la migración 060. Es solo metadatos: la
+    #: BD ya lo tiene. Sin esta línea ``alembic check`` lo veía como diferencia y un
+    #: ``--autogenerate`` habría emitido un DROP, dejando el intervalo sin guardrail.
+    __table_args__ = (
+        CheckConstraint(
+            "provider_check_interval_seconds >= 15 AND provider_check_interval_seconds <= 3600",
+            name="sync_settings_provider_check_interval_check",
+        ),
+    )
+
 
 class SyncQueueItemRow(Base):
     __tablename__ = "sync_queue"
