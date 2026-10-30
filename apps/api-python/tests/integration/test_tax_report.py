@@ -24,10 +24,10 @@ que sin tipo no se inventa una estimación.
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-
-from bolsa_api.main import create_app, lifespan
 from tests.conftest import purge_accounts
 from tests.opening_gate_seed import seed_http_opening_allow
+
+from bolsa_api.main import create_app, lifespan
 
 
 async def _first_instrument_id(client: AsyncClient) -> str:

@@ -1,10 +1,10 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
-
-from bolsa_api.main import create_app, lifespan
 from tests.conftest import purge_accounts
 from tests.opening_gate_seed import seed_http_opening_allow
+
+from bolsa_api.main import create_app, lifespan
 
 STANDARD_ES_SETTINGS = {
     "commission": {
