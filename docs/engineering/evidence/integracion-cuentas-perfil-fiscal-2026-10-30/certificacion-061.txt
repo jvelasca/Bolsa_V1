@@ -1,0 +1,60 @@
+Certificación de la 061 por la ruta REAL de despliegue (no por el CLI)
+Worktree: C:\Users\josea\.cursor\worktrees\integracion-cuentas-perfil-2026-10-30
+Rama:     integracion/cuentas-perfil-2026-10-30 (HEAD 9fb39d12)
+BD:       bolsa_v1_integracion (scratch propia; NUNCA bolsa_v1)
+Fecha:    2026-10-30
+
+[1] Head único
+$ alembic heads
+061_profile_delete_restrict (head)
+
+[2] Restauración de la copia heredada + migración por el camino del bootstrap
+$ node scripts/db-restore.mjs --file db-backups/bolsa_v1-20261029-145347-232.sql \
+      --yes --target-db bolsa_v1_integracion
+[db-restore] BD "bolsa_v1_integracion" recreada
+[db-restore] ... aplicado a "bolsa_v1_integracion" (sql)
+[db-restore] Alembic → BD "bolsa_v1_integracion" (destino restaurada, no la principal)
+[db-restore] Alembic aplicado a head (023) en "bolsa_v1_integracion"
+[db-restore] Restauración completa — ese script llama a runDbMigrateDeploy -> ensure_migrated,
+             la MISMA ruta que usa database_bootstrap (API, workers, scripts/lib/db.mjs)
+
+[3] Estado de la scratch tras esa ruta (solo lectura)
+alembic_version                = 061_profile_delete_restrict
+investment_accounts_active_profile_id_fkey  oid=613733  confdeltype='r'  convalidated=true
+cuentas                        = 1
+perfiles                       = 1
+cuentas con perfil asignado    = 1
+huérfanos (asignado sin perfil)= 0
+  -> la copia heredada traía una asignación viva (PROF-afa68b344b69) y sigue viva
+
+[4] Idempotencia (ensure_migrated repetido)
+oid/acción antes              = (613733, 'r')
+tras 1ª re-ejecución          = (613733, 'r')
+tras 2ª re-ejecución          = (613733, 'r')
+IDEMPOTENTE                   = True   (no recrea la FK, no cambia el oid)
+
+[5] Ciclo downgrade/upgrade
+inicial                       = ('061_profile_delete_restrict', 'r', 1, 0)
+tras downgrade_to(060...)     = ('060_provider_check_policy',   'n', 1, 0)
+tras migrate_to(head)         = ('061_profile_delete_restrict', 'r', 1, 0)
+  (r = RESTRICT, n = SET NULL; la asignación se conserva y no aparecen huérfanos)
+
+[6] Arranque real del API (lifespan, no CLI) contra la scratch
+$ API_PYTHON_PORT=8318 DATABASE_URL=...bolsa_v1_integracion bolsa-api
+GET /api/health -> 200
+  provenance.schema_revision = 061_profile_delete_restrict
+  provenance.git_sha         = 9fb39d128a1f96a9a51c97ec24e45231138890d7
+  database.status            = ok
+
+[7] Ventana de bloqueo (documentada, no medida aparte)
+La 061 hace DROP + ADD CONSTRAINT dentro de la transacción de Alembic: toma
+ACCESS EXCLUSIVE sobre investment_accounts. En la práctica son milisegundos y un lector
+concurrente nunca ve la FK ausente (la transacción publica el cambio entero o nada).
+No se relaja: `test_061_profile_delete_restrict_pg.py` cubre el ciclo y la carrera.
+
+[8] Resultado del gate de drift en esta misma scratch (PREEXISTENTE, ver nota)
+$ pytest apps/api-python/tests/test_schema_drift_gate_pg.py  (SCHEMA_DRIFT_PG_REQUIRED=1)
+1 failed, 1 passed
+  -> remove_fk onupdate='CASCADE' ondelete='RESTRICT' en la BD vs metadata sin onupdate.
+     Reproducido también en el árbol fiscal con la BD de desarrollo en 060: la diferencia
+     de `onupdate` ya existía antes de la 061.

@@ -1,0 +1,67 @@
+{
+  "base": "http://localhost:5318",
+  "account": "default-account-seed",
+  "checks": [
+    {
+      "name": "la ficha pinta el bloque de perfil",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "el bloque de perfil nombra «Perfil por defecto (moderado)»",
+      "ok": true,
+      "detail": "Perfil inversor Un perfil activo por cuenta. Define la Trading Policy del Policy Gate. Gestionar catálogo → Activo: Perfil por defecto (moderado) · Moderado Per"
+    },
+    {
+      "name": "la ficha muestra el resumen fiscal fusionado",
+      "ok": true,
+      "detail": "Comisiones y fiscal Broker estándar ES · 0,1 % comisión · mín. 1,00 EUR · máx. 29,00 EUR · IVA 21 % · FX 0,5 % · custodia 0,2 % anual Fiscal · España (ES) · FIF"
+    },
+    {
+      "name": "el botón usa el copy del candidato",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "el diálogo abre con focus=fiscal",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "el diálogo es el del candidato",
+      "ok": true,
+      "detail": "Comisiones y fiscal de la cuenta Comisiones y fiscal de «Cuenta demo EUR». El perfil inversor se asigna en la ficha de l"
+    },
+    {
+      "name": "la pestaña Fiscal está activa",
+      "ok": true,
+      "detail": "aria-selected=true"
+    },
+    {
+      "name": "la pestaña Fiscal pinta sus campos",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "el panel no contiene el selector de perfil",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "el panel no tiene ningún desplegable de perfil",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "el panel no repite la acción de asignar perfil",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "el panel conserva el botón de guardado fiscal",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "consoleLines": []
+}
