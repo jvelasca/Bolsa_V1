@@ -5,6 +5,10 @@
 $ alembic_head()
 062_sync_settings_check_backfill
 
+# Nota: el arnés del gate de drift (make_pg_session_factory -> ensure_migrated) aplicó la
+# 062 sobre bolsa_v1_integracion (061 -> 062) al ejecutar la batería. Sin pérdida de datos:
+# CHECK creado, 1 fila de sync_settings intacta, FK ('r','c'). bolsa_v1 sigue en 060.
+
 # --- Drift + acciones de FK + ciclo de 061/062 sobre la BD de integración -----------
 $ DATABASE_URL=...bolsa_v1_integracion \
   SCHEMA_DRIFT_PG_REQUIRED=1 SYNC_SETTINGS_CHECK_PG_REQUIRED=1 \

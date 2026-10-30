@@ -93,7 +93,11 @@ acciones de FK          : SIN DIFERENCIAS
 
 - `bolsa_v1` (compartida) sigue en **060** y no se tocó; su FK está en `SET NULL` a
   propósito: la 061 solo se aplica cuando el árbol fiscal adopte la cadena completa.
-- `bolsa_v1_integracion` sigue en **061** (scratch de integración, no operativa).
+- `bolsa_v1_integracion` (scratch de integración, no operativa) partía de **061**; al
+  ejecutar la batería, el arnés del gate de drift (`make_pg_session_factory` ->
+  `ensure_migrated`) la llevó a **062**. La `062` creó el `CHECK` sin tocar datos (1 fila
+  de `sync_settings` intacta) y la FK sigue `('r','c')`. La ruta heredada se certificó
+  aparte en `bolsa_ev_a_legacy`.
 - Las bases de la sonda se conservan para inspección; `probe.py --drop` las elimina.
 - La `062` es la única vía de reparación de bases ya estampadas; la corrección de la
   `060` solo protege a las bases nuevas.

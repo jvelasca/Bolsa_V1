@@ -78,8 +78,12 @@ fb4e32c6 merge: expediente B (Ruff reproducible 0.16.2)
 ## Estado de las bases
 
 - `bolsa_v1` (compartida): sigue en **060**, no se tocó.
-- `bolsa_v1_integracion`: sigue en **061**; sigue documentada como *scratch* de
-  integración, no operativa. No se le aplicó ninguna migración nueva.
+- `bolsa_v1_integracion`: partía de **061**; el propio arnés del gate de drift
+  (`make_pg_session_factory` -> `ensure_migrated`) la llevó a **062** al ejecutar la
+  batería. La `062` creó el `CHECK` **sin tocar datos** (1 fila de `sync_settings`
+  intacta) y la FK sigue `('r','c')`. Sigue siendo *scratch* de integración, no
+  operativa; ya no queda ninguna base en `061` que certificar aparte porque la ruta
+  heredada se midió en `bolsa_ev_a_legacy`.
 - `bolsa_ev_a_legacy` / `bolsa_ev_a_new`: BDs desechables de la sonda, se conservan para
   inspección; `probe.py --drop` las elimina. Ninguna es la BD operativa.
 
