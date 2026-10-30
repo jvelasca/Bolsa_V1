@@ -87,5 +87,6 @@ pin, el Makefile, el CI y la evidencia viajan en esta rama, y el reordenado exac
 **fusión final** sobre la rama de integración, donde el defecto existe. Se corrige solo
 esos dos ficheros: nada de `--fix` sobre el árbol completo.
 
-El `ruff.txt` de la evidencia de integración estaba desincronizado (medido sin `--config`);
-la auditoría final lo regenera con el comando exacto del CI.
+La evidencia de integración no tenía un `ruff.txt` medido con el comando exacto del CI; la
+auditoría final lo crea con `--config` y deja documentada, aparte, la medición sin
+`--config` como explicación del falso positivo.

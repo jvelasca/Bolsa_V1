@@ -1,0 +1,63 @@
+# Gates finales — auditoría sin publicar (2026-10-30)
+# Rama: integracion/cuentas-perfil-2026-10-30 @ 582f6f4b (+ este commit de docs)
+# Entorno: PostgreSQL 16 (bolsa-postgres) | DATABASE_URL -> bolsa_v1_integracion
+
+$ alembic_head()
+062_sync_settings_check_backfill
+
+# --- Drift + acciones de FK + ciclo de 061/062 sobre la BD de integración -----------
+$ DATABASE_URL=...bolsa_v1_integracion \
+  SCHEMA_DRIFT_PG_REQUIRED=1 SYNC_SETTINGS_CHECK_PG_REQUIRED=1 \
+  PROFILE_DELETE_MIGRATION_PG_REQUIRED=1 \
+  pytest \
+    packages/py/infrastructure/tests/test_schema_contract.py \
+    packages/py/infrastructure/tests/test_061_profile_delete_restrict.py \
+    packages/py/infrastructure/tests/test_062_sync_settings_check_pg.py \
+    packages/py/infrastructure/tests/test_061_profile_delete_restrict_pg.py \
+    apps/api-python/tests/test_schema_drift_gate_pg.py -q
+27 passed in 14.87s
+
+# --- Área de perfiles / guard de borrado / asignación -------------------------------
+$ pytest packages/py/application/tests/test_investor_profiles.py \
+         packages/py/infrastructure/tests/test_investor_profile_delete_guard.py \
+         apps/api-python/tests/test_investor_profiles_assign.py -q
+17 passed in 4.89s
+
+# --- Ruff (comando exacto del CI) ---------------------------------------------------
+$ ruff --version
+ruff 0.16.2
+$ ruff check packages/py apps/api-python --config pyproject.toml
+All checks passed!
+
+# --- Import-linter ------------------------------------------------------------------
+$ lint-imports --config packages/py/.importlinter
+Contracts: 4 kept, 0 broken.
+
+# --- mypy ---------------------------------------------------------------------------
+$ mypy packages/py/domain/src packages/py/market/src \
+       packages/py/infrastructure/src apps/api-python/src
+Success: no issues found in 308 source files
+
+# --- TypeScript / ESLint / contrato / Vitest ----------------------------------------
+$ pnpm typecheck
+Tasks: 4 successful, 4 total
+$ pnpm lint
+Tasks: 4 successful, 4 total (0 errors, 23 warnings preexistentes)
+$ pnpm contract:check
+contract:check OK — openapi.json y schema.d.ts coinciden con el commit.
+$ pnpm test
+Test Files  355 passed (355)
+     Tests  2659 passed (2659)
+
+# --- Integridad de la fusión --------------------------------------------------------
+$ git merge-base --is-ancestor 06653971 HEAD    # los 3 commits siguen intactos
+$ git diff 06653971 -- packages/py/infrastructure/alembic/versions/061_profile_delete_restrict.py
+# (vacío)
+$ python -c "yaml.safe_load(open('.github/workflows/python-ci.yml'))"   # válido
+
+# --- Sonda de las dos rutas de esquema (BDs desechables) -----------------------------
+$ python docs/engineering/evidence/integridad-esquema-2026-10-30/probe.py
+# BD heredada: árbol anterior -> 061 sin CHECK -> árbol corregido -> 062 con CHECK
+# BD nueva:    árbol corregido -> head -> CHECK presente
+# compare_metadata: SIN DIFERENCIAS | acciones de FK: SIN DIFERENCIAS
+# (salida completa en el README de esta carpeta)
