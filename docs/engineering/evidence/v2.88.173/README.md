@@ -44,12 +44,18 @@ Dos cambios de producto:
 
 | Comprobación | Resultado |
 | --- | --- |
+| `vitest run` (árbol exacto del sello, sin el trabajo fiscal sin commitear) | **348 archivos / 2614 tests** |
 | `vitest run` (área nueva) | **4 archivos / 32 tests** |
 | `tsc -b --noEmit` | **OK** |
 | `eslint` (web) | **0 errores**, 23 avisos preexistentes |
 | `pnpm contract:check` | **OK** — `openapi.json` y `schema.d.ts` sin diff |
 | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **2 passed** |
 | `pnpm window:freeze` | **`freeze OK`** tras re-anclar el pin |
+
+La suite se midió sobre el **árbol limpio del commit del sello** (el trabajo fiscal se apartó con
+`git stash` y se restauró después), no sobre el working tree completo. Con ese trabajo presente la
+cifra era **351 / 2636**; esa diferencia (**3 archivos / 22 tests**) es exactamente el trabajo **fuera**
+de este sello y no se acredita aquí.
 
 Evidencia capturada en [`evidence/general-espacios-2026-10-30/`](../general-espacios-2026-10-30/):
 `vitest-area.txt`, `vitest-web-full.txt`, `tsc.txt`, `eslint.txt`, `contract-check.txt`,
@@ -85,8 +91,8 @@ Evidencia capturada en [`evidence/general-espacios-2026-10-30/`](../general-espa
 | Dato | Valor |
 | --- | --- |
 | Rama | `fix/059-060-proveedores` |
-| Commit del sello | _pendiente de rellenar tras el commit_ |
-| Re-anclaje del pin | _pendiente_ |
+| Commit del sello | `bbc6e9a3` (`feat(ui)`: Configuración por ámbito, espacio de trabajo y bump `2.11.173-beta`) |
+| Re-anclaje del pin | `9a78606a` (`chore(window)`; `appsHash 9d3d4356…`, `packagesHash 3df714c5…`) |
 | Tag | `v2.88.173-beta` (anotado) |
 | Runs de CI | _pendiente de medir_ |
 
