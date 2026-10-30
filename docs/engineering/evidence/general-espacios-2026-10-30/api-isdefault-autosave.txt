@@ -1,0 +1,19 @@
+﻿Verificación en vivo contra la API local (sin tocar el documento del espacio).
+
+1) Desactivar 'Autoguardado' en el gestor (WS-D3):
+   antes  => isDefault=True  autoSave=True
+   despues => isDefault=True  autoSave=False   (se persiste de inmediato: antes no se guardaba)
+
+2) Desmarcar 'Preferido al arrancar' (WS-D2):
+   despues => isDefault=False  document.preferences.openOnStartup=True (campo legado intacto)
+
+3) Pulsar 'Guardar actual' (WS-D2: la estrella no debe saltar):
+   despues => isDefault=False  (el PUT generico ya no envia isDefault)
+
+4) Volver a marcar 'Preferido' con clic real:
+   despues => isDefault=True
+
+5) Restauracion final del estado del operador:
+   isDefault=True  autoSave=True
+
+GET /api/workspaces y GET /api/workspaces/{id} usados como fuente de verdad.

@@ -1,7 +1,8 @@
 # Premisa — Preferencias UI en `localStorage`
 
 > **Premisa de producto (jul 2026).** Aplica a **toda** la app web.  
-> Complementa [WORKSPACE_PERSISTENCE.md](./WORKSPACE_PERSISTENCE.md), [UI_PLATFORM.md](./UI_PLATFORM.md) y [RESPONSIVE_PREMISES.md](./RESPONSIVE_PREMISES.md).
+> Complementa [WORKSPACE_PERSISTENCE.md](./WORKSPACE_PERSISTENCE.md), [UI_PLATFORM.md](./UI_PLATFORM.md) y [RESPONSIVE_PREMISES.md](./RESPONSIVE_PREMISES.md).  
+> **Oct 2026:** tema y densidad salen a `bolsa-ui-prefs-v1` (§3b) al dejar de compartir clave con la sesión de dibujo.
 
 ---
 
@@ -33,7 +34,10 @@
 
 | Ámbito                                                     | Clave / store                                                                                                                                                                                     |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dock Trading                                               | `bolsa-trading-layout-v1` (listas/ops/operativa open · anchos · alturas de sección Operativa)                                                                                                     |
+| Tema de UI                                                 | `bolsa-ui-prefs-v1` → `uiTheme`: `dark` \| `light` \| `system` (default `dark`) — ver §3b                                                                                                          |
+| Densidad de UI                                             | `bolsa-ui-prefs-v1` → `uiDensity`: `comfortable` \| `compact` (default `comfortable`)                                                                                                              |
+| Herramienta de dibujo + último por grupo                   | `bolsa-chart-draw-tool-session` (`chartDrawTool`, `lastDrawToolByGroup`) — **no** guarda tema/densidad                                                                                             |
+| Dock Trading                                               | `bolsa-trading-layout-v1` (listas/ops/operativa open · anchos · alturas de sección Operativa · `namedLayoutId`)                                                                                    |
 | Libro operativo DEMO (MANUAL/SEMI)                         | `bolsa-demo-book-prefs-v1`                                                                                                                                                                        |
 | Mercado Decision Surface (panel vs gráfico)                | `bolsa-mercado-decision-surface-v1` (`placement`: `panel` \| `chart`, default `panel`)                                                                                                            |
 | Barra de estado Trading (métricas + icono servidores)      | `bolsa-status-bar-prefs-v1` (`visibleItems`: métricas de la cuenta · `showProviderHealth`: icono de servidores de datos en el rail derecho, configurable desde el engranaje de la barra)             |
@@ -55,6 +59,20 @@
 | CORE-R informe Lista AUTO                                  | `bolsa-core-r-report-v1` (juicio post-settle; fuente de Encolar) · sync BD                                                                                                                        |
 | Inbox alarmas Tracker                                      | `bolsa-tracker-alarm-inbox-v1`                                                                                                                                                                    |
 | Preferencias de trade / cuenta activa                      | `bolsa-trade-preferences`, `bolsa-active-account`                                                                                                                                                 |
+
+---
+
+## 3b. Tema y densidad: clave propia (oct 2026)
+
+```
+bolsa-ui-prefs-v1 = { state: { uiTheme, uiDensity }, version: 0 }
+```
+
+`useUiStore` persiste **solo** esos dos campos (`partialize`). Antes vivían en `bolsa-chart-draw-tool-session`, la misma clave que `writeDrawToolSessionLocal` reescribe al elegir herramienta de dibujo: el tema desaparecía del `localStorage` y al recargar volvía el oscuro.
+
+- La herramienta de dibujo se sigue guardando en `bolsa-chart-draw-tool-session` y se restaura en el bootstrap del espacio (`applyLocalDrawToolSession`), no vía `persist`.
+- **Migración de una vez:** si `bolsa-ui-prefs-v1` no existe, `merge` lee `state.uiTheme` / `state.uiDensity` del blob antiguo. Si la clave nueva existe, gana siempre.
+- Regresión cubierta por `apps/web/src/stores/ui-store-persistence.test.ts` (incluye reescribir la clave legacy y comprobar que el tema sobrevive).
 
 ---
 

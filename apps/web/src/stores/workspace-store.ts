@@ -48,6 +48,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         isDirty: false,
         isSaving: false,
         recents: [],
+        loadError: null,
       };
       return {
         ...initial,

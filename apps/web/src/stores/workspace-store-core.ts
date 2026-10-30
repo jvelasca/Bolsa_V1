@@ -363,6 +363,38 @@ export function chartPersistBackupFrom(
 
 export const WORKSPACE_META_KEY = "bolsa-workspace-meta";
 
+/**
+ * Backup local que corresponde al espacio dado.
+ *
+ * El backup no guarda id de espacio: si no se reescribe al cambiar de espacio,
+ * el bootstrap siguiente fusiona el del espacio anterior y pueden reaparecer
+ * pestañas y dibujos ajenos.
+ */
+export function workspaceBackupPatch(
+  activeWorkspaceId: string | null,
+  recents: string[],
+  workspace: WorkspaceDocument,
+): Partial<WorkspaceState> {
+  const backup = chartPersistBackupFrom(workspace);
+  writeChartPersistBackupSync(activeWorkspaceId, recents, backup);
+  return { chartPersistBackup: backup };
+}
+
+/** Nombre libre para una copia: `X (copia)`, `X (copia 2)`, … */
+export function nextCopyName(
+  baseName: string,
+  existingNames: ReadonlyArray<string>,
+): string {
+  const root =
+    baseName.replace(/\s*\(copia(?:\s+\d+)?\)\s*$/i, "").trim() || baseName;
+  const taken = new Set(existingNames.map((name) => name.trim().toLowerCase()));
+  const first = `${root} (copia)`;
+  if (!taken.has(first.toLowerCase())) return first;
+  let index = 2;
+  while (taken.has(`${root} (copia ${index})`.toLowerCase())) index += 1;
+  return `${root} (copia ${index})`;
+}
+
 export function writeChartPersistBackupSync(
   activeWorkspaceId: string | null,
   recents: string[],
@@ -831,6 +863,8 @@ export interface WorkspaceState {
   isDirty: boolean;
   isSaving: boolean;
   recents: string[];
+  /** Motivo si la carga del catálogo falló (el gestor muestra reintento). */
+  loadError: string | null;
   getActiveChartTab: () => ChartTabState | null;
   /**
    * Carga inicial: lista API → elige activo local / preferido / primero;
@@ -838,7 +872,7 @@ export interface WorkspaceState {
    */
   bootstrapWorkspaces: () => Promise<void>;
   refreshSummaries: () => Promise<void>;
-  /** PUT del documento activo (nombre, document, dockLayout, isDefault). */
+  /** PUT del documento activo (nombre, document, dockLayout). No toca `isDefault`. */
   saveToServer: () => Promise<void>;
   requestAutoSave: (immediate?: boolean) => void;
   syncWorkspaceFromServer: () => Promise<void>;
@@ -874,10 +908,11 @@ export interface WorkspaceState {
   reload: () => void;
   setAutoSave: (enabled: boolean) => void;
   /**
-   * Marca el espacio como preferido al arrancar (`isDefault` en el próximo save).
-   * Solo actúa si este dispositivo no tiene `activeWorkspaceId` válido.
+   * Marca (o desmarca) este espacio como preferido al arrancar.
+   * Persiste `is_default` en el servidor de inmediato: es la única autoridad,
+   * no se deriva de `preferences.openOnStartup` al guardar.
    */
-  setOpenOnStartup: (enabled: boolean) => void;
+  setPreferred: (enabled: boolean) => Promise<void>;
   toggleNewChartTemplatePin: () => void;
   openChartTab: (instrumentId: string, label: string) => string;
   focusInstrumentFromList: (
@@ -1125,12 +1160,21 @@ export function downloadJson(filename: string, data: unknown) {
 export function applyServerWorkspace(record: {
   id: string;
   name: string;
+  isDefault?: boolean;
   document: WorkspaceDocument;
   dockLayout: TradingDockLayoutPrefs | null;
 }): Pick<WorkspaceState, "workspace" | "activeWorkspaceId" | "isDirty"> {
   const workspace = normalizeWorkspace(record.document);
   workspace.id = record.id;
   workspace.name = record.name;
+  // Autoridad del «preferido al arrancar» = `is_default` del servidor.
+  // `preferences.openOnStartup` se mantiene en el documento por compatibilidad.
+  if (typeof record.isDefault === "boolean") {
+    workspace.preferences = {
+      ...workspace.preferences,
+      openOnStartup: record.isDefault,
+    };
+  }
   // dockLayout del servidor se ignora: paneles = localStorage por dispositivo.
   void record.dockLayout;
   return { workspace, activeWorkspaceId: record.id, isDirty: false };

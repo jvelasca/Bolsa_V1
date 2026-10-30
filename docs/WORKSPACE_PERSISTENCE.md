@@ -15,12 +15,23 @@
 | Arrancar app | Carga `activeWorkspaceId` local → si no, espacio `isDefault` (preferido) → si no, el primero |
 | Chip barra superior | Abre gestor de espacios |
 | Nuevo (blanco) | Documento vacío (`DEFAULT_WORKSPACE`) |
-| Duplicar activo | Clona documento + dock del espacio actual con nuevo nombre |
-| Preferido al arrancar | Marca `isDefault` en servidor (reserva si no hay último activo) |
-| Autoguardado | Debounce ~1 s al servidor |
+| Duplicar activo | Clona documento + dock del espacio actual con nombre libre (`(copia)`, `(copia 2)`, …) |
+| Preferido al arrancar | `PUT { isDefault }` inmediato (reserva si no hay último activo local) |
+| Autoguardado | Debounce ~1 s al servidor; apagarlo también se guarda al momento |
 
 Cabecera derecha (orden): **chip espacio** · Ayuda · Config · **sesión**.  
 Guardar: autoguardado + «Guardar actual» en el gestor. Exportar JSON también en el gestor. Sin menú ⋯ ni botón Guardar suelto.
+
+### 0b. Reparto de superficies (oct 2026)
+
+`Configuración → General` y el gestor de espacios no se solapan:
+
+| Superficie | Qué contiene |
+|------------|--------------|
+| **General** | `Tema` y `Densidad de UI` (app/dispositivo), toggle **Panel/Gráfico** del HUD Mercado (dispositivo) y un **resumen de solo lectura** del espacio activo + botón «Gestionar espacios…» |
+| **Gestor de espacios** (única superficie de edición del espacio) | Catálogo (cambiar / renombrar / borrar) · preferencias de servidor (autoguardado, preferido, plantilla de gráficos nuevos) · chrome del dispositivo (diseño de Mercado, restablecer paneles) · nuevo/duplicar/exportar/guardar |
+
+Motivo: `Tema` y `Densidad` son globales por dispositivo; si vivieran en el espacio el usuario creería que cambian al cambiar de espacio. `Diseño de Mercado` y `Restablecer paneles` sí son chrome del espacio, aunque por dispositivo.
 
 ---
 
@@ -31,8 +42,10 @@ Guardar: autoguardado + «Guardar actual» en el gestor. Exportar JSON también 
 | **Servidor** | `PUT /api/workspaces/:id` | Documento (`WorkspaceDocument`). `dockLayout` en API es legado (no se aplica al cargar) |
 | **Backup local** | `bolsa-workspace-meta` → `chartPersistBackup` | Gráficos, listas, barras, inspector, snapshots de dibujos |
 | **Metadatos locales** | `bolsa-workspace-meta` | `activeWorkspaceId`, `recents` |
-| **Dock (por dispositivo)** | `bolsa-trading-layout-v1` | Abierto/ancho watchlist y operaciones |
+| **Dock (por dispositivo)** | `bolsa-trading-layout-v1` | Abierto/ancho watchlist y operaciones, `namedLayoutId` |
 | **Anchos columnas (por dispositivo)** | `bolsa-list-chrome-layout-v1` | Anchos Valores/Hub + columnas de acciones |
+| **Tema / densidad (por dispositivo)** | `bolsa-ui-prefs-v1` | Solo `uiTheme` y `uiDensity` — ver [UI_PREFS_LOCALSTORAGE.md](./UI_PREFS_LOCALSTORAGE.md) |
+| **Sesión de dibujo** | `bolsa-chart-draw-tool-session` | `chartDrawTool` + `lastDrawToolByGroup` (comparte prefijo pero **no** claves con la UI) |
 
 El servidor es la **fuente de verdad del contenido** del espacio (gráficos, listas, orden/visibilidad de columnas, dibujos…).  
 El **chrome de layout** (tamaños de paneles y anchos de columna) es **por dispositivo** (`localStorage`): escritorio y portátil no se pisan al cambiar de PC.
@@ -125,6 +138,29 @@ beforeunload / pagehide → flushWorkspaceOnUnload (keepalive al servidor + back
 
 Los diálogos ⚙ llaman `save()` al confirmar (guardado inmediato al servidor).
 
+### 3b. Semántica de `isDefault` (oct 2026)
+
+`is_default` es la **única** autoridad del «preferido al arrancar».
+
+| Camino | ¿Envía `isDefault`? |
+|--------|---------------------|
+| `saveToServer` (autoguardado, «Guardar actual», `setAutoSave`) | **No** |
+| `flushWorkspaceOnUnload` (keepalive) | **No** |
+| `setPreferred(enabled)` (checkbox del gestor) | **Sí**: `PUT { isDefault }` y refresca el catálogo |
+| `applyServerWorkspace` (bootstrap / cambiar / recargar / borrar) | — lo **lee** y fija `preferences.openOnStartup` |
+
+Antes cada guardado enviaba `isDefault: preferences.openOnStartup` (default `true`), así que la estrella saltaba al último espacio guardado. `preferences.openOnStartup` sigue en el documento por compatibilidad, pero ya no decide nada en la UI.
+
+En el servidor, `WorkspaceRepository.update` solo toca `is_default` cuando el campo llega en el body, así que un guardado normal nunca lo desmarca.
+
+### 3c. Exportar JSON ≠ guardar
+
+`exportJson` serializa `prepareWorkspaceForSave(workspace)` pero **no** limpia `isDirty`: exportar no cambia el estado del servidor, y marcar el espacio como limpio permitía que el siguiente pull pisara cambios sin guardar.
+
+### 3d. Cambio de espacio y backup local
+
+`chartPersistBackup` no guarda id de espacio. Al cambiar/crear/duplicar/recargar/borrar se reescribe con el documento nuevo (`workspaceBackupPatch` + `writeChartPersistBackupSync`); sin eso, el bootstrap siguiente fusionaba pestañas y dibujos del espacio anterior. Al borrar también se purga el id de `recents`.
+
 ---
 
 ## 4. Arranque (bootstrap)
@@ -184,8 +220,13 @@ Ayuda en app: **Ayuda → Watchlist (Listas / Valores)**.
 8. Inspector abierto/cerrado → recargar → debe recordar el último estado.
 9. Abrir valor desde lista, añadir indicadores/dibujos, cerrar pestaña, recargar → **no** debe reaparecer la pestaña ni su estado.
 10. Reabrir el mismo valor tras cerrar → gráfico limpio o heredado según conmutador «Nuevo», sin restaurar la sesión anterior.
-11. Chip superior → gestor → **Nuevo (blanco)** → sin pestañas del anterior; **Duplicar activo** → misma configuración con otro nombre.
+11. Chip superior → gestor → **Nuevo (blanco)** → sin pestañas del anterior; **Duplicar activo** → misma configuración con otro nombre (`(copia 2)`, `(copia 3)` si repites).
 12. Cerrar app y reabrir → se restaura el último espacio activo (no el «preferido», salvo que no haya activo local).
+13. **Autoguardado** en el gestor: desactivarlo → recargar → sigue desactivado (se persiste al momento).
+14. **Preferido al arrancar**: marcarlo en el espacio A, guardar el espacio B → la estrella sigue en A.
+15. **Exportar JSON**: con cambios sin guardar, descargar → el punto ámbar (`isDirty`) permanece.
+16. Cambiar de espacio → no reaparecen pestañas ni dibujos del espacio anterior al recargar.
+17. **Tema**: Claro → cambiar de herramienta de dibujo → recargar → sigue Claro (el tema ya no comparte clave con la sesión de dibujo).
 
 ---
 
@@ -194,7 +235,11 @@ Ayuda en app: **Ayuda → Watchlist (Listas / Valores)**.
 | Archivo | Rol |
 |---------|-----|
 | `apps/web/src/stores/workspace-store.ts` | Store, bootstrap, create/duplicate/rename, save |
+| `apps/web/src/stores/workspace-store-core.ts` | `applyServerWorkspace`, `nextCopyName`, `workspaceBackupPatch`, payloads |
+| `apps/web/src/stores/workspace-slice-account.ts` | Acciones de espacio (`setPreferred`, `setAutoSave`, `exportJson`, borrado) |
 | `apps/web/src/features/workspace/workspace-picker-dialog.tsx` | Gestor UI (chip / Config → General) |
+| `apps/web/src/features/settings/general-settings-section.tsx` | General por ámbitos + resumen del espacio |
+| `apps/web/src/components/ui/dialog.tsx` | `Dialog` (título con `useId`, pila de Escape) + `DialogTabs` accesibles |
 | `apps/web/src/components/layout/app-top-bar.tsx` | Chip + Guardar + ⋯ |
 | `apps/web/src/lib/chart-list-snapshot.ts` | `mergeWorkspaceChartState`, `mergeListConfig` |
 | `apps/web/src/lib/workspace-payload.ts` | Payload API |

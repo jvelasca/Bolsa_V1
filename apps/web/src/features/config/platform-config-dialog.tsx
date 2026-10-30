@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -42,7 +43,21 @@ function AccountSettingsCard() {
   const openWizard = useUiStore((s) => s.openCreateAccountWizard);
   const { account, effectiveAccountId, accounts } = useActiveAccount();
   const activate = useActivateAccount();
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const openAccounts = accounts.filter((a) => a.status === "active");
+
+  async function handleActivate(id: string) {
+    setSwitchError(null);
+    try {
+      await activate.mutateAsync(id);
+    } catch (err) {
+      setSwitchError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo registrar la cuenta activa en el servidor",
+      );
+    }
+  }
 
   return (
     <Card>
@@ -61,7 +76,7 @@ function AccountSettingsCard() {
             disabled={activate.isPending || openAccounts.length === 0}
             onChange={(e) => {
               const id = e.target.value;
-              if (id) void activate.mutateAsync(id);
+              if (id) void handleActivate(id);
             }}
             className="rounded-md border border-border bg-background px-3 py-2"
           >
@@ -71,7 +86,18 @@ function AccountSettingsCard() {
               </option>
             ))}
           </select>
+          <span className="text-[11px] text-muted-foreground">
+            Cambiar aquí cambia la cuenta de toda la app, no solo de esta
+            pestaña.
+          </span>
         </label>
+
+        {switchError && (
+          <p role="alert" className="text-xs text-destructive">
+            Cuenta cambiada en este dispositivo, pero el servidor no la
+            registró: {switchError}
+          </p>
+        )}
 
         {account && (
           <div className="rounded-md border border-border bg-muted/20 p-3 text-xs">
@@ -352,14 +378,6 @@ function ConfigTabPanel({ tab }: { tab: PlatformConfigTab }) {
             </p>
             <MarketProvidersStatusCard />
           </div>
-        </div>
-      );
-    case "sounds":
-      // Tab reservado (aún sin UI)
-      return (
-        <div className="space-y-4">
-          <AccountSettingsCard />
-          <GeneralSettingsSection compact />
         </div>
       );
     default:

@@ -14,7 +14,7 @@ Complementa [UI_PLATFORM.md](./UI_PLATFORM.md), [CHART_RESPONSIVE.md](./CHART_RE
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │  PLATAFORMA          Top bar → Configuración                     │
-│  cuenta, sync, Perfil inversor (RFC-008), atajos, sonidos…       │
+│  cuenta, sync, Perfil inversor (RFC-008), atajos, General…       │
 └──────────────────────────────────────────────────────────────────┘
 ┌──────────────────────────────────────────────────────────────────┐
 │  BARRA GLOBAL        ⚙ → solo barra global del workspace         │
@@ -34,6 +34,23 @@ Complementa [UI_PLATFORM.md](./UI_PLATFORM.md), [CHART_RESPONSIVE.md](./CHART_RE
 ```
 
 **Inline (estrella)** en Escala / Estilo / Valor / Cursor = configuración **frecuente** de favoritos; no sustituye al ⚙ de la barra de datos, lo complementa.
+
+### 1b. Ámbitos de Configuración → General (oct 2026)
+
+La pestaña **General** se organiza por **dónde se guarda** cada preferencia, y el espacio de trabajo se edita en su propio gestor:
+
+| Ámbito | Pestaña / superficie | Dónde vive | Ejemplos |
+|--------|----------------------|------------|----------|
+| App y dispositivo | General → **Apariencia** | `localStorage` `bolsa-ui-prefs-v1` | Tema (`dark`/`light`/`system`), densidad (`comfortable`/`compact`) |
+| App y dispositivo | General → **Mercado** | `localStorage` `bolsa-mercado-decision-surface-v1` | HUD del estado operativo: en panel vs en gráfico |
+| Chrome del espacio, por dispositivo | **Gestor de espacios** → «Diseño en este dispositivo» | `localStorage` `bolsa-trading-layout-v1` | Diseño de Mercado (Simple/Trader/Analista), restablecer paneles |
+| Documento del espacio | **Gestor de espacios** → «Preferencias del espacio activo» | Servidor `PUT /api/workspaces/:id` | Autoguardado, preferido al arrancar (`is_default`), plantilla de gráficos nuevos |
+| Documento del espacio | **Gestor de espacios** → catálogo | Servidor `/api/workspaces` | Gráficos abiertos, listas, dibujos, plantillas de indicadores |
+| Cuenta | General → **Cuenta activa** / Perfil / Comisiones y fiscal | Servidor + sesión local | Cuenta activa de toda la app, perfil inversor, comisiones |
+
+`General` mantiene además un **resumen de solo lectura** del espacio activo (nombre, gráficos abiertos, listas, autoguardado, preferido, última modificación) con el botón «Gestionar espacios…».
+
+Retirado: el `case "sounds"` del panel de configuración (no estaba en `TABS` y solo re-renderizaba General).
 
 ---
 

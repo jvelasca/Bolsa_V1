@@ -2,6 +2,65 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.173-beta] — **la configuración se ordena por ámbito y el espacio de trabajo deja de falsear su estado** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `060_provider_check_policy` · UI-only**)
+
+**Naturaleza:** sello **UI-only** posterior a `2.11.172-beta`. No cambia ninguna regla, indicador,
+umbral, peso ni sizing (**`Δ motor = 0`**), no se decide distinto (**`Δ decisión = 0`**) y el contrato
+HTTP no se mueve (**`Δ contrato HTTP = 0`**; `contract:check` **OK**, sin `contract:gen`). **SIN
+migración** (`head` sigue `060_provider_check_policy`). **Bump** `2.11.172-beta` → `2.11.173-beta`
+(+ los **13** `meta.bump`; `test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de
+`v2_87` no se toca). **Publicación:** rama + **tag anotado `v2.88.173-beta`**, con `Release tag CI`.
+
+**W-173-1 · el defecto de fondo: dos ámbitos mezclados en una sola pestaña.** «General» presentaba
+como una sola cosa la **apariencia del dispositivo** (tema y densidad), la **colocación de la
+superficie de decisión** y las **preferencias del espacio de trabajo** (autoSave, espacio preferido,
+plantilla de gráfico). Peor: el tema y la densidad se persistían dentro de la clave de la **sesión de
+dibujo** (`bolsa-chart-draw-tool-session`), de modo que cambiar de tema reescribía un estado que no le
+pertenece y la preferencia se perdía si esa clave se limpiaba. La pestaña queda en tres bloques
+—**Apariencia**, **Mercado** y **Espacio de trabajo** (resumen de solo lectura + «Gestionar
+espacios…»)— y cada dato vive en la superficie que le corresponde:
+
+| Superficie | Clave / dueño | Qué guarda |
+| --- | --- | --- |
+| App / dispositivo | `bolsa-ui-prefs-v1` (`localStorage`) | `uiTheme`, `uiDensity` (migra el valor legado de la sesión de dibujo) |
+| Mercado | `bolsa-mercado-decision-surface-v1` (`localStorage`) | colocación de la superficie de decisión |
+| Chrome del espacio | `bolsa-trading-layout-v1` (`localStorage`) | `namedLayoutId`, reset de paneles |
+| Documento y preferencias | PostgreSQL (`/api/workspaces`) | contenido, `autoSave`, `is_default`, `newChartTemplateChartId` |
+
+**W-173-2 · el modal del espacio deja de confundir «guardado» con «guardado en el servidor».** Se
+separa en catálogo, **preferencias del servidor**, **diseño del dispositivo** y acciones de pie. Los
+defectos cerrados, uno a uno:
+
+| # | Defecto | Cierre |
+| --- | --- | --- |
+| `WS-D1` | `exportJson` limpiaba `isDirty` | exporta con `prepareWorkspaceForSave` y **no** toca el flag |
+| `WS-D2` | `saveToServer`/`flushWorkspaceOnUnload` enviaban `isDefault` | solo `setPreferred(enabled)` cambia `is_default` |
+| `WS-D3` | `setAutoSave` no guardaba al cambiar | guarda de inmediato (`saveToServer`) |
+| `WS-D4` | el backup del gráfico sobrevivía al cambio de espacio | `workspaceBackupPatch` lo reescribe al cambiar/crear/duplicar/recargar; el borrado purga `recents` |
+| `WS-D5` | nombres de copia duplicados | `nextCopyName(name, summaries)` |
+| `WS-D6` | dos checkboxes duplicados en General | resumen de solo lectura, una sola fuente de escritura |
+| `WS-D7` | `Escape` cerraba todos los modales anidados | pila de diálogos (`pushDialog`/`popDialog`) |
+| `WS-D8` | `id` de título repetido | `useId()` en `aria-labelledby` |
+| `WS-D9` | error de carga indistinguible de lista vacía | estado `loadError` + reintento |
+| `WS-D10` | el fallo de activación de cuenta no se mostraba | error en `role="alert"` |
+| `WS-D11` | tema/densidad en la clave de dibujo | `bolsa-ui-prefs-v1` con migración |
+
+**W-173-3 · accesibilidad de las primitivas.** `DialogTabs` gana `role="tablist"`/`role="tab"`,
+`aria-selected`, `tabIndex` móvil y navegación con flechas/`Home`/`End`; el `Escape` de un modal
+anidado ya no cierra la pila entera.
+
+**W-173-4 · verificación.** `tsc -b --noEmit` **OK** · `eslint` **0 errores** (23 avisos
+preexistentes) · área nueva **4 archivos / 32 tests** verdes · `contract:check` **OK** ·
+`test_dia_d_bump_guard` **2 passed**. La suite completa del frontend y los jobs de CI los mide el
+**CI de la rama y del tag**; la evidencia viva está en
+[`evidence/v2.88.173/`](./docs/engineering/evidence/v2.88.173/README.md) y el seguimiento en
+[`seguimiento-ui-general-espacios-2026-10-30.md`](./docs/engineering/seguimiento-ui-general-espacios-2026-10-30.md).
+
+**W-173-5 · lo que este sello NO hace.** No toca el motor, ni la decisión, ni el contrato; no
+reorganiza la página `/fiscal` ni las cuentas (ese trabajo sigue **sin commitear** y **fuera** de este
+sello); no añade workspace multiusuario ni sincronización en la nube del *chrome* (el `namedLayoutId`
+sigue siendo del dispositivo, por diseño).
+
 ## [2.11.172-beta] — **la ventana BD deja de ser solo informativa: una acción, con cerrojo y auditoría** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · contrato HTTP ADITIVO · SIN migración · head `060_provider_check_policy`**)
 
 **Naturaleza:** sello de **funcionalidad de mantenimiento** posterior a `2.11.171-beta`. Responde a la

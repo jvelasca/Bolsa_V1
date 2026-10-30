@@ -25,6 +25,8 @@ import {
   downloadJson,
   applyLocalDrawToolFavorites,
   applyLocalDrawToolSession,
+  nextCopyName,
+  workspaceBackupPatch,
 } from "./workspace-store-core";
 
 let saveQueued = false;
@@ -55,10 +57,17 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
             updatedAt: created.data.updatedAt,
           },
         ];
+        const applied = applyServerWorkspace(created.data);
         set({
-          ...applyServerWorkspace(created.data),
+          ...applied,
+          ...workspaceBackupPatch(
+            applied.activeWorkspaceId,
+            get().recents,
+            applied.workspace,
+          ),
           workspaceSummaries: summaries,
           hydrated: true,
+          loadError: null,
         });
         return;
       }
@@ -97,10 +106,13 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
         workspaceSummaries: summaries,
         hydrated: true,
         isDirty: backupWasNewer,
+        loadError: null,
       });
     } catch (err) {
       const legacyDoc = readLegacyWorkspaceFromStorage();
       const backup = get().chartPersistBackup;
+      const loadError =
+        err instanceof Error ? err.message : "No se pudo cargar el espacio";
       if (legacyDoc) {
         let workspace = normalizeWorkspace(legacyDoc);
         if (backup) {
@@ -114,6 +126,7 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
           chartPersistBackup: chartPersistBackupFrom(workspace),
           hydrated: true,
           isDirty: true,
+          loadError,
         });
       } else if (backup) {
         const backupDoc = buildBackupWorkspaceDoc(backup);
@@ -122,9 +135,10 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
           chartPersistBackup: chartPersistBackupFrom(backupDoc),
           hydrated: true,
           isDirty: true,
+          loadError,
         });
       } else {
-        set({ hydrated: true });
+        set({ hydrated: true, loadError });
       }
       if (err instanceof ApiError) {
         console.warn("Workspace bootstrap:", err.message);
@@ -160,7 +174,6 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
         name: prepared.name,
         document: payload.document,
         dockLayout: payload.dockLayout,
-        isDefault: prepared.preferences.openOnStartup,
       });
       const live = get().workspace;
       // Autoridad post-PUT = pestañas vivas ahora. No reinyectar `prepared`
@@ -212,7 +225,6 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
       name: prepared.name,
       document: payload.document,
       dockLayout: payload.dockLayout,
-      isDefault: prepared.preferences.openOnStartup,
     });
   },
   syncWorkspaceFromServer: async () => {
@@ -264,12 +276,20 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
       return;
     }
     const detail = await api.getWorkspace(workspaceId);
+    const applied = applyServerWorkspace(detail.data);
+    const recents = [
+      workspaceId,
+      ...get().recents.filter((id) => id !== workspaceId),
+    ].slice(0, 8);
     set({
-      ...applyServerWorkspace(detail.data),
-      recents: [
-        workspaceId,
-        ...get().recents.filter((id) => id !== workspaceId),
-      ].slice(0, 8),
+      ...applied,
+      ...workspaceBackupPatch(
+        applied.activeWorkspaceId,
+        recents,
+        applied.workspace,
+      ),
+      recents,
+      loadError: null,
     });
   },
   createWorkspace: async (name) => {
@@ -280,8 +300,14 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
       document: payload.document,
       dockLayout: payload.dockLayout,
     });
+    const applied = applyServerWorkspace(created.data);
     set({
-      ...applyServerWorkspace(created.data),
+      ...applied,
+      ...workspaceBackupPatch(
+        applied.activeWorkspaceId,
+        get().recents,
+        applied.workspace,
+      ),
       isDirty: false,
     });
     await get().refreshSummaries();
@@ -290,7 +316,10 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
     const prepared = prepareWorkspaceForSave(get().workspace);
     const newName =
       name?.trim() ||
-      `${prepared.name.replace(/\s*\(copia(?:\s+\d+)?\)\s*$/i, "").trim()} (copia)`;
+      nextCopyName(
+        prepared.name,
+        get().workspaceSummaries.map((item) => item.name),
+      );
     const cloneDoc = normalizeWorkspace({
       ...prepared,
       name: newName,
@@ -303,13 +332,20 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
       dockLayout: payload.dockLayout,
       isDefault: false,
     });
+    const applied = applyServerWorkspace(created.data);
+    const recents = [
+      created.data.id,
+      ...get().recents.filter((id) => id !== created.data.id),
+    ].slice(0, 8);
     set({
-      ...applyServerWorkspace(created.data),
+      ...applied,
+      ...workspaceBackupPatch(
+        applied.activeWorkspaceId,
+        recents,
+        applied.workspace,
+      ),
       isDirty: false,
-      recents: [
-        created.data.id,
-        ...get().recents.filter((id) => id !== created.data.id),
-      ].slice(0, 8),
+      recents,
     });
     await get().refreshSummaries();
   },
@@ -342,18 +378,36 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
       return;
     }
     const detail = await api.getWorkspace(id);
+    const applied = applyServerWorkspace(detail.data);
     set({
-      ...applyServerWorkspace(detail.data),
+      ...applied,
+      ...workspaceBackupPatch(
+        applied.activeWorkspaceId,
+        get().recents,
+        applied.workspace,
+      ),
       isDirty: false,
     });
   },
   deleteWorkspaceById: async (workspaceId) => {
     await api.deleteWorkspace(workspaceId);
+    // Un id borrado no puede seguir en `recents` (el bootstrap lo ignoraría,
+    // pero ensucia el orden de arranque).
+    const recents = get().recents.filter((id) => id !== workspaceId);
+    set({ recents });
     await get().refreshSummaries();
     const { activeWorkspaceId } = get();
     if (workspaceId === activeWorkspaceId) {
       const defaultWs = await api.getDefaultWorkspace();
-      set(applyServerWorkspace(defaultWs.data));
+      const applied = applyServerWorkspace(defaultWs.data);
+      set({
+        ...applied,
+        ...workspaceBackupPatch(
+          applied.activeWorkspaceId,
+          recents,
+          applied.workspace,
+        ),
+      });
     }
   },
   rename: (name) =>
@@ -379,32 +433,40 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
   },
   exportJson: () => {
     const { workspace } = get();
+    // Exportar NO es guardar: el punto ámbar debe seguir visible para que un
+    // pull del servidor no pise cambios sin guardar.
     downloadJson(
       `${workspace.name.replace(/\s+/g, "-").toLowerCase()}.bolsa-workspace.json`,
-      workspace,
+      prepareWorkspaceForSave(workspace),
     );
-    set({ isDirty: false });
   },
   reload: () => {
     void get().reloadActiveFromServer();
   },
-  setAutoSave: (enabled) =>
+  setAutoSave: (enabled) => {
     set((state) => ({
       workspace: {
         ...state.workspace,
         preferences: { ...state.workspace.preferences, autoSave: enabled },
       },
       isDirty: true,
-    })),
-  setOpenOnStartup: (enabled) =>
+    }));
+    // Es una acción explícita: se persiste aunque se acabe de apagar el
+    // autoguardado (el debounce lo ignora justo en ese caso).
+    void get().saveToServer();
+  },
+  setPreferred: async (enabled) => {
+    const id = get().activeWorkspaceId;
+    if (!id) return;
+    await api.updateWorkspace(id, { isDefault: enabled });
+    // Solo el flag de arranque: no tocamos `isDirty` para no ocultar cambios
+    // reales del documento que siguen sin guardar.
     set((state) => ({
       workspace: {
         ...state.workspace,
-        preferences: {
-          ...state.workspace.preferences,
-          openOnStartup: enabled,
-        },
+        preferences: { ...state.workspace.preferences, openOnStartup: enabled },
       },
-      isDirty: true,
-    })),
+    }));
+    await get().refreshSummaries();
+  },
 });
