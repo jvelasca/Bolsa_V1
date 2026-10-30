@@ -29,10 +29,26 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync
+        # --frozen: el lock es la única fuente de verdad. Un `uv sync` sin `--frozen`
+        # re-resuelve y puede cambiar la versión de Ruff (y con ella, las reglas)
+        # sin que nadie toque el manifiesto.
+        run: uv sync --frozen
+
+      - name: Ruff version guard
+        # El pin `ruff==0.16.2` debe ser lo que resuelve el lock. Si no, el step Ruff
+        # mediría con otro motor y el verde dejaría de ser reproducible.
+        run: |
+          actual="$(uv run ruff --version)"
+          echo "ruff resuelto: ${actual}"
+          test "${actual}" = "ruff 0.16.2" || {
+            echo "::error::se esperaba 'ruff 0.16.2' (pin de pyproject/uv.lock); obtenido '${actual}'"
+            exit 1
+          }
 
       - name: Ruff
         # Root pyproject select (E/F/I/UP/B); package pyprojects lack lint.select.
+        # `--config` explícito: sin él, al recibir directorios Ruff no resuelve el
+        # pyproject raíz y pierde `known-first-party` (cientos de I001 falsos).
         run: uv run ruff check packages/py apps/api-python --config pyproject.toml
 
       - name: Import-linter

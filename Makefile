@@ -7,8 +7,11 @@ dev-api:
 	cd apps/api-python && uv run bolsa-api
 
 lint:
-	uv run ruff check packages/py apps/api-python
-	uv run ruff format --check packages/py apps/api-python
+	# --config explícito: sin él, ruff NO encuentra el pyproject raíz al recibir
+	# directorios y pierde `known-first-party`, reportando cientos de I001 falsos
+	# (medido: 2 reales con --config frente a 828 sin él en el árbol integrado).
+	uv run ruff check --config pyproject.toml packages/py apps/api-python
+	uv run ruff format --check --config pyproject.toml packages/py apps/api-python
 
 typecheck:
 	uv run mypy packages/py/domain/src packages/py/market/src packages/py/infrastructure/src apps/api-python/src
