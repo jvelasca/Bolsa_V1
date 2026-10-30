@@ -15,6 +15,7 @@ import pytest
 
 from bolsa_application.database_maintenance import GetDatabaseMaintenance
 from bolsa_infrastructure.database.backup_inventory import BackupInventoryAdapter
+from bolsa_infrastructure.database.migrations import alembic_head
 from bolsa_infrastructure.database.schema_contract import SchemaContractAdapter
 from tests._estudio_pg_helpers import make_pg_session_factory, require_or_skip
 
@@ -22,7 +23,9 @@ if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 _REQUIRED_ENV = "DATABASE_MAINTENANCE_PG_REQUIRED"
-_EXPECTED_HEAD = "061_profile_delete_restrict"
+# Derivada del filesystem de migraciones (no hardcodeada): la doctrina de
+# ``alembic_head`` evita que cada revisión nueva rompa este gate sin que sea un defecto.
+_EXPECTED_HEAD = alembic_head()
 
 
 class _DeadSession:

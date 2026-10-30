@@ -1946,7 +1946,11 @@ class InvestmentAccountRow(Base):
         String,
         # AUD-03: RESTRICT (no SET NULL). Borrar un perfil asignado es imposible incluso
         # por SQL crudo; la desasignación solo ocurre con un PUT explícito de la cuenta.
-        ForeignKey("investor_profiles.id", ondelete="RESTRICT"),
+        # ``onupdate="CASCADE"`` declara lo que la BD YA tiene (la FK nació así en el
+        # catálogo ART-PROFILE y la 061 la recrea conservándolo). No hay DDL nuevo: los
+        # identificadores son inmutables, así que la acción es inerte en la práctica, y
+        # el test PG de acciones de FK exige que metadata y ``pg_constraint`` coincidan.
+        ForeignKey("investor_profiles.id", ondelete="RESTRICT", onupdate="CASCADE"),
         nullable=True,
     )
     strategy_definition_id: Mapped[str | None] = mapped_column(

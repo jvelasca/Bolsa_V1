@@ -77,3 +77,7 @@ def test_active_profile_fk_is_restrict_not_set_null() -> None:
     assert len(foreign_keys) == 1, foreign_keys
     assert foreign_keys[0].target_fullname == "investor_profiles.id"
     assert foreign_keys[0].ondelete == "RESTRICT"
+    # La BD crea la FK con ON UPDATE CASCADE (catálogo ART-PROFILE y la 061 lo conserva).
+    # Sin declararlo aquí, ``alembic check`` no lo ve (Alembic no compara acciones de FK)
+    # y el drift solo lo detecta el gate PG de acciones: la metadata debe decir la verdad.
+    assert foreign_keys[0].onupdate == "CASCADE"
