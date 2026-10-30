@@ -6,7 +6,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
@@ -151,34 +152,85 @@ class SqlAlchemyInvestorProfileRepository:
         await self._session.flush()
         return _map(row)
 
-    async def delete(self, profile_id: str) -> bool:
-        row = await self._session.get(InvestorProfileRow, profile_id)
+    async def delete_if_unused(self, profile_id: str) -> tuple[bool, tuple[str, ...]]:
+        """Borra el perfil SOLO si ninguna cuenta lo tiene asignado.
+
+        La comprobación y el ``DELETE`` viven en la misma transacción y bajo el mismo
+        bloqueo de fila (``SELECT … FOR UPDATE`` sobre el perfil). Cualquier asignación
+        concurrente del mismo perfil pasa por ese lock, así que no puede colarse entre
+        el recuento y el borrado:
+
+        * si el borrado gana, la asignación espera el lock, relee y no encuentra el
+          perfil → ``ValueError("Perfil no encontrado")`` (404), sin escribir nada;
+        * si la asignación gana, el borrado espera el lock, relee y ve la cuenta → no
+          borra y devuelve los nombres para el 409 ``profile_in_use``.
+
+        Además la FK ``ON DELETE RESTRICT`` es el backstop: ni un ``DELETE`` en SQL
+        crudo puede dejar una cuenta apuntando a un perfil inexistente. Este método
+        **nunca** desasigna cuentas (la desasignación es un ``PUT`` explícito).
+        """
+        row = await self._lock_profile(profile_id)
         if row is None:
-            return False
-        # Desasignar cuentas
-        await self._session.execute(
-            update(InvestmentAccountRow)
-            .where(InvestmentAccountRow.active_profile_id == profile_id)
-            .values(active_profile_id=None)
-        )
-        await self._session.delete(row)
-        await self._session.flush()
-        return True
+            return (False, ())
+        users = await self.accounts_using(profile_id)
+        if users:
+            return (False, tuple(name for _account_id, name in users))
+        try:
+            async with self._session.begin_nested():
+                await self._session.delete(row)
+                await self._session.flush()
+        except IntegrityError:
+            # Asignación concurrente justo después del recuento: la FK RESTRICT aborta
+            # el borrado. Se devuelven las cuentas para que la ruta responda 409.
+            users = await self.accounts_using(profile_id)
+            return (False, tuple(name for _account_id, name in users))
+        return (True, ())
 
     async def assign_to_account(
-        self, account_id: str, profile_id: str | None
+        self,
+        account_id: str,
+        profile_id: str | None,
+        *,
+        owner_user_id: str | None = None,
     ) -> str | None:
         account = await self._session.get(InvestmentAccountRow, account_id)
         if account is None:
             raise ValueError("Cuenta no encontrada")
+        if owner_user_id is not None and account.user_id != owner_user_id:
+            # Cuenta ajena: mismo error que «no existe» para no filtrar su existencia.
+            raise ValueError("Cuenta no encontrada")
         if profile_id is not None:
-            profile = await self._session.get(InvestorProfileRow, profile_id)
-            if profile is None:
+            # Se bloquea la fila del perfil igual que en ``delete_if_unused``: asignar y
+            # borrar el mismo perfil se serializan sobre esa fila. Si el borrado ganó,
+            # la relectura no lo encuentra → 404 en vez de un error de FK.
+            profile = await self._lock_profile(profile_id)
+            if profile is None or (
+                owner_user_id is not None and profile.user_id != owner_user_id
+            ):
+                # Un perfil de otro usuario (o huérfano, user_id NULL) es invisible: 404.
                 raise ValueError("Perfil no encontrado")
         account.active_profile_id = profile_id
         account.updated_at = datetime.now(UTC)
         await self._session.flush()
         return account.active_profile_id
+
+    async def _lock_profile(self, profile_id: str) -> InvestorProfileRow | None:
+        """``SELECT … FOR UPDATE`` sobre el perfil (serializa asignación y borrado)."""
+        result = await self._session.execute(
+            select(InvestorProfileRow)
+            .where(InvestorProfileRow.id == profile_id)
+            .with_for_update()
+        )
+        return result.scalar_one_or_none()
+
+    async def accounts_using(self, profile_id: str) -> list[tuple[str, str]]:
+        """Cuentas con ``active_profile_id`` = ``profile_id``: (id, nombre), ordenadas."""
+        result = await self._session.execute(
+            select(InvestmentAccountRow.id, InvestmentAccountRow.name)
+            .where(InvestmentAccountRow.active_profile_id == profile_id)
+            .order_by(InvestmentAccountRow.name)
+        )
+        return [(str(row[0]), str(row[1])) for row in result.all()]
 
     async def get_for_account(self, account_id: str) -> InvestorProfileRecord | None:
         account = await self._session.get(InvestmentAccountRow, account_id)

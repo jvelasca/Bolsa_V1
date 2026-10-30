@@ -25720,6 +25720,9 @@
             },
             "description": "Successful Response"
           },
+          "404": {
+            "description": "Cuenta o perfil no encontrado para este usuario."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -33221,6 +33224,9 @@
               }
             },
             "description": "Successful Response"
+          },
+          "409": {
+            "description": "El perfil está asignado a una o más cuentas. Reasígnalas antes de borrarlo (no se desasigna en silencio)."
           },
           "422": {
             "content": {

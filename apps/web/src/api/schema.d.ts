@@ -13307,6 +13307,13 @@ export interface operations {
                     "application/json": components["schemas"]["AssignProfileResponseDto"];
                 };
             };
+            /** @description Cuenta o perfil no encontrado para este usuario. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -18124,6 +18131,13 @@ export interface operations {
                         [key: string]: boolean;
                     };
                 };
+            };
+            /** @description El perfil está asignado a una o más cuentas. Reasígnalas antes de borrarlo (no se desasigna en silencio). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

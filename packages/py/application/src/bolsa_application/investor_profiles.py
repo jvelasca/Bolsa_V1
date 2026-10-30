@@ -36,10 +36,15 @@ class InvestorProfileStore(Protocol):
         version: str = "1.0.0",
     ) -> InvestorProfileRecord: ...
     async def update(self, profile_id: str, **kwargs: object) -> InvestorProfileRecord | None: ...
-    async def delete(self, profile_id: str) -> bool: ...
+    async def delete_if_unused(self, profile_id: str) -> tuple[bool, tuple[str, ...]]: ...
     async def assign_to_account(
-        self, account_id: str, profile_id: str | None
+        self,
+        account_id: str,
+        profile_id: str | None,
+        *,
+        owner_user_id: str | None = None,
     ) -> str | None: ...
+    async def accounts_using(self, profile_id: str) -> list[tuple[str, str]]: ...
     async def get_for_account(self, account_id: str) -> InvestorProfileRecord | None: ...
     async def save_observed(
         self, profile_id: str, observed: dict[str, Any]
@@ -82,26 +87,54 @@ class UpdateInvestorProfile:
         return await self._store.update(profile_id, **kwargs)
 
 
+@dataclass(frozen=True, slots=True)
+class DeleteInvestorProfileResult:
+    """Resultado del borrado: ``deleted=False`` = no existía; ``in_use_by`` = cuentas que lo usan."""
+
+    deleted: bool
+    in_use_by: tuple[str, ...] = ()
+
+
 class DeleteInvestorProfile:
-    """Elimina Investor Profile."""
+    """Elimina Investor Profile, pero nunca desasigna cuentas en silencio.
+
+    El guard (recuento + borrado) vive en el repositorio bajo bloqueo de fila: aquí solo
+    se traduce el resultado. Un perfil en uso devuelve ``deleted=False`` con las cuentas
+    afectadas y la ruta lo convierte en 409 ``profile_in_use``.
+    """
+
     def __init__(self, store: InvestorProfileStore) -> None:
         self._store = store
 
-    async def execute(self, profile_id: str) -> bool:
-        return await self._store.delete(profile_id)
+    async def execute(self, profile_id: str) -> DeleteInvestorProfileResult:
+        deleted, in_use_by = await self._store.delete_if_unused(profile_id)
+        return DeleteInvestorProfileResult(deleted=deleted, in_use_by=tuple(in_use_by))
 
 
 class AssignInvestorProfileToAccount:
-    """Asigna Investor Profile To Account."""
+    """Asigna Investor Profile To Account (valida el dueño de la cuenta y del perfil)."""
+
     def __init__(self, store: InvestorProfileStore) -> None:
         self._store = store
 
-    async def execute(self, account_id: str, profile_id: str | None) -> str | None:
-        return await self._store.assign_to_account(account_id, profile_id)
+    async def execute(
+        self,
+        account_id: str,
+        profile_id: str | None,
+        *,
+        owner_user_id: str | None = None,
+    ) -> str | None:
+        return await self._store.assign_to_account(
+            account_id, profile_id, owner_user_id=owner_user_id
+        )
+
+
+#: Nombre del perfil compartido que crea el bootstrap (uno por usuario, no uno por cuenta).
+DEFAULT_PROFILE_NAME = "Perfil por defecto (moderado)"
 
 
 class EnsureDefaultInvestorProfile:
-    """Crea perfil moderate + lo asigna si la cuenta no tiene active_profile_id."""
+    """Garantiza perfil activo: reutiliza UN perfil por defecto por usuario y lo asigna."""
 
     def __init__(self, store: InvestorProfileStore) -> None:
         self._store = store
@@ -116,19 +149,27 @@ class EnsureDefaultInvestorProfile:
         existing = await self._store.get_for_account(account_id)
         if existing is not None:
             return existing
-        profile = await self._store.create(
-            name=f"Perfil · {account_name}".strip()[:80] or "Perfil por defecto",
+        profile = await self._default_profile(user_id)
+        await self._store.assign_to_account(account_id, profile.id, owner_user_id=user_id)
+        return profile
+
+    async def _default_profile(self, user_id: str | None) -> InvestorProfileRecord:
+        # ``list_profiles(user_id=None)`` no filtra por dueño (es el modo "todas"), así que el
+        # filtro por propietario se repite aquí para no reutilizar el perfil de otro usuario.
+        for profile in await self._store.list_profiles(user_id=user_id):
+            if profile.user_id == user_id and profile.name == DEFAULT_PROFILE_NAME:
+                return profile
+        return await self._store.create(
+            name=DEFAULT_PROFILE_NAME,
             horizon="swing",
             objectives=["growth"],
             risk_tolerance="moderate",
             experience="intermediate",
             suggested_policy_template_id="moderate",
             selected_policy_template_id="moderate",
-            notes="Creado automáticamente al abrir la cuenta",
+            notes="Perfil compartido creado por el bootstrap de cuentas sin perfil",
             user_id=user_id,
         )
-        await self._store.assign_to_account(account_id, profile.id)
-        return profile
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,14 +234,14 @@ class EnsureAccountInvestorProfile:
             )
         elif active_profile_id:
             existing = await self._store.get(active_profile_id)
-            if existing is None:
+            if existing is None or (user_id is not None and existing.user_id != user_id):
                 raise ValueError("Perfil inversor no encontrado")
             profile = existing
         else:
             profile = await EnsureDefaultInvestorProfile(self._store).execute(
                 account_id, account_name, user_id=user_id
             )
-        await self._store.assign_to_account(account_id, profile.id)
+        await self._store.assign_to_account(account_id, profile.id, owner_user_id=user_id)
         return profile
 
 
@@ -213,12 +254,16 @@ class EnsureDefaultsForAccounts:
     async def execute(
         self,
         accounts: list[tuple[str, str]],
+        *,
+        user_id: str | None = None,
     ) -> list[InvestorProfileRecord]:
         """accounts = [(account_id, account_name), ...]"""
         ensured: list[InvestorProfileRecord] = []
         for account_id, account_name in accounts:
             ensured.append(
-                await EnsureDefaultInvestorProfile(self._store).execute(account_id, account_name)
+                await EnsureDefaultInvestorProfile(self._store).execute(
+                    account_id, account_name, user_id=user_id
+                )
             )
         return ensured
 

@@ -156,7 +156,9 @@ Contenedor de cuenta de inversión.
 | leverage | decimal | |
 | settings_json | json | Comisiones + fiscal |
 | is_default | bool | Espejo de última cuenta Activa (UI) |
-| active_profile_id | FK? | → `investor_profiles` |
+| active_profile_id | FK? | → `investor_profiles` · `ON DELETE RESTRICT` |
+
+**Integridad de la asignación (AUD-03):** la FK es **`RESTRICT`**, no `SET NULL`. Borrar un perfil todavía asignado es imposible incluso por SQL directo: la desasignación solo ocurre con un `PUT /api/accounts/{id}/active-profile {"profileId": null}` explícito (o «Quitar perfil» en la UI). El borrado del catálogo comprueba las asignaciones y borra en la misma transacción, bajo `SELECT … FOR UPDATE` sobre la fila del perfil, y responde **409 `profile_in_use`** con las cuentas afectadas cuando alguna lo usa. Ver [`API_REFERENCE.md`](./API_REFERENCE.md).
 
 **Premisa producto (2026-07-31):** una sola cuenta **Activa**; operación solo DEMO. Tipo Paper ≠ paper-trading: será enlace a operador bursátil. Ver [account-premises-demo-vs-paper-2026-07-31.md](./engineering/account-premises-demo-vs-paper-2026-07-31.md).
 

@@ -37,7 +37,22 @@ BEGIN
     ALTER TABLE "investment_accounts"
       ADD CONSTRAINT "investment_accounts_active_profile_id_fkey"
       FOREIGN KEY ("active_profile_id") REFERENCES "investor_profiles"("id")
-      ON DELETE SET NULL ON UPDATE CASCADE;
+      ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+  -- AUD-03: bases creadas antes del endurecimiento tienen ON DELETE SET NULL. Se
+  -- convierte a RESTRICT de forma idempotente: borrar un perfil asignado deja de
+  -- desasignar cuentas en silencio, también por SQL directo.
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'investment_accounts_active_profile_id_fkey'
+      AND confdeltype <> 'r'
+  ) THEN
+    ALTER TABLE "investment_accounts"
+      DROP CONSTRAINT "investment_accounts_active_profile_id_fkey";
+    ALTER TABLE "investment_accounts"
+      ADD CONSTRAINT "investment_accounts_active_profile_id_fkey"
+      FOREIGN KEY ("active_profile_id") REFERENCES "investor_profiles"("id")
+      ON DELETE RESTRICT ON UPDATE CASCADE;
   END IF;
 END $$;
 

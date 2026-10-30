@@ -19,7 +19,10 @@ import {
   suggestPolicyTemplateFromDeclared,
 } from "@bolsa/shared";
 import { Dialog, FieldRow, inputClassName } from "@/components/ui/dialog";
-import { InvestorProfilePicker } from "@/features/accounts/investor-profile-picker";
+import {
+  InvestorProfilePicker,
+  profileUsageByAccount,
+} from "@/features/accounts/investor-profile-picker";
 import { AccountWizardIdentityStep } from "@/features/accounts/account-wizard-identity-step";
 import { AccountWizardCapitalStep } from "@/features/accounts/account-wizard-capital-step";
 import { AccountWizardCommissionsStep } from "@/features/accounts/account-wizard-commissions-step";
@@ -218,6 +221,11 @@ export function CreateAccountWizardDialog() {
     queryFn: async () => (await api.listInvestorProfiles()).data,
     enabled: open,
   });
+  const accountsQuery = useQuery({
+    queryKey: ["accounts"],
+    queryFn: async () => (await api.getAccounts()).data,
+    enabled: open,
+  });
 
   const settings = useMemo(() => buildSettings(form), [form]);
   const sampleFees = useMemo(
@@ -239,6 +247,7 @@ export function CreateAccountWizardDialog() {
   const selectedCatalog = catalogProfiles.find(
     (p) => p.profileId === form.existingProfileId,
   );
+  const profileUsage = profileUsageByAccount(accountsQuery.data ?? []);
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateInvestmentAccountRequestDto) =>
@@ -439,8 +448,13 @@ export function CreateAccountWizardDialog() {
                   patch({ existingProfileId: profileId })
                 }
                 disabled={createMutation.isPending}
+                usedByAccounts={profileUsage}
                 maxHeightClassName="max-h-64"
               />
+              <p className="text-[11px] text-muted-foreground">
+                El perfil elegido se asignará a esta cuenta al crearla; no
+                cambia ninguna otra.
+              </p>
               {selectedCatalog ? (
                 <p className="text-xs text-muted-foreground">
                   Seleccionado:{" "}

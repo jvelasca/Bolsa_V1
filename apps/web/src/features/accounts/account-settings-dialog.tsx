@@ -19,15 +19,14 @@ export function AccountSettingsDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title="Configuración de cuenta"
-      description={`Perfil inversor, comisiones y fiscal de «${account.name}»`}
+      title="Comisiones y fiscal de la cuenta"
+      description={`Comisiones y fiscal de «${account.name}». El perfil inversor se asigna en la ficha de la cuenta.`}
       className="max-w-2xl"
     >
       <AccountSettingsPanel
         accountId={account.id}
         currency={account.currency}
         settings={account.settings}
-        activeProfileId={account.activeProfileId}
         onSaved={onClose}
       />
     </Dialog>

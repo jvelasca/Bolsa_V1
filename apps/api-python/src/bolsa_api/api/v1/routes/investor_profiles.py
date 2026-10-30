@@ -102,7 +102,9 @@ async def ensure_default_profiles(
     )
     missing = [(a.id, a.name) for a in accounts if not a.active_profile_id]
     if missing:
-        await EnsureDefaultsForAccounts(store).execute(missing)  # type: ignore[arg-type]
+        # El bootstrap también es owner-scoped: un perfil con user_id=NULL es invisible para
+        # su propio dueño (leerlo devolvía 404 nada más crearlo).
+        await EnsureDefaultsForAccounts(store).execute(missing, user_id=principal)  # type: ignore[arg-type]
     rows = await ListInvestorProfiles(store).execute(user_id=principal)  # type: ignore[arg-type]
     return InvestorProfileListResponseDto(data=[_to_dto(r) for r in rows])
 
@@ -188,7 +190,17 @@ async def update_investor_profile(
     return InvestorProfileResponseDto(data=_to_dto(row))
 
 
-@router.delete("/investor-profiles/{profile_id}")
+@router.delete(
+    "/investor-profiles/{profile_id}",
+    responses={
+        409: {
+            "description": (
+                "El perfil está asignado a una o más cuentas. Reasígnalas antes de borrarlo "
+                "(no se desasigna en silencio)."
+            )
+        }
+    },
+)
 async def delete_investor_profile(
     profile_id: str,
     request: Request,
@@ -198,8 +210,17 @@ async def delete_investor_profile(
     store = get_investor_profile_repository(session)
     existing = await GetInvestorProfile(store).execute(profile_id)  # type: ignore[arg-type]
     _require_profile_access(existing, principal)
-    ok = await DeleteInvestorProfile(store).execute(profile_id)  # type: ignore[arg-type]
-    if not ok:
+    result = await DeleteInvestorProfile(store).execute(profile_id)  # type: ignore[arg-type]
+    if result.in_use_by:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "profile_in_use",
+                "message": "El perfil está en uso; reasigna sus cuentas antes de borrarlo.",
+                "accounts": list(result.in_use_by),
+            },
+        )
+    if not result.deleted:
         raise HTTPException(status_code=404, detail="Perfil no encontrado")
     return {"ok": True}
 
@@ -241,15 +262,24 @@ async def refresh_observed_profile(
     return InvestorProfileResponseDto(data=_to_dto(row))
 
 
-@router.put("/accounts/{account_id}/active-profile", response_model=AssignProfileResponseDto)
+@router.put(
+    "/accounts/{account_id}/active-profile",
+    response_model=AssignProfileResponseDto,
+    responses={
+        404: {"description": "Cuenta o perfil no encontrado para este usuario."},
+    },
+)
 async def assign_active_profile(
     account_id: Annotated[str, Depends(require_account_access)],
     body: AssignProfileDto,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AssignProfileResponseDto:
     store = get_investor_profile_repository(session)
     try:
-        pid = await AssignInvestorProfileToAccount(store).execute(account_id, body.profile_id)  # type: ignore[arg-type]
+        pid = await AssignInvestorProfileToAccount(store).execute(  # type: ignore[arg-type]
+            account_id, body.profile_id, owner_user_id=get_request_principal(request)
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return AssignProfileResponseDto(

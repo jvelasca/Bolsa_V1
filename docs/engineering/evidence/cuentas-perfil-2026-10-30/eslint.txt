@@ -1,0 +1,7 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+(node:26872) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/josea/.cursor/worktrees/cuentas-perfil-2026-10-30/eslint.config.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to \\?\C:\Users\josea\.cursor\worktrees\cuentas-perfil-2026-10-30\package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[exit 0 · 2 s]

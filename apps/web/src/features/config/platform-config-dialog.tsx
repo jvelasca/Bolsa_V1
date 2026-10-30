@@ -205,40 +205,27 @@ function ActiveAccountSelect() {
 }
 
 function InvestorProfileTabPanel() {
-  const { account, accounts } = useActiveAccount();
-  const invalidateAccounts = useQueryClient();
-
-  if (!account) {
-    return (
-      <Card>
-        <CardContent className="pt-6 text-sm text-muted-foreground">
-          Crea una cuenta de inversión para asignar un perfil del catálogo
-          (RFC-008 ART-PROFILE).
-        </CardContent>
-      </Card>
-    );
-  }
+  const { accounts } = useActiveAccount();
+  const queryClient = useQueryClient();
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Catálogo de perfiles</CardTitle>
         <CardDescription>
-          Catálogo reutilizable: crea/edita perfiles y asígnalos a cada cuenta
-          (una cuenta = un perfil activo). También se elige al crear una demo en
-          el asistente.
+          Catálogo reutilizable del usuario: crea, edita y elimina perfiles y
+          consulta en qué cuentas está en uso. La asignación se hace en{" "}
+          <span className="text-foreground">
+            Cuentas → [cuenta] → Configuración
+          </span>{" "}
+          (una cuenta = un perfil activo).
         </CardDescription>
       </CardHeader>
       <CardContent>
         <InvestorProfilePanel
-          accountId={account.id}
-          activeProfileId={account.activeProfileId}
           accounts={accounts}
-          catalogOnly
           onSaved={() => {
-            void invalidateAccounts.invalidateQueries({
-              queryKey: ["accounts"],
-            });
+            void queryClient.invalidateQueries({ queryKey: ["accounts"] });
           }}
         />
       </CardContent>
@@ -264,10 +251,10 @@ function CommissionsTabPanel() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Cuenta: perfil, comisiones y fiscal</CardTitle>
+          <CardTitle>Cuenta: comisiones y fiscal</CardTitle>
           <CardDescription>
-            Elige el perfil inversor de esta cuenta y los parámetros de
-            comisiones/fiscal. El Policy Gate usa el perfil seleccionado.
+            Parámetros de comisiones y fiscal de esta cuenta. El perfil inversor
+            se asigna en Cuentas → ficha → Configuración.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -276,7 +263,6 @@ function CommissionsTabPanel() {
             accountId={account.id}
             currency={account.currency}
             settings={account.settings}
-            activeProfileId={account.activeProfileId}
           />
         </CardContent>
       </Card>

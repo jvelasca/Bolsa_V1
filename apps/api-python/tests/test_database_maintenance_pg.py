@@ -22,7 +22,7 @@ if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 _REQUIRED_ENV = "DATABASE_MAINTENANCE_PG_REQUIRED"
-_EXPECTED_HEAD = "060_provider_check_policy"
+_EXPECTED_HEAD = "061_profile_delete_restrict"
 
 
 class _DeadSession:

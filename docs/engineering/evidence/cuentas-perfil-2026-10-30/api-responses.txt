@@ -1,0 +1,193 @@
+
+=== 0. Cuenta semilla ===
+GET /api/accounts: 200
+{
+  "data": [
+    {
+      "activeProfileId": "PROF-996fcd3d6ec6",
+      "baseCurrency": "EUR",
+      "createdAt": "2026-10-27T08:42:25.429957+00:00",
+      "currency": "EUR",
+      "description": "Cuenta demo migrada desde cartera única",
+      "id": "default-account-seed",
+      "initialDeposit": 100000.0,
+      "isDefault": true,
+      "labEvidence": null,
+      "lastActivityAt": "2026-10-27T13:10:30.591942+00:00",
+      "leverage": 1.0,
+      "marginCallLevelPct": 100.0,
+      "name": "Cuenta demo EUR",
+      "settings": {
+        "commission": {
+          "custodyAnnualPct": 0.2,
+          "fxConversionPct": 0.5,
+          "label": "Broker estándar ES",
+          "presetId": "standard_es",
+          "stockCommissionMax": 29.0,
+          "stockCommissionMin": 1.0,
+          "stockCommissionPct": 0.1,
+          "vatOnCommissionPct": 21.0
+        },
+        "notes": null,
+        "tax": {
+          "capitalGainsTaxPct": 19.0,
+          "costBasisMethod": "fifo",
+          "dividendWithholdingPct": 19.0,
+          "fiscalYearStartMonth": 1,
+          "jurisdiction": "ES",
+          "stampDutyBuyPct": 0.2
+        }
+      },
+      "sourceBacktestRunId": null,
+      "status": "active",
+      "strategyDefinitionId": null,
+      "type": "simulated",
+      "updatedAt": "2026-10-30T19:11:41.220747+00:00",
+      "userId": "app"
+    }
+  ]
+}
+
+=== 1. Perfil propio (catálogo) ===
+POST /api/investor-profiles: 200
+{
+  "data": {
+    "createdAt": "2026-10-30T19:13:56.146232Z",
+    "declared": {
+      "experience": "intermediate",
+      "horizon": "swing",
+      "maxAcceptableLossPct": null,
+      "notes": null,
+      "objectives": [
+        "growth"
+      ],
+      "riskTolerance": "moderate"
+    },
+    "name": "PROF-EVIDENCIA AUD-03 1793387636",
+    "observed": null,
+    "profileId": "PROF-08e0a3ac79a0",
+    "selectedPolicyTemplateId": "moderate",
+    "suggestedPolicyTemplateId": "moderate",
+    "updatedAt": "2026-10-30T19:13:56.146232Z",
+    "updatedBy": "user",
+    "userId": "app",
+    "version": "1.0.0"
+  }
+}
+
+=== 2. Asignación a la cuenta semilla ===
+PUT /api/accounts/default-account-seed/active-profile: 200
+{
+  "data": {
+    "accountId": "default-account-seed",
+    "activeProfileId": "PROF-08e0a3ac79a0"
+  }
+}
+
+=== 3. Borrado del perfil EN USO → 409 profile_in_use ===
+DELETE /api/investor-profiles/PROF-08e0a3ac79a0: 409
+{
+  "detail": {
+    "accounts": [
+      "Cuenta demo EUR"
+    ],
+    "code": "profile_in_use",
+    "message": "El perfil está en uso; reasigna sus cuentas antes de borrarlo."
+  }
+}
+GET active-profile (no debe haberse desasignado): 200
+{
+  "data": {
+    "createdAt": "2026-10-30T19:13:56.146232Z",
+    "declared": {
+      "experience": "intermediate",
+      "horizon": "swing",
+      "maxAcceptableLossPct": null,
+      "notes": null,
+      "objectives": [
+        "growth"
+      ],
+      "riskTolerance": "moderate"
+    },
+    "name": "PROF-EVIDENCIA AUD-03 1793387636",
+    "observed": null,
+    "profileId": "PROF-08e0a3ac79a0",
+    "selectedPolicyTemplateId": "moderate",
+    "suggestedPolicyTemplateId": "moderate",
+    "updatedAt": "2026-10-30T19:13:56.146232Z",
+    "updatedBy": "user",
+    "userId": "app",
+    "version": "1.0.0"
+  }
+}
+
+=== 4. Perfil de otro tenant → 404 ===
+GET /api/investor-profiles/PROF-AJENO-1793387636: 404
+{
+  "detail": "Perfil no encontrado"
+}
+PUT /api/accounts/default-account-seed/active-profile (ajeno): 404
+{
+  "detail": "Perfil no encontrado"
+}
+
+=== 5. «Quitar perfil» → active_profile_id = NULL (sin perfil por defecto) ===
+PUT /api/accounts/default-account-seed/active-profile {profileId: null}: 200
+{
+  "data": {
+    "accountId": "default-account-seed",
+    "activeProfileId": null
+  }
+}
+GET active-profile (debe ser 404: sin perfil): 404
+{
+  "detail": "La cuenta no tiene perfil activo"
+}
+
+=== 6. Borrado del perfil ya libre → 200 ===
+DELETE /api/investor-profiles/PROF-08e0a3ac79a0: 200
+{
+  "ok": true
+}
+
+=== 7. Restauración del estado ===
+PUT active-profile (restaurar): 200
+{
+  "data": {
+    "accountId": "default-account-seed",
+    "activeProfileId": "PROF-996fcd3d6ec6"
+  }
+}
+GET active-profile (restaurado): 200
+{
+  "data": {
+    "createdAt": "2026-10-30T17:43:05.715202Z",
+    "declared": {
+      "experience": "intermediate",
+      "horizon": "swing",
+      "maxAcceptableLossPct": null,
+      "notes": "Perfil compartido creado por el bootstrap de cuentas sin perfil",
+      "objectives": [
+        "growth"
+      ],
+      "riskTolerance": "moderate"
+    },
+    "name": "Perfil por defecto (moderado)",
+    "observed": null,
+    "profileId": "PROF-996fcd3d6ec6",
+    "selectedPolicyTemplateId": "moderate",
+    "suggestedPolicyTemplateId": "moderate",
+    "updatedAt": "2026-10-30T17:43:05.715202Z",
+    "updatedBy": "user",
+    "userId": "app",
+    "version": "1.0.0"
+  }
+}
+
+=== 8. Verificación de residuos (solo lectura) ===
+perfiles residuales PROF-EVIDENCIA*/PROF-AJENO-*: []
+active_profile_id final de la cuenta semilla: PROF-996fcd3d6ec6
+
+Resultado: 0 comprobación(es) fallida(s)
+
+[exit 0 · 3 s]

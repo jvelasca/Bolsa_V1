@@ -338,12 +338,14 @@ function AccountsContent() {
           Desde <RouteLink to="/accounts">Cuentas</RouteLink> →{" "}
           <em>Nueva demo</em>. El asistente pide identidad, capital,{" "}
           <strong>perfil inversor del catálogo</strong> (lista selectable; o
-          crear uno nuevo), comisiones y fiscal. Una cuenta = un perfil activo.
-          Se cambia después en{" "}
+          crear uno nuevo), comisiones y fiscal. Una cuenta = un perfil activo,
+          y se asigna al crearla. Para cambiarlo después: Cuentas → [cuenta] →{" "}
+          <em>Configuración</em> → bloque «Perfil inversor». El catálogo
+          (crear/editar/eliminar) se gestiona en{" "}
           <OpenConfigLink tab="investor-profile">
             Configuración → Perfil inversor
-          </OpenConfigLink>{" "}
-          o en la ficha de la cuenta.
+          </OpenConfigLink>
+          , que ya no asigna perfiles a cuentas.
         </p>
       </section>
       <section>
@@ -681,11 +683,14 @@ function TradingContent() {
             cola supervisada).
           </li>
           <li>
-            Perfil inversor por cuenta:{" "}
+            Perfil inversor por cuenta: Cuentas → [cuenta] →{" "}
+            <em>Configuración</em>. Es la única superficie de asignación. El
+            catálogo (crear, editar, eliminar y ver uso) vive en{" "}
             <OpenConfigLink tab="investor-profile">
               Configuración → Perfil inversor
             </OpenConfigLink>
-            .
+            . Seleccionar una cuenta en la lista no cambia la cuenta activa:
+            para eso, «Usar ahora» en su ficha.
           </li>
         </ul>
       </section>

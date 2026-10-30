@@ -136,20 +136,38 @@ Ver [PORTFOLIO_AND_CASH.md](./PORTFOLIO_AND_CASH.md) para reglas de movimientos.
 
 ## Investor profiles (RFC-008 ART-PROFILE)
 
-Catálogo reutilizable; no vive en `settings_json`.
+Catálogo reutilizable **del usuario**; no vive en `settings_json`. Todas las rutas están acotadas al principal de la petición: un perfil con `user_id` NULL o de otro tenant responde `404` (no se revela su existencia).
 
-| Método | Ruta                                           | Descripción                                                |
-| ------ | ---------------------------------------------- | ---------------------------------------------------------- |
-| GET    | `/api/investor-profiles`                       | Listar perfiles del catálogo                               |
-| POST   | `/api/investor-profiles`                       | Crear perfil (declared + plantilla)                        |
-| GET    | `/api/investor-profiles/{id}`                  | Detalle                                                    |
-| PATCH  | `/api/investor-profiles/{id}`                  | Actualizar                                                 |
-| DELETE | `/api/investor-profiles/{id}`                  | Eliminar (cuentas con ese activo → `activeProfileId` null) |
-| PUT    | `/api/accounts/{id}/active-profile`            | Asignar perfil activo (`{ profileId }`)                    |
-| GET    | `/api/accounts/{id}/active-profile`            | Perfil activo de la cuenta                                 |
-| POST   | `/api/investor-profiles/{id}/refresh-observed` | Recalcula Observed desde Decision Memory → `observed_json` |
+| Método | Ruta                                           | Descripción                                                                 |
+| ------ | ---------------------------------------------- | --------------------------------------------------------------------------- |
+| GET    | `/api/investor-profiles`                       | Listar perfiles del catálogo del principal                                  |
+| POST   | `/api/investor-profiles`                       | Crear perfil (declared + plantilla)                                         |
+| POST   | `/api/investor-profiles/ensure-defaults`       | Bootstrap: crea/reutiliza **un** perfil `moderate` por usuario y lo asigna a cuentas sin perfil (idempotente) |
+| GET    | `/api/investor-profiles/{id}`                  | Detalle                                                                     |
+| PATCH  | `/api/investor-profiles/{id}`                  | Actualizar (afecta a todas las cuentas que lo comparten)                    |
+| DELETE | `/api/investor-profiles/{id}`                  | Eliminar; `409 profile_in_use` si alguna cuenta lo usa (no desasigna)       |
+| PUT    | `/api/accounts/{id}/active-profile`            | Asignar perfil activo (`{ profileId }`, `null` desasigna); perfil ajeno → `404` |
+| GET    | `/api/accounts/{id}/active-profile`            | Perfil activo de la cuenta                                                  |
+| POST   | `/api/investor-profiles/{id}/refresh-observed` | Recalcula Observed desde Decision Memory → `observed_json`                  |
+
+**Asignación (`PUT /api/accounts/{id}/active-profile`).** Valida la cuenta (`require_account_access`) **y** el perfil contra el principal: `account.user_id` y `profile.user_id` deben coincidir con el principal; si no, `404 «Perfil no encontrado»` y la cuenta conserva su perfil anterior. Perfil `null` desasigna (`200`) y **no** asigna el perfil por defecto: el resultado es `active_profile_id = NULL`. Esa es la llamada que hace el botón «Quitar perfil» de la UI, con confirmación previa.
+
+**Borrado (`DELETE /api/investor-profiles/{id}`).** Si el perfil está asignado a alguna cuenta (también **cerrada**), no se borra ni se desasigna en silencio. La comprobación y el `DELETE` ocurren en la misma transacción bajo `SELECT … FOR UPDATE` sobre el perfil, y la FK `investment_accounts.active_profile_id → investor_profiles.id` es **`ON DELETE RESTRICT`**: ni un `DELETE` en SQL directo ni una asignación concurrente pueden dejar una cuenta apuntando a un perfil inexistente.
+
+```json
+HTTP 409
+{ "detail": { "code": "profile_in_use",
+              "message": "El perfil está en uso; reasigna sus cuentas antes de borrarlo.",
+              "accounts": ["Cuenta demo EUR"] } }
+```
+
+Orden de resolución de la carrera: si el borrado gana el lock, la asignación concurrente espera, relee y recibe `404`; si la asignación gana, el borrado relee, ve la cuenta y responde `409`. En ningún orden se desasigna una cuenta.
+
+**Bootstrap (`ensure-defaults`).** Propaga el principal como `user_id`; reutiliza un único perfil `Perfil por defecto (moderado)` por usuario. Sin `user_id` correcto el perfil quedaría asignado pero invisible para su dueño. Segunda llamada idempotente.
 
 `POST /api/accounts` acepta opcionalmente `investorProfile` (crear + asignar) o `activeProfileId` (asignar del catálogo). Si ninguno: crea y asigna un perfil **moderate** por defecto.
+
+**Superficie UI (no hay ruta `/configuracion`).** El CRUD vive en el modal de Configuración → Perfil inversor (solo catálogo, sin asignar); la asignación por cuenta vive en Cuentas → ficha → Configuración. Ver [CONFIGURATION_MODEL.md](./CONFIGURATION_MODEL.md).
 
 ### Supervisado / Intent (F3) + DecisionSession
 

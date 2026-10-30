@@ -548,6 +548,17 @@ jobs:
       - name: Alembic upgrade head
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
+      - name: Pytest integridad 061 PG (fail if skipped)
+        env:
+          PROFILE_DELETE_MIGRATION_PG_REQUIRED: '1'
+          PROFILE_DELETE_RACE_PG_REQUIRED: '1'
+        run: >
+          uv run pytest
+          packages/py/infrastructure/tests/test_061_profile_delete_restrict_pg.py
+          packages/py/infrastructure/tests/test_investor_profile_delete_race_pg.py
+          -q
+          --tb=short
+
       - name: Pytest A12 PG (fail if skipped)
         run: >
           uv run pytest

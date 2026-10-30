@@ -21,6 +21,7 @@ import { Link } from "react-router-dom";
 import { createIdempotencyKey } from "@bolsa/shared";
 import type { InvestmentAccountDto, LedgerEntryDto } from "@bolsa/shared";
 import {
+  POLICY_TEMPLATE_LABELS,
   formatLedgerEntryLabel,
   ledgerAmountTone,
   ledgerEntryHint,
@@ -104,6 +105,7 @@ export function AccountDetailPanel({
   // intento; se limpia al confirmar éxito o al cambiar de tipo de movimiento.
   const cashIdemKeyRef = useRef<string | null>(null);
   const operativaRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     cashIdemKeyRef.current = null;
@@ -126,9 +128,16 @@ export function AccountDetailPanel({
   }, [initialTab, account.id]);
 
   useEffect(() => {
-    if (tab !== "config" || focus !== "operativa") return;
+    if (tab !== "config") return;
+    const target =
+      focus === "operativa"
+        ? operativaRef.current
+        : focus === "perfil"
+          ? profileRef.current
+          : null;
+    if (!target) return;
     const t = window.setTimeout(() => {
-      operativaRef.current?.scrollIntoView({
+      target.scrollIntoView({
         behavior: "smooth",
         block: "nearest",
       });
@@ -136,9 +145,20 @@ export function AccountDetailPanel({
     return () => window.clearTimeout(t);
   }, [tab, focus, account.id]);
 
+  // `?focus=perfil` es un deep-link al bloque de asignación: si no se pidió otra pestaña,
+  // abre Configuración directamente.
+  useEffect(() => {
+    if (focus === "perfil" && !parseDetailTab(initialTab)) setTab("config");
+  }, [focus, initialTab, account.id]);
+
   const summaryQuery = useQuery({
     queryKey: ["account-summary", account.id],
     queryFn: async () => (await api.getAccountSummary(account.id)).data,
+  });
+
+  const profilesQuery = useQuery({
+    queryKey: ["investor-profiles"],
+    queryFn: async () => (await api.listInvestorProfiles()).data,
   });
 
   const portfolioQuery = useQuery({
@@ -155,6 +175,26 @@ export function AccountDetailPanel({
   const summary = summaryQuery.data;
   const portfolio = portfolioQuery.data?.data;
   const ledger = ledgerQuery.data ?? [];
+
+  const activeProfile =
+    (profilesQuery.data ?? []).find(
+      (p) => p.profileId === account.activeProfileId,
+    ) ?? null;
+  const activeProfileTemplate = activeProfile
+    ? (POLICY_TEMPLATE_LABELS[
+        activeProfile.selectedPolicyTemplateId as keyof typeof POLICY_TEMPLATE_LABELS
+      ] ?? activeProfile.selectedPolicyTemplateId)
+    : null;
+
+  function goToProfileBlock() {
+    setTab("config");
+    window.setTimeout(() => {
+      profileRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }, 80);
+  }
 
   async function handleExportLedger(format: "csv" | "json") {
     setExportingLedger(true);
@@ -293,6 +333,34 @@ export function AccountDetailPanel({
               · {account.currency}
               {isClosed ? " · cerrada" : ""}
             </p>
+            <p
+              className="mt-1 text-xs text-muted-foreground"
+              data-testid="account-detail-profile"
+            >
+              Perfil:{" "}
+              {activeProfile ? (
+                <span className="text-foreground">
+                  {activeProfile.name} · {activeProfileTemplate}
+                </span>
+              ) : account.activeProfileId ? (
+                <span className="text-amber-700 dark:text-amber-300">
+                  fuera del catálogo (perfil legacy)
+                </span>
+              ) : (
+                <span className="text-amber-700 dark:text-amber-300">
+                  Sin perfil
+                </span>
+              )}
+              {!isClosed ? (
+                <button
+                  type="button"
+                  className="ml-2 text-primary hover:underline"
+                  onClick={goToProfileBlock}
+                >
+                  Cambiar →
+                </button>
+              ) : null}
+            </p>
             {isPaper && account.strategyDefinitionId && (
               <p className="mt-1 text-xs text-muted-foreground">
                 Estrategia:{" "}
@@ -334,6 +402,7 @@ export function AccountDetailPanel({
             {!isClosed && !isWorkingAccount && (
               <button
                 type="button"
+                data-testid="account-activate"
                 disabled={activateAccount.isPending}
                 onClick={() => {
                   void activateAccount.mutateAsync(account.id).then(() => {
@@ -415,6 +484,21 @@ export function AccountDetailPanel({
               label="Posiciones"
               value={
                 summary ? String(summary.positionsCount) : absentDataLabel()
+              }
+            />
+            <Metric
+              label="P&amp;L realizado"
+              value={
+                summary?.totalRealizedPnl != null
+                  ? formatPrice(summary.totalRealizedPnl)
+                  : absentDataLabel()
+              }
+              tone={
+                summary?.totalRealizedPnl != null
+                  ? summary.totalRealizedPnl >= 0
+                    ? "positive"
+                    : "negative"
+                  : undefined
               }
             />
           </div>
@@ -640,10 +724,12 @@ export function AccountDetailPanel({
               </button>
             )}
             {!isClosed ? (
-              <AccountInvestorProfileSelect
-                accountId={account.id}
-                activeProfileId={account.activeProfileId}
-              />
+              <div ref={profileRef} data-testid="account-profile-block">
+                <AccountInvestorProfileSelect
+                  accountId={account.id}
+                  activeProfileId={account.activeProfileId}
+                />
+              </div>
             ) : null}
             <div className="rounded-md border border-border bg-muted/20 p-3 text-sm">
               <p className="font-medium">Comisiones y fiscal</p>
@@ -659,7 +745,7 @@ export function AccountDetailPanel({
                   onClick={() => setSettingsOpen(true)}
                   className="mt-2 text-primary hover:underline"
                 >
-                  Editar perfil, comisiones y fiscal →
+                  Editar comisiones y fiscal →
                 </button>
               )}
             </div>

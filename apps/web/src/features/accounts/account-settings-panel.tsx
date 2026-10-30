@@ -14,7 +14,6 @@ import {
   resolveCommissionProfile,
 } from "@bolsa/shared";
 import { FieldRow, inputClassName } from "@/components/ui/dialog";
-import { AccountInvestorProfileSelect } from "@/features/accounts/account-investor-profile-select";
 import { AccountVenuePreference } from "@/features/accounts/account-venue-preference";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { api } from "@/lib/api";
@@ -35,7 +34,6 @@ interface AccountSettingsPanelProps {
   accountId: string;
   currency: string;
   settings: AccountSettings | null;
-  activeProfileId?: string | null;
   onSaved?: () => void;
   compact?: boolean;
 }
@@ -53,7 +51,6 @@ export function AccountSettingsPanel({
   accountId,
   currency,
   settings,
-  activeProfileId,
   onSaved,
   compact = false,
 }: AccountSettingsPanelProps) {
@@ -124,11 +121,6 @@ export function AccountSettingsPanel({
 
   return (
     <div className={cn("space-y-4", compact && "text-sm")}>
-      <AccountInvestorProfileSelect
-        accountId={accountId}
-        activeProfileId={activeProfileId}
-      />
-
       <AccountVenuePreference accountId={accountId} />
 
       <div className="flex gap-1 border-b border-border">

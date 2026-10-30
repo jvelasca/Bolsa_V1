@@ -1944,7 +1944,9 @@ class InvestmentAccountRow(Base):
     active_profile_id: Mapped[str | None] = mapped_column(
         "active_profile_id",
         String,
-        ForeignKey("investor_profiles.id", ondelete="SET NULL"),
+        # AUD-03: RESTRICT (no SET NULL). Borrar un perfil asignado es imposible incluso
+        # por SQL crudo; la desasignación solo ocurre con un PUT explícito de la cuenta.
+        ForeignKey("investor_profiles.id", ondelete="RESTRICT"),
         nullable=True,
     )
     strategy_definition_id: Mapped[str | None] = mapped_column(

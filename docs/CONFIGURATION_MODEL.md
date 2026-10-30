@@ -46,7 +46,7 @@ La pestaña **General** se organiza por **dónde se guarda** cada preferencia, y
 | Chrome del espacio, por dispositivo | **Gestor de espacios** → «Diseño en este dispositivo» | `localStorage` `bolsa-trading-layout-v1` | Diseño de Mercado (Simple/Trader/Analista), restablecer paneles |
 | Documento del espacio | **Gestor de espacios** → «Preferencias del espacio activo» | Servidor `PUT /api/workspaces/:id` | Autoguardado, preferido al arrancar (`is_default`), plantilla de gráficos nuevos |
 | Documento del espacio | **Gestor de espacios** → catálogo | Servidor `/api/workspaces` | Gráficos abiertos, listas, dibujos, plantillas de indicadores |
-| Cuenta | General → **Cuenta activa** / Perfil / Comisiones y fiscal | Servidor + sesión local | Cuenta activa de toda la app, perfil inversor, comisiones |
+| Cuenta | General → **Cuenta activa** / **Perfil inversor** (catálogo) / Comisiones y fiscal | Servidor + sesión local | Cuenta activa de toda la app, catálogo de perfiles, comisiones |
 
 `General` mantiene además un **resumen de solo lectura** del espacio activo (nombre, gráficos abiertos, listas, autoguardado, preferido, última modificación) con el botón «Gestionar espacios…».
 
@@ -280,7 +280,16 @@ Encaja con ProRealTime / TradingView: **chrome de barras** cerca de las barras; 
 ¿Listas?                                     → ListHub
 ```
 
-**Perfil inversor (RFC-008 ART-PROFILE):** catálogo reutilizable en `investor_profiles`; cada cuenta tiene **un** `active_profile_id` (varias cuentas pueden compartir el mismo perfil). UI: **asistente Nueva demo** (paso Perfil = lista del catálogo o crear), **Configuración → Perfil inversor** (CRUD + asignar a cuenta), ficha de cuenta / Comisiones. `settings_json` solo comisiones/fiscal.
+**Perfil inversor (RFC-008 ART-PROFILE):** catálogo reutilizable **del usuario** en `investor_profiles`; cada cuenta tiene **un** `active_profile_id` (varias cuentas pueden compartir el mismo perfil). Reparto de superficies:
+
+| Superficie | Qué hace | Qué **no** hace |
+|------------|----------|-----------------|
+| **Configuración → Perfil inversor** | CRUD del catálogo (crear, editar, duplicar, eliminar) y uso por perfil en solo lectura | No elige cuenta ni asigna; no crea perfiles al abrirse |
+| **Cuentas → [cuenta] → Configuración** | **Única** asignación: elegir perfil y «Aplicar a esta cuenta» (con aviso de uso compartido) y, si la cuenta ya tiene perfil, **«Quitar perfil»** con confirmación inline | No asigna ningún perfil por defecto al desasignar |
+| **Nueva demo → paso Perfil** | Asigna el perfil al crear la cuenta | No edita cuentas existentes |
+| **Cuentas → lista** | Selección (navegación, `?selected=`) y badge de perfil («Perfil: …» o «Sin perfil») | No activa la cuenta global |
+
+Clic en la lista **no** cambia la cuenta activa de la app; para eso está «Usar ahora» en la ficha. El borrado de un perfil en uso se rechaza con `409 profile_in_use` (hay que reasignar o quitar el perfil primero). «Quitar perfil» envía un único `PUT {"profileId": null}`: la cuenta queda **sin perfil** (`active_profile_id = NULL`), el Policy Gate sigue aplicando `moderate` por defecto y **no** se asigna el perfil del catálogo automáticamente. La FK es `ON DELETE RESTRICT`, así que ni un borrado por SQL puede desasignar una cuenta. `settings_json` solo comisiones/fiscal.
 
 ---
 

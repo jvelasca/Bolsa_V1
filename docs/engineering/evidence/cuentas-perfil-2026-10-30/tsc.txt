@@ -1,0 +1,5 @@
+
+> @bolsa/web@0.1.0 typecheck C:\Users\josea\.cursor\worktrees\cuentas-perfil-2026-10-30\apps\web
+> tsc -b --noEmit
+
+[exit 0 · 14 s]

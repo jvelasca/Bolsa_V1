@@ -1,0 +1,83 @@
+# Traza de red del navegador — CUE-E2E «Quitar perfil» (AUD-01)
+# 2026-10-30T18:46:38.965Z · http://localhost:5317
+# Peticiones /api/* observadas: 34
+
+## Recuento por endpoint
+  3 × GET /api/accounts
+  1 × GET /api/accounts/7f30945fa8304cacb9e2cf9ee/ledger
+  3 × GET /api/accounts/7f30945fa8304cacb9e2cf9ee/summary
+  1 × GET /api/accounts/default-account-seed/broker-venue
+  1 × GET /api/accounts/default-account-seed/decision-board
+  1 × GET /api/accounts/default-account-seed/decision-studies
+  1 × GET /api/accounts/default-account-seed/operational-incidents/active
+  2 × GET /api/accounts/default-account-seed/supervised-f3-queue
+  1 × GET /api/accounts/summaries
+  1 × GET /api/alerts
+  2 × GET /api/auth/status
+  1 × GET /api/investor-profiles
+  1 × GET /api/lists
+  1 × GET /api/lists/estudio
+  2 × GET /api/pending-orders
+  2 × GET /api/portfolio
+  1 × GET /api/risk/broker-venue
+  1 × GET /api/risk/kill-switch
+  1 × GET /api/scans/jobs
+  1 × GET /api/signal-alerts
+  1 × GET /api/workspaces
+  1 × GET /api/workspaces/7e503dd5c4b84b9ab4acb3f5b
+  1 × POST /api/instrument-daily-opinions/query
+  1 × POST /api/instruments/quotes
+  2 × PUT /api/accounts/7f30945fa8304cacb9e2cf9ee/active-profile
+
+## Peticiones de cuentas y perfiles (con cuerpo cuando lo hay)
+GET /api/accounts → 200
+GET /api/accounts/summaries → 200
+GET /api/investor-profiles → 200
+GET /api/accounts/7f30945fa8304cacb9e2cf9ee/summary → 200
+GET /api/accounts/7f30945fa8304cacb9e2cf9ee/ledger?limit=30&offset=0 → 200
+GET /api/accounts/default-account-seed/operational-incidents/active → 200
+GET /api/accounts/default-account-seed/broker-venue → 200
+GET /api/accounts/default-account-seed/supervised-f3-queue → 200
+GET /api/accounts/default-account-seed/decision-board → 200
+GET /api/accounts/default-account-seed/supervised-f3-queue → 200
+PUT /api/accounts/7f30945fa8304cacb9e2cf9ee/active-profile → 200 · body={"profileId":"PROF-5a8f2e6b980d"}
+GET /api/accounts → 200
+GET /api/accounts/7f30945fa8304cacb9e2cf9ee/summary → 200
+GET /api/accounts/default-account-seed/decision-studies?limit=200 → 200
+PUT /api/accounts/7f30945fa8304cacb9e2cf9ee/active-profile → 200 · body={"profileId":null}
+GET /api/accounts → 200
+GET /api/accounts/7f30945fa8304cacb9e2cf9ee/summary → 200
+
+## Traza completa
+GET /api/auth/status → 200
+GET /api/auth/status → 200
+GET /api/accounts → 200
+GET /api/workspaces → 200
+GET /api/investor-profiles → 200
+GET /api/scans/jobs → 200
+GET /api/accounts/summaries → 200
+GET /api/pending-orders → 200
+GET /api/accounts/7f30945fa8304cacb9e2cf9ee/ledger?limit=30&offset=0 → 200
+GET /api/accounts/7f30945fa8304cacb9e2cf9ee/summary → 200
+GET /api/accounts/default-account-seed/operational-incidents/active → 200
+GET /api/alerts?activeOnly=true → 200
+GET /api/portfolio → 200
+GET /api/accounts/default-account-seed/supervised-f3-queue → 200
+GET /api/signal-alerts?activeOnly=true → 200
+GET /api/pending-orders → 200
+GET /api/accounts/default-account-seed/decision-board → 200
+GET /api/workspaces/7e503dd5c4b84b9ab4acb3f5b → 200
+GET /api/accounts/default-account-seed/supervised-f3-queue → 200
+GET /api/lists → 200
+GET /api/lists/estudio → 200
+PUT /api/accounts/7f30945fa8304cacb9e2cf9ee/active-profile → 200
+GET /api/accounts → 200
+GET /api/accounts/7f30945fa8304cacb9e2cf9ee/summary → 200
+POST /api/instruments/quotes → 200
+GET /api/accounts/default-account-seed/broker-venue → 200
+POST /api/instrument-daily-opinions/query → 200
+GET /api/accounts/default-account-seed/decision-studies?limit=200 → 200
+GET /api/portfolio → 200
+PUT /api/accounts/7f30945fa8304cacb9e2cf9ee/active-profile → 200
+GET /api/accounts → 200
+GET /api/accounts/7f30945fa8304cacb9e2cf9ee/summary → 200

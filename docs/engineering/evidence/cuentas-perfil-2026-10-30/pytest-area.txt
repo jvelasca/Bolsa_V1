@@ -1,0 +1,46 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\josea\.cursor\worktrees\cuentas-perfil-2026-10-30\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\josea\.cursor\worktrees\cuentas-perfil-2026-10-30
+configfile: pyproject.toml
+plugins: anyio-4.14.2, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 33 items
+
+packages/py/application/tests/test_investor_profiles.py::test_assign_propagates_owner_to_store PASSED [  3%]
+packages/py/application/tests/test_investor_profiles.py::test_unassign_passes_none_profile PASSED [  6%]
+packages/py/application/tests/test_investor_profiles.py::test_default_profile_is_shared_per_user_and_idempotent PASSED [  9%]
+packages/py/application/tests/test_investor_profiles.py::test_default_profile_never_reuses_other_tenants_profile PASSED [ 12%]
+packages/py/application/tests/test_investor_profiles.py::test_existing_account_profile_is_kept PASSED [ 15%]
+packages/py/application/tests/test_investor_profiles.py::test_ensure_defaults_for_accounts_propagates_owner PASSED [ 18%]
+packages/py/application/tests/test_investor_profiles.py::test_delete_profile_in_use_is_blocked PASSED [ 21%]
+packages/py/application/tests/test_investor_profiles.py::test_delete_unused_profile PASSED [ 24%]
+packages/py/application/tests/test_investor_profiles.py::test_delete_delegates_guard_to_store_without_reading_accounts_first PASSED [ 27%]
+packages/py/application/tests/test_investor_profiles.py::test_wizard_rejects_foreign_profile PASSED [ 30%]
+packages/py/infrastructure/tests/test_investor_profile_delete_guard.py::test_repository_never_unassigns_accounts_on_delete PASSED [ 33%]
+packages/py/infrastructure/tests/test_investor_profile_delete_guard.py::test_raw_sql_delete_is_blocked_by_restrict_fk PASSED [ 36%]
+packages/py/infrastructure/tests/test_investor_profile_delete_guard.py::test_concurrent_assign_and_delete_never_leave_inconsistent_state PASSED [ 39%]
+packages/py/infrastructure/tests/test_schema_contract.py::test_sync_settings_declares_the_060_check PASSED [ 42%]
+packages/py/infrastructure/tests/test_schema_contract.py::test_contract_snapshot_covers_metadata PASSED [ 45%]
+packages/py/infrastructure/tests/test_schema_contract.py::test_allowlist_matches_by_name_and_type PASSED [ 48%]
+packages/py/infrastructure/tests/test_schema_contract.py::test_include_object_hides_only_declared_objects PASSED [ 51%]
+packages/py/infrastructure/tests/test_schema_contract.py::test_active_profile_fk_is_restrict_not_set_null PASSED [ 54%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict.py::test_061_revision_fits_alembic_version_varchar32 PASSED [ 57%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict.py::test_061_hangs_linearly_from_060 PASSED [ 60%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict.py::test_061_is_linear_and_single_head PASSED [ 63%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict.py::test_061_upgrade_is_a_noop_when_the_fk_is_already_restrict PASSED [ 66%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict.py::test_061_upgrade_recreates_the_fk_as_restrict_preserving_identity PASSED [ 69%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict.py::test_061_upgrade_creates_the_fk_when_it_does_not_exist PASSED [ 72%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict.py::test_061_upgrade_does_not_improvise_on_an_incomplete_schema PASSED [ 75%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict.py::test_061_downgrade_is_a_noop_when_the_fk_is_already_set_null PASSED [ 78%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict.py::test_061_downgrade_restores_set_null PASSED [ 81%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict.py::test_061_downgrade_does_not_improvise_on_an_incomplete_schema PASSED [ 84%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict.py::test_delete_action_is_restrict_in_all_three_sources PASSED [ 87%]
+apps/api-python/tests/test_investor_profiles_assign.py::test_assign_own_profile_and_reject_foreign PASSED [ 90%]
+apps/api-python/tests/test_investor_profiles_assign.py::test_ensure_defaults_creates_one_shared_owned_profile PASSED [ 93%]
+apps/api-python/tests/test_investor_profiles_assign.py::test_delete_profile_in_use_returns_conflict PASSED [ 96%]
+apps/api-python/tests/test_investor_profiles_assign.py::test_delete_profile_in_use_by_closed_account_still_returns_conflict PASSED [100%]
+
+============================= 33 passed in 4.71s ==============================
+
+[exit 0 · 6 s]

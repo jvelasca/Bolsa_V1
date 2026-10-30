@@ -9,12 +9,12 @@ import type {
 } from "@bolsa/shared";
 import {
   ACCOUNT_ORIGIN_LABEL,
+  POLICY_TEMPLATE_LABELS,
   accountOriginKind,
   listCloseableDevExtraAccounts,
 } from "@bolsa/shared";
 import { AccountDetailPanel } from "@/features/accounts/account-detail-panel";
 import { formatPaperLabEvidence } from "@/features/accounts/paper-lab-evidence";
-import { useActivateAccount } from "@/features/accounts/use-active-account";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -33,12 +33,15 @@ function AccountListItem({
   onSelect,
   isWorking,
   totalEquity,
+  profileLabel,
 }: {
   account: InvestmentAccountDto;
   selected: boolean;
   onSelect: () => void;
   isWorking?: boolean;
   totalEquity?: number;
+  /** `null` = la cuenta no tiene perfil activo (el Policy Gate cae a moderate). */
+  profileLabel?: string | null;
 }) {
   const origin = accountOriginKind(account);
   return (
@@ -87,6 +90,17 @@ function AccountListItem({
           {formatPrice(totalEquity)}
         </p>
       )}
+      <p
+        className={cn(
+          "mt-1 text-[11px]",
+          profileLabel
+            ? "text-muted-foreground"
+            : "text-amber-700 dark:text-amber-300",
+        )}
+        data-testid={`account-list-profile-${account.id}`}
+      >
+        {profileLabel ? `Perfil: ${profileLabel}` : "Sin perfil"}
+      </p>
     </button>
   );
 }
@@ -96,7 +110,6 @@ type HubFilter = "demo" | "paper" | "all";
 export function AccountsPage() {
   const queryClient = useQueryClient();
   const activeAccountId = useActiveAccountStore((s) => s.activeAccountId);
-  const activateAccount = useActivateAccount();
   const openWizard = useUiStore((s) => s.openCreateAccountWizard);
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -137,6 +150,10 @@ export function AccountsPage() {
     queryFn: async () => (await api.getAccountSummaries()).data,
     staleTime: 30_000,
   });
+  const profilesQuery = useQuery({
+    queryKey: ["investor-profiles"],
+    queryFn: async () => (await api.listInvestorProfiles()).data,
+  });
 
   const accounts = useMemo(
     () => accountsQuery.data ?? [],
@@ -157,6 +174,18 @@ export function AccountsPage() {
     }
     return map;
   }, [summariesQuery.data]);
+
+  const profileLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const profile of profilesQuery.data ?? []) {
+      const template =
+        POLICY_TEMPLATE_LABELS[
+          profile.selectedPolicyTemplateId as keyof typeof POLICY_TEMPLATE_LABELS
+        ] ?? profile.selectedPolicyTemplateId;
+      map.set(profile.profileId, `${profile.name} · ${template}`);
+    }
+    return map;
+  }, [profilesQuery.data]);
 
   const closeableDevExtras = useMemo(
     () => listCloseableDevExtraAccounts(accounts, positionsCountById),
@@ -227,29 +256,44 @@ export function AccountsPage() {
 
   useEffect(() => {
     const fromUrl = searchParams.get("selected");
-    if (fromUrl) setSelectedId(fromUrl);
+    setSelectedId(fromUrl);
   }, [searchParams]);
 
-  const effectiveSelectedId =
-    selectedId ??
-    activeAccountId ??
-    activeAccounts.find((a) => a.isDefault)?.id ??
-    activeAccounts[0]?.id ??
-    filteredAccounts[0]?.id ??
-    null;
+  // La selección vive dentro del filtro vigente: si la cuenta seleccionada (o la activa) no
+  // está en esta pestaña, la lista y el detalle no pueden mostrar cuentas distintas.
+  const effectiveSelectedId = useMemo(() => {
+    const isInFilter = (id: string | null | undefined): id is string =>
+      id != null && filteredAccounts.some((a) => a.id === id);
+    const candidates: (string | null)[] = [
+      selectedId,
+      activeAccountId,
+      activeAccounts.find((a) => a.isDefault)?.id ?? null,
+      activeAccounts[0]?.id ?? null,
+      filteredAccounts[0]?.id ?? null,
+    ];
+    return candidates.find(isInFilter) ?? null;
+  }, [selectedId, activeAccountId, activeAccounts, filteredAccounts]);
 
   const selectedAccount =
-    accounts.find((a) => a.id === effectiveSelectedId) ??
-    filteredAccounts.find((a) => a.id === effectiveSelectedId) ??
-    null;
+    filteredAccounts.find((a) => a.id === effectiveSelectedId) ?? null;
 
-  useEffect(() => {
-    if (selectedAccount?.status !== "active") return;
-    if (selectedAccount.id === activeAccountId) return;
-    void activateAccount.mutateAsync(selectedAccount.id);
-    // Solo al cambiar de cuenta seleccionada; mutateAsync es estable en TanStack Query.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid re-fire on mutation identity
-  }, [selectedAccount?.id, selectedAccount?.status, activeAccountId]);
+  const activeAccount = accounts.find((a) => a.id === activeAccountId) ?? null;
+  const activeOutsideFilter =
+    activeAccount != null &&
+    !filteredAccounts.some((a) => a.id === activeAccount.id);
+
+  /**
+   * Seleccionar SOLO navega: no toca la cuenta activa de la app. Activar es la acción
+   * explícita «Usar ahora» de la ficha.
+   */
+  function selectAccount(accountId: string) {
+    setSelectedId(accountId);
+    const params = new URLSearchParams(searchParams);
+    params.set("selected", accountId);
+    // El foco pertenece a la ficha anterior; se descarta al cambiar de cuenta.
+    params.delete("focus");
+    setSearchParams(params, { replace: true });
+  }
 
   function setHubFilter(next: HubFilter) {
     const params = new URLSearchParams(searchParams);
@@ -351,6 +395,53 @@ export function AccountsPage() {
         </div>
       </div>
 
+      {accountsQuery.isError ? (
+        <div
+          role="alert"
+          data-testid="accounts-load-error"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+        >
+          <p>
+            No se pudieron cargar las cuentas
+            {accountsQuery.error instanceof Error
+              ? `: ${accountsQuery.error.message}`
+              : "."}
+          </p>
+          <button
+            type="button"
+            className="underline"
+            onClick={() => void accountsQuery.refetch()}
+          >
+            Reintentar
+          </button>
+        </div>
+      ) : null}
+
+      {summariesQuery.isError ? (
+        <p
+          role="alert"
+          data-testid="accounts-summaries-error"
+          className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+        >
+          No se pudieron cargar los resúmenes: el saldo y el número de
+          posiciones pueden faltar o estar desactualizados.
+        </p>
+      ) : null}
+
+      {activeOutsideFilter && activeAccount ? (
+        <p
+          data-testid="accounts-active-outside-filter"
+          className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-muted-foreground"
+        >
+          La cuenta activa es{" "}
+          <span className="font-medium text-foreground">
+            {activeAccount.name}
+          </span>{" "}
+          y no está en esta pestaña. La app sigue operando con ella; cámbiala en
+          su ficha con «Usar ahora».
+        </p>
+      ) : null}
+
       {deployBanner && (
         <div className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-muted-foreground">
           <p>
@@ -377,9 +468,11 @@ export function AccountsPage() {
           <div className="space-y-2">
             {activeAccounts.length === 0 ? (
               <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-                {hubFilter === "paper"
-                  ? "Aún no hay cuentas Paper. Se crean al desplegar una estrategia desde Backtesting."
-                  : "No hay cuentas demo activas."}
+                {accountsQuery.isError
+                  ? "No se pudieron cargar las cuentas."
+                  : hubFilter === "paper"
+                    ? "Aún no hay cuentas Paper. Se crean al desplegar una estrategia desde Backtesting."
+                    : "No hay cuentas demo activas."}
               </p>
             ) : (
               activeAccounts.map((account) => (
@@ -389,7 +482,13 @@ export function AccountsPage() {
                   selected={account.id === effectiveSelectedId}
                   isWorking={account.id === activeAccountId}
                   totalEquity={equityByAccountId.get(account.id)}
-                  onSelect={() => setSelectedId(account.id)}
+                  profileLabel={
+                    account.activeProfileId
+                      ? (profileLabelById.get(account.activeProfileId) ??
+                        "perfil no visible")
+                      : null
+                  }
+                  onSelect={() => selectAccount(account.id)}
                 />
               ))
             )}
@@ -414,7 +513,13 @@ export function AccountsPage() {
                       account={account}
                       selected={account.id === effectiveSelectedId}
                       totalEquity={equityByAccountId.get(account.id)}
-                      onSelect={() => setSelectedId(account.id)}
+                      profileLabel={
+                        account.activeProfileId
+                          ? (profileLabelById.get(account.activeProfileId) ??
+                            "perfil no visible")
+                          : null
+                      }
+                      onSelect={() => selectAccount(account.id)}
                     />
                   ))}
                 </div>

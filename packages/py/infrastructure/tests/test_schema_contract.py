@@ -58,3 +58,22 @@ def test_include_object_hides_only_declared_objects() -> None:
     assert include(object(), "sync_settings", "table", False, None) is True
     assert len(KNOWN_SCHEMA_DIVERGENCES) > 0
     assert Base.metadata.tables, "Los metadatos deben cargarse"
+
+
+def test_active_profile_fk_is_restrict_not_set_null() -> None:
+    """AUD-03: el borrado de un perfil asignado no puede desasignar cuentas por FK.
+
+    ``SET NULL`` era una segunda vía de desasignación silenciosa (incluso por SQL
+    directo). La migración 061 convierte la FK a ``RESTRICT``; los metadatos deben
+    declarar lo mismo o un ``--autogenerate`` reintroduciría la semántica vieja.
+    """
+    from bolsa_infrastructure.database.models import InvestmentAccountRow
+
+    foreign_keys = [
+        fk
+        for fk in InvestmentAccountRow.__table__.foreign_keys
+        if fk.parent.name == "active_profile_id"
+    ]
+    assert len(foreign_keys) == 1, foreign_keys
+    assert foreign_keys[0].target_fullname == "investor_profiles.id"
+    assert foreign_keys[0].ondelete == "RESTRICT"
