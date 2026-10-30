@@ -19,8 +19,15 @@ bloques rotulados en la UI:
 Restricción ``CHECK`` de rango: la base de datos es la última defensa si algún camino
 escribe sin pasar por el caso de uso (misma doctrina que la ``059``).
 
-Aditiva e idempotente (comprueba existencia de tabla/columna antes de tocar);
+Aditiva e idempotente (comprueba existencia de tabla/columna/constraint antes de tocar);
 ``downgrade`` simétrico.
+
+Idempotencia del ``CHECK`` declarada: la baseline (``003_prisma_schema_baseline``) crea
+``sync_settings`` **desde los metadatos**, que ya incluyen la columna del intervalo. Por
+eso la columna puede existir al llegar aquí y aun así faltar el ``CHECK``. Crearlo dentro
+de ``if not _column_exists(...)`` lo ataba a un caso que no se da en bases nuevas y lo
+dejaba ausente (drift real observado). Ahora la creación del ``CHECK`` se decide por su
+propia existencia, no por la de la columna.
 
 Cadena lineal: ``down_revision = "059_market_provider_settings"``.
 """
@@ -102,6 +109,9 @@ def upgrade() -> None:
                 server_default="60",
             ),
         )
+    # Fuera del bloque de la columna: en bases nuevas la columna ya viene de la baseline
+    # y el CHECK seguía ausente. Se decide por la existencia del propio constraint.
+    if not _constraint_exists(bind):
         op.create_check_constraint(
             _INTERVAL_CHECK,
             _TABLE,

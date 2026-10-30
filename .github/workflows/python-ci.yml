@@ -544,6 +544,9 @@ jobs:
       SCHEMA_DRIFT_PG_REQUIRED: '1'
       # 061: diagnóstico read-only de la BD (esquema, capacidad, vacuum, copias).
       DATABASE_MAINTENANCE_PG_REQUIRED: '1'
+      # 062: backfill del CHECK de sync_settings en bases heredadas. Sin PG el test
+      # skipearía en mudo y el drift de la 060 volvería a pasar desapercibido.
+      SYNC_SETTINGS_CHECK_PG_REQUIRED: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -579,6 +582,7 @@ jobs:
           apps/api-python/tests/test_database_maintenance_pg.py
           packages/py/application/tests/test_sim_strategy_attribution.py
           packages/py/infrastructure/tests/test_schema_contract.py
+          packages/py/infrastructure/tests/test_062_sync_settings_check_pg.py
           -q
           --tb=short
 
