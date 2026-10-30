@@ -90,11 +90,40 @@ Evidencia capturada en [`evidence/general-espacios-2026-10-30/`](../general-espa
 
 | Dato | Valor |
 | --- | --- |
-| Rama | `fix/059-060-proveedores` |
+| Rama | `fix/059-060-proveedores` (`7e8fe706..a5f6f1c6`) |
 | Commit del sello | `bbc6e9a3` (`feat(ui)`: Configuración por ámbito, espacio de trabajo y bump `2.11.173-beta`) |
 | Re-anclaje del pin | `9a78606a` (`chore(window)`; `appsHash 9d3d4356…`, `packagesHash 3df714c5…`) |
-| Tag | `v2.88.173-beta` (anotado) |
-| Runs de CI | _pendiente de medir_ |
+| Cierre documental | `a5f6f1c6` (docs-only; este texto) |
+| Tag | `v2.88.173-beta` **anotado** — objeto `db37a3bb` → commit `a5f6f1c6` |
+| PR / Release | sin PR; GitHub Release no emitida |
+
+### 7.1 Runs de CI medidos
+
+| Run | Workflow | Ref | Resultado |
+| --- | --- | --- | --- |
+| [`41093711443`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093711443) | `Frontend CI` | rama (`a5f6f1c6`) | **success** |
+| [`41093711410`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093711410) | `Python CI` | rama | **success** |
+| [`41093711640`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093711640) | `Optimize lab` | rama | **success** |
+| [`41093740416`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093740416) | `Release tag CI` | tag | **success** — 13 jobs `success` + `certify` `success`; `playwright (integrated E2E, opt-in)` `skipped` |
+| [`41093740321`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093740321) | `Frontend CI` | tag | **success** |
+| [`41093740355`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093740355) | `Python CI` | tag | **success** |
+| [`41093740277`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093740277) | `Optimize lab` | tag | **success** |
+| [`41093740147`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093740147) | `Fase 2 scientific` | tag | **success** |
+
+`Release tag CI` incluye `replay-repro`, que regenera el artefacto del sello desde el fixture y lo
+compara **byte a byte**: **success** ⇒ **`Δ motor = 0`** confirmado en CI, no solo declarado.
+
+### 7.2 Verificación local del sello (`a5f6f1c6`)
+
+| Comprobación | Resultado |
+| --- | --- |
+| `pnpm window:freeze` | **`freeze OK`** — `appsHash 9d3d4356…`, `packagesHash 3df714c5…` |
+| `git status -sb` | rama sincronizada con `origin` antes del cierre documental |
+
+El pin se re-ancló en `9a78606a` sobre el **árbol limpio** del sello (el trabajo fiscal se apartó con
+`git stash` y se restauró después). La etiqueta `commit` del pin dice `bbc6e9a3` mientras HEAD es
+`a5f6f1c6`; el freeze real son los dos tree hashes, y el cierre documental no toca `apps/` ni
+`packages/`.
 
 ## 8. Falsabilidad
 

@@ -9,7 +9,11 @@ umbral, peso ni sizing (**`Δ motor = 0`**), no se decide distinto (**`Δ decisi
 HTTP no se mueve (**`Δ contrato HTTP = 0`**; `contract:check` **OK**, sin `contract:gen`). **SIN
 migración** (`head` sigue `060_provider_check_policy`). **Bump** `2.11.172-beta` → `2.11.173-beta`
 (+ los **13** `meta.bump`; `test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de
-`v2_87` no se toca). **Publicación:** rama + **tag anotado `v2.88.173-beta`**, con `Release tag CI`.
+`v2_87` no se toca). **Publicación:** rama + **tag anotado `v2.88.173-beta`**; `Release tag CI`
+[`41093740416`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093740416) **VERDE** (13 jobs
+`success` + `certify`; `replay-repro` `success` ⇒ **`Δ motor = 0`**), y `Frontend CI`/`Python CI`
+verdes tanto en la rama ([`41093711443`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093711443) /
+[`41093711410`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093711410)) como en el tag.
 
 **W-173-1 · el defecto de fondo: dos ámbitos mezclados en una sola pestaña.** «General» presentaba
 como una sola cosa la **apariencia del dispositivo** (tema y densidad), la **colocación de la
