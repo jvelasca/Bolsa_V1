@@ -170,3 +170,57 @@ async def test_list_payloads_since_filters_the_discovery_marker(pg_factory: Any)
         assert yesterday_id
     finally:
         await _delete(pg_factory, discovery_id, manual_id, yesterday_id)
+
+
+@pytest.mark.asyncio
+async def test_list_payloads_since_filters_by_status_for_the_daily_dedupe(
+    pg_factory: Any,
+) -> None:
+    """D-3 — un discovery ``failed`` de hoy NO cuenta como «ya encolado hoy».
+
+    Sin el filtro de estado, el job fallido bloqueaba el reintento del día entero. La
+    consulta con la lista de INCLUSIÓN lo deja fuera y la consulta de fallidos lo declara.
+    """
+    now = datetime.now(UTC)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    live_id = await _insert(
+        pg_factory,
+        status="pending",
+        created_at=now,
+        payload=_payload(discovery=True, list_id="estudio"),
+    )
+    failed_id = await _insert(
+        pg_factory,
+        status="failed",
+        created_at=now,
+        payload=_payload(discovery=True, list_id="otro"),
+    )
+    try:
+        async with pg_factory() as session:
+            repo = SqlAlchemyScanJobRepository(session)
+            live = await repo.list_payloads_since(
+                since=day_start,
+                payload_key=_DISCOVERY_KEY,
+                statuses=("pending", "processing", "completed"),
+            )
+            failed = await repo.list_payloads_since(
+                since=day_start,
+                payload_key=_DISCOVERY_KEY,
+                statuses=("failed",),
+            )
+            failed_records = await repo.list_since(
+                since=day_start,
+                payload_key=_DISCOVERY_KEY,
+                statuses=("failed",),
+            )
+            every = await repo.list_payloads_since(
+                since=day_start, payload_key=_DISCOVERY_KEY
+            )
+        assert {payload["universe"]["listId"] for payload in live} == {"estudio"}
+        assert {payload["universe"]["listId"] for payload in failed} == {"otro"}
+        # La variante con IDENTIDAD es la que permite declarar el ``jobId`` del fallo.
+        assert [record.id for record in failed_records] == [failed_id]
+        # ``None`` conserva el contrato histórico (cualquier estado).
+        assert {payload["universe"]["listId"] for payload in every} == {"estudio", "otro"}
+    finally:
+        await _delete(pg_factory, live_id, failed_id)

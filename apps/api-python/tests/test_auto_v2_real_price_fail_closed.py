@@ -255,3 +255,108 @@ def test_real_price_is_inert_by_default(monkeypatch: pytest.MonkeyPatch) -> None
     for off in ("", "0", "false", "no", "off", "  "):
         monkeypatch.setenv(AUTO_REAL_PRICE_ENV, off)
         assert real_price_enabled() is False, f"{off!r} NO debe activar el precio real"
+
+
+# ── 4. D-1: el veto de la propuesta mide el precio de FILL, no solo el de decisión ──
+
+_SEAM_PLAN: dict[str, float] = {
+    "entry": 100.0,
+    "structuralStop": 97.0,
+    "target1": 103.0,
+    "target2": 106.0,
+}
+
+
+def _worker_with_daily_proposal(
+    price_source: PriceSource,
+) -> AutoSimulationWorker:
+    """Worker real con una propuesta del parte adoptable (misma geometría que el plan)."""
+    from bolsa_application.estudio_daily_proposals import select_adoptable
+    from bolsa_domain.entities.estudio_daily_proposal import EstudioDailyProposal
+
+    async def _source(
+        account_id: str, decision_day: str, instruments: Sequence[str]
+    ) -> Any:
+        proposal = EstudioDailyProposal(
+            id="prop-seam",
+            account_id=account_id,
+            day=decision_day,
+            instrument_id="AAA",
+            status="proposed",
+            symbol="AAA",
+            decision_id="tp-AAA-seam",
+            signal_id="edo-AAA-seam",
+            bar_date=decision_day,
+            plan=dict(_SEAM_PLAN),
+        )
+        # El día de la vela es la MISMA frontera de decisión: la frescura no interviene y
+        # lo único que puede vetar es el precio.
+        return select_adoptable(
+            [proposal], instruments=instruments, decision_bar_day=decision_day
+        )
+
+    return AutoSimulationWorker(
+        clock=step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))[1],
+        exec_store=InMemoryExecutionEventStore(),
+        reservation_store=InMemoryReservationStore(),
+        exit_order_store=InMemoryExitOrderStore(),
+        sector_source=lambda _symbol: "tech",
+        liquidity_source=lambda _symbol: 1_000_000.0,
+        edge_source=_edge_source(),
+        price_source=price_source,
+        engine_id="w4-d1-seam",
+        account_id="acc-1",
+        daily_proposal_source=_source,
+    )
+
+
+def _entry_payloads(worker: AutoSimulationWorker) -> list[dict[str, Any]]:
+    return [
+        dict(entry.payload or {})
+        for entry in worker._v2_journal
+        if (entry.payload or {}).get("event") == "auto_entry_decision"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_the_proposal_veto_measures_the_fill_price_not_the_decision_price(
+    v2_env: None,
+) -> None:
+    """D-1 — decisión 100 (``close(B-1)``) con fill 96 (``open(B)``) y stop 97: NO se abre.
+
+    Sin contrastar el precio de ejecución, la geometría cuadraba con la decisión (100) y la
+    orden se liquidaba a 96: la posición nacía con el stop publicado POR ENCIMA del fill.
+    """
+    worker = _worker_with_daily_proposal(
+        _SplitSource(mid={"AAA": 100.0}, exec_={"AAA": 96.0})
+    )
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    assert worker._open.get("AAA", Decimal("0")) == 0, (
+        "un fill en/por debajo del stop publicado no puede abrir posición"
+    )
+    payloads = _entry_payloads(worker)
+    assert payloads, "el veto debe quedar declarado en el journal"
+    vetoed = payloads[0]
+    assert vetoed["approved"] is False
+    assert vetoed["reasonCodes"] == ["proposal_price_invalid"]
+    assert vetoed["proposalPriceConflict"]["code"] == "at_or_below_stop"
+    assert vetoed["proposalPriceConflict"]["executionPrice"] == 96.0
+    assert worker._v2_positions == {}
+
+
+@pytest.mark.asyncio
+async def test_a_fill_inside_the_published_geometry_still_opens(v2_env: None) -> None:
+    """Contraprueba D-1: el guard no es un veto ciego — con fill 99 (sobre el stop) se abre."""
+    worker = _worker_with_daily_proposal(
+        _SplitSource(mid={"AAA": 100.0}, exec_={"AAA": 99.0})
+    )
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    assert worker._open.get("AAA", Decimal("0")) > 0
+    assert worker._entry_price.get("AAA") == Decimal("99.0")
+    payloads = _entry_payloads(worker)
+    assert payloads and payloads[0]["approved"] is True
+    assert payloads[0]["tradePlan"]["structuralStop"] == 97.0

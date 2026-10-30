@@ -12,9 +12,11 @@ import type {
   TaxJurisdiction,
 } from "@bolsa/shared";
 import {
+  COST_BASIS_LABELS,
   POLICY_TEMPLATE_LABELS,
   TAX_PRESETS,
   calculateTradeFees,
+  describeTaxProfile,
   resolveCommissionProfile,
   suggestPolicyTemplateFromDeclared,
 } from "@bolsa/shared";
@@ -603,6 +605,7 @@ export function CreateAccountWizardDialog() {
         <AccountWizardCommissionsStep
           commissionPresetId={form.commissionPresetId}
           sampleFees={sampleFees}
+          currency={form.currency}
           onPatch={patch}
         />
       )}
@@ -613,6 +616,7 @@ export function CreateAccountWizardDialog() {
           costBasisMethod={form.costBasisMethod}
           stampDutyBuyPct={form.stampDutyBuyPct}
           dividendWithholdingPct={form.dividendWithholdingPct}
+          tax={settings.tax}
           notes={form.notes}
           onPatch={patch}
           onJurisdictionChange={(j) => {
@@ -637,8 +641,22 @@ export function CreateAccountWizardDialog() {
             ["Perfil inversor", profileReviewLabel()],
             ["Comisiones", settings.commission.label],
             [
-              "Fiscal",
-              `${form.taxJurisdiction} · ${form.costBasisMethod.toUpperCase()}`,
+              "Coste de una compra de 5.000",
+              `${formatPrice(sampleFees.total, form.currency)} · comisión ${formatPrice(
+                sampleFees.commission,
+                form.currency,
+              )} + IVA ${formatPrice(
+                sampleFees.vatOnCommission,
+                form.currency,
+              )} + transmisiones ${formatPrice(
+                sampleFees.stampDuty,
+                form.currency,
+              )}`,
+            ],
+            ["Fiscal", describeTaxProfile(settings.tax)],
+            [
+              "Método de coste",
+              COST_BASIS_LABELS[form.costBasisMethod] ?? form.costBasisMethod,
             ],
           ]}
         />

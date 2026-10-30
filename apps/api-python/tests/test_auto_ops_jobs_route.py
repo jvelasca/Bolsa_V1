@@ -15,6 +15,7 @@ from httpx import ASGITransport, AsyncClient
 import bolsa_api.api.v1.routes.auto_ops_jobs as route
 from bolsa_api.api.dependencies import get_db_session
 from bolsa_api.main import create_app
+from bolsa_application.auto_ops_jobs import EnqueueOutcome
 from bolsa_domain.entities.auto_ops_job import (
     JOB_KIND_ESTUDIO_DAILY,
     JOB_STATUS_COMPLETED,
@@ -66,9 +67,22 @@ class _FakeJobRepo:
         account_id: str | None,
         payload: dict[str, Any] | None = None,
     ) -> AutoOpsJob:
+        outcome = await self.enqueue_with_outcome(
+            kind=kind, day=day, account_id=account_id, payload=payload
+        )
+        return outcome.job
+
+    async def enqueue_with_outcome(
+        self,
+        *,
+        kind: str,
+        day: str,
+        account_id: str | None,
+        payload: dict[str, Any] | None = None,
+    ) -> Any:
         existing = await self.find_active(kind=kind, day=day, account_id=account_id)
         if existing is not None:
-            return existing
+            return EnqueueOutcome(job=existing, created=False)
         type(self)._seq += 1
         job = AutoOpsJob(
             id=f"job-{type(self)._seq}",
@@ -80,7 +94,7 @@ class _FakeJobRepo:
             created_at="2026-10-18T20:00:00+00:00",
         )
         self.jobs.append(job)
-        return job
+        return EnqueueOutcome(job=job, created=True)
 
     async def list_for_account(
         self, *, account_id: str | None, kind: str | None = None, limit: int = 20
@@ -260,9 +274,27 @@ async def test_slot_declares_server_truth_for_the_queue(
             json={"kind": kind, "day": day, "payload": {"symbol": "AAA"}},
         )
     ).json()
-    assert mine["slot"]["state"] == "active_same_request"
+    # D-4 — el hueco estaba LIBRE: el servidor encoló de verdad y lo declara.
+    assert mine["slot"]["state"] == "free"
     assert mine["slot"]["matchesRequest"] is True
     assert mine["slot"]["activeSymbol"] == "AAA"
+    assert "quedó encolado para AAA" in mine["slot"]["message"]
+    # Encolado ≠ iniciado: el mensaje no puede afirmar que ya empezó.
+    assert "iniciada" not in mine["slot"]["message"]
+
+    # El MISMO valor: el servidor ya no encola nada y devuelve el job activo.
+    same = (
+        await _request(
+            app,
+            "POST",
+            "/auto/ops-jobs",
+            json={"kind": kind, "day": day, "payload": {"symbol": "AAA"}},
+        )
+    ).json()
+    assert same["id"] == mine["id"]
+    assert same["slot"]["state"] == "active_same_request"
+    assert same["slot"]["matchesRequest"] is True
+    assert "aún no iniciada" in same["slot"]["message"]
 
     # Otro valor del MISMO día: el servidor devuelve el job activo y declara el choque.
     other = (
@@ -280,4 +312,6 @@ async def test_slot_declares_server_truth_for_the_queue(
     assert slot["activeSymbol"] == "AAA"
     assert slot["requestedSymbol"] == "BBB"
     assert slot["activeJobId"] == mine["id"]
-    assert "BBB queda pendiente" in slot["message"]
+    # El símbolo pedido NO quedó pendiente: la petición se descartó.
+    assert "NO se ha encolado" in slot["message"]
+    assert "queda pendiente" not in slot["message"]

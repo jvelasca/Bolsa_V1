@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -27,17 +28,54 @@ from bolsa_application.opportunity_daily_discovery import (
     resolve_universe_list_id,
 )
 from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.repositories.scan_job_repository import (
+    ScanJobRecord,
+    SqlAlchemyScanJobRepository,
+)
 
 logger = logging.getLogger(__name__)
 
 #: Motivo de journal/log cuando el tick de hoy ya estaba encolado (T-2, dedupe durable).
 SCAN_DAILY_ALREADY_ENQUEUED = "scan_daily_already_enqueued"
 
+#: D-3 (auditoría 2) — estados que SÍ representan «ya encolado hoy» para el dedupe durable.
+#: Un job ``failed`` NO ejecutó el descubrimiento: contarlo como encolado dejaba el día
+#: entero sin scan y sin aviso hasta el siguiente día UTC. La lista es de INCLUSIÓN (no de
+#: exclusión) para que un estado terminal futuro (p. ej. ``cancelled``) tampoco lo bloquee.
+SCAN_DAILY_DEDUPE_STATUSES: tuple[str, ...] = ("pending", "processing", "completed")
+
+#: D-3 — motivo declarado cuando el discovery del día FALLÓ: el silencio era el defecto.
+SCAN_DAILY_FAILED_TODAY = "scan_daily_failed_today"
+
 _last_ran_day_key: str | None = None
 
 
 def _utc_day_key() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%d")
+
+
+def _discovery_key(payload: Mapping[str, Any]) -> tuple[str, str | None]:
+    """Par ``(listId, accountId)`` de un payload de discovery (normalizado).
+
+    Es la clave del dedupe durable: el MISMO universo para la MISMA cuenta no se encola
+    dos veces el mismo día. Puro y sin I/O, para poder testearlo sin PostgreSQL.
+    """
+    universe = payload.get("universe")
+    raw_list = payload.get("listId") or (
+        universe.get("listId") if isinstance(universe, Mapping) else None
+    )
+    account = payload.get("opportunityAccountId")
+    return (
+        clamp_daily_ops_list_id(
+            str(raw_list or DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID)
+        ),
+        str(account) if account else None,
+    )
+
+
+def _dedupe_keys(payloads: Sequence[Mapping[str, Any]]) -> set[tuple[str, str | None]]:
+    """Pares ``(listId, accountId)`` ya encolados hoy (puro, sin I/O)."""
+    return {_discovery_key(payload) for payload in payloads}
 
 
 async def _resolve_targets(session: AsyncSession) -> list[dict[str, Any]]:
@@ -114,44 +152,83 @@ async def _targets_already_enqueued_today(session: AsyncSession) -> set[tuple[st
     T-2 hace el primer tick **inmediato**, así que un reinicio no puede re-encolar el mismo
     universo el mismo día: el guard en memoria (``_last_ran_day_key``) muere con el proceso,
     la fila de ``scan_jobs`` no.
-    """
-    from bolsa_infrastructure.database.repositories.scan_job_repository import (
-        SqlAlchemyScanJobRepository,
-    )
 
+    D-3 (auditoría 2): solo cuentan los estados de ``SCAN_DAILY_DEDUPE_STATUSES``. Antes el
+    dedupe no filtraba por estado, así que un job que terminó ``failed`` contaba como «ya
+    encolado hoy» y el día quedaba sin descubrimiento hasta el siguiente día UTC.
+    """
     day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     payloads = await SqlAlchemyScanJobRepository(session).list_payloads_since(
         since=day_start,
         payload_key=OPPORTUNITY_DISCOVERY_PAYLOAD_KEY,
+        statuses=SCAN_DAILY_DEDUPE_STATUSES,
     )
-    done: set[tuple[str, str | None]] = set()
-    for payload in payloads:
-        universe = payload.get("universe")
-        raw_list = payload.get("listId") or (
-            universe.get("listId") if isinstance(universe, dict) else None
-        )
-        account = payload.get("opportunityAccountId")
-        done.add(
-            (
-                clamp_daily_ops_list_id(str(raw_list or DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID)),
-                str(account) if account else None,
-            )
-        )
-    return done
+    return _dedupe_keys(payloads)
+
+
+async def _failed_discoveries_today(session: AsyncSession) -> list[ScanJobRecord]:
+    """D-3 — discovery del día que FALLARON (se declaran; ya no bloquean el reintento)."""
+    day_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    return await SqlAlchemyScanJobRepository(session).list_since(
+        since=day_start,
+        payload_key=OPPORTUNITY_DISCOVERY_PAYLOAD_KEY,
+        statuses=("failed",),
+    )
 
 
 async def _run_opportunity_daily_once(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> str | None:
+    """Un intento de discovery del día (idempotente y con REINTENTO de fallidos).
+
+    Capas de protección del día (de más barata a más durable):
+
+    1. ``_last_ran_day_key`` — guard en MEMORIA: muere con el proceso.
+    2. Dedupe DURABLE en ``scan_jobs`` — el MISMO ``(listId, cuenta)`` no se encola dos
+       veces el día UTC, aunque el proceso reinicie (T-2).
+
+    D-3 (auditoría 2): un discovery ``failed`` no ejecutó nada, así que NO cuenta como
+    «ya encolado» (``SCAN_DAILY_DEDUPE_STATUSES``) y el día se reintenta. El reintento
+    ocurre también DENTRO del mismo proceso: el guard en memoria solo corta cuando no hay
+    ningún fallido pendiente de reintento. La condición de «pendiente» es que su
+    ``(listId, cuenta)`` no esté ya cubierto por un job vivo o completado — así el aviso
+    ``scan_daily_failed_today`` solo se emite cuando ese hueco sigue sin cubrir (el caso en
+    que de verdad procede reintentar) y los reintentos quedan serializados uno a uno por el
+    dedupe durable (no uno por tick).
+
+    CONCURRENCIA (límite DECLARADO): ``scan_jobs`` no tiene una clave única de discovery,
+    así que esta función asume UN scheduler por despliegue. Dos schedulers concurrentes
+    pueden ver el dedupe vacío a la vez y encolar dos scans del mismo día; si el despliegue
+    deja de garantizar un único proceso, hace falta un claim atómico (o una clave única
+    por día/universo/cuenta) antes de confiar en este dedupe.
+    """
     global _last_ran_day_key
     day = _utc_day_key()
-    if _last_ran_day_key == day:
-        return None
 
     async with session_factory() as session:
         try:
             targets = await _resolve_targets(session)
             already = await _targets_already_enqueued_today(session)
+            # D-3 — un fallido SOLO es reintentable si su hueco no está ya cubierto por un
+            # job vivo o completado: si lo está, no hay nada que reintentar (y decirlo
+            # sería mentir en cada reinicio).
+            retryable = [
+                failed
+                for failed in await _failed_discoveries_today(session)
+                if _discovery_key(failed.payload) not in already
+            ]
+            if _last_ran_day_key == day and not retryable:
+                return None
+            for failed in retryable:
+                failed_list, failed_account = _discovery_key(failed.payload)
+                logger.warning(
+                    "Opportunity daily scan FALLÓ hoy y se REINTENTA — reason=%s job=%s "
+                    "list=%s account=%s",
+                    SCAN_DAILY_FAILED_TODAY,
+                    failed.id,
+                    failed_list,
+                    failed_account,
+                )
             enqueue_uc = get_enqueue_scan_job_use_case(session)
             discovery = EnqueueOpportunityDailyScan(enqueue_uc)
             for target in targets:

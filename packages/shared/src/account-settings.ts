@@ -114,7 +114,10 @@ export const TAX_PRESETS: Record<TaxJurisdiction, TaxProfile> = {
     costBasisMethod: "fifo",
     stampDutyBuyPct: 0.2,
     dividendWithholdingPct: 19,
-    capitalGainsTaxPct: null,
+    // Paridad con el dominio (`bolsa_domain.account_settings.TAX_PRESETS["ES"]`): el
+    // tramo inicial del ahorro es el tipo con el que se estima la plusvalía. Es una
+    // proyección, no una retención: la escala real es progresiva.
+    capitalGainsTaxPct: 19,
     fiscalYearStartMonth: 1,
   },
   EU_OTHER: {
@@ -174,7 +177,147 @@ export function defaultAccountSettings(
   };
 }
 
-/** Calcula comisiones e impuestos de una operación (cliente y servidor). */
+/**
+ * Catálogo único de PRESENTACIÓN de comisiones y fiscal.
+ *
+ * Panel de configuración, asistente de alta y ficha de cuenta leen de aquí: antes cada
+ * superficie escribía sus propios hints y el catálogo se desincronizaba del preset real
+ * (p. ej. mostraba «IVA 21 %» con un preset que ya no lo aplicaba).
+ */
+export const COMMISSION_PRESET_IDS: CommissionPresetId[] = [
+  "standard_es",
+  "xtb_zero_stock",
+  "ibkr_tiered",
+  "custom",
+  "none",
+];
+
+export const TAX_JURISDICTION_LABELS: Record<TaxJurisdiction, string> = {
+  ES: "España (ES)",
+  EU_OTHER: "Unión Europea (otro)",
+  US: "Estados Unidos",
+  CUSTOM: "Personalizado (definir a mano)",
+};
+
+export const COST_BASIS_LABELS: Record<CostBasisMethod, string> = {
+  fifo: "FIFO (primero en entrar, primero en salir)",
+  average: "Coste medio ponderado",
+};
+
+export const COST_BASIS_SHORT_LABELS: Record<CostBasisMethod, string> = {
+  fifo: "FIFO",
+  average: "Coste medio",
+};
+
+export function commissionPresetLabel(id: CommissionPresetId): string {
+  if (id === "custom") return "Personalizado";
+  return COMMISSION_PRESETS[id].label;
+}
+
+function pctEs(value: number): string {
+  return String(Number(value.toFixed(4))).replace(".", ",");
+}
+
+function amountEs(value: number, currency?: string): string {
+  const amount = value.toFixed(2).replace(".", ",");
+  return currency ? `${amount} ${currency}` : amount;
+}
+
+/**
+ * Hint del preset derivado de SUS NÚMEROS (no de un texto paralelo): si mañana cambia
+ * la comisión del preset, el hint cambia con ella.
+ */
+export function describeCommissionPreset(
+  id: CommissionPresetId,
+  options?: { currency?: string | null },
+): string {
+  if (id === "custom") {
+    return "Parámetros manuales de comisión, IVA, FX y custodia";
+  }
+  if (id === "none") {
+    // Honestidad (COM-D12): «sin comisiones» NO significa «sin impuestos». El impuesto
+    // de transmisiones sale del perfil fiscal, no del preset de comisión: con ES el
+    // backend sigue cobrando el 0,2 % en las compras.
+    return "Sin comisión de operación · los impuestos dependen de la jurisdicción";
+  }
+  return describeCommissionProfile(COMMISSION_PRESETS[id], options);
+}
+
+/**
+ * Detalle de un perfil de comisión CONCRETO (preset o personalizado). A diferencia de
+ * `describeCommissionPreset`, aquí los números salen del propio perfil, así que sirve
+ * para el preset `custom` que el usuario ha editado.
+ */
+export function describeCommissionProfile(
+  profile: CommissionProfile,
+  options?: { currency?: string | null },
+): string {
+  const currency = options?.currency?.trim() || undefined;
+  const parts: string[] = [];
+  if (profile.stockCommissionPct > 0) {
+    parts.push(`${pctEs(profile.stockCommissionPct)} % comisión`);
+  } else {
+    parts.push("0 % comisión en acciones");
+  }
+  if (profile.stockCommissionMin > 0) {
+    parts.push(`mín. ${amountEs(profile.stockCommissionMin, currency)}`);
+  }
+  if (profile.stockCommissionMax != null) {
+    parts.push(`máx. ${amountEs(profile.stockCommissionMax, currency)}`);
+  }
+  if (profile.vatOnCommissionPct > 0) {
+    parts.push(`IVA ${pctEs(profile.vatOnCommissionPct)} %`);
+  }
+  if (profile.fxConversionPct > 0) {
+    parts.push(`FX ${pctEs(profile.fxConversionPct)} %`);
+  }
+  if (profile.custodyAnnualPct != null && profile.custodyAnnualPct > 0) {
+    parts.push(`custodia ${pctEs(profile.custodyAnnualPct)} % anual`);
+  }
+  return parts.join(" · ");
+}
+
+/** Tipos que el backend aplicará de verdad en el informe fiscal (para resúmenes). */
+export function describeTaxProfile(tax: TaxProfile): string {
+  const parts = [
+    TAX_JURISDICTION_LABELS[tax.jurisdiction] ?? tax.jurisdiction,
+    COST_BASIS_SHORT_LABELS[tax.costBasisMethod] ?? tax.costBasisMethod,
+  ];
+  if (tax.stampDutyBuyPct > 0)
+    parts.push(`transmisiones ${pctEs(tax.stampDutyBuyPct)} %`);
+  if (tax.dividendWithholdingPct > 0) {
+    parts.push(`retención div. ${pctEs(tax.dividendWithholdingPct)} %`);
+  }
+  if (tax.capitalGainsTaxPct != null && tax.capitalGainsTaxPct > 0) {
+    parts.push(`plusvalías ${pctEs(tax.capitalGainsTaxPct)} %`);
+  }
+  return parts.join(" · ");
+}
+
+/**
+ * Cuantiza a 4 decimales con HALF_UP: misma semántica que
+ * `Decimal.quantize(Decimal("0.0001"), ROUND_HALF_UP)` del dominio Python
+ * (`bolsa_domain.account_settings.calculate_trade_fees`). Sin esta cuantización la
+ * vista previa del navegador podía diferir del asiento real en la 4.ª decimal.
+ *
+ * Todos los importes de comisión son no negativos; el signo se conserva por robustez.
+ */
+export function quantizeMoney4(value: number): number {
+  if (!Number.isFinite(value)) return value;
+  const sign = value < 0 ? -1 : 1;
+  // `toFixed(6)` neutraliza el error binario (p. ej. 1234.5678 * 1e4 = 12345678.000000002)
+  // antes del redondeo, sin mover los medios exactos (.5 ⇒ hacia arriba).
+  const scaled = Number((Math.abs(value) * 1e4).toFixed(6));
+  return (sign * Math.round(scaled)) / 1e4;
+}
+
+/**
+ * Calcula comisiones e impuestos de una operación (cliente y servidor).
+ *
+ * Contrato de paridad con el dominio Python: el IVA se aplica sobre la comisión SIN
+ * redondear y el total se suma SIN redondear; solo el resultado final de cada
+ * componente se cuantiza a 4 decimales. Redondear los intermedios cambiaría el asiento.
+ */
 export function calculateTradeFees(
   notional: number,
   side: "buy" | "sell",
@@ -202,11 +345,11 @@ export function calculateTradeFees(
       : 0;
   const total = commissionAmount + vatOnCommission + stampDuty + fxConversion;
   return {
-    commission: commissionAmount,
-    vatOnCommission,
-    stampDuty,
-    fxConversion,
-    total,
+    commission: quantizeMoney4(commissionAmount),
+    vatOnCommission: quantizeMoney4(vatOnCommission),
+    stampDuty: quantizeMoney4(stampDuty),
+    fxConversion: quantizeMoney4(fxConversion),
+    total: quantizeMoney4(total),
     currency: options?.currency ?? "EUR",
   };
 }

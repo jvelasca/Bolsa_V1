@@ -25,6 +25,7 @@ y la Simulation Gate del worker).
 from __future__ import annotations
 
 import logging
+import math
 import os
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -100,6 +101,7 @@ from bolsa_application.auto_reason_codes import (
     OPPORTUNITY_EXPIRED,
     OPPORTUNITY_REJECTED,
     OPPORTUNITY_TRADED,
+    PROPOSAL_PRICE_INVALID,
     RESERVATION_FAILED,
 )
 from bolsa_application.decision_contract import DecisionPackage, GatedState
@@ -113,6 +115,10 @@ from bolsa_application.discovery_market_regime import (
     REGIME_TREND_DOWN,
     REGIME_TREND_UP,
     classify_market_regime,
+)
+from bolsa_application.estudio_daily_proposals import (
+    PROPOSAL_MAX_ENTRY_DIVERGENCE_PCT,
+    proposal_price_conflict,
 )
 from bolsa_application.portfolio_decision_engine import (
     DecisionReasonCode,
@@ -685,6 +691,12 @@ class V2Signal:
     # Si se aporta, manda sobre ``sector``/``liquidity_notional`` sueltos: es la vía por
     # la que el worker comunica KNOWN/STALE/CONFLICTING/UNKNOWN sin perder información.
     trade_context: TradeContext | None = None
+    # D-1 (auditoría 2) — precio de EJECUCIÓN del tick (con fuente real, ``open(B)``), si el
+    # productor lo declara. ``price`` es el precio de DECISIÓN (``close(B-1)``) y ambos son
+    # fronteras distintas a propósito: la geometría del parte se contrasta contra el precio
+    # al que de verdad se liquida la orden, no solo contra el de la decisión. ADITIVA: sin
+    # productor que la declare (``None``) el contraste usa ``price`` y el tick es Δ = 0.
+    execution_price: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1291,6 +1303,9 @@ def plan_v2_tick(
     geometría publicada (entrada/stop/objetivo) y la señal adoptada viaja ya en
     ``V2Signal.signal_id``: el ciclo durable nace con la MISMA identidad que el usuario
     vio en pantalla. Con ``None`` (o sin entrada) el tick es byte-idéntico al histórico.
+    La geometría se contrasta con ``V2Signal.execution_price`` cuando el productor lo
+    declara (precio de FILL, ``open(B)``) y con ``V2Signal.price`` (decisión) en caso
+    contrario: el veto de precio tiene que medir el precio al que se ejecuta la orden.
     """
     cfg = tunables if tunables is not None else V2Tunables()
     # B-5 — los HOLD con motivo de la ACTIVE se declaran APARTE del embudo: no compiten, no
@@ -1637,10 +1652,60 @@ def plan_v2_tick(
         # nada tienen que ver con el parte.
         stop_price: float | None = None
         target_price: float | None = None
+        # D-1 (auditoría 2) — la geometría del parte se contrasta con el precio VIVO antes
+        # de adoptarla. ``select_adoptable`` certifica identidad y frescura, no que el plan
+        # siga siendo ejecutable hoy: con el mercado en/por debajo del stop publicado la
+        # posición nacía con el stop encima (cierre en el primer tick) y con el precio muy
+        # por encima de la entrada el riesgo real por acción no era el presupuestado. La
+        # orden se ejecuta al precio VIVO, así que dimensionar con la entrada del parte sin
+        # contrastarla es una atribución falsa.
+        proposal_conflict: str | None = None
+        proposal_price_detail: dict[str, Any] | None = None
         if proposal is not None:
-            entry_price = _declared_number(proposal, "entry") or entry_price
-            stop_price = _declared_number(proposal, "structuralStop")
-            target_price = _declared_number(proposal, "target1")
+            # D-1 — el contraste se hace contra el precio al que la orden se LIQUIDA: con
+            # fuente real ``signal.price`` es la decisión (``close(B-1)``) y
+            # ``execution_price`` la ejecución (``open(B)``). Contratar solo la decisión
+            # dejaba pasar el fill que abre en/por debajo del stop publicado. Sin precio de
+            # ejecución declarado se conserva el contraste histórico (Δ = 0).
+            contrast_price = (
+                signal.execution_price
+                if signal.execution_price is not None
+                else signal.price
+            )
+            proposal_conflict = proposal_price_conflict(
+                proposal,
+                market_price=contrast_price,
+                direction=_ENTRY_DIRECTION,
+            )
+            if proposal_conflict is None:
+                entry_price = _declared_number(proposal, "entry") or entry_price
+                stop_price = _declared_number(proposal, "structuralStop")
+                target_price = _declared_number(proposal, "target1")
+            else:
+                # El veto viaja con los números que lo decidieron (no con una etiqueta).
+                # Los niveles se sanitizan: el detalle se persiste en el journal (JSONB) y
+                # un ``NaN``/``inf`` crudo rompería el JSON. El MOTIVO ya declara el
+                # problema (``geometry_not_finite``); el valor no representable no se cuela.
+                proposal_price_detail = {
+                    "code": proposal_conflict,
+                    "marketPrice": (
+                        signal.price
+                        if math.isfinite(signal.price) and signal.price > 0
+                        else None
+                    ),
+                    "entry": _json_safe_number(proposal, "entry"),
+                    "structuralStop": _json_safe_number(proposal, "structuralStop"),
+                    "target1": _json_safe_number(proposal, "target1"),
+                    "tolerancePct": PROPOSAL_MAX_ENTRY_DIVERGENCE_PCT,
+                }
+                if (
+                    signal.execution_price is not None
+                    and math.isfinite(signal.execution_price)
+                    and signal.execution_price != signal.price
+                ):
+                    # Solo cuando DIFIERE de la decisión: es el número que produjo el veto.
+                    proposal_price_detail["executionPrice"] = signal.execution_price
+        adopted_proposal = proposal if proposal_conflict is None else None
         decision = decide_portfolio(
             instrument_id=signal.instrument_id,
             direction=_ENTRY_DIRECTION,
@@ -1663,8 +1728,25 @@ def plan_v2_tick(
             ),
             # Handoff: la identidad del PLAN es la del parte cuando se adoptó. Es OTRA
             # identidad que la del claim, a propósito (la reserva no cambia de clave).
-            plan_id=str((proposal or {}).get("planId") or ""),
+            plan_id=str((adopted_proposal or {}).get("planId") or ""),
         )
+        if proposal_conflict is not None:
+            # D-1 — veto ANTES de construir el paquete: una aprobación con el plan del
+            # motor NO es adoptable cuando la geometría del parte no cuadra con el precio
+            # vivo. Se anula también el ``trade_plan``/``allocation`` para que el seam
+            # (``trade_plan_to_decision_package``) no emita propuesta ni se materialice
+            # reserva: ningún camino aguas abajo puede ejecutar este plan.
+            decision = replace(
+                decision,
+                approved=False,
+                action="HOLD",
+                reason_codes=cast(
+                    "tuple[DecisionReasonCode, ...]", (PROPOSAL_PRICE_INVALID,)
+                ),
+                trade_plan=None,
+                allocation=None,
+                plan_violations=(),
+            )
         decisions.append(decision)
         decision_keys.append(signal_key)
         package = trade_plan_to_decision_package(
@@ -1768,6 +1850,9 @@ def plan_v2_tick(
                 # que la cadena pueda demostrar la igualdad EXACTA de identidades (y su
                 # ausencia cuando no la hubo). Se omite si no hay propuesta.
                 daily_proposal=proposal,
+                # D-1 — si la propuesta NO se adoptó por precio, el journal lleva el
+                # motivo y los números que lo decidieron (mercado, entrada, stop, target).
+                proposal_price_conflict_detail=proposal_price_detail,
             )
         )
 
@@ -2597,6 +2682,19 @@ def _declared_number(row: Mapping[str, Any], key: str) -> float | None:
         return None
 
 
+def _json_safe_number(row: Mapping[str, Any], key: str) -> float | None:
+    """Nivel declarado saneado para el journal: un no finito viaja como ``None``.
+
+    El detalle del veto se sella en el journal (``JSONB``): ``json.dumps`` escribiría
+    ``NaN``/``Infinity`` y PostgreSQL rechaza ese JSON como inválido. La AUSENCIA del
+    número no oculta nada — el motivo (``geometry_not_finite``) es el que lo declara.
+    """
+    value = _declared_number(row, key)
+    if value is None or not math.isfinite(value):
+        return None
+    return value
+
+
 def _journal_entry(
     decision: PortfolioDecision,
     *,
@@ -2618,6 +2716,7 @@ def _journal_entry(
     market_regime: str | None = None,
     entry_regime_scope: str | None = None,
     daily_proposal: Mapping[str, Any] | None = None,
+    proposal_price_conflict_detail: Mapping[str, Any] | None = None,
 ) -> DecisionJournalEntryRecord:
     from uuid import uuid4
 
@@ -2710,6 +2809,11 @@ def _journal_entry(
         }
         if proposal_payload:
             payload["dailyProposal"] = proposal_payload
+    # D-1 — el contraste precio vivo ↔ geometría publicada que vetó la adopción. Es una
+    # clave ADITIVA (JSONB, sin migración) y se OMITE cuando no hubo conflicto: la
+    # ausencia es información, jamás un relleno.
+    if proposal_price_conflict_detail is not None:
+        payload["proposalPriceConflict"] = dict(proposal_price_conflict_detail)
     if decision.opportunity_score is not None:
         payload["opportunityScore"] = decision.opportunity_score
     if score is not None and score.rank is not None:

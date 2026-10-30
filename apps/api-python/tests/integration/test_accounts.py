@@ -1,10 +1,10 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
-from tests.conftest import purge_accounts
-from tests.opening_gate_seed import seed_http_opening_allow
 
 from bolsa_api.main import create_app, lifespan
+from tests.conftest import purge_accounts
+from tests.opening_gate_seed import seed_http_opening_allow
 
 STANDARD_ES_SETTINGS = {
     "commission": {
@@ -22,7 +22,10 @@ STANDARD_ES_SETTINGS = {
         "costBasisMethod": "fifo",
         "stampDutyBuyPct": 0.2,
         "dividendWithholdingPct": 19,
-        "capitalGainsTaxPct": None,
+        # COM-D1: paridad con el dominio (`TAX_PRESETS["ES"].capital_gains_tax_pct`).
+        # Antes este fixture fijaba `null`, que era justo la divergencia que dejaba
+        # la estimación fiscal siempre vacía.
+        "capitalGainsTaxPct": 19,
         "fiscalYearStartMonth": 1,
     },
     "notes": None,
@@ -104,12 +107,20 @@ async def test_create_account_with_settings_and_trade_fees() -> None:
             try:
                 assert account["settings"]["commission"]["presetId"] == "standard_es"
                 assert account.get("activeProfileId")  # perfil moderate por defecto
+                # COM-D1 — el perfil fiscal viaja íntegro: la proyección de plusvalías
+                # es un campo del contrato, no un adorno del preset TS.
+                assert account["settings"]["tax"]["capitalGainsTaxPct"] == 19
 
                 patch = await client.patch(
                     f"/api/accounts/{account_id}/settings",
                     json={"settings": STANDARD_ES_SETTINGS},
                 )
                 assert patch.status_code == 200
+                patched = patch.json()["data"]["settings"]["tax"]
+                assert patched["costBasisMethod"] == "fifo"
+                assert patched["capitalGainsTaxPct"] == 19
+                assert patched["dividendWithholdingPct"] == 19
+                assert patched["stampDutyBuyPct"] == pytest.approx(0.2)
 
                 instrument_id = await _first_instrument_id(client)
                 await seed_http_opening_allow(app, client, account_id, instrument_id)

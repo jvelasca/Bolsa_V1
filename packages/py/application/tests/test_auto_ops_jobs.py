@@ -16,6 +16,7 @@ import pytest
 
 from bolsa_application.auto_ops_jobs import (
     EnqueueAutoOpsJob,
+    EnqueueOutcome,
     GetAutoOpsJob,
     ListAutoOpsJobs,
 )
@@ -58,9 +59,22 @@ class _FakeJobRepo:
         account_id: str | None,
         payload: dict[str, Any] | None = None,
     ) -> AutoOpsJob:
+        outcome = await self.enqueue_with_outcome(
+            kind=kind, day=day, account_id=account_id, payload=payload
+        )
+        return outcome.job
+
+    async def enqueue_with_outcome(
+        self,
+        *,
+        kind: str,
+        day: str,
+        account_id: str | None,
+        payload: dict[str, Any] | None = None,
+    ) -> EnqueueOutcome:
         existing = await self.find_active(kind=kind, day=day, account_id=account_id)
         if existing is not None:
-            return existing
+            return EnqueueOutcome(job=existing, created=False)
         self._seq += 1
         job = AutoOpsJob(
             id=f"job-{self._seq}",
@@ -71,7 +85,7 @@ class _FakeJobRepo:
             payload=dict(payload or {}),
         )
         self.jobs.append(job)
-        return job
+        return EnqueueOutcome(job=job, created=True)
 
     async def list_for_account(
         self, *, account_id: str | None, kind: str | None = None, limit: int = 20
@@ -96,6 +110,38 @@ async def test_two_runs_of_the_same_day_do_not_duplicate_the_active_job() -> Non
 
     assert first.id == second.id
     assert len(repo.jobs) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_outcome_declares_whether_this_request_created_the_job() -> None:
+    """D-4 — ``created`` distingue «encolado ahora» de «ya ocupado por otro trabajo»."""
+    repo = _FakeJobRepo()
+    use_case = EnqueueAutoOpsJob(repo)
+
+    first = await use_case.execute_with_outcome(
+        kind=JOB_KIND_DIA_D_VALUE_REPLAY,
+        account_id="acc-1",
+        day="2026-10-18",
+        payload={"symbol": "AAA"},
+    )
+    second = await use_case.execute_with_outcome(
+        kind=JOB_KIND_DIA_D_VALUE_REPLAY,
+        account_id="acc-1",
+        day="2026-10-18",
+        payload={"symbol": "BBB"},
+    )
+
+    assert first.created is True
+    assert second.created is False
+    # El job devuelto es el MISMO: el segundo símbolo no se encoló.
+    assert second.job.id == first.job.id
+    # El camino histórico (`execute`) sigue devolviendo solo el job.
+    assert (await use_case.execute(
+        kind=JOB_KIND_DIA_D_VALUE_REPLAY,
+        account_id="acc-1",
+        day="2026-10-18",
+        payload={"symbol": "CCC"},
+    )).id == first.job.id
 
 
 @pytest.mark.asyncio

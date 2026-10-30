@@ -123,6 +123,10 @@ DecisionReasonCode = Literal[
     "exposure_measurement_unknown",
     "open_orders_unmeasurable",
     "plan_invalid",
+    # Handoff ESTUDIO → AUTO (D-1, auditoría 2) — la geometría publicada por el parte no
+    # es ejecutable al precio VIVO del tick (mercado en/por debajo del stop, objetivo ya
+    # alcanzado o divergencia fuera de tolerancia). Veto de ENTRADA con motivo propio.
+    "proposal_price_invalid",
     # AUTO-1 — no se pudo materializar la reserva de una aprobación (no existe aprobación
     # sin reserva): la decisión se degrada a veto con este motivo.
     "reservation_failed",
@@ -159,6 +163,8 @@ _NO_TRADE_REASONS: frozenset[str] = frozenset(
         "exposure_measurement_unknown",
         "open_orders_unmeasurable",
         "plan_invalid",
+        # D-1 (auditoría 2) — plan del parte no ejecutable al precio vivo.
+        "proposal_price_invalid",
         # AUTO-1 — aprobación que no pudo materializarse en reserva.
         "reservation_failed",
         # V2.43/AUTO-3 — veto de PERMISO del gobernador (sin entradas / parada total).

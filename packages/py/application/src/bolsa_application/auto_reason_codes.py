@@ -111,6 +111,12 @@ RESERVATION_UNMEASURABLE = "reservation_unmeasurable"
 # AUTO-1b — no se apila un segundo compromiso sobre un instrumento ya reservado.
 RESERVATION_ALREADY_LIVE = "reservation_already_live"
 
+# D-1 (auditoría 2) — handoff ESTUDIO → AUTO: la geometría que publicó el parte NO es
+# ejecutable al precio VIVO del tick (mercado en/por debajo del stop, objetivo alcanzado o
+# divergencia fuera de tolerancia). Veto de ENTRADA con motivo propio: sin él la orden se
+# ejecutaba al precio vivo con el stop publicado encima del mercado.
+PROPOSAL_PRICE_INVALID = "proposal_price_invalid"
+
 # AUTO-2 — FSM de la posición: ratchet de stop y degradación de protección.
 STOP_RATCHET_APPLIED = "stop_ratchet_applied"
 STOP_RATCHET_REJECTED = "stop_ratchet_rejected"
@@ -415,6 +421,7 @@ __all__ = [
     "POSITION_ROW_UNRECONCILED",
     "POSITION_SKIP_REASONS",
     "POSITION_UNMANAGED",
+    "PROPOSAL_PRICE_INVALID",
     "PROTECTION_MISSING",
     "PROTECT_REQUESTED",
     "RECONCILIATION_REQUIRED",

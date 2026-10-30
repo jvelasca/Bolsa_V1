@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -88,21 +89,21 @@ class SqlAlchemyScanJobRepository:
         result = await self._session.execute(stmt)
         return [self._to_record(row) for row in result.scalars().all()]
 
-    async def list_payloads_since(
+    async def list_since(
         self,
         *,
         since: datetime,
         payload_key: str,
+        statuses: Sequence[str] | None = None,
         limit: int = 500,
-    ) -> list[dict[str, Any]]:
-        """Payloads de jobs con ``payload[payload_key]`` verdadero creados desde ``since``.
+    ) -> list[ScanJobRecord]:
+        """Filas (con ``id``) de jobs con el marcador, creados desde ``since``.
 
-        Sirve al dedupe *durable* del scan diario (T-2): un reinicio del proceso no debe
-        volver a encolar el mismo universo el mismo día. Filtra en SQL (JSONB) para no
-        depender de cuántos scans manuales haya habido.
+        D-3 (auditoría 2) — variante con IDENTIDAD de ``list_payloads_since``: el aviso de
+        discovery fallido necesita el ``jobId`` para ser accionable, no solo el payload.
         """
         stmt = (
-            select(ScanJobRow.payload)
+            select(ScanJobRow)
             .where(
                 ScanJobRow.created_at >= since,
                 ScanJobRow.payload[payload_key].astext == "true",
@@ -110,8 +111,39 @@ class SqlAlchemyScanJobRepository:
             .order_by(ScanJobRow.created_at.desc())
             .limit(limit)
         )
+        if statuses is not None:
+            stmt = stmt.where(ScanJobRow.status.in_(tuple(statuses)))
         result = await self._session.execute(stmt)
-        return [payload for payload in result.scalars().all() if isinstance(payload, dict)]
+        return [self._to_record(row) for row in result.scalars().all()]
+
+    async def list_payloads_since(
+        self,
+        *,
+        since: datetime,
+        payload_key: str,
+        statuses: Sequence[str] | None = None,
+        limit: int = 500,
+    ) -> list[dict[str, Any]]:
+        """Payloads de jobs con ``payload[payload_key]`` verdadero creados desde ``since``.
+
+        Sirve al dedupe *durable* del scan diario (T-2): un reinicio del proceso no debe
+        volver a encolar el mismo universo el mismo día. Filtra en SQL (JSONB) para no
+        depender de cuántos scans manuales haya habido.
+
+        ``statuses`` (D-3, auditoría 2) acota el dedupe a los estados que de verdad
+        representan trabajo VIVO O HECHO. Sin filtro, un job ``failed`` contaba como "ya
+        encolado hoy" y el día entero quedaba sin descubrimiento y sin aviso; el llamante
+        pasa la lista de INCLUSIÓN (``pending``/``processing``/``completed``) y consulta
+        aparte los fallidos para declararlos. ``None`` conserva el contrato histórico
+        (cualquier estado).
+        """
+        records = await self.list_since(
+            since=since,
+            payload_key=payload_key,
+            statuses=statuses,
+            limit=limit,
+        )
+        return [record.payload for record in records]
 
     async def claim_next(self) -> ScanJobRecord | None:
         stmt = (

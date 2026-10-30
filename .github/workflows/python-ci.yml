@@ -507,6 +507,8 @@ jobs:
     # backend, no solo en el tag. El E2E A12 (DISCOVERY → SHADOW → SIM → READOPT →
     # VIGILANCIA) y las migraciones 032/033/034 se validan en cada push/PR, con gates
     # fail-if-skipped: un skip silencioso aquí es un fallo duro.
+    # 061: además certifica ``alembic check`` (drift con allowlist declarada), el
+    # diagnóstico read-only de la BD y la configuración de proveedores de 059/060.
     name: lifecycle-pg (Alembic + A12 E2E, per-commit)
     runs-on: ubuntu-latest
     services:
@@ -535,6 +537,13 @@ jobs:
       STRATEGY_LIFECYCLE_PG_REQUIRED: '1'
       # T-1/T-2: salud de ``scan_jobs`` y dedupe durable del scan diario (JSONB real).
       SCAN_QUEUE_PG_REQUIRED: '1'
+      # 059/060: configuración de proveedores y política de comprobación.
+      MARKET_PROVIDERS_PG_REQUIRED: '1'
+      # 061: ``alembic check`` como gate real. La allowlist declara la deuda histórica;
+      # una divergencia NUEVA falla aquí (no se puede silenciar con un skip).
+      SCHEMA_DRIFT_PG_REQUIRED: '1'
+      # 061: diagnóstico read-only de la BD (esquema, capacidad, vacuum, copias).
+      DATABASE_MAINTENANCE_PG_REQUIRED: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -565,7 +574,11 @@ jobs:
           apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
           apps/api-python/tests/test_strategy_lifecycle_pg.py
           apps/api-python/tests/test_scan_queue_health_pg.py
+          apps/api-python/tests/test_market_providers_pg.py
+          apps/api-python/tests/test_schema_drift_gate_pg.py
+          apps/api-python/tests/test_database_maintenance_pg.py
           packages/py/application/tests/test_sim_strategy_attribution.py
+          packages/py/infrastructure/tests/test_schema_contract.py
           -q
           --tb=short
 

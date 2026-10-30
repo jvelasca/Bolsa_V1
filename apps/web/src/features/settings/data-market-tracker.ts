@@ -15,7 +15,8 @@ export const DATA_MARKET_SYNC = {
   adrIntraday: "docs/adr/007-intraday-ohlcv-persistence.md",
   configHint:
     "Configuración → Sync / proveedores (sync automática y estado de proveedores)",
-  bdHint: "Configuración → BD (conteos, huérfanos y purga)",
+  bdHint:
+    "Configuración → BD (diagnóstico read-only: esquema, capacidad, mantenimiento y copias; conteos, huérfanos y purga)",
 } as const;
 
 /** Orientación en lenguaje llano (primera tarjeta). */

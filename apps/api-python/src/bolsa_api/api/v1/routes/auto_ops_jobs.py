@@ -118,17 +118,39 @@ def job_to_dto(job: AutoOpsJob, *, slot: AutoOpsJobSlotDto | None = None) -> Aut
     )
 
 
-def build_slot(job: AutoOpsJob, *, requested_symbol: str | None) -> AutoOpsJobSlotDto:
+def build_slot(
+    job: AutoOpsJob, *, requested_symbol: str | None, created: bool = False
+) -> AutoOpsJobSlotDto:
     """Verdad de servidor del hueco de la cola para esta petición.
 
     ``matchesRequest`` es la ÚNICA fuente para saber si el job devuelto es el que el
     usuario pidió: comparar ``payload.symbol`` en el cliente era una inferencia que
     fallaba justo cuando importaba (dos valores del mismo día se serializan).
+
+    D-4 (auditoría 2): ``created`` distingue lo que el servidor HIZO de lo que devolvió.
+    Antes ``free`` era inalcanzable desde el POST (el job devuelto siempre era el activo) y
+    un job recién creado se rotulaba «ya en curso, iniciada …»; además, al chocar con otro
+    valor, el mensaje decía que el pedido «queda pendiente» cuando en realidad se descartó.
     """
     active_symbol = (
         str((job.payload or {}).get("symbol") or "").strip().upper() or None
     )
     requested = str(requested_symbol or "").strip().upper() or None
+    if created:
+        # El hueco estaba libre: ESTA petición lo creó. ``started_at`` puede ser ``None``
+        # (encolado ≠ iniciado) y el mensaje no puede afirmar que ya empezó.
+        return AutoOpsJobSlotDto(
+            state="free",
+            active_job_id=job.id,
+            active_symbol=active_symbol,
+            requested_symbol=requested,
+            matches_request=True,
+            started_at=job.started_at,
+            message=(
+                "Hueco libre: el trabajo quedó encolado para "
+                f"{requested}." if requested else "Hueco libre: el trabajo quedó encolado."
+            ),
+        )
     if not job.is_active:
         return AutoOpsJobSlotDto(
             state="free",
@@ -137,11 +159,13 @@ def build_slot(job: AutoOpsJob, *, requested_symbol: str | None) -> AutoOpsJobSl
             requested_symbol=requested,
             matches_request=False,
             started_at=job.started_at or job.created_at,
-            message=(
-                "Hueco libre: el trabajo quedó encolado para "
-                f"{requested}." if requested else "Hueco libre: el trabajo quedó encolado."
-            ),
+            message="Hueco libre: no hay trabajo activo en esta cola.",
         )
+    when = (
+        f"iniciada {job.started_at}"
+        if job.started_at
+        else f"en cola desde {job.created_at or 'sin marca'}, aún no iniciada"
+    )
     matches = requested == active_symbol
     if matches:
         return AutoOpsJobSlotDto(
@@ -152,9 +176,9 @@ def build_slot(job: AutoOpsJob, *, requested_symbol: str | None) -> AutoOpsJobSl
             matches_request=True,
             started_at=job.started_at or job.created_at,
             message=(
-                "Verificación ya en curso para "
-                f"{active_symbol} (job {job.id}, iniciada "
-                f"{job.started_at or job.created_at or 'sin marca'})."
+                f"Verificación ya en curso para {active_symbol} (job {job.id}, {when})."
+                if active_symbol
+                else f"El trabajo de la cola ya existe (job {job.id}, {when})."
             ),
         )
     detail = (
@@ -171,10 +195,8 @@ def build_slot(job: AutoOpsJob, *, requested_symbol: str | None) -> AutoOpsJobSl
         matches_request=False,
         started_at=job.started_at or job.created_at,
         message=(
-            f"{detail} (job {job.id}, iniciada "
-            f"{job.started_at or job.created_at or 'sin marca'}). "
-            "La cola admite una por cuenta y día; "
-            f"{pending} queda pendiente."
+            f"{detail} (job {job.id}, {when}). La cola admite una por cuenta y día: "
+            f"{pending} NO se ha encolado; vuelve a pedirlo cuando termine la actual."
         ),
     )
 
@@ -198,7 +220,7 @@ async def create_auto_ops_job(
         raise _no_scope()
     repo = SqlAlchemyAutoOpsJobRepository(session)
     try:
-        job = await EnqueueAutoOpsJob(repo).execute(
+        outcome = await EnqueueAutoOpsJob(repo).execute_with_outcome(
             kind=body.kind,
             account_id=scope,
             day=body.day,
@@ -206,16 +228,20 @@ async def create_auto_ops_job(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    job = outcome.job
     await session.commit()
     logger.info(
-        "auto_ops_job encolado %s (%s · día %s · cuenta %s)",
+        "auto_ops_job %s %s (%s · día %s · cuenta %s)",
+        "encolado" if outcome.created else "ya activo (no encolado)",
         job.id,
         job.kind,
         job.day,
         job.account_id,
     )
     slot = build_slot(
-        job, requested_symbol=str((body.payload or {}).get("symbol") or "").strip() or None
+        job,
+        requested_symbol=str((body.payload or {}).get("symbol") or "").strip() or None,
+        created=outcome.created,
     )
     return job_to_dto(job, slot=slot)
 

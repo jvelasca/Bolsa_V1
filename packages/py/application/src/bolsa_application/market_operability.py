@@ -185,6 +185,9 @@ VETO_BUCKET_BY_REASON: dict[str, str] = {
     "sector_exposure_unverifiable": BUCKET_DATA,
     "stale_data": BUCKET_DATA,
     "atr_unknown": BUCKET_DATA,
+    # D-1 (auditoría 2) — la geometría del parte no cuadra con el precio vivo: dato no
+    # verificable (fail-closed), no un veto de cantidad de riesgo ni un hecho de régimen.
+    "proposal_price_invalid": BUCKET_DATA,
     # V2.79 — motivos del OPTIMIZADOR y del ADAPTIVE: son decisiones de ENTRADA (la candidata se
     # evaluó y no entró, o su estrategia está pausada) ⇒ vetos con familia, nunca ``other``.
     **{code: _OPTIMIZER_BUCKET_OVERRIDES.get(code, BUCKET_RISK) for code in OPTIMIZER_REASONS},

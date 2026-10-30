@@ -62,7 +62,9 @@ Noticias Yahoo y macro (VIX / curva) se usan en el camino cognitivo con TTL en m
 | **Rastreadores** | No (OHLCV) | Usan barras en BD; híbrido puede refrescar solo fundamentales stale |
 
 Ajustes: **Configuración → Sync / proveedores** (universo listas vs todos, pausas, post-cierre, proveedores).  
-Estado y mantenimiento PostgreSQL: **Configuración → BD** (conteos, huérfanos, demos cerradas, purga).  
+Estado y mantenimiento PostgreSQL: **Configuración → BD** — diagnóstico **read-only** de esquema/head,
+capacidad, vacuum/analyze, conexiones, integridad y **estado de las copias**; más conteos,
+huérfanos, demos cerradas y purga explícita.
 Ayuda → Datos de mercado → «¿Qué se actualiza solo?» / «Quitar de lista y limpiar BD».
 
 ## Ciclo de vida: listas ↔ BD

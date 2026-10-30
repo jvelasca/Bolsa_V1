@@ -1171,7 +1171,7 @@ describe("EstudioDailyOpsPanel", () => {
         matchesRequest: false,
         startedAt: "2026-10-16T09:00:00Z",
         message:
-          "Verificación en curso para BBB (job value-job-other, iniciada 2026-10-16T09:00:00Z). La cola admite una por cuenta y día; AAA queda pendiente.",
+          "Verificación en curso para BBB (job value-job-other, iniciada 2026-10-16T09:00:00Z). La cola admite una por cuenta y día: AAA NO se ha encolado; vuelve a pedirlo cuando termine la actual.",
       },
     } as never);
     renderPanel();
@@ -1192,7 +1192,7 @@ describe("EstudioDailyOpsPanel", () => {
     expect(occupied.textContent).toContain(
       "La cola admite una por cuenta y día",
     );
-    expect(occupied.textContent).toContain("AAA queda pendiente");
+    expect(occupied.textContent).toContain("AAA NO se ha encolado");
 
     const scope = aaa?.querySelector(
       '[data-testid="estudio-chain-dia-d-scope"]',

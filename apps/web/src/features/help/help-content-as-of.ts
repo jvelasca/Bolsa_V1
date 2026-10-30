@@ -171,5 +171,6 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  * @see docs/engineering/seguimiento-ui-proveedores-2026-10-29.md
+ * @see docs/engineering/handoff-061-ventana-bd-2026-10-29.md
  */
 export const HELP_CONTENT_AS_OF = "2026-10-29" as const;

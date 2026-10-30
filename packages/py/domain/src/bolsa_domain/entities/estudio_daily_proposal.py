@@ -75,3 +75,22 @@ class EstudioDailyProposal:
     @property
     def is_pending(self) -> bool:
         return self.status in PROPOSAL_PENDING_STATUSES
+
+    @property
+    def degraded_reasons(self) -> tuple[str, ...]:
+        """D-2 — motivos por los que el PARTE quedó ``partial`` (dentro del plan).
+
+        La marca vive en el JSON del plan (``plan.degradedReasons``) porque la tabla no
+        tiene columna propia: no se rellena un hueco con una migración solo para declarar
+        una degradación. Un plan antiguo (sin la clave) devuelve ``()``, que es "no
+        declarado", nunca "sano".
+        """
+        raw = (self.plan or {}).get("degradedReasons")
+        if not isinstance(raw, (list, tuple)):
+            return ()
+        seen: dict[str, None] = {}
+        for item in raw:
+            text = str(item or "").strip()
+            if text:
+                seen.setdefault(text, None)
+        return tuple(seen)

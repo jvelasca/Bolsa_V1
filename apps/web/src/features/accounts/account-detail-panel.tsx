@@ -22,6 +22,9 @@ import { createIdempotencyKey } from "@bolsa/shared";
 import type { InvestmentAccountDto, LedgerEntryDto } from "@bolsa/shared";
 import {
   POLICY_TEMPLATE_LABELS,
+  describeCommissionPreset,
+  describeCommissionProfile,
+  describeTaxProfile,
   formatLedgerEntryLabel,
   ledgerAmountTone,
   ledgerEntryHint,
@@ -150,6 +153,15 @@ export function AccountDetailPanel({
   useEffect(() => {
     if (focus === "perfil" && !parseDetailTab(initialTab)) setTab("config");
   }, [focus, initialTab, account.id]);
+
+  // COM-D10: deep-link `/accounts?selected=<id>&tab=config&focus=fiscal` abre el
+  // diálogo de configuración directamente en la pestaña Fiscal, en vez de obligar a
+  // buscar el botón «Editar comisiones y fiscal».
+  useEffect(() => {
+    if (tab !== "config" || focus !== "fiscal") return;
+    if (isClosed) return;
+    setSettingsOpen(true);
+  }, [tab, focus, account.id, isClosed]);
 
   const summaryQuery = useQuery({
     queryKey: ["account-summary", account.id],
@@ -731,14 +743,36 @@ export function AccountDetailPanel({
                 />
               </div>
             ) : null}
-            <div className="rounded-md border border-border bg-muted/20 p-3 text-sm">
+            <div
+              className="rounded-md border border-border bg-muted/20 p-3 text-sm"
+              data-testid="account-fiscal-summary"
+            >
               <p className="font-medium">Comisiones y fiscal</p>
-              <p className="text-muted-foreground">
-                {account.settings?.commission.label ?? absentDataLabel()} ·{" "}
-                {account.settings?.tax.jurisdiction ?? absentDataLabel()} ·{" "}
-                {account.settings?.tax.costBasisMethod.toUpperCase() ??
-                  absentDataLabel()}
-              </p>
+              {account.settings ? (
+                <>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    <span className="text-foreground">
+                      {account.settings.commission.label}
+                    </span>
+                    {" · "}
+                    {account.settings.commission.presetId === "custom"
+                      ? describeCommissionProfile(account.settings.commission, {
+                          currency: account.currency,
+                        })
+                      : describeCommissionPreset(
+                          account.settings.commission.presetId,
+                          { currency: account.currency },
+                        )}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    <span className="text-foreground">Fiscal</span>
+                    {" · "}
+                    {describeTaxProfile(account.settings.tax)}
+                  </p>
+                </>
+              ) : (
+                <p className="text-muted-foreground">{absentDataLabel()}</p>
+              )}
               {!isClosed && (
                 <button
                   type="button"
@@ -795,6 +829,7 @@ export function AccountDetailPanel({
       <AccountSettingsDialog
         account={account}
         open={settingsOpen}
+        initialTab={focus === "fiscal" ? "tax" : "commissions"}
         onClose={() => setSettingsOpen(false)}
       />
     </div>

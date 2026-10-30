@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 
 import bolsa_api.background.estudio_eod_opinion_worker as worker
+from bolsa_application.auto_ops_jobs import EnqueueOutcome
 from bolsa_domain.entities.auto_ops_job import (
     JOB_KIND_ESTUDIO_DAILY,
     JOB_STATUS_COMPLETED,
@@ -75,6 +76,19 @@ class _FakeJobRepo:
         account_id: str | None,
         payload: dict[str, Any] | None = None,
     ) -> AutoOpsJob:
+        outcome = await self.enqueue_with_outcome(
+            kind=kind, day=day, account_id=account_id, payload=payload
+        )
+        return outcome.job
+
+    async def enqueue_with_outcome(
+        self,
+        *,
+        kind: str,
+        day: str,
+        account_id: str | None,
+        payload: dict[str, Any] | None = None,
+    ) -> EnqueueOutcome:
         type(self)._seq += 1
         job = AutoOpsJob(
             id=f"job-{type(self)._seq}",
@@ -86,7 +100,7 @@ class _FakeJobRepo:
         )
         self.jobs.append(job)
         type(self).enqueued.append({"id": job.id, "day": day, "payload": job.payload})
-        return job
+        return EnqueueOutcome(job=job, created=True)
 
 
 @pytest.fixture(autouse=True)

@@ -3114,6 +3114,12 @@ class AutoSimulationWorker:
                     instrument_id=symbol,
                     action=action,
                     price=float(price),
+                    # D-1 — el precio de FILL del tick viaja con la señal: el contraste de
+                    # la geometría del parte tiene que hacerse contra el precio al que la
+                    # orden se liquida (``open(B)``), no solo contra la decisión
+                    # (``close(B-1)``). Sin fuente real ambos coinciden (Δ = 0); sin precio
+                    # de ejecución se declara ``None`` y el plan usa la decisión.
+                    execution_price=self._v2_price_exec(symbol, self._v2_bar_tick()),
                     atr=signal_atr,
                     edge=self._v2_edge(pkg, version or "unversioned"),
                     sector=context.sector,

@@ -30,6 +30,7 @@ Reglas duras
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -57,12 +58,41 @@ __all__ = [
     "RecordDailyProposalOutcomes",
     "proposal_candidate_from_value",
     "proposal_identity_matches",
+    "proposal_price_conflict",
     "select_adoptable",
 ]
 
 #: Días de calendario que una propuesta sigue siendo adoptable. Acota la atribución
 #: de un plan viejo al ciclo de hoy sin convertir la cadena en una inferencia.
 PROPOSAL_MAX_BAR_LAG_DAYS = 5
+
+#: D-1 (auditoría 2) — divergencia máxima tolerada (fracción de la entrada publicada)
+#: entre la geometría del parte y el precio VIVO del tick. Por encima, el plan publicado
+#: ya no es el que se ejecutaría: el stop y el objetivo se midieron contra OTRO precio,
+#: el riesgo real por acción no es el presupuestado y la orden nace con el stop al otro
+#: lado del mercado (cierre en el primer tick).
+PROPOSAL_MAX_ENTRY_DIVERGENCE_PCT = 0.02
+
+#: Motivos estables del contraste precio vivo ↔ geometría publicada (nunca un booleano).
+PROPOSAL_PRICE_MARKET_UNKNOWN = "market_price_unknown"
+PROPOSAL_PRICE_ENTRY_ABSENT = "entry_absent"
+PROPOSAL_PRICE_GEOMETRY_NOT_FINITE = "geometry_not_finite"
+PROPOSAL_PRICE_AT_OR_BELOW_STOP = "at_or_below_stop"
+PROPOSAL_PRICE_TARGET_REACHED = "target_reached"
+PROPOSAL_PRICE_DIVERGED = "diverged"
+
+#: Tolerancia de la comparación del borde: ``abs(98/100 - 1)`` es ``0.020000000000000018``
+#: en coma flotante, así que comparar con ``> 0.02`` convertiría el límite declarado
+#: («veto SOLO por encima del 2 %») en un veto en el propio 2 %. El épsilon absorbe el
+#: ruido de representación sin ensanchar el contrato (``1e-12`` es ~4e-11 del límite).
+_DIVERGENCE_EPSILON = 1e-12
+
+#: D-2 (auditoría 2) — motivos de degradación del parte que IMPIDEN adoptar sus propuestas.
+#: Un parte con ``positions_unavailable`` no midió la cartera: la propuesta se sigue
+#: persistiendo (el usuario la ve y el hueco queda declarado en ``skipped``), pero AUTO no
+#: la adopta, porque el plan pudo dimensionarse contra una cartera que no existe.
+PROPOSAL_BLOCKING_DEGRADATIONS: frozenset[str] = frozenset({"positions_unavailable"})
+PROPOSAL_DEGRADED = "proposal_degraded"
 
 #: Estados de atribución que la evidencia publica (nunca un booleano ambiguo).
 ADOPTION_EXACT = "exact"
@@ -220,14 +250,103 @@ def _lag_days(later: str, earlier: str) -> int | None:
         return None
 
 
+def _reason_codes(value: Any) -> tuple[str, ...]:
+    """Motivos de degradación LIMPIOS y sin duplicados (orden de aparición)."""
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return ()
+    seen: dict[str, None] = {}
+    for item in value:
+        text = _text(item)
+        if text is not None:
+            seen.setdefault(text, None)
+    return tuple(seen)
+
+
+def proposal_price_conflict(
+    payload: Mapping[str, Any],
+    *,
+    market_price: float | None,
+    direction: str = "long",
+    tolerance_pct: float = PROPOSAL_MAX_ENTRY_DIVERGENCE_PCT,
+) -> str | None:
+    """D-1 — motivo por el que la geometría PUBLICADA no es ejecutable al precio vivo.
+
+    ``select_adoptable`` certifica identidad y frescura, pero no que el plan siga siendo
+    ejecutable con el precio de hoy: el parte propone ``entry``/``structuralStop`` y el
+    productor ejecuta al precio VIVO. Con el mercado en/por debajo del stop publicado, la
+    posición nace con el stop al otro lado y se cierra en el primer tick (el mismo fallo
+    que el proyecto midió el 2026-10-21 en adopciones); con el mercado muy por encima de
+    la entrada, el riesgo real por acción es mayor que el presupuestado. Sin este
+    contraste, dimensionar y ejecutar con precios distintos es una atribución falsa.
+
+    Es una función PURA y falsable: sin I/O, sin reloj, sin estado. Devuelve ``None``
+    cuando la geometría es ejecutable (o cuando la propuesta no publica geometría: en ese
+    caso el camino histórico decide) y un motivo ESTABLE en caso contrario:
+
+    * ``market_price_unknown`` — no hay precio vivo con el que contrastar (``UNKNOWN != 0``);
+    * ``entry_absent`` — publica stop/objetivo sin entrada válida, o la entrada no es finita;
+    * ``geometry_not_finite`` — publica un stop/objetivo ``NaN``/``inf``: no hay nivel que
+      contrastar, así que la geometría es inutilizable (no «sin dato», que sería adoptable);
+    * ``at_or_below_stop`` — el mercado ya está en/por debajo del stop (largo; espejo en corto);
+    * ``target_reached`` — el mercado ya alcanzó el objetivo primario;
+    * ``diverged:<frac>`` — la divergencia relativa a la entrada supera ``tolerance_pct``.
+    """
+    entry = _number(payload.get("entry"))
+    stop = _number(payload.get("structuralStop"))
+    target = _number(payload.get("target1"))
+    if entry is None:
+        # Sin entrada publicada no hay geometría que contrastar; pero si publica stop u
+        # objetivo sin entrada, el plan está incompleto y no se adopta a ciegas.
+        return (
+            PROPOSAL_PRICE_ENTRY_ABSENT if (stop is not None or target is not None) else None
+        )
+    if not math.isfinite(entry) or entry <= 0:
+        return PROPOSAL_PRICE_ENTRY_ABSENT
+    # Un nivel no finito no se puede contrastar: adoptarlo entregaría ``NaN``/``inf`` al
+    # dimensionado (``decide_portfolio``) y el stop dejaría de ser un número. No es «sin
+    # dato» (que se declara y sigue el camino histórico): es geometría INVÁLIDA.
+    for level in (stop, target):
+        if level is not None and not math.isfinite(level):
+            return PROPOSAL_PRICE_GEOMETRY_NOT_FINITE
+    price = _number(market_price)
+    if price is None or not math.isfinite(price) or price <= 0:
+        # Sin precio vivo no se puede afirmar que la geometría es ejecutable: fail-closed.
+        return PROPOSAL_PRICE_MARKET_UNKNOWN
+    if stop is not None:
+        if (direction == "short" and price >= stop) or (
+            direction != "short" and price <= stop
+        ):
+            return PROPOSAL_PRICE_AT_OR_BELOW_STOP
+    if target is not None:
+        if (direction == "short" and price <= target) or (
+            direction != "short" and price >= target
+        ):
+            return PROPOSAL_PRICE_TARGET_REACHED
+    divergence = abs(price / entry - 1.0)
+    tolerance = max(0.0, float(tolerance_pct))
+    # Borde INCLUSIVO: exactamente el 2 % no veta (ver ``_DIVERGENCE_EPSILON``).
+    if divergence - tolerance > _DIVERGENCE_EPSILON:
+        return f"{PROPOSAL_PRICE_DIVERGED}:{divergence:.4f}"
+    return None
+
+
 def proposal_candidate_from_value(
     value: Mapping[str, Any],
+    *,
+    degraded_reasons: Sequence[str] = (),
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Extrae la propuesta de UN valor del parte diario.
 
     Devuelve ``(candidato, motivo_de_omision)``. Solo se propone lo que el parte
     declara como ``ok`` con un plan ``TRIGGERED``: un valor sin señal, sin plan o con
     error NO genera propuesta (el hueco se declara, no se rellena).
+
+    D-2 (auditoría 2): ``degraded_reasons`` son los motivos por los que el PARTE quedó
+    ``partial``. Viajan DENTRO del plan persistido (``plan.degradedReasons``) para que la
+    propuesta no pierda la marca al cruzar la frontera: con la marca, AUTO puede declarar
+    ``proposal_degraded:<motivo>`` en vez de adoptar un plan medido contra una cartera que
+    no se pudo leer. La propuesta se sigue persistiendo (el usuario la ve y el hueco no se
+    rellena en silencio).
     """
     status = _text(value.get("status"))
     if status != "ok":
@@ -255,6 +374,26 @@ def proposal_candidate_from_value(
         version_int = int(version) if version is not None else None
     except (TypeError, ValueError):
         version_int = None
+    candidate_plan: dict[str, Any] = {
+        key: plan.get(key)
+        for key in (
+            "decisionId",
+            "status",
+            "direction",
+            "entry",
+            "structuralStop",
+            "target1",
+            "target2",
+            "riskAmount",
+            "expectedRR",
+        )
+        if plan.get(key) is not None
+    }
+    # D-2 — la marca de parte PARCIAL viaja con la propuesta: sin ella la cadena no puede
+    # distinguir un plan medido con la cartera completa de uno medido sin cartera.
+    degradations = _reason_codes(degraded_reasons)
+    if degradations:
+        candidate_plan["degradedReasons"] = list(degradations)
     return (
         {
             "instrument_id": instrument_id,
@@ -265,21 +404,7 @@ def proposal_candidate_from_value(
             "strategy_version": version_int,
             "preset_key": _text(strategy.get("presetKey")),
             "bar_date": _day(value.get("asOfBarDate")),
-            "plan": {
-                key: plan.get(key)
-                for key in (
-                    "decisionId",
-                    "status",
-                    "direction",
-                    "entry",
-                    "structuralStop",
-                    "target1",
-                    "target2",
-                    "riskAmount",
-                    "expectedRR",
-                )
-                if plan.get(key) is not None
-            },
+            "plan": candidate_plan,
         },
         None,
     )
@@ -301,13 +426,19 @@ class PersistEstudioDailyProposals:
             )
         values = report.get("values")
         rows = values if isinstance(values, Sequence) else []
+        # D-2 — el parte declara POR QUÉ quedó parcial; la marca viaja a cada propuesta.
+        degradations = _reason_codes(
+            report.get("degradedReasons") or report.get("degraded_reasons")
+        )
         proposed = 0
         skipped: list[dict[str, str]] = []
         ids: list[str] = []
         for raw in rows:
             if not isinstance(raw, Mapping):
                 continue
-            candidate, reason = proposal_candidate_from_value(raw)
+            candidate, reason = proposal_candidate_from_value(
+                raw, degraded_reasons=degradations
+            )
             instrument = _text(raw.get("instrumentId")) or ""
             if candidate is None:
                 skipped.append(
@@ -338,6 +469,8 @@ def select_adoptable(
     Reglas (puras y falsables):
 
     * solo propuestas PENDIENTES con ``decision_id`` y ``signal_id``;
+    * una propuesta de un parte DEGRADADO (motivo bloqueante en ``plan.degradedReasons``)
+      no se adopta: se declara en ``skipped`` como ``proposal_degraded:<motivo>``;
     * la vela de la propuesta no puede ser POSTERIOR a la frontera de decisión (lookahead);
     * el retraso de vela se declara (``barLagDays``) y por encima de ``max_lag_days``
       la propuesta CADUCA con motivo (no se atribuye un plan viejo a un ciclo nuevo);
@@ -371,6 +504,20 @@ def select_adoptable(
                 {
                     "instrumentId": proposal.instrument_id,
                     "reason": "proposal_without_identity",
+                }
+            )
+            continue
+        # D-2 — un parte degradado no midió lo que dice medir: la propuesta se declara con
+        # su motivo (``proposal_degraded:<motivo>``) y NO se adopta. Sin este contraste,
+        # AUTO adoptaba tal cual un plan dimensionado contra una cartera ilegible.
+        blocking = sorted(
+            PROPOSAL_BLOCKING_DEGRADATIONS.intersection(proposal.degraded_reasons)
+        )
+        if blocking:
+            skipped.append(
+                {
+                    "instrumentId": proposal.instrument_id,
+                    "reason": f"{PROPOSAL_DEGRADED}:{blocking[0]}",
                 }
             )
             continue

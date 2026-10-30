@@ -6,12 +6,15 @@ interface AccountSettingsDialogProps {
   account: InvestmentAccountDto | null;
   open: boolean;
   onClose: () => void;
+  /** Pestaña inicial: `/fiscal` enlaza con `focus=fiscal` para abrir en «Fiscal». */
+  initialTab?: "commissions" | "tax";
 }
 
 export function AccountSettingsDialog({
   account,
   open,
   onClose,
+  initialTab = "commissions",
 }: AccountSettingsDialogProps) {
   if (!account) return null;
 
@@ -27,6 +30,7 @@ export function AccountSettingsDialog({
         accountId={account.id}
         currency={account.currency}
         settings={account.settings}
+        initialTab={initialTab}
         onSaved={onClose}
       />
     </Dialog>
