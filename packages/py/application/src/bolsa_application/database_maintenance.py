@@ -915,6 +915,19 @@ class GetDatabaseMaintenance:
                 detail="Existe exactamente una fila de configuración",
                 value=str(row.only_id or ""),
             )
+        if count == 0:
+            # Misma doctrina que ``_check_provider_rows``: una base recién migrada tiene la
+            # tabla vacía porque la fila única se siembra en la primera lectura. No es un
+            # defecto, así que no puede tumbar el informe; pero tampoco es un verde.
+            return CheckResult(
+                id="integrity.sync_settings_singleton",
+                label="Fila única de sync_settings",
+                status="warning",
+                detail=(
+                    "La tabla está vacía: la fila única se siembra en la primera lectura"
+                ),
+                value="0",
+            )
         return CheckResult(
             id="integrity.sync_settings_singleton",
             label="Fila única de sync_settings",
