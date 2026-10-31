@@ -3,6 +3,12 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
+from bolsa_application.broker_venue_runtime import (
+    account_broker_venue_from_settings,
+    effective_broker_venue_async,
+    normalize_broker_venue,
+)
+from bolsa_domain.errors import AccountClosedError
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -80,13 +86,39 @@ from bolsa_api.schemas.accounts import (
     WithdrawCashDto,
 )
 from bolsa_api.schemas.ai_governance import AiEffectivenessResponseDto
-from bolsa_application.broker_venue_runtime import (
-    account_broker_venue_from_settings,
-    effective_broker_venue_async,
-    normalize_broker_venue,
-)
 
 router = APIRouter()
+
+#: Contrato de escritura sobre una cuenta **cerrada** (registro histórico). Se documenta
+#: porque el cliente distingue «no encontrada» (404) de «estado no editable» (409).
+ACCOUNT_CLOSED_RESPONSES: dict[int | str, dict[str, Any]] = {
+    409: {
+        "description": (
+            "La cuenta está cerrada: es registro histórico y no admite cambios de datos, "
+            "configuración ni perfil."
+        ),
+        "content": {
+            "application/json": {
+                "example": {
+                    "detail": {
+                        "code": "account_closed",
+                        "message": (
+                            "La cuenta está cerrada: no admite cambios de datos, "
+                            "configuración ni perfil."
+                        ),
+                    }
+                }
+            }
+        },
+    }
+}
+
+
+def _account_closed_http_error(exc: AccountClosedError) -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={"code": exc.code, "message": str(exc)},
+    )
 
 
 class AccountBrokerVenueBody(BaseModel):
@@ -198,7 +230,11 @@ async def get_account(
     return AccountResponseDto(data=to_investment_account_dto(account))
 
 
-@router.patch("/accounts/{account_id}", response_model=AccountResponseDto)
+@router.patch(
+    "/accounts/{account_id}",
+    response_model=AccountResponseDto,
+    responses=ACCOUNT_CLOSED_RESPONSES,
+)
 async def update_account(
     account_id: Annotated[str, Depends(require_account_access)],
     body: UpdateInvestmentAccountDto,
@@ -210,6 +246,8 @@ async def update_account(
             name=body.name,
             description=body.description,
         )
+    except AccountClosedError as exc:
+        raise _account_closed_http_error(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return AccountResponseDto(data=to_investment_account_dto(account))
@@ -231,7 +269,11 @@ async def make_default_account(
     return AccountResponseDto(data=to_investment_account_dto(account))
 
 
-@router.patch("/accounts/{account_id}/settings", response_model=AccountResponseDto)
+@router.patch(
+    "/accounts/{account_id}/settings",
+    response_model=AccountResponseDto,
+    responses=ACCOUNT_CLOSED_RESPONSES,
+)
 async def update_account_settings(
     account_id: Annotated[str, Depends(require_account_access)],
     body: UpdateAccountSettingsDto,
@@ -242,6 +284,8 @@ async def update_account_settings(
             account_id,
             settings_dto_to_domain(body.settings),
         )
+    except AccountClosedError as exc:
+        raise _account_closed_http_error(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return AccountResponseDto(data=to_investment_account_dto(account))
@@ -562,9 +606,8 @@ async def _instrument_ids_for_decisions(
     decision_ids: list[str],
 ) -> dict[str, str | None]:
     """Soft-join fail-closed: decision_sessions.decision_id → instrument_id."""
-    from sqlalchemy import select
-
     from bolsa_infrastructure.database.models.tables import DecisionSessionRow
+    from sqlalchemy import select
 
     keys = [d.strip() for d in decision_ids if (d or "").strip()]
     if not keys:

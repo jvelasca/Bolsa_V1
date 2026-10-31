@@ -4,10 +4,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import delete, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
 from bolsa_domain.account_settings import (
     AccountSettings,
     default_account_settings,
@@ -15,6 +11,11 @@ from bolsa_domain.account_settings import (
     settings_to_dict,
 )
 from bolsa_domain.entities.account import AccountScope, InvestmentAccount, InvestmentPortfolio
+from bolsa_domain.errors import AccountClosedError
+from sqlalchemy import delete, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from bolsa_infrastructure.config import get_settings as load_app_settings
 from bolsa_infrastructure.database.models import (
     ConfidenceStateRow,
@@ -452,6 +453,10 @@ class SqlAlchemyAccountRepository:
         row = await self._session.get(InvestmentAccountRow, account_id)
         if row is None:
             raise ValueError("Cuenta no encontrada")
+        # CTA-D5: mismo contrato que ``update_account``. Una cerrada es registro
+        # histórico: editar su configuración reescribiría una cuenta ya fuera de operación.
+        if row.status == "closed":
+            raise AccountClosedError()
         previous = dict(row.settings_json) if row.settings_json else {}
         merged = settings_to_dict(settings)
         # Preservar claves operativas no modeladas en AccountSettings
@@ -515,7 +520,7 @@ class SqlAlchemyAccountRepository:
         if row is None:
             raise ValueError("Cuenta no encontrada")
         if row.status == "closed":
-            raise ValueError("No se puede editar una cuenta cerrada")
+            raise AccountClosedError("No se puede editar una cuenta cerrada")
         now = datetime.now(UTC)
         if name is not None and name.strip():
             row.name = name.strip()

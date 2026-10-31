@@ -6,8 +6,9 @@ import asyncio
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-from bolsa_application.accounts import ListAccountSummaries
 from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary
+
+from bolsa_application.accounts import ListAccountSummaries
 
 
 @dataclass
@@ -15,6 +16,7 @@ class _Account:
     id: str
     name: str = "A"
     leverage: float = 1.0
+    status: str = "active"
 
 
 @dataclass
@@ -35,6 +37,9 @@ class _FakeAccountRepo:
     async def resolve_scope(self, account_id: str, portfolio_id: str | None):
         self.resolve_calls.append(account_id)
         account = next(a for a in self.accounts if a.id == account_id)
+        if account.status != "active":
+            # Mismo literal que ``SqlAlchemyAccountRepository._load_scope``.
+            raise ValueError("Cuenta no encontrada o inactiva")
         portfolio = SimpleNamespace(id=f"p-{account_id}", legacy_portfolio_id=f"leg-{account_id}")
         return SimpleNamespace(
             account=account,
@@ -89,3 +94,27 @@ def test_list_account_summaries_one_summary_per_account() -> None:
     assert account_repo.resolve_calls == ["a1", "a2"]
     assert portfolio_repo.summary_calls == ["leg-a1", "leg-a2"]
     assert all(item.total_equity == 1000.0 for item in items)
+
+
+def test_list_account_summaries_ignora_cuentas_cerradas() -> None:
+    """CTA-D10: una cuenta cerrada no rompe la lista de resúmenes.
+
+    ``resolve_scope`` solo resuelve cuentas activas (``_load_scope`` filtra por
+    ``status == "active"``), así que ``GET /accounts/summaries`` debe saltar las
+    cerradas en vez de propagar un ``ValueError`` que acababa en 500.
+    """
+    accounts = [
+        _Account(id="a1"),
+        _Account(id="closed-1", status="closed"),
+        _Account(id="a2"),
+    ]
+    account_repo = _FakeAccountRepo(accounts=accounts, resolve_calls=[])
+    portfolio_repo = _FakePortfolioRepo(summary_calls=[])
+    use_case = ListAccountSummaries(account_repo, portfolio_repo)  # type: ignore[arg-type]
+
+    items = asyncio.run(use_case.execute())
+
+    assert [item.account.id for item in items] == ["a1", "a2"]
+    # La cerrada ni siquiera intenta resolver scope (no hay trabajo inútil ni error).
+    assert account_repo.resolve_calls == ["a1", "a2"]
+    assert portfolio_repo.summary_calls == ["leg-a1", "leg-a2"]

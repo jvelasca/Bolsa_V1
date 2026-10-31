@@ -1,6 +1,5 @@
 """Use-cases de resumen de cuentas (margen y hub listing)."""
 
-from bolsa_application.accounts.tax import collect_report_inputs
 from bolsa_domain.account_settings import settings_from_dict
 from bolsa_domain.entities.account import (
     AccountSummary,
@@ -19,6 +18,8 @@ from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlch
 from bolsa_infrastructure.database.repositories.portfolio_repository import (
     SqlAlchemyPortfolioRepository,
 )
+
+from bolsa_application.accounts.tax import collect_report_inputs
 
 
 async def _all_time_realized_pnl(
@@ -178,6 +179,13 @@ class ListAccountSummaries:
         )
         items: list[AccountSummary] = []
         for account in accounts:
+            # CTA-D10: ``resolve_scope`` solo resuelve cuentas ACTIVAS
+            # (``_load_scope`` filtra ``status == "active"``). Una cuenta cerrada en la
+            # lista haría saltar ``ValueError`` y romper la vía entera con un 500; se
+            # omite: la lista de resúmenes es para cuentas operables y no hay cartera
+            # que resumir en una cerrada.
+            if getattr(account, "status", "active") != "active":
+                continue
             scope = await self._account_repo.resolve_scope(account.id, None)
             summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
             items.append(

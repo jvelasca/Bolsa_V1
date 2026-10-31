@@ -13241,6 +13241,23 @@ export interface operations {
                     "application/json": components["schemas"]["AccountResponseDto"];
                 };
             };
+            /** @description La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración ni perfil. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "detail": {
+                     *         "code": "account_closed",
+                     *         "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                     *       }
+                     *     }
+                     */
+                    "application/json": unknown;
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -13309,6 +13326,13 @@ export interface operations {
             };
             /** @description Cuenta o perfil no encontrado para este usuario. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description La cuenta está cerrada: es registro histórico y conserva su perfil (no admite asignación ni desasignación). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -14112,6 +14136,23 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountResponseDto"];
+                };
+            };
+            /** @description La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración ni perfil. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "detail": {
+                     *         "code": "account_closed",
+                     *         "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                     *       }
+                     *     }
+                     */
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

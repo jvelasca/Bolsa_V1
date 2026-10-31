@@ -66,6 +66,27 @@ class PermanentRejectionError(ValueError):
         super().__init__(reason)
 
 
+class AccountClosedError(ValueError):
+    """Una cuenta **cerrada** no admite escrituras: es registro histórico.
+
+    El cierre conserva el historial contable para auditoría, así que editar sus
+    datos, su configuración o su perfil reescribiría un registro que ya no está en
+    operación. La UI ya oculta estas acciones; esta excepción impide que la API se
+    comporte distinto (antes ``PATCH /settings`` devolvía 200 sobre una cerrada).
+
+    Subclase de ``ValueError`` a propósito: las rutas que ya traducían ``ValueError``
+    siguen funcionando, y las que necesitan el 409 ``account_closed`` la distinguen.
+    """
+
+    code = "account_closed"
+    default_message = (
+        "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+    )
+
+    def __init__(self, message: str | None = None) -> None:
+        super().__init__(message or self.default_message)
+
+
 class UnsupportedGranularityError(ValueError):
     """Una granularidad operativa **declarada** no está **habilitada** (fail-closed).
 
@@ -86,6 +107,7 @@ class UnsupportedGranularityError(ValueError):
 
 
 __all__ = [
+    "AccountClosedError",
     "IdempotencyKeyExists",
     "IdempotencyKeyReused",
     "PermanentRejectionError",

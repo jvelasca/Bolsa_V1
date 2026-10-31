@@ -25628,6 +25628,19 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "account_closed",
+                    "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                  }
+                }
+              }
+            },
+            "description": "La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración ni perfil."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -25722,6 +25735,9 @@
           },
           "404": {
             "description": "Cuenta o perfil no encontrado para este usuario."
+          },
+          "409": {
+            "description": "La cuenta está cerrada: es registro histórico y conserva su perfil (no admite asignación ni desasignación)."
           },
           "422": {
             "content": {
@@ -27198,6 +27214,19 @@
               }
             },
             "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "account_closed",
+                    "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                  }
+                }
+              }
+            },
+            "description": "La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración ni perfil."
           },
           "422": {
             "content": {

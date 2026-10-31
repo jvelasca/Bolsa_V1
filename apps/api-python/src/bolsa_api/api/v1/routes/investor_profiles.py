@@ -4,6 +4,24 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
+from bolsa_application.investor_profiles import (
+    AssignInvestorProfileToAccount,
+    CreateInvestorProfile,
+    DeleteInvestorProfile,
+    EnsureDefaultsForAccounts,
+    GetInvestorProfile,
+    ListInvestorProfiles,
+    RefreshObservedProfile,
+    UpdateInvestorProfile,
+)
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
+from bolsa_domain.errors import AccountClosedError
+from bolsa_infrastructure.database.repositories.cognitive_repository import (
+    SqlAlchemyCognitiveRepository,
+)
+from bolsa_infrastructure.database.repositories.investor_profile_repository import (
+    SqlAlchemyInvestorProfileRepository,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,23 +42,6 @@ from bolsa_api.schemas.investor_profiles import (
     InvestorProfileListResponseDto,
     InvestorProfileResponseDto,
     UpdateInvestorProfileDto,
-)
-from bolsa_application.investor_profiles import (
-    AssignInvestorProfileToAccount,
-    CreateInvestorProfile,
-    DeleteInvestorProfile,
-    EnsureDefaultsForAccounts,
-    GetInvestorProfile,
-    ListInvestorProfiles,
-    RefreshObservedProfile,
-    UpdateInvestorProfile,
-)
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
-from bolsa_infrastructure.database.repositories.cognitive_repository import (
-    SqlAlchemyCognitiveRepository,
-)
-from bolsa_infrastructure.database.repositories.investor_profile_repository import (
-    SqlAlchemyInvestorProfileRepository,
 )
 
 router = APIRouter()
@@ -100,7 +101,13 @@ async def ensure_default_profiles(
     accounts = await get_list_accounts_use_case(session).execute(
         owner_user_id=principal,
     )
-    missing = [(a.id, a.name) for a in accounts if not a.active_profile_id]
+    # CTA-D5: las cerradas son registro histórico; el bootstrap no les escribe un perfil
+    # (lo contrario reabriría una asignación sobre una cuenta que ya no opera).
+    missing = [
+        (a.id, a.name)
+        for a in accounts
+        if not a.active_profile_id and a.status == "active"
+    ]
     if missing:
         # El bootstrap también es owner-scoped: un perfil con user_id=NULL es invisible para
         # su propio dueño (leerlo devolvía 404 nada más crearlo).
@@ -267,6 +274,12 @@ async def refresh_observed_profile(
     response_model=AssignProfileResponseDto,
     responses={
         404: {"description": "Cuenta o perfil no encontrado para este usuario."},
+        409: {
+            "description": (
+                "La cuenta está cerrada: es registro histórico y conserva su perfil "
+                "(no admite asignación ni desasignación)."
+            )
+        },
     },
 )
 async def assign_active_profile(
@@ -280,6 +293,11 @@ async def assign_active_profile(
         pid = await AssignInvestorProfileToAccount(store).execute(  # type: ignore[arg-type]
             account_id, body.profile_id, owner_user_id=get_request_principal(request)
         )
+    except AccountClosedError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": exc.code, "message": str(exc)},
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return AssignProfileResponseDto(

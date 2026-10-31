@@ -6,11 +6,12 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
+from bolsa_domain.errors import AccountClosedError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 from bolsa_infrastructure.database.models import InvestmentAccountRow, InvestorProfileRow
 from bolsa_infrastructure.ids import new_id
 
@@ -199,6 +200,11 @@ class SqlAlchemyInvestorProfileRepository:
         if owner_user_id is not None and account.user_id != owner_user_id:
             # Cuenta ajena: mismo error que «no existe» para no filtrar su existencia.
             raise ValueError("Cuenta no encontrada")
+        # CTA-D5: una cuenta cerrada es registro histórico. Cambiar (o quitar) su perfil
+        # reescribiría una asignación que ya no está en operación; el cierre preserva el
+        # vínculo (y por eso sigue bloqueando el borrado del perfil, AUD-03).
+        if account.status == "closed":
+            raise AccountClosedError()
         if profile_id is not None:
             # Se bloquea la fila del perfil igual que en ``delete_if_unused``: asignar y
             # borrar el mismo perfil se serializan sobre esa fila. Si el borrado ganó,
