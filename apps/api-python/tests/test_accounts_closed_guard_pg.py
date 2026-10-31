@@ -76,11 +76,10 @@ async def api() -> AsyncIterator[tuple[AsyncClient, async_sessionmaker[AsyncSess
     from dotenv import load_dotenv
 
     load_dotenv(_DOTENV, override=False)
+    from bolsa_api.main import create_app, lifespan
     from bolsa_infrastructure.config import get_settings
     from bolsa_infrastructure.database.migrations import ensure_migrated
     from bolsa_infrastructure.database.session import create_engine, create_session_factory
-
-    from bolsa_api.main import create_app, lifespan
 
     get_settings.cache_clear()
     settings = get_settings()

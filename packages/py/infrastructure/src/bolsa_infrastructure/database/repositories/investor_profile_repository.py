@@ -6,12 +6,12 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
-from bolsa_domain.errors import AccountClosedError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
+from bolsa_domain.errors import AccountClosedError
 from bolsa_infrastructure.database.models import InvestmentAccountRow, InvestorProfileRow
 from bolsa_infrastructure.ids import new_id
 

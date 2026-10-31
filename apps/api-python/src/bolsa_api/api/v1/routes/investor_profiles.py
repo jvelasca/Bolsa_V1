@@ -4,24 +4,6 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from bolsa_application.investor_profiles import (
-    AssignInvestorProfileToAccount,
-    CreateInvestorProfile,
-    DeleteInvestorProfile,
-    EnsureDefaultsForAccounts,
-    GetInvestorProfile,
-    ListInvestorProfiles,
-    RefreshObservedProfile,
-    UpdateInvestorProfile,
-)
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
-from bolsa_domain.errors import AccountClosedError
-from bolsa_infrastructure.database.repositories.cognitive_repository import (
-    SqlAlchemyCognitiveRepository,
-)
-from bolsa_infrastructure.database.repositories.investor_profile_repository import (
-    SqlAlchemyInvestorProfileRepository,
-)
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,6 +24,24 @@ from bolsa_api.schemas.investor_profiles import (
     InvestorProfileListResponseDto,
     InvestorProfileResponseDto,
     UpdateInvestorProfileDto,
+)
+from bolsa_application.investor_profiles import (
+    AssignInvestorProfileToAccount,
+    CreateInvestorProfile,
+    DeleteInvestorProfile,
+    EnsureDefaultsForAccounts,
+    GetInvestorProfile,
+    ListInvestorProfiles,
+    RefreshObservedProfile,
+    UpdateInvestorProfile,
+)
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
+from bolsa_domain.errors import AccountClosedError
+from bolsa_infrastructure.database.repositories.cognitive_repository import (
+    SqlAlchemyCognitiveRepository,
+)
+from bolsa_infrastructure.database.repositories.investor_profile_repository import (
+    SqlAlchemyInvestorProfileRepository,
 )
 
 router = APIRouter()

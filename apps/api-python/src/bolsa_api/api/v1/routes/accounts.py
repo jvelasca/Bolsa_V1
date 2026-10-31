@@ -3,12 +3,6 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from bolsa_application.broker_venue_runtime import (
-    account_broker_venue_from_settings,
-    effective_broker_venue_async,
-    normalize_broker_venue,
-)
-from bolsa_domain.errors import AccountClosedError
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -86,6 +80,12 @@ from bolsa_api.schemas.accounts import (
     WithdrawCashDto,
 )
 from bolsa_api.schemas.ai_governance import AiEffectivenessResponseDto
+from bolsa_application.broker_venue_runtime import (
+    account_broker_venue_from_settings,
+    effective_broker_venue_async,
+    normalize_broker_venue,
+)
+from bolsa_domain.errors import AccountClosedError
 
 router = APIRouter()
 
@@ -612,8 +612,9 @@ async def _instrument_ids_for_decisions(
     decision_ids: list[str],
 ) -> dict[str, str | None]:
     """Soft-join fail-closed: decision_sessions.decision_id → instrument_id."""
-    from bolsa_infrastructure.database.models.tables import DecisionSessionRow
     from sqlalchemy import select
+
+    from bolsa_infrastructure.database.models.tables import DecisionSessionRow
 
     keys = [d.strip() for d in decision_ids if (d or "").strip()]
     if not keys:

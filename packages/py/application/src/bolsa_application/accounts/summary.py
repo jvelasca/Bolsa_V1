@@ -1,5 +1,6 @@
 """Use-cases de resumen de cuentas (margen y hub listing)."""
 
+from bolsa_application.accounts.tax import collect_report_inputs
 from bolsa_domain.account_settings import settings_from_dict
 from bolsa_domain.entities.account import (
     AccountSummary,
@@ -18,8 +19,6 @@ from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlch
 from bolsa_infrastructure.database.repositories.portfolio_repository import (
     SqlAlchemyPortfolioRepository,
 )
-
-from bolsa_application.accounts.tax import collect_report_inputs
 
 
 async def _all_time_realized_pnl(
