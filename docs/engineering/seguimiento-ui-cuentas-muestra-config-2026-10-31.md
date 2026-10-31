@@ -5,9 +5,11 @@
 > Docs de referencia: [CONFIGURATION_MODEL.md](../CONFIGURATION_MODEL.md), [API_REFERENCE.md](../API_REFERENCE.md), [Seguimiento previo de Cuentas y Perfil inversor](./seguimiento-ui-cuentas-perfil-inversor-2026-10-30.md).
 > Evidencia: [`evidence/cuentas-muestra-config-2026-10-31/`](./evidence/cuentas-muestra-config-2026-10-31/).
 
-**Integración**: el código y la evidencia de este documento quedan en `380a456e` (backend y contrato, CTA-D5/CTA-D10) y `4f8308bb` (frontend, CTA-D1…CTA-D9); el tercer commit solo añade documentación y evidencia. Sin `push`, sin PR y sin sello: `2.11.173-beta` sigue siendo la versión vigente y `.174` no existe.
+**Integración**: el código y la evidencia de este documento quedan en `380a456e` (backend y contrato, CTA-D5/CTA-D10) y `4f8308bb` (frontend, CTA-D1…CTA-D9); el tercer commit solo añade documentación y evidencia.
 
-Este documento es un **registro de revisión**: no certifica el sello ni autoriza operación. Los commits son locales y no se han publicado (sin `push`, PR, tag ni Release); el diff queda para revisión de alcance.
+**Publicación**: los commits ya están en `origin/fix/059-060-proveedores` (`15ad62ac` y, desde el cierre del gate, `2c02178a`). Sin PR —el grafo lo descarta—, sin tag y sin Release: `2.11.173-beta` sigue siendo la versión vigente y `.174` no existe. El estado exacto, la comprobación de grafo y la reparación del gate Ruff se registran en [Verificación de grafo y cierre del gate Ruff (2026-10-31)](./verificacion-grafo-cuentas-2026-10-31.md).
+
+Este documento es un **registro de revisión**: no certifica el sello ni autoriza operación. Describe el árbol revisado; el `push` no altera el alcance revisado ni autoriza el sello `.174`.
 
 ---
 
@@ -201,7 +203,7 @@ Hallazgo durante el cierre: la comprobación de scope de `X-Account-Id` se afin�
 - **Motor / AUTO**: sin cambios.
 - **`api.ensureDefaultInvestorProfiles`**: sigue sin llamadores (AUD-02).
 - **Cambios de contrato**: solo documentación de `409 account_closed`; `contract:check` verde.
-- **Sin commit, push, PR, tag ni Release**: el diff queda para revisión de alcance.
+- **Sin PR, sin tag ni Release**: los commits están publicados en `origin/fix/059-060-proveedores`; el sello `.174` sigue pendiente de autorización expresa.
 
 ---
 
@@ -223,3 +225,4 @@ Hallazgo durante el cierre: la comprobación de scope de `X-Account-Id` se afin�
 | 12 | E2E `e2e-cuentas.mjs`: 90 comprobaciones, 13 capturas, consola/red y foto de BD antes/después idéntica; API reiniciada sin `--reload` para validar el fix de CTA-D10 en vivo. |
 | 13 | Gates re-medidos (pytest 72, vitest área 51, vitest web 2673, `tsc`, ESLint, `contract:check`, Ruff, Mypy) y evidencia cruda guardada. |
 | 14 | Continuación de esta serie: [Seguimiento — Cuentas: muestra y configuración (2026-10-31)](./seguimiento-ui-cuentas-muestra-config-2026-10-31.md), con CTA-D1…CTA-D10 y el E2E de 90 comprobaciones. |
+| 15 | Cierre del gate (2026-10-31): el Ruff del paso 13 se midió sin `--config pyproject.toml` y no era el del CI; tras el push, el job `quality` cayó con 8 I001 del propio cambio. Corregido en `2c02178a` y registrado en [Verificación de grafo y cierre del gate Ruff](./verificacion-grafo-cuentas-2026-10-31.md). Python CI verde con `Ruff`, `Import-linter`, `Mypy` y `Pytest` ejecutados. |
