@@ -1,0 +1,485 @@
+{
+  "createdAt": "2026-10-31T19:14:46.860Z",
+  "base": "http://127.0.0.1:5173",
+  "provenance": {
+    "branch": "fix/059-060-proveedores",
+    "head": "4f8308bb133e803e2ca157781c1ac21cfd1acc52",
+    "headShort": "4f8308bb",
+    "version": "2.11.173-beta",
+    "dirty": true,
+    "startedAt": "2026-10-31T19:14:05.253Z",
+    "finishedAt": "2026-10-31T19:14:46.860Z"
+  },
+  "seed": {
+    "id": "default-account-seed",
+    "isDefault": true,
+    "activeProfileId": "PROF-996fcd3d6ec6",
+    "name": "Cuenta demo EUR"
+  },
+  "disposable": {
+    "accounts": [
+      "ead6bc6a99204f0d9b5167181",
+      "6a98392f0954451abd023b43d",
+      "3ece4deb3cd14d428c0cb5b42"
+    ],
+    "profiles": [
+      "PROF-f139c36642b4",
+      "PROF-537678bcb5a3"
+    ]
+  },
+  "checks": [
+    {
+      "name": "semilla presente y activa",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "alta cuenta A",
+      "ok": true,
+      "detail": "201"
+    },
+    {
+      "name": "alta cuenta B",
+      "ok": true,
+      "detail": "201"
+    },
+    {
+      "name": "alta perfil desechable",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "CTA-01 · contador Demo (3)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-01 · contador Paper futuro (0)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-01 · pestaña Todas",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-01 · fila semilla con perfil",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-01 · fila A con el perfil por defecto compartido",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-01 · badge «Activa» solo en la semilla",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-02 · seleccionar no dispara make-default",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-02 · localStorage intacto",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-02 · el badge sigue en la semilla",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-D1 · portfolio con X-Account-Id de la cuenta seleccionada",
+      "ok": true,
+      "detail": "ead6bc6a99204f0d9b5167181"
+    },
+    {
+      "name": "CTA-02 · botón «Usar ahora» disponible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-03 · POST make-default 200",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-03 · el badge se mueve a A",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-03 · una sola llamada make-default",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-03 · localStorage apunta a A",
+      "ok": true,
+      "detail": "{\"state\":{\"activeAccountId\":\"ead6bc6a99204f0d9b5167181\"},\"version\":0}"
+    },
+    {
+      "name": "CTA-03 · «Usar ahora» desaparece al ser la activa",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-04 · aviso de activa fuera del filtro",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-04 · Paper no lista cuentas demo",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-04 · selección constreñida al filtro",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-05 · Patrimonio con cifra",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-05 · Efectivo con cifra",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-05 · P&L no realizado",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-05 · P&L realizado",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-05 · Posiciones 0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-05 · sin rótulos de ausencia en Resumen",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-05 · error de resumen como alerta",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-05 · cifras como «No disponible», no 0",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-06 · 1 PATCH de la cuenta",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-06 · payload con nombre y descripción",
+      "ok": true,
+      "detail": "{\"name\":\"CU-REV A 045634 renombrada\",\"description\":\"descripción con espacios\"}"
+    },
+    {
+      "name": "CTA-06 · solo 1 escritura al guardar",
+      "ok": true,
+      "detail": "1"
+    },
+    {
+      "name": "CTA-06 · nombre persistido",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-06 · descripción persistida",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-06 · una sola superficie de perfil en la ficha",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-06 · resumen fiscal visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-07 · asignar A es 1 PUT con el perfil",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-07 · cabecera con el perfil",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-07 · abrir la ficha de B no escribe",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "name": "CTA-07 · aviso de perfil compartido",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-07 · asignar B es 1 PUT",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-07 · confirmación inline (alertdialog)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-07 · pulsar «Quitar perfil» no escribe",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-07 · desasignar es 1 PUT con profileId null",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-07 · «Quitar perfil» deja de ofrecerse",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-08 · deep-link focus=fiscal abre «Fiscal»",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-09 · PATCH broker-venue live",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-09 · botón Live activo",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-09 · preferencia persistida en la API",
+      "ok": true,
+      "detail": "{\"accountId\":\"ead6bc6a99204f0d9b5167181\",\"preference\":\"live\",\"effective\":\"live\"}"
+    },
+    {
+      "name": "CTA-08 · cancelar con Escape no escribe",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "name": "CTA-D3 · el texto conserva los espacios al teclear",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-08 · 1 PATCH de settings",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-08 · preset custom persistido en el payload",
+      "ok": true,
+      "detail": "{\"presetId\":\"custom\",\"label\":\"Broker estándar ES\",\"stockCommissionPct\":0.12,\"stockCommissionMin\":1,\"stockCommissionMax\":29,\"vatOnCommissionPct\":21,\"fxConversionPct\":0.5,\"custodyAnnualPct\":0.2}"
+    },
+    {
+      "name": "CTA-08 · jurisdicción US en el payload",
+      "ok": true,
+      "detail": "US"
+    },
+    {
+      "name": "CTA-08 · notas recortadas solo al guardar",
+      "ok": true,
+      "detail": "\"nota con espacios internos\""
+    },
+    {
+      "name": "CTA-08 · notas con espacios verificadas en la API",
+      "ok": true,
+      "detail": "\"nota con espacios internos\""
+    },
+    {
+      "name": "CTA-08 · guardar settings conserva brokerVenue",
+      "ok": true,
+      "detail": "{\"accountId\":\"ead6bc6a99204f0d9b5167181\",\"preference\":\"live\",\"effective\":\"live\"}"
+    },
+    {
+      "name": "CTA-08 · resumen fiscal refleja la jurisdicción",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-10 · el asistente abre en Identidad",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-10 · revisión con cuenta y perfil",
+      "ok": true,
+      "detail": "CuentaCU-REV wizard 045634MonedaEURDepósito inicial100000.00Apalancamiento1xPerfil inversorPROF-REV wizard 045634 · Moderado · moderateComisionesBroker estándar ESCoste de una compra de 5.00016.05 € · comisión 5.00 € + IVA 1.05 € + transmisiones 10.00 €FiscalEspaña (ES) · FIFO · transmisiones 0,2 % · retención div. 19 % · plusvalías 19 %Método de costeFIFO (primero en entrar, primero en salir)Se creará la cuenta demo con cartera, depósito inicial, perfil inversor activo y preset de comisiones/fiscal."
+    },
+    {
+      "name": "CTA-10 · POST /accounts 201",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-10 · la cuenta nueva aparece y es la Activa",
+      "ok": true,
+      "detail": "CU-REV wizard 045634EUR · Demo · DemoActivaPerfil: perfil no visible · localStorage={\"state\":{\"activeAccountId\":\"3ece4deb3cd14d428c0cb5b42\"},\"version\":0}"
+    },
+    {
+      "name": "CTA-10 · cuenta con perfil asignado",
+      "ok": true,
+      "detail": "\"PROF-537678bcb5a3\""
+    },
+    {
+      "name": "CTA-10 · comisión por defecto del asistente",
+      "ok": true,
+      "detail": "standard_es"
+    },
+    {
+      "name": "CTA-10 · fiscal por defecto del asistente",
+      "ok": true,
+      "detail": "ES"
+    },
+    {
+      "name": "CTA-10 · perfil nuevo en el catálogo",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-10 · el perfil es el de la cuenta",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-11 · cerrar cuenta 200",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-11 · nombre y descripción no editables",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-11 · sin «Guardar datos» en cerrada",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-11 · sin bloque de perfil en cerrada",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-11 · sin edición de comisiones/fiscal en cerrada",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-11 · «Eliminar cuenta (demo)» disponible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-D5 · settings de cerrada → 409 account_closed",
+      "ok": true,
+      "detail": "{\"detail\":{\"code\":\"account_closed\",\"message\":\"La cuenta está cerrada: no admite cambios de datos, configuración ni perfil.\"}}"
+    },
+    {
+      "name": "CTA-D5 · perfil de cerrada → 409 account_closed",
+      "ok": true,
+      "detail": "{\"detail\":{\"code\":\"account_closed\",\"message\":\"La cuenta está cerrada: no admite cambios de datos, configuración ni perfil.\"}}"
+    },
+    {
+      "name": "CTA-D5 · nombre de cerrada → 409",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-11 · la cerrada aparece al mostrarla",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-11 · borrado de demo 204",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-12 · 0 pageerror",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-12 · 0 console.error",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-12 · 0 llamadas a ensure-defaults",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-12 · escrituras de la superficie todas contabilizadas",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CTA-12 · la ficha pide el portfolio de la cuenta seleccionada (CTA-D1)",
+      "ok": true,
+      "detail": "6/15"
+    },
+    {
+      "name": "CTA-12 · portfolio nunca con el scope de una tercera cuenta (CTA-D1)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "cleanup · solo queda la semilla",
+      "ok": true,
+      "detail": "[\"Cuenta demo EUR\"]"
+    },
+    {
+      "name": "cleanup · sin perfiles PROF-REV",
+      "ok": true,
+      "detail": "[\"Perfil por defecto (moderado)\"]"
+    },
+    {
+      "name": "cleanup · semilla is_default",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "cleanup · semilla conserva su perfil",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "ok": true,
+  "apiCalls": 312,
+  "writes": 42
+}

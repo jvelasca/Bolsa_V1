@@ -1,0 +1,23 @@
+{
+  "seed": {
+    "id": "default-account-seed",
+    "isDefault": true,
+    "activeProfileId": "PROF-996fcd3d6ec6",
+    "name": "Cuenta demo EUR"
+  },
+  "disposable": {
+    "accountA": {
+      "id": "ead6bc6a99204f0d9b5167181",
+      "name": "CU-REV A 045634"
+    },
+    "accountB": {
+      "id": "6a98392f0954451abd023b43d",
+      "name": "CU-REV B 045634"
+    },
+    "profile": {
+      "id": "PROF-f139c36642b4",
+      "name": "PROF-REV principal 045634"
+    }
+  },
+  "createdAt": "2026-10-31T19:14:05.957Z"
+}

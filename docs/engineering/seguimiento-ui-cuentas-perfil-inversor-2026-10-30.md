@@ -4,6 +4,7 @@
 > Base de trabajo: worktree `cuentas-perfil-2026-10-30`, rama `feat/cuentas-perfil-2026-10-30`, desde el sello `a5f6f1c6` (`v2.88.173-beta` en `package.json` → `2.11.173-beta`).
 > Docs de referencia: [CONFIGURATION_MODEL.md](../CONFIGURATION_MODEL.md), [API_REFERENCE.md](../API_REFERENCE.md).
 > Evidencia: [`evidence/cuentas-perfil-2026-10-30/`](./evidence/cuentas-perfil-2026-10-30/).
+> Continuación: [Seguimiento — Cuentas: muestra y configuración (2026-10-31)](./seguimiento-ui-cuentas-muestra-config-2026-10-31.md).
 
 Este documento es un **registro de consolidación**, no una certificación del sello ni una autorización operativa. No incluye trabajo fiscal, migraciones, PR, tag ni Release.
 

@@ -1,0 +1,35 @@
+{
+  "tables": [
+    "investment_accounts",
+    "investor_profiles"
+  ],
+  "provenance": {
+    "branch": "fix/059-060-proveedores",
+    "head": "4f8308bb133e803e2ca157781c1ac21cfd1acc52",
+    "headShort": "4f8308bb",
+    "version": "2.11.173-beta",
+    "dirty": true
+  },
+  "account_count": 1,
+  "profile_count": 1,
+  "accounts": [
+    {
+      "id": "default-account-seed",
+      "name": "Cuenta demo EUR",
+      "type": "simulated",
+      "status": "active",
+      "is_default": true,
+      "active_profile_id": "PROF-996fcd3d6ec6",
+      "user_id": "app"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "PROF-996fcd3d6ec6",
+      "name": "Perfil por defecto (moderado)",
+      "user_id": "app",
+      "template": "moderate"
+    }
+  ],
+  "residue_like": []
+}

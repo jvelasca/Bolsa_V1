@@ -1,0 +1,224 @@
+# Consola, comprobaciones y decisiones — CTA-E2E /accounts
+# 2026-10-31T19:14:46.849Z · http://127.0.0.1:5173
+# procedencia · rama=fix/059-060-proveedores · head=4f8308bb · version=2.11.173-beta · dirty=true
+
+== CTA-E2E /accounts · 2026-10-31T19:14:05.887Z ==
+Base: http://127.0.0.1:5173
+OK  · semilla presente y activa
+OK  · alta cuenta A — 201
+OK  · alta cuenta B — 201
+OK  · alta perfil desechable — 200
+§goto http://127.0.0.1:5173/accounts
+[store +51179] cuenta activa del cliente → default-account-seed
+OK  · CTA-01 · contador Demo (3)
+OK  · CTA-01 · contador Paper futuro (0)
+OK  · CTA-01 · pestaña Todas
+OK  · CTA-01 · fila semilla con perfil
+OK  · CTA-01 · fila A con el perfil por defecto compartido
+OK  · CTA-01 · badge «Activa» solo en la semilla
+§CTA-01 e2e-01-lista.png
+OK  · CTA-02 · seleccionar no dispara make-default
+OK  · CTA-02 · localStorage intacto
+OK  · CTA-02 · el badge sigue en la semilla
+OK  · CTA-D1 · portfolio con X-Account-Id de la cuenta seleccionada — ead6bc6a99204f0d9b5167181
+OK  · CTA-02 · botón «Usar ahora» disponible
+§CTA-02 e2e-02-seleccion.png
+OK  · CTA-03 · POST make-default 200
+OK  · CTA-03 · el badge se mueve a A
+OK  · CTA-03 · una sola llamada make-default
+OK  · CTA-03 · localStorage apunta a A — {"state":{"activeAccountId":"ead6bc6a99204f0d9b5167181"},"version":0}
+OK  · CTA-03 · «Usar ahora» desaparece al ser la activa
+[store +51691] cuenta activa del cliente → ead6bc6a99204f0d9b5167181
+§CTA-03 e2e-03-usar-ahora.png
+OK  · CTA-04 · aviso de activa fuera del filtro
+OK  · CTA-04 · Paper no lista cuentas demo
+OK  · CTA-04 · selección constreñida al filtro
+§CTA-04 e2e-04-filtro-paper.png
+§CTA-04 restauración intencional: semilla Activa y localStorage limpio
+§goto http://127.0.0.1:5173/accounts?type=all
+[store +51877] cuenta activa del cliente → null
+[store +54506] cuenta activa del cliente → default-account-seed
+§goto http://127.0.0.1:5173/accounts?type=all&selected=ead6bc6a99204f0d9b5167181
+OK  · CTA-05 · Patrimonio con cifra
+OK  · CTA-05 · Efectivo con cifra
+OK  · CTA-05 · P&L no realizado
+OK  · CTA-05 · P&L realizado
+OK  · CTA-05 · Posiciones 0
+OK  · CTA-05 · sin rótulos de ausencia en Resumen
+§CTA-05 e2e-05-resumen.png
+OK  · CTA-05 · error de resumen como alerta
+OK  · CTA-05 · cifras como «No disponible», no 0
+§CTA-05 e2e-05-resumen-error.png
+§goto http://127.0.0.1:5173/accounts?type=all&selected=ead6bc6a99204f0d9b5167181&tab=config
+OK  · CTA-06 · 1 PATCH de la cuenta
+OK  · CTA-06 · payload con nombre y descripción — {"name":"CU-REV A 045634 renombrada","description":"descripción con espacios"}
+OK  · CTA-06 · solo 1 escritura al guardar — 1
+OK  · CTA-06 · nombre persistido
+OK  · CTA-06 · descripción persistida
+OK  · CTA-06 · una sola superficie de perfil en la ficha
+OK  · CTA-06 · resumen fiscal visible
+§CTA-06 e2e-06-config.png
+OK  · CTA-07 · asignar A es 1 PUT con el perfil
+OK  · CTA-07 · cabecera con el perfil
+§CTA-07 perfil asignado a A
+§goto http://127.0.0.1:5173/accounts?type=all&selected=6a98392f0954451abd023b43d&tab=config
+OK  · CTA-07 · abrir la ficha de B no escribe — 0
+OK  · CTA-07 · aviso de perfil compartido
+OK  · CTA-07 · asignar B es 1 PUT
+OK  · CTA-07 · confirmación inline (alertdialog)
+OK  · CTA-07 · pulsar «Quitar perfil» no escribe
+§CTA-07 e2e-07-confirmacion.png
+OK  · CTA-07 · desasignar es 1 PUT con profileId null
+OK  · CTA-07 · «Quitar perfil» deja de ofrecerse
+§CTA-07 e2e-07-sin-perfil.png
+§goto http://127.0.0.1:5173/accounts?type=all&selected=ead6bc6a99204f0d9b5167181&tab=config&focus=fiscal
+OK  · CTA-08 · deep-link focus=fiscal abre «Fiscal»
+OK  · CTA-09 · PATCH broker-venue live
+OK  · CTA-09 · botón Live activo
+§CTA-09 e2e-08-fiscal-dialog.png
+OK  · CTA-09 · preferencia persistida en la API — {"accountId":"ead6bc6a99204f0d9b5167181","preference":"live","effective":"live"}
+OK  · CTA-08 · cancelar con Escape no escribe — 0
+OK  · CTA-D3 · el texto conserva los espacios al teclear
+OK  · CTA-08 · 1 PATCH de settings
+OK  · CTA-08 · preset custom persistido en el payload — {"presetId":"custom","label":"Broker estándar ES","stockCommissionPct":0.12,"stockCommissionMin":1,"stockCommissionMax":29,"vatOnCommissionPct":21,"fxConversionPct":0.5,"custodyAnnualPct":0.2}
+OK  · CTA-08 · jurisdicción US en el payload — US
+OK  · CTA-08 · notas recortadas solo al guardar — "nota con espacios internos"
+OK  · CTA-08 · notas con espacios verificadas en la API — "nota con espacios internos"
+OK  · CTA-08 · guardar settings conserva brokerVenue — {"accountId":"ead6bc6a99204f0d9b5167181","preference":"live","effective":"live"}
+OK  · CTA-08 · resumen fiscal refleja la jurisdicción
+§CTA-08 e2e-09-fiscal-guardado.png
+§goto http://127.0.0.1:5173/accounts?type=all
+OK  · CTA-10 · el asistente abre en Identidad
+OK  · CTA-10 · revisión con cuenta y perfil — CuentaCU-REV wizard 045634MonedaEURDepósito inicial100000.00Apalancamiento1xPerfil inversorPROF-REV wizard 045634 · Moderado · moderateComisionesBroker estándar ESCoste de una compra de 5.00016.05 € · comisión 5.00 € + IVA 1.05 € + transmisiones 10.00 €FiscalEspaña (ES) · FIFO · transmisiones 0,2 % · retención div. 19 % · plusvalías 19 %Método de costeFIFO (primero en entrar, primero en salir)Se creará la cuenta demo con cartera, depósito inicial, perfil inversor activo y preset de comisiones/fiscal.
+§CTA-10 e2e-10-wizard-revision.png
+OK  · CTA-10 · POST /accounts 201
+[store +78405] cuenta activa del cliente → 3ece4deb3cd14d428c0cb5b42
+OK  · CTA-10 · la cuenta nueva aparece y es la Activa — CU-REV wizard 045634EUR · Demo · DemoActivaPerfil: perfil no visible · localStorage={"state":{"activeAccountId":"3ece4deb3cd14d428c0cb5b42"},"version":0}
+§CTA-10 e2e-10-cuenta-creada.png
+OK  · CTA-10 · cuenta con perfil asignado — "PROF-537678bcb5a3"
+OK  · CTA-10 · comisión por defecto del asistente — standard_es
+OK  · CTA-10 · fiscal por defecto del asistente — ES
+OK  · CTA-10 · perfil nuevo en el catálogo
+OK  · CTA-10 · el perfil es el de la cuenta
+§goto http://127.0.0.1:5173/accounts?type=all&selected=6a98392f0954451abd023b43d&tab=config
+OK  · CTA-11 · cerrar cuenta 200
+OK  · CTA-11 · nombre y descripción no editables
+OK  · CTA-11 · sin «Guardar datos» en cerrada
+OK  · CTA-11 · sin bloque de perfil en cerrada
+OK  · CTA-11 · sin edición de comisiones/fiscal en cerrada
+OK  · CTA-11 · «Eliminar cuenta (demo)» disponible
+§CTA-11 e2e-11-cerrada.png
+OK  · CTA-D5 · settings de cerrada → 409 account_closed — {"detail":{"code":"account_closed","message":"La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."}}
+OK  · CTA-D5 · perfil de cerrada → 409 account_closed — {"detail":{"code":"account_closed","message":"La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."}}
+OK  · CTA-D5 · nombre de cerrada → 409
+OK  · CTA-11 · la cerrada aparece al mostrarla
+OK  · CTA-11 · borrado de demo 204
+OK  · CTA-12 · 0 pageerror
+OK  · CTA-12 · 0 console.error
+OK  · CTA-12 · 0 llamadas a ensure-defaults
+OK  · CTA-12 · escrituras de la superficie todas contabilizadas
+aviso · 14 petición(es) de fondo del shell en vuelo al cerrar la captura (no son escrituras de /cuentas): GET /api/risk/kill-switch, GET /api/risk/broker-venue, GET /api/accounts/ead6bc6a99204f0d9b5167181/broker-venue, GET /api/risk/kill-switch, GET /api/risk/broker-venue, GET /api/accounts/default-account-seed/broker-venue, GET /api/risk/kill-switch, GET /api/risk/broker-venue, GET /api/risk/kill-switch, GET /api/risk/broker-venue, GET /api/risk/kill-switch, GET /api/risk/broker-venue, GET /api/accounts/3ece4deb3cd14d428c0cb5b42/broker-venue, GET /api/accounts/3ece4deb3cd14d428c0cb5b42/supervised-f3-queue
+OK  · CTA-12 · la ficha pide el portfolio de la cuenta seleccionada (CTA-D1) — 6/15
+OK  · CTA-12 · portfolio nunca con el scope de una tercera cuenta (CTA-D1)
+
+§cleanup — restauración de la semilla y borrado de datos desechables
+cleanup · CU-REV A 045634 renombrada (ead6bc6a99204f0d9b5167181) → 204
+cleanup · CU-REV wizard 045634 (3ece4deb3cd14d428c0cb5b42) → 204
+cleanup · PROF-REV wizard 045634 (PROF-537678bcb5a3) → 200
+cleanup · PROF-REV principal 045634 (PROF-f139c36642b4) → 200
+OK  · cleanup · solo queda la semilla — ["Cuenta demo EUR"]
+OK  · cleanup · sin perfiles PROF-REV — ["Perfil por defecto (moderado)"]
+OK  · cleanup · semilla is_default
+OK  · cleanup · semilla conserva su perfil
+
+## Comprobaciones
+- OK · semilla presente y activa
+- OK · alta cuenta A (201)
+- OK · alta cuenta B (201)
+- OK · alta perfil desechable (200)
+- OK · CTA-01 · contador Demo (3)
+- OK · CTA-01 · contador Paper futuro (0)
+- OK · CTA-01 · pestaña Todas
+- OK · CTA-01 · fila semilla con perfil
+- OK · CTA-01 · fila A con el perfil por defecto compartido
+- OK · CTA-01 · badge «Activa» solo en la semilla
+- OK · CTA-02 · seleccionar no dispara make-default
+- OK · CTA-02 · localStorage intacto
+- OK · CTA-02 · el badge sigue en la semilla
+- OK · CTA-D1 · portfolio con X-Account-Id de la cuenta seleccionada (ead6bc6a99204f0d9b5167181)
+- OK · CTA-02 · botón «Usar ahora» disponible
+- OK · CTA-03 · POST make-default 200
+- OK · CTA-03 · el badge se mueve a A
+- OK · CTA-03 · una sola llamada make-default
+- OK · CTA-03 · localStorage apunta a A ({"state":{"activeAccountId":"ead6bc6a99204f0d9b5167181"},"version":0})
+- OK · CTA-03 · «Usar ahora» desaparece al ser la activa
+- OK · CTA-04 · aviso de activa fuera del filtro
+- OK · CTA-04 · Paper no lista cuentas demo
+- OK · CTA-04 · selección constreñida al filtro
+- OK · CTA-05 · Patrimonio con cifra
+- OK · CTA-05 · Efectivo con cifra
+- OK · CTA-05 · P&L no realizado
+- OK · CTA-05 · P&L realizado
+- OK · CTA-05 · Posiciones 0
+- OK · CTA-05 · sin rótulos de ausencia en Resumen
+- OK · CTA-05 · error de resumen como alerta
+- OK · CTA-05 · cifras como «No disponible», no 0
+- OK · CTA-06 · 1 PATCH de la cuenta
+- OK · CTA-06 · payload con nombre y descripción ({"name":"CU-REV A 045634 renombrada","description":"descripción con espacios"})
+- OK · CTA-06 · solo 1 escritura al guardar (1)
+- OK · CTA-06 · nombre persistido
+- OK · CTA-06 · descripción persistida
+- OK · CTA-06 · una sola superficie de perfil en la ficha
+- OK · CTA-06 · resumen fiscal visible
+- OK · CTA-07 · asignar A es 1 PUT con el perfil
+- OK · CTA-07 · cabecera con el perfil
+- OK · CTA-07 · abrir la ficha de B no escribe (0)
+- OK · CTA-07 · aviso de perfil compartido
+- OK · CTA-07 · asignar B es 1 PUT
+- OK · CTA-07 · confirmación inline (alertdialog)
+- OK · CTA-07 · pulsar «Quitar perfil» no escribe
+- OK · CTA-07 · desasignar es 1 PUT con profileId null
+- OK · CTA-07 · «Quitar perfil» deja de ofrecerse
+- OK · CTA-08 · deep-link focus=fiscal abre «Fiscal»
+- OK · CTA-09 · PATCH broker-venue live
+- OK · CTA-09 · botón Live activo
+- OK · CTA-09 · preferencia persistida en la API ({"accountId":"ead6bc6a99204f0d9b5167181","preference":"live","effective":"live"})
+- OK · CTA-08 · cancelar con Escape no escribe (0)
+- OK · CTA-D3 · el texto conserva los espacios al teclear
+- OK · CTA-08 · 1 PATCH de settings
+- OK · CTA-08 · preset custom persistido en el payload ({"presetId":"custom","label":"Broker estándar ES","stockCommissionPct":0.12,"stockCommissionMin":1,"stockCommissionMax":29,"vatOnCommissionPct":21,"fxConversionPct":0.5,"custodyAnnualPct":0.2})
+- OK · CTA-08 · jurisdicción US en el payload (US)
+- OK · CTA-08 · notas recortadas solo al guardar ("nota con espacios internos")
+- OK · CTA-08 · notas con espacios verificadas en la API ("nota con espacios internos")
+- OK · CTA-08 · guardar settings conserva brokerVenue ({"accountId":"ead6bc6a99204f0d9b5167181","preference":"live","effective":"live"})
+- OK · CTA-08 · resumen fiscal refleja la jurisdicción
+- OK · CTA-10 · el asistente abre en Identidad
+- OK · CTA-10 · revisión con cuenta y perfil (CuentaCU-REV wizard 045634MonedaEURDepósito inicial100000.00Apalancamiento1xPerfil inversorPROF-REV wizard 045634 · Moderado · moderateComisionesBroker estándar ESCoste de una compra de 5.00016.05 € · comisión 5.00 € + IVA 1.05 € + transmisiones 10.00 €FiscalEspaña (ES) · FIFO · transmisiones 0,2 % · retención div. 19 % · plusvalías 19 %Método de costeFIFO (primero en entrar, primero en salir)Se creará la cuenta demo con cartera, depósito inicial, perfil inversor activo y preset de comisiones/fiscal.)
+- OK · CTA-10 · POST /accounts 201
+- OK · CTA-10 · la cuenta nueva aparece y es la Activa (CU-REV wizard 045634EUR · Demo · DemoActivaPerfil: perfil no visible · localStorage={"state":{"activeAccountId":"3ece4deb3cd14d428c0cb5b42"},"version":0})
+- OK · CTA-10 · cuenta con perfil asignado ("PROF-537678bcb5a3")
+- OK · CTA-10 · comisión por defecto del asistente (standard_es)
+- OK · CTA-10 · fiscal por defecto del asistente (ES)
+- OK · CTA-10 · perfil nuevo en el catálogo
+- OK · CTA-10 · el perfil es el de la cuenta
+- OK · CTA-11 · cerrar cuenta 200
+- OK · CTA-11 · nombre y descripción no editables
+- OK · CTA-11 · sin «Guardar datos» en cerrada
+- OK · CTA-11 · sin bloque de perfil en cerrada
+- OK · CTA-11 · sin edición de comisiones/fiscal en cerrada
+- OK · CTA-11 · «Eliminar cuenta (demo)» disponible
+- OK · CTA-D5 · settings de cerrada → 409 account_closed ({"detail":{"code":"account_closed","message":"La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."}})
+- OK · CTA-D5 · perfil de cerrada → 409 account_closed ({"detail":{"code":"account_closed","message":"La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."}})
+- OK · CTA-D5 · nombre de cerrada → 409
+- OK · CTA-11 · la cerrada aparece al mostrarla
+- OK · CTA-11 · borrado de demo 204
+- OK · CTA-12 · 0 pageerror
+- OK · CTA-12 · 0 console.error
+- OK · CTA-12 · 0 llamadas a ensure-defaults
+- OK · CTA-12 · escrituras de la superficie todas contabilizadas
+- OK · CTA-12 · la ficha pide el portfolio de la cuenta seleccionada (CTA-D1) (6/15)
+- OK · CTA-12 · portfolio nunca con el scope de una tercera cuenta (CTA-D1)
+- OK · cleanup · solo queda la semilla (["Cuenta demo EUR"])
+- OK · cleanup · sin perfiles PROF-REV (["Perfil por defecto (moderado)"])
+- OK · cleanup · semilla is_default
+- OK · cleanup · semilla conserva su perfil
