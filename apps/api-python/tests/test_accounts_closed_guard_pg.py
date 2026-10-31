@@ -14,6 +14,8 @@ Casos que fija esta suite (ASGI contra ``DATABASE_URL``):
    (la preferencia Paper/Live de la cuenta no se borra al guardar el otro bloque).
 5. **CTA-D10**: ``GET /accounts/summaries`` omite las cuentas cerradas en vez de
    fallar con 500 al resolver su scope (que solo admite activas).
+6. **make-default**: ``POST /accounts/{id}/make-default`` sobre una cuenta cerrada
+   responde 409 ``account_closed`` y **no** mueve el default vigente del owner.
 
 Si PostgreSQL no responde se salta, salvo ``CTA_PG_REQUIRED=1``.
 """
@@ -138,6 +140,13 @@ async def _active_profile_id(client: AsyncClient, account_id: str) -> str | None
     return str(response.json()["data"]["profileId"])
 
 
+async def _default_account_ids(client: AsyncClient) -> set[str]:
+    """Ids de las cuentas del principal marcadas ``isDefault`` (incluye cerradas)."""
+    response = await client.get("/api/accounts")
+    response.raise_for_status()
+    return {str(row["id"]) for row in response.json()["data"] if row.get("isDefault")}
+
+
 async def _dispose_account(client: AsyncClient, account_id: str) -> None:
     """Cierra (si hace falta) y borra la cuenta demo desechable."""
     await client.post(f"/api/accounts/{account_id}/close")
@@ -203,6 +212,38 @@ async def test_closed_account_rejects_settings_name_and_profile_writes(
         await _dispose_account(client, account_id)
         allowed = await client.delete(f"/api/investor-profiles/{profile_id}")
         assert allowed.status_code == 200, allowed.text
+
+
+async def test_closed_account_cannot_be_made_default(
+    api: tuple[AsyncClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    """Una cuenta cerrada no puede promocionarse a principal (409 ``account_closed``).
+
+    La guarda vive en el repositorio y corre **antes** del ``UPDATE`` que desmarca al
+    resto de cuentas del owner: el rechazo no puede mover el default vigente.
+    """
+    client, _factory = api
+    stamp = int(time.time())
+    account_id = await _create_account(client, f"CU-CTA-D5 default {stamp}")
+
+    try:
+        defaults_before = await _default_account_ids(client)
+
+        closed = await client.post(f"/api/accounts/{account_id}/close")
+        assert closed.status_code in (200, 204), closed.text
+
+        blocked = await client.post(f"/api/accounts/{account_id}/make-default")
+        _assert_account_closed(blocked)
+
+        # El default vigente del owner no se movió.
+        assert await _default_account_ids(client) == defaults_before
+
+        # Y la cerrada sigue sin ser principal.
+        after = await client.get(f"/api/accounts/{account_id}")
+        assert after.status_code == 200, after.text
+        assert after.json()["data"]["isDefault"] is False
+    finally:
+        await _dispose_account(client, account_id)
 
 
 async def test_ensure_defaults_does_not_touch_closed_accounts(

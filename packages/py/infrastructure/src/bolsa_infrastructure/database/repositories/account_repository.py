@@ -542,6 +542,11 @@ class SqlAlchemyAccountRepository:
         Solo las cuentas activas del mismo principal pierden ``is_default``; nunca
         las de otro tenant. Un ``account_id`` de otro owner se trata como no
         encontrada (same semantics que ``get_account``), no 500.
+
+        Una cuenta **cerrada** es registro histórico y no puede promocionarse a
+        principal: ``AccountClosedError`` (la ruta lo traduce a 409 ``account_closed``,
+        el mismo contrato que las demás escrituras). Cualquier otro estado no activo
+        conserva el ``ValueError`` genérico.
         """
         row = await self._session.get(InvestmentAccountRow, account_id)
         if row is None:
@@ -549,6 +554,10 @@ class SqlAlchemyAccountRepository:
         owner = owner_user_id if owner_user_id is not None else _app_owner_id()
         if not _account_visible_to_owner(row.user_id, owner):
             raise ValueError("Cuenta no encontrada")
+        if row.status == "closed":
+            raise AccountClosedError(
+                "La cuenta está cerrada: no puede marcarse como principal."
+            )
         if row.status != "active":
             raise ValueError("Solo una cuenta activa puede marcarse como principal")
         await self._session.execute(

@@ -95,7 +95,7 @@ ACCOUNT_CLOSED_RESPONSES: dict[int | str, dict[str, Any]] = {
     409: {
         "description": (
             "La cuenta está cerrada: es registro histórico y no admite cambios de datos, "
-            "configuración ni perfil."
+            "configuración, perfil ni activación como principal."
         ),
         "content": {
             "application/json": {
@@ -253,7 +253,11 @@ async def update_account(
     return AccountResponseDto(data=to_investment_account_dto(account))
 
 
-@router.post("/accounts/{account_id}/make-default", response_model=AccountResponseDto)
+@router.post(
+    "/accounts/{account_id}/make-default",
+    response_model=AccountResponseDto,
+    responses=ACCOUNT_CLOSED_RESPONSES,
+)
 async def make_default_account(
     request: Request,
     account_id: Annotated[str, Depends(require_account_access)],
@@ -264,6 +268,8 @@ async def make_default_account(
             account_id,
             owner_user_id=get_request_principal(request),
         )
+    except AccountClosedError as exc:
+        raise _account_closed_http_error(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return AccountResponseDto(data=to_investment_account_dto(account))

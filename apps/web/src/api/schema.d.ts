@@ -13241,7 +13241,7 @@ export interface operations {
                     "application/json": components["schemas"]["AccountResponseDto"];
                 };
             };
-            /** @description La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración ni perfil. */
+            /** @description La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -13865,6 +13865,23 @@ export interface operations {
                     "application/json": components["schemas"]["AccountResponseDto"];
                 };
             };
+            /** @description La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "detail": {
+                     *         "code": "account_closed",
+                     *         "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                     *       }
+                     *     }
+                     */
+                    "application/json": unknown;
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -14138,7 +14155,7 @@ export interface operations {
                     "application/json": components["schemas"]["AccountResponseDto"];
                 };
             };
-            /** @description La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración ni perfil. */
+            /** @description La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal. */
             409: {
                 headers: {
                     [name: string]: unknown;

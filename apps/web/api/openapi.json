@@ -25639,7 +25639,7 @@
                 }
               }
             },
-            "description": "La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración ni perfil."
+            "description": "La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal."
           },
           "422": {
             "content": {
@@ -26782,6 +26782,19 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "account_closed",
+                    "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                  }
+                }
+              }
+            },
+            "description": "La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -27226,7 +27239,7 @@
                 }
               }
             },
-            "description": "La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración ni perfil."
+            "description": "La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal."
           },
           "422": {
             "content": {

@@ -109,6 +109,7 @@ Aplica a `/api/portfolio`, `/api/portfolio/trade`, `/api/portfolio/transactions`
 | GET    | `/api/accounts/{id}`                                           | Detalle cuenta                                        |
 | PATCH  | `/api/accounts/{id}`                                           | Editar nombre y descripción                           |
 | PATCH  | `/api/accounts/{id}/settings`                                  | Comisiones y fiscal (sin perfil inversor)             |
+| POST   | `/api/accounts/{id}/make-default`                              | Activar como principal (solo activas; cerrada → 409 `account_closed`) |
 | POST   | `/api/accounts/{id}/close`                                     | Cerrar cuenta (conserva historial)                    |
 | DELETE | `/api/accounts/{id}`                                           | Eliminar cuenta demo cerrada (hard delete)            |
 | GET    | `/api/accounts/{id}/summary`                                   | Resumen (dispara custodia anual si procede)           |

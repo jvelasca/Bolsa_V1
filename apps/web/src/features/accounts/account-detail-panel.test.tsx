@@ -296,6 +296,15 @@ describe("AccountDetailPanel — scoping y errores de lectura (CTA-D1/D2/D4/D6/D
     expect(mocks.getPortfolio).not.toHaveBeenCalled();
   });
 
+  it("una cuenta cerrada no ofrece «Usar ahora» ni llama a make-default", async () => {
+    renderPanel({ account: account({ status: "closed" }) });
+
+    // La ficha está montada (el aviso de cerrada es su señal de render).
+    expect(await screen.findByTestId("account-closed-notice")).toBeTruthy();
+    expect(screen.queryByTestId("account-activate")).toBeNull();
+    expect(mocks.setDefaultAccount).not.toHaveBeenCalled();
+  });
+
   it("CTA-D7: el enlace fiscal declara que informa de la cuenta activa", async () => {
     renderPanel();
 
