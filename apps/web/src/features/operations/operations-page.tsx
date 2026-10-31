@@ -25,7 +25,7 @@ export function OperationsPage() {
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
   });
 
   const { entriesBlocked } = useMesaEntriesBlocked();

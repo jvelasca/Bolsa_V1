@@ -166,6 +166,49 @@ describe("AccountSettingsPanel · validación cliente (COM-D6)", () => {
   });
 });
 
+describe("AccountSettingsPanel · notas internas (CTA-D3)", () => {
+  it("conserva los espacios mientras se escribe y recorta solo al guardar", async () => {
+    renderPanel(defaultAccountSettings(), "tax");
+    const notes = screen.getByLabelText(
+      "Notas internas",
+    ) as HTMLTextAreaElement;
+
+    // Escritura incremental: antes cada pulsación recortaba el borrador y era
+    // imposible separar palabras.
+    for (const value of [
+      "n",
+      "no",
+      "nota",
+      "nota ",
+      "nota c",
+      "nota con espacios ",
+    ]) {
+      fireEvent.change(notes, { target: { value } });
+    }
+    expect(notes).toHaveValue("nota con espacios ");
+
+    fireEvent.click(screen.getByRole("button", { name: /Guardar comisiones/ }));
+
+    await waitFor(() => expect(updateAccountSettings).toHaveBeenCalledTimes(1));
+    expect(updateAccountSettings.mock.calls[0][1].notes).toBe(
+      "nota con espacios",
+    );
+  });
+
+  it("un borrador de solo espacios se guarda como sin notas (null)", async () => {
+    renderPanel(defaultAccountSettings(), "tax");
+    const notes = screen.getByLabelText(
+      "Notas internas",
+    ) as HTMLTextAreaElement;
+
+    fireEvent.change(notes, { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: /Guardar comisiones/ }));
+
+    await waitFor(() => expect(updateAccountSettings).toHaveBeenCalledTimes(1));
+    expect(updateAccountSettings.mock.calls[0][1].notes).toBeNull();
+  });
+});
+
 describe("AccountSettingsPanel · guardado y vista previa", () => {
   it("manda el borrador completo con el PATCH", async () => {
     renderPanel();

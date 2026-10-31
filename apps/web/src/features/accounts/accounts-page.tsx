@@ -13,6 +13,7 @@ import {
   accountOriginKind,
   listCloseableDevExtraAccounts,
 } from "@bolsa/shared";
+import { ABSENT_DATA_NOT_AVAILABLE } from "@/components/absent-data";
 import { AccountDetailPanel } from "@/features/accounts/account-detail-panel";
 import { formatPaperLabEvidence } from "@/features/accounts/paper-lab-evidence";
 import { formatPrice } from "@/features/charts/chart-utils";
@@ -186,6 +187,20 @@ export function AccountsPage() {
     }
     return map;
   }, [profilesQuery.data]);
+
+  /**
+   * CTA-D2: con el catálogo caído no se puede afirmar «perfil no visible»; la
+   * etiqueta honesta es el rótulo de dato no disponible. Con el catálogo cargado,
+   * un id ausente sí es un perfil fuera de catálogo.
+   */
+  function profileLabelFor(account: InvestmentAccountDto): string | null {
+    if (!account.activeProfileId) return null;
+    const known = profileLabelById.get(account.activeProfileId);
+    if (known) return known;
+    return profilesQuery.isError
+      ? ABSENT_DATA_NOT_AVAILABLE
+      : "perfil no visible";
+  }
 
   const closeableDevExtras = useMemo(
     () => listCloseableDevExtraAccounts(accounts, positionsCountById),
@@ -428,6 +443,28 @@ export function AccountsPage() {
         </p>
       ) : null}
 
+      {profilesQuery.isError ? (
+        <p
+          role="alert"
+          data-testid="accounts-profiles-error"
+          className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+        >
+          No se pudo cargar el catálogo de perfiles
+          {profilesQuery.error instanceof Error
+            ? `: ${profilesQuery.error.message}`
+            : "."}{" "}
+          Las cuentas se marcan como «{ABSENT_DATA_NOT_AVAILABLE}», no como «sin
+          perfil».{" "}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => void profilesQuery.refetch()}
+          >
+            Reintentar
+          </button>
+        </p>
+      ) : null}
+
       {activeOutsideFilter && activeAccount ? (
         <p
           data-testid="accounts-active-outside-filter"
@@ -482,12 +519,7 @@ export function AccountsPage() {
                   selected={account.id === effectiveSelectedId}
                   isWorking={account.id === activeAccountId}
                   totalEquity={equityByAccountId.get(account.id)}
-                  profileLabel={
-                    account.activeProfileId
-                      ? (profileLabelById.get(account.activeProfileId) ??
-                        "perfil no visible")
-                      : null
-                  }
+                  profileLabel={profileLabelFor(account)}
                   onSelect={() => selectAccount(account.id)}
                 />
               ))
@@ -513,12 +545,7 @@ export function AccountsPage() {
                       account={account}
                       selected={account.id === effectiveSelectedId}
                       totalEquity={equityByAccountId.get(account.id)}
-                      profileLabel={
-                        account.activeProfileId
-                          ? (profileLabelById.get(account.activeProfileId) ??
-                            "perfil no visible")
-                          : null
-                      }
+                      profileLabel={profileLabelFor(account)}
                       onSelect={() => selectAccount(account.id)}
                     />
                   ))}

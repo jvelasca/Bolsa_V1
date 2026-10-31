@@ -255,13 +255,16 @@ export function CreateAccountWizardDialog() {
     mutationFn: (payload: CreateInvestmentAccountRequestDto) =>
       api.createAccount(payload),
     onSuccess: async (response) => {
+      // CTA-D9: primero el refresco de la lista y DESPUÉS la Activa local. Al revés,
+      // `useActiveAccount` compara el id con su caché de `["accounts"]`, aún sin la
+      // cuenta recién creada, la da por inexistente y revierte la Activa al fallback.
+      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
       setActiveAccountId(response.data.id);
       try {
         await api.setDefaultAccount(response.data.id);
       } catch {
         /* Activa local ya fijada; espejo servidor best-effort */
       }
-      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
       void queryClient.invalidateQueries({ queryKey: ["account-summaries"] });
       void queryClient.invalidateQueries({ queryKey: ["portfolio"] });
       void queryClient.invalidateQueries({ queryKey: ["investor-profiles"] });

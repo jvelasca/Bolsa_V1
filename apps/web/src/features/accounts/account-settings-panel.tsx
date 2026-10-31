@@ -45,6 +45,19 @@ function cloneSettings(source: AccountSettings | null): AccountSettings {
 }
 
 /**
+ * CTA-D3 — el recorte de las notas es una decisión de GUARDADO, no de tecleo.
+ * Antes el `onChange` hacía `trim()`, así que era imposible escribir «nota con
+ * espacios»: cada espacio desaparecía al pulsarlo. El borrador conserva el texto
+ * tal cual y aquí se recortan solo los extremos (vacío → `null`, sin notas).
+ */
+export function normalizeSettingsForSave(
+  settings: AccountSettings,
+): AccountSettings {
+  const notes = settings.notes?.trim() ?? "";
+  return { ...settings, notes: notes.length > 0 ? notes : null };
+}
+
+/**
  * Validación de CLIENTE del mismo contrato que aplica la API
  * (`apps/api-python/src/bolsa_api/schemas/accounts.py`): un tope menor que el mínimo o
  * un mes fuera de 1..12 son 422 en el servidor. Aquí se detectan antes de enviar para
@@ -137,7 +150,8 @@ export function AccountSettingsPanel({
   );
 
   const saveMutation = useMutation({
-    mutationFn: () => api.updateAccountSettings(accountId, draft),
+    mutationFn: () =>
+      api.updateAccountSettings(accountId, normalizeSettingsForSave(draft)),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["accounts"] });
       void queryClient.invalidateQueries({
@@ -488,7 +502,7 @@ export function AccountSettingsPanel({
               onChange={(e) =>
                 setDraft((prev) => ({
                   ...prev,
-                  notes: e.target.value.trim() || null,
+                  notes: e.target.value,
                 }))
               }
             />

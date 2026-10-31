@@ -107,7 +107,7 @@ export function MesaHoyPage() {
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
     staleTime: 15_000,
     refetchInterval: MESA_REFETCH_MS,
   });

@@ -182,7 +182,10 @@ describe("AccountsPage — selección ≠ cuenta activa (CU-D3)", () => {
     await waitFor(() => {
       expect(mocks.setDefaultAccount).toHaveBeenCalledWith("acc-b");
     });
-    expect(useActiveAccountStore.getState().activeAccountId).toBe("acc-b");
+    // CTA-D4: el estado local se fija cuando el servidor confirma, no antes.
+    await waitFor(() => {
+      expect(useActiveAccountStore.getState().activeAccountId).toBe("acc-b");
+    });
   });
 
   it("muestra el perfil de cada cuenta o «Sin perfil»", async () => {
@@ -213,5 +216,17 @@ describe("AccountsPage — selección ≠ cuenta activa (CU-D3)", () => {
     const alert = await screen.findByTestId("accounts-load-error");
     expect(alert.textContent).toContain("API caída");
     expect(screen.queryByText("No hay cuentas demo activas.")).toBeNull();
+  });
+
+  it("CTA-D2: un catálogo caído se declara y no se afirma «perfil no visible»", async () => {
+    mocks.listInvestorProfiles.mockRejectedValue(new Error("catálogo caído"));
+    renderPage();
+
+    const alert = await screen.findByTestId("accounts-profiles-error");
+    expect(alert.textContent).toContain("catálogo caído");
+
+    const label = await screen.findByTestId("account-list-profile-acc-a");
+    expect(label.textContent).toContain("No disponible");
+    expect(label.textContent).not.toContain("no visible");
   });
 });

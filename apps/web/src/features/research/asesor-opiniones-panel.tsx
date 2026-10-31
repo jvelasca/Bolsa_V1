@@ -93,7 +93,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", "asesor-opiniones"],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
     staleTime: 30_000,
   });
 

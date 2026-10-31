@@ -59,7 +59,7 @@ export function OperativaPhaseToastPoller() {
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
     staleTime: 15_000,
     enabled,
     refetchInterval: enabled ? POLL_MS : false,

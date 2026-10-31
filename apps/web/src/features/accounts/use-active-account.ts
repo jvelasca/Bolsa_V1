@@ -108,8 +108,11 @@ export function useActivateAccount() {
 
   return useMutation({
     mutationFn: async (accountId: string) => {
-      setActiveAccountId(accountId);
+      // CTA-D4: primero el espejo en servidor y solo después el estado local. Si la
+      // llamada falla, la app no se queda «activada» en una cuenta que el servidor no
+      // reconoce como última usada (antes se cambiaba el store y el fallo era invisible).
       await api.setDefaultAccount(accountId);
+      setActiveAccountId(accountId);
       return accountId;
     },
     onSuccess: () => {

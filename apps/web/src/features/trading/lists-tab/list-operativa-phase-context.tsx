@@ -86,7 +86,7 @@ export function ListOperativaPhaseProvider({
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
     staleTime: 15_000,
     enabled: ids.length > 0,
   });

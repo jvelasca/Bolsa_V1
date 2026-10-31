@@ -135,7 +135,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
     staleTime: 15_000,
   });
   const instrumentsCatalogQuery = useQuery({

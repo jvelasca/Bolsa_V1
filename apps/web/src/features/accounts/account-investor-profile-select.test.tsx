@@ -217,4 +217,15 @@ describe("AccountInvestorProfileSelect — desasignación explícita «Quitar pe
     await screen.findByTestId("account-profile-missing");
     expect(screen.queryByTestId("account-profile-clear")).toBeNull();
   });
+
+  it("CTA-D2: un catálogo caído no se presenta como perfil legacy", async () => {
+    mocks.listInvestorProfiles.mockRejectedValue(new Error("API caída"));
+    renderSelect("prof-moderate");
+
+    expect(
+      await screen.findByText(/No se pudo cargar el catálogo/),
+    ).toBeTruthy();
+    expect(screen.queryByTestId("account-profile-missing")).toBeNull();
+    expect(screen.queryByTestId("account-profile-active")).toBeNull();
+  });
 });

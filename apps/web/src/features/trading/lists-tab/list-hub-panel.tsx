@@ -126,7 +126,7 @@ export function ListHubPanel() {
   });
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
   });
 
   const apiLists = listsQuery.data?.data ?? [];

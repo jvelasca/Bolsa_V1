@@ -101,7 +101,7 @@ function account(
 function renderPanel(
   props: {
     account?: InvestmentAccountDto;
-    initialTab?: "config";
+    initialTab?: "resumen" | "posiciones" | "movimientos" | "config";
     focus?: string;
   } = {},
 ) {
@@ -213,5 +213,107 @@ describe("AccountDetailPanel — perfil visible y una sola asignación (CU-D2/CU
     expect(
       screen.queryByText("Editar perfil, comisiones y fiscal →"),
     ).toBeNull();
+  });
+});
+
+describe("AccountDetailPanel — scoping y errores de lectura (CTA-D1/D2/D4/D6/D8)", () => {
+  it("CTA-D1: pide el portfolio de la cuenta seleccionada, no el de la activa", async () => {
+    // La cuenta activa es «acc-other» (beforeEach) y la ficha es «acc-a».
+    renderPanel();
+
+    await waitFor(() => expect(mocks.getPortfolio).toHaveBeenCalled());
+    expect(mocks.getPortfolio).toHaveBeenCalledWith("acc-a");
+  });
+
+  it("CTA-D2: un catálogo caído no se presenta como perfil legacy", async () => {
+    mocks.listInvestorProfiles.mockRejectedValue(new Error("catálogo caído"));
+    renderPanel({ account: account({ activeProfileId: "prof-legacy" }) });
+
+    expect(
+      await screen.findByTestId("account-profile-error"),
+    ).toHaveTextContent("catálogo caído");
+    const header = screen.getByTestId("account-detail-profile");
+    expect(header.textContent).toContain("No disponible");
+    expect(header.textContent).not.toContain("legacy");
+  });
+
+  it("CTA-D4: un fallo al activar deja un error visible", async () => {
+    mocks.setDefaultAccount.mockRejectedValue(
+      new Error("400: cuenta no activable"),
+    );
+    renderPanel();
+
+    fireEvent.click(await screen.findByTestId("account-activate"));
+
+    expect(
+      await screen.findByTestId("account-activate-error"),
+    ).toHaveTextContent("cuenta no activable");
+  });
+
+  it("CTA-D6: no guarda un nombre vacío y explica por qué", async () => {
+    renderPanel({ initialTab: "config" });
+
+    fireEvent.change(await screen.findByLabelText("Nombre"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar datos" }));
+
+    expect(await screen.findByTestId("account-name-error")).toHaveTextContent(
+      "El nombre no puede estar vacío.",
+    );
+    expect(mocks.updateAccount).not.toHaveBeenCalled();
+  });
+
+  it("CTA-D8: un fallo del resumen se declara, no se pinta como «Sin dato todavía»", async () => {
+    mocks.getAccountSummary.mockRejectedValue(new Error("API caída"));
+    renderPanel();
+
+    expect(
+      await screen.findByTestId("account-summary-error"),
+    ).toHaveTextContent("API caída");
+    expect(screen.queryByText("Sin dato todavía")).toBeNull();
+    expect(screen.getAllByText("No disponible").length).toBeGreaterThan(0);
+  });
+
+  it("CTA-D8: un fallo del portfolio no se pinta como «Sin posiciones abiertas»", async () => {
+    mocks.getPortfolio.mockRejectedValue(new Error("API caída"));
+    renderPanel({ initialTab: "posiciones" });
+
+    expect(
+      await screen.findByTestId("account-portfolio-error"),
+    ).toHaveTextContent("API caída");
+    expect(screen.queryByText("Sin posiciones abiertas.")).toBeNull();
+  });
+
+  it("CTA-D8: una cuenta cerrada declara la ficha como no disponible, no como vacía", async () => {
+    renderPanel({
+      account: account({ status: "closed" }),
+      initialTab: "posiciones",
+    });
+
+    expect(await screen.findByTestId("account-closed-notice")).toBeTruthy();
+    expect(screen.queryByText("Sin posiciones abiertas.")).toBeNull();
+    expect(mocks.getPortfolio).not.toHaveBeenCalled();
+  });
+
+  it("CTA-D7: el enlace fiscal declara que informa de la cuenta activa", async () => {
+    renderPanel();
+
+    const link = await screen.findByRole("link", {
+      name: /Informe fiscal/,
+    });
+    expect(link.textContent).toBe("Informe fiscal (cuenta activa)");
+    expect(link.getAttribute("title")).toContain("cuenta Activa");
+  });
+
+  it("CTA-D7: con la cuenta activa, el enlace no necesita matiz", async () => {
+    useActiveAccountStore.setState({ activeAccountId: "acc-a" });
+    renderPanel();
+
+    const link = await screen.findByRole("link", {
+      name: /Informe fiscal/,
+    });
+    expect(link.textContent).toBe("Informe fiscal");
+    expect(link.getAttribute("title")).toBeNull();
   });
 });

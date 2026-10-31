@@ -144,7 +144,7 @@ export function ListValuesPanel() {
   const listsQuery = useQuery({ queryKey: ["lists"], queryFn: api.getLists });
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
     staleTime: 15_000,
   });
 

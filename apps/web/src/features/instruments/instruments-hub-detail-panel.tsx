@@ -131,7 +131,7 @@ export function InstrumentsHubDetailPanel({
   // Misma `queryKey` que `useInstrumentsHubEnrichment`: comparte caché y no duplica fetch.
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
     staleTime: 15_000,
     enabled: sectionsOpen.resumen,
   });

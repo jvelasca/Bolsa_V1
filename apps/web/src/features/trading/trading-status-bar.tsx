@@ -114,7 +114,7 @@ export function TradingStatusBar() {
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", effectiveAccountId],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
     enabled: Boolean(effectiveAccountId),
     refetchInterval: 60_000,
   });

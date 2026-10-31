@@ -41,7 +41,7 @@ export function MesaOperationalBar({
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
     enabled: Boolean(accountScope),
     staleTime: 15_000,
   });

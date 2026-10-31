@@ -964,9 +964,22 @@ export const api = {
     return result;
   },
 
-  getPortfolio: () =>
+  /**
+   * Cartera de una cuenta concreta.
+   *
+   * `accountId` es OBLIGATORIO siempre que la superficie no sea la cuenta Activa de
+   * la app: el middleware solo inyecta `X-Account-Id` con la activa, así que sin el
+   * header explícito la ficha de otra cuenta pediría (y pintaría) la cartera de la
+   * activa (CTA-D1). Los `queryFn: api.getPortfolio` reciben un `QueryFunctionContext`
+   * como primer argumento, por eso hay que envolverlos: `() => api.getPortfolio()`.
+   */
+  getPortfolio: (accountId?: string) =>
     call<{ data: import("@bolsa/shared").PortfolioSummaryDto }>(() =>
-      client.GET("/api/portfolio"),
+      client.GET("/api/portfolio", {
+        params: {
+          header: accountId ? { "X-Account-Id": accountId } : {},
+        },
+      }),
     ),
 
   /** V1.89/V1.90 — lifecycle sidecar snapshot (stage FSM). No cash ledger. */
