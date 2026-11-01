@@ -1,13 +1,25 @@
+/**
+ * Overview — resumen de la cuenta activa (pregunta: «¿qué tengo y por dónde
+ * sigo?»). Tres bloques, cada hecho una sola vez:
+ *
+ *  1. Cuenta activa + métricas de patrimonio.
+ *  2. Accesos rápidos (fila compacta; la navegación completa ya vive en la barra
+ *     L1 y en el `AdminRail`, así que aquí no se duplica como catálogo de cards).
+ *  3. Últimos movimientos de la cuenta activa.
+ *
+ * `RT-01`/`R-G1`: ni documentación de arquitectura interna ni tutoriales ocupan
+ * el primer nivel; eso vive en Ayuda (Backtesting / Análisis del valor) y en
+ * Configuración (Sync / proveedores).
+ *
+ * @see docs/engineering/spec-ui-contract-5-0-2026-10-08.md (§2 RT-01, R-G1, UI5-20)
+ */
+
+import type { ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
-  FlaskConical,
   History,
-  FileSpreadsheet,
-  Landmark,
   LineChart,
-  ScanSearch,
-  Settings2,
   TrendingUp,
   Wallet,
 } from "lucide-react";
@@ -24,8 +36,6 @@ import {
   accountTypeShortLabel,
   useActiveAccount,
 } from "@/features/accounts/use-active-account";
-import { HELP_CONTENT_AS_OF } from "@/features/help/help-content-as-of";
-import { DataSyncSummaryCard } from "@/features/settings/data-sync-summary-card";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { absentDataLabel } from "@/components/absent-data";
 import { api } from "@/lib/api";
@@ -85,17 +95,17 @@ function ActiveAccountPanel() {
     <section className="rounded-lg border border-border bg-card/60 p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Cuenta activa
-          </p>
+          </h2>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando cuentas…</p>
           ) : account ? (
             <>
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-xl font-semibold tracking-tight">
+                <p className="truncate text-xl font-semibold tracking-tight">
                   {account.name}
-                </h2>
+                </p>
                 <span className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                   {accountTypeShortLabel(account.type)}
                 </span>
@@ -103,10 +113,9 @@ function ActiveAccountPanel() {
                   {account.currency}
                 </span>
               </div>
-              <p className="max-w-xl text-sm text-muted-foreground">
-                Con esta cuenta opera toda la app (Trading, barra inferior,
-                órdenes e historial). Se restaura al reabrir. Cambia o limpia
-                demos en Cuentas — aquí no listamos el catálogo completo.
+              <p className="text-sm text-muted-foreground">
+                Toda la app opera con esta cuenta. Cambiar de cuenta es en
+                Cuentas.
               </p>
             </>
           ) : (
@@ -178,8 +187,7 @@ function ActiveAccountPanel() {
             {otherAccounts.length} otra
             {otherAccounts.length === 1 ? "" : "s"} cuenta
             {otherAccounts.length === 1 ? "" : "s"} activa
-            {otherAccounts.length === 1 ? "" : "s"} — gestionar en Cuentas (no
-            se listan aquí).
+            {otherAccounts.length === 1 ? "" : "s"} — cambiar en Cuentas.
           </p>
           <Link
             to="/accounts"
@@ -195,46 +203,77 @@ function ActiveAccountPanel() {
   );
 }
 
-function NavCard({
-  title,
-  description,
-  icon: Icon,
-  to,
-  onClick,
-}: {
-  title: string;
-  description: string;
-  icon: typeof Wallet;
-  to?: string;
-  onClick?: () => void;
-}) {
-  const inner = (
-    <>
-      <div className="flex items-start justify-between gap-2">
-        <Icon className="h-5 w-5 text-primary" />
-        <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-      </div>
-      <CardTitle className="mt-3 text-base">{title}</CardTitle>
-      <CardDescription className="mt-1">{description}</CardDescription>
-    </>
-  );
+type QuickLink = {
+  to: string;
+  label: string;
+  hint: string;
+  icon: ComponentType<{ className?: string }>;
+  primary?: boolean;
+};
 
-  if (onClick) {
-    return (
-      <button type="button" onClick={onClick} className="group text-left">
-        <Card className="h-full transition-colors hover:border-primary/40 hover:bg-accent/30">
-          <CardHeader className="pb-2">{inner}</CardHeader>
-        </Card>
-      </button>
-    );
-  }
+const QUICK_LINKS: readonly QuickLink[] = [
+  {
+    to: "/trading",
+    label: "Trading",
+    hint: "Gráficos, listas y órdenes",
+    icon: LineChart,
+    primary: true,
+  },
+  {
+    to: "/operations",
+    label: "Operaciones",
+    hint: "Posiciones y P&L",
+    icon: TrendingUp,
+  },
+  {
+    to: "/history",
+    label: "Historial",
+    hint: "Movimientos y comisiones",
+    icon: History,
+  },
+  {
+    to: "/accounts",
+    label: "Cuentas",
+    hint: "Efectivo y configuración",
+    icon: Wallet,
+  },
+];
 
+function QuickLinks() {
   return (
-    <Link to={to!} className="group block">
-      <Card className="h-full transition-colors hover:border-primary/40 hover:bg-accent/30">
-        <CardHeader className="pb-2">{inner}</CardHeader>
-      </Card>
-    </Link>
+    <section className="space-y-3">
+      <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Accesos rápidos
+      </h2>
+      <nav
+        aria-label="Accesos rápidos"
+        className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
+      >
+        {QUICK_LINKS.map(({ to, label, hint, icon: Icon, primary }) => (
+          <Link
+            key={to}
+            to={to}
+            className={cn(
+              "group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors hover:bg-accent",
+              primary
+                ? "border-primary/40 bg-primary/5"
+                : "border-border bg-card/60",
+            )}
+          >
+            <Icon className="h-5 w-5 shrink-0 text-primary" />
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium">
+                {label}
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {hint}
+              </span>
+            </span>
+            <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+          </Link>
+        ))}
+      </nav>
+    </section>
   );
 }
 
@@ -257,7 +296,9 @@ function RecentLedgerCard() {
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
           <div>
-            <CardTitle className="text-base">Últimos movimientos</CardTitle>
+            <CardTitle level="h2" className="text-base">
+              Últimos movimientos
+            </CardTitle>
             <CardDescription>
               {account
                 ? `Movimientos de «${account.name}» (cuenta activa)`
@@ -320,208 +361,7 @@ function RecentLedgerCard() {
   );
 }
 
-function ResearchHighlights() {
-  return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Investigación · sync {HELP_CONTENT_AS_OF}
-          </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Últimas mejoras: embudo Backtesting y motor de análisis fundamental
-            (FIE).
-          </p>
-        </div>
-        <p className="text-[11px] text-muted-foreground">
-          Detalle en Ayuda → Backtesting / Análisis del valor
-        </p>
-      </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="border-primary/20 bg-card/80">
-          <CardHeader className="pb-2">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <FlaskConical className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Backtesting</CardTitle>
-              </div>
-              <Link
-                to="/backtests"
-                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                Abrir
-                <ArrowRight className="h-3 w-3" />
-              </Link>
-            </div>
-            <CardDescription>
-              Análisis técnico · Análisis fundamental · Play · Lista AUTO ·
-              Finalistas
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <ul className="list-disc space-y-1.5 pl-4">
-              <li>
-                <span className="text-foreground">Análisis técnico</span>:
-                gráfico, replay, equity y trades (Detalle clásico, sin FA
-                mezclado).
-              </li>
-              <li>
-                <span className="text-foreground">Análisis fundamental</span>:
-                Tarjeta Valor completa (ratios, Composite, filings).
-              </li>
-              <li>
-                <span className="text-foreground">Play</span>: genéricas → Coach
-                → Lab → revalidar → Finalistas (TOP solo si el Lab mejora).
-              </li>
-              <li>
-                <span className="text-foreground">Lista AUTO</span>: mismo ciclo
-                × ticker; omitir si Finalistas frescos; progreso en el footer de
-                Trading.
-              </li>
-              <li>
-                Finalistas: <span className="text-foreground">Checklist</span> =
-                paper manual (A) ·{" "}
-                <span className="text-foreground">Proponer</span> = Supervisado
-                F3 (C). Distintos.
-              </li>
-            </ul>
-            <p className="text-[11px] leading-relaxed">
-              No es predicción ni auto de producción. Paper D (execute) es otra
-              puerta, off por defecto.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-primary/20 bg-card/80">
-          <CardHeader className="pb-2">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Landmark className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">
-                  Análisis fundamental
-                </CardTitle>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  to="/backtests"
-                  className="text-xs text-primary hover:underline"
-                  title="Tarjeta Valor en Backtesting → Monitor / Valor"
-                >
-                  Tarjeta Valor
-                </Link>
-                <span className="text-muted-foreground/40">·</span>
-                <Link
-                  to="/screeners"
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  Screeners
-                  <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-            </div>
-            <CardDescription>
-              FIE cerrado en código · fase prueba APP · Python calcula, LLM solo
-              explica
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <ul className="list-disc space-y-1.5 pl-4">
-              <li>
-                <span className="text-foreground">Tarjeta Valor</span>:
-                Score_FUND, Piotroski, ROIC, Beneish, Graham, DCF
-                bear/base/bull, CAPM/WACC, Composite.
-              </li>
-              <li>
-                Filings (upload / SEC / RAG) para contexto —{" "}
-                <span className="text-foreground">no</span> alimentan Score_FUND
-                ni el gate.
-              </li>
-              <li>
-                Embudo FA: <span className="text-foreground">Screener FA</span>{" "}
-                → whitelist → <span className="text-foreground">Paper D</span>{" "}
-                (propose dry-run; execute con env).
-              </li>
-              <li>
-                Yahoo: balance vía timeseries si el quoteSummary llega vacío;
-                cobertura uneven en bancos (null-if-incomplete).
-              </li>
-            </ul>
-            <p className="text-[11px] leading-relaxed">
-              Verificar:{" "}
-              <code className="rounded bg-muted px-1">pnpm test:fa</code> ·
-              cobertura:{" "}
-              <code className="rounded bg-muted px-1">
-                pnpm audit:fa:coverage
-              </code>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    </section>
-  );
-}
-
-function NextStepsCard() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Por dónde seguir</CardTitle>
-        <CardDescription>
-          Flujo habitual: cuenta → trading → research → paper
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3 text-sm text-muted-foreground">
-        <ol className="list-decimal space-y-2 pl-4">
-          <li>
-            Confirma la <span className="text-foreground">cuenta activa</span>{" "}
-            arriba (o en la barra inferior).
-          </li>
-          <li>
-            Abre{" "}
-            <Link to="/trading" className="text-primary hover:underline">
-              Trading
-            </Link>{" "}
-            para gráficos, listas y órdenes simuladas.
-          </li>
-          <li>
-            En{" "}
-            <Link to="/backtests" className="text-primary hover:underline">
-              Backtesting
-            </Link>
-            : Play (o Lista AUTO) hasta Finalistas; revisa la{" "}
-            <span className="text-foreground">Tarjeta Valor</span> del ticker.
-          </li>
-          <li>
-            En{" "}
-            <Link to="/screeners" className="text-primary hover:underline">
-              Screeners
-            </Link>
-            : Screener FA → whitelist → Paper D dry-run (execute solo con{" "}
-            <code className="rounded bg-muted px-1 text-[11px]">
-              PAPER_D_EXECUTE=1
-            </code>
-            ).
-          </li>
-          <li>
-            Revisa P&amp;L en{" "}
-            <Link to="/operations" className="text-primary hover:underline">
-              Operaciones
-            </Link>{" "}
-            o{" "}
-            <Link to="/accounts" className="text-primary hover:underline">
-              Cuentas
-            </Link>
-            .
-          </li>
-        </ol>
-      </CardContent>
-    </Card>
-  );
-}
-
 export function OverviewPage() {
-  const openConfig = useUiStore((s) => s.openPlatformConfig);
-
   const healthQuery = useQuery({
     queryKey: ["health"],
     queryFn: api.getHealth,
@@ -529,94 +369,23 @@ export function OverviewPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-2xl space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
-          <p className="text-sm text-muted-foreground">
-            Cuenta activa, patrimonio y atajos a Trading, Backtesting y análisis
-            fundamental.
+      <div className="max-w-2xl space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
+        <p className="text-sm text-muted-foreground">
+          Tu cuenta simulada, su patrimonio y los accesos que más usas.
+        </p>
+        {healthQuery.isError && (
+          <p className="mt-2 text-sm text-destructive">
+            API no disponible — comprueba que el backend esté en marcha.
           </p>
-          {healthQuery.isError && (
-            <p className="mt-2 text-sm text-destructive">
-              API no disponible — comprueba que el backend esté en marcha.
-            </p>
-          )}
-        </div>
-        <Link
-          to="/trading"
-          className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-        >
-          <LineChart className="h-4 w-4" />
-          Ir a Trading
-        </Link>
+        )}
       </div>
 
       <ActiveAccountPanel />
 
-      <ResearchHighlights />
+      <QuickLinks />
 
-      <div>
-        <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Accesos
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <NavCard
-            title="Trading"
-            description="Workspace: gráficos, listas, indicadores y panel de órdenes."
-            icon={LineChart}
-            to="/trading"
-          />
-          <NavCard
-            title="Backtesting"
-            description="Play ciclo, Lista AUTO, Finalistas, Lab y Monitor de estado."
-            icon={FlaskConical}
-            to="/backtests"
-          />
-          <NavCard
-            title="Screeners"
-            description="Screener FA → whitelist · Paper D propose/execute (gated)."
-            icon={ScanSearch}
-            to="/screeners"
-          />
-          <NavCard
-            title="Cuentas"
-            description="Detalle, efectivo, posiciones y configuración de cada cuenta."
-            icon={Wallet}
-            to="/accounts"
-          />
-          <NavCard
-            title="Operaciones"
-            description="Posiciones abiertas, órdenes pendientes y P&L de la activa."
-            icon={TrendingUp}
-            to="/operations"
-          />
-          <NavCard
-            title="Historial"
-            description="Movimientos contables, comisiones y operaciones ejecutadas."
-            icon={History}
-            to="/history"
-          />
-          <NavCard
-            title="Informe fiscal"
-            description="Plusvalías realizadas (FIFO o coste medio) de la activa."
-            icon={FileSpreadsheet}
-            to="/fiscal"
-          />
-          <NavCard
-            title="Configuración"
-            description="Workspace, sync de datos y preferencias de la plataforma."
-            icon={Settings2}
-            onClick={() => openConfig("general")}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <RecentLedgerCard />
-        <NextStepsCard />
-      </div>
-
-      <DataSyncSummaryCard />
+      <RecentLedgerCard />
     </div>
   );
 }

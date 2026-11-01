@@ -1,0 +1,62 @@
+﻿
+Running 35 tests using 8 workers
+
+node.exe : (node:36240) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+En C:\Users\josea\AppData\Roaming\npm\pnpm.ps1: 24 Carácter: 5
++     & "node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:36240) Wa... env being set.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:34388) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13304) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:11056) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:17916) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4644) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2604) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:36260) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  3 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /mesa @móvil 390×844 (8.2s)
+  ok  4 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /mesa?view=posiciones @móvil 390×844 (8.3s)
+  ok  8 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /confirm @desktop (8.2s)
+  ok  5 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /confirm @móvil 390×844 (8.3s)
+  ok  7 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /mesa @desktop (8.6s)
+  ok  6 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /mesa?view=posiciones @desktop (8.8s)
+  ok  1 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /trading @móvil 390×844 (9.7s)
+  ok  2 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /trading @desktop (9.8s)
+  ok  9 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /research @desktop (5.0s)
+  ok 10 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /research @móvil 390×844 (5.3s)
+  ok 12 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /history @móvil 390×844 (5.4s)
+  ok 13 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /overview @desktop (6.0s)
+  ok 11 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /history @desktop (6.4s)
+  ok 14 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /overview @móvil 390×844 (6.5s)
+  ok 16 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /backtests @móvil 390×844 (6.1s)
+  ok 15 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /backtests @desktop (6.3s)
+  ok 17 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /accounts @desktop (4.7s)
+  ok 18 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /accounts @móvil 390×844 (5.0s)
+  ok 19 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /screeners @desktop (5.4s)
+  ok 20 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /screeners @móvil 390×844 (5.5s)
+  ok 21 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /alerts @desktop (5.7s)
+  ok 22 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /alerts @móvil 390×844 (6.1s)
+  ok 23 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /fiscal @desktop (5.9s)
+  ok 24 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /fiscal @móvil 390×844 (5.8s)
+  ok 25 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /operational-console @desktop (5.8s)
+  ok 26 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /operational-console @móvil 390×844 (5.7s)
+  ok 27 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /auto-monitor @desktop (6.0s)
+  ok 28 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /auto-monitor @móvil 390×844 (5.9s)
+  ok 29 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /instruments @desktop (6.4s)
+  ok 32 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /instruments/inst-aapl @móvil 390×844 (5.9s)
+  ok 30 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /instruments @móvil 390×844 (6.2s)
+  ok 31 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /instruments/inst-aapl @desktop (6.3s)
+  ok 33 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /decision-journal @desktop (5.2s)
+  ok 34 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:326:7 › GP-E2E UI5-0 — rutas tocadas (axe) › 0 critical/serious en /decision-journal @móvil 390×844 (5.1s)
+  ok 35 e2e\gp-e2e-ui5-0-axe-touched-routes-mock.spec.ts:341:3 › GP-E2E UI5-0 — rutas tocadas (axe) › command palette: overlay accesible (Ctrl+K) con un único dialog (4.6s)
+
+  35 passed (30.9s)

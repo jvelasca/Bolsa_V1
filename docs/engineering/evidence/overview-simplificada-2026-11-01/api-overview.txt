@@ -1,0 +1,5 @@
+GET /api/accounts -> 1 cuenta(s); activa id=default-account-seed
+GET /api/accounts/default-account-seed/summary -> totalEquity=99800,0 cash=99800,0 totalUnrealizedPnl=0,0 positionsCount=0 freeMargin=99800,0
+GET /api/accounts/default-account-seed/ledger?limit=8 -> 2 asiento(s)
+  fee 5404093c433a4c0698ab7adb3 amount=-200,0 referenceType=custody
+  deposit 0102f83ca8954b4888c6b4680 amount=100000,0 referenceType=migration
