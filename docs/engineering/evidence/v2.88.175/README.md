@@ -90,9 +90,23 @@ Estado de las BD tras la pasada de `chaos/live_a7`: `bolsa_v1_a7` con `live_orde
 | Cierre documental (expediente) | `aef2187b` |
 | Bump `2.11.175-beta` | `4b3bbad3` |
 | Re-anclaje del pin | `0e5a7517` |
-| Tag anotado `v2.88.175-beta` | sobre el commit de este documento (cierre documental), patrón `.173`/`.174` |
-| `Release tag CI` del tag | pendiente del push; se anotan los run IDs al leerlos |
+| Tag anotado `v2.88.175-beta` | sobre el commit de este documento (cierre documental, `de5c9424`), patrón `.173`/`.174` |
+| `Release tag CI` del tag | [`41337773491`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41337773491) — **GREEN** |
 | GitHub Release | **no se emite** (mismo criterio que `.173` y `.174`) |
+
+### 6.1 Runs del tag medidos (2026-11-01)
+
+Esta sección se añade **POST-PUSH**, así que no viaja en el árbol del tag (mismo patrón que `.173`).
+
+| Run | SHA | Resultado |
+| --- | --- | --- |
+| `Release tag CI` [`41337773491`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41337773491) | `de5c9424` | **GREEN**: 12 jobs `success` + `certify`; único `skipped` el E2E integrado opt-in |
+| Job `a7-gate` (dentro del run) | `de5c9424` | **success** con `LIVE_A7_PG_REQUIRED: 1` y `DB_NAME: bolsa_v1_a7`: `19 passed in 14,57 s`, **0 skipped** (un skip habría sido `AssertionError`) |
+| Artefacto `release-tag-ci-summary` | `de5c9424` | `status: GREEN`, `"a7-gate": "success"`, `asOf 2026-11-01T18:55:25Z` |
+
+El `a7-gate` del tag es la pieza que faltaba para cerrar el punto 1 del expediente: el mismo run que en
+local da `12 passed, 7 skipped` en verde da aquí **19 passed, 0 skipped**, y si hubiera saltado uno habría
+sido rojo y `certify` no habría escrito `GREEN`.
 
 ## 7. Falsabilidad
 
@@ -120,4 +134,5 @@ Estado de las BD tras la pasada de `chaos/live_a7`: `bolsa_v1_a7` con `live_orde
 | 3 | Reforzado el mensaje de la guarda (el run no certifica) y anclado el cableado de `a7-gate` con `test_release_tag_ci_a7_gate_wiring.py`. |
 | 4 | Repetida `chaos/live_a7` contra `bolsa_v1_a7`: 19/19 con el stack vivo y sin el aviso de la purga. |
 | 5 | Bump `2.11.175-beta` (`4b3bbad3`) y re-anclaje del pin (`0e5a7517`), `freeze OK` y `window:test` 50/50. |
-| 6 | Este documento; el tag va sobre su commit. |
+| 6 | Este documento (`de5c9424`), tag anotado `v2.88.175-beta` sobre él y push de rama y tag. |
+| 7 | Run del tag [`41337773491`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41337773491): **GREEN**, `a7-gate` `success` con `19 passed in 14,57 s` (0 skipped). Anotado POST-PUSH. |

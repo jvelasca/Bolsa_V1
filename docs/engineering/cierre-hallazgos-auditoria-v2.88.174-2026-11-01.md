@@ -314,3 +314,19 @@ este documento afirme.
 | Frontend | `apps/web/src/features/config/database-maintenance-panel.tsx`, `apps/web/src/features/settings/market-providers-status-card.tsx`, `apps/web/src/features/sync/sync-settings-panel.tsx`, `packages/shared/src/types.ts`, contrato generado (`apps/web/api/openapi.json`, `apps/web/src/api/schema.d.ts`) |
 | Guarda de exclusividad (`chaos/live_a7`) | `apps/api-python/tests/chaos/live_a7/_exclusivity_guard.py` (**nuevo**), `.../test_exclusivity_guard.py` (**nuevo**), `.../test_c3_crash_injection_recovery_worker.py`, `.../conftest.py` |
 | Tripwires del cierre | `apps/api-python/tests/test_release_tag_ci_a7_gate_wiring.py` (**nuevo**), `apps/api-python/tests/test_residual_purge_schema_guard.py` (**nuevo**), `apps/api-python/tests/conftest.py` (guarda de esquema en la purga) |
+
+## Publicación del sello `.175`
+
+Añadido **POST-PUSH**: no viaja en el árbol del tag (mismo patrón que `.173`).
+
+| Paso | SHA | Resultado |
+| --- | --- | --- |
+| Delta de corrección | `12e2c871` | producto + tests + guarda + tripwires |
+| Expediente (este documento) | `aef2187b` | gates A7, purga y verificabilidad |
+| Bump `2.11.175-beta` | `4b3bbad3` | `test_dia_d_bump_guard` 2 passed |
+| Re-anclaje del pin PAPER | `0e5a7517` | `window:freeze` → `freeze OK`; `window:test` 50/50 |
+| Evidencia del sello y tag | `de5c9424` | tag anotado `v2.88.175-beta` |
+| `Release tag CI` | `de5c9424` | [`41337773491`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41337773491) **GREEN**; `a7-gate` `success` con `LIVE_A7_PG_REQUIRED=1` y **19 passed, 0 skipped** (14,57 s); artefacto `release-tag-ci-summary` con `status: GREEN` y `"a7-gate": "success"` |
+
+El punto 1 del expediente —que un verde con skips se pudiera leer como éxito— queda cerrado con esa
+medición: el job que decide el sello ejecutó los 19 casos sin saltar ninguno.
