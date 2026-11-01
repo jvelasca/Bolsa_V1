@@ -2,6 +2,70 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.176-beta] — **la pantalla de entrada deja de repetir la navegación y de hablar en jerga interna: Overview responde a una sola pregunta** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** sello de **producto**, solo frontend, posterior a `2.11.175-beta`. No cambia ninguna regla,
+indicador, umbral, peso, sizing, régimen ni replay (**`Δ motor = 0`**), no se decide distinto (**`Δ decisión = 0`**)
+y no toca el contrato HTTP (`openapi.json`/`schema.d.ts` sin diff; `contract:check` **OK**). Sin migración: head
+sigue `062_sync_settings_check_backfill`.
+**Bump** `2.11.175-beta` → `2.11.176-beta` (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` no se toca).
+
+**El hueco.** A 1440×900 el contenido de `/overview` medía **1749 px** sobre un viewport útil de 853 px, con
+vocabulario de implementación en el primer nivel (`Score_FUND`, `Piotroski`, `FIE`, `Paper D`, `whitelist`,
+`PAPER_D_EXECUTE=1`) y **ocho** tarjetas de acceso que repetían la barra L1 y el `AdminRail`. La pantalla de
+entrada no respondía a una pregunta: repetía el mapa de la aplicación.
+
+**La decisión.** Overview pasa a responder *¿qué tengo y por dónde sigo?* con **tres** bloques, cada hecho una
+sola vez:
+
+| Bloque | Contenido |
+| --- | --- |
+| Cuenta activa | cuatro métricas + «Gestionar cuentas» / «Nueva demo» |
+| Accesos rápidos | **cuatro** destinos reales: `/trading`, `/operations`, `/history`, `/accounts` |
+| Últimos movimientos | `GET /api/accounts` + `/summary` + `/ledger?limit=8` |
+
+Jerarquía fijada: `h1 Overview` → `h2 Cuenta activa` → `h2 Accesos rápidos` → `h2 Últimos movimientos`, sin
+saltos ni `h3` intermedio. La ruta `/overview` y el ítem del `AdminRail` **no** se renombran: cero impacto en e2e
+y en el barrido axe.
+
+**El resultado medido.** Desktop 1440×900: **596 px** sin scroll (`scrollH = clientH = 853`), y el número se
+recompone —**56 / 209 / 85 / 174 px** de bloque + **72 px** de los tres `space-y-6` = 524 + 72 = **596**—. Móvil
+390×740: `scrollWidth = 390`, sin desbordamiento horizontal (el scroll vertical, 1103 px de contenido, es
+esperado). Área tocada: **19/19** (nueve casos de `dashboard-page.test.tsx` + diez de `heading-order.test.tsx`).
+`tsc -b --noEmit` **limpio**; **0** problemas de ESLint en las tres áreas tocadas (los 23 avisos de `src/`
+completo son preexistentes).
+
+**El borrado.** `data-sync-summary-card.tsx` se elimina: **no tiene consumidores** —la superficie real de sync es
+`SyncSettingsPanel` + `MarketProvidersStatusCard`, en la pestaña `other` de `platform-config-dialog.tsx`—. No se
+pierde información: se retira una **segunda** superficie que ofrecía lo mismo.
+
+**Lo que este sello NO acredita.** Las cifras **2 686/2 686** de la suite web y **35/35** de axe son del **árbol
+de trabajo** y se citan como citadas, no se heredan a ningún tag; el sello las re-mide donde el CI del tag las
+cubre. Y quedan **dos límites nombrados**, con condición de reapertura escrita:
+
+| Límite | Situación | Cierre necesario |
+| --- | --- | --- |
+| `L-OVW-1` | el estado de sync ya no se muestra en Overview | confirmar que Configuración → «Automatización: velas y servidores» conserva el estado y sigue siendo alcanzable |
+| `L-OVW-2` | «otras cuentas activas» cubierto **solo** por test | prueba real con dos cuentas: texto, enlace, cambio de cuenta y repintado a 390×740 |
+
+Ninguno de los dos impide aceptar la simplificación; ambos impiden llamarla «completamente verificada».
+
+**Contenido del sello.** La implementación y su aceptación técnica viajan en `62665ff7` (**16 ficheros**,
+`+1006/−460`: `dashboard-page.tsx` reescrito, `dashboard-page.test.tsx` nuevo, `data-sync-summary-card.tsx`
+borrado, y el expediente en `docs/`). La aceptación de **ese** commit, escrita en un descendiente para que no se
+certifique a sí misma, es `23c9c689`. El bump y el re-anclaje del pin PAPER van en commits propios, en ese orden,
+porque los `meta.bump` viven en `apps/` y mueven `appsHash`.
+
+**Publicación.** Rama `fix/059-060-proveedores`, **sin PR** (la rama de integración es ancestro). Tag anotado
+`v2.88.176-beta` sobre el cierre documental; el sello es el `Release tag CI` del tag. Release de GitHub: **se
+emite** en este sello — cambio de criterio respecto a `.173`…`.175`, que no la emitieron.
+
+Expediente: [`dictamen-overview-simplificada-2026-11-01.md`](./docs/engineering/dictamen-overview-simplificada-2026-11-01.md) ·
+[`dictamen-commit-62665ff7-2026-11-01.md`](./docs/engineering/dictamen-commit-62665ff7-2026-11-01.md) ·
+[`seguimiento-ui-overview-2026-11-01.md`](./docs/engineering/seguimiento-ui-overview-2026-11-01.md) ·
+[`evidence/overview-simplificada-2026-11-01/README.md`](./docs/engineering/evidence/overview-simplificada-2026-11-01/README.md).
+
 ## [2.11.175-beta] — **el cierre de la auditoría `.174` se vuelve verificable: P-1b y N-1…N-4 sellados, el gate A7 es duro y la purga deja de mentir** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO · SIN migración · head `062_sync_settings_check_backfill`**)
 
 **Naturaleza:** sello de **corrección** posterior a `2.11.174-beta`. Cierra los cinco hallazgos abiertos de
