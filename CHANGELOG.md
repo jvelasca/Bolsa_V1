@@ -45,8 +45,9 @@ antes del tag y el job `shared` (`Window freeze gate`) fallaría. El pin se re-a
 **CTA-174-4 · verificación (local, sobre el árbol del código).** `pytest` del área **72 passed** ·
 Vitest del área **8 files / 51 tests** · Vitest web completo **356 files / 2673 tests** · `tsc -b`
 **limpio** · `eslint` **0 errores** (6 avisos `exhaustive-deps` preexistentes) · `contract:check`
-**OK** · `ruff` **All checks passed** · `mypy` **582 ficheros** sin errores · E2E en vivo **90/90**
-(`pageerror` 0, `console.error` 0, 0 `ensure-defaults`, foto de BD antes/después idéntica).
+**OK** · `ruff` **All checks passed** · `mypy` **582 ficheros** sin errores · E2E en vivo **90/90** sobre el árbol del sello (`ea1432fb`,
+`dirty: false`; `pageerror` 0, `console.error` 0, 0 `ensure-defaults`, foto de BD antes/después con el
+mismo contenido).
 
 **CTA-174-5 · lo que este sello NO hace.** No toca el motor ni la decisión; no re-scopea `/fiscal`
 (`CTA-D7` queda documentado en UI); no pagina el ledger; no añade llamadores a
@@ -56,9 +57,14 @@ Los límites, la atribución de cada evidencia a su `headSha` y la tabla de runs
 [expediente pre-sello](./docs/engineering/pre-sello-v2.88.174-2026-10-31.md).
 
 **CTA-174-6 · publicación.** Rama `fix/059-060-proveedores`, **sin PR** (la rama de integración es
-ancestro y un PR contra `main` mezclaría expedientes). El **tag anotado `v2.88.174-beta`** y la
-GitHub Release **no se crean en este acto**: requieren autorización explícita y el cierre de
-`window:freeze` + CI sobre el commit final. `2.11.173-beta` sigue siendo la versión publicada de
+ancestro y un PR contra `main` mezclaría expedientes). Gates cerrados sobre el árbol del sello
+(`ea1432fb`): `Python CI` [`41292199040`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41292199040),
+`Frontend CI` [`41292198768`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41292198768) y
+`Optimize lab` [`41292198835`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41292198835) verdes, y
+`Release tag CI` despachado sobre `c1326295` ([`41292811777`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41292811777))
+**GREEN**, con `Window freeze gate` y `Contract check (no gen)` en `success`. El **tag anotado
+`v2.88.174-beta`** y la GitHub Release **no se crean en este acto**: requieren autorización explícita y
+el run del tag sobre el cierre documental. `2.11.173-beta` sigue siendo la versión publicada de
 referencia.
 
 ## [2.11.173-beta] — **la configuración se ordena por ámbito y el espacio de trabajo deja de falsear su estado** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `060_provider_check_policy` · UI-only**)

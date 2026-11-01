@@ -5,7 +5,7 @@
 > Rama: `fix/059-060-proveedores` · árbol del sello `ea1432fb` (bump + re-anclaje del pin) · SHA previo medido por CI `2c02178a` · versión `2.11.174-beta`.
 > Actualización 2026-11-01: árbol movido de `7993f7ca` a `ea1432fb`; ver §5 (pin resuelto) y §6 (estado real de cada paso).
 > Docs de referencia: [Seguimiento — Cuentas](./seguimiento-ui-cuentas-muestra-config-2026-10-31.md), [Verificación de grafo y cierre del gate Ruff](./verificacion-grafo-cuentas-2026-10-31.md), [Evidencia del sello .173](./evidence/v2.88.173/README.md).
-> Evidencia: [`evidence/cuentas-muestra-config-2026-10-31/`](./evidence/cuentas-muestra-config-2026-10-31/).
+> Evidencia: [`evidence/cuentas-muestra-config-2026-10-31/`](./evidence/cuentas-muestra-config-2026-10-31/) y [evidencia del sello `v2.88.174`](./evidence/v2.88.174/README.md).
 
 ---
 
@@ -136,6 +136,21 @@ Local está verde (`OK — openapi.json y schema.d.ts coinciden`) y el diff de c
 
 `workflow_dispatch` no está restringido a tags: los jobs no filtran por `github.ref_type`, así que un despacho sobre la rama produce evidencia verificable de `contract:check` sin crear versión, tag ni Release. El resumen se publicaría como `dispatch-<sha>`.
 
+**Resuelto el 2026-11-01:** despachado sobre `c1326295`, run [`41292811777`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41292811777) → **GREEN** (13 jobs `success` + `certify`; `playwright (integrated E2E, opt-in)` `skipped`). El step `Contract check (no gen)` del job `frontend` y el step `Window freeze gate` del job `shared` salieron **`success`**, con el artefacto resumido como `dispatch-c132629513abc33854b2c323640651404b6c6708`.
+
+### 4.4 Estado de las condiciones del dictamen (2026-11-01)
+
+| Condición | Estado | Evidencia |
+|---|---|---|
+| Documentación y atribución | **Cumplida** | `afef4fd1` con los tres `.md`; CI separado por `headSha` (§2) |
+| Pin de ventana | **Cumplida** | `ea1432fb`: `window:freeze` → `freeze OK`; `Window freeze gate` **success** en CI |
+| CI del HEAD | **Cumplida sobre el árbol del sello** | `41292199040` / `41292198768` / `41292198835` verdes en `ea1432fb` |
+| `contract:check` en la nube | **Cumplida** | `41292811777`, job `frontend`, step `Contract check (no gen)` `success` |
+| E2E 90/90 | **Repetido sobre el árbol del sello** | §4.2: `head ea1432fb`, `dirty: false`, 90/90 |
+| Versión, tag y Release | **Parcial**: versión bumpeada; tag y Release **no creados** | `3792ae19`; `git tag --list "*174*"` vacío |
+
+Lo que sigue abierto es deliberadamente de publicación, no técnico: autorización explícita, `git tag -a v2.88.174-beta` sobre el cierre documental y el **run del tag**, que es el que certifica el sello. Todo lo demás está medido. El detalle por run está en [`evidence/v2.88.174/README.md`](./evidence/v2.88.174/README.md).
+
 ---
 
 ## 5. Hallazgo bloqueante para el sello: el pin de ventana está `TREE_MOVED`
@@ -175,7 +190,7 @@ Los pasos 0 a 3 se ejecutaron y están fechados abajo. Los pasos 4 a 8 **no** se
 | 1 | Bump de versión | `package.json` → `2.11.174-beta` y los `meta.bump` de los 13 scripts (`v2_87`, `v2_89`…`v2_100`; `v2_100` emite dos artefactos, 14 literales) | **hecho** — `3792ae19` |
 | 2 | Guardián del bump | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` (2 tests) | **hecho** — 2 passed |
 | 3 | Re-anclaje del pin | `pnpm window:pin -- --note "sello v2.88.174-beta"` **después** del bump, y después `pnpm window:freeze` → `freeze OK` | **hecho** — `ea1432fb`; `freeze OK` |
-| 4 | Evidencia del sello | `docs/engineering/evidence/v2.88.174/README.md` con la tabla de runs, a la manera de `.173` | pendiente |
+| 4 | Evidencia del sello | `docs/engineering/evidence/v2.88.174/README.md` con la tabla de runs, a la manera de `.173` | **hecho** — `c1326295` |
 | 5 | Cierre documental | Commit docs-only que acompaña al sello (patrón `.173`: el tag apunta al cierre documental, no al commit del bump) | pendiente |
 | 6 | Tag anotado | `git tag -a v2.88.174-beta -m "…"` sobre el cierre documental | **no ejecutado** (sin autorización) |
 | 7 | Release tag CI | Se dispara con el push del tag; verificar 12 jobs + `certify`, y **leer el step `contract:check`** | pendiente del tag |
@@ -216,4 +231,5 @@ El vehículo es el sello con tag y Release sobre esta rama, no un PR. Sin cambio
 | 5 | `pnpm window:freeze`: `TREE_MOVED`, documentado como paso bloqueante de la secuencia. |
 | 6 | Corrección de atribución en los dos documentos del expediente y publicación de esta nota. |
 | 7 | 2026-11-01: corrección del estado del working tree (§1) y del orden bump → re-anclaje (§6), tras medir que los `meta.bump` viven en `apps/` y por tanto mueven `appsHash`. |
-| 8 | 2026-11-01: ejecución de los pasos 0–3. `afef4fd1` (docs), `3792ae19` (bump, guardián 2 passed), `ea1432fb` (`window:freeze` → `freeze OK`; `window:test` 50/50; `contract:check` OK) y push. E2E 90/90 repetido sobre `ea1432fb` con `dirty: false`. Tag y Release **no** creados. |
+| 8 | 2026-11-01: ejecución de los pasos 0–3. `afef4fd1` (docs), `3792ae19` (bump, guardián 2 passed), `ea1432fb` (`window:freeze` → `freeze OK`; `window:test` 50/50; `contract:check` OK) y push. |
+| 9 | 2026-11-01: CI de rama verde en `ea1432fb` (`Python CI` `41292199040`, `Frontend CI` `41292198768`, `Optimize lab` `41292198835`); E2E 90/90 repetido sobre ese árbol con `dirty: false` y publicado en `c1326295`; `Release tag CI` despachado sobre `c1326295` (`41292811777`) → **GREEN**, con `Window freeze gate` y `Contract check (no gen)` en `success`. Tag y Release **no** creados: sin autorización. |
