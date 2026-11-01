@@ -1,8 +1,9 @@
 # Pre-sello `v2.88.174-beta` — expediente preparado, publicación no autorizada (2026-10-31)
 
 > **Qué es:** el expediente de preparación del sello `.174` del bloque **Cuentas** (CTA-D1…CTA-D10) sobre `fix/059-060-proveedores`.
-> **Qué no es:** una autorización. No se ha creado la versión `2.11.174-beta`, ni el tag `v2.88.174-beta`, ni la GitHub Release.
-> Rama: `fix/059-060-proveedores` · HEAD `7993f7ca` (docs-only) · SHA medido por CI `2c02178a` · versión vigente `2.11.173-beta`.
+> **Qué no es:** una autorización. La versión `2.11.174-beta` **sí** existe ya en `package.json` (bump `3792ae19`), pero el tag `v2.88.174-beta` y la GitHub Release **no** se han creado.
+> Rama: `fix/059-060-proveedores` · árbol del sello `ea1432fb` (bump + re-anclaje del pin) · SHA previo medido por CI `2c02178a` · versión `2.11.174-beta`.
+> Actualización 2026-11-01: árbol movido de `7993f7ca` a `ea1432fb`; ver §5 (pin resuelto) y §6 (estado real de cada paso).
 > Docs de referencia: [Seguimiento — Cuentas](./seguimiento-ui-cuentas-muestra-config-2026-10-31.md), [Verificación de grafo y cierre del gate Ruff](./verificacion-grafo-cuentas-2026-10-31.md), [Evidencia del sello .173](./evidence/v2.88.173/README.md).
 > Evidencia: [`evidence/cuentas-muestra-config-2026-10-31/`](./evidence/cuentas-muestra-config-2026-10-31/).
 
@@ -110,10 +111,19 @@ Resultado: árbol limpio, 77 ficheros en las cuatro áreas de §3, versión y ch
 
 ### 4.2 E2E 90/90 (límite conservado, no re-medido)
 
-El `e2e-result.json` declara `provenance.head = 4f8308bb`. No se ha repetido sobre `2c02178a` ni sobre `7993f7ca`:
+El `e2e-result.json` declaraba `provenance.head = 4f8308bb`. **Resuelto el 2026-11-01**: el recorrido se repitió sobre el árbol del sello (`ea1432fb`, `2.11.174-beta`) con el árbol limpio, y ahora declara:
 
-- El incidente Ruff fue reordenación de imports, sin cambio de comportamiento, pero eso es un argumento.
-- Decisión para el sello: o se conserva la atribución a `4f8308bb` en el expediente, o se repite el recorrido sobre el HEAD definitivo antes de autorizar.
+| Dato | Valor medido |
+|---|---|
+| `provenance.head` | `ea1432fb…` (árbol del sello) |
+| `provenance.version` | `2.11.174-beta` |
+| `provenance.dirty` | `false` |
+| Comprobaciones | **90/90 OK** |
+| Peticiones / escrituras | 309 / 42 |
+| `pageerror` / `console.error` | 0 / 0 |
+| Foto de BD | contenido idéntico (SHA-256 normalizado `8c8e2966…`); la única línea distinta es `dirty`, que el propio recorrido invierte al reescribir la evidencia |
+
+La atribución a `4f8308bb` deja de ser la vigente: queda en el historial de Git. La equivalencia entre el código servido por la API y el árbol medido está comprobada (`git diff --name-only 2c02178a..HEAD -- apps/api-python/src packages/py` vacío, API de `run_dev.py` sin `--reload` desde el 2026-10-31 20:41), no supuesta.
 
 ### 4.3 `contract:check` en GitHub (pendiente)
 
@@ -141,29 +151,39 @@ pnpm window:freeze
 #   re-ancla con: node scripts/window-pin.mjs --write --note "<motivo>"
 ```
 
-Es esperado: el pin se ancló al árbol del sello `.173` y Cuentas modifica `apps/web` y `packages/py`. **Consecuencia operativa:** si se empuja el tag `.174` sin re-anclar, `shared` falla y `certify` marca el sello en rojo ([`release-tag-ci.yml`](../../.github/workflows/release-tag-ci.yml), `Window freeze gate`). No es un defecto del cambio; es un paso obligatorio de la secuencia de sello que hoy está sin hacer.
+Es esperado: el pin se ancló al árbol del sello `.173` y Cuentas modifica `apps/web` y `packages/py`. **Consecuencia operativa:** si se empuja el tag `.174` sin re-anclar, `shared` falla y `certify` marca el sello en rojo ([`release-tag-ci.yml`](../../.github/workflows/release-tag-ci.yml), `Window freeze gate`). No es un defecto del cambio; es un paso obligatorio de la secuencia de sello.
+
+**Resolución (2026-11-01):** el pin se re-ancló **después** del bump, en el commit `ea1432fb`, y la comprobación ya devuelve `freeze OK`:
+
+```text
+[window-pin] freeze OK (ea1432fb)
+  appsHash     1a5bc7c4f20744852e7a5b85309abf46db6dad17
+  packagesHash 741ed1a8a358f2b0555d9c32a7105fc46ef92546
+```
+
+`pnpm window:test` → **50/50** y `pnpm contract:check` → **OK** sobre ese mismo árbol. El orden importa: los 13 `meta.bump` viven en `apps/`, así que reanclar antes del bump habría dejado el pin `TREE_MOVED` de nuevo justo antes del tag.
 
 ---
 
-## 6. Secuencia de sello (documentada, **no ejecutada**)
+## 6. Secuencia de sello (pasos 0–3 ejecutados el 2026-11-01; del 4 en adelante, pendiente)
 
-Ninguno de estos pasos se ha ejecutado. Se listan para que la autorización sea sobre un procedimiento conocido, no sobre una intención.
+Los pasos 0 a 3 se ejecutaron y están fechados abajo. Los pasos 4 a 8 **no** se han ejecutado: el tag y la Release requieren autorización explícita y no está dada.
 
 | # | Paso | Comando / efecto | Estado |
 |---|---|---|---|
-| 0 | Cierre de estos documentos | Commit docs-only con los tres `.md` del expediente, para que el bump se mida sobre un árbol sin cambios pendientes | pendiente |
-| 1 | Bump de versión | `package.json` → `2.11.174-beta` y los `meta.bump` de los 13 scripts (`v2_87`, `v2_89`…`v2_100`; `v2_100` emite dos artefactos, 14 literales) | pendiente |
-| 2 | Guardián del bump | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` (2 tests) | pendiente |
-| 3 | Re-anclaje del pin | `pnpm window:pin -- --note "sello v2.88.174-beta"` **después** del bump, y después `pnpm window:freeze` → `freeze OK` | **bloqueante** (§5) |
+| 0 | Cierre de estos documentos | Commit docs-only con los tres `.md` del expediente, para que el bump se mida sobre un árbol sin cambios pendientes | **hecho** — `afef4fd1` |
+| 1 | Bump de versión | `package.json` → `2.11.174-beta` y los `meta.bump` de los 13 scripts (`v2_87`, `v2_89`…`v2_100`; `v2_100` emite dos artefactos, 14 literales) | **hecho** — `3792ae19` |
+| 2 | Guardián del bump | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` (2 tests) | **hecho** — 2 passed |
+| 3 | Re-anclaje del pin | `pnpm window:pin -- --note "sello v2.88.174-beta"` **después** del bump, y después `pnpm window:freeze` → `freeze OK` | **hecho** — `ea1432fb`; `freeze OK` |
 | 4 | Evidencia del sello | `docs/engineering/evidence/v2.88.174/README.md` con la tabla de runs, a la manera de `.173` | pendiente |
 | 5 | Cierre documental | Commit docs-only que acompaña al sello (patrón `.173`: el tag apunta al cierre documental, no al commit del bump) | pendiente |
-| 6 | Tag anotado | `git tag -a v2.88.174-beta -m "…"` sobre el cierre documental | pendiente |
-| 7 | Release tag CI | Se dispara con el push del tag; verificar 12 jobs + `certify`, y **leer el step `contract:check`** | pendiente |
-| 8 | GitHub Release | No se emitió en `.173`; decidir explícitamente si `.174` la emite o mantiene el criterio | pendiente |
+| 6 | Tag anotado | `git tag -a v2.88.174-beta -m "…"` sobre el cierre documental | **no ejecutado** (sin autorización) |
+| 7 | Release tag CI | Se dispara con el push del tag; verificar 12 jobs + `certify`, y **leer el step `contract:check`** | pendiente del tag |
+| 8 | GitHub Release | No se emitió en `.173`; decidir explícitamente si `.174` la emite o mantiene el criterio | **no ejecutado** (sin autorización) |
 
 **Orden obligatorio: el paso 3 va DESPUÉS del paso 1, nunca antes.** El bump mueve `appsHash`, porque los 13 `meta.bump` viven en `apps/api-python/scripts/` y `apps/` sí participa del freeze. Reanclar el pin sobre `2.11.173-beta` (como sugería la secuencia del dictamen, con el bump al final) dejaría el árbol `TREE_MOVED` otra vez justo antes del tag, y el job `shared` (`Window freeze gate`) fallaría. Es el orden que ya siguió `.173`: `bbc6e9a3` (bump) → `9a78606a` (`chore(window)`) → `a5f6f1c6` (cierre documental, tag).
 
-El paso 3 es el que cambia el resultado del CI del tag; los pasos 0 y 2 no lo condicionan (el guardián pasa hoy con `2.11.173-beta` coherente). El paso 7 es donde se cierra la condición §4.3.
+El paso 3 es el que cambia el resultado del CI del tag; los pasos 0 y 2 no lo condicionan. El paso 7 es donde se cierra la condición §4.3, y el E2E (§4.2) ya se repitió sobre `ea1432fb`.
 
 ---
 
@@ -196,3 +216,4 @@ El vehículo es el sello con tag y Release sobre esta rama, no un PR. Sin cambio
 | 5 | `pnpm window:freeze`: `TREE_MOVED`, documentado como paso bloqueante de la secuencia. |
 | 6 | Corrección de atribución en los dos documentos del expediente y publicación de esta nota. |
 | 7 | 2026-11-01: corrección del estado del working tree (§1) y del orden bump → re-anclaje (§6), tras medir que los `meta.bump` viven en `apps/` y por tanto mueven `appsHash`. |
+| 8 | 2026-11-01: ejecución de los pasos 0–3. `afef4fd1` (docs), `3792ae19` (bump, guardián 2 passed), `ea1432fb` (`window:freeze` → `freeze OK`; `window:test` 50/50; `contract:check` OK) y push. E2E 90/90 repetido sobre `ea1432fb` con `dirty: false`. Tag y Release **no** creados. |

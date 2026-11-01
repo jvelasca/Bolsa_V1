@@ -9,6 +9,8 @@
 
 **Publicación**: los commits ya están en `origin/fix/059-060-proveedores` (`15ad62ac`, la reparación del gate `2c02178a` y el cierre documental `7993f7ca`, docs-only). Sin PR —el grafo lo descarta—, sin tag y sin Release: `2.11.173-beta` sigue siendo la versión vigente y `.174` no existe. El CI de rama acredita `2c02178a` (el HEAD no tiene run propio por el filtro de `paths`). El estado exacto, la comprobación de grafo y la reparación del gate Ruff se registran en [Verificación de grafo y cierre del gate Ruff (2026-10-31)](./verificacion-grafo-cuentas-2026-10-31.md).
 
+**Actualización 2026-11-01 (sello `.174`)**: el árbol del sello es `ea1432fb` (`2.11.174-beta`, pin de ventana re-anclado). El E2E de §8 se **repitió** sobre ese árbol con `dirty: false` y es el que este documento publica; ver el [expediente pre-sello](./pre-sello-v2.88.174-2026-10-31.md). El tag `v2.88.174-beta` y la Release **siguen sin crear**: la autorización es explícita y no está dada.
+
 Este documento es un **registro de revisión**: no certifica el sello ni autoriza operación. Describe el árbol revisado; el `push` no altera el alcance revisado ni autoriza el sello `.174`.
 
 ---
@@ -177,18 +179,18 @@ Playwright con Chrome del sistema contra el proxy Vite → API 8000 (`E2E_BASE_U
 
 | Dato | Valor |
 |------|-------|
-| Procedencia | `e2e-result.json` → `provenance`: rama `fix/059-060-proveedores`, `head 4f8308bb…`, `2.11.173-beta`, `dirty: true` (solo quedaban sin commitear estos docs y la evidencia), `startedAt`/`finishedAt` |
+| Procedencia | `e2e-result.json` → `provenance`: rama `fix/059-060-proveedores`, `head ea1432fb…` (árbol del sello `.174`), `2.11.174-beta`, `dirty: false`, `startedAt`/`finishedAt` |
 | Comprobaciones | **90/90 OK** (`e2e-result.json`, `ok: true`) |
-| Peticiones API observadas | 312 |
+| Peticiones API observadas | 309 |
 | Escrituras | 42 |
 | `pageerror` / `console.error` | **0 / 0** |
 | `ensure-defaults` desde la UI | 0 |
 | Capturas | `e2e-01-lista.png` … `e2e-11-cerrada.png` (14 imágenes de recorrido, más `probe-resumen.png`) |
 | Trazas | `console.txt`, `network.txt` (ambas con línea `# procedencia`), `e2e-run.log` |
-| Foto de BD | `db-before.json` ≡ `db-after.json` (**idénticos byte a byte**, SHA-256 `FED9A486…`), `residue_like: []`; `tables` declara el alcance real (`investment_accounts`, `investor_profiles`) |
+| Foto de BD | `db-before.json` y `db-after.json` con **contenido idéntico**: SHA-256 del snapshot sin el bloque `provenance` = `8c8e2966…` en ambos; la única línea distinta entre los dos ficheros es `dirty` (`false` antes del recorrido, `true` después, porque el propio recorrido reescribe esta evidencia). `residue_like: []`; `tables` declara el alcance real (`investment_accounts`, `investor_profiles`) |
 | Semilla restaurada | `is_default = true`, `active_profile_id = PROF-996fcd3d6ec6` |
 
-La ejecución se repitió sobre el árbol congelado y con la API reiniciada sin `--reload`, y la que se publica es la que declara `head 4f8308bb`: corresponde a los dos commits de código, no a una ejecución anterior. El recuento de peticiones oscila en ±2 entre pasadas porque el *shell* deja lecturas de fondo en vuelo al cerrar la captura (quedan listadas como aviso, nunca como fallo ni como escritura). La foto de BD declara sus tablas: prueba ausencia de residuos en ellas durante este recorrido, no que toda operación posible sea correcta.
+La ejecución que se publica aquí es la de `ea1432fb` (árbol del sello `.174`), lanzada con el árbol **limpio** (`dirty: false`) y contra el stack local ya levantado: API `8000` servida por `run_dev.py` (sin `--reload`, proceso iniciado el 2026-10-31 20:41) y Vite `5173`. La equivalencia entre lo servido y el árbol medido está comprobada, no supuesta: `git diff --name-only 2c02178a..HEAD -- apps/api-python/src packages/py` está **vacío**, así que ningún fuente servido cambió desde el SHA que midió el CI. La ejecución anterior, con `provenance.head = 4f8308bb`, queda en el historial de Git como la del commit de frontend; ya no es la que este documento publica. El recuento de peticiones oscila entre pasadas (312 en `4f8308bb`, 309 en `ea1432fb`) porque el *shell* deja lecturas de fondo en vuelo al cerrar la captura (quedan listadas como aviso, nunca como fallo ni como escritura). La foto de BD declara sus tablas: prueba ausencia de residuos en ellas durante este recorrido, no que toda operación posible sea correcta.
 
 Hallazgo durante el cierre: la comprobación de scope de `X-Account-Id` se afinó para distinguir el **poller del shell** (que pide `/portfolio` con la cuenta activa por diseño) de la **ficha** (que debe pedirlo con la seleccionada). Quedan dos invariantes medidas: la ficha usa la seleccionada (6 llamadas) y ninguna llamada usa el scope de una tercera cuenta. Las peticiones de fondo que siguen en vuelo al cerrar la captura son `GET` del shell y quedan listadas como aviso, no como fallo.
 
@@ -226,3 +228,4 @@ Hallazgo durante el cierre: la comprobación de scope de `X-Account-Id` se afin�
 | 13 | Gates re-medidos (pytest 72, vitest área 51, vitest web 2673, `tsc`, ESLint, `contract:check`, Ruff, Mypy) y evidencia cruda guardada. |
 | 14 | Continuación de esta serie: [Seguimiento — Cuentas: muestra y configuración (2026-10-31)](./seguimiento-ui-cuentas-muestra-config-2026-10-31.md), con CTA-D1…CTA-D10 y el E2E de 90 comprobaciones. |
 | 15 | Cierre del gate (2026-10-31): el Ruff del paso 13 se midió sin `--config pyproject.toml` y no era el del CI; tras el push, el job `quality` cayó con 8 I001 del propio cambio. Corregido en `2c02178a` y registrado en [Verificación de grafo y cierre del gate Ruff](./verificacion-grafo-cuentas-2026-10-31.md). Python CI verde con `Ruff`, `Import-linter`, `Mypy` y `Pytest` ejecutados. |
+| 16 | Sello `.174` (2026-11-01): bump a `2.11.174-beta` en `3792ae19`, re-anclaje del pin en `ea1432fb` (`window:freeze` → `freeze OK`, `appsHash 1a5bc7c4…` / `packagesHash 741ed1a8…`) y **E2E repetido sobre `ea1432fb`**: 90/90, 309 peticiones, 42 escrituras, `dirty: false`. La foto de BD pasa a compararse por contenido (SHA-256 normalizado `8c8e2966…`), no byte a byte, porque el propio recorrido reescribe la evidencia e invierte el flag `dirty`. |

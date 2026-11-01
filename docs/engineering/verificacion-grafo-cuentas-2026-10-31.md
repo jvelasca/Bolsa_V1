@@ -184,7 +184,7 @@ El dictamen **funcional** de Cuentas no cambia: los 12 expedientes y la guarda d
 - **Sello `.174`**: no autorizado. Sin `push` adicional, sin tag y sin Release.
 - **E2E 90/90**: procedencia `4f8308bb`; no repetido sobre el HEAD actual.
 - **`contract:check` en CI**: solo corre en `release-tag-ci.yml`. En local está verde sobre este árbol; no hay run en la nube para este SHA hasta que se dispare el workflow del sello.
-- **CI sobre el HEAD**: el verde de rama acredita `2c02178a`; `7993f7ca` es docs-only y **no tiene run propio** (los filtros de `paths` no cubren `docs/**`). No debe presentarse como una ejecución sobre `7993f7ca`.
+- **CI sobre el HEAD**: el verde de rama acredita `2c02178a`; `7993f7ca` es docs-only y **no tiene run propio** (los filtros de `paths` no cubren `docs/**`). No debe presentarse como una ejecución sobre `7993f7ca`. **Actualización 2026-11-01:** el árbol del sello es `ea1432fb` (bump + re-anclaje del pin) y **sí** tiene runs propios de rama, porque el bump toca `apps/api-python/**` y `package.json`; esas son ya las ejecuciones atribuibles al sello, no a `2c02178a`.
 - **CTA-D7**, paginación del ledger, `api.ensureDefaultInvestorProfiles` sin llamadores (AUD-02): igual que en el seguimiento de Cuentas.
 - **Trazabilidad de los 18 envoltorios `getPortfolio`**, manifiesto de hashes y degradación de Redis/worker ARQ: deuda documental/operativa ya declarada, fuera de este expediente.
 

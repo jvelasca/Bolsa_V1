@@ -1,14 +1,14 @@
 {
-  "createdAt": "2026-10-31T19:14:46.860Z",
+  "createdAt": "2026-11-01T09:15:58.376Z",
   "base": "http://127.0.0.1:5173",
   "provenance": {
     "branch": "fix/059-060-proveedores",
-    "head": "4f8308bb133e803e2ca157781c1ac21cfd1acc52",
-    "headShort": "4f8308bb",
-    "version": "2.11.173-beta",
-    "dirty": true,
-    "startedAt": "2026-10-31T19:14:05.253Z",
-    "finishedAt": "2026-10-31T19:14:46.860Z"
+    "head": "ea1432fbdfb7aa9306561e675d83e8c912751c07",
+    "headShort": "ea1432fb",
+    "version": "2.11.174-beta",
+    "dirty": false,
+    "startedAt": "2026-11-01T09:15:16.910Z",
+    "finishedAt": "2026-11-01T09:15:58.376Z"
   },
   "seed": {
     "id": "default-account-seed",
@@ -18,13 +18,13 @@
   },
   "disposable": {
     "accounts": [
-      "ead6bc6a99204f0d9b5167181",
-      "6a98392f0954451abd023b43d",
-      "3ece4deb3cd14d428c0cb5b42"
+      "5ac313c3fbd94990adae9a745",
+      "b1ee0d1511204206aabea32b9",
+      "12a5f5f9c9da478d850011753"
     ],
     "profiles": [
-      "PROF-f139c36642b4",
-      "PROF-537678bcb5a3"
+      "PROF-05f77957378f",
+      "PROF-e8013d788124"
     ]
   },
   "checks": [
@@ -96,7 +96,7 @@
     {
       "name": "CTA-D1 · portfolio con X-Account-Id de la cuenta seleccionada",
       "ok": true,
-      "detail": "ead6bc6a99204f0d9b5167181"
+      "detail": "5ac313c3fbd94990adae9a745"
     },
     {
       "name": "CTA-02 · botón «Usar ahora» disponible",
@@ -121,7 +121,7 @@
     {
       "name": "CTA-03 · localStorage apunta a A",
       "ok": true,
-      "detail": "{\"state\":{\"activeAccountId\":\"ead6bc6a99204f0d9b5167181\"},\"version\":0}"
+      "detail": "{\"state\":{\"activeAccountId\":\"5ac313c3fbd94990adae9a745\"},\"version\":0}"
     },
     {
       "name": "CTA-03 · «Usar ahora» desaparece al ser la activa",
@@ -191,7 +191,7 @@
     {
       "name": "CTA-06 · payload con nombre y descripción",
       "ok": true,
-      "detail": "{\"name\":\"CU-REV A 045634 renombrada\",\"description\":\"descripción con espacios\"}"
+      "detail": "{\"name\":\"CU-REV A 517295 renombrada\",\"description\":\"descripción con espacios\"}"
     },
     {
       "name": "CTA-06 · solo 1 escritura al guardar",
@@ -281,7 +281,7 @@
     {
       "name": "CTA-09 · preferencia persistida en la API",
       "ok": true,
-      "detail": "{\"accountId\":\"ead6bc6a99204f0d9b5167181\",\"preference\":\"live\",\"effective\":\"live\"}"
+      "detail": "{\"accountId\":\"5ac313c3fbd94990adae9a745\",\"preference\":\"live\",\"effective\":\"live\"}"
     },
     {
       "name": "CTA-08 · cancelar con Escape no escribe",
@@ -321,7 +321,7 @@
     {
       "name": "CTA-08 · guardar settings conserva brokerVenue",
       "ok": true,
-      "detail": "{\"accountId\":\"ead6bc6a99204f0d9b5167181\",\"preference\":\"live\",\"effective\":\"live\"}"
+      "detail": "{\"accountId\":\"5ac313c3fbd94990adae9a745\",\"preference\":\"live\",\"effective\":\"live\"}"
     },
     {
       "name": "CTA-08 · resumen fiscal refleja la jurisdicción",
@@ -336,7 +336,7 @@
     {
       "name": "CTA-10 · revisión con cuenta y perfil",
       "ok": true,
-      "detail": "CuentaCU-REV wizard 045634MonedaEURDepósito inicial100000.00Apalancamiento1xPerfil inversorPROF-REV wizard 045634 · Moderado · moderateComisionesBroker estándar ESCoste de una compra de 5.00016.05 € · comisión 5.00 € + IVA 1.05 € + transmisiones 10.00 €FiscalEspaña (ES) · FIFO · transmisiones 0,2 % · retención div. 19 % · plusvalías 19 %Método de costeFIFO (primero en entrar, primero en salir)Se creará la cuenta demo con cartera, depósito inicial, perfil inversor activo y preset de comisiones/fiscal."
+      "detail": "CuentaCU-REV wizard 517295MonedaEURDepósito inicial100000.00Apalancamiento1xPerfil inversorPROF-REV wizard 517295 · Moderado · moderateComisionesBroker estándar ESCoste de una compra de 5.00016.05 € · comisión 5.00 € + IVA 1.05 € + transmisiones 10.00 €FiscalEspaña (ES) · FIFO · transmisiones 0,2 % · retención div. 19 % · plusvalías 19 %Método de costeFIFO (primero en entrar, primero en salir)Se creará la cuenta demo con cartera, depósito inicial, perfil inversor activo y preset de comisiones/fiscal."
     },
     {
       "name": "CTA-10 · POST /accounts 201",
@@ -346,12 +346,12 @@
     {
       "name": "CTA-10 · la cuenta nueva aparece y es la Activa",
       "ok": true,
-      "detail": "CU-REV wizard 045634EUR · Demo · DemoActivaPerfil: perfil no visible · localStorage={\"state\":{\"activeAccountId\":\"3ece4deb3cd14d428c0cb5b42\"},\"version\":0}"
+      "detail": "CU-REV wizard 517295EUR · Demo · DemoActivaPerfil: perfil no visible · localStorage={\"state\":{\"activeAccountId\":\"12a5f5f9c9da478d850011753\"},\"version\":0}"
     },
     {
       "name": "CTA-10 · cuenta con perfil asignado",
       "ok": true,
-      "detail": "\"PROF-537678bcb5a3\""
+      "detail": "\"PROF-e8013d788124\""
     },
     {
       "name": "CTA-10 · comisión por defecto del asistente",
@@ -480,6 +480,6 @@
     }
   ],
   "ok": true,
-  "apiCalls": 312,
+  "apiCalls": 309,
   "writes": 42
 }
