@@ -212,3 +212,17 @@ los dos tree hashes, y el commit del re-anclaje vive en `scripts/`, que no parti
 | 5 | E2E 90/90 repetido sobre `ea1432fb` con `dirty: false`; `c1326295` publica la evidencia. |
 | 6 | `Release tag CI` despachado sobre `c1326295`: **GREEN**, `Window freeze gate` y `Contract check (no gen)` `success`. |
 | 7 | Este documento. Tag y Release **no** creados. |
+
+## 10. Cierre de hallazgos posteriores (auditoría `AUDITORIA 1`) — sellado en `.175`
+
+Los cinco hallazgos abiertos de la auditoría de `.174` (**P-1b**, **N-1**, **N-2**, **N-3**, **N-4**) y sus
+dos observaciones (rol de los `purge` y atribución del fichero creado) quedan cerrados en
+[`../cierre-hallazgos-auditoria-v2.88.174-2026-11-01.md`](../cierre-hallazgos-auditoria-v2.88.174-2026-11-01.md),
+con su causa raíz, la corrección, la prueba que la rompe y las mediciones locales.
+
+El tag `v2.88.174-beta` **no contiene** ese código: se auditó y ni la guarda de exclusividad ni el documento
+de cierre existen ahí. Por eso el delta se selló aparte como **`v2.88.175-beta`** (bump `2.11.175-beta`, tag
+sobre el cierre documental y su `Release tag CI`). Este documento sigue describiendo lo que `.174` publicó y
+no se reescribe por el cierre posterior; `head` de `.174` sigue siendo `060_provider_check_policy`.
+`AUDITORIA 2` (dictamen de publicación y certificación por el CI del tag) es informativa y no requería
+acción.
