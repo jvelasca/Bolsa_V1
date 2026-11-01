@@ -2,6 +2,63 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.175-beta] — **el cierre de la auditoría `.174` se vuelve verificable: P-1b y N-1…N-4 sellados, el gate A7 es duro y la purga deja de mentir** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** sello de **corrección** posterior a `2.11.174-beta`. Cierra los cinco hallazgos abiertos de
+`AUDITORIA 1` —**P-1b** y **N-1**…**N-4**— y sus dos observaciones (rol de los `purge` y atribución del
+fichero creado), más los tres puntos que quedaron en el expediente. No cambia ninguna regla, indicador,
+umbral, peso ni sizing (**`Δ motor = 0`**), no se decide distinto (**`Δ decisión = 0`**) y no hay migración.
+**Bump** `2.11.174-beta` → `2.11.175-beta` (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` no se toca).
+
+**El tag auditado `v2.88.174-beta` no contiene este código.** Se auditó y ni
+`chaos/live_a7/_exclusivity_guard.py` ni el documento de cierre existen en él (`git cat-file -e
+"v2.88.174-beta:<ruta>"` falla en ambos): el delta vivía sin commitear. Por eso se sella aparte, con bump
+propio y el tag anotado sobre el cierre documental.
+
+| # | Hallazgo | Cierre |
+| --- | --- | --- |
+| `P-1b` | El placeholder `KILL_STATE_UNREADABLE` enmascaraba y luego **borraba** una parada real | el placeholder no es una causa: un motivo real lo **sustituye** (`changed=True`), él nunca pisa un motivo real y `_v2_kill_state()` devuelve `None` ⇒ no se persiste. `_release_unreadable_placeholder` libera solo con `engaged && reason == KILL_STATE_UNREADABLE` |
+| `N-1` | «Deshabilitar Yahoo» solo cortaba el histórico (OHLCV) | punto único de estrangulamiento en el cliente (`_ensure_traffic_allowed` en `_get_client`, refrescado por `list_configs`): con el proveedor apagado no se construye ni un `httpx.AsyncClient`; `/market/fx` responde **`409 provider_disabled:yahoo`** |
+| `N-2` | La sonda aceptaba `0.0`, negativos y `NaN` como precio | `math.isfinite(p) and p > 0` en el origen, en la sonda y en FX (directa **e** inversa) |
+| `N-3` | La copia de BD no declaraba que no pudo auditarse | `audit_recorded` / `backups_error` en el caso de uso, el DTO, `types.ts`, el contrato y la UI (aviso ámbar); el fallo de auditoría se loguea |
+| `N-4` | El grupo se daba por «fresco» con la medición **más reciente** | `min(measured)`: el grupo está tan fresco como su proveedor **más viejo** |
+| `Obs. 1` | Los dos `purge` de mantenimiento no exigían rol | mismo criterio `require_admin_when_auth_enabled` que `POST /database/backup` (403 **antes** de tocar la BD) |
+| `Obs. 2` | El fichero creado se infería por `after − before` | se parsea `[db-dump] Backup creado: <path>` y se valida (existe, es backup, cae en el directorio); el delta queda como compatibilidad declarada en el log |
+
+**CIERRE-175-1 · un A7 verde con skips ya no se puede leer como sello.** El riesgo residual era de lectura:
+`12 passed, 7 skipped` en verde parece éxito. Lo que lo cubre es el cableado del job `a7-gate` —
+`LIVE_A7_PG_REQUIRED=1` en el `env` del job **y** del step de pytest, `a7-gate` en el `needs` de `certify`,
+`needs.a7-gate.result != 'success'` ⇒ `exit 1` y `"a7-gate"` en el artefacto resumen—, y ese cableado ahora
+está anclado por `test_release_tag_ci_a7_gate_wiring.py` (5 casos, parser por líneas con anclas positivas).
+El mensaje del skip de la guarda lo dice también: `describe()` termina declarando que ese run no certifica.
+
+**CIERRE-175-2 · el aviso `relation "investment_accounts" does not exist` se corrige, no se declara.** La
+purga de residuos es `autouse` de sesión y corre antes de que la batería lleve su BD a head; en una BD
+recién creada (la scratch `bolsa_v1_a7`) el `SELECT` de cuentas fallaba y se convertía en `warnings.warn`.
+Ahora `purge_all_residuals` comprueba `to_regclass('public.investment_accounts')` y, si no existe, no purga
+y no avisa. La red fail-soft para la BD caída (`ResidualsUnavailable`) queda intacta. Tripwire:
+`test_residual_purge_schema_guard.py` (3 casos).
+
+**CIERRE-175-3 · verificación medida (local, sobre `12e2c871`).** Nodos tocados: **81 passed** en el lado
+API (8 ficheros) y **92 passed** en librerías (6 ficheros) · `chaos/live_a7` real-PG con
+`LIVE_A7_PG_REQUIRED=1` sobre `bolsa_v1_a7` (drop+create): **19 passed, 0 skipped** en dos pasadas —stack
+**parado** sobre el delta y stack **vivo** sobre el árbol sellado— con `bolsa_v1` intacta (`live_orders` 0,
+head `062_sync_settings_check_backfill`) · `ruff check` **All checks passed** · `mypy` **582 ficheros** ·
+`contract:check` **OK** · `tsc -b --noEmit` **limpio** · `vitest` de los 2 ficheros web tocados **15 passed**.
+Las suites completas **no** se repitieron sobre este árbol: las cifras de `.174` no se heredan.
+
+**CIERRE-175-4 · lo que este sello NO hace.** No toca `live_orders`, el recovery ni `execution_events`; no
+re-relaja ningún criterio de C3-A ni de la guarda (`LIVE_A7_ALLOW_SHARED_DB=1` no se usa como atajo); no
+certifica la convivencia de `chaos/live_a7` con el stack **sobre la BD compartida** —ahí la guarda seguirá
+diagnosticando y saltando, correctamente—. El detalle, la causa raíz y la tabla de verificabilidad están en
+[`docs/engineering/cierre-hallazgos-auditoria-v2.88.174-2026-11-01.md`](./docs/engineering/cierre-hallazgos-auditoria-v2.88.174-2026-11-01.md).
+
+**CIERRE-175-5 · publicación.** Rama `fix/059-060-proveedores`, **sin PR** (misma razón que `.174`: la rama
+de integración es ancestro). Tag anotado `v2.88.175-beta` sobre el cierre documental; el sello es el
+`Release tag CI` del tag, con `a7-gate` en `success`. Release de GitHub: no se emite, mismo criterio que
+`.173` y `.174`.
+
 ## [2.11.174-beta] — **Cuentas deja de afirmar lo que no midió: la ficha pide la cuenta que muestra y una cuenta cerrada deja de romper la lista** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO (`409 account_closed`) · SIN migración · head `060_provider_check_policy`**)
 
 **Naturaleza:** sello de **Cuentas** (CTA-D1…CTA-D10) posterior a `2.11.173-beta`. No cambia ninguna
