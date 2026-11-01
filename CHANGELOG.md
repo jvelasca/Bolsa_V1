@@ -2,6 +2,65 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.174-beta] — **Cuentas deja de afirmar lo que no midió: la ficha pide la cuenta que muestra y una cuenta cerrada deja de romper la lista** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO (`409 account_closed`) · SIN migración · head `060_provider_check_policy`**)
+
+**Naturaleza:** sello de **Cuentas** (CTA-D1…CTA-D10) posterior a `2.11.173-beta`. No cambia ninguna
+regla, indicador, umbral, peso ni sizing (**`Δ motor = 0`**), no se decide distinto (**`Δ decisión = 0`**)
+y no hay migración (`head` sigue `060_provider_check_policy`). El contrato HTTP **solo crece**: el diff
+de [`openapi.json`](./apps/web/api/openapi.json) es **+42 líneas y 0 eliminaciones** (respuestas `409`
+documentadas y `X-Account-Id` en `/portfolio`), con `contract:check` **OK** y sin `contract:gen`
+posterior. **Bump** `2.11.173-beta` → `2.11.174-beta` (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` no se toca).
+
+**CTA-174-1 · el defecto de fondo: la ficha pedía la cartera de otra cuenta.** `AccountDetailPanel`
+llamaba a `GET /portfolio` sin identificador, así que al seleccionar la cuenta **B** sin activarla (la
+decisión de producto es «seleccionar ≠ activar»), la pestaña **Posiciones** pedía y pintaba la cartera
+de la cuenta **activa A**. Ahora `getPortfolio(account.id)` viaja con `X-Account-Id` explícito.
+
+**CTA-174-2 · una cuenta cerrada es registro histórico, no una cuenta vacía.** `update_account` ya la
+rechazaba, pero `PATCH /settings`, `PUT /active-profile`, `ensure-defaults` y `make-default` no:
+ahora los cuatro devuelven **`409 account_closed`** con el mismo cuerpo. Y `GET /accounts/summaries`
+dejaba de responder **500** con una cuenta cerrada en la base: el scope de la lista omite las cerradas
+(no hay cartera operable que resumir).
+
+| # | Síntoma | Cierre |
+| --- | --- | --- |
+| `CTA-D1` | La ficha pintaba la cartera de la cuenta activa, no de la seleccionada | `getPortfolio(account.id)` + `X-Account-Id`; 18 envoltorios mecánicos preservan el scope ambiente donde corresponde |
+| `CTA-D2` | Si fallaba el catálogo de perfiles se afirmaba «no visible» o «legacy» | estado de error real (`role="alert"`) y rótulo honesto de dato no disponible |
+| `CTA-D3` | Las notas internas hacían `trim()` en cada pulsación | se recorta **solo al guardar**; round-trip por API del texto con espacios |
+| `CTA-D4` | «Usar ahora» sin `catch`: un 4xx no dejaba mensaje | error visible con reintento; el store local se fija **después** de confirmar el servidor |
+| `CTA-D5` | Settings y perfil no rechazaban cuentas cerradas | **`409 account_closed`** en settings, perfil, `ensure-defaults` y `make-default`; contrato documentado |
+| `CTA-D6` | La ficha enviaba `name: ""`, el backend lo ignoraba y la UI decía «actualizado» | validación en cliente (`aria-invalid`), sin `PATCH` espurio |
+| `CTA-D7` | «Informe fiscal» desde una cuenta no activa abría `/fiscal` con la activa, sin avisar | rótulo «Informe fiscal (cuenta activa)» con explicación; **no** se re-scopea `/fiscal` |
+| `CTA-D8` | Lecturas fallidas se pintaban como «Sin posiciones», «Sin dato» o ceros | estados de error explícitos; una cerrada declara la ficha no disponible y no fabrica cifras |
+| `CTA-D9` | Tras «Nueva demo», `useActiveAccount` evaluaba una caché de `["accounts"]` sin la cuenta y revertía a la semilla | invalidar/esperar `["accounts"]` **antes** de fijar `activeAccountId` |
+| `CTA-D10` | Con una cuenta cerrada en la BD, `GET /accounts/summaries` devolvía **500** | la lista de resúmenes omite las cerradas; tests de aplicación y de ASGI+PostgreSQL |
+
+**CTA-174-3 · el orden del sello se corrige: el pin de ventana se re-ancla DESPUÉS del bump.** Los 13
+`meta.bump` viven en `apps/api-python/scripts/`, es decir dentro de `apps/`, que **sí** participa del
+freeze de ventana. Por tanto, reanclar el pin antes del bump lo dejaría `TREE_MOVED` otra vez justo
+antes del tag y el job `shared` (`Window freeze gate`) fallaría. El pin se re-ancla en el commit
+`chore(window)` inmediatamente posterior al bump, igual que en `.173`.
+
+**CTA-174-4 · verificación (local, sobre el árbol del código).** `pytest` del área **72 passed** ·
+Vitest del área **8 files / 51 tests** · Vitest web completo **356 files / 2673 tests** · `tsc -b`
+**limpio** · `eslint` **0 errores** (6 avisos `exhaustive-deps` preexistentes) · `contract:check`
+**OK** · `ruff` **All checks passed** · `mypy` **582 ficheros** sin errores · E2E en vivo **90/90**
+(`pageerror` 0, `console.error` 0, 0 `ensure-defaults`, foto de BD antes/después idéntica).
+
+**CTA-174-5 · lo que este sello NO hace.** No toca el motor ni la decisión; no re-scopea `/fiscal`
+(`CTA-D7` queda documentado en UI); no pagina el ledger; no añade llamadores a
+`api.ensureDefaultInvestorProfiles` (AUD-02); no amplía el catálogo de Configuración → Perfil inversor.
+Los límites, la atribución de cada evidencia a su `headSha` y la tabla de runs medida están en
+[`evidence/v2.88.174/`](./docs/engineering/evidence/v2.88.174/README.md) y en el
+[expediente pre-sello](./docs/engineering/pre-sello-v2.88.174-2026-10-31.md).
+
+**CTA-174-6 · publicación.** Rama `fix/059-060-proveedores`, **sin PR** (la rama de integración es
+ancestro y un PR contra `main` mezclaría expedientes). El **tag anotado `v2.88.174-beta`** y la
+GitHub Release **no se crean en este acto**: requieren autorización explícita y el cierre de
+`window:freeze` + CI sobre el commit final. `2.11.173-beta` sigue siendo la versión publicada de
+referencia.
+
 ## [2.11.173-beta] — **la configuración se ordena por ámbito y el espacio de trabajo deja de falsear su estado** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `060_provider_check_policy` · UI-only**)
 
 **Naturaleza:** sello **UI-only** posterior a `2.11.172-beta`. No cambia ninguna regla, indicador,
