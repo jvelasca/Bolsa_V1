@@ -7,6 +7,8 @@
 > tests, contrato, CI, migraciones, `package.json`, `CHANGELOG` ni tags.
 > **Veredicto:** se acepta la simplificación de Overview como **cerrada técnicamente**, con dos límites
 > nombrados —`L-OVW-1` y `L-OVW-2` (§4)— que quedan declarados como parte de la aceptación.
+> **POST-COMMIT:** [`dictamen-commit-62665ff7-2026-11-01.md`](./dictamen-commit-62665ff7-2026-11-01.md) — acepta
+> el commit que contiene este documento; `62665ff7` queda **intacto** (este acto no lo enmienda).
 
 ---
 
