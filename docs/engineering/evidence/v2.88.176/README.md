@@ -107,10 +107,24 @@ Solo `appsHash` se movió, que es exactamente lo que produce tocar `apps/web/src
 | `Release tag CI` del tag | **ver §6.1** |
 | GitHub Release | **se emite** — cambio de criterio respecto a `.173`…`.175` |
 
-### 6.1 Runs del tag medidos
+### 6.1 Runs del tag medidos (2026-11-01)
 
 Esta sección se añade **POST-TAG**, así que no viaja en el árbol del tag (mismo patrón que `.173` y `.175`).
-Se completa en el commit documental posterior al run.
+
+| Run / job | SHA | Resultado |
+| --- | --- | --- |
+| `Release tag CI` [`41360000070`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41360000070) | `081cb4c0` | **GREEN**: **12 jobs `success`** + `certify`; único `skipped` el E2E integrado opt-in. `23:01:15Z` → `23:15:11Z` (**13m56s**) |
+| `shared` ⇒ step `Window freeze gate` | `081cb4c0` | **success** ⇒ `[window-pin] freeze OK (081cb4c0)` |
+| `frontend` ⇒ step `Test web` | `081cb4c0` | **`2 686 passed`** (357 ficheros), `172,16 s` — **coincide** con la cifra que §2 declara citada del árbol de trabajo, y aquí queda **medida sobre el commit del sello** |
+| `frontend` ⇒ step `Contract check (no gen)` | `081cb4c0` | **success** |
+| `playwright (integrated axe)` ⇒ step `Run integrated axe E2E (fail if skipped)` | `081cb4c0` | **32 passed** (`3,0m`), con `/overview` @desktop y @móvil 390×844 en **0 `critical`/`serious` + heading-order**. No es el barrido de `35/35` rutas tocadas: es otro conjunto y se cita aparte |
+| `replay-repro` ⇒ step `ASSERT del SHA-256 y del tamaño` | `081cb4c0` | **`REPRODUCIDO`** (`sha256 E9B7376B…7F5625`, contenido `3 383 461` bytes; el sello en CRLF `3 488 758`): digest **idéntico** al de `.175` ⇒ **`Δ motor = 0` confirmado por el CI** |
+| `a7-gate` | `081cb4c0` | **success** con `LIVE_A7_PG_REQUIRED=1` y BD dedicada `bolsa_v1_a7` |
+| Artefacto `release-tag-ci-summary` | `081cb4c0` | `status: GREEN`, los 12 jobs en `success`, `asOf 2026-11-01T23:15:08Z` |
+
+El `2 686` deja de ser una cifra heredada del árbol de trabajo: el CI la mide sobre el mismo commit que porta
+el tag. Las `35/35` de axe **siguen** siendo la medición del barrido de rutas tocadas del expediente, distinta
+del `32 passed` del job `axe` integrado; no se suman ni se intercambian.
 
 ## 7. Falsabilidad
 
