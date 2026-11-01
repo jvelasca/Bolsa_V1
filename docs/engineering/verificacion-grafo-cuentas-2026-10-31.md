@@ -1,8 +1,8 @@
 # Verificación de grafo y cierre del gate Ruff (2026-10-31)
 
 > Alcance: decidir si procedía abrir un PR nuevo para el cierre funcional de **Cuentas** (CTA-D1…CTA-D10) y reparar el gate **Ruff** que el `push` de `15ad62ac` dejó en rojo en el CI.
-> Rama: `fix/059-060-proveedores` · HEAD `2c02178a` · `2.11.173-beta` · **sin PR, sin tag `.174` y sin Release**.
-> Docs de referencia: [Seguimiento — Cuentas: muestra y configuración](./seguimiento-ui-cuentas-muestra-config-2026-10-31.md), [Integración Cuentas / Perfil inversor](./integracion-cuentas-perfil-fiscal-2026-10-30.md).
+> Rama: `fix/059-060-proveedores` · HEAD `7993f7ca` (docs-only) · SHA medido por CI `2c02178a` · `2.11.173-beta` · **sin PR, sin tag `.174` y sin Release**.
+> Docs de referencia: [Seguimiento — Cuentas: muestra y configuración](./seguimiento-ui-cuentas-muestra-config-2026-10-31.md), [Integración Cuentas / Perfil inversor](./integracion-cuentas-perfil-fiscal-2026-10-30.md), [Pre-sello .174](./pre-sello-v2.88.174-2026-10-31.md).
 > Evidencia: [`evidence/cuentas-muestra-config-2026-10-31/`](./evidence/cuentas-muestra-config-2026-10-31/), en particular [`ruff.txt`](./evidence/cuentas-muestra-config-2026-10-31/ruff.txt) (regenerado en este cierre).
 
 Este documento es un **registro de verificación y reparación**. No certifica el sello ni autoriza operación: el tag `.174` sigue sin autorización expresa.
@@ -32,16 +32,17 @@ graph LR
   c1 --> c2["4f8308bb frontend Cuentas"]
   c2 --> c3["ecade4ba docs + evidencia E2E"]
   c3 --> c4["15ad62ac guarda make-default"]
-  c4 --> c5["2c02178a imports para el gate Ruff (HEAD)"]
+  c4 --> c5["2c02178a imports para el gate Ruff"]
+  c5 --> c6["7993f7ca docs del cierre (HEAD)"]
   integ --> c1
 ```
 
-| Ref | Tip | Relación con HEAD (`2c02178a`) |
+| Ref | Tip | Relación con HEAD (`7993f7ca`) |
 |---|---|---|
 | `origin/main` | `26250187` (2026-10-22) | Ancestro estricto. **No** contiene ni `v2.88.170-beta` ni posteriores |
 | `origin/integracion/cuentas-perfil-2026-10-30` | `51c3bdfc` | Ancestro estricto. Es el **merge commit del PR #77** |
-| `fix/059-060-proveedores` (local y remota) | `2c02178a` | HEAD, sincronizadas |
-| `v2.88.173-beta` | `a5f6f1c6` | Tag vigente; HEAD va **17 commits** por delante |
+| `fix/059-060-proveedores` (local y remota) | `7993f7ca` | HEAD, sincronizadas. El código medido por CI es `2c02178a` (ver §6) |
+| `v2.88.173-beta` | `a5f6f1c6` | Tag vigente; HEAD va **18 commits** por delante |
 
 **PR #77** (consultado, no asumido): base `fix/059-060-proveedores`, head `integracion/cuentas-perfil-2026-10-30`, estado `MERGED` el 2026-10-31T17:39:44Z, merge commit `51c3bdfc`. Como la rama de integración ya apunta a ese mismo commit y es ancestro de HEAD, **un PR contra ella sería vacío**.
 
@@ -61,6 +62,7 @@ graph LR
 | 3 | `ecade4ba` | `docs(cuentas): seguimiento y evidencia E2E 2026-10-31` | Documentación + evidencia |
 | 4 | `15ad62ac` | `fix(cuentas): make-default rechaza cuentas cerradas con 409 account_closed` | Guarda de la última laguna |
 | 5 | `2c02178a` | `style(cuentas): ordena imports para el gate Ruff con --config (8 I001)` | Reparación del gate (este cierre) |
+| 6 | `7993f7ca` | `docs(cuentas): verifica el grafo, descarta el PR y registra el cierre del gate Ruff` | Este documento; docs-only, no dispara CI de rama |
 
 ---
 
@@ -137,7 +139,9 @@ CI sobre `2c02178a`:
 | [`41236648795`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41236648795) | Fase 2 scientific | `success` |
 | [`41236648825`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41236648825) | Optimize lab | `success` |
 
-Dentro de `quality` se ejecutaron y pasaron, por fin sobre este HEAD: `Ruff version guard`, `Ruff`, `Import-linter`, `Mypy` y `Pytest`.
+Dentro de `quality` se ejecutaron y pasaron, por fin sobre el SHA de código: `Ruff version guard`, `Ruff`, `Import-linter`, `Mypy` y `Pytest`.
+
+Los tres runs verdes tienen `headSha = 2c02178a` (verificado con `gh run list --json headSha`). El HEAD `7993f7ca` **no tiene run propio**: ni `python-ci.yml` ni `frontend-ci.yml` incluyen `docs/**` en sus filtros de `paths`, y el commit solo toca `docs/engineering/`. Por tanto, el verde acredita `2c02178a`; el HEAD es alcanzable desde él sin cambios de código (`git diff --name-only 2c02178a..HEAD` devuelve dos ficheros `.md`), pero esa continuidad es un argumento, no una medición.
 
 `Frontend CI` **no se disparó**, y es correcto: su filtro de `paths` no incluye `apps/api-python/**` ni los paquetes Python tocados, y este push no cambia ningún fichero de `apps/web/**` ni `packages/shared/**`. El último Frontend CI verde sobre contenido frontend es el de `15ad62ac`.
 
@@ -147,18 +151,18 @@ Dentro de `quality` se ejecutaron y pasaron, por fin sobre este HEAD: `Ruff vers
 
 | Elemento | Estado |
 |---|---|
-| Rama local y remota | Sincronizadas en `2c02178a` |
-| Commits publicados | 5 sobre la base integrada `51c3bdfc` |
-| Push | `15ad62ac..2c02178a` |
+| Rama local y remota | Sincronizadas en `7993f7ca` |
+| Commits publicados | 6 sobre la base integrada `51c3bdfc` |
+| Push | `15ad62ac..2c02178a` (código) y `2c02178a..7993f7ca` (docs-only) |
 | Working tree | Limpio |
 | PR nuevo | **No creado** (ni contra la rama de integración ni contra `main`) |
 | Tag `v2.88.174-beta` | **No creado** |
 | Release .174 | **No creada** |
 | Versión vigente | `2.11.173-beta` (raíz) |
 
-Sobre el E2E: la evidencia de **90/90 conserva su procedencia `4f8308bb`** y no se ha repetido sobre `2c02178a`. No se le atribuye. El commit nuevo no toca comportamiento (solo orden de imports), pero eso es un argumento, no una medición: si el sello lo exige, el recorrido se repite antes de autorizarlo.
+Sobre el E2E: la evidencia de **90/90 conserva su procedencia `4f8308bb`** y no se ha repetido sobre `2c02178a`. No se le atribuye. El commit de imports no toca comportamiento, pero eso es un argumento, no una medición: si el sello lo exige, el recorrido se repite antes de autorizarlo.
 
-El commit que publica este documento es **docs-only**. Ni `python-ci.yml` ni `frontend-ci.yml` lo disparan (sus filtros de `paths` no incluyen `docs/**`), así que el SHA medido por CI para el código sigue siendo `2c02178a`: publicar la nota no mueve la medición.
+El commit que publica este documento es `7993f7ca` y es **docs-only**. Ni `python-ci.yml` ni `frontend-ci.yml` lo disparan (sus filtros de `paths` no incluyen `docs/**`), así que el SHA medido por CI para el código sigue siendo `2c02178a`: publicar la nota no mueve la medición.
 
 ---
 
@@ -180,6 +184,7 @@ El dictamen **funcional** de Cuentas no cambia: los 12 expedientes y la guarda d
 - **Sello `.174`**: no autorizado. Sin `push` adicional, sin tag y sin Release.
 - **E2E 90/90**: procedencia `4f8308bb`; no repetido sobre el HEAD actual.
 - **`contract:check` en CI**: solo corre en `release-tag-ci.yml`. En local está verde sobre este árbol; no hay run en la nube para este SHA hasta que se dispare el workflow del sello.
+- **CI sobre el HEAD**: el verde de rama acredita `2c02178a`; `7993f7ca` es docs-only y **no tiene run propio** (los filtros de `paths` no cubren `docs/**`). No debe presentarse como una ejecución sobre `7993f7ca`.
 - **CTA-D7**, paginación del ledger, `api.ensureDefaultInvestorProfiles` sin llamadores (AUD-02): igual que en el seguimiento de Cuentas.
 - **Trazabilidad de los 18 envoltorios `getPortfolio`**, manifiesto de hashes y degradación de Redis/worker ARQ: deuda documental/operativa ya declarada, fuera de este expediente.
 
@@ -198,3 +203,4 @@ El dictamen **funcional** de Cuentas no cambia: los 12 expedientes y la guarda d
 | 7 | Gates locales: Ruff, Import-linter (4 kept), Mypy (582 ficheros), `contract:check`, 36 tests. |
 | 8 | Commit `2c02178a` y push; CI verde en Python CI (5 jobs), Fase 2 scientific y Optimize lab. |
 | 9 | Este documento. |
+| 10 | `7993f7ca`: publica este documento con la corrección de atribución (HEAD frente a SHA medido por CI) y el tercer límite de evidencia. Docs-only; no dispara run de rama. |

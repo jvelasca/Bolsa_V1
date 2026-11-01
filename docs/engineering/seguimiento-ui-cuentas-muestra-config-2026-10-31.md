@@ -7,7 +7,7 @@
 
 **Integración**: el código y la evidencia de este documento quedan en `380a456e` (backend y contrato, CTA-D5/CTA-D10) y `4f8308bb` (frontend, CTA-D1…CTA-D9); el tercer commit solo añade documentación y evidencia.
 
-**Publicación**: los commits ya están en `origin/fix/059-060-proveedores` (`15ad62ac` y, desde el cierre del gate, `2c02178a`). Sin PR —el grafo lo descarta—, sin tag y sin Release: `2.11.173-beta` sigue siendo la versión vigente y `.174` no existe. El estado exacto, la comprobación de grafo y la reparación del gate Ruff se registran en [Verificación de grafo y cierre del gate Ruff (2026-10-31)](./verificacion-grafo-cuentas-2026-10-31.md).
+**Publicación**: los commits ya están en `origin/fix/059-060-proveedores` (`15ad62ac`, la reparación del gate `2c02178a` y el cierre documental `7993f7ca`, docs-only). Sin PR —el grafo lo descarta—, sin tag y sin Release: `2.11.173-beta` sigue siendo la versión vigente y `.174` no existe. El CI de rama acredita `2c02178a` (el HEAD no tiene run propio por el filtro de `paths`). El estado exacto, la comprobación de grafo y la reparación del gate Ruff se registran en [Verificación de grafo y cierre del gate Ruff (2026-10-31)](./verificacion-grafo-cuentas-2026-10-31.md).
 
 Este documento es un **registro de revisión**: no certifica el sello ni autoriza operación. Describe el árbol revisado; el `push` no altera el alcance revisado ni autoriza el sello `.174`.
 
