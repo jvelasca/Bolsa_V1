@@ -413,6 +413,28 @@ async def test_yahoo_probe_reports_price_on_success() -> None:
     assert repo.records[PROVIDER_YAHOO].last_check_ok is True
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_price", [0.0, -1.0, float("nan"), float("inf")])
+async def test_yahoo_probe_rejects_a_worthless_price(bad_price: float) -> None:
+    """N-2 — 0, negativo, NaN e inf NO son una verificación correcta.
+
+    Antes solo se capturaba ``TypeError``/``ValueError``: un proveedor que devolvía basura
+    quedaba persistido como ``last_check_ok=True`` (icono verde).
+    """
+    repo = FakeRepo([_record(PROVIDER_YAHOO)])
+
+    async def _probe() -> tuple[float, str]:
+        return bad_price, "2026-10-29T09:00:00Z"
+
+    result = await TestProviderConnection(  # type: ignore[arg-type]
+        repo, yahoo_probe=_probe, on_change=lambda: None
+    ).execute(PROVIDER_YAHOO)
+
+    assert result.ok is False
+    assert "no válido" in result.message
+    assert repo.records[PROVIDER_YAHOO].last_check_ok is False
+
+
 # ── PRV-10 · estado honesto ─────────────────────────────────────────────────
 
 
@@ -585,6 +607,47 @@ def test_summary_off_never_reports_stale() -> None:
     assert summary.status == "ok"
     assert summary.auto_check_enabled is False
     assert summary.next_check_at is None
+
+
+def test_summary_stale_uses_the_oldest_measurement_not_the_newest() -> None:
+    """N-4 — medir UN proveedor no rejuvenece al resto.
+
+    Con ``max``, pulsar «Probar» en Yahoo dejaba el veredicto en ``ok`` aunque el otro
+    proveedor habilitado llevase 10 minutos sin medirse. El grupo está tan fresco como su
+    medición más vieja: es la que toca refrescar.
+    """
+    summary = summarize_provider_health(
+        [
+            _status(PROVIDER_YAHOO, last_check_at="2026-10-29T10:05:00+00:00"),
+            _status(PROVIDER_XTB, last_check_at="2026-10-29T09:55:00+00:00"),
+        ],
+        policy=ProviderCheckPolicy(enabled=True, interval_seconds=60),
+        now=_NOW,
+    )
+
+    assert summary.status == "stale"
+    assert summary.ok is False
+    assert summary.measured_at == "2026-10-29T09:55:00+00:00"
+
+
+@pytest.mark.asyncio
+async def test_monitor_is_due_by_the_oldest_provider_measurement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """N-4 — ``last_measured_at`` es la más antigua: un proveedor al día no tapa al otro."""
+    repo = FakeRepo(
+        [
+            _record(PROVIDER_YAHOO, last_check_at="2026-10-29T10:05:00+00:00"),
+            _record(PROVIDER_XTB, last_check_at="2026-10-29T09:55:00+00:00"),
+        ]
+    )
+    policy = ProviderCheckPolicy(enabled=True, interval_seconds=60)
+    monitor, _session = _monitor(monkeypatch, repo, policy=policy, clock=lambda: _NOW)
+
+    oldest = await monitor.last_measured_at()
+
+    assert oldest == datetime(2026, 10, 29, 9, 55, tzinfo=UTC)
+    assert monitor.is_due(policy, oldest) is True, "el grupo se mide por su medición más vieja"
 
 
 def test_summary_degraded_wins_over_unverified() -> None:

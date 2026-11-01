@@ -106,6 +106,10 @@ MARKET_PROVIDER_SPECS: tuple[MarketProviderSpec, ...] = (
         id=PROVIDER_YAHOO,
         label="Yahoo Finance",
         capabilities=(CAPABILITY_OHLCV, CAPABILITY_FUNDAMENTALS, CAPABILITY_FX),
+        # ``capabilities`` declara COBERTURA (qué puede aportar el proveedor cuando está
+        # habilitado), no el alcance del interruptor: ``enabled`` corta TODAS las peticiones
+        # a Yahoo (N-1). Sin esta distinción la descripción prometía más de lo que hacía el
+        # interruptor y el estado «deshabilitado» convivía con tráfico real.
         configurable_base_url=False,
         configurable_throttle=True,
         default_enabled=True,
@@ -113,7 +117,10 @@ MARKET_PROVIDER_SPECS: tuple[MarketProviderSpec, ...] = (
         # Espejo del defecto de ``YAHOO_MIN_INTERVAL_SEC``: el throttle real vive en el
         # cliente HTTP y aquí solo se publica el valor con el que se configura.
         default_min_interval_seconds=2,
-        description="Histórico diario, fundamentales y tipos de cambio.",
+        description=(
+            "Histórico diario, fundamentales, tipos de cambio, índices, búsqueda, macro y "
+            "noticias. Desactivarlo detiene TODO el tráfico a Yahoo."
+        ),
     ),
     MarketProviderSpec(
         id=PROVIDER_XTB,

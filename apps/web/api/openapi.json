@@ -4949,8 +4949,13 @@
         "type": "object"
       },
       "CreateDatabaseBackupResultDto": {
-        "description": "El intento y el estado real de las copias después (recalculado, no cacheado).",
+        "description": "El intento y el estado real de las copias después (recalculado, no cacheado).\n\n``auditRecorded=False`` declara que la copia se hizo pero su entrada de auditoría no se\npudo escribir (N-3): la respuesta deja de ser indistinguible de una copia auditada.\n``backupsError`` explica un ``backups=None`` (inventario ilegible).",
         "properties": {
+          "auditRecorded": {
+            "default": true,
+            "title": "Auditrecorded",
+            "type": "boolean"
+          },
           "backups": {
             "anyOf": [
               {
@@ -4960,6 +4965,17 @@
                 "type": "null"
               }
             ]
+          },
+          "backupsError": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backupserror"
           },
           "run": {
             "$ref": "#/components/schemas/BackupRunDto"

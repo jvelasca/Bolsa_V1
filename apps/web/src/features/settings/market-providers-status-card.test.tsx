@@ -65,7 +65,8 @@ function makeProvider(
     minIntervalSeconds: 2,
     baseUrl: null,
     capabilities: ["ohlcv", "fundamentals"],
-    description: "Histórico diario, fundamentales y tipos de cambio.",
+    description:
+      "Histórico diario, fundamentales, tipos de cambio, índices, búsqueda, macro y noticias. Desactivarlo detiene TODO el tráfico a Yahoo.",
     verified: false,
     ...overrides,
   };
@@ -129,6 +130,18 @@ describe("MarketProvidersStatusCard · estado honesto", () => {
     renderCard();
     expect(await screen.findByTestId("provider-state-xtb")).toHaveTextContent(
       "Sin URL de bridge",
+    );
+  });
+
+  it("declara el alcance del interruptor de Yahoo (no solo histórico)", async () => {
+    renderCard();
+
+    expect(
+      await screen.findByTestId("provider-yahoo-switch-scope"),
+    ).toHaveTextContent(/TODO el tráfico a Yahoo/);
+    // XTB no tiene interruptor de Yahoo: la nota no se duplica en otras tarjetas.
+    expect(screen.getAllByTestId("provider-yahoo-switch-scope")).toHaveLength(
+      1,
     );
   });
 });

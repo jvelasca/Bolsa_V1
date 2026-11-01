@@ -33,6 +33,8 @@ const createDatabaseBackup = vi.fn(async () => ({
       error: null,
     },
     backups: makeReport().backups,
+    auditRecorded: true,
+    backupsError: null,
   },
 }));
 
@@ -303,5 +305,72 @@ describe("DatabaseMaintenancePanel", () => {
     const error = await screen.findByTestId("db-backup-error");
     expect(error.textContent).toContain("backup_in_progress");
     expect(screen.queryByTestId("db-backup-result")).toBeNull();
+  });
+
+  it("declara una copia sin auditoría (N-3) sin dejar de ser éxito", async () => {
+    createDatabaseBackup.mockResolvedValueOnce({
+      data: {
+        run: {
+          ok: true,
+          file: "/repo/db-backups/bolsa_v1-20261029-150000-000.sql.gz",
+          bytes: 52_000_000,
+          sha256: "abcdef0123456789".padEnd(64, "0"),
+          schemaRevision: "060_provider_check_policy",
+          pruned: 0,
+          mirrorPath: null,
+          durationMs: 1000,
+          errorCode: null,
+          error: null,
+        },
+        backups: makeReport().backups,
+        auditRecorded: false,
+        backupsError: null,
+      },
+    } as never);
+    renderPanel(makeReport());
+
+    fireEvent.click(await screen.findByTestId("db-backup-start"));
+    fireEvent.change(screen.getByLabelText(/Escribe/i), {
+      target: { value: "COPIAR" },
+    });
+    fireEvent.click(screen.getByTestId("db-backup-confirm"));
+
+    expect(await screen.findByTestId("db-backup-result")).toBeTruthy();
+    expect(
+      await screen.findByTestId("db-backup-audit-warning"),
+    ).toHaveTextContent(/auditoría/i);
+  });
+
+  it("declara un inventario ilegible con su motivo (N-3)", async () => {
+    createDatabaseBackup.mockResolvedValueOnce({
+      data: {
+        run: {
+          ok: true,
+          file: "/repo/db-backups/bolsa_v1-20261029-150000-000.sql.gz",
+          bytes: 1,
+          sha256: null,
+          schemaRevision: null,
+          pruned: 0,
+          mirrorPath: null,
+          durationMs: 10,
+          errorCode: null,
+          error: null,
+        },
+        backups: null,
+        auditRecorded: true,
+        backupsError:
+          "inventory_unavailable: PermissionError: permiso denegado",
+      },
+    } as never);
+    renderPanel(makeReport());
+
+    fireEvent.click(await screen.findByTestId("db-backup-start"));
+    fireEvent.change(screen.getByLabelText(/Escribe/i), {
+      target: { value: "COPIAR" },
+    });
+    fireEvent.click(screen.getByTestId("db-backup-confirm"));
+
+    const warning = await screen.findByTestId("db-backup-inventory-warning");
+    expect(warning.textContent).toContain("inventory_unavailable");
   });
 });

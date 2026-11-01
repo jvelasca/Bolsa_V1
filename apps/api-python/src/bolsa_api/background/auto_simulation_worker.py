@@ -2584,11 +2584,21 @@ class AutoSimulationWorker:
         return bool(switch is not None and switch.engaged)
 
     def _v2_kill_state(self, *, at: str | None = None) -> KillState | None:
-        """Foto durable del latch actual; ``None`` sin cuenta/engine (no persistible)."""
+        """Foto durable del latch actual; ``None`` sin cuenta/engine (no persistible).
+
+        P-1b — el placeholder ``KILL_STATE_UNREADABLE`` devuelve ``None``: no es un HECHO
+        durable (nace de no poder leer el espejo, y la escritura fallaría por la misma
+        causa), así que no se persiste. Guardarlo como si fuera una parada real haría que
+        un reinicio posterior la restaurase como ``SYSTEM_ERROR`` —un motivo inventado— y
+        borrase el rastro de la parada de verdad. El latch local sigue activo: vetar
+        entradas no depende de que esto sea persistible.
+        """
         switch = self._v2_kill_switch
         account_id = self._account_id or ""
         engine_id = self._engine_id or ""
         if not account_id or not engine_id:
+            return None
+        if switch.reason == KILL_STATE_UNREADABLE:
             return None
         return KillState(
             account_id=account_id,
@@ -2697,6 +2707,12 @@ class AutoSimulationWorker:
         que no hay parada activa (sin fila, o fila liberada con ``reconciliation_id``) es
         la única vía para deshacer el placeholder tras un fallo TRANSITORIO. Antes, el
         proceso quedaba parado en memoria hasta reiniciarse aunque el store ya leyese.
+
+        P-1b — el predicado es la garantía, no una optimización: cuando una causa REAL
+        aparece con el placeholder activo, ``HardKillSwitch.engage`` asciende el motivo
+        (el placeholder deja de ser ``reason``), así que este método ya no puede liberar
+        la parada. Sin ese ascenso, una lectura válida posterior habría borrado un HALT
+        de verdad sin dejar rastro.
         """
         switch = self._v2_kill_switch
         if not switch.engaged or switch.reason != KILL_STATE_UNREADABLE:
@@ -2713,10 +2729,19 @@ class AutoSimulationWorker:
         Fail-closed en la dirección que importa: un fallo de escritura NO desactiva la
         parada (el latch sigue in-memory y se declara). Lo que no se hace es creer que el
         sistema está protegido por un HALT que nadie podrá leer tras un crash.
+
+        P-1b — el placeholder ``KILL_STATE_UNREADABLE`` no se persiste (``_v2_kill_state``
+        devuelve ``None``): se declara el motivo en el log para que el tramo ilegible no
+        desaparezca sin dejar rastro.
         """
         store = self._kill_switch_store
         state = self._v2_kill_state(at=at)
         if store is None or state is None:
+            if self._v2_kill_switch.engaged and self._v2_kill_switch.reason == KILL_STATE_UNREADABLE:
+                logger.warning(
+                    "auto_sim v2 kill state NOT persisted: placeholder %s is not a durable fact",
+                    KILL_STATE_UNREADABLE,
+                )
             return False
         try:
             await store.save(state)

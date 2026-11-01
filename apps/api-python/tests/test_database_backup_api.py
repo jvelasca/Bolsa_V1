@@ -140,8 +140,45 @@ async def test_creates_backup_with_camel_case_payload(
     assert data["run"]["errorCode"] is None
     assert data["backups"]["latestName"] == "bolsa_v1-20261029-150000-000.sql.gz"
     assert data["backups"]["checksumPresent"] is True
+    # N-3: la respuesta declara explícitamente que sí se auditó y que no hay error de inventario.
+    assert data["auditRecorded"] is True
+    assert data["backupsError"] is None
     # El actor sale del principal del request (en tests, el owner de settings).
     assert use_case.actor
+
+
+async def test_an_unaudited_copy_still_returns_200_and_declares_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """N-3 — la copia es el hecho; la auditoría perdida es una salvedad declarada."""
+    report = BackupRunReport(
+        run=_success().run,
+        backups=_backups(),
+        audit_recorded=False,
+    )
+    app, _ = _app(monkeypatch, report)
+    response = await _post(app, {"confirm": "COPIAR"})
+
+    assert response.status_code == 200, "la copia se creó: no es un fallo del volcado"
+    assert response.json()["data"]["auditRecorded"] is False
+    assert response.json()["data"]["run"]["ok"] is True
+
+
+async def test_an_unreadable_inventory_is_declared_with_its_reason(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    report = BackupRunReport(
+        run=_success().run,
+        backups=None,
+        backups_error="inventory_unavailable: PermissionError: permiso denegado",
+    )
+    app, _ = _app(monkeypatch, report)
+    response = await _post(app, {"confirm": "COPIAR"})
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["backups"] is None
+    assert "inventory_unavailable" in data["backupsError"]
 
 
 async def test_confirmation_is_case_insensitive_but_required(

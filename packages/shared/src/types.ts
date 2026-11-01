@@ -707,6 +707,10 @@ export interface CreateDatabaseBackupResultDto {
   run: DatabaseBackupRunDto;
   /** Inventario recalculado tras la copia (null si no se pudo leer). */
   backups: DatabaseBackupsDto | null;
+  /** false si la copia se hizo pero su entrada de auditoría no se pudo escribir. */
+  auditRecorded: boolean;
+  /** Motivo de un `backups` nulo (inventario ilegible), si lo hubo. */
+  backupsError: string | null;
 }
 
 export interface ListMembershipRefDto {

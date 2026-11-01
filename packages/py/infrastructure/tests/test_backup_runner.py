@@ -37,11 +37,13 @@ def _fake_run_factory(
     file_name: str = "bolsa_v1-20261029-150000-000.sql.gz",
     create: bool = True,
     captured: dict[str, Any] | None = None,
+    declare: bool = True,
 ):
     def _run(command: list[str], **kwargs: Any) -> SimpleNamespace:
         if captured is not None:
             captured["command"] = command
             captured["kwargs"] = kwargs
+        stdout = ""
         if create:
             target = directory / file_name
             _write(target)
@@ -51,7 +53,13 @@ def _fake_run_factory(
                 f'[{{"file": "{file_name}", "schema": "060_provider_check_policy"}}]',
                 encoding="utf-8",
             )
-        return SimpleNamespace(returncode=returncode, stdout="", stderr=stderr)
+            if declare:
+                # Línea REAL del script del repo (``logInfo`` de db-dump.mjs).
+                stdout = (
+                    f"[db-dump] Backup creado: {target} (1 bytes, gzip) · "
+                    "retención 5 · dump 12 ms\n"
+                )
+        return SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
 
     return _run
 
@@ -86,12 +94,17 @@ def test_pruned_counts_retention_removals(
 ) -> None:
     old = tmp_path / "bolsa_v1-20261001-000000-000.sql.gz"
     _write(old)
+    new_name = "bolsa_v1-20261029-150000-000.sql.gz"
 
     def _run(command: list[str], **kwargs: Any) -> SimpleNamespace:
         # El script poda el más viejo y escribe el nuevo, como db-dump.mjs.
         old.unlink()
-        _write(tmp_path / "bolsa_v1-20261029-150000-000.sql.gz")
-        return SimpleNamespace(returncode=0, stdout="", stderr="")
+        _write(tmp_path / new_name)
+        return SimpleNamespace(
+            returncode=0,
+            stdout=f"[db-dump] Backup creado: {tmp_path / new_name} (1 bytes, gzip)\n",
+            stderr="",
+        )
 
     monkeypatch.setattr(subprocess, "run", _run)
     result = NodeBackupRunner(node_executable="node", script=backup_script_path()).create(
@@ -100,6 +113,87 @@ def test_pruned_counts_retention_removals(
 
     assert result.ok is True
     assert result.pruned == 1
+
+
+def test_the_declared_file_wins_over_a_foreign_file_in_the_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """El fichero propio lo dice el script, no el delta del directorio.
+
+    Un ``pnpm db:dump`` externo concurrente deja un fichero nuevo que el cerrojo de la API
+    no serializa (solo serializa llamadas de la API). Con ``after − before`` esa copia
+    ajena se atribuía a esta petición.
+    """
+    mine = "bolsa_v1-20261029-150000-000.sql.gz"
+    foreign = "bolsa_v1-20261029-150100-000.sql.gz"
+
+    def _run(command: list[str], **kwargs: Any) -> SimpleNamespace:
+        _write(tmp_path / mine)
+        _write(tmp_path / f"{mine}.sha256", f"{_SHA}  {mine}\n")
+        # Otra copia, más NUEVA, escrita por otro proceso mientras corría la nuestra.
+        _write(tmp_path / foreign)
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                f"[backup] Vaciando bolsa_v1 → {tmp_path / mine}\n"
+                f"[db-dump] Backup creado: {tmp_path / mine} (1 bytes, gzip) · "
+                "retención 5 · dump 12 ms\n"
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", _run)
+    result = NodeBackupRunner(node_executable="node", script=backup_script_path()).create(
+        tmp_path
+    )
+
+    assert result.ok is True
+    assert result.file is not None
+    assert Path(result.file).name == mine, "se informa la copia propia, no la ajena"
+    assert result.sha256 == _SHA
+
+
+def test_without_a_declared_line_the_delta_is_still_used_and_declared(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Compatibilidad: si el script no declara, se infiere (y queda en el log)."""
+    monkeypatch.setattr(
+        subprocess, "run", _fake_run_factory(tmp_path, declare=False)
+    )
+    result = NodeBackupRunner(node_executable="node", script=backup_script_path()).create(
+        tmp_path
+    )
+
+    assert result.ok is True
+    assert result.file is not None
+    assert Path(result.file).name == "bolsa_v1-20261029-150000-000.sql.gz"
+
+
+def test_a_declared_file_outside_the_backup_directory_is_not_trusted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Lo declarado se valida: no se informa de un fichero ajeno como si fuera la copia."""
+    outside = tmp_path.parent / "ajeno.sql"
+    _write(outside)
+    real = "bolsa_v1-20261029-150000-000.sql.gz"
+
+    def _run(command: list[str], **kwargs: Any) -> SimpleNamespace:
+        _write(tmp_path / real)
+        return SimpleNamespace(
+            returncode=0,
+            stdout=f"[db-dump] Backup creado: {outside} (9 bytes)\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", _run)
+    result = NodeBackupRunner(node_executable="node", script=backup_script_path()).create(
+        tmp_path
+    )
+
+    assert result.ok is True
+    assert result.file is not None
+    assert Path(result.file).parent == tmp_path
+    assert Path(result.file).name == real
 
 
 def test_missing_node_is_declared_not_simulated(

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bolsa_api.api.dependencies import (
     get_db_session,
     get_fx_rate_use_case,
+    get_market_provider_config_resolver,
     get_market_status_use_case,
     get_provider_check_policy_use_case,
     get_test_provider_connection_use_case,
@@ -32,6 +33,7 @@ from bolsa_application.market_providers import (
     UnknownProviderError,
     summarize_provider_health,
 )
+from bolsa_market.yahoo_client import YahooProviderDisabledError
 
 router = APIRouter()
 
@@ -185,11 +187,20 @@ async def get_fx_rate(
     from_currency: Annotated[str, Query(alias="from", min_length=3, max_length=3)],
     to_currency: Annotated[str, Query(alias="to", min_length=3, max_length=3)],
 ) -> FxRateResponseDto:
-    _ = session
+    # N-1 — el semáforo de Yahoo se refresca desde la configuración ANTES de pedir: con el
+    # proveedor deshabilitado, esta ruta no lanza tráfico y lo declara (409, configuración)
+    # en lugar de devolver un 502 como si Yahoo estuviera caído. El resto de consumidores
+    # degradan a su dato guardado, igual que ante un Yahoo sin respuesta.
+    await get_market_provider_config_resolver(session).list_configs()
     try:
         fx = await get_fx_rate_use_case().execute(from_currency, to_currency)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except YahooProviderDisabledError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Proveedor de tipos de cambio no disponible (provider_disabled:yahoo): {exc}",
+        ) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

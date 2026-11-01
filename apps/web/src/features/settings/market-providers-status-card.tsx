@@ -172,6 +172,21 @@ function ProviderCard({ provider }: { provider: MarketProviderStatusDto }) {
           Usar este proveedor
         </label>
 
+        {/* N-1 — el interruptor no se limita al histórico: con Yahoo apagado NO sale ninguna
+            petición (histórico, fundamentales, FX, índices, búsqueda, macro ni noticias). Se
+            dice explícitamente para que «deshabilitado» signifique lo mismo en pantalla y
+            en la red. */}
+        {provider.id === "yahoo" && (
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="provider-yahoo-switch-scope"
+          >
+            {provider.enabled
+              ? "Al desactivarlo se detiene TODO el tráfico a Yahoo (histórico, fundamentales, FX, índices, búsqueda, macro y noticias)."
+              : "Desactivado: no se lanza ninguna petición a Yahoo. El histórico se queda sin sincronizar y fundamentales, FX, índices, búsqueda, macro y noticias usan su último dato guardado o declaran que no lo hay."}
+          </p>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
             <span className="text-muted-foreground">

@@ -229,6 +229,32 @@ class ResidualsUnavailable(RuntimeError):
 #: descarta y no llega ni ECONNREFUSED) costaba ~130 s por sesión.
 _PURGE_CONNECT_TIMEOUT_S = 2
 
+#: Tabla cuya ausencia demuestra que el esquema NO está migrado.
+#:
+#: La purga es autouse de SESIÓN y corre ANTES de que la batería lleve su BD a head
+#: (`ensure_migrated` del fixture ``factory``). En una BD recién creada —la scratch
+#: ``bolsa_v1_a7`` del job ``a7-gate``, DROP+CREATE— el esquema está vacío en la purga de
+#: apertura: sin esta guarda la lectura de cuentas emitía
+#: ``relation "investment_accounts" does not exist`` como aviso fail-soft, que era benigno
+#: pero inexacto. Nada que limpiar no es un fallo ni un aviso.
+_PURGE_SCHEMA_SENTINEL = "investment_accounts"
+
+
+async def _relation_present(session, name: str) -> bool:
+    """¿Existe la tabla ``public.<name>`` en la BD de ``session``?
+
+    Usa ``to_regclass``, que devuelve ``NULL`` en vez de lanzar cuando el nombre no se
+    resuelve: es la comprobación correcta para distinguir "esquema sin migrar" de "tabla
+    vacía".
+    """
+    from sqlalchemy import text
+
+    found = await session.execute(
+        text("SELECT to_regclass(:qualified)"),
+        {"qualified": f"public.{name}"},
+    )
+    return found.scalar() is not None
+
 
 async def purge_all_residuals() -> None:
     """Borra TODO residuo de tests: cuentas, portfolios, instrumentos sintéticos y perfiles.
@@ -268,6 +294,11 @@ async def purge_all_residuals() -> None:
             raise ResidualsUnavailable(type(exc).__name__) from exc
 
         async with factory() as session:
+            if not await _relation_present(session, _PURGE_SCHEMA_SENTINEL):
+                # Esquema sin migrar (BD recién creada): no hay residuo que purgar y no
+                # se inventa un aviso sobre una tabla que todavía no existe. La purga de
+                # cierre sí la encontrará, porque para entonces el fixture ha migrado.
+                return
             all_accounts = (
                 (await session.execute(text("SELECT id FROM investment_accounts"))).scalars().all()
             )
@@ -367,6 +398,20 @@ def _isolate_auto_real_price_switch(monkeypatch: pytest.MonkeyPatch) -> None:
     contamina la sesión y un test puede encenderlo dentro de su cuerpo sin pelear con esto.
     """
     monkeypatch.setenv(_AUTO_REAL_PRICE_ENV, "0")
+
+
+@pytest.fixture(autouse=True)
+def _reset_yahoo_traffic_gate() -> Iterator[None]:
+    """N-1 — el semáforo de tráfico Yahoo es estado de PROCESO, no de un test.
+
+    Cualquier test que resuelva configuración de proveedores con Yahoo deshabilitado lo
+    apaga para el resto del proceso; sin esta guarda, una suite posterior que espera
+    tráfico (sonda, FX, sync) fallaría según el orden de ejecución y no por su código.
+    """
+    from bolsa_market.yahoo_client import set_yahoo_traffic_enabled
+
+    yield
+    set_yahoo_traffic_enabled(True)
 
 
 #: Interruptor de la sonda de proveedores al arrancar la API.

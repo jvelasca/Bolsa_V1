@@ -162,12 +162,19 @@ class BackupRunDto(BaseModel):
 
 
 class CreateDatabaseBackupResultDto(BaseModel):
-    """El intento y el estado real de las copias después (recalculado, no cacheado)."""
+    """El intento y el estado real de las copias después (recalculado, no cacheado).
+
+    ``auditRecorded=False`` declara que la copia se hizo pero su entrada de auditoría no se
+    pudo escribir (N-3): la respuesta deja de ser indistinguible de una copia auditada.
+    ``backupsError`` explica un ``backups=None`` (inventario ilegible).
+    """
 
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     run: BackupRunDto
     backups: BackupsStatusDto | None = None
+    audit_recorded: bool = Field(default=True, alias="auditRecorded")
+    backups_error: str | None = Field(default=None, alias="backupsError")
 
 
 class CreateDatabaseBackupResponseDto(BaseModel):

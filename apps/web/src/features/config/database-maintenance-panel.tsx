@@ -428,6 +428,7 @@ function BackupAction({
   });
 
   const result = mutation.data?.data.run;
+  const payload = mutation.data?.data;
   // Cualquier error con mensaje se muestra: perderlo obligaría al usuario a adivinar si
   // falló la red, el rol, el cerrojo o el propio ``pg_dump``.
   const error =
@@ -530,6 +531,30 @@ function BackupAction({
           {result.sha256 ? ` · sha256 ${result.sha256.slice(0, 12)}…` : ""}
           {result.pruned > 0 ? ` · ${result.pruned} podada(s)` : ""}
           {` · ${(result.durationMs / 1000).toFixed(1)} s`}
+        </p>
+      )}
+
+      {/* La copia es el hecho; que no se haya podido AUDITAR es una salvedad declarada, no
+          un éxito silencioso ni un fallo de la copia (N-3). */}
+      {result && payload?.auditRecorded === false && (
+        <p
+          data-testid="db-backup-audit-warning"
+          className="text-xs text-amber-700 dark:text-amber-400"
+        >
+          La copia se creó, pero su entrada de auditoría <strong>no</strong> se
+          pudo registrar (<code>logs/agent/db-maintenance.jsonl</code>). Revisa
+          permisos y espacio en disco.
+        </p>
+      )}
+
+      {result && payload?.backups === null && (
+        <p
+          data-testid="db-backup-inventory-warning"
+          className="text-xs text-amber-700 dark:text-amber-400"
+        >
+          El inventario de copias no se pudo leer
+          {payload.backupsError ? ` (${payload.backupsError})` : ""}: el estado
+          posterior queda «sin verificar», no verde.
         </p>
       )}
 

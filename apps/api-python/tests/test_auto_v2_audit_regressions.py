@@ -35,6 +35,10 @@ from bolsa_analytics.cognitive.exit_plan import (
     build_exit_plan_from_position,
     protective_fill_price,
 )
+from bolsa_analytics.cognitive.hard_kill_switch import (
+    KILL_STATE_UNREADABLE,
+    HardKillSwitch,
+)
 from bolsa_analytics.cognitive.position_ledger import AppliedFillFact
 from bolsa_analytics.cognitive.position_state import (
     apply_position_mark,
@@ -168,6 +172,7 @@ class _FlakyKillSwitchStore(InMemoryKillSwitchStore):
         self.fail_next = fail_next
         self.always_fail = always_fail
         self.loads = 0
+        self.saves = 0
 
     async def load(self, account_id: str, engine_id: str) -> KillState | None:
         self.loads += 1
@@ -176,6 +181,10 @@ class _FlakyKillSwitchStore(InMemoryKillSwitchStore):
                 self.fail_next -= 1
             raise RuntimeError("kill state unreadable (P-1)")
         return await super().load(account_id, engine_id)
+
+    async def save(self, state: KillState) -> bool:
+        self.saves += 1
+        return await super().save(state)
 
 
 class _OhlcPriceSource:
@@ -693,6 +702,103 @@ async def test_p1_control_a_readable_store_still_lifts_nothing(v2_env: None) -> 
 
     assert report.proposals >= 1, "el camino está vivo: el HALT no se inventa"
     assert w._v2_kill_switch_halted() is False  # noqa: SLF001
+
+
+# ---------------------------------------------------------------------------
+# P-1b — el placeholder no enmascara ni borra una parada real
+# ---------------------------------------------------------------------------
+
+
+def test_p1b_a_real_reason_supersedes_the_placeholder() -> None:
+    """Una causa REAL sustituye al placeholder (y pide persistirse)."""
+    switch = HardKillSwitch()
+    assert switch.engage(KILL_STATE_UNREADABLE, at="2026-11-01T10:00:00Z") is True
+
+    changed = switch.engage(
+        "DATA_CORRUPTION", at="2026-11-01T10:00:05Z", engagement_id="eng-real"
+    )
+
+    assert changed is True, "el ascenso cambia el estado durable: hay que persistirlo"
+    assert switch.engaged is True, "ascender el motivo NO levanta la parada"
+    assert switch.reason == "DATA_CORRUPTION"
+    assert switch.engagement_id == "eng-real"
+    assert switch.engaged_at == "2026-11-01T10:00:05Z"
+    assert switch.reengagements == 1, "el reintento se sigue contando"
+
+
+def test_p1b_the_placeholder_never_degrades_a_real_reason() -> None:
+    """Sentido contrario: un placeholder NO pisa una causa real conocida."""
+    switch = HardKillSwitch()
+    switch.engage("RISK_BREACH", at="2026-11-01T10:00:00Z", engagement_id="eng-real")
+
+    changed = switch.engage(KILL_STATE_UNREADABLE, at="2026-11-01T10:00:05Z")
+
+    assert changed is False
+    assert switch.reason == "RISK_BREACH"
+    assert switch.engagement_id == "eng-real"
+
+
+def test_p1b_a_real_reason_does_not_reset_a_real_latch() -> None:
+    """La idempotencia previa se conserva entre motivos reales."""
+    switch = HardKillSwitch()
+    switch.engage("RISK_BREACH", at="2026-11-01T10:00:00Z", engagement_id="eng-first")
+
+    changed = switch.engage("DATA_CORRUPTION", at="2026-11-01T10:00:05Z")
+
+    assert changed is False, "el primero es el que originó la parada"
+    assert switch.reason == "RISK_BREACH"
+    assert switch.engagement_id == "eng-first"
+    assert switch.reengagements == 1
+
+
+@pytest.mark.asyncio
+async def test_p1b_a_real_halt_discovered_under_the_placeholder_is_never_released(
+    v2_env: None,
+) -> None:
+    """El agujero de P-1b: parada real mientras el espejo es ilegible.
+
+    Con el placeholder activo y el store ilegible, el worker descubre una causa REAL (aquí
+    un HALT durable que no pudo leer y luego una activación local declarada). La lectura
+    válida siguiente, SIN fila durable, liberaba el latch porque el motivo seguía siendo
+    el placeholder: la parada real desaparecía sin rastro. Ahora el motivo real manda y
+    sólo una reconciliación explícita lo levanta.
+    """
+    stores = _Stores()
+    stores.kill_state = _FlakyKillSwitchStore(fail_next=1)
+    w = _restart(stores, minute=1)
+    w._decider = _buy()
+
+    first = await _real_turn(w, stores)
+    assert first.proposals == 0
+    assert w._v2_kill_switch.reason == KILL_STATE_UNREADABLE  # noqa: SLF001
+
+    assert w.engage_kill_switch("DATA_CORRUPTION", at="2026-09-15T09:30:00Z") is True
+    assert w._v2_kill_switch.reason == "DATA_CORRUPTION"  # noqa: SLF001
+
+    second = await _real_turn(w, stores)
+
+    assert w._v2_kill_switch_halted() is True, (  # noqa: SLF001
+        "una causa real no puede desaparecer al recuperar la lectura"
+    )
+    assert w._v2_kill_switch.reason == "DATA_CORRUPTION"  # noqa: SLF001
+    assert second.proposals == 0, "con la parada real el motor no abre"
+
+
+@pytest.mark.asyncio
+async def test_p1b_the_placeholder_is_not_persisted_as_a_durable_halt(v2_env: None) -> None:
+    """El placeholder no se guarda: no es un hecho durable y contaminaría el reinicio."""
+    stores = _Stores()
+    stores.kill_state = _FlakyKillSwitchStore(always_fail=True)
+    w = _restart(stores, minute=1)
+    w._decider = _buy()
+
+    await _real_turn(w, stores)
+    assert w._v2_kill_switch.reason == KILL_STATE_UNREADABLE  # noqa: SLF001
+
+    persisted = await w._v2_persist_kill_state()  # noqa: SLF001
+
+    assert persisted is False, "el placeholder no viaja al espejo durable"
+    assert stores.kill_state.saves == 0, "no se escribe ninguna fila con el placeholder"
 
 
 @pytest.mark.asyncio

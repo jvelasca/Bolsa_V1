@@ -6185,9 +6185,20 @@ export interface components {
         /**
          * CreateDatabaseBackupResultDto
          * @description El intento y el estado real de las copias después (recalculado, no cacheado).
+         *
+         *     ``auditRecorded=False`` declara que la copia se hizo pero su entrada de auditoría no se
+         *     pudo escribir (N-3): la respuesta deja de ser indistinguible de una copia auditada.
+         *     ``backupsError`` explica un ``backups=None`` (inventario ilegible).
          */
         CreateDatabaseBackupResultDto: {
+            /**
+             * Auditrecorded
+             * @default true
+             */
+            auditRecorded: boolean;
             backups?: components["schemas"]["BackupsStatusDto"] | null;
+            /** Backupserror */
+            backupsError?: string | null;
             run: components["schemas"]["BackupRunDto"];
         };
         /** CreateExecutionPolicyRequestDto */

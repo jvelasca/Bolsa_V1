@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -48,6 +49,7 @@ from bolsa_market.providers import (
     XtbBridgeHealth,
     format_xtb_bridge_connect_error,
 )
+from bolsa_market.yahoo_client import set_yahoo_traffic_enabled
 
 __all__ = [
     "PROVIDER_CONFIG_CACHE_TTL_SECONDS",
@@ -144,6 +146,27 @@ def _effective_config(
 _CACHE: dict[str, Any] = {"loaded_at": 0.0, "configs": ()}
 
 
+def _apply_yahoo_traffic_gate(configs: tuple[MarketProviderConfig, ...]) -> None:
+    """N-1 — propaga el interruptor de Yahoo al cliente real (semáforo de proceso).
+
+    Se hace en el LECTOR de configuración (``list_configs``) porque es el único punto por el
+    que pasan la API, los workers y la sonda: así el estado que el operador ve en
+    Configuración es el que gobierna TODAS las peticiones a Yahoo (histórico, fundamentales,
+    FX, índices, búsqueda, macro y noticias), no solo ``CAPABILITY_OHLCV``. El desfase
+    máximo es el TTL de esta caché (30 s), igual que para el resto de la configuración.
+
+    Un proceso que nunca resuelve configuración (una herramienta suelta, un script) conserva
+    el defecto habilitado: esta función no puede inventar una fila que nadie leyó.
+    """
+    yahoo = next((config for config in configs if config.id == "yahoo"), None)
+    if yahoo is None:
+        return
+    set_yahoo_traffic_enabled(
+        yahoo.enabled,
+        reason=None if yahoo.enabled else "provider_disabled:yahoo",
+    )
+
+
 def invalidate_provider_config_cache() -> None:
     """Fuerza la relectura en la próxima resolución (mismo proceso)."""
     _CACHE["loaded_at"] = 0.0
@@ -184,6 +207,7 @@ class MarketProviderConfigResolver:
         )
         _CACHE["configs"] = configs
         _CACHE["loaded_at"] = self._clock()
+        _apply_yahoo_traffic_gate(configs)
         return list(configs)
 
     async def get(self, provider_id: str, *, refresh: bool = False) -> MarketProviderConfig | None:
@@ -369,14 +393,20 @@ class TestProviderConnection:
                 ok=False, message=f"Yahoo sin respuesta: {type(exc).__name__}: {exc}"
             )
         try:
-            formatted = f"{float(price):.4f}"
+            numeric = float(price)
         except (TypeError, ValueError):
             return ProviderProbeResult(
                 ok=False, message=f"Yahoo devolvió un precio no numérico: {price!r}"
             )
+        # N-2 — un precio no finito o no positivo NO demuestra que el proveedor funcione:
+        # antes 0.0, -1 y NaN pasaban y se persistían como ``last_check_ok=True`` (verde).
+        if not math.isfinite(numeric) or numeric <= 0:
+            return ProviderProbeResult(
+                ok=False, message=f"Yahoo devolvió un precio no válido: {price!r}"
+            )
         return ProviderProbeResult(
             ok=True,
-            message=f"Yahoo respondió {formatted} (ref. ^IBEX, {timestamp})",
+            message=f"Yahoo respondió {numeric:.4f} (ref. ^IBEX, {timestamp})",
         )
 
 
@@ -457,6 +487,9 @@ def summarize_provider_health(
 
     Acepta ``MarketProviderStatus`` (value object) porque el llamador ya resolvió la
     configuración efectiva; no se vuelve a leer la BD para construir el resumen.
+
+    ``measured_at`` publica la medición MÁS ANTIGUA de los proveedores habilitados (N-4):
+    es la que gobierna «caducado» y ``next_check_at``, porque es la que se refresca última.
     """
     effective_policy = policy or ProviderCheckPolicy()
     moment = now or datetime.now(UTC)
@@ -497,7 +530,10 @@ def summarize_provider_health(
     failing = [entry for entry in considered if entry.verified and not entry.healthy]
     unmeasured = [entry for entry in considered if not entry.verified]
     measured = [parsed for parsed in (_parse_iso(entry.last_check_at) for entry in considered) if parsed]
-    latest = max(measured) if measured else None
+    # N-4 — la medición que manda es la MÁS ANTIGUA de los proveedores habilitados: es la
+    # que hay que refrescar primero. Con ``max``, pulsar «Probar» en un solo proveedor
+    # rejuvenecía el grupo entero y el veredicto seguía en ``ok`` con el otro caducado.
+    oldest = min(measured) if measured else None
 
     if failing:
         status = "degraded"
@@ -505,8 +541,8 @@ def summarize_provider_health(
         status = "unverified"
     elif (
         effective_policy.enabled
-        and latest is not None
-        and (moment - latest).total_seconds() > effective_policy.stale_after_seconds
+        and oldest is not None
+        and (moment - oldest).total_seconds() > effective_policy.stale_after_seconds
     ):
         # Hay medición y era correcta, pero ya no se refresca al ritmo declarado: el bucle
         # no está corriendo. Verde aquí sería afirmar salud sin medirla ahora.
@@ -514,7 +550,7 @@ def summarize_provider_health(
     else:
         status = "ok"
 
-    return _summary(status, latest)
+    return _summary(status, oldest)
 
 
 class ProviderHealthMonitor:
@@ -588,7 +624,11 @@ class ProviderHealthMonitor:
             return ProviderCheckPolicy()
 
     async def last_measured_at(self) -> datetime | None:
-        """Medición más reciente entre los proveedores habilitados (persistida)."""
+        """Medición más ANTIGUA entre los proveedores habilitados (persistida).
+
+        N-4 — es la que decide si toca medir: con la más reciente, medir un solo proveedor
+        posponía la comprobación del resto indefinidamente.
+        """
         async with self._session_factory() as session:
             repository = SqlAlchemyMarketProviderSettingsRepository(session)
             resolver = MarketProviderConfigResolver(
@@ -604,7 +644,7 @@ class ProviderHealthMonitor:
             )
             if parsed is not None
         ]
-        return max(measured) if measured else None
+        return min(measured) if measured else None
 
     def is_due(self, policy: ProviderCheckPolicy, last: datetime | None) -> bool:
         """¿Toca comprobar? ON y (nunca medido o edad ≥ intervalo configurado)."""

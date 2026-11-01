@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -23,3 +24,17 @@ def _load_repo_dotenv() -> None:
     except ImportError:
         return
     load_dotenv(env_path, override=False)
+
+
+@pytest.fixture(autouse=True)
+def _reset_yahoo_traffic_gate() -> Any:
+    """N-1 — el semáforo de Yahoo es estado de PROCESO: cada test lo deja habilitado.
+
+    Un test que resuelve configuración con Yahoo deshabilitado lo apaga para el resto del
+    proceso; sin esta guarda, un test posterior que sí espera tráfico fallaría según el
+    orden de ejecución (y no por su propio código).
+    """
+    from bolsa_market.yahoo_client import set_yahoo_traffic_enabled
+
+    yield
+    set_yahoo_traffic_enabled(True)

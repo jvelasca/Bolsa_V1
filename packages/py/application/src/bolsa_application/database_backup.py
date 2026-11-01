@@ -22,6 +22,7 @@ Puertos (sin imports de infraestructura): ``BackupRunner`` ejecuta el volcado,
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -33,6 +34,8 @@ from bolsa_application.database_maintenance import (
     BackupSnapshot,
     summarize_backup_snapshot,
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "BackupRunReport",
@@ -93,6 +96,12 @@ class BackupRunReport:
 
     ``backups`` se recalcula **después** del volcado, para que la tarjeta muestre la copia
     recién creada sin una segunda llamada ni un dato viejo.
+
+    N-3 — la auditoría dejó de ser invisible cuando falla: el docstring prometía «la
+    ausencia de entrada es un fallo del propio registro», pero el fallo se tragaba
+    (``except: pass``) y la respuesta era indistinguible de una copia auditada.
+    ``audit_recorded=False`` viaja al cliente y queda en el log; ``backups=None`` por un
+    inventario ilegible también trae su motivo en ``backups_error``.
     """
 
     run: BackupRunResult
@@ -100,6 +109,8 @@ class BackupRunReport:
     busy: bool = False
     refused: bool = False
     reason: str | None = None
+    audit_recorded: bool = True
+    backups_error: str | None = None
 
     @property
     def ok(self) -> bool:
@@ -193,12 +204,15 @@ class CreateDatabaseBackup:
             await self._lock.release()
 
         # Una sola entrada por intento: éxito y fallo se registran igual.
-        self._record(who, started, result)
+        audit_recorded = self._record(who, started, result)
+        backups, backups_error = self._snapshot()
         return BackupRunReport(
             run=result,
-            backups=self._snapshot(),
+            backups=backups,
             busy=False,
             refused=False,
+            audit_recorded=audit_recorded,
+            backups_error=backups_error,
         )
 
     # ------------------------------------------------------------------ internos
@@ -208,8 +222,14 @@ class CreateDatabaseBackup:
         actor: str,
         started: datetime,
         result: BackupRunResult,
-    ) -> None:
-        """Registra el intento (éxito o fallo) sin poder tumbar la petición."""
+    ) -> bool:
+        """Registra el intento (éxito o fallo); ``False`` si no se pudo auditar.
+
+        N-3 — no tumbar la petición por un fallo de auditoría sigue siendo correcto (la
+        copia ocurrió), pero el fallo ya no es silencioso: se loguea y la respuesta declara
+        ``audit_recorded=False``. Un registro que desaparece sin aviso es justo lo que la
+        doctrina de esta pieza prohíbe.
+        """
         entry = MaintenanceAuditEntry(
             action="database.backup",
             actor=actor,
@@ -223,19 +243,34 @@ class CreateDatabaseBackup:
         )
         try:
             self._audit.record(entry)
-        except Exception:  # noqa: BLE001 — la auditoría best-effort no tumba la copia
-            pass
+        except Exception as exc:  # noqa: BLE001 — la auditoría best-effort no tumba la copia
+            logger.warning(
+                "no se pudo registrar la auditoría de la copia (actor=%s, ok=%s): %s: %s",
+                actor,
+                result.ok,
+                type(exc).__name__,
+                exc,
+                exc_info=True,
+            )
+            return False
+        return True
 
-    def _snapshot(self) -> BackupReport | None:
+    def _snapshot(self) -> tuple[BackupReport | None, str | None]:
+        """Informe del inventario y, si no se pudo leer, el motivo (``None`` si bien)."""
         try:
             snapshot: BackupSnapshot = self._backup_inventory.snapshot()
-        except Exception:  # noqa: BLE001 — sin inventario no se inventa estado
-            return None
-        return summarize_backup_snapshot(
-            snapshot,
-            expected_head=self._expected_head,
-            stale_hours=self._backup_stale_hours,
-            now=datetime.now(UTC),
+        except Exception as exc:  # noqa: BLE001 — sin inventario no se inventa estado
+            detail = f"inventory_unavailable: {type(exc).__name__}: {exc}"
+            logger.warning("no se pudo leer el inventario de copias: %s", detail)
+            return None, detail
+        return (
+            summarize_backup_snapshot(
+                snapshot,
+                expected_head=self._expected_head,
+                stale_hours=self._backup_stale_hours,
+                now=datetime.now(UTC),
+            ),
+            None,
         )
 
 

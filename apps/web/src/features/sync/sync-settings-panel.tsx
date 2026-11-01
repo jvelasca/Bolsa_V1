@@ -243,7 +243,8 @@ export function SyncSettingsPanel({
             className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-300"
           >
             Yahoo Finance está deshabilitado: no se encolará ni se sincronizará
-            nada hasta volver a habilitarlo en «Proveedores».
+            ningún histórico y tampoco se pedirán fundamentales, FX, índices,
+            búsqueda, macro ni noticias. Vuelve a habilitarlo en «Proveedores».
           </p>
         )}
 

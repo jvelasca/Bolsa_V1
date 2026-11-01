@@ -210,6 +210,36 @@ async def test_audit_failure_does_not_hide_the_copy() -> None:
     assert report.run.file is not None
 
 
+async def test_an_unaudited_copy_is_declared_not_silent() -> None:
+    """N-3 — la auditoría perdida viaja en la respuesta (antes: ``except: pass``)."""
+    report = await _use_case(audit=_Audit(raises=True)).execute()
+
+    assert report.ok is True, "la copia ocurrió: el fallo de auditoría no la invalida"
+    assert report.audit_recorded is False
+
+
+async def test_an_audited_copy_declares_it() -> None:
+    report = await _use_case(audit=_Audit()).execute()
+
+    assert report.audit_recorded is True
+
+
+async def test_an_unreadable_inventory_declares_its_reason() -> None:
+    """N-3 — ``backups=None`` sin motivo era indistinguible de «no hay inventario»."""
+
+    class _BrokenInventory:
+        def snapshot(self) -> BackupSnapshot:
+            raise OSError("permiso denegado")
+
+    report = await _use_case(inventory=_BrokenInventory()).execute()
+
+    assert report.ok is True
+    assert report.backups is None
+    assert report.backups_error is not None
+    assert "inventory_unavailable" in report.backups_error
+    assert "permiso denegado" in report.backups_error
+
+
 async def test_actor_is_trimmed_and_bounded() -> None:
     audit = _Audit()
     await _use_case(audit=audit).execute(actor="  " + "x" * 500)

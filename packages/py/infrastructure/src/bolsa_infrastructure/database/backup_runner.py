@@ -18,6 +18,8 @@ Tres piezas de infraestructura que implementan los puertos de
 from __future__ import annotations
 
 import json
+import logging
+import re
 import shutil
 import subprocess
 import time
@@ -42,6 +44,8 @@ __all__ = [
     "backup_script_path",
     "agent_log_directory",
 ]
+
+logger = logging.getLogger(__name__)
 
 #: Clave del advisory lock de mantenimiento. Distinta de ``BOOTSTRAP_ADVISORY_LOCK_KEY``
 #: (774_104_253): migrar y copiar son trabajos independientes que pueden coincidir.
@@ -78,6 +82,36 @@ def _tail(raw: str | None, limit: int = _MAX_DETAIL) -> str:
         return ""
     cleaned = raw.strip()
     return cleaned[-limit:] if len(cleaned) > limit else cleaned
+
+
+#: Línea que emite ``scripts/db-dump.mjs`` al terminar: ``[db-dump] Backup creado: <path>
+#: (<bytes> bytes[, gzip]) · retención …``. Es el único testigo del fichero PROPIO.
+_DECLARED_BACKUP_RE = re.compile(r"\[db-dump\]\s+Backup creado:\s+(?P<path>.+?)\s+\(\d+\s+bytes")
+
+
+def _declared_backup_path(stdout: str | None, directory: Path) -> Path | None:
+    """Ruta que el script declara haber creado, validada contra el directorio de copias.
+
+    Devuelve ``None`` si no hay línea reconocible o si lo declarado no es un fichero de
+    copia existente DENTRO de ``directory`` (una salida manipulada o un script distinto no
+    puede hacer que informemos de un fichero ajeno).
+    """
+    if not stdout:
+        return None
+    matches = list(_DECLARED_BACKUP_RE.finditer(stdout))
+    if not matches:
+        return None
+    candidate = Path(matches[-1].group("path").strip().strip('"'))
+    try:
+        resolved = candidate.resolve()
+        target_dir = directory.resolve()
+    except OSError:
+        return None
+    if resolved.parent != target_dir or not _is_backup_file(resolved.name):
+        return None
+    if not resolved.is_file():
+        return None
+    return resolved
 
 
 class NodeBackupRunner:
@@ -153,13 +187,25 @@ class NodeBackupRunner:
         if completed.returncode != 0:
             detail = _tail(completed.stderr) or _tail(completed.stdout) or "sin detalle"
             return self._failure("DUMP_FAILED", detail, started, pruned=self._pruned(before, after))
-        if not created:
+
+        # Atribución: el script DICE qué fichero creó. El delta del directorio no sirve como
+        # fuente (cualquier fichero nuevo del directorio —un ``pnpm db:dump`` externo en
+        # paralelo— se atribuiría a esta copia; el cerrojo solo serializa llamadas de la API).
+        declared = _declared_backup_path(completed.stdout, directory)
+        if declared is not None:
+            newest = declared.name
+        elif created:
+            # Sin línea reconocible se conserva el comportamiento anterior, declarándolo: es
+            # una inferencia, no un hecho del script.
+            logger.warning(
+                "db-dump no declaró el fichero creado; se infiere del delta del directorio (%s)",
+                sorted(created),
+            )
+            newest = max(created, key=lambda name: (directory / name).stat().st_mtime)
+        else:
             detail = _tail(completed.stderr) or "el script terminó sin escribir ningún fichero"
             return self._failure("OUTPUT_MISSING", detail, started, pruned=self._pruned(before, after))
 
-        # Normalmente nace un único fichero; si hubiera más de uno, se informa el más
-        # reciente y se deja constancia del resto en el mensaje.
-        newest = max(created, key=lambda name: (directory / name).stat().st_mtime)
         path = directory / newest
         try:
             size = path.stat().st_size

@@ -286,6 +286,8 @@ async def create_database_backup(
         data=CreateDatabaseBackupResultDto(
             run=_to_backup_run_dto(report.run),
             backups=_to_backups_dto(report.backups) if report.backups is not None else None,
+            audit_recorded=report.audit_recorded,
+            backups_error=report.backups_error,
         )
     )
 
@@ -302,8 +304,12 @@ async def list_orphan_instruments(
 @router.post("/database/orphans/purge", response_model=PurgeOrphansResponseDto)
 async def purge_orphan_instruments(
     body: PurgeOrphansRequestDto,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> PurgeOrphansResponseDto:
+    # Mismo criterio que la copia bajo demanda: es una escritura destructiva de la BD, no un
+    # diagnóstico. Sin auth activa no exige rol (no hay rol que exigir); con auth, admin.
+    require_admin_when_auth_enabled(request)
     raw = await get_purge_orphan_instruments_use_case(session).execute(limit=body.limit)
     return PurgeOrphansResponseDto(data=to_purge_orphans_result_dto(raw))
 
@@ -342,8 +348,11 @@ async def list_closed_simulated_accounts(
 @router.post("/database/closed-accounts/purge", response_model=PurgeClosedAccountsResponseDto)
 async def purge_closed_simulated_accounts(
     body: PurgeClosedAccountsRequestDto,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> PurgeClosedAccountsResponseDto:
+    # Mismo criterio que la copia bajo demanda: borrar cuentas cerradas es destructivo.
+    require_admin_when_auth_enabled(request)
     raw = await get_purge_closed_simulated_accounts_use_case(session).execute(limit=body.limit)
     skipped_raw = cast(list[object], raw.get("skipped") or [])
     skipped = [
