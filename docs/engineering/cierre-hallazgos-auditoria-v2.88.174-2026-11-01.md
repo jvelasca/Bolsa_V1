@@ -282,9 +282,29 @@ que la BD es exclusiva, no que el escenario se haya ejecutado en un entorno libr
   (árbol sin commitear) y con el stack **vivo** sobre el árbol sellado. Lo que ninguna de las dos certifica
   es la convivencia con el stack **sobre la BD compartida**: ahí la guarda seguirá diagnosticando y saltando
   (correctamente), y la certificación de release sigue siendo el job `a7-gate` del CI, con BD dedicada y
-  stack inexistente. El diff no toca `live_orders`, el recovery ni `execution_events`.
+  stack inexistente —límite **`L-175-1`**, permanente y fuera de alcance por decisión—. El diff no toca
+  `live_orders`, el recovery ni `execution_events`.
 * `N-1` no cambia `capabilities` (cobertura del proveedor): cambia lo que **hace** el interruptor y lo dice
   en la descripción y en la UI.
+
+### `L-175-1` — la convivencia sobre `bolsa_v1` compartida queda fuera de alcance **por decisión**
+
+Límite **permanente y nombrado**, aceptado en el
+[dictamen de aceptación del sello](./dictamen-tecnico-v2.88.175-beta-2026-11-01.md) (§4.1). No es una deuda
+pendiente de un sello futuro ni una medición que falte por hacer.
+
+* **Qué no está certificado.** `chaos/live_a7` conviviendo con el stack de desarrollo sobre la BD **compartida**
+  `bolsa_v1`. Ahí el `scheduler_worker` de `pnpm dev` drena la fila `UNKNOWN` sembrada
+  (`claim_unknown_batch` barre toda la tabla, sin filtro de cuenta) y la guarda diagnostica y **salta a
+  propósito**: un `12 passed, 7 skipped` en verde **no** es un pase.
+* **Por qué se excluye.** La única forma de certificarla sería ejecutar C3 **escribiendo** en la BD del entorno
+  de desarrollo, es decir, interferir con él para probar que no se interfiere. Eso cambia el riesgo en lugar de
+  reducirlo.
+* **Qué sustituye a esa certificación.** El job `a7-gate` del `Release tag CI`, con BD dedicada `bolsa_v1_a7`
+  (drop+create) y sin stack: mismo escenario, precondición verificada y skip convertido en `AssertionError`.
+* **Qué haría falta para abrirlo.** Un mecanismo de verificación **sin escrituras** sobre la BD compartida y una
+  **decisión explícita** con su propio alcance y su propio sello. **No** se abre con un test más ni con una
+  ejecución nocturna.
 
 ## Verificabilidad en el tag
 

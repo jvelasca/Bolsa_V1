@@ -36,7 +36,7 @@ está en [`../../cierre-hallazgos-auditoria-v2.88.174-2026-11-01.md`](../../cier
 | **La GitHub Release** | No se emite, mismo criterio que `.173` y `.174`. |
 | **Rentabilidad ni operativa** | Un sello de corrección no añade evidencia de resultados. AUTO **OFF**; PAPER **`INCONCLUSIVE`**. |
 | **Las suites completas sobre este árbol** | No se repitieron. Las cifras de `.174` (`4 582` / `1 454` / `2 677`) **no se heredan**: aquí solo se midieron los nodos tocados. |
-| **`chaos/live_a7` conviviendo con el stack sobre la BD compartida** | Ahí la guarda seguirá diagnosticando y saltando (correctamente). La certificación es el job `a7-gate`, con BD dedicada `bolsa_v1_a7` y sin stack. |
+| **`chaos/live_a7` conviviendo con el stack sobre la BD compartida** (`L-175-1`) | Ahí la guarda seguirá diagnosticando y saltando (correctamente). La certificación es el job `a7-gate`, con BD dedicada `bolsa_v1_a7` y sin stack. Límite **permanente y fuera de alcance por decisión** (ver el [`dictamen de aceptación`](../../dictamen-tecnico-v2.88.175-beta-2026-11-01.md) §4.1). |
 | **El E2E en la nube** | No se repitió E2E para este sello: el diff no toca flujo de UI nuevo (solo avisos de N-3 y descripciones de N-1). |
 
 ## 3. Ficheros del sello
@@ -77,7 +77,9 @@ Estado de las BD tras la pasada de `chaos/live_a7`: `bolsa_v1_a7` con `live_orde
 
 - El sello es el `Release tag CI` **del tag**: los gates de rama no lo sustituyen.
 - `chaos/live_a7` certifica C3 **aislado** contra BD dedicada; la convivencia con el stack sobre la BD
-  compartida queda diagnosticada y saltada a propósito, no certificada.
+  compartida queda diagnosticada y saltada a propósito, no certificada. Es el límite **`L-175-1`**:
+  **permanente y fuera de alcance por decisión**, no una medición pendiente (ver el
+  [`dictamen de aceptación`](../../dictamen-tecnico-v2.88.175-beta-2026-11-01.md) §4.1).
 - La guarda detecta un worker ajeno **si dejó un claim fresco** en la preflight; uno que arranque después no
   se intercepta (el escenario lo diagnosticaría por lease). Los puertos son contexto, no prueba.
 - No se re-miden E2E ni las suites completas sobre este árbol.
