@@ -13,6 +13,7 @@ import {
 } from "@/lib/workspace-payload";
 import {
   type WorkspaceSlice,
+  type WorkspaceState,
   DEFAULT_WORKSPACE,
   applyServerWorkspace,
   normalizeWorkspace,
@@ -27,9 +28,97 @@ import {
   applyLocalDrawToolSession,
   nextCopyName,
   workspaceBackupPatch,
+  workspacePayloadByteLength,
 } from "./workspace-store-core";
 
 let saveQueued = false;
+
+/** Backoff del autoguardado cuando el API no responde (p. ej. reiniciando). */
+const WORKSPACE_SAVE_RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000];
+/**
+ * Tope práctico del body de un `fetch` con `keepalive` (~64 KiB en Chromium).
+ * Por encima, el navegador rechaza la petición y el guardado se pierde; con un
+ * documento de 200+ pestañas (~600 KB) el flush al cerrar NUNCA llegaba.
+ */
+const WORKSPACE_KEEPALIVE_MAX_BYTES = 60_000;
+
+let saveRetryTimer: number | null = null;
+let saveRetryAttempt = 0;
+let conflictRetried = false;
+
+function resetSaveRetry(): void {
+  saveRetryAttempt = 0;
+  conflictRetried = false;
+  if (saveRetryTimer !== null && typeof window !== "undefined") {
+    window.clearTimeout(saveRetryTimer);
+  }
+  saveRetryTimer = null;
+}
+
+/** Programa un reintento del guardado; devuelve `false` solo sin ventana (SSR). */
+function scheduleWorkspaceSaveRetry(get: () => WorkspaceState): boolean {
+  if (typeof window === "undefined") return false;
+  if (saveRetryTimer !== null) return true;
+  const delay =
+    WORKSPACE_SAVE_RETRY_DELAYS_MS[
+      Math.min(saveRetryAttempt, WORKSPACE_SAVE_RETRY_DELAYS_MS.length - 1)
+    ] ?? 30_000;
+  saveRetryAttempt += 1;
+  saveRetryTimer = window.setTimeout(() => {
+    saveRetryTimer = null;
+    const state = get();
+    if (
+      !state.hydrated ||
+      !state.isDirty ||
+      !state.workspace.preferences.autoSave
+    ) {
+      return;
+    }
+    void state.saveToServer();
+  }, delay);
+  return true;
+}
+
+function workspacePayloadBytes(body: unknown): number {
+  return workspacePayloadByteLength(body);
+}
+
+/**
+ * 409: otro cliente guardó antes. Relee, refusiona (el documento más reciente
+ * manda para la membresía de pestañas) y deja `serverUpdatedAt` al día para que
+ * el reintento pase la comprobación. Devuelve `false` si no se pudo releer.
+ */
+async function resolveWorkspaceConflict(
+  get: () => WorkspaceState,
+  set: (partial: Partial<WorkspaceState>) => void,
+): Promise<boolean> {
+  const id = get().activeWorkspaceId;
+  if (!id) return false;
+  try {
+    const detail = await api.getWorkspace(id);
+    const serverBase = normalizeWorkspace(detail.data.document);
+    serverBase.id = detail.data.id;
+    serverBase.name = detail.data.name;
+    const local = get().workspace;
+    const merged = mergeWorkspaceChartState(local, serverBase);
+    merged.id = local.id;
+    merged.name = local.name;
+    if (
+      local.activeChartId &&
+      merged.charts.some((tab) => tab.id === local.activeChartId)
+    ) {
+      merged.activeChartId = local.activeChartId;
+    }
+    set({
+      workspace: merged,
+      chartPersistBackup: chartPersistBackupFrom(merged),
+      serverUpdatedAt: detail.data.updatedAt ?? null,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export const accountSlice: WorkspaceSlice = (get, set) => ({
   getActiveChartTab: () => {
@@ -150,12 +239,12 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
     set({ workspaceSummaries: list.data });
   },
   saveToServer: async () => {
-    if (!get().hydrated) return;
+    if (!get().hydrated) return false;
     const id = get().activeWorkspaceId;
-    if (!id) return;
+    if (!id) return false;
     if (get().isSaving) {
       saveQueued = true;
-      return;
+      return false;
     }
 
     set({ isSaving: true });
@@ -170,10 +259,21 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
       // No sustituir `workspace` aquí: un set intermedio + await permite que un
       // sync/merge deje menos pestañas al volver. Solo enviamos `prepared`.
       const payload = buildWorkspacePayload(prepared);
+      // Cierres ya cubiertos por este PUT (los que ocurran durante el await no).
+      const closedCoveredBySave = new Set(
+        get().pendingClosedChartInstrumentIds ?? [],
+      );
+      // Identidad del workspace antes del await: cualquier mutación del store crea
+      // un objeto nuevo, así se detecta también lo que NO cambia la membresía
+      // (indicadores, dibujos, orden de pestañas) y no se marca como guardado.
+      const workspaceBeforeSave = get().workspace;
       const response = await api.updateWorkspace(id, {
         name: prepared.name,
         document: payload.document,
         dockLayout: payload.dockLayout,
+        // Concurrencia optimista: si el servidor cambió por otra pestaña o
+        // dispositivo desde nuestra última lectura, responde 409.
+        expectedUpdatedAt: get().serverUpdatedAt,
       });
       const live = get().workspace;
       // Autoridad post-PUT = pestañas vivas ahora. No reinyectar `prepared`
@@ -181,29 +281,59 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
       const preparedInstr = new Set(
         prepared.charts.map((c) => c.instrumentId).filter(Boolean),
       );
-      const openedDuringSave = live.charts.some(
-        (tab) => tab.instrumentId && !preparedInstr.has(tab.instrumentId),
+      const liveInstr = new Set(
+        live.charts.map((c) => c.instrumentId).filter(Boolean),
       );
+      // Cambió la membresía (abrir O cerrar) durante el PUT → queda dirty.
+      const membershipChanged =
+        preparedInstr.size !== liveInstr.size ||
+        [...preparedInstr].some((instrumentId) => !liveInstr.has(instrumentId));
+      // Cualquier otra mutación del documento durante el await (tiempo, indicadores,
+      // dibujos, orden, pestaña activa) también deja cambios sin persistir.
+      const contentChanged = live !== workspaceBeforeSave;
+      const stillPending = membershipChanged || contentChanged;
       const nextWorkspace = {
         ...live,
         name: response.data.name,
         updatedAt: response.data.updatedAt ?? live.updatedAt,
       };
+      resetSaveRetry();
       set({
         workspace: nextWorkspace,
         chartPersistBackup: chartPersistBackupFrom(nextWorkspace),
         activeWorkspaceId: response.data.id,
-        isDirty: openedDuringSave,
+        serverUpdatedAt: response.data.updatedAt ?? get().serverUpdatedAt,
+        pendingClosedChartInstrumentIds: (
+          get().pendingClosedChartInstrumentIds ?? []
+        ).filter((instrumentId) => !closedCoveredBySave.has(instrumentId)),
+        isDirty: stillPending,
         isSaving: false,
       });
-      if (openedDuringSave) saveQueued = true;
+      if (stillPending) saveQueued = true;
       await get().refreshSummaries();
+      return true;
     } catch (err) {
       set({ isSaving: false });
-      if (err instanceof ApiError) {
-        window.alert(`No se pudo guardar: ${err.message}`);
+      if (err instanceof ApiError && err.status === 409 && !conflictRetried) {
+        // Otra pestaña/dispositivo guardó antes: refusionar y reintentar una vez.
+        conflictRetried = true;
+        const resolved = await resolveWorkspaceConflict(get, set);
+        if (resolved) {
+          const retried = await get().saveToServer();
+          if (retried) return true;
+        }
+        scheduleWorkspaceSaveRetry(get);
+        return false;
       }
-      throw err;
+      // 4xx (salvo el 409 ya resuelto arriba) no se arregla reintentando.
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500) {
+        window.alert(`No se pudo guardar: ${err.message}`);
+        return false;
+      }
+      // Fallo de red o del servidor (p. ej. API reiniciándose): NO perder los
+      // cambios — reintentar con backoff mientras siga dirty y autoSave.
+      scheduleWorkspaceSaveRetry(get);
+      return false;
     } finally {
       if (saveQueued) {
         saveQueued = false;
@@ -221,11 +351,38 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
     const backup = chartPersistBackupFrom(prepared);
     writeChartPersistBackupSync(state.activeWorkspaceId, state.recents, backup);
     const payload = buildWorkspacePayload(prepared);
-    api.updateWorkspaceKeepalive(state.activeWorkspaceId, {
+    // La poda de pestañas viaja en un body mínimo (solo ids): es lo que de verdad
+    // se pierde al cerrar el navegador y cabe de sobra en `keepalive`.
+    const pendingClosed = state.pendingClosedChartInstrumentIds ?? [];
+    if (pendingClosed.length > 0) {
+      api.closeWorkspaceCharts(
+        state.activeWorkspaceId,
+        {
+          instrumentIds: pendingClosed,
+          activeChartId: prepared.activeChartId,
+          expectedUpdatedAt: state.serverUpdatedAt,
+        },
+        { keepalive: true },
+      );
+      // NO se reenvía además el documento completo: si esa escritura gana la
+      // carrera, vuelve a meter las pestañas que este mismo cierre está podando.
+      return;
+    }
+    const body = {
       name: prepared.name,
       document: payload.document,
       dockLayout: payload.dockLayout,
-    });
+      // Sin la revisión, el PUT de despedida pisaba cualquier guardado más reciente
+      // de otra pestaña/dispositivo (la comprobación optimista se quedaba sin base).
+      expectedUpdatedAt: state.serverUpdatedAt,
+    };
+    // Un documento con 200+ pestañas (~600 KB) supera el tope de `keepalive`
+    // (~64 KiB): el navegador lo rechaza en silencio. Mejor no enviarlo y
+    // conservar el último guardado que perder la petición entera. El tope se mide
+    // en BYTES UTF-8, no en unidades de `String#length`.
+    if (workspacePayloadBytes(body) <= WORKSPACE_KEEPALIVE_MAX_BYTES) {
+      api.updateWorkspaceKeepalive(state.activeWorkspaceId, body);
+    }
   },
   syncWorkspaceFromServer: async () => {
     const id = get().activeWorkspaceId;
@@ -259,6 +416,7 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
       set({
         workspace: merged,
         chartPersistBackup: chartPersistBackupFrom(merged),
+        serverUpdatedAt: detail.data.updatedAt ?? null,
       });
     } catch {
       // Sin conexión o sesión — ignorar
@@ -362,6 +520,7 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
           name: response.data.name,
           updatedAt: response.data.updatedAt ?? state.workspace.updatedAt,
         },
+        serverUpdatedAt: response.data.updatedAt ?? state.serverUpdatedAt,
       }));
     }
     await get().refreshSummaries();
@@ -458,7 +617,7 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
   setPreferred: async (enabled) => {
     const id = get().activeWorkspaceId;
     if (!id) return;
-    await api.updateWorkspace(id, { isDefault: enabled });
+    const response = await api.updateWorkspace(id, { isDefault: enabled });
     // Solo el flag de arranque: no tocamos `isDirty` para no ocultar cambios
     // reales del documento que siguen sin guardar.
     set((state) => ({
@@ -466,6 +625,8 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
         ...state.workspace,
         preferences: { ...state.workspace.preferences, openOnStartup: enabled },
       },
+      // El PUT movió `updated_at`: sin esto el siguiente guardado daría 409.
+      serverUpdatedAt: response.data.updatedAt ?? state.serverUpdatedAt,
     }));
     await get().refreshSummaries();
   },

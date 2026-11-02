@@ -3999,6 +3999,47 @@
         "title": "CloseSessionOutcomeRequest",
         "type": "object"
       },
+      "CloseWorkspaceChartsRequestDto": {
+        "description": "Cierre compacto de pestañas (Visualizados) sin reenviar el documento.",
+        "properties": {
+          "activeChartId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activechartid"
+          },
+          "expectedUpdatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedupdatedat"
+          },
+          "instrumentIds": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Instrumentids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "instrumentIds"
+        ],
+        "title": "CloseWorkspaceChartsRequestDto",
+        "type": "object"
+      },
       "ClosedSimulatedAccountDto": {
         "properties": {
           "currency": {
@@ -13099,6 +13140,7 @@
         "type": "object"
       },
       "InstrumentQuotesRequestDto": {
+        "description": "Batch de cotizaciones por id (máx. 200 — el cliente trocea).",
         "properties": {
           "ids": {
             "items": {
@@ -20400,6 +20442,7 @@
         "type": "object"
       },
       "QueryInstrumentDailyOpinionsDto": {
+        "description": "Dictámenes diarios por lote (máx. 200 — el cliente trocea).",
         "properties": {
           "accountId": {
             "anyOf": [
@@ -24818,6 +24861,17 @@
               }
             ],
             "title": "Document"
+          },
+          "expectedUpdatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedupdatedat"
           },
           "isDefault": {
             "anyOf": [
@@ -39408,6 +39462,59 @@
           }
         },
         "summary": "Update Workspace",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/api/workspaces/{workspace_id}/charts/close": {
+      "post": {
+        "description": "Cierra pestañas sin reenviar el documento (Visualizados + snapshots).",
+        "operationId": "close_workspace_charts_api_workspaces__workspace_id__charts_close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseWorkspaceChartsRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Workspace Charts",
         "tags": [
           "workspaces"
         ]

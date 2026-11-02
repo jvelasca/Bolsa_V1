@@ -22,6 +22,18 @@ import {
   scheduleWorkspaceSettingsPersist,
 } from "./workspace-store-core";
 
+/** Acumula instrumentos cerrados para el flush compacto al cerrar el navegador. */
+function withPendingClosed(
+  previous: string[] | undefined,
+  instrumentIds: ReadonlyArray<string | null | undefined>,
+): string[] {
+  const ids = instrumentIds.filter((instrumentId): instrumentId is string =>
+    Boolean(instrumentId),
+  );
+  if (ids.length === 0) return previous ?? [];
+  return [...new Set([...(previous ?? []), ...ids])];
+}
+
 export const chartsSlice: WorkspaceSlice = (get, set) => ({
   openChartTab: (instrumentId, label) => {
     const existing = get().workspace.charts.find(
@@ -211,6 +223,10 @@ export const chartsSlice: WorkspaceSlice = (get, set) => ({
       );
       return {
         workspace: syncSnapshotsFromCharts(next),
+        pendingClosedChartInstrumentIds: withPendingClosed(
+          state.pendingClosedChartInstrumentIds,
+          [closingTab?.instrumentId],
+        ),
         isDirty: true,
       };
     });
@@ -272,6 +288,10 @@ export const chartsSlice: WorkspaceSlice = (get, set) => ({
       );
       return {
         workspace: syncSnapshotsFromCharts(next),
+        pendingClosedChartInstrumentIds: withPendingClosed(
+          state.pendingClosedChartInstrumentIds,
+          closingTabs.map((tab) => tab.instrumentId),
+        ),
         isDirty: true,
       };
     });

@@ -4504,6 +4504,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workspaces/{workspace_id}/charts/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Workspace Charts
+         * @description Cierra pestañas sin reenviar el documento (Visualizados + snapshots).
+         */
+        post: operations["close_workspace_charts_api_workspaces__workspace_id__charts_close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5825,6 +5845,18 @@ export interface components {
             returnPct?: number | null;
             /** Verdict */
             verdict?: ("hit" | "miss" | "neutral" | "invalid" | "skipped") | null;
+        };
+        /**
+         * CloseWorkspaceChartsRequestDto
+         * @description Cierre compacto de pestañas (Visualizados) sin reenviar el documento.
+         */
+        CloseWorkspaceChartsRequestDto: {
+            /** Activechartid */
+            activeChartId?: string | null;
+            /** Expectedupdatedat */
+            expectedUpdatedAt?: string | null;
+            /** Instrumentids */
+            instrumentIds: string[];
         };
         /** ClosedSimulatedAccountDto */
         ClosedSimulatedAccountDto: {
@@ -9097,7 +9129,10 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
-        /** InstrumentQuotesRequestDto */
+        /**
+         * InstrumentQuotesRequestDto
+         * @description Batch de cotizaciones por id (máx. 200 — el cliente trocea).
+         */
         InstrumentQuotesRequestDto: {
             /** Ids */
             ids: string[];
@@ -11439,7 +11474,10 @@ export interface components {
              */
             regime: string;
         };
-        /** QueryInstrumentDailyOpinionsDto */
+        /**
+         * QueryInstrumentDailyOpinionsDto
+         * @description Dictámenes diarios por lote (máx. 200 — el cliente trocea).
+         */
         QueryInstrumentDailyOpinionsDto: {
             /** Accountid */
             accountId?: string | null;
@@ -12866,6 +12904,8 @@ export interface components {
             document?: {
                 [key: string]: unknown;
             } | null;
+            /** Expectedupdatedat */
+            expectedUpdatedAt?: string | null;
             /** Isdefault */
             isDefault?: boolean | null;
             /** Name */
@@ -22133,6 +22173,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_workspace_charts_api_workspaces__workspace_id__charts_close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseWorkspaceChartsRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceResponseDto"];
+                };
             };
             /** @description Validation Error */
             422: {

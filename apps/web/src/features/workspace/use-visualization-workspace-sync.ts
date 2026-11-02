@@ -4,10 +4,27 @@ import { reconcileVisualizadosToOpenCharts } from "@/features/trading/lists-tab/
 import { useVisualizationStore } from "@/stores/visualization-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
+/** Mismos instrumentos (orden incluido): la lista es espejo 1:1 de pestañas. */
+function sameInstrumentIds(
+  a: ReadonlyArray<{ instrumentId: string }> | undefined,
+  b: ReadonlyArray<{ instrumentId: string }> | undefined,
+): boolean {
+  const left = a ?? [];
+  const right = b ?? [];
+  if (left.length !== right.length) return false;
+  return left.every(
+    (entry, index) => entry.instrumentId === right[index]?.instrumentId,
+  );
+}
+
 /**
  * Persiste Visualizados (= pestañas abiertas) en el workspace.
  * No restaura el dump legacy `visualizationEntries` (pudo ser el Estudio de 100+).
  * SoT al cargar: charts abiertos → reconcile.
+ *
+ * La reconciliación de arranque NO reescribe el workspace si el conjunto ya
+ * coincide: antes marcaba dirty y guardaba en cada carga, y ese guardado
+ * reinyectaba las pestañas que el usuario acababa de cerrar.
  */
 export function useVisualizationWorkspaceSync() {
   const hydrated = useWorkspaceStore((state) => state.hydrated);
@@ -30,9 +47,13 @@ export function useVisualizationWorkspaceSync() {
     skipPersistRef.current = true;
     // Ignora dump legacy; alinea a pestañas abiertas del workspace ya hidratado.
     reconcileVisualizadosToOpenCharts();
-    // Fuerza persistir el conjunto podado (evita reinyectar Estudio 100+ en merge).
     const pruned = useVisualizationStore.getState().entries;
-    updateListConfig({ visualizationEntries: pruned });
+    const persisted =
+      useWorkspaceStore.getState().workspace.list.visualizationEntries;
+    if (!sameInstrumentIds(pruned, persisted)) {
+      // Solo si de verdad cambió: persistir el conjunto podado.
+      updateListConfig({ visualizationEntries: pruned });
+    }
     queueMicrotask(() => {
       skipPersistRef.current = false;
     });

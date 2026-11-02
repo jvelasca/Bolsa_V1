@@ -342,6 +342,10 @@ jobs:
         # ``price_script`` ni decider fake) también va en ``--ignore`` aquí y se certifica en
         # ``auto-v2-durable-pg`` en un paso PROPIO con ``AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED=1``
         # y guarda anti-skip: sin PG skipearía en mudo y aparentaría certificar la ruta real.
+        # Persistencia del workspace (auditoría 2026-11-02): ``test_workspace_persistence.py``
+        # ejercita concurrencia optimista y cierre compacto contra PostgreSQL REAL y no lleva
+        # guarda de skip (sin PG falla: es lo correcto). Va en ``--ignore`` aquí —no hay PG en
+        # este job— y se certifica por COMMIT en ``lifecycle-pg`` con gate propio.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -424,6 +428,7 @@ jobs:
           --ignore=apps/api-python/tests/integration
           --ignore=apps/api-python/tests/test_lists.py
           --ignore=apps/api-python/tests/test_workspaces.py
+          --ignore=apps/api-python/tests/test_workspace_persistence.py
           --ignore=apps/api-python/tests/test_health.py
           --ignore=apps/api-python/tests/test_auth.py
           --ignore=apps/api-python/tests/test_account_isolation.py
@@ -599,6 +604,17 @@ jobs:
           packages/py/application/tests/test_sim_strategy_attribution.py
           packages/py/infrastructure/tests/test_schema_contract.py
           packages/py/infrastructure/tests/test_062_sync_settings_check_pg.py
+          -q
+          --tb=short
+
+      - name: Pytest persistencia del workspace PG
+        # Auditoría 2026-11-02: concurrencia optimista (dos PUT con la misma revisión →
+        # exactamente uno gana), 409/400 de revisión, cierre compacto de pestañas y
+        # relectura tras reiniciar la app. Exige esquema migrado (paso anterior) y
+        # PostgreSQL real: el fichero va en ``--ignore`` del job ``quality``.
+        run: >
+          uv run pytest
+          apps/api-python/tests/test_workspace_persistence.py
           -q
           --tb=short
 

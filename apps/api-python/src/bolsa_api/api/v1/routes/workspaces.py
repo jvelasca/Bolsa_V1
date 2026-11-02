@@ -15,6 +15,7 @@ from bolsa_api.api.dependencies import get_db_session, get_workspace_repository
 from bolsa_api.auth.principal import account_visible_to_principal
 from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_api.schemas.workspaces import (
+    CloseWorkspaceChartsRequestDto,
     CreateWorkspaceRequestDto,
     UpdateWorkspaceRequestDto,
     WorkspaceDetailDto,
@@ -23,6 +24,7 @@ from bolsa_api.schemas.workspaces import (
     WorkspaceSummaryDto,
 )
 from bolsa_application.workspaces import (
+    CloseWorkspaceCharts,
     CreateWorkspace,
     DeleteWorkspace,
     GetDefaultWorkspace,
@@ -31,8 +33,10 @@ from bolsa_application.workspaces import (
     UpdateWorkspace,
 )
 from bolsa_infrastructure.database.repositories.workspace_repository import (
+    WorkspaceInvalidRevision,
     WorkspaceRecord,
     WorkspaceSummary,
+    WorkspaceVersionConflict,
 )
 
 router = APIRouter()
@@ -68,6 +72,29 @@ def _require_workspace_access(
     if record is None or not account_visible_to_principal(record.user_id, principal):
         raise HTTPException(status_code=404, detail="Workspace not found")
     return record
+
+
+def _conflict(exc: WorkspaceVersionConflict) -> HTTPException:
+    """409 con la revisión vigente para que el cliente refusione y reintente."""
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": "workspace_conflict",
+            "message": "Workspace was modified by another client",
+            "currentUpdatedAt": exc.current_updated_at,
+        },
+    )
+
+
+def _invalid_revision(exc: WorkspaceInvalidRevision) -> HTTPException:
+    """400: una revisión ilegible no puede desactivar la concurrencia optimista."""
+    return HTTPException(
+        status_code=400,
+        detail={
+            "code": "workspace_invalid_revision",
+            "message": str(exc),
+        },
+    )
 
 
 def _to_summary_dto(item: WorkspaceSummary) -> WorkspaceSummaryDto:
@@ -174,7 +201,44 @@ async def update_workspace(
             document=body.document,
             dock_layout=body.dock_layout,
             is_default=body.is_default,
+            expected_updated_at=body.expected_updated_at,
         )
+    except WorkspaceVersionConflict as exc:
+        raise _conflict(exc) from exc
+    except WorkspaceInvalidRevision as exc:
+        raise _invalid_revision(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return WorkspaceResponseDto(data=_to_detail_dto(updated))
+
+
+@router.post(
+    "/workspaces/{workspace_id}/charts/close",
+    response_model=WorkspaceResponseDto,
+)
+async def close_workspace_charts(
+    workspace_id: str,
+    body: CloseWorkspaceChartsRequestDto,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> WorkspaceResponseDto:
+    """Cierra pestañas sin reenviar el documento (Visualizados + snapshots)."""
+    principal = get_request_principal(request)
+    repo = get_workspace_repository(session)
+    existing = await GetWorkspace(repo).execute(workspace_id)
+    _require_workspace_access(existing, principal)
+    try:
+        updated = await CloseWorkspaceCharts(repo).execute(
+            workspace_id,
+            owner_user_id=principal,
+            instrument_ids=body.instrument_ids,
+            active_chart_id=body.active_chart_id,
+            expected_updated_at=body.expected_updated_at,
+        )
+    except WorkspaceVersionConflict as exc:
+        raise _conflict(exc) from exc
+    except WorkspaceInvalidRevision as exc:
+        raise _invalid_revision(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return WorkspaceResponseDto(data=_to_detail_dto(updated))

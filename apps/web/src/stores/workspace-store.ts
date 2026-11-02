@@ -47,6 +47,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         hydrated: false,
         isDirty: false,
         isSaving: false,
+        serverUpdatedAt: null,
+        pendingClosedChartInstrumentIds: [],
         recents: [],
         loadError: null,
       };

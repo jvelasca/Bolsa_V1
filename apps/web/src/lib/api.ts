@@ -2887,6 +2887,8 @@ export const api = {
       document?: import("@bolsa/shared").WorkspaceDocument;
       dockLayout?: import("@bolsa/shared").TradingDockLayoutPrefs;
       isDefault?: boolean;
+      /** Concurrencia optimista: `updated_at` del servidor que vimos por última vez. */
+      expectedUpdatedAt?: string | null;
     },
   ) =>
     call<{ data: WorkspaceDetailApi }>(() =>
@@ -2895,6 +2897,38 @@ export const api = {
         body: apiBody(body),
       }),
     ),
+
+  /**
+   * Cierra pestañas en el servidor con un body mínimo (solo instrument ids).
+   * Es el camino fiable al salir: el documento completo (~600 KB con 200+
+   * pestañas) no cabe en un `fetch` con `keepalive`.
+   */
+  closeWorkspaceCharts: (
+    id: string,
+    body: {
+      instrumentIds: string[];
+      activeChartId?: string | null;
+      expectedUpdatedAt?: string | null;
+    },
+    options?: { keepalive?: boolean },
+  ): Promise<{ data: WorkspaceDetailApi }> | void => {
+    if (options?.keepalive) {
+      void fetch(`${API_URL}/api/workspaces/${id}/charts/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+        keepalive: true,
+      });
+      return;
+    }
+    return call<{ data: WorkspaceDetailApi }>(() =>
+      client.POST("/api/workspaces/{workspace_id}/charts/close", {
+        params: { path: { workspace_id: id } },
+        body: apiBody(body),
+      }),
+    );
+  },
 
   deleteWorkspace: (id: string) =>
     call<void>(() =>
@@ -2911,6 +2945,8 @@ export const api = {
       document?: import("@bolsa/shared").WorkspaceDocument;
       dockLayout?: import("@bolsa/shared").TradingDockLayoutPrefs;
       isDefault?: boolean;
+      /** Revisión leída: el PUT de despedida también pasa por la comprobación optimista. */
+      expectedUpdatedAt?: string | null;
     },
   ) => {
     void fetch(`${API_URL}/api/workspaces/${id}`, {

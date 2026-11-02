@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_infrastructure.database.models import WorkspaceRow
@@ -56,6 +57,50 @@ def _to_record(row: WorkspaceRow) -> WorkspaceRecord:
         created_at=row.created_at.isoformat(),
         updated_at=row.updated_at.isoformat(),
     )
+
+
+class WorkspaceVersionConflict(Exception):
+    """El documento cambió en el servidor desde la revisión que envió el cliente."""
+
+    def __init__(self, current_updated_at: str) -> None:
+        super().__init__("Workspace was modified by another client")
+        self.current_updated_at = current_updated_at
+
+
+class WorkspaceInvalidRevision(ValueError):
+    """La revisión enviada no es un ISO-8601 válido.
+
+    Antes se degradaba a `None`, lo que **desactivaba** la comprobación optimista
+    (fail-open): un cliente con una revisión corrupta pisaba cualquier guardado.
+    """
+
+    def __init__(self, value: str) -> None:
+        super().__init__(f"Invalid workspace revision: {value!r}")
+        self.value = value
+
+
+def parse_timestamp(value: str | None) -> datetime | None:
+    """Parsea ISO-8601 tolerando ``Z`` y offsets (el cliente manda ``toISOString``).
+
+    ``None``/vacío significa "sin comprobación"; un valor presente pero ilegible
+    lanza ``WorkspaceInvalidRevision`` en vez de desactivar la comprobación.
+    """
+    if not value:
+        return None
+    normalized = value.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise WorkspaceInvalidRevision(value) from exc
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+#: Nombre histórico (el módulo era privado). Se conserva por compatibilidad.
+_parse_timestamp = parse_timestamp
 
 
 class SqlAlchemyWorkspaceRepository:
@@ -135,6 +180,7 @@ class SqlAlchemyWorkspaceRepository:
         document: dict[str, Any] | None = None,
         dock_layout: dict[str, Any] | None = None,
         is_default: bool | None = None,
+        expected_updated_at: str | None = None,
     ) -> WorkspaceRecord | None:
         stmt = select(WorkspaceRow).where(WorkspaceRow.id == workspace_id)
         result = await self._session.execute(stmt)
@@ -142,18 +188,52 @@ class SqlAlchemyWorkspaceRepository:
         if row is None:
             return None
 
+        # Concurrencia optimista: si el cliente leyó una revisión anterior a la
+        # actual, no se escribe (409). Evita que un documento viejo con pestañas
+        # ya cerradas pise el guardado bueno de otra pestaña/dispositivo.
+        expected_at = parse_timestamp(expected_updated_at)
+
+        values: dict[str, Any] = {}
         if name is not None:
-            row.name = name.strip()
+            values["name"] = name.strip()
         if document is not None:
-            row.document = document
+            values["document"] = document
         if dock_layout is not None:
-            row.dock_layout = dock_layout
+            values["dock_layout"] = dock_layout
         if is_default is not None:
             if is_default:
                 await self._clear_default_flag(owner_user_id=owner_user_id, exclude_id=workspace_id)
-            row.is_default = is_default
-        row.updated_at = datetime.now(UTC)
+            values["is_default"] = is_default
+        values["updated_at"] = datetime.now(UTC)
+
+        if expected_at is None:
+            for key, value in values.items():
+                setattr(row, key, value)
+            await self._session.flush()
+            return _to_record(row)
+
+        # La comprobación y la escritura son UNA sola sentencia: comparar en Python
+        # entre SELECT y UPDATE dejaba una ventana en la que dos clientes con la
+        # misma revisión pasaban ambos y el último pisaba al primero sin 409.
+        conditional = (
+            update(WorkspaceRow)
+            .where(WorkspaceRow.id == workspace_id)
+            .where(WorkspaceRow.updated_at == expected_at)
+            .values(**values)
+            .execution_options(synchronize_session=False)
+        )
+        written = cast(
+            CursorResult[Any], await self._session.execute(conditional)
+        )
+        if written.rowcount == 0:
+            current_at = await self._session.scalar(
+                select(WorkspaceRow.updated_at).where(WorkspaceRow.id == workspace_id)
+            )
+            if current_at is None:
+                return None
+            raise WorkspaceVersionConflict(_as_utc(current_at).isoformat())
         await self._session.flush()
+        await self._session.refresh(row)
         return _to_record(row)
 
     async def delete(self, workspace_id: str, *, owner_user_id: str) -> bool:
