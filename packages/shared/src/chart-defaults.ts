@@ -150,8 +150,9 @@ export interface ListPanelConfig {
   favoriteColumnIdsByListId?: Record<string, ListColumnId[]>;
 }
 
-export const DEFAULT_LIST_ROW_ACTIONS_WIDTH = 72;
-export const MIN_LIST_ROW_ACTIONS_WIDTH = 56;
+export const DEFAULT_LIST_ROW_ACTIONS_WIDTH = 84;
+/** 3 iconos de 24 px + padding + borde = 75 px: el mínimo debe caber sin recortar. */
+export const MIN_LIST_ROW_ACTIONS_WIDTH = 78;
 export const MAX_LIST_ROW_ACTIONS_WIDTH = 112;
 
 export function clampListRowActionsWidth(width: number): number {
@@ -235,6 +236,11 @@ export interface WorkspaceDocument {
   updatedAt: string;
   layout: {
     listPanelOpen: boolean;
+    /**
+     * @deprecated El ancho real del panel vive en `bolsa-trading-layout-v1`
+     * (`listsWidthPct`, por dispositivo). Aquí solo se guarda como semilla para
+     * la primera visita. @see docs/WORKSPACE_PERSISTENCE.md
+     */
     listPanelSizePct: number;
     rightPanelOpen: boolean;
     rightPanelSizePct: number;

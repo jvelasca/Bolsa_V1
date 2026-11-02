@@ -18,6 +18,8 @@ import {
 } from "@/features/command-palette/named-layout";
 
 const DEFAULT_LISTS_WIDTH_PCT = 26;
+/** Clave de persistencia local; también marca si ya hay preferencia de ancho. */
+const TRADING_LAYOUT_STORAGE_KEY = "bolsa-trading-layout-v1";
 const DEFAULT_OPERATIONS_HEIGHT_PCT = 22;
 /** V2.41 — DECISIÓN floor ~28% so tablet ≥ ~280px (was ~215 @1024). */
 const DEFAULT_OPERATIVA_WIDTH_PCT = 28;
@@ -288,7 +290,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
       },
     }),
     {
-      name: "bolsa-trading-layout-v1",
+      name: TRADING_LAYOUT_STORAGE_KEY,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<TradingLayoutState>;
         const namedLayoutId =
@@ -342,4 +344,19 @@ export function getDockLayoutPrefs(): TradingDockLayoutPrefs {
     listsWidthPct: s.listsWidthPct,
     operationsHeightPct: s.operationsHeightPct,
   };
+}
+
+/**
+ * Siembra el ancho del panel listas desde el workspace (legado `listPanelSizePct`)
+ * solo en la primera visita: si ya hay preferencia local, manda el store.
+ * No toca `namedLayoutId` (no es un ajuste manual del usuario).
+ */
+export function seedListsWidthPctFromLegacy(pct: number | undefined): void {
+  if (pct == null || !Number.isFinite(pct)) return;
+  if (typeof window === "undefined") return;
+  if (window.localStorage.getItem(TRADING_LAYOUT_STORAGE_KEY)) return;
+  const current = useTradingLayoutStore.getState().listsWidthPct;
+  const next = clamp(pct, MIN_LISTS_WIDTH_PCT, MAX_LISTS_WIDTH_PCT);
+  if (next === current) return;
+  useTradingLayoutStore.setState({ listsWidthPct: next });
 }

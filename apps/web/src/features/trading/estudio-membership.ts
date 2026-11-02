@@ -6,6 +6,7 @@
 import type { InstrumentWithMetaDto } from "@bolsa/shared";
 import { ESTUDIO_LIST_ID } from "@bolsa/shared";
 import { api } from "@/lib/api";
+import { fetchInstrumentQuotesChunked } from "@/lib/chunked-quotes";
 import {
   useEstudioMembershipStore,
   type EstudioMemberEntry,
@@ -39,9 +40,9 @@ export async function hydrateEstudioMembershipFromApi(): Promise<void> {
   let quotesById = new Map<string, { symbol: string; name: string }>();
   if (apiIds.length > 0) {
     try {
-      const quotes = await api.getInstrumentQuotes(apiIds);
+      const quotes = await fetchInstrumentQuotesChunked(apiIds);
       quotesById = new Map(
-        quotes.data.map((q) => [q.id, { symbol: q.symbol, name: q.name }]),
+        quotes.map((q) => [q.id, { symbol: q.symbol, name: q.name }]),
       );
     } catch {
       // stubs below

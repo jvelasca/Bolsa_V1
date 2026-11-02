@@ -1,7 +1,5 @@
 import {
-  MAX_LIST_PANEL_SIZE_PCT,
   MAX_RIGHT_PANEL_SIZE_PCT,
-  MIN_LIST_PANEL_SIZE_PCT,
   MIN_RIGHT_PANEL_SIZE_PCT,
   DEFAULT_LIST_PANEL_SIZE_PCT,
   DEFAULT_RIGHT_PANEL_SIZE_PCT,
@@ -29,21 +27,6 @@ export const layoutSlice: WorkspaceSlice = (get, set) => ({
       },
       isDirty: true,
     })),
-  setListPanelSizePct: (pct) => {
-    const clamped = Math.min(
-      MAX_LIST_PANEL_SIZE_PCT,
-      Math.max(MIN_LIST_PANEL_SIZE_PCT, Math.round(pct)),
-    );
-    set((state) => ({
-      workspace: {
-        ...state.workspace,
-        layout: { ...state.workspace.layout, listPanelSizePct: clamped },
-        updatedAt: new Date().toISOString(),
-      },
-      isDirty: !state.workspace.preferences.autoSave,
-    }));
-    if (get().workspace.preferences.autoSave) scheduleWorkspaceServerSave(get);
-  },
   setRightPanelOpen: (open) =>
     set((state) => ({
       workspace: {

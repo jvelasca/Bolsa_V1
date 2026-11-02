@@ -346,6 +346,8 @@ export async function seedMercadoBrowserState(
     workspaceDocument?: ReturnType<typeof mercadoWorkspaceDocument>;
     operativaOpen?: boolean;
     chartsOpen?: boolean;
+    /** Ancho del panel Listas en % (18 / 26 / 45 para probar paneles estrechos). */
+    listsWidthPct?: number;
   },
 ): Promise<void> {
   const accountId = opts?.accountId ?? E2E_ACCOUNT_ID;
@@ -355,6 +357,7 @@ export async function seedMercadoBrowserState(
   const chartPersistBackup = chartPersistBackupFromWorkspace(workspaceDocument);
   const operativaOpen = opts?.operativaOpen ?? true;
   const chartsOpen = opts?.chartsOpen ?? true;
+  const listsWidthPct = opts?.listsWidthPct ?? 26;
 
   await page.addInitScript(
     ({
@@ -363,6 +366,7 @@ export async function seedMercadoBrowserState(
       chartPersistBackup,
       operativaOpen,
       chartsOpen,
+      listsWidthPct,
     }) => {
       const zustand = (key: string, partial: Record<string, unknown>) => {
         localStorage.setItem(
@@ -379,7 +383,7 @@ export async function seedMercadoBrowserState(
         listsMaximized: false,
         chartsMaximized: false,
         operationsMaximized: false,
-        listsWidthPct: 26,
+        listsWidthPct,
         operationsHeightPct: 22,
         operativaWidthPct: 28,
         operativaSections: {
@@ -410,6 +414,13 @@ export async function seedMercadoBrowserState(
         }),
       );
     },
-    { accountId, workspaceId, chartPersistBackup, operativaOpen, chartsOpen },
+    {
+      accountId,
+      workspaceId,
+      chartPersistBackup,
+      operativaOpen,
+      chartsOpen,
+      listsWidthPct,
+    },
   );
 }

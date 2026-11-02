@@ -7,8 +7,10 @@ import {
   MAX_OPERATIONS_HEIGHT_PCT,
   MIN_OPERATIVA_WIDTH_PCT,
   MAX_OPERATIVA_WIDTH_PCT,
+  seedListsWidthPctFromLegacy,
   useTradingLayoutStore,
 } from "@/stores/trading-layout-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 import { DockZone } from "@/components/layout/dock-zone";
 import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
 import { WatchlistPanel } from "@/features/trading/lists-tab/watchlist-panel";
@@ -43,6 +45,15 @@ export function TradingLayout({ children }: { children: ReactNode }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const layout = useTradingLayoutStore();
+  const legacyListsWidthPct = useWorkspaceStore(
+    (state) => state.workspace.layout.listPanelSizePct,
+  );
+
+  // Primera visita: el ancho del panel venía del workspace (legado). Después manda
+  // la preferencia local del dock (`bolsa-trading-layout-v1`).
+  useEffect(() => {
+    seedListsWidthPctFromLegacy(legacyListsWidthPct);
+  }, [legacyListsWidthPct]);
 
   const [liveListsPct, setLiveListsPct] = useState(layout.listsWidthPct);
   const [liveOpsPct, setLiveOpsPct] = useState(layout.operationsHeightPct);

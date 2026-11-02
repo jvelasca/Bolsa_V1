@@ -5,9 +5,17 @@
  */
 
 import type { CompositeChipDto, FundamentalChipDto } from "@bolsa/shared";
+import {
+  chunkIds,
+  COMPOSITE_BATCH_LIMIT,
+  FUNDAMENTALS_BATCH_LIMIT,
+} from "@bolsa/shared";
 
-export const HUB_FA_QUERY_CHUNK = 80;
-export const HUB_COMPOSITE_QUERY_CHUNK = 40;
+/** Troceo compartido (fuente única: `@bolsa/shared`). */
+export { chunkIds };
+
+export const HUB_FA_QUERY_CHUNK = FUNDAMENTALS_BATCH_LIMIT;
+export const HUB_COMPOSITE_QUERY_CHUNK = COMPOSITE_BATCH_LIMIT;
 
 export type HubFaScore = {
   scoreDisplay100: number | null;
@@ -23,15 +31,6 @@ export type HubTaScore = {
   /** IO server 0–100 si el chip lo trae (Ciclo I2). */
   indiceOperativo?: number | null;
 };
-
-export function chunkIds(ids: string[], size: number): string[][] {
-  if (size <= 0) return [ids];
-  const out: string[][] = [];
-  for (let i = 0; i < ids.length; i += size) {
-    out.push(ids.slice(i, i + size));
-  }
-  return out;
-}
 
 export function indexFaScores(
   chips: FundamentalChipDto[],

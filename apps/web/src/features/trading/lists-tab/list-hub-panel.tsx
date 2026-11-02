@@ -50,55 +50,7 @@ import {
   ListHubRow,
 } from "@/features/trading/lists-tab/list-hub-row";
 import { ListHubIndexSearch } from "@/features/trading/lists-tab/list-hub-index-search";
-
-function listTypeLabel(list: InstrumentListSummaryDto): string {
-  if (isVirtualListId(list.id)) return "sistema";
-  if (list.source === "catalog" || list.kind === "linked_universe")
-    return "índice";
-  if (list.kind === "snapshot") return "copia";
-  return "personal";
-}
-
-type ListHubFamilyId = "sistema" | "indices" | "personales";
-
-const LIST_HUB_FAMILY_ORDER: ListHubFamilyId[] = [
-  "sistema",
-  "indices",
-  "personales",
-];
-
-const LIST_HUB_FAMILY_LABEL: Record<ListHubFamilyId, string> = {
-  sistema: "Sistema",
-  indices: "Índices",
-  personales: "Personales",
-};
-
-function listHubFamily(list: InstrumentListSummaryDto): ListHubFamilyId {
-  if (isVirtualListId(list.id)) return "sistema";
-  if (list.source === "catalog" || list.kind === "linked_universe")
-    return "indices";
-  return "personales";
-}
-
-function groupListsByFamily(
-  sorted: InstrumentListSummaryDto[],
-): { id: ListHubFamilyId; label: string; lists: InstrumentListSummaryDto[] }[] {
-  const buckets: Record<ListHubFamilyId, InstrumentListSummaryDto[]> = {
-    sistema: [],
-    indices: [],
-    personales: [],
-  };
-  for (const list of sorted) {
-    buckets[listHubFamily(list)].push(list);
-  }
-  return LIST_HUB_FAMILY_ORDER.filter((id) => buckets[id].length > 0).map(
-    (id) => ({
-      id,
-      label: LIST_HUB_FAMILY_LABEL[id],
-      lists: buckets[id],
-    }),
-  );
-}
+import { groupListsByFamily, listTypeLabel } from "@/lib/list-hub-families";
 
 export function ListHubPanel() {
   const listConfig = useWorkspaceStore((state) => state.workspace.list);

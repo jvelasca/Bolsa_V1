@@ -77,6 +77,7 @@ export * from "./ai-indicator-series.js";
 export * from "./sub-panel-layout.js";
 export * from "./chart-new-tab-setup.js";
 export * from "./default-lists.js";
+export * from "./batch-limits.js";
 export * from "./market-indices.js";
 export * from "./instrument-search.js";
 export * from "./create-id.js";

@@ -1,8 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ListColumnId } from "@bolsa/shared";
 
-import { LIST_COLUMN_LABELS } from "@bolsa/shared";
+import {
+  DEFAULT_LIST_COLUMN_WIDTHS,
+  DEFAULT_LIST_ROW_ACTIONS_WIDTH,
+  LIST_COLUMN_LABELS,
+  clampListRowActionsWidth,
+} from "@bolsa/shared";
 
 import {
   ArrowDown,
@@ -18,11 +23,14 @@ import { cn } from "@/lib/utils";
 import {
   LIST_HEADER_GRIP_INSET_PX,
   LIST_ROW_EXPAND_WIDTH_PX,
+  LIST_ROW_HORIZONTAL_PADDING_PX,
   LIST_ROW_SELECT_WIDTH_PX,
+  fitColumnWidthsToAvailable,
   isCenteredListColumn,
   isNumericListColumn,
   listColumnContentClass,
   listRowLeftGutterWidthPx,
+  listRowMinWidthPx,
   patchListFavoriteColumn,
   resolveListFavoriteColumnIds,
 } from "@/lib/list-column-layout";
@@ -185,22 +193,84 @@ export function ListColumnHeader({
 
   const selectEnabled = typeof onSelectAllToggle === "function";
   const headerSelectRef = useRef<HTMLInputElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [availableDataWidth, setAvailableDataWidth] = useState<number | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!headerSelectRef.current) return;
     headerSelectRef.current.indeterminate = Boolean(selectAllIndeterminate);
   }, [selectAllIndeterminate]);
 
+  // Ancho útil para las columnas = scrollport − gutter − acciones − padding de fila.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const scroller = headerRef.current?.parentElement;
+    if (!scroller) return;
+    setAvailableDataWidth(
+      scroller.clientWidth -
+        listRowLeftGutterWidthPx(selectEnabled) -
+        clampListRowActionsWidth(rowActionsWidth) -
+        LIST_ROW_HORIZONTAL_PADDING_PX,
+    );
+  }, [menuOpen, selectEnabled, rowActionsWidth, visibleColumns]);
+
+  const overflowColumnCount = useMemo(() => {
+    if (availableDataWidth == null) return 0;
+    let consumed = 0;
+    let hidden = 0;
+    for (const column of visibleColumns) {
+      consumed += column.width;
+      if (consumed > availableDataWidth) hidden += 1;
+    }
+    return hidden;
+  }, [availableDataWidth, visibleColumns]);
+
+  function handleFitToWidth() {
+    const scroller = headerRef.current?.parentElement;
+    if (!scroller) return;
+    const target =
+      scroller.clientWidth -
+      listRowLeftGutterWidthPx(selectEnabled) -
+      clampListRowActionsWidth(rowActionsWidth) -
+      LIST_ROW_HORIZONTAL_PADDING_PX;
+    if (target <= 0) return;
+    for (const column of fitColumnWidthsToAvailable(visibleColumns, target)) {
+      resizeColumn(column.id, column.width);
+    }
+    setMenuOpen(false);
+  }
+
+  function handleResetWidths() {
+    for (const column of layout) {
+      resizeColumn(
+        column.id,
+        DEFAULT_LIST_COLUMN_WIDTHS[column.id] ?? column.width,
+      );
+    }
+    resizeRowActionsWidth(DEFAULT_LIST_ROW_ACTIONS_WIDTH);
+    setMenuOpen(false);
+  }
+
   return (
     <div
+      ref={headerRef}
       className={cn(
         "sticky top-0 z-10 flex items-center gap-0 border-b border-border bg-card px-1 py-1 text-[10px] text-muted-foreground select-none",
 
         className,
       )}
+      style={{
+        minWidth: listRowMinWidthPx(
+          visibleColumns,
+          rowActionsWidth,
+          selectEnabled,
+        ),
+      }}
     >
       <div
-        className="flex shrink-0 items-center"
+        className="sticky left-0 z-[2] flex shrink-0 items-center bg-card"
         style={{ width: listRowLeftGutterWidthPx(selectEnabled) }}
       >
         {selectEnabled ? (
@@ -330,7 +400,7 @@ export function ListColumnHeader({
       </div>
 
       <div
-        className="relative shrink-0 border-l border-border/50"
+        className="sticky right-0 z-[2] shrink-0 border-l border-border/50 bg-card shadow-[-6px_0_8px_-8px_rgba(0,0,0,0.45)]"
         style={{ width: rowActionsWidth }}
       >
         <RowActionsResizeHandle
@@ -402,6 +472,32 @@ export function ListColumnHeader({
                   </button>
                 </label>
               ))}
+              <div className="mt-1 border-t border-border/60 px-2 pt-1">
+                <p className="pb-1 text-[9px] leading-snug text-muted-foreground">
+                  {visibleColumns.length} de {layout.length} columnas visibles
+                  {overflowColumnCount > 0
+                    ? ` · ${overflowColumnCount} fuera de vista (scroll horizontal)`
+                    : ""}
+                </p>
+                <div className="flex items-center gap-1 pb-1">
+                  <button
+                    type="button"
+                    title="Compacta las columnas para ver el máximo posible en el ancho actual (mínimo 40 px; si no cabe, la lista scrollea)"
+                    className="flex-1 rounded border border-border px-1.5 py-1 text-[10px] font-medium hover:bg-accent"
+                    onClick={handleFitToWidth}
+                  >
+                    Ajustar al ancho
+                  </button>
+                  <button
+                    type="button"
+                    title="Devuelve todas las columnas a su ancho por defecto"
+                    className="flex-1 rounded border border-border px-1.5 py-1 text-[10px] font-medium hover:bg-accent"
+                    onClick={handleResetWidths}
+                  >
+                    Restablecer
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

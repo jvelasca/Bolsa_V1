@@ -19,6 +19,7 @@ import {
   isNumericListHubColumn,
   isSortableListHubColumn,
   listHubColumnContentClass,
+  listHubRowMinWidthPx,
   toggleListHubFavoriteColumn,
 } from "@/lib/list-hub-column-layout";
 import { useListHubColumnLayoutContext } from "@/features/trading/lists-tab/list-hub-column-layout-context";
@@ -162,9 +163,18 @@ export function ListHubColumnHeader({
   }
 
   return (
-    <div className="sticky top-0 z-10 flex items-center gap-0 border-b border-border bg-card px-1 py-1 text-[10px] text-muted-foreground select-none">
+    <div
+      className="sticky top-0 z-10 flex items-center gap-0 border-b border-border bg-card px-1 py-1 text-[10px] text-muted-foreground select-none"
+      style={{
+        minWidth: listHubRowMinWidthPx(
+          visibleColumns,
+          rowActionsWidth,
+          Boolean(chartInstrumentLabel),
+        ),
+      }}
+    >
       <span
-        className="shrink-0"
+        className="sticky left-0 z-[2] shrink-0 bg-card"
         style={{ width: LIST_HUB_ROW_EXPAND_WIDTH_PX }}
         aria-hidden
       />
@@ -280,7 +290,7 @@ export function ListHubColumnHeader({
       </div>
 
       <div
-        className="relative shrink-0 border-l border-border/50"
+        className="sticky right-0 z-[2] shrink-0 border-l border-border/50 bg-card shadow-[-6px_0_8px_-8px_rgba(0,0,0,0.45)]"
         style={{ width: rowActionsWidth }}
       >
         <RowActionsResizeHandle

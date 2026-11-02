@@ -889,7 +889,6 @@ export interface WorkspaceState {
   reloadActiveFromServer: () => Promise<void>;
   deleteWorkspaceById: (workspaceId: string) => Promise<void>;
   setListPanelOpen: (open: boolean) => void;
-  setListPanelSizePct: (pct: number) => void;
   setRightPanelOpen: (open: boolean) => void;
   setRightPanelSizePct: (pct: number) => void;
   setChartInspectorOpen: (open: boolean) => void;

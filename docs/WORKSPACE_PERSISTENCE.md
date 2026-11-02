@@ -73,7 +73,8 @@ Esto es instancia de la **premisa de app**: preferencias/UI configurables → `l
 | Listas: carrusel, columnas (orden/visibilidad), ordenación | `list.carouselListIds`, `list.carouselHiddenListIds`, `list.columnLayoutsByListId`, `list.sortByListId` — **anchos** en `bolsa-list-chrome-layout-v1` |
 | Lista Visualización | `list.visualizationEntries` (espejo de pestañas de gráfico abiertas) |
 | Inspector abierto/cerrado | `layout.chartInspectorOpen` |
-| Tamaño panel listas / inspector | `layout.listPanelSizePct`, `layout.rightPanelSizePct` |
+| Tamaño panel inspector | `layout.rightPanelSizePct` |
+| Tamaño panel listas | `bolsa-trading-layout-v1` (`listsWidthPct`, por dispositivo). `layout.listPanelSizePct` es **legado**: solo se usa como semilla si no hay preferencia local |
 | Dibujos e indicadores (solo pestañas abiertas) | `charts[]` |
 | Copia efímera al guardar (misma sesión) | `chartStateByListInstrument` — solo instrumentos con pestaña abierta |
 | Presets de indicadores | `indicatorPresets` |

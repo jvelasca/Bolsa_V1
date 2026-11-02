@@ -8,6 +8,7 @@ import type {
   InstrumentDailyOpinionHintV1,
   InstrumentDailyOpinionV1,
 } from "@bolsa/shared";
+import { chunkIds, DAILY_OPINIONS_BATCH_LIMIT } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { positionOpenHintKey } from "@/lib/position-open-hint";
 
@@ -52,12 +53,18 @@ export function useInstrumentDailyOpinions(
     staleTime: 60_000,
     refetchInterval: options?.refetchInterval,
     queryFn: async (): Promise<InstrumentDailyOpinionV1[]> => {
-      const res = await api.queryInstrumentDailyOpinions({
-        instrumentIds: ids,
-        forceRefresh: options?.forceRefresh ?? false,
-        hints: hints.filter((h) => ids.includes(h.instrumentId)),
-      });
-      return res.data ?? [];
+      // El API acepta 200 ids por petición: Visualizados puede superarlo.
+      const chunks = chunkIds(ids, DAILY_OPINIONS_BATCH_LIMIT);
+      const parts = await Promise.all(
+        chunks.map((chunk) =>
+          api.queryInstrumentDailyOpinions({
+            instrumentIds: chunk,
+            forceRefresh: options?.forceRefresh ?? false,
+            hints: hints.filter((h) => chunk.includes(h.instrumentId)),
+          }),
+        ),
+      );
+      return parts.flatMap((res) => res.data ?? []);
     },
   });
 }

@@ -26,8 +26,10 @@ import {
   isCenteredListHubColumn,
   isNumericListHubColumn,
   listHubColumnContentClass,
+  listHubRowMinWidthPx,
 } from "@/lib/list-hub-column-layout";
 import { useListHubColumnLayoutContext } from "@/features/trading/lists-tab/list-hub-column-layout-context";
+import { listTypeLabel } from "@/lib/list-hub-families";
 import { LIST_HUB_EXPAND_ACCESOS_TITLE } from "@/features/confirm/daily-nav";
 import { ListHubShortcutsSection } from "@/features/trading/lists-tab/list-hub-shortcuts-section";
 
@@ -36,14 +38,6 @@ function formatLastSynced(iso: string | null | undefined): string | null {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return formatDate(d);
-}
-
-function listTypeLabel(list: InstrumentListSummaryDto): string {
-  if (isVirtualListId(list.id)) return "sistema";
-  if (list.source === "catalog" || list.kind === "linked_universe")
-    return "índice";
-  if (list.kind === "snapshot") return "copia";
-  return "personal";
 }
 
 export function ListHubRow({
@@ -175,9 +169,18 @@ export function ListHubRow({
         isActive && "border-l-2 border-l-primary bg-primary/5",
       )}
     >
-      <div className="flex items-center gap-0 px-1 py-1">
+      <div
+        className="flex items-center gap-0 px-1 py-1"
+        style={{
+          minWidth: listHubRowMinWidthPx(
+            visibleColumns,
+            rowActionsWidth,
+            Boolean(chartInstrumentLabel),
+          ),
+        }}
+      >
         <div
-          className="shrink-0"
+          className="sticky left-0 z-[2] shrink-0 bg-card"
           style={{ width: LIST_HUB_ROW_EXPAND_WIDTH_PX }}
           onClick={(event) => event.stopPropagation()}
         >
@@ -267,7 +270,7 @@ export function ListHubRow({
         </div>
 
         <div
-          className="flex shrink-0 items-center justify-end gap-0.5 border-l border-border/40 pl-0.5"
+          className="sticky right-0 z-[2] flex shrink-0 items-center justify-end gap-0.5 border-l border-border/40 bg-card pl-0.5 shadow-[-6px_0_8px_-8px_rgba(0,0,0,0.45)]"
           style={{ width: rowActionsWidth }}
           onClick={(event) => event.stopPropagation()}
         >

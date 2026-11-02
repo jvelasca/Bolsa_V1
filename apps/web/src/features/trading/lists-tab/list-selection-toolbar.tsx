@@ -46,18 +46,18 @@ export function ListSelectionToolbar({
 }) {
   return (
     <div
-      className="z-20 flex shrink-0 flex-wrap items-center gap-1.5 border-t border-border bg-card px-2 py-2 text-[11px] shadow-[0_-4px_12px_rgba(0,0,0,0.06)]"
+      className="z-20 flex shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto overflow-y-hidden border-t border-border bg-card px-2 py-2 text-[11px] whitespace-nowrap shadow-[0_-4px_12px_rgba(0,0,0,0.06)]"
       data-testid="list-selection-actions"
       role="toolbar"
       aria-label="Acciones sobre la selección"
     >
-      <span className="mr-1 tabular-nums text-muted-foreground">
+      <span className="mr-1 shrink-0 tabular-nums text-muted-foreground">
         {count} seleccionado{count === 1 ? "" : "s"}
       </span>
       {!viewingEstudio ? (
         <button
           type="button"
-          className="inline-flex items-center gap-1 rounded border border-primary/50 bg-primary/15 px-2 py-1.5 font-semibold text-primary hover:bg-primary/20"
+          className="inline-flex shrink-0 items-center gap-1 rounded border border-primary/50 bg-primary/15 px-2 py-1.5 font-semibold text-primary hover:bg-primary/20"
           onClick={onAddToEstudio}
           title="Pasar la selección a Estudio (supervisión)"
         >
@@ -69,8 +69,8 @@ export function ListSelectionToolbar({
         type="button"
         className={
           viewingEstudio || viewingVisualizados
-            ? "inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-2 py-1.5 font-semibold text-destructive hover:bg-destructive/15 disabled:cursor-not-allowed disabled:opacity-40"
-            : "inline-flex items-center gap-1 rounded border border-border px-2 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+            ? "inline-flex shrink-0 items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-2 py-1.5 font-semibold text-destructive hover:bg-destructive/15 disabled:cursor-not-allowed disabled:opacity-40"
+            : "inline-flex shrink-0 items-center gap-1 rounded border border-border px-2 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
         }
         onClick={onRemove}
         disabled={
@@ -98,7 +98,7 @@ export function ListSelectionToolbar({
       {viewingVisualizados ? (
         <button
           type="button"
-          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex shrink-0 items-center gap-1 rounded border border-border px-2 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
           disabled={count < 2 || sortingByIo}
           onClick={onReorderByIo}
           title="Ordena pestañas por Índice Operativo (IO 0–100): mayor IO a la izquierda (#1 en Estudio = mejor IO). Usa caché de Operativa; si falta, carga en trozos pequeños."
@@ -114,7 +114,7 @@ export function ListSelectionToolbar({
       {!viewingVisualizados ? (
         <button
           type="button"
-          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1.5 font-medium text-foreground hover:bg-accent"
+          className="inline-flex shrink-0 items-center gap-1 rounded border border-border px-2 py-1.5 font-medium text-foreground hover:bg-accent"
           onClick={onOpenCharts}
           title="Abrir gráficos de la selección"
         >
@@ -126,7 +126,7 @@ export function ListSelectionToolbar({
         <>
           <button
             type="button"
-            className="inline-flex items-center gap-1 rounded border border-border px-2.5 py-1.5 font-semibold text-foreground hover:bg-accent disabled:opacity-50"
+            className="inline-flex shrink-0 items-center gap-1 rounded border border-border px-2.5 py-1.5 font-semibold text-foreground hover:bg-accent disabled:opacity-50"
             disabled={updatingSelected}
             title="Adelanta vigilia + frescura (velas + Lab). Funciona con Supervisión OFF."
             onClick={() => onUpdateSelected({ rediscover: false })}
@@ -136,7 +136,7 @@ export function ListSelectionToolbar({
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-1 rounded border border-amber-500/50 bg-amber-500/10 px-2.5 py-1.5 font-semibold text-amber-800 hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-200"
+            className="inline-flex shrink-0 items-center gap-1 rounded border border-amber-500/50 bg-amber-500/10 px-2.5 py-1.5 font-semibold text-amber-800 hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-200"
             disabled={updatingSelected}
             title="Costoso: embudo completo y búsqueda de nuevas estrategias TOP. Pide confirmación."
             onClick={() => onUpdateSelected({ rediscover: true })}
@@ -148,7 +148,7 @@ export function ListSelectionToolbar({
       ) : null}
       <button
         type="button"
-        className="ml-auto inline-flex items-center gap-1 rounded px-2.5 py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+        className="ml-auto inline-flex shrink-0 items-center gap-1 rounded px-2.5 py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
         onClick={onClear}
         title="Quitar la selección"
       >
