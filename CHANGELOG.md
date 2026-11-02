@@ -2,6 +2,41 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.177-beta] — **guardar el espacio de trabajo deja de perder pestañas: concurrencia optimista atómica, cierre compacto y Visualizados derivados** (**`Δ motor = 0` · `Δ decisión = 0` · contrato **aditivo** · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** sello de **corrección** sobre `2.11.176-beta`, posterior a la auditoría de persistencia del
+workspace del 2026-11-02. No toca motor, reglas, indicadores, umbrales ni replay (**`Δ motor = 0`**), no se
+decide distinto (**`Δ decisión = 0`**) y no hay migración: `head` sigue `062_sync_settings_check_backfill`.
+El contrato HTTP es **aditivo**: `expectedUpdatedAt` en `PUT /api/workspaces/{id}` y
+`POST /api/workspaces/{id}/charts/close` (`openapi.json`/`schema.d.ts` regenerados; `contract:check` **OK**).
+**Bump** `2.11.176-beta` → `2.11.177-beta` (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` no se toca).
+
+**Los defectos.** Seis hallazgos de la auditoría, todos con prueba que falla sin la corrección:
+
+| Id | Defecto | Corrección |
+| --- | --- | --- |
+| P0-1 | dos clientes con la misma revisión podían ganar ambos: la comparación y la escritura eran dos pasos | `UPDATE … WHERE updated_at = :expected` en **una sola sentencia**; `rowcount = 0` ⇒ **409** `workspace_conflict` |
+| P0-2 | el `keepalive` de cierre guardaba sin revisión y pisaba lo más reciente | el cierre viaja con `expectedUpdatedAt`; con pestañas pendientes **no** se reenvía además el documento |
+| P1-3 | snapshots con el mismo número de indicadores/dibujos se daban por iguales | comparación canónica profunda (claves ordenadas) |
+| P1-4 | un cierre durante el PUT se marcaba como guardado | `isDirty` mira **membresía** y **contenido** (identidad del documento antes del `await`) |
+| P1-7 | Visualizados podía quedar obsoleto respecto a las pestañas | `deriveVisualizationEntries` en `prepareWorkspaceForSave` |
+| P2-5 | el tope de `keepalive` se medía en caracteres, no en bytes | `TextEncoder` (bytes UTF-8) |
+| P2-6 | contexto de lista huérfano y doble flush `beforeunload` + `pagehide` | poda del contexto en la fusión y en el servidor; guard de reentrada del flush |
+
+Además, la causa raíz del «cierro las pestañas y reaparecen al recargar»: la fusión **añadía** las pestañas del
+documento antiguo. Ahora la membresía la dicta el documento más reciente (`newest-wins`).
+
+**La evidencia.** `14 passed` de persistencia contra PostgreSQL real (concurrencia `[200, 409]`, 409 de revisión
+obsoleta, 400 de revisión malformada), la sonda de proceso real con **reinicio** de la API en `PASS`, y las
+suites completas sobre el árbol del commit: **364 ficheros / 2728 tests** web, **101 / 883** shared,
+typecheck limpio, Ruff limpio, mypy **582 ficheros / 0 errores** (ver
+[`evidence/v2.88.177/README.md`](./docs/engineering/evidence/v2.88.177/README.md) y
+[`revision-independiente-workspace-2026-11-02.md`](./docs/engineering/revision-independiente-workspace-2026-11-02.md)).
+
+**Lo que NO cambia.** Nada del motor de decisión ni de la operativa: AUTO sigue **OFF** y PAPER sigue
+**`INCONCLUSIVE`**. Este sello **no** despliega las correcciones en la instancia de desarrollo.
+
 ## [2.11.176-beta] — **la pantalla de entrada deja de repetir la navegación y de hablar en jerga interna: Overview responde a una sola pregunta** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
 
 **Naturaleza:** sello de **producto**, solo frontend, posterior a `2.11.175-beta`. No cambia ninguna regla,
