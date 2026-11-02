@@ -51,6 +51,13 @@ expediente. Donde el CI no mide algo, lo dice en vez de inferirlo del verde.
 El digest del replay es **el mismo** que el del sello `.175` (`E9B7376B…`): eso es lo que convierte
 «`Δ motor = 0`» en una afirmación **medida por el CI** y no en una lectura del diff.
 
+**Alcance de esa medida (O-3).** `Δ motor = 0` es lo que el replay mide **sobre el camino que el replay
+ejercita**; no cubre la ruta del placeholder `KILL_STATE_UNREADABLE`, cuyo código de motor
+(`hard_kill_switch.py` y `auto_simulation_worker.py`) sí cambió en `.175` (el `packagesHash` pasó de
+`741ed1a8…` a `7091cc8d…` y se re-ancló). Ese delta está declarado y cubierto por
+`test_auto_v2_audit_regressions.py::test_p1b_*`; lo que el replay no hace es ejercitarlo, así que el digest
+idéntico no debe leerse como «el árbol del motor es byte-idéntico al de `.174`».
+
 ### 2.2 La separación de los tres niveles de aceptación
 
 Se acepta que la cadena distingue **tres** objetos y no los confunde:
@@ -85,7 +92,9 @@ documental ni lo movió ni necesitó re-anclar. Es exactamente lo que el
 * **32 passed** de axe integrado acredita 0 `critical`/`serious` en esas rutas con datos sembrados por el CI. No
   es el barrido de `35/35` rutas tocadas que cita el expediente, ni una auditoría de accesibilidad completa.
 * **`REPRODUCIDO`** acredita que el artefacto del replay se regenera byte a byte desde el fixture con el mismo
-  script. Acredita `Δ motor = 0`; no acredita rentabilidad.
+  script. Acredita `Δ motor = 0` **en el camino replay**; no acredita rentabilidad, ni cubre la ruta del
+  placeholder `KILL_STATE_UNREADABLE` (ver §2.1, O-3). Ese límite se cierra por otra vía, no por el digest:
+  [`cierre-condiciones-r1-u1-o3-2026-11-02.md`](./cierre-condiciones-r1-u1-o3-2026-11-02.md).
 * **`freeze OK`** acredita que el pin casa con `HEAD:apps`/`HEAD:packages` del commit del tag. No acredita que
   la ventana PAPER haya certificado: el estado de la ventana es **`INCONCLUSIVE`** y este sello no lo cambia.
 
@@ -136,7 +145,7 @@ GitHub de forma independiente más allá del run y su artefacto.
 | 1 | El objeto aceptado es `v2.88.176-beta` → `081cb4c0` | mover o borrar el tag ⇒ esta aceptación deja de apuntar a nada |
 | 2 | El run del sello es **GREEN** con 12 jobs obligatorios `success` | reaparecer un job obligatorio en `failure` o `skipped` ⇒ el artefacto no diría `GREEN` |
 | 3 | El pin casa con el árbol del tag | cambiar `apps/` o `packages/` en un commit posterior al re-anclaje ⇒ `TREE_MOVED` y `Window freeze gate` rojo |
-| 4 | `Δ motor = 0` medido por el CI | cambiar el digest de `replay-repro` respecto de `E9B7376B…` ⇒ el motor se movió |
+| 4 | `Δ motor = 0` medido por el CI **en el camino replay** | cambiar el digest de `replay-repro` respecto de `E9B7376B…` ⇒ el motor se movió en ese camino (no mide la ruta del placeholder: ver O-3) |
 | 5 | La suite web del tag es 2 686 | cambiar el número en `frontend` ⇒ el árbol difiere del que cita el expediente |
 | 6 | `L-OVW-1` y `L-OVW-2` siguen abiertos | declararlos cerrados sin la comprobación de §4.1/§4.2 ⇒ la aceptación dice más de lo que midió |
 | 7 | El commit documental no mueve el pin | cambiar `appsHash` en `081cb4c0` ⇒ se coló contenido fuera de `docs/` |
@@ -149,6 +158,10 @@ GitHub de forma independiente más allá del run y su artefacto.
 * **No** mueve el tag: lo acepta tal como se publicó. Si el tag se moviera, este dictamen quedaría inválido.
 * **No** re-ancla el pin ni lanza CI: cita el run del tag.
 * **No** cierra `L-OVW-1` ni `L-OVW-2`.
+* Las tres comprobaciones que este dictamen deja **pendientes** (R-1 en PostgreSQL, U-1 en navegador y O-3 en
+  documentos vivos) se cierran en
+  [`cierre-condiciones-r1-u1-o3-2026-11-02.md`](./cierre-condiciones-r1-u1-o3-2026-11-02.md), que **no**
+  enmienda este registro ni crea sello.
 
 ## 8. Cierre
 

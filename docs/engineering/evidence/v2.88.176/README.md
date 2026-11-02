@@ -93,6 +93,13 @@ Solo `appsHash` se movió, que es exactamente lo que produce tocar `apps/web/src
 - `Δ motor = 0` se sostiene porque el diff del sello **no toca** `packages/py` ni el motor de decisión: solo
   `apps/web/src` y literales de versión. Lo confirma el `replay-repro` del CI del tag, que regenera el artefacto
   congelado desde el fixture y lo compara byte a byte.
+- **Alcance (O-3):** el replay acredita `Δ motor = 0` **en su camino**. No cubre la ruta del placeholder
+  `KILL_STATE_UNREADABLE`: ese código de motor cambió en `.175` (`packagesHash` `741ed1a8…` → `7091cc8d…`,
+  re-anclado y declarado) y el replay no lo ejercita. La cobertura de esa ruta son los `test_p1b_*` de
+  `test_auto_v2_audit_regressions.py`, no el digest. La comprobación de integración que cierra esta laguna
+  (R-1 contra PostgreSQL, U-1 en navegador y O-3 en documentos vivos) está en
+  [`cierre-condiciones-r1-u1-o3-2026-11-02.md`](../../cierre-condiciones-r1-u1-o3-2026-11-02.md): **no** forma
+  parte de este sello ni lo reabre.
 
 ## 6. Publicación
 
@@ -118,7 +125,7 @@ Esta sección se añade **POST-TAG**, así que no viaja en el árbol del tag (mi
 | `frontend` ⇒ step `Test web` | `081cb4c0` | **`2 686 passed`** (357 ficheros), `172,16 s` — **coincide** con la cifra que §2 declara citada del árbol de trabajo, y aquí queda **medida sobre el commit del sello** |
 | `frontend` ⇒ step `Contract check (no gen)` | `081cb4c0` | **success** |
 | `playwright (integrated axe)` ⇒ step `Run integrated axe E2E (fail if skipped)` | `081cb4c0` | **32 passed** (`3,0m`), con `/overview` @desktop y @móvil 390×844 en **0 `critical`/`serious` + heading-order**. No es el barrido de `35/35` rutas tocadas: es otro conjunto y se cita aparte |
-| `replay-repro` ⇒ step `ASSERT del SHA-256 y del tamaño` | `081cb4c0` | **`REPRODUCIDO`** (`sha256 E9B7376B…7F5625`, contenido `3 383 461` bytes; el sello en CRLF `3 488 758`): digest **idéntico** al de `.175` ⇒ **`Δ motor = 0` confirmado por el CI** |
+| `replay-repro` ⇒ step `ASSERT del SHA-256 y del tamaño` | `081cb4c0` | **`REPRODUCIDO`** (`sha256 E9B7376B…7F5625`, contenido `3 383 461` bytes; el sello en CRLF `3 488 758`): digest **idéntico** al de `.175` ⇒ **`Δ motor = 0` confirmado por el CI en el camino replay** |
 | `a7-gate` | `081cb4c0` | **success** con `LIVE_A7_PG_REQUIRED=1` y BD dedicada `bolsa_v1_a7` |
 | Artefacto `release-tag-ci-summary` | `081cb4c0` | `status: GREEN`, los 12 jobs en `success`, `asOf 2026-11-01T23:15:08Z` |
 
@@ -137,7 +144,7 @@ del `32 passed` del job `axe` integrado; no se suman ni se intercambian.
 | 5 | No cambia el contrato API | tocar `openapi.json`/`schema.d.ts` sin backend ⇒ rojo en `contract:check` |
 | 6 | El bump es coherente en los 14 literales | `test_dia_d_bump_guard` (y el literal congelado `2.11.0-beta` sigue anclado por su propio test) |
 | 7 | El pin casa con el árbol | `pnpm window:freeze` ⇒ `freeze OK`; rojo en el step `Window freeze gate` del CI del tag |
-| 8 | El motor no cambió | `replay-repro` regenera el artefacto congelado y lo compara byte a byte |
+| 8 | El motor no cambió **en el camino replay** | `replay-repro` regenera el artefacto congelado y lo compara byte a byte; no cubre la ruta del placeholder `KILL_STATE_UNREADABLE` (cambiada en `.175`, ver §5) |
 | 9 | La aceptación no enmienda el objeto aceptado | reescribir `62665ff7` o `23c9c689` ⇒ cambia el SHA y ambas aceptaciones dejan de apuntar a nada |
 | 10 | `L-OVW-1` / `L-OVW-2` siguen abiertos | declararlos cerrados sin la comprobación de §4 del dictamen ⇒ la aceptación dice más de lo que midió |
 
