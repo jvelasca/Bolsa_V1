@@ -2625,6 +2625,13 @@ class AutoSimulationWorker:
 
         Sin store (o sin cuenta/engine) no hay nada que leer: se declara y el latch local se
         conserva. Un fallo de lectura tampoco levanta la parada.
+
+        R-1 — la lectura sana SIN parada durable no cierra el caso cuando el latch local
+        tiene una causa REAL: puede ser un HALT cuya escritura falló (store caído en el
+        momento de la activación). Si no se reintenta, el siguiente reinicio lee «sin fila»
+        y reabre el motor. Por eso, en las ramas en que el espejo no contiene ese halt, se
+        reintenta persistirlo (idempotente); la liberación del placeholder y la regla de
+        adopción no cambian.
         """
         store = self._kill_switch_store
         account_id = self._account_id or ""
@@ -2649,6 +2656,10 @@ class AutoSimulationWorker:
             # recuperación tras un fallo TRANSITORIO de lectura. Sin esto el proceso
             # quedaba parado en memoria hasta reiniciarse, aunque la lectura ya fuese sana.
             self._release_unreadable_placeholder(detail="sin fila durable")
+            # R-1 — una lectura sana sin fila NO demuestra que el latch local (con causa
+            # real) sea un fantasma: puede ser un HALT cuya escritura falló. Se reintenta
+            # persistirlo antes de devolver, o el reinicio siguiente reabriría el motor.
+            await self._v2_repersist_local_halt()
             return
         if state.engaged:
             # El placeholder ``KILL_STATE_UNREADABLE`` NO oculta la causa durable: en
@@ -2687,10 +2698,16 @@ class AutoSimulationWorker:
                 detail=f"fila durable liberada reconciliation={state.release_reconciliation_id}"
             )
         if not self._v2_kill_switch.engaged or not state.release_reconciliation_id:
+            # R-1 — la fila liberada NO demuestra una liberación explícita, así que un
+            # HALT local con causa real sigue vigente: se reintenta hacerlo durable.
+            await self._v2_repersist_local_halt()
             return
         released_at = _instant(state.released_at)
         engaged_at = _instant(self._v2_kill_switch.engaged_at)
         if released_at is None or engaged_at is None or released_at < engaged_at:
+            # R-1 — instantes no comparables o liberación ANTERIOR al halt local: la
+            # parada local es posterior y manda, pero solo si sobrevive al reinicio.
+            await self._v2_repersist_local_halt()
             return
         self._v2_kill_switch.release(reconciliation_ok=True)
         logger.warning(
@@ -2721,6 +2738,29 @@ class AutoSimulationWorker:
             logger.warning(
                 "auto_sim v2 hard kill placeholder RELEASED by a valid durable read (%s)",
                 detail,
+            )
+
+    async def _v2_repersist_local_halt(self) -> None:
+        """R-1 — reintenta escribir un HALT REAL que el espejo durable no refleja.
+
+        El caso que cierra: el store está caído, el latch local se engancha con el
+        placeholder y una causa REAL lo asciende (``HardKillSwitch.engage``) mientras la
+        escritura sigue fallando. Cuando el store vuelve, la lectura es sana pero sin fila
+        —o con una fila liberada anterior al halt— y antes se devolvía sin más: la parada
+        vivía solo en RAM y el reinicio siguiente reabría el motor.
+
+        Solo aplica a un latch engaged con motivo distinto del placeholder (el placeholder
+        no es un hecho durable). Es idempotente: tras un ``save`` correcto la lectura
+        siguiente ve la fila ``engaged`` y no se vuelve a escribir por esta vía.
+        """
+        switch = self._v2_kill_switch
+        if not switch.engaged or switch.reason == KILL_STATE_UNREADABLE:
+            return
+        if await self._v2_persist_kill_state():
+            logger.warning(
+                "auto_sim v2 hard kill RE-PERSISTED from the local latch reason=%s engagement=%s",
+                switch.reason,
+                switch.engagement_id,
             )
 
     async def _v2_persist_kill_state(self, *, at: str | None = None) -> bool:

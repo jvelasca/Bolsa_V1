@@ -159,7 +159,11 @@ class _ProjectionFailingStore(InMemorySimAutoPositionStore):
 
 
 class _FlakyKillSwitchStore(InMemoryKillSwitchStore):
-    """``load()`` falla de forma transitoria (``fail_next``) o persistente (``always_fail``)."""
+    """``load()``/``save()`` fallan de forma transitoria (``*_next``) o persistente.
+
+    ``saved`` guarda SOLO las escrituras que llegaron al store (las que fallaron no
+    cuentan): es lo que distingue «se intentó persistir» de «la parada es durable».
+    """
 
     def __init__(
         self,
@@ -167,12 +171,15 @@ class _FlakyKillSwitchStore(InMemoryKillSwitchStore):
         seed: tuple[KillState, ...] = (),
         fail_next: int = 0,
         always_fail: bool = False,
+        fail_save_next: int = 0,
     ) -> None:
         super().__init__(seed=seed)
         self.fail_next = fail_next
         self.always_fail = always_fail
+        self.fail_save_next = fail_save_next
         self.loads = 0
         self.saves = 0
+        self.saved: list[KillState] = []
 
     async def load(self, account_id: str, engine_id: str) -> KillState | None:
         self.loads += 1
@@ -184,6 +191,10 @@ class _FlakyKillSwitchStore(InMemoryKillSwitchStore):
 
     async def save(self, state: KillState) -> bool:
         self.saves += 1
+        if self.fail_save_next > 0:
+            self.fail_save_next -= 1
+            raise RuntimeError("kill state not writable (R-1)")
+        self.saved.append(state)
         return await super().save(state)
 
 
@@ -799,6 +810,95 @@ async def test_p1b_the_placeholder_is_not_persisted_as_a_durable_halt(v2_env: No
 
     assert persisted is False, "el placeholder no viaja al espejo durable"
     assert stores.kill_state.saves == 0, "no se escribe ninguna fila con el placeholder"
+
+
+# ---------------------------------------------------------------------------
+# R-1 — el HALT local que su escritura no llegó a fijar
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_r1_a_real_halt_is_repersisted_when_the_mirror_returns(
+    v2_env: None,
+) -> None:
+    """Escritura fallida + lectura sana SIN fila ⇒ se reintenta persistir la parada.
+
+    Secuencia exacta del hallazgo: el espejo no deja escribir, el latch local se engancha
+    con una causa REAL y el fallo de ``save`` se declara en el log. Cuando el store vuelve,
+    la lectura es sana pero sin fila; antes se devolvía sin más y el reinicio siguiente
+    leía «la parada nunca se activó» y reabría el motor.
+    """
+    stores = _Stores()
+    stores.kill_state = _FlakyKillSwitchStore(fail_save_next=1)
+    w = _restart(stores, minute=1)
+    w._decider = _buy()
+
+    assert await w.engage_kill_switch_durable("DUPLICATE_EXECUTION") is True
+    assert stores.kill_state.saves == 1, "se intentó persistir"
+    assert stores.kill_state.saved == [], "la escritura falló: no hay parada durable"
+
+    report = await _real_turn(w, stores)
+
+    assert report.proposals == 0, "la parada sigue vetando mientras se reintenta escribir"
+    assert stores.kill_state.saves == 2, "la lectura sana sin fila dispara el reintento"
+    assert [state.reason for state in stores.kill_state.saved] == ["DUPLICATE_EXECUTION"]
+    assert stores.kill_state.saved[0].engaged is True
+
+    # El reinicio SÍ encuentra la parada ahora: el motor no se reabre.
+    restarted = _restart(stores, minute=2)
+    restarted._decider = _buy()
+    after = await _real_turn(restarted, stores)
+
+    assert after.proposals == 0, "el reinicio no puede reabrir un HALT que ya es durable"
+    assert restarted._v2_kill_switch_halted() is True  # noqa: SLF001
+    assert restarted._v2_kill_switch.reason == "DUPLICATE_EXECUTION"  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_r1_a_real_halt_newer_than_a_released_row_is_repersisted(
+    v2_env: None,
+) -> None:
+    """Una fila liberada ANTERIOR al halt local no lo borra: se vuelve a persistir.
+
+    Es la otra rama en la que el espejo no contiene el halt vigente. La parada local es
+    posterior y manda (regla ya existente); lo que faltaba era hacerla sobrevivir al
+    reinicio.
+    """
+    released = KillState(
+        account_id=ACCOUNT_ID,
+        engine_id=ENGINE_ID,
+        engaged=False,
+        reason=None,
+        engaged_at=None,
+        engagement_id=None,
+        reengagements=0,
+        released_at="2026-09-15T08:00:00Z",
+        release_actor="api",
+        release_reconciliation_id="recon-old",
+        updated_at="2026-09-15T08:00:00Z",
+    )
+    stores = _Stores()
+    stores.kill_state = _FlakyKillSwitchStore(seed=(released,))
+    w = _restart(stores, minute=1)
+    w._decider = _buy()
+
+    assert w.engage_kill_switch("RISK_BREACH", at="2026-09-15T09:00:00Z") is True
+    assert w._v2_kill_switch_halted() is True  # noqa: SLF001
+
+    report = await _real_turn(w, stores)
+
+    assert report.proposals == 0, "un halt posterior a la liberación sigue vetando"
+    assert w._v2_kill_switch_halted() is True  # noqa: SLF001
+    assert stores.kill_state.saved, "el halt local se reintenta hacer durable"
+    last = stores.kill_state.saved[-1]
+    assert last.engaged is True
+    assert last.reason == "RISK_BREACH"
+    assert last.engaged_at == "2026-09-15T09:00:00Z"
+
+    # Idempotente: con la fila ya engaged, la lectura siguiente no vuelve a escribir.
+    writes = stores.kill_state.saves
+    await _real_turn(w, stores)
+    assert stores.kill_state.saves == writes, "persistir no es un latido por tick"
 
 
 @pytest.mark.asyncio

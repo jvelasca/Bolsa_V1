@@ -54,6 +54,12 @@ export function useActiveAccount(): {
   effectiveAccountId: string | null;
   isLoading: boolean;
   accounts: InvestmentAccountDto[];
+  /**
+   * U-1 — un fallo de `GET /accounts` NO es «no hay cuentas». Sin este booleano la UI
+   * no podía distinguir UNKNOWN de vacío y ofrecía crear una demo que quizá ya existe.
+   */
+  isError: boolean;
+  refetch: () => void;
 } {
   const activeAccountId = useActiveAccountStore((s) => s.activeAccountId);
   const setActiveAccountId = useActiveAccountStore((s) => s.setActiveAccountId);
@@ -98,6 +104,8 @@ export function useActiveAccount(): {
     effectiveAccountId,
     isLoading: accountsQuery.isLoading,
     accounts,
+    isError: accountsQuery.isError,
+    refetch: () => void accountsQuery.refetch(),
   };
 }
 

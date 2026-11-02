@@ -11,7 +11,13 @@
  *
  * @see docs/engineering/spec-ui-contract-5-0-2026-10-08.md §2
  */
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
@@ -36,6 +42,8 @@ const accountsMock = vi.hoisted(() => ({
   accounts: [] as InvestmentAccountDto[],
   account: null as InvestmentAccountDto | null,
   isLoading: false,
+  isError: false,
+  refetch: vi.fn(),
 }));
 
 vi.mock("@/features/accounts/use-active-account", async (importOriginal) => {
@@ -50,6 +58,8 @@ vi.mock("@/features/accounts/use-active-account", async (importOriginal) => {
       effectiveAccountId: accountsMock.account?.id ?? null,
       isLoading: accountsMock.isLoading,
       accounts: accountsMock.accounts,
+      isError: accountsMock.isError,
+      refetch: accountsMock.refetch,
     }),
   };
 });
@@ -153,6 +163,7 @@ afterEach(() => {
   accountsMock.accounts = [];
   accountsMock.account = null;
   accountsMock.isLoading = false;
+  accountsMock.isError = false;
 });
 
 function seedHappyPath() {
@@ -230,6 +241,49 @@ describe("Overview · estructura", () => {
     renderPage();
 
     expect(await screen.findByText(/API no disponible/)).toBeTruthy();
+  });
+});
+
+describe("Overview · error de carga (U-1)", () => {
+  it("un fallo de /accounts no se rotula como «no hay cuenta activa»", async () => {
+    accountsMock.isError = true;
+    apiMock.getHealth.mockResolvedValue({ status: "ok" });
+    renderPage();
+
+    // El error se declara como error, con una acción de reintento.
+    expect(
+      await screen.findByText(/No se pudieron cargar tus cuentas/),
+    ).toBeTruthy();
+    expect(screen.getByText(/no se pudo cargar la cuenta activa/)).toBeTruthy();
+    // Y NO se induce a crear una cuenta que puede existir.
+    expect(screen.queryByText(/No hay cuenta activa/)).toBeNull();
+    expect(screen.queryByText(/Sin movimientos/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Nueva demo" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+    expect(accountsMock.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("un fallo del ledger no se rotula como «sin movimientos» y se reintenta", async () => {
+    seedHappyPath();
+    apiMock.getAccountLedger.mockRejectedValueOnce(new Error("ledger down"));
+    renderPage();
+
+    const card = screen
+      .getByRole("heading", { level: 2, name: "Últimos movimientos" })
+      .closest("div.rounded-xl") as HTMLElement;
+    const scope = within(card);
+
+    expect(
+      await scope.findByText("No se pudieron cargar los movimientos."),
+    ).toBeTruthy();
+    expect(scope.queryByText(/Sin movimientos/)).toBeNull();
+
+    fireEvent.click(scope.getByRole("button", { name: "Reintentar" }));
+
+    // El vacío real sigue existiendo, pero solo cuando la consulta responde.
+    expect(await scope.findByText("Custodia anual")).toBeTruthy();
+    expect(scope.queryByText(/Sin movimientos/)).toBeNull();
   });
 });
 

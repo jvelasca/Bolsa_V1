@@ -73,7 +73,7 @@ function Metric({
 }
 
 function ActiveAccountPanel() {
-  const { account, effectiveAccountId, accounts, isLoading } =
+  const { account, effectiveAccountId, accounts, isLoading, isError, refetch } =
     useActiveAccount();
   const openWizard = useUiStore((s) => s.openCreateAccountWizard);
 
@@ -100,6 +100,16 @@ function ActiveAccountPanel() {
           </h2>
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando cuentas…</p>
+          ) : isError ? (
+            <>
+              <p role="alert" className="text-sm text-destructive">
+                No se pudieron cargar tus cuentas.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                No se puede afirmar que no tengas ninguna: reintenta antes de
+                crear otra demo.
+              </p>
+            </>
           ) : account ? (
             <>
               <div className="flex flex-wrap items-center gap-2">
@@ -132,13 +142,23 @@ function ActiveAccountPanel() {
             Gestionar cuentas
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
-          <button
-            type="button"
-            onClick={openWizard}
-            className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            Nueva demo
-          </button>
+          {isError ? (
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent"
+            >
+              Reintentar
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={openWizard}
+              className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              Nueva demo
+            </button>
+          )}
         </div>
       </div>
 
@@ -278,8 +298,14 @@ function QuickLinks() {
 }
 
 function RecentLedgerCard() {
-  const { account, effectiveAccountId } = useActiveAccount();
-
+  // U-1 — sin cuenta activa la query del ledger está DESHABILITADA, así que su
+  // `isError` sería siempre `false` y un fallo de `/accounts` se leería como «sin
+  // movimientos». La causa se toma del hook de cuentas.
+  const {
+    account,
+    effectiveAccountId,
+    isError: accountsError,
+  } = useActiveAccount();
   const ledgerQuery = useQuery({
     queryKey: ["ledger", effectiveAccountId],
     queryFn: async () => {
@@ -314,12 +340,33 @@ function RecentLedgerCard() {
         {ledgerQuery.isLoading && (
           <p className="text-sm text-muted-foreground">Cargando…</p>
         )}
-        {!ledgerQuery.isLoading && entries.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            Sin movimientos. Cuando operes o deposites, aparecerán aquí.
+        {!ledgerQuery.isLoading && accountsError && (
+          <p role="alert" className="text-sm text-destructive">
+            No se pudieron cargar los movimientos: no se pudo cargar la cuenta
+            activa.
           </p>
         )}
-        {entries.length > 0 && (
+        {!ledgerQuery.isLoading && !accountsError && ledgerQuery.isError && (
+          <div role="alert" className="space-y-1 text-sm text-destructive">
+            <p>No se pudieron cargar los movimientos.</p>
+            <button
+              type="button"
+              className="text-xs underline"
+              onClick={() => void ledgerQuery.refetch()}
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+        {!ledgerQuery.isLoading &&
+          !accountsError &&
+          !ledgerQuery.isError &&
+          entries.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Sin movimientos. Cuando operes o deposites, aparecerán aquí.
+            </p>
+          )}
+        {!accountsError && !ledgerQuery.isError && entries.length > 0 && (
           <ul className="space-y-2 text-sm">
             {entries.map((entry) => {
               // P1-04 — coste/entrada/neutral por papel del asiento.
