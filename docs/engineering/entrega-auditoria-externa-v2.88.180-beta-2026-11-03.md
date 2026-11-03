@@ -132,7 +132,10 @@ PostgreSQL. Se descartaron **44** exclusiones en el tag CI (48 de 92 honoradas) 
 El detalle, las cifras y los tres runs afectados están en
 [`evidence/v2.88.180/README.md`](./evidence/v2.88.180/README.md) §10.
 
-**Consecuencia declarada.** El tag `v2.88.180-beta` queda publicado y **rojo**; la certificación de C-1 sí quedó
-verde en `lifecycle-pg`. La corrección va en un sello **`.181`** —comentarios fuera del bloque y una prueba que
-impida la recaída— sin reabrir C-1 y sin mover este tag.
+**Consecuencia.** El tag `v2.88.180-beta` queda publicado y **rojo**; la certificación de C-1 sí quedó verde en
+`lifecycle-pg`. La corrección se publicó en el sello
+[`v2.88.181-beta`](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.181-beta) (tag anotado `587b7d92` →
+commit `7d9648b9`; GitHub Release de 2026-11-03T20:40:17Z, con
+[`Release tag CI` verde](https://github.com/jvelasca/Bolsa_V1/actions/runs/41704764605)) —comentarios fuera del
+bloque plegado y una prueba que impide la recaída— sin reabrir C-1 y sin mover este tag.
 
