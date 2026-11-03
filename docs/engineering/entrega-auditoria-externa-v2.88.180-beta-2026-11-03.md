@@ -113,12 +113,26 @@ $env:AUTO_CHAIN_READ_GAPS_PG_REQUIRED='1'
 
 ## 7. POST-TAG (identidad y corrida)
 
-Se completa en el commit `docs(evidence)` posterior al tag, para que el acto no se certifique a sí mismo:
+Medido en un descendiente del tag, para que el acto no se certifique a sí mismo:
 
 | Dato | Valor |
 | --- | --- |
-| Objeto del tag | pendiente de medir |
-| Commit apuntado | pendiente de medir |
-| `Release tag CI` | pendiente de medir |
-| GitHub Release | pendiente de medir |
-| Paso `Pytest C-1 readGaps (PG, fail if skipped)` | pendiente de medir |
+| Objeto del tag | `037c3656293a56c0e436c600a873f694050bb247` |
+| Commit apuntado | `92d66fc41b56b62c0a6824f9211611966f37c1b3` |
+| `Release tag CI` | [41683440085](https://github.com/jvelasca/Bolsa_V1/actions/runs/41683440085) → **`failure`** |
+| Paso `Pytest C-1 readGaps (PG, fail if skipped)` | **success** (y su guarda anti-`SKIPPED`, sin disparar) |
+| Job `python (ruff/imports/mypy/pytest offline)` | **failure**: 3 `FAILED` por `connection refused` a PostgreSQL en un job sin PostgreSQL |
+| Job `certify (aggregate + artifact)` | **failure** (agrega el anterior) |
+| GitHub Release | **NO creada** (un rojo no publica release; precedente `.177`/`.178`) |
+
+**Causa del rojo (no es C-1).** El commit de cableado `c9eaeeaf` metió comentarios `#` **dentro** del bloque
+plegado `run: >` de las listas de `--ignore` de `release-tag-ci.yml` y `python-ci.yml`. En un escalar plegado el
+`#` es texto del comando: comentó el resto de la lista y el job offline empezó a recoger ficheros que exigen
+PostgreSQL. Se descartaron **44** exclusiones en el tag CI (48 de 92 honoradas) y **45** en `Python CI` (52 de 97).
+El detalle, las cifras y los tres runs afectados están en
+[`evidence/v2.88.180/README.md`](./evidence/v2.88.180/README.md) §10.
+
+**Consecuencia declarada.** El tag `v2.88.180-beta` queda publicado y **rojo**; la certificación de C-1 sí quedó
+verde en `lifecycle-pg`. La corrección va en un sello **`.181`** —comentarios fuera del bloque y una prueba que
+impida la recaída— sin reabrir C-1 y sin mover este tag.
+

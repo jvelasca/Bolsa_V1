@@ -154,3 +154,51 @@ sigue verde: el fichero se **ejecuta**, no queda invisible.
   añade evidencia de resultados.
 - **DS-1, O-2, H-1 y GP-V190**: fuera de este tag (§2).
 - **El mecanismo productivo de reservas**: la corrección es del test (§5, `L-180-2`).
+
+## 10. POST-TAG — el CI del tag quedó **ROJO**, y la causa es del propio sello
+
+> **Veredicto:** `Release tag CI` **41683440085** → **`failure`**. **No se crea GitHub Release.** El tag
+> `v2.88.180-beta` (objeto `037c3656`, commit `92d66fc4`) queda **publicado y rojo**, como quedaron `.177` y
+> `.178`; se documenta aquí en vez de reescribir el tag (un tag es inmutable: moverlo rompería la
+> reproducibilidad del expediente).
+
+| Job | Resultado |
+| --- | --- |
+| `decision-spine`, `security`, `frontend`, `shared`, `playwright` (×4), `a7-gate`, `dr-verify`, `replay-repro` | **success** |
+| **`lifecycle-pg`** — incluidos **`Pytest C-1 readGaps (PG, fail if skipped)`** y **`Fail on skipped C-1 readGaps`** | **success** |
+| **`python (ruff/imports/mypy/pytest offline)`** | **failure** (3 `FAILED`) |
+| **`certify (aggregate + artifact)`** | **failure** (agrega el anterior) |
+
+**Lo que sí quedó certificado en el tag:** el paso dedicado de C-1 corrió y **pasó** en `lifecycle-pg` (junto con
+su guarda anti-`SKIPPED`, que no disparó). La certificación de C-1 sobre PostgreSQL real es, por tanto, verde en
+el tag; lo que falló es otra cosa.
+
+**La causa.** En el commit `c9eaeeaf` se insertaron **comentarios `#` dentro del bloque plegado `run: >`** de la
+lista de `--ignore` de dos workflows. En un escalar plegado cada línea es **texto del comando**, así que el `#`
+convirtió en comentario de shell **todo lo que venía detrás**: la lista de exclusiones se truncó en silencio y el
+job offline se puso a recoger ficheros que exigen PostgreSQL. Es exactamente el riesgo que el propio
+`release-tag-ci.yml` documenta desde V2.40.2 (líneas 857-864 del fichero) y que `python-ci.yml` arrastra igual.
+
+| Workflow | `--ignore` declarados | honorados | **descartados por el `#`** | Efecto medido |
+| --- | --- | --- | --- | --- |
+| `release-tag-ci.yml` (job `python`) | 92 | 48 | **44** | 3 `FAILED` (`test_f3b_alembic_data_epoch`, `test_mandate_sync_orphan_instrument` ×2) |
+| `python-ci.yml` (job `quality`) | 97 | 52 | **45** | 6 `FAILED` (los 3 anteriores + 3 de `chaos/live_a7`) |
+
+Los tres fallos son `sqlalchemy.exc.OperationalError: connection refused` a `127.0.0.1:5432`: ficheros que
+**necesitan** PostgreSQL ejecutándose en un job que **no tiene servicio de PostgreSQL**. No son un fallo de C-1 ni
+de producto: es el cableado el que dejó de aislar.
+
+**Runs afectados (mismo defecto, mismo commit `c9eaeeaf`):**
+
+| Run | Workflow | Rama/tag | Resultado |
+| --- | --- | --- | --- |
+| [41683440085](https://github.com/jvelasca/Bolsa_V1/actions/runs/41683440085) | `Release tag CI` | `v2.88.180-beta` | **failure** |
+| [41683439960](https://github.com/jvelasca/Bolsa_V1/actions/runs/41683439960) | `Python CI` | `v2.88.180-beta` | **failure** |
+| [41683396573](https://github.com/jvelasca/Bolsa_V1/actions/runs/41683396573) | `Python CI` | `seal/v2.88.180-beta` | **failure** |
+
+**Corrección (sello `.181`, sin reabrir C-1):** mover esos comentarios **fuera** del bloque `run: >` (como ya hace
+la nota V2.40.2 del propio fichero) restaura la lista completa de exclusiones; y añadir una prueba que **impida la
+recaída** —el hazard ya se documentó una vez y volvió a entrar—, de modo que un `#` dentro de un `run: >` falle en
+CI local en vez de degradar el job en silencio. El contenido funcional de C-1 **no** se toca: este sello ya lo
+certificó en `lifecycle-pg`.
+
