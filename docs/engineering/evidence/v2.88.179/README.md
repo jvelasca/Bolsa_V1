@@ -102,14 +102,42 @@ Cadena del pin en este sello:
 | `c5c96068` fix de la carrera del test | hecho |
 | `91af003b` bump `2.11.179-beta` | hecho |
 | `c1280773` re-anclaje del pin | hecho |
-| Tag anotado `v2.88.179-beta` | sobre el commit de este documento |
-| `Release tag CI` del tag | **§5.1** (POST-TAG) |
-| GitHub Release | **§5.1** (POST-TAG) |
+| Tag anotado `v2.88.179-beta` | `8fe47426`, pusheado |
+| `Release tag CI` del tag | **`success`** — run `41597599762`, **12 min 04 s** (**§5.1**) |
+| GitHub Release | [publicada](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.179-beta) (**§5.1**) |
 | Despliegue en `:8000` | **no realizado** y fuera de este sello |
 
-### 5.1 POST-TAG
+### 5.1 POST-TAG — `Release tag CI` del sello
 
-Pendiente de anotar tras el run del tag `v2.88.179-beta`.
+[`Release tag CI` 41597599762](https://github.com/jvelasca/Bolsa_V1/actions/runs/41597599762) sobre
+`8fe47426` (`v2.88.179-beta`): **`success`**, `2026-11-03T07:37:55Z` → `07:49:59Z` (**12 min 04 s**),
+**14 jobs `success`** + `certify (aggregate + artifact)` `success` + `playwright (integrated E2E, opt-in)`
+`skipped` (opt-in, como en los sellos anteriores).
+
+| Job | Duración | Evidencia del log |
+| --- | --- | --- |
+| `lifecycle-pg` | 7 m 24 s | **`Pytest persistencia del workspace PG` → `9 passed in 7,44 s`** (la certificación de `.178`, verde en el tag) · **`Pytest multiprocess AUTO` → `1 passed in 114,31 s`** |
+| `frontend` | 4 m 30 s | web **364 / 2728** · `contract:check` OK (aviso heredado: *uv no disponible; se omite la validación contra FastAPI*) |
+| `python` | 3 m 34 s | ruff **All checks passed!** · mypy **582** ficheros · `pytest` offline **5883 passed, 98 skipped** |
+| `playwright (mock E2E)` | 11 m 52 s | **144 passed** |
+| `replay-repro` | 5 m 15 s | **VEREDICTO `REPRODUCIDO`** (mismo contenido; sello en CRLF, fixture en LF) |
+| `playwright (integrated axe)` | 4 m 05 s | **32 passed** |
+| `playwright (integrated AUTO S5)` | 2 m 52 s | **7 passed** |
+| `playwright (live AUTO daily chain)` | 1 m 43 s | **2 passed** |
+| `shared` | 41 s | shared **101 / 883** (+1 todo) · **`window-pin freeze OK (8fe47426)`** |
+| `a7-gate` · `dr-verify` · `decision-spine` · `security` | 55 s · 50 s · 27 s · 11 s | `success` |
+| `certify (aggregate + artifact)` | 5 s | `success` |
+
+**Nota sobre `Pytest multiprocess AUTO`: 114,31 s.** Ese número es la prueba del diagnóstico: en el runner
+de CI la trancha tardó cerca de **dos minutos** en materializarse después de que la reserva existiera. La
+condición de salida vieja daba la fase 1 por resuelta en el primer poll, y el `assert released > 0` caía
+**5,68 s** después de arrancar. Con la salida corregida el test **espera lo que de verdad tiene que esperar**
+y mide el estado final, no el intermedio.
+
+**GitHub Release:** [**`v2.88.179-beta`**](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.179-beta)
+publicada como *latest* de la serie `v2.88.x`, con el resumen del sello y los enlaces a este expediente y a la
+revisión independiente. Los tags `v2.88.177-beta` y `v2.88.178-beta` siguen **sin** release: quedan como registro
+del rojo. **Despliegue en `:8000`:** no realizado (fuera del alcance del sello), igual que en `.176`–`.178`.
 
 ## 6. Falsabilidad
 
