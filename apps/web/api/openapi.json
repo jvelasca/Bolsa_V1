@@ -9590,6 +9590,20 @@
             "title": "Notes",
             "type": "array"
           },
+          "readGaps": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Readgaps",
+            "type": "object"
+          },
           "readOnly": {
             "default": true,
             "title": "Readonly",

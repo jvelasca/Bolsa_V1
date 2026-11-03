@@ -7940,6 +7940,10 @@ export interface components {
             };
             /** Notes */
             notes?: string[];
+            /** Readgaps */
+            readGaps?: {
+                [key: string]: string | null;
+            };
             /**
              * Readonly
              * @default true

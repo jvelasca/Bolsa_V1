@@ -118,12 +118,31 @@ const ATTRIBUTION_LABELS: Record<string, string> = {
     "Atribución mixta: los ciclos del valor no coinciden en un único estado; se muestran todos, sin elegir uno.",
 };
 
+/**
+ * Motivos de `unmeasured` que NO son «falta la identidad» sino «no se pudo LEER».
+ *
+ * C-1 (auditoría 2.88.179): un fallo de lectura de las propuestas del parte se publicaba
+ * aguas arriba como `not_proposed` («el ciclo nació sin propuesta»), la afirmación contraria
+ * al hueco real. Ahora llega como `unmeasured` con este motivo y la ficha lo dice tal cual.
+ */
+const UNMEASURED_REASON_LABELS: Record<string, string> = {
+  proposals_unreadable:
+    "Atribución no medible: no se pudieron leer las propuestas del parte (fallo de lectura, no ausencia de propuesta).",
+};
+
 /** Traduce el estado de atribución a una frase; un hueco se declara, no se disfraza. */
 export const describeAttribution = (
   attribution: EstudioChainAttributionV1 | null | undefined,
 ): string => {
   if (!attribution || !attribution.state) {
     return "Sin dato de atribución en este parte.";
+  }
+  // C-1: `unmeasured` por fallo de LECTURA se explica con su motivo, no como «falta identidad».
+  const reasonLabel = attribution.reason
+    ? UNMEASURED_REASON_LABELS[attribution.reason]
+    : undefined;
+  if (reasonLabel) {
+    return reasonLabel;
   }
   return (
     ATTRIBUTION_LABELS[attribution.state] ??

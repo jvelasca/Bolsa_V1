@@ -21,6 +21,7 @@ import pytest
 
 from bolsa_application.auto_chain_durable_reader import (
     CANONICAL_STEPS,
+    DAILY_PROPOSALS_UNREADABLE,
     best_scored_asset,
     build_chain_evidence_artifact,
     chain_gaps,
@@ -30,8 +31,10 @@ from bolsa_application.auto_chain_durable_reader import (
     executed_vs_dia_d,
     pnl_reconciliation,
     project_cycle_steps,
+    read_daily_proposals,
     read_top3_snapshot,
     read_top3_snapshots,
+    resolve_cycle_attribution,
     resolve_executed_vs_best,
     snapshot_as_of,
     value_strategy,
@@ -686,3 +689,124 @@ def test_artifact_without_a_photo_before_the_entry_declares_the_gap() -> None:
     assert compare["executedIsBestScoredAsset"] is None
     assert compare["anchor"]["reason"] == "no_snapshot_at_or_before_entry"
     assert compare["strategyMeasurement"] == "UNKNOWN"
+
+# ── C-1 (auditoría 2.88.179): el hueco de LECTURA no es «no propuesta» ────────────
+
+
+class _NestedTransaction:
+    async def __aenter__(self) -> _NestedTransaction:
+        return self
+
+    async def __aexit__(self, *_exc: object) -> bool:
+        return False
+
+
+class _BrokenSession:
+    """Sesión cuya consulta falla (BD caída o esquema sin 058)."""
+
+    def begin_nested(self) -> _NestedTransaction:
+        return _NestedTransaction()
+
+    async def execute(self, _stmt: Any) -> Any:
+        raise RuntimeError("db caída")
+
+
+class _EmptyResult:
+    def all(self) -> list[Any]:
+        return []
+
+
+class _EmptySession:
+    """Sesión que responde con cero filas."""
+
+    def begin_nested(self) -> _NestedTransaction:
+        return _NestedTransaction()
+
+    async def execute(self, _stmt: Any) -> Any:
+        return _EmptyResult()
+
+
+@pytest.mark.asyncio
+async def test_an_unreadable_proposal_source_is_not_an_empty_proposal_list() -> None:
+    """C-1: un fallo de lectura se DECLARA (``read=False``), no se disfraza de ``[]``."""
+    result = await read_daily_proposals(_BrokenSession(), "acc-1")
+
+    assert result.read is False
+    assert result.reason == DAILY_PROPOSALS_UNREADABLE
+    assert result.rows == ()
+
+
+@pytest.mark.asyncio
+async def test_a_readable_empty_source_is_distinguishable_from_a_failure() -> None:
+    """C-1: «no hay propuestas» (``read=True``) y «no se pudo leer» (``read=False``) difieren."""
+    result = await read_daily_proposals(_EmptySession(), "acc-1")
+
+    assert result.read is True
+    assert result.reason is None
+    assert result.rows == ()
+
+
+def test_an_unreadable_source_never_produces_not_proposed() -> None:
+    """C-1: sin propuestas Y sin lectura ⇒ ``unmeasured``/``proposals_unreadable``."""
+    attribution = resolve_cycle_attribution(_cycle(), [], proposals_read=False)
+
+    assert attribution["state"] == "unmeasured"
+    assert attribution["reason"] == DAILY_PROPOSALS_UNREADABLE
+    assert attribution["measurement"] == "UNKNOWN"
+
+
+def test_a_readable_source_without_links_still_says_not_proposed() -> None:
+    """C-1: cuando la lectura SÍ ocurrió, ``not_proposed`` sigue siendo la respuesta correcta."""
+    attribution = resolve_cycle_attribution(_cycle(), [], proposals_read=True)
+
+    assert attribution["state"] == "not_proposed"
+    assert attribution["reason"] == "no_daily_proposal"
+
+
+def test_a_journal_sealed_attribution_survives_an_unreadable_source() -> None:
+    """C-1: el hecho durable del journal manda; un fallo de lectura no lo degrada."""
+    cycle = {
+        **_cycle(),
+        "attribution": {"state": "exact", "reason": None, "measurement": "COMPLETE"},
+    }
+
+    attribution = resolve_cycle_attribution(cycle, [], proposals_read=False)
+
+    assert attribution["state"] == "exact"
+    assert attribution["measurement"] == "COMPLETE"
+
+
+# ── O-1 (auditoría 2.88.179): «consumida» es una decisión, no un fill ────────────
+
+
+def test_a_durable_link_labels_the_attribution_as_a_decision_not_a_fill() -> None:
+    """O-1: el enlace durable sella la propuesta al aprobar el plan, antes de la orden."""
+    cycle = {
+        **_cycle(),
+        "attribution": {
+            "state": "exact",
+            "reason": None,
+            "measurement": "COMPLETE",
+            "source": "durable_link",
+        },
+    }
+
+    artifact = build_chain_evidence_artifact(
+        account_id="acc",
+        estudio={"status": "ok", "instrumentIds": ["inst-1"]},
+        cycles=[cycle],
+    )
+
+    assert any("fill" in limit for limit in artifact["limits"]), (
+        "el artefacto debe rotular que el enlace durable no prueba un fill"
+    )
+
+
+def test_without_a_durable_link_the_artifact_adds_no_label() -> None:
+    artifact = build_chain_evidence_artifact(
+        account_id="acc",
+        estudio={"status": "ok", "instrumentIds": ["inst-1"]},
+        cycles=[_cycle()],
+    )
+
+    assert artifact["limits"] == []

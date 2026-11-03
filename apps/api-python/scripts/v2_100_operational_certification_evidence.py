@@ -302,6 +302,9 @@ async def _collect(args: argparse.Namespace) -> dict[str, Any]:
         estudio=estudio,
         cycles=read["cycles"],
         best_scored=read["bestScored"],
+        # C-1: sin este cableado el bundle certificaba con `readGaps` vacío aunque la
+        # lectura hubiera fallado (el artefacto por defecto no recibe los huecos).
+        read_gaps=read.get("readGaps"),
         as_of=captured_at,
         meta={
             "bump": "2.11.176-beta",
@@ -351,6 +354,10 @@ async def _collect(args: argparse.Namespace) -> dict[str, Any]:
         "windowProvenance": window_meta,
         "chainSummary": chain.get("summary"),
         "chainMeta": chain.get("meta"),
+        # C-1 (auditoría 2.88.179): el bundle copiaba solo `summary` y `meta`, así que un
+        # hueco de LECTURA (una etapa que no se pudo medir) desaparecía al certificar y el
+        # JSON decía lo mismo que «todo medido y vacío». Se copia el mapa de huecos.
+        "chainReadGaps": chain.get("readGaps"),
         "limits": [
             "El bundle LEE el material durable existente; NO ejecuta la ventana real.",
             "No fabrica: un dato ausente se declara None (hueco), nunca 0 (UNKNOWN != 0).",

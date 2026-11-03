@@ -22,7 +22,11 @@ import type {
   EstudioDailyValueV1,
 } from "@bolsa/shared";
 import { ESTUDIO_CHAIN_STEPS } from "@bolsa/shared";
-import { describeAttribution } from "@bolsa/shared";
+import {
+  chainReadGaps,
+  describeAttribution,
+  describeChainReadGaps,
+} from "@bolsa/shared";
 import { absentDataLabel, isAbsent } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import {
@@ -432,6 +436,10 @@ export function EstudioChainEvidence({
   const attributionLabel = attribution
     ? describeAttribution(attribution)
     : CHAIN_NOT_ATTRIBUTED_LABEL;
+  // C-1: un hueco de LECTURA se declara aparte de la atribución. Sin esto, una etapa que no
+  // se pudo medir era indistinguible de una etapa medida y vacía.
+  const readGaps = chainReadGaps(chain);
+  const readGapsLabel = describeChainReadGaps(chain);
 
   return (
     <section
@@ -449,6 +457,16 @@ export function EstudioChainEvidence({
       >
         {attributionLabel}
       </p>
+
+      {readGapsLabel ? (
+        <p
+          className="text-[9px] font-medium text-amber-700 dark:text-amber-400"
+          data-testid="estudio-chain-read-gaps"
+          data-read-gaps={readGaps.map((gap) => gap.stage).join(",")}
+        >
+          {readGapsLabel}
+        </p>
+      ) : null}
 
       {chainFailed ? (
         <p

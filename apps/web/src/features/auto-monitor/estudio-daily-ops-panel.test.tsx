@@ -1546,4 +1546,40 @@ describe("EstudioDailyOpsPanel", () => {
     expect(coverage.getAttribute("data-reconciled")).toBe("true");
     expect(screen.queryByTestId("estudio-daily-coverage-warning")).toBeNull();
   });
+
+  // C-1 (auditoría 2.88.179) — un `[]` de propuestas por fallo de lectura NO es «el parte no
+  // propuso nada»: la ficha declara el hueco y no lo confunde con una ausencia real.
+  it("declara en la ficha las etapas que NO se pudieron leer (C-1)", async () => {
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce({
+      ...CHAIN,
+      readGaps: { dailyProposals: "proposals_unreadable", diaD: null },
+    } as never);
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    const notice = aaa?.querySelector(
+      '[data-testid="estudio-chain-read-gaps"]',
+    );
+    expect(notice).toBeTruthy();
+    expect(notice?.getAttribute("data-read-gaps")).toBe("dailyProposals");
+    expect(notice?.textContent).toContain("propuestas diarias del parte");
+    expect(notice?.textContent).toContain("no es una ausencia real");
+    // La etapa medida (`diaD: null`) NO se anuncia como hueco.
+    expect(notice?.textContent).not.toContain("verificaciones DÍA-D");
+  });
+
+  it("con todas las etapas medidas no pinta ningún aviso de lectura", async () => {
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce({
+      ...CHAIN,
+      readGaps: { dailyProposals: null, diaD: null },
+    } as never);
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    expect(
+      aaa?.querySelector('[data-testid="estudio-chain-read-gaps"]'),
+    ).toBeNull();
+  });
 });

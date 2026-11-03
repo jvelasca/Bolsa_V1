@@ -72,6 +72,10 @@ class EstudioChainResponseDto(BaseModel):
     meta: dict[str, Any] = Field(default_factory=dict)
     limits: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    #: C-1 (auditoría 2.88.179) — etapas que NO se pudieron LEER, por nombre de etapa. ``None``
+    #: (o ausencia de la clave) significa «medida»; un motivo declara el hueco y aguas abajo el
+    #: estado de atribución es ``unmeasured``, nunca ``not_proposed``.
+    read_gaps: dict[str, str | None] = Field(default_factory=dict, alias="readGaps")
     #: Motivo legible cuando la lectura falla. Un hueco **medido** no lo rellena.
     error: str | None = None
 
@@ -137,6 +141,9 @@ async def get_auto_estudio_chain(
             cycles=read["cycles"],
             best_scored=read["bestScored"],
             best_scored_by_cycle=read.get("bestScoredByCycle"),
+            # C-1: los huecos de LECTURA acompañan a la evidencia; sin este cableado el
+            # artefacto publicaba lo mismo para «no hay propuestas» y «no se pudieron leer».
+            read_gaps=read.get("readGaps"),
             meta={
                 "engineId": resolved_engine,
                 "limit": int(limit),
@@ -180,4 +187,5 @@ async def get_auto_estudio_chain(
         meta=dict(artifact.get("meta") or {}),
         limits=list(artifact.get("limits") or []),
         notes=list(artifact.get("notes") or []),
+        read_gaps=dict(artifact.get("readGaps") or {}),
     )
