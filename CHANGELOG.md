@@ -2,6 +2,52 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.181-beta] — **SELLO CORRECTOR de `2.11.180-beta`: los comentarios salen del bloque plegado y una prueba impide la recaída** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** sello **corrector** sobre `2.11.180-beta`. Cambian **solo dos workflows y una prueba nueva**:
+ningún fichero de producto, motor, decisión, contrato HTTP ni esquema (`contract:check` **OK**; head sigue
+`062_sync_settings_check_backfill`). El contenido funcional de C-1 **no** se toca: ese sello ya lo certificó.
+
+**El rojo.** `v2.88.180-beta` quedó **ROJO** en
+[`Release tag CI` 41683440085](https://github.com/jvelasca/Bolsa_V1/actions/runs/41683440085): doce jobs
+`success` —**incluido `lifecycle-pg`, con el paso nuevo `Pytest C-1 readGaps` y su guarda anti-`SKIPPED`**— y dos
+`failure`: `python (ruff/imports/mypy/pytest offline)` y, por agregación, `certify`.
+
+**La causa.** En YAML, un escalar **plegado** (`run: >`) convierte cada línea en **texto del comando**, unido por
+espacios. El commit de cableado metió tres comentarios `#` **dentro** de la lista de `--ignore`; el `#` no es un
+comentario YAML, es el inicio de un comentario de **shell**: comentó todo lo que venía detrás en esa misma línea
+de comando.
+
+| Workflow | `--ignore` declarados | honorados | descartados | Efecto |
+| --- | --- | --- | --- | --- |
+| `release-tag-ci.yml` (job `python`) | 92 | 48 | **44** | 3 `FAILED` por `connection refused` |
+| `python-ci.yml` (job `quality`) | 97 | 52 | **45** | 6 `FAILED` (incluye `chaos/live_a7`) |
+
+Los ficheros PG-gated volvieron a recogerse en un job **sin** PostgreSQL, así que fallaron por conexión. No fue un
+fallo de producto ni de C-1: fue el cableado dejando de aislar. El propio `release-tag-ci.yml` documenta el hazard
+desde V2.40.2 (``estos comentarios van FUERA del bloque plegado``) y volvió a entrar por la puerta de atrás.
+
+**La corrección.**
+
+1. Los seis comentarios pasan a las líneas del **step**, por encima de `run: >`, donde sí son comentarios YAML.
+2. Nuevo [`test_workflow_folded_run_comments.py`](apps/api-python/tests/test_workflow_folded_run_comments.py),
+   que recorre los workflows con la **indentación real** (no con el YAML ya parseado, que perdería la distinción
+   plegado/literal) y **falla** ante cualquier `#` dentro de un `run: >`, nombrando fichero y línea. Incluye control
+   negativo del descubrimiento y un ancla de que `test_auto_chain_read_gaps_pg.py` sigue en `--ignore`: sin él, el
+   job offline volvería a romperse.
+
+**La prueba de que la guarda sirve.** El mismo algoritmo, aplicado al árbol de `.180`, señala el defecto
+(`92 declaradas / 48 honoradas`, `97 / 52`); aplicado a este árbol da `92 / 92` y `97 / 97`, sin `#` en el comando
+plegado. La comprobación es falsable: no pasa por construcción.
+
+**Verificación local de este árbol.** Guarda nueva **4 passed**; `a7-gate` + censo **10 passed**; bump guard
+**2 passed**; `ruff` **All checks passed**; `contract:check` **OK**; `window:freeze` **OK** y `window:test`
+**50 / 50**; YAML de los dos workflows válido; plegado real del comando `92/92` y `97/97`.
+
+**Lo que este sello NO cambia.** C-1 sigue siendo el de `.180` (`readGaps`, `unmeasured` ≠ `not_proposed`,
+certificación PG verde en `lifecycle-pg`). Los límites `L-180-1`…`L-180-4` siguen vigentes y DS-1, O-2, H-1 y
+GP-V190 siguen fuera. `.180` **no** publicó release: un tag rojo no se reescribe, se corrige en un sello posterior.
+
 ## [2.11.180-beta] — **C-1: la ficha de la cadena distingue «no se pudo leer» de «no hay propuesta», y la certificación viaja con el sello** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP aditivo (`readGaps`) · SIN migración · head `062_sync_settings_check_backfill`**)
 
 **Naturaleza:** sello de **publicación** sobre `2.11.179-beta` que incorpora el bloque **C-1** (lecturas
