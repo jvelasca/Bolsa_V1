@@ -477,6 +477,10 @@ jobs:
           --ignore=apps/api-python/tests/test_dia_d_cycle_verification_pg.py
           --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
           --ignore=apps/api-python/tests/test_scan_queue_health_pg.py
+          # C-1 (auditoría 2.88.179): readGaps solo se puede medir contra PostgreSQL real
+          # (esquema señuelo en ``search_path`` + SAVEPOINT). Corre en ``lifecycle-pg`` con
+          # gate ``AUTO_CHAIN_READ_GAPS_PG_REQUIRED``; aquí skipearía en mudo.
+          --ignore=apps/api-python/tests/test_auto_chain_read_gaps_pg.py
           --ignore=apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
@@ -558,6 +562,10 @@ jobs:
       STRATEGY_LIFECYCLE_PG_REQUIRED: '1'
       # T-1/T-2: salud de ``scan_jobs`` y dedupe durable del scan diario (JSONB real).
       SCAN_QUEUE_PG_REQUIRED: '1'
+      # C-1 (auditoría 2.88.179): un fallo de lectura de propuestas DENTRO del SAVEPOINT no
+      # aborta la sesión del tick, ``readGaps`` llega al artefacto y la atribución distingue
+      # ``unmeasured`` de ``not_proposed``. Un skip mudo dejaría C-1 sin certificar.
+      AUTO_CHAIN_READ_GAPS_PG_REQUIRED: '1'
       # 059/060: configuración de proveedores y política de comprobación.
       MARKET_PROVIDERS_PG_REQUIRED: '1'
       # 061: ``alembic check`` como gate real. La allowlist declara la deuda histórica;
@@ -598,6 +606,7 @@ jobs:
           apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
           apps/api-python/tests/test_strategy_lifecycle_pg.py
           apps/api-python/tests/test_scan_queue_health_pg.py
+          apps/api-python/tests/test_auto_chain_read_gaps_pg.py
           apps/api-python/tests/test_market_providers_pg.py
           apps/api-python/tests/test_schema_drift_gate_pg.py
           apps/api-python/tests/test_database_maintenance_pg.py
