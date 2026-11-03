@@ -158,12 +158,25 @@ async def test_n_real_processes_claim_one_signal_exactly_once_pg(mp_pg_factory: 
         procs = [_spawn(env, log_path) for _ in range(_PROCESSES)]
 
         # ── FASE 1 · la carrera se resuelve: alguien abre con fill PARCIAL ────────
+        # La condición de salida exige TAMBIÉN ``released > 0``: una reserva ``OPEN``
+        # nace con ``released_qty = 0`` y ``remaining_qty = pedido``, así que «hay
+        # posición y queda capital vivo» se cumple ANTES de que el fill materialice la
+        # primera trancha. Sin esta condición la carrera podía darse por resuelta en el
+        # primer poll y el ``assert released > 0`` de abajo fallaba sin margen — el
+        # rojo del `Release tag CI` 41594625695 (5,68 s) no era un fallo del producto,
+        # era el test midiendo un estado intermedio. El presupuesto de espera es el
+        # mismo (``_MAX_POLLS``); si la trancha no llega, el assert sigue fallando con
+        # el log de los procesos.
         for _ in range(_MAX_POLLS):
             await asyncio.sleep(_POLL_S)
             _alive(procs, log_path, phase="la carrera")
             positions = await _count_positions(mp_pg_factory, account_id)
             live = await _live_reservations(mp_pg_factory, account_id)
-            if positions >= 1 and any(float(r.remaining_qty or 0) > 0 for r in live):
+            if (
+                positions >= 1
+                and any(float(r.remaining_qty or 0) > 0 for r in live)
+                and any(float(r.released_qty or 0) > 0 for r in live)
+            ):
                 break
 
         positions = await _count_positions(mp_pg_factory, account_id)
