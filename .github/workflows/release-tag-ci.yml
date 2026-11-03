@@ -1074,6 +1074,16 @@ jobs:
         # y sumidero de auditoría) y la costura del worker entran con ANCLA explícita; su
         # certificación PG (``test_auto_operational_monitor_pg.py``) va en ``--ignore`` aquí y
         # corre en el job ``lifecycle-pg`` de este workflow con gate fail-if-skipped.
+        #
+        # C-1 (auditoría 2.88.179): ``readGaps`` exige PostgreSQL real (esquema señuelo en
+        # ``search_path`` + SAVEPOINT), así que ``test_auto_chain_read_gaps_pg.py`` va en
+        # ``--ignore`` aquí y corre en el paso dedicado ``Pytest C-1 readGaps`` de
+        # ``lifecycle-pg`` con ``AUTO_CHAIN_READ_GAPS_PG_REQUIRED=1`` y guarda anti-skip:
+        # sin PG skipearía en mudo y el job diría «verde» sin certificar nada.
+        # Este comentario va FUERA del bloque plegado a propósito: dentro de un ``run: >``
+        # cada línea es texto del comando y un ``#`` comentaría el resto de la lista de
+        # ``--ignore`` (V2.40.2). El escáner ``test_workflow_folded_run_comments.py`` impide
+        # que vuelva a entrar.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -1210,9 +1220,6 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_dia_d_trace_pg.py
           --ignore=apps/api-python/tests/test_auto_ops_job_attempt_cap_pg.py
           --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
-          # C-1 (auditoría 2.88.179): ``readGaps`` exige PostgreSQL real (esquema señuelo
-          # en ``search_path`` + SAVEPOINT). Va en el paso dedicado con gate; aquí
-          # skipearía en mudo y el job diría «verde» sin certificar nada.
           --ignore=apps/api-python/tests/test_auto_chain_read_gaps_pg.py
           --ignore=apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
