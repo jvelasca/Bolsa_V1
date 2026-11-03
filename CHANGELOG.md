@@ -2,6 +2,43 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.178-beta] — **SELLO CORRECTOR de `2.11.177-beta`: la persistencia del workspace también se certifica en el CI del TAG** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** sello **corrector** sobre `2.11.177-beta`. No cambia producto, motor, decisión, contrato HTTP ni
+esquema (`contract:check` **OK**; head sigue `062_sync_settings_check_backfill`). Corrige **un hueco de
+selección de tests** en el CI del tag.
+
+**El rojo.** El tag `v2.88.177-beta` quedó **ROJO** en
+[`Release tag CI` 41592978552](https://github.com/jvelasca/Bolsa_V1/actions/runs/41592978552): el job
+`python (ruff/imports/mypy/pytest offline)` murió en **`Pytest offline`** con **5 fallos** de
+`test_workspace_persistence.py` por `Connection refused` (ese job **no tiene** servicio PostgreSQL), sobre
+`5887 passed`. Los otros once jobs del tag fueron `success`, incluidos `frontend`, `shared`, `replay-repro`,
+`a7-gate`, `security`, `dr-verify`, `decision-spine` y los cuatro `playwright`.
+
+**La causa.** `d3236b5c` hizo la corrección y añadió el `--ignore` de ese fichero **solo** a
+`python-ci.yml`. El `release-tag-ci.yml` mantiene su **propia** lista de `pytest` offline, así que el fichero
+nuevo se recolectó allí sin base de datos. Es el riesgo que el propio `OBS-19` describe: la selección de tests
+está escrita a mano **por workflow**.
+
+**La corrección.** Dos cambios en `.github/workflows/release-tag-ci.yml`, espejo de lo que ya hace
+`python-ci.yml`:
+
+1. `--ignore=apps/api-python/tests/test_workspace_persistence.py` en el bloque `Pytest offline`, con el motivo
+   escrito **fuera** del `run: >` (un `#` dentro del plegado habría comentado el resto de la lista — el hazard
+   documentado en `V2.40.2`).
+2. Paso dedicado **`Pytest persistencia del workspace PG`** en el job `lifecycle-pg` del tag, después de
+   `Alembic upgrade head`: el fichero deja de estar «ignorado» para quedar **certificado en el tag**, no solo en
+   el CI por commit.
+
+**Verificado.** `test_ci_test_selection_census.py` **5 passed** (el fichero sigue contando como ejecutado en un
+job, ahora también en el del tag); el YAML parsea y el `run` offline no contiene `#`; `test_dia_d_bump_guard`
+**2 passed**; el resto de la evidencia de `.177` (revisión independiente, 14 passed de persistencia, sonda con
+reinicio, 364/2728 web, 101/883 shared, mypy 582) **se hereda** y no cambia: el árbol de producto es idéntico
+salvo el bump.
+
+**Bump** `2.11.177-beta` → `2.11.178-beta` (+ los **13** `meta.bump`, **14 literales**; el literal congelado
+`2.11.0-beta` de `v2_87` no se toca).
+
 ## [2.11.177-beta] — **guardar el espacio de trabajo deja de perder pestañas: concurrencia optimista atómica, cierre compacto y Visualizados derivados** (**`Δ motor = 0` · `Δ decisión = 0` · contrato **aditivo** · SIN migración · head `062_sync_settings_check_backfill`**)
 
 **Naturaleza:** sello de **corrección** sobre `2.11.176-beta`, posterior a la auditoría de persistencia del
