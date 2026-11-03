@@ -2,6 +2,36 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.179-beta] — **SELLO CORRECTOR de `2.11.178-beta`: la carrera multi-proceso espera la trancha, no la reserva** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** sello **corrector** sobre `2.11.178-beta`. Cambia **solo un test** (`test_auto_v46_multiprocess_pg.py`):
+ningún fichero de producto, motor, decisión, contrato HTTP ni esquema (`contract:check` **OK**; head sigue
+`062_sync_settings_check_backfill`).
+
+**El rojo.** El tag `v2.88.178-beta` quedó **ROJO** en
+[`Release tag CI` 41594625695](https://github.com/jvelasca/Bolsa_V1/actions/runs/41594625695): once jobs `success`
+—incluido el paso nuevo **`Pytest persistencia del workspace PG`**, que certifica en el tag lo que `.178` venía a
+corregir— y solo `lifecycle-pg` falló, en `Pytest multiprocess AUTO`, con `AssertionError: debe haber
+materializado ≥1 trancha` (`assert Decimal('0') > 0`) **en 5,68 s**.
+
+**La causa.** No es un fallo del producto ni del paso nuevo (que corre en ese job **antes** este test). La fase 1
+espera «hay posición y una reserva `OPEN` con `remaining_qty > 0`», y ese estado se cumple **en el instante en que
+la reserva nace**: `released_qty = 0`, `remaining_qty = pedido`. La primera trancha la materializa el fill, en un
+ciclo posterior del `auto_sim`. Si el primer poll cae en esa ventana —lo que pasó en el runner de CI, y no en las
+dos corridas locales, que tardaron 158 s en ver el estado— el `assert released > 0` de después fallaba sin margen.
+
+**La corrección.** La condición de salida exige ahora también `released_qty > 0`, con el **mismo** presupuesto de
+espera (`_MAX_POLLS` = 160 × 0,5 s = 80 s). Si la trancha no llega, el assert sigue fallando con el log de los tres
+procesos: el test no se debilita, deja de medir un estado intermedio.
+
+**Verificado.** `test_auto_v46_multiprocess_pg.py` **1 passed in 158,08 s** contra PostgreSQL real
+(`bolsa_v1_audit`, `AUTO_MULTIPROCESS_PG_REQUIRED=1`), con y sin la corrección: el rojo es de **carrera**, no de
+timing del runner. `test_dia_d_bump_guard` **2 passed**; la evidencia de `.177`/.178 (revisión independiente,
+14 passed de persistencia, sonda con reinicio, 364/2728 web, 101/883 shared, mypy 582) **se hereda** y no cambia.
+
+**Bump** `2.11.178-beta` → `2.11.179-beta` (+ los **13** `meta.bump`, **14 literales**; el literal congelado
+`2.11.0-beta` de `v2_87` no se toca).
+
 ## [2.11.178-beta] — **SELLO CORRECTOR de `2.11.177-beta`: la persistencia del workspace también se certifica en el CI del TAG** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
 
 **Naturaleza:** sello **corrector** sobre `2.11.177-beta`. No cambia producto, motor, decisión, contrato HTTP ni
