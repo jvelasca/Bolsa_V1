@@ -307,7 +307,7 @@ async def _collect(args: argparse.Namespace) -> dict[str, Any]:
         read_gaps=read.get("readGaps"),
         as_of=captured_at,
         meta={
-            "bump": "2.11.179-beta",
+            "bump": "2.11.180-beta",
             "phase": "V2.100 OPERATIONAL CERTIFICATION EVIDENCE",
             "nature": "INVESTIGACION",
             "account": account_id,
@@ -339,7 +339,7 @@ async def _collect(args: argparse.Namespace) -> dict[str, Any]:
         "readOnly": True,
         "substitutesRealOperation": False,
         "meta": {
-            "bump": "2.11.179-beta",
+            "bump": "2.11.180-beta",
             "phase": "V2.100 OPERATIONAL CERTIFICATION EVIDENCE",
             "nature": "OPERACION",
             "account": account_id,

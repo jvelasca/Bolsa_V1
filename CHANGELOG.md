@@ -2,6 +2,69 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.180-beta] — **C-1: la ficha de la cadena distingue «no se pudo leer» de «no hay propuesta», y la certificación viaja con el sello** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP aditivo (`readGaps`) · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** sello de **publicación** sobre `2.11.179-beta` que incorpora el bloque **C-1** (lecturas
+tipadas de la cadena y `readGaps`) con su evidencia y su certificación de integración. **`Δ motor = 0`** · 
+**`Δ decisión = 0`**: no se toca selección, umbrales, reparto, régimen ni ejecución. El contrato HTTP es
+**aditivo** (`readGaps`, opcional); `contract:check` **OK**. Sin migración: head sigue
+`062_sync_settings_check_backfill`.
+
+**El hueco que cierra.** El lector durable de la cadena devolvía «sin propuestas» cuando la lectura **fallaba**,
+así que un error transitorio de PostgreSQL —o un esquema sin la migración `058`— quedaba indistinguible de una
+ausencia legítima: la ficha afirmaba `not_proposed` sobre un hecho que **no se había medido**. Ahora cada etapa
+declara su estado de lectura en `readGaps` y la atribución de un ciclo cuyas propuestas no se pudieron leer es
+`unmeasured`, **nunca** `not_proposed`.
+
+| Regla dura | Comportamiento |
+| --- | --- |
+| `unmeasured` ≠ `not_proposed` | el fallo de lectura se declara con su motivo (`proposals_unreadable`) |
+| El veredicto del journal no se degrada | un `exact` ya sellado se mantiene; el hueco va por su canal |
+| Servidores anteriores compatibles | clave opcional y aditiva; `schemaVersion` no sube |
+| Motivos desconocidos no desaparecen | se conservan y se muestran en crudo |
+
+**Cómo se lee sin romper la sesión del tick.** La lectura va sellada en `SAVEPOINT` (`begin_nested`) **por
+etapa**: en PostgreSQL un statement fallido aborta la transacción de la sesión, y esa sesión es la del tick. Sin
+el savepoint, un solo error vaciaba varios eslabones a la vez (propuestas y DÍA-D comparten sesión). La prueba por
+mutación lo demuestra: al retirar el `begin_nested` de `read_daily_proposals`, el test falla con
+`InFailedSqlTransaction`.
+
+**Superficie de UI.** Publicar el dato no bastaba: la ficha seguía sin distinguir «no hay propuestas» de «no se
+pudo leer». `estudio-chain-evidence.tsx` pinta ahora un aviso (`data-read-gaps="<etapas>"`) que nombra la etapa
+y el motivo: «Etapas no leídas: propuestas diarias del parte (falló la lectura). Su ausencia no es una ausencia
+real.»
+
+**El test multiproceso, corregido otra vez y por la razón correcta.** `.179` exigía `released_qty > 0` **con**
+cola viva, así que con un fill **completo** (reserva `RELEASED_BY_FILL`, cola cero) el bucle no rompía nunca y
+gastaba los 80 s de presupuesto —los **114,31 s** del job en el tag `.179`—. Este sello espera el hecho que el
+test asserta: `released > 0` **y** `released + remaining == requested`, condición estable en cualquier punto
+intermedio. Sigue sin tocarse el producto: la ventana entre el commit de la posición y el de la liberación es
+deliberada y la reconcilia el arranque.
+
+**El cierre del flaky, con su red.** La evidencia de `lab discovery` remitía a un test de determinismo que solo
+vivía en el árbol de trabajo; se incorpora al sello: ejecuta el mismo caso dos veces y exige identidad exacta de
+campeón, trials, CPCV, WF y PBO. Un no-determinismo futuro falla ahí, con nombre, en vez de aparecer como flaky.
+
+**El cableado de CI, aislado.** El gate `AUTO_CHAIN_READ_GAPS_PG_REQUIRED` y el paso dedicado con guarda
+anti-`SKIPPED` entran en `python-ci.yml` y en el CI del tag **solo para C-1**. DS-1, O-2, H-1 y GP-V190 no se
+mezclan con este sello.
+
+**Lo que este sello NO acredita.** Queda declarado en `docs/engineering/evidence/v2.88.180/README.md`: DS-1, O-2,
+H-1 y GP-V190 no están en este árbol; la matriz PG combinada de `certificacion-pg-c1-ds1-o2-2026-11-03` se midió
+sobre un árbol que sí los contenía y aquí solo se acreditan las filas de C-1 (`L-180-1`); la corrección del test
+no certifica el mecanismo productivo de reservas (`L-180-2`); toda etapa nueva debe traer su lector tipado
+(`L-180-3`); el dwell de FASE 2 sigue fijo en 30 s (`L-180-4`).
+
+**Verificación local de este árbol.** C-1 PG **6 passed** (0 skipped, `AUTO_CHAIN_READ_GAPS_PG_REQUIRED=1`);
+multiproceso **2 passed in 36,09 s** (frente a 114,31 s en `.179`); `lab discovery` **9 passed**; bump guard,
+censo de selección de tests y wiring del `a7-gate` **12 passed**; `ruff` **All checks passed**; `shared`
+**891 passed** (1 todo); `tsc` de `shared` y `web` limpios; `contract:check` **OK**.
+
+**Contenido del sello.** Los cambios funcionales y su evidencia viajan en commits propios sobre `.179`; el bump
+(`2.11.179-beta` → `2.11.180-beta`, **13** `meta.bump`, **14 literales**; el literal congelado `2.11.0-beta` de `v2_87` no
+se toca) y el re-anclaje del pin PAPER van en commits separados, en ese orden, porque los `meta.bump` viven en
+`apps/` y mueven `appsHash`.
+
 ## [2.11.179-beta] — **SELLO CORRECTOR de `2.11.178-beta`: la carrera multi-proceso espera la trancha, no la reserva** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
 
 **Naturaleza:** sello **corrector** sobre `2.11.178-beta`. Cambia **solo un test** (`test_auto_v46_multiprocess_pg.py`):
