@@ -314,14 +314,18 @@ export const accountSlice: WorkspaceSlice = (get, set) => ({
       return true;
     } catch (err) {
       set({ isSaving: false });
-      if (err instanceof ApiError && err.status === 409 && !conflictRetried) {
-        // Otra pestaña/dispositivo guardó antes: refusionar y reintentar una vez.
-        conflictRetried = true;
-        const resolved = await resolveWorkspaceConflict(get, set);
-        if (resolved) {
-          const retried = await get().saveToServer();
-          if (retried) return true;
+      if (err instanceof ApiError && err.status === 409) {
+        if (!conflictRetried) {
+          // Otra pestaña/dispositivo guardó antes: refusionar y reintentar una vez.
+          conflictRetried = true;
+          const resolved = await resolveWorkspaceConflict(get, set);
+          if (resolved && (await get().saveToServer())) return true;
         }
+        // El conflicto persiste: NO es un 4xx sin arreglo. Se reprograma con
+        // backoff y el siguiente intento vuelve a refusionar una vez; sin esto el
+        // reintento fallido caía en la rama de alerta y el guardado quedaba
+        // atascado con `conflictRetried` en true para siempre.
+        conflictRetried = false;
         scheduleWorkspaceSaveRetry(get);
         return false;
       }

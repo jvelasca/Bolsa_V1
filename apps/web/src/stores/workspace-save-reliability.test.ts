@@ -166,6 +166,50 @@ describe("saveToServer — concurrencia optimista", () => {
     expect(useWorkspaceStore.getState().isDirty).toBe(false);
   });
 
+  it("409 persistente → reprograma en vez de alertar y atascarse", async () => {
+    // Regresión W-2: el reintento interno que volvía a conflictuar caía en la rama
+    // 4xx, alertaba y dejaba `conflictRetried` en true. Desde ahí, cualquier 409
+    // posterior alertaba y NO reprogramaba: el guardado quedaba atascado.
+    vi.useFakeTimers();
+    resetStore([tab("t1", "SAN")]);
+    updateWorkspace
+      .mockRejectedValueOnce(new MockApiError("workspace_conflict", 409))
+      .mockRejectedValueOnce(new MockApiError("workspace_conflict", 409))
+      .mockRejectedValueOnce(new MockApiError("workspace_conflict", 409))
+      .mockResolvedValueOnce(serverResponse("2026-11-02T10:02:00+00:00"));
+    getWorkspace.mockResolvedValue({
+      data: {
+        id: "ws-1",
+        name: "Espacio",
+        isDefault: false,
+        document: {
+          ...DEFAULT_WORKSPACE,
+          charts: [tab("s1", "SAN")],
+          updatedAt: "2026-11-02T10:00:30.000Z",
+        },
+        dockLayout: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-11-02T10:00:30+00:00",
+      },
+    });
+
+    const ok = await useWorkspaceStore.getState().saveToServer();
+    expect(ok).toBe(false);
+    // El primer 409 no alerta: se refusiona y se reintenta.
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(updateWorkspace).toHaveBeenCalledTimes(2);
+    expect(useWorkspaceStore.getState().isDirty).toBe(true);
+
+    // El tercer PUT también conflicta: se refusiona otra vez y el cuarto guarda.
+    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.runOnlyPendingTimersAsync();
+
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(updateWorkspace).toHaveBeenCalledTimes(4);
+    expect(getWorkspace).toHaveBeenCalledTimes(2);
+    expect(useWorkspaceStore.getState().isDirty).toBe(false);
+  });
+
   it("fallo de red → no lanza, sigue dirty y programa reintento", async () => {
     vi.useFakeTimers();
     resetStore();
