@@ -918,6 +918,13 @@ jobs:
         # y la identidad de estrategia en el payload entran explícitos/pase de directorio.
         # El día REAL (proceso scheduler + PG) se certifica en el job lifecycle-pg del tag
         # con su gate fail-if-skipped, así que va en ``--ignore`` de este job offline.
+        # v2.88.178 (SELLO CORRECTOR de v2.88.177): ``test_workspace_persistence.py``
+        # exige PostgreSQL real (concurrencia optimista, cierre compacto y relectura tras
+        # reiniciar la app) y va en ``--ignore`` aquí + paso dedicado en ``lifecycle-pg``,
+        # igual que en ``python-ci.yml``. El tag ``v2.88.177-beta`` quedó ROJO por NO
+        # tenerlo (run 41592978552: 5 ``Connection refused`` en este mismo step): el
+        # fichero nacía en ese commit y el ``--ignore`` solo se añadió al workflow por
+        # commit, no al del tag.
         # V2.46/AUTO-6 (Crash/Recovery + Concurrent AUTO): las dos capas herméticas
         # (``test_auto_v46_crash_recovery.py`` y ``test_auto_v46_concurrent.py``) entran por
         # el pase de directorio de ``apps/api-python/tests``. Sus gemelos PG
@@ -1158,6 +1165,7 @@ jobs:
           --ignore=apps/api-python/tests/integration
           --ignore=apps/api-python/tests/test_lists.py
           --ignore=apps/api-python/tests/test_workspaces.py
+          --ignore=apps/api-python/tests/test_workspace_persistence.py
           --ignore=apps/api-python/tests/test_health.py
           --ignore=apps/api-python/tests/test_auth.py
           --ignore=apps/api-python/tests/test_account_isolation.py
@@ -1453,6 +1461,17 @@ jobs:
 
       - name: Alembic upgrade head
         run: cd packages/py/infrastructure && uv run alembic upgrade head
+
+      # v2.88.178 (SELLO CORRECTOR de v2.88.177): la certificación de persistencia del
+      # workspace también viaja en el CI del TAG, no solo en el CI por commit. Sin este
+      # paso, el ``--ignore`` del job offline dejaba el fichero SIN certificar en el tag
+      # (y sin el ``--ignore`` el job offline moría sin BD: run 41592978552).
+      - name: Pytest persistencia del workspace PG
+        run: >
+          uv run pytest
+          apps/api-python/tests/test_workspace_persistence.py
+          -q
+          --tb=short
 
       # G2 / `OBS-19` (2026-10-03) — tanda W-G2/2 del agujero DECLARADO de selección de tests.
       # Estos 32 ficheros existían y NO los ejecutaba ningún job: el job offline los deja fuera
