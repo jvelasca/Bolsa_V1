@@ -355,6 +355,20 @@ describe("describeAttribution", () => {
   it("un hueco se declara como hueco, no como estado", () => {
     expect(describeAttribution(null)).toContain("Sin dato de atribución");
   });
+
+  // C-1 (auditoría 2.88.179): un fallo de lectura de las propuestas del parte llegaba como
+  // `not_proposed` («el ciclo nació sin propuesta»), lo contrario del hueco real. Ahora llega
+  // como `unmeasured` con motivo propio y la ficha lo dice sin jerga.
+  it("distingue «no se pudo leer» de «falta identidad»", () => {
+    const unreadable = {
+      ...attribution("unmeasured"),
+      reason: "proposals_unreadable",
+    } as EstudioChainAttributionV1;
+
+    const text = describeAttribution(unreadable);
+    expect(text).toContain("no se pudieron leer las propuestas");
+    expect(text).not.toContain("falta la identidad");
+  });
 });
 
 describe("aggregateAttribution", () => {

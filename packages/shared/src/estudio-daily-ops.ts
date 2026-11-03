@@ -485,8 +485,71 @@ export type EstudioChainResponseV1 = {
   meta: Record<string, unknown>;
   limits: string[];
   notes: string[];
+  /**
+   * C-1 (auditoría 2.88.179) — etapas que NO se pudieron LEER, por nombre de etapa.
+   * `null` (o ausencia de la clave) significa «medida»; un motivo declara el hueco. Es
+   * distinto de una etapa sin datos: la atribución de un ciclo sin propuestas legibles es
+   * `unmeasured`, nunca `not_proposed`.
+   *
+   * Opcional a propósito: un servidor anterior a C-1 no envía la clave, y su ausencia debe
+   * leerse como «no declarado», no como «todo medido». `describeChainReadGaps` la tolera.
+   */
+  readGaps?: Record<string, string | null>;
   error: string | null;
 };
+
+/** Nombre legible de cada etapa que puede declarar un hueco de LECTURA. */
+const READ_GAP_STAGE_LABELS: Record<string, string> = {
+  dailyProposals: "propuestas diarias del parte",
+  diaD: "verificaciones DÍA-D",
+};
+
+/** Motivo legible de un hueco de lectura conocido; el código crudo se declara tal cual. */
+const READ_GAP_REASON_LABELS: Record<string, string> = {
+  proposals_unreadable: "falló la lectura",
+  dia_d_unreadable: "falló la lectura",
+};
+
+export type EstudioChainReadGapV1 = { stage: string; reason: string };
+
+/**
+ * Huecos de LECTURA declarados por el servidor (C-1). Lista VACÍA = todas las etapas medidas.
+ *
+ * Una clave con `null` significa «medida»; solo un motivo no vacío es un hueco. Se ordena por
+ * etapa para que la ficha no cambie de orden entre renders (el `Record` del servidor no
+ * garantiza orden estable al serializarse).
+ */
+export function chainReadGaps(
+  chain: Pick<EstudioChainResponseV1, "readGaps"> | null | undefined,
+): EstudioChainReadGapV1[] {
+  const gaps = chain?.readGaps ?? {};
+  return Object.entries(gaps)
+    .filter(
+      ([, reason]) => typeof reason === "string" && reason.trim().length > 0,
+    )
+    .map(([stage, reason]) => ({ stage, reason: (reason as string).trim() }))
+    .sort((a, b) => a.stage.localeCompare(b.stage));
+}
+
+/**
+ * Frase para la ficha: dice QUÉ no se pudo leer y por qué. `null` si no hay ningún hueco.
+ *
+ * Sin esto, un `[]` de propuestas por fallo de lectura se leía igual que «el parte no propuso
+ * nada» —la afirmación contraria al hueco real—.
+ */
+export function describeChainReadGaps(
+  chain: Pick<EstudioChainResponseV1, "readGaps"> | null | undefined,
+): string | null {
+  const gaps = chainReadGaps(chain);
+  if (gaps.length === 0) return null;
+  const parts = gaps.map(
+    ({ stage, reason }) =>
+      `${READ_GAP_STAGE_LABELS[stage] ?? stage} (${
+        READ_GAP_REASON_LABELS[reason] ?? reason
+      })`,
+  );
+  return `Etapas no leídas: ${parts.join(", ")}. Su ausencia no es una ausencia real.`;
+}
 
 /* ────────────────────────────────────────────────────────────────────────────
  * DÍA-D del valor (`GET /auto/dia-d-replay/{day}/value/{symbol}`)
