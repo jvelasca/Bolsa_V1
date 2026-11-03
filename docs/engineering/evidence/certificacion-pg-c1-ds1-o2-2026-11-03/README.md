@@ -3,6 +3,15 @@
 **Fecha:** 2026-11-03
 **Alcance:** cierre de las seis condiciones de integración que el dictamen exigía antes de sellar el bloque de concurrencia/atribución. Solo se marca verde lo que se ejecutó contra PostgreSQL real; ningún `skipped` cuenta como prueba superada.
 
+> **Corrección de alcance (sello `v2.88.180-beta`, 2026-11-03).** La matriz de esta página se
+> midió sobre un **árbol de trabajo** que contenía C-1 **y también** DS-1 y O-2, y por eso
+> certifica 28 pruebas de cuatro ficheros. El sello `v2.88.180-beta` publica **solo C-1**: en su
+> árbol existen y se cablean únicamente `test_auto_chain_read_gaps_pg.py` (filas **1, 1b, 6, 6b,
+> 6c y 6d** de la matriz) con el gate `AUTO_CHAIN_READ_GAPS_PG_REQUIRED`. DS-1 (`scan_job_lease`),
+> O-2 (savepoint del sumidero) y sus ficheros **no** están en ese sello; sus filas de esta página
+> siguen siendo evidencia del árbol donde se midieron, **no** del tag `.180`. Ver
+> [`../v2.88.180/README.md`](../v2.88.180/README.md) §2 y el límite `L-180-1`.
+
 ## Entorno de la corrida
 
 | Dato | Valor |
