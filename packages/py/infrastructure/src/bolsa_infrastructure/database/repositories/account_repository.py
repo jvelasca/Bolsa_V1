@@ -474,11 +474,26 @@ class SqlAlchemyAccountRepository:
             raise ValueError("Cuenta no encontrada")
         return dict(row.settings_json) if row.settings_json else None
 
-    async def merge_settings_json(self, account_id: str, fragment: dict[str, Any]) -> dict[str, Any]:
-        """Fusiona claves en settings_json sin pasar por AccountSettings (F4 equityMarks)."""
+    async def merge_settings_json(
+        self,
+        account_id: str,
+        fragment: dict[str, Any],
+        *,
+        require_open: bool = False,
+    ) -> dict[str, Any]:
+        """Fusiona claves en settings_json sin pasar por AccountSettings (F4 equityMarks).
+
+        ``require_open`` lo activan las rutas que escriben **en nombre del usuario**:
+        una cuenta cerrada es registro histórico y no admite cambios. Por defecto
+        queda abierto porque los escritores internos (``equityMarks``,
+        ``labEvidence``) registran hechos ya ocurridos y no son ediciones de la
+        configuración de una cuenta fuera de operación.
+        """
         row = await self._session.get(InvestmentAccountRow, account_id)
         if row is None:
             raise ValueError("Cuenta no encontrada")
+        if require_open and row.status == "closed":
+            raise AccountClosedError()
         current = dict(row.settings_json) if row.settings_json else settings_to_dict(default_account_settings())
         current.update(fragment)
         row.settings_json = current

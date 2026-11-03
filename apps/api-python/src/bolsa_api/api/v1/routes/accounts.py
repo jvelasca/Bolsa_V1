@@ -331,12 +331,21 @@ async def patch_account_broker_venue(
     body: AccountBrokerVenueBody,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AccountBrokerVenueResponse:
-    """PA-1 — escribe settings_json.brokerVenue vía merge (≠ POST /risk/broker-venue)."""
+    """PA-1 — escribe settings_json.brokerVenue vía merge (≠ POST /risk/broker-venue).
+
+    CTA-D5/CL-1: una cuenta cerrada es registro histórico; esta preferencia la
+    elige el usuario y no un hecho ya ocurrido, así que la escritura se rechaza
+    igual que las de datos, configuración y perfil (409 ``account_closed``).
+    """
     chosen = normalize_broker_venue(body.venue)
     try:
         await get_account_repository(session).merge_settings_json(
-            account_id, {"brokerVenue": chosen}
+            account_id, {"brokerVenue": chosen}, require_open=True
         )
+    except AccountClosedError as exc:
+        # Antes que ``ValueError``: ``AccountClosedError`` hereda de él y si no,
+        # el cierre se traduciría a un 404 «Cuenta no encontrada».
+        raise _account_closed_http_error(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     effective = await effective_broker_venue_async(account_venue=chosen)

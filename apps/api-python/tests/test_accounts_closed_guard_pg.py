@@ -16,6 +16,9 @@ Casos que fija esta suite (ASGI contra ``DATABASE_URL``):
    fallar con 500 al resolver su scope (que solo admite activas).
 6. **make-default**: ``POST /accounts/{id}/make-default`` sobre una cuenta cerrada
    responde 409 ``account_closed`` y **no** mueve el default vigente del owner.
+7. **CL-1**: ``PATCH /accounts/{id}/broker-venue`` sobre una cuenta cerrada responde
+   409 ``account_closed`` y **no** reescribe ``settings_json.brokerVenue`` (antes
+   era la única puerta de escritura que quedaba abierta en una cuenta archivada).
 
 Si PostgreSQL no responde se salta, salvo ``CTA_PG_REQUIRED=1``.
 """
@@ -241,6 +244,44 @@ async def test_closed_account_cannot_be_made_default(
         after = await client.get(f"/api/accounts/{account_id}")
         assert after.status_code == 200, after.text
         assert after.json()["data"]["isDefault"] is False
+    finally:
+        await _dispose_account(client, account_id)
+
+
+async def test_closed_account_rejects_broker_venue_write(
+    api: tuple[AsyncClient, async_sessionmaker[AsyncSession]],
+) -> None:
+    """CL-1 — la preferencia Paper|Live tampoco se escribe en una cuenta cerrada.
+
+    ``patch_account_broker_venue`` iba directo a ``merge_settings_json``, que no
+    miraba el estado de cierre: respondía 200 y cambiaba ``settings_json`` y
+    ``updated_at`` de una cuenta archivada. La guarda vive en la ruta (con
+    ``require_open``) para no cerrar la puerta a los escritores internos que
+    registran hechos ya ocurridos.
+    """
+    client, _factory = api
+    stamp = int(time.time())
+    account_id = await _create_account(client, f"CU-CL-1 {stamp}")
+
+    try:
+        chosen = await client.patch(
+            f"/api/accounts/{account_id}/broker-venue", json={"venue": "paper"}
+        )
+        assert chosen.status_code == 200, chosen.text
+        assert chosen.json()["preference"] == "paper"
+
+        closed = await client.post(f"/api/accounts/{account_id}/close")
+        assert closed.status_code in (200, 204), closed.text
+
+        blocked = await client.patch(
+            f"/api/accounts/{account_id}/broker-venue", json={"venue": "live"}
+        )
+        _assert_account_closed(blocked)
+
+        # La escritura rechazada no se aplicó a medias.
+        venue = await client.get(f"/api/accounts/{account_id}/broker-venue")
+        assert venue.status_code == 200, venue.text
+        assert venue.json()["preference"] == "paper"
     finally:
         await _dispose_account(client, account_id)
 
