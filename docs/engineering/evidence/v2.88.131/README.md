@@ -54,7 +54,7 @@ Núcleo **puro/read-only** que proyecta la cadena COMPLETA por ciclo reutilizand
 - `executed_vs_dia_d(...)` — coincidencia de identidad entre el ciclo y su verificación DÍA-D: `True`/`False` solo con **ambas** partes; con una sola, `None` (`UNKNOWN ≠ 0`).
 - `dia_d_link(...)` — declara `linkable` + el borrador de `upsert` **reutilizando** [`build_dia_d_cycle_verification_draft`](../../../../packages/py/application/src/bolsa_application/dia_d_cycle_verification.py) (sin duplicar sus precondiciones); borrador incompleto ⇒ `None` + `linkable = False`.
 - `pnl_reconciliation(cycle)` — conciliación `CYCLE_CLOSED.pnl` vs `SETTLEMENT.pnl` **al quantum del dinero** (`NUMERIC(18,6)`, `ROUND_HALF_UP` `1e-6`); sin ambas cifras ⇒ `None` (nunca un `True` optimista).
-- `build_chain_evidence_artifact(...)` — artefacto canónico **puro y determinista** (`kind: AUTO_ESTUDIO_CHAIN_EVIDENCE`, `schemaVersion: auto-estudio-chain-v1`, `readOnly: true`): agrupa por valor de ESTUDIO, publica por ciclo la cadena + identidad + `executedVsBest` + `executedVsDiaD`/`diaDLink` + P&L y por valor `strategy`/`strategyDiaD`, y declara aparte los ciclos **fuera** del universo ESTUDIO (`cyclesOutsideEstudio`) **sin** descartarlos en silencio.
+- `build_chain_evidence_artifact(...)` — artefacto canónico **puro y determinista** (`kind: AUTO_ESTUDIO_CHAIN_EVIDENCE`, `schemaVersion: auto-estudio-chain-v1`, `readOnly: true`): agrupa por valor de ESTUDIO, publica por ciclo la cadena + identidad + `executedVsBest` + `executedVsDiaD`/`diaDLink` + P&L y por valor `strategy`/`strategyDiaD`, y declara aparte los ciclos **fuera** del universo ESTUDIO (`cyclesOutsideEstudio`) **sin** descartarlos en silencio. **Addendum 2026-11-03 (C-1):** publica además `readGaps`, el mapa de etapas que **no se pudieron leer** — ver [§10](#10-addendum-2026-11-03--contrato-de-readgaps-c-1).
 - `read_top3_snapshot` / `read_dia_d_verifications` / `read_estudio_chain_evidence` — lectores **read-only** (`SELECT`) que enlazan la foto TOP3 y la verificación DÍA-D por `cycle_id` (la verificación viaja con `instrument_id`/`symbol` para poder recomponer su borrador canónico).
 - `day_durable_chain_counts(session, account_id, day)` — cuentas durables por etapa contable (`SIGNAL`/`TOP_N`/`RISK`/`ORDER`/`SETTLEMENT`) del día `[00:00, +24h)` UTC; fuente ilegible ⇒ `None` (hueco declarado, nunca `0`).
 
@@ -181,3 +181,88 @@ Rótulos canónicos nuevos en [`auto-operation-strategy.ts`](../../../../apps/we
 **Lo decisivo:** el job `lifecycle-pg` —donde entra el **gate de cadena ESTUDIO** (`AUTO_ESTUDIO_CHAIN_PG_REQUIRED=1`, paso DEDICADO con guard anti-skip)— queda **`success`**; `replay-repro` **REPRODUCIDO** ⇒ `Δ decisión = 0` confirmado por CI; `frontend` verde ⇒ `contract:check` OK (`Δ contrato HTTP = 0`); `certify` agrega y **certifica** con todos los obligatorios verdes.
 
 **Desviación honesta declarada.** A diferencia de los sellos previos (tag **anotado**), `v2.88.131-beta` es **lightweight**: el re-tag a anotado fue **bloqueado por el auto-review** al tratarse de reescribir un tag **ya publicado**. Funcionalmente es **idéntico** (mismo commit; `Release tag CI` dispara igual con `push: tags: v*`), y el run citado **es el real** de este tag.
+
+---
+
+## 10. Addendum 2026-11-03 — contrato de `readGaps` (C-1)
+
+> Este addendum **no reescribe** §0–§9: documenta un campo **aditivo** añadido después del sello, para que el esquema de la cadena de evidencia quede explícito. Commit `544b9d05` (auditoría 2.88.179, condición **C-1**). Detalle de la certificación PostgreSQL: [`../certificacion-pg-c1-ds1-o2-2026-11-03/README.md`](../certificacion-pg-c1-ds1-o2-2026-11-03/README.md).
+
+### 10.1 Qué era el hueco
+
+El lector durable devolvía `[]` cuando la lectura de propuestas fallaba, y aguas abajo ese vacío se publicaba como `not_proposed`/`no_daily_proposal` — es decir, «este ciclo nació sin propuesta del parte», que es la afirmación **contraria** al hecho real (no se pudo leer). Un fallo transitorio de PostgreSQL, o un esquema sin la migración `058`, quedaba indistinguible de una ausencia legítima.
+
+### 10.2 Semántica del campo (estado por etapa)
+
+`readGaps` es un `Record<string, string | null>`: la clave es el **nombre de etapa** y el valor su estado de lectura.
+
+| Valor en `readGaps[etapa]` | Significado | Efecto |
+| --- | --- | --- |
+| `null` | Etapa **medida**, sin hueco de lectura | No se pinta aviso |
+| Clave **ausente** | Servidor **anterior a C-1**: no declarado | **No** se inventa un fallo y **no** se lee como «todo medido» |
+| Motivo **no vacío** (`proposals_unreadable`, `dia_d_unreadable`) | Hueco de **lectura** | La ficha declara la etapa y el motivo |
+| Motivo o etapa **desconocidos** | Contrato ampliado por el servidor | Se conservan y se muestran **crudos**, nunca se descartan |
+| Cadena vacía o solo espacios | No es un motivo | Se trata como medida |
+
+Reglas duras:
+
+- Una etapa **no leída** no equivale a una etapa **sin propuesta** ni a una **ausencia real**. La atribución de un ciclo cuyas propuestas no se pudieron leer es `unmeasured` (con `reason = proposals_unreadable`), **nunca** `not_proposed`.
+- La lectura va sellada en `SAVEPOINT` (`begin_nested`): en PostgreSQL un statement fallido aborta la transacción de la sesión, y esa sesión es la del tick. Sin el savepoint, un solo error vaciaba **varios** eslabones a la vez (propuestas y DÍA-D comparten sesión).
+- Cada etapa tiene su propio `SAVEPOINT`: un fallo DÍA-D **no** vacía el enlace de propuestas, ni al revés.
+- `readGaps` es **observabilidad**: no modifica por sí mismo el veredicto del **journal** ni la atribución. Un veredicto ya sellado (`exact`) **no se degrada** por un fallo de lectura; el hueco viaja por su propio canal. La atribución solo cambia cuando lo que falta es la **medición** del enlace (`unmeasured`), no cuando el journal ya la declaró.
+- Control negativo, también fijado: si la lectura **sí** ocurrió y no hay propuestas, la respuesta sigue siendo `not_proposed`. El hueco no se usa como excusa para no afirmar lo medido.
+
+### 10.3 Compatibilidad
+
+- `schemaVersion` **no** sube: sigue en `auto-estudio-chain-v1`. El campo es **aditivo y opcional**, tanto en el artefacto como en el DTO y en el tipo de `@bolsa/shared`.
+- Un cliente antiguo que ignore la clave no cambia de comportamiento; un servidor antiguo que no la envíe hace que la UI **no** pinte ningún aviso (no se inventa un fallo).
+- `Δ motor = 0` · `Δ decisión = 0`. El cambio es de **publicación y lectura**, no de selección, umbrales ni ejecución.
+
+### 10.4 Propagación
+
+```mermaid
+flowchart LR
+  Reader["read_daily_proposals / read_dia_d_verifications"] -->|"read=False + reason"| Artifact["build_chain_evidence_artifact(read_gaps=...)"]
+  Artifact -->|"readGaps"| DTO["EstudioChainResponseDto.read_gaps (alias readGaps)"]
+  DTO --> Contract["openapi.json / schema.d.ts"]
+  Contract --> Shared["EstudioChainResponseV1.readGaps?"]
+  Shared --> UI["estudio-chain-evidence.tsx · aviso data-read-gaps"]
+```
+
+| Fichero | Cambio |
+| --- | --- |
+| `packages/py/application/src/bolsa_application/auto_chain_durable_reader.py` | `DailyProposalsRead` / `DiaDVerificationsRead` con `read`/`reason`; `read_gaps` en `build_chain_evidence_artifact(..., read_gaps=...)`; `"readGaps"` en el artefacto |
+| `apps/api-python/src/bolsa_api/api/v1/routes/auto_estudio_chain.py` | pasa `read_gaps` al artefacto y lo publica en `EstudioChainResponseDto` |
+| `apps/api-python/scripts/v2_100_operational_certification_evidence.py` | el bundle publica `chainReadGaps` (antes copiaba solo `summary`/`meta`: el hueco se perdía al certificar) |
+| `packages/shared/src/estudio-daily-ops.ts` | `readGaps?: Record<string, string \| null>`; `chainReadGaps()` y `describeChainReadGaps()` (puras, orden estable por etapa) |
+| `packages/shared/src/estudio-daily-summary.ts` | `describeAttribution` explica `unmeasured` por lectura fallida con su motivo |
+| `apps/web/api/openapi.json` + `apps/web/src/api/schema.d.ts` | regenerados con `contract:gen` (+14 / +4 líneas) |
+| `apps/web/src/features/auto-monitor/estudio-chain-evidence.tsx` | aviso `estudio-chain-read-gaps` con `data-read-gaps="<etapas>"`, en ámbar, junto a la atribución |
+
+La frase publicada es explícita: «Etapas no leídas: propuestas diarias del parte (falló la lectura). Su ausencia no es una ausencia real.»
+
+### 10.5 Tests que fijan la semántica
+
+| Suite | Qué blinda | Resultado |
+| --- | --- | --- |
+| `packages/shared/src/estudio-daily-ops.test.ts` | `null` = medida; ausencia de clave = no declarado; motivo vacío no es hueco; orden por etapa; motivo/etapa desconocidos crudos | **7 passed** |
+| `packages/shared/src/estudio-daily-summary.test.ts` | «no se pudo leer» ≠ «falta identidad» | **1 caso** (dentro de `describeAttribution`) |
+| `apps/web/src/features/auto-monitor/estudio-daily-ops-panel.test.tsx` | aviso presente con `dailyProposals` ilegible; **ausente** con todo medido | **2 casos** (panel: **38 passed**) |
+| `apps/api-python/tests/test_auto_chain_read_gaps_pg.py` | savepoint no aborta la sesión; `readGaps` publicado y vacío si todo se midió; hueco → artefacto y `unmeasured`; veredicto `exact` no se degrada; control negativo `not_proposed` | **6 passed** (0 skipped, gate `AUTO_CHAIN_READ_GAPS_PG_REQUIRED=1`) |
+| `packages/py/application/tests/test_auto_chain_durable_reader.py` + `apps/api-python/tests/test_operational_certification_evidence.py` | lectura tipada, atribución y cableado del bundle | **47 passed** |
+
+### 10.6 Verificación de la rebanada
+
+| Gate | Comando | Resultado |
+| --- | --- | --- |
+| Build `shared` | `pnpm --filter @bolsa/shared build` | OK |
+| Typecheck `shared` | `pnpm --filter @bolsa/shared typecheck` | OK |
+| Tests `shared` | `pnpm --filter @bolsa/shared test` | **891 passed** (1 todo) |
+| Typecheck `web` | `pnpm --filter @bolsa/web typecheck` | OK |
+| Panel | `pnpm --filter @bolsa/web test -- estudio-daily-ops-panel` | **38 passed** |
+| Contrato | `pnpm contract:check` | **OK** |
+| Ruff | `ruff check` de los ficheros tocados | **All checks passed** |
+| PostgreSQL | `test_auto_chain_read_gaps_pg.py` con `DATABASE_URL=…@127.0.0.1:5432/bolsa_v1` | **6 passed**, 0 skipped |
+
+**Riesgo residual declarado.** `readGaps` cubre hoy las etapas con lector propio (`dailyProposals`, `diaD`). Una etapa nueva que se añada al artefacto sin lector tipado no declarará hueco hasta que se le dé su entrada: el mapa no se rellena por inferencia.
+
