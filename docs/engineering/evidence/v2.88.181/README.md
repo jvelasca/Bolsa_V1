@@ -120,13 +120,16 @@ Base: `99171b8d` (POST-TAG de `.180`).
 
 ## 9. POST-TAG
 
-Se completa en un descendiente del tag (el acto no se certifica a sí mismo):
+Medido en un descendiente del tag, para que el acto no se certifique a sí mismo:
 
 | Dato | Valor |
 | --- | --- |
-| Objeto del tag | pendiente de medir |
-| Commit apuntado | pendiente de medir |
-| `Release tag CI` | pendiente de medir |
-| Job `python (… pytest offline)` | pendiente de medir |
-| Job `lifecycle-pg` (`Pytest C-1 readGaps`) | pendiente de medir |
-| GitHub Release | pendiente de medir |
+| Objeto del tag | `587b7d9223df08e3bce4fd3f2ec89b8ac5242641` |
+| Commit apuntado | `7d9648b97ff01cdaa03b4a1af45db91260e13f60` |
+| `Release tag CI` | [41704764605](https://github.com/jvelasca/Bolsa_V1/actions/runs/41704764605) → **`success`** (14 jobs verdes, 1 `skipped` opt-in) |
+| Job `python (… pytest offline)` | **success** — las 92 exclusiones se honran: el job vuelve a aislar |
+| Job `lifecycle-pg` (`Pytest C-1 readGaps`) | **success**: **6 passed in 1,76 s**; guarda anti-`SKIPPED` sin disparar |
+| `Pytest multiprocess AUTO` (mismo job, no es de este sello) | **2 passed in 36,64 s** (`.179`: 114,31 s) |
+| `Python CI` de la rama | [41704764828](https://github.com/jvelasca/Bolsa_V1/actions/runs/41704764828) → **success**, `quality` verde (97/97) |
+| GitHub Release | **publicada**: <https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.181-beta> (no prerelease, `latest`) |
+
