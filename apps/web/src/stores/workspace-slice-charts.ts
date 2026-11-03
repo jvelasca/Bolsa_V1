@@ -34,6 +34,24 @@ function withPendingClosed(
   return [...new Set([...(previous ?? []), ...ids])];
 }
 
+/**
+ * Un instrumento que vuelve a estar abierto deja de estar pendiente de cierre.
+ * Sin esto, cerrar una pestaña y reabrirla antes del siguiente flush deja el id
+ * en la lista y el `keepalive` del cierre de navegador poda una pestaña viva.
+ */
+function withoutPendingClosed(
+  previous: string[] | undefined,
+  instrumentIds: ReadonlyArray<string | null | undefined>,
+): string[] {
+  const reopened = new Set(
+    instrumentIds.filter((instrumentId): instrumentId is string =>
+      Boolean(instrumentId),
+    ),
+  );
+  if (reopened.size === 0) return previous ?? [];
+  return (previous ?? []).filter((instrumentId) => !reopened.has(instrumentId));
+}
+
 export const chartsSlice: WorkspaceSlice = (get, set) => ({
   openChartTab: (instrumentId, label) => {
     const existing = get().workspace.charts.find(
@@ -45,6 +63,10 @@ export const chartsSlice: WorkspaceSlice = (get, set) => ({
           ...state.workspace,
           activeChartId: existing.id,
         }),
+        pendingClosedChartInstrumentIds: withoutPendingClosed(
+          state.pendingClosedChartInstrumentIds,
+          [instrumentId],
+        ),
         // Con autoSave, isDirty=false permitía sync remoto con menos tabs.
         isDirty: true,
       }));
@@ -61,6 +83,10 @@ export const chartsSlice: WorkspaceSlice = (get, set) => ({
         charts: [...state.workspace.charts, nextTab],
         activeChartId: nextTab.id,
       }),
+      pendingClosedChartInstrumentIds: withoutPendingClosed(
+        state.pendingClosedChartInstrumentIds,
+        [instrumentId],
+      ),
       isDirty: true,
     }));
     if (get().workspace.preferences.autoSave) {
@@ -111,6 +137,10 @@ export const chartsSlice: WorkspaceSlice = (get, set) => ({
       activeTabId = activeChartId ?? "";
       return {
         workspace,
+        pendingClosedChartInstrumentIds: withoutPendingClosed(
+          state.pendingClosedChartInstrumentIds,
+          [instrumentId],
+        ),
         // Siempre dirty: con autoSave no marcar dirty permitía que un sync/PUT
         // concurrente borrara pestañas recién abiertas.
         isDirty: true,
@@ -168,7 +198,14 @@ export const chartsSlice: WorkspaceSlice = (get, set) => ({
           ? { listId, instrumentId: lastInstrumentId }
           : workspace.chartListContext,
       });
-      return { workspace, isDirty: true };
+      return {
+        workspace,
+        pendingClosedChartInstrumentIds: withoutPendingClosed(
+          state.pendingClosedChartInstrumentIds,
+          items.map((item) => item.instrumentId),
+        ),
+        isDirty: true,
+      };
     });
     flushDrawingAutoSave(get, true);
     if (get().workspace.preferences.autoSave) {
