@@ -134,6 +134,12 @@ condición de salida vieja daba la fase 1 por resuelta en el primer poll, y el `
 **5,68 s** después de arrancar. Con la salida corregida el test **espera lo que de verdad tiene que esperar**
 y mide el estado final, no el intermedio.
 
+**Aislamiento, re-verificado tras el sello.** `bolsa_v1` (la base de desarrollo) conserva su catálogo
+(**181 instrumentos**) y su workspace (`7e503dd5…`, con sus 33 `indicatorPresets`, 8 `drawingTemplates` y
+`chartToolbarGlobal`), mientras `bolsa_v1_audit` —la base de trabajo de toda la revisión— quedó **sin residuos**
+(0 instrumentos: el `purge_all_residuals` del `conftest` barre `inst-%` y las cuentas al terminar). El árbol
+principal sigue intacto: **34** ficheros sin commitear de GP-V190 en `fix/059-060-proveedores` sobre `d3236b5c`.
+
 **GitHub Release:** [**`v2.88.179-beta`**](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.179-beta)
 publicada como *latest* de la serie `v2.88.x`, con el resumen del sello y los enlaces a este expediente y a la
 revisión independiente. Los tags `v2.88.177-beta` y `v2.88.178-beta` siguen **sin** release: quedan como registro
