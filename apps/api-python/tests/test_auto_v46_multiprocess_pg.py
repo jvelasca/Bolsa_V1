@@ -30,6 +30,7 @@ import os
 import sys
 import tempfile
 import uuid
+from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -43,7 +44,6 @@ if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
 from tests.test_crash_recovery_day_process_pg import (  # noqa: E402
     _crash_instrument_id,
     _kill_hard,
-    _live_reservations,
 )
 from tests.test_golden_day_v2_process_pg import (  # noqa: E402
     _count_buy_orders,
@@ -124,6 +124,79 @@ async def _reservation_rows(factory: Any, account_id: str) -> list[Any]:
         )
 
 
+async def _materialization_snapshot(factory: Any, account_id: str) -> tuple[int, list[Any]]:
+    """(posiciones abiertas, filas de reserva) leídas de lo DURABLE en un mismo instante."""
+    return (
+        await _count_positions(factory, account_id),
+        await _reservation_rows(factory, account_id),
+    )
+
+
+def _materialized(positions: int, rows: Sequence[Any]) -> bool:
+    """La FASE 1 está resuelta: hay posición Y una reserva que ya materializó ≥1 trancha.
+
+    **Por qué NO se espera a «una reserva viva con cola».** El camino caliente persiste la
+    posición (``_persist_position``, store con ``autocommit=True``) y DESPUÉS libera la
+    reserva del fill (``_v2_release_reservations_for_fill``) en **dos transacciones
+    distintas**. Entre las dos existe un estado durable —legítimo— en el que la posición ya
+    está y ``released_qty`` sigue en 0. Romper el bucle en ese estado ejecutaba la aserción
+    de materialización antes de tiempo: medido en CI, ``assert Decimal('0') > 0`` con el
+    resto de invariantes todavía sin escribir. Y exigir una reserva ``OPEN`` con cola
+    tampoco vale: un fill **completo** deja la fila en ``RELEASED_BY_FILL`` con
+    ``remaining_qty = 0``, así que el bucle nunca rompía y gastaba los 80 s de presupuesto
+    (medido en local: 115 s de corrida).
+
+    La condición que sí es estable en cualquier punto intermedio es la contabilidad cerrada
+    (``released + remaining == requested``, que el libro mantiene en cada liberación) junto
+    con haber materializado al menos una trancha: es exactamente lo que el test asserta.
+    """
+    if positions < 1 or not rows:
+        return False
+    for row in rows:
+        requested = Decimal(str(row.quantity or 0))
+        released = Decimal(str(row.released_qty or 0))
+        remaining = Decimal(str(row.remaining_qty or 0))
+        if released > 0 and released + remaining == requested:
+            return True
+    return False
+
+
+def _materialization_dump(positions: int, rows: Sequence[Any]) -> str:
+    """Estado durable legible para el mensaje de fallo (sin inventar cifras)."""
+    detail = [
+        f"{row.reservation_id}(status={row.status}, qty={row.quantity}, "
+        f"released={row.released_qty}, remaining={row.remaining_qty})"
+        for row in rows
+    ]
+    return f"posiciones={positions}, reservas={detail or 'ninguna'}"
+
+
+def test_la_materializacion_no_se_da_por_hecha_entre_las_dos_transacciones() -> None:
+    """Regresión del fallo intermitente de CI (``assert Decimal('0') > 0``).
+
+    ``_persist_position`` hace **commit propio** de la posición y
+    ``_v2_release_reservations_for_fill`` libera la reserva en un commit **posterior**: hay
+    un instante durable, y legítimo, con la posición ya escrita y ``released_qty = 0``. El
+    bucle de espera no puede romper ahí. Prueba PURA: no necesita PostgreSQL.
+    """
+    from types import SimpleNamespace
+
+    sin_liberar = SimpleNamespace(
+        quantity=Decimal("100"), released_qty=Decimal("0"), remaining_qty=Decimal("100")
+    )
+    liberada = SimpleNamespace(
+        quantity=Decimal("100"), released_qty=Decimal("100"), remaining_qty=Decimal("0")
+    )
+    partial = SimpleNamespace(
+        quantity=Decimal("100"), released_qty=Decimal("40"), remaining_qty=Decimal("60")
+    )
+    assert _materialized(1, [sin_liberar]) is False
+    assert _materialized(1, [liberada]) is True
+    assert _materialized(1, [partial]) is True
+    assert _materialized(0, [liberada]) is False
+    assert _materialized(1, []) is False
+
+
 def _alive(procs: list[Any], log_path: Path, *, phase: str) -> None:
     for index, proc in enumerate(procs):
         if proc.poll() is not None:
@@ -157,29 +230,22 @@ async def test_n_real_processes_claim_one_signal_exactly_once_pg(mp_pg_factory: 
         env = _env_for(account_id, engine_id, instrument_ids=[instrument_id])
         procs = [_spawn(env, log_path) for _ in range(_PROCESSES)]
 
-        # ── FASE 1 · la carrera se resuelve: alguien abre con fill PARCIAL ────────
-        # La condición de salida exige TAMBIÉN ``released > 0``: una reserva ``OPEN``
-        # nace con ``released_qty = 0`` y ``remaining_qty = pedido``, así que «hay
-        # posición y queda capital vivo» se cumple ANTES de que el fill materialice la
-        # primera trancha. Sin esta condición la carrera podía darse por resuelta en el
-        # primer poll y el ``assert released > 0`` de abajo fallaba sin margen — el
-        # rojo del `Release tag CI` 41594625695 (5,68 s) no era un fallo del producto,
-        # era el test midiendo un estado intermedio. El presupuesto de espera es el
-        # mismo (``_MAX_POLLS``); si la trancha no llega, el assert sigue fallando con
-        # el log de los procesos.
+        # ── FASE 1 · la carrera se resuelve: alguien abre y materializa una trancha ─────
+        # El bucle espera el HECHO que el test asserta (materialización durable), no un
+        # proxy: ver ``_materialized`` para las dos formas en que el proxy fallaba.
         for _ in range(_MAX_POLLS):
             await asyncio.sleep(_POLL_S)
             _alive(procs, log_path, phase="la carrera")
-            positions = await _count_positions(mp_pg_factory, account_id)
-            live = await _live_reservations(mp_pg_factory, account_id)
-            if (
-                positions >= 1
-                and any(float(r.remaining_qty or 0) > 0 for r in live)
-                and any(float(r.released_qty or 0) > 0 for r in live)
-            ):
+            positions, rows = await _materialization_snapshot(mp_pg_factory, account_id)
+            if _materialized(positions, rows):
                 break
 
-        positions = await _count_positions(mp_pg_factory, account_id)
+        positions, rows = await _materialization_snapshot(mp_pg_factory, account_id)
+        assert _materialized(positions, rows), _proc_failure(
+            "ningún proceso materializó una trancha durable en "
+            f"{_MAX_POLLS * _POLL_S:.0f}s: {_materialization_dump(positions, rows)}",
+            log_path,
+        )
         assert positions >= 1, _proc_failure(
             f"algún proceso debe abrir posición (abiertas={positions})", log_path
         )
@@ -194,7 +260,6 @@ async def test_n_real_processes_claim_one_signal_exactly_once_pg(mp_pg_factory: 
             log_path,
         )
 
-        rows = await _reservation_rows(mp_pg_factory, account_id)
         assert len(rows) == 1, _proc_failure(
             "la reserva debe ser única por (cuenta, instrumento): hay "
             f"{len(rows)} filas {[r.reservation_id for r in rows]}",
