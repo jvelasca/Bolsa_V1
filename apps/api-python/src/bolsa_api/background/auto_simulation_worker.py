@@ -526,6 +526,9 @@ def flat_price_script(_symbol: str, _tick: int) -> float:
 # object con delegación.
 ProtectionConfig = ProtectionPolicy
 
+#: M6: tope de eventos de gestión de posición pendientes de reintento (cola acotada).
+_POSITION_JOURNAL_RETRY_CAP = 500
+
 
 def _protection_config_from_env() -> ProtectionPolicy:
     """Lee la política de protección de env (default OFF = fail-closed).
@@ -2149,6 +2152,14 @@ class AutoSimulationWorker:
         return self._time
 
     # ---- W4 (v2.88.17): precio con estado «NO HAY PRECIO» (fail-closed) ------------
+    def _safe_price_script(self, symbol: str, tick: int) -> Any:
+        """M9: una excepción del ``price_script`` es «no hay precio» (como en ``PriceSource``)."""
+        try:
+            return self._price_script(symbol, tick)
+        except Exception:  # noqa: BLE001 — un fallo de precio ES «no hay precio».
+            logger.exception("auto_sim v2 price_script failed symbol=%s", symbol)
+            return None
+
     def _v2_price_exec(self, symbol: str, tick: int) -> float | None:
         """Precio de EJECUCIÓN/MARCA del tick — o ``None`` si **no hay precio**.
 
@@ -2158,7 +2169,7 @@ class AutoSimulationWorker:
         """
         source = self._price_source
         if source is None:
-            value = self._price_script(symbol, tick)
+            value = self._safe_price_script(symbol, tick)
             if value is None:
                 return None
             # P9: ``NaN``/``inf`` de la fuente hermética tampoco es un precio.
@@ -2184,7 +2195,7 @@ class AutoSimulationWorker:
         """
         source = self._price_source
         if source is None:
-            value = self._price_script(symbol, tick)
+            value = self._safe_price_script(symbol, tick)
             return None if value is None else finite_float(value)
         try:
             price = finite_float(source.mid(symbol))
@@ -3724,8 +3735,12 @@ class AutoSimulationWorker:
             persisted.append(reservation)
         try:
             await store.commit()
-        except Exception:  # noqa: BLE001 — con autocommit ya es durable; se declara.
+        except Exception:  # noqa: BLE001 — sin commit no hay compromiso durable: no se emite.
             logger.exception("auto_sim v2 reservation commit failed")
+            # M5: no se asume autocommit. Lo no confirmado no cuenta como reservado y su
+            # instrumento queda vetado este turno (fail-closed).
+            blocked.update(row.instrument_id for row in persisted)
+            persisted = []
         # AUTO-10 — el ciclo que acaba de abrir deja su régimen en el journal DURABLE. Se
         # publica DESPUÉS del commit de la reserva: primero el compromiso de capital, después
         # la traza (si la traza falla, el dinero sigue comprometido y el hueco se declara).
@@ -3761,20 +3776,23 @@ class AutoSimulationWorker:
             self._audit_session_id = session
         return session
 
-    async def _v2_audit_emit(self, entry: Any, *, label: str) -> None:
+    async def _v2_audit_emit(self, entry: Any, *, label: str) -> bool:
         """Publica UNA entrada de auditoría; best-effort declarado (``M2``).
 
         Sin sink es un no-op silencioso: no hay nada que fingir. Un fallo del sink NO puede
         tumbar el turno (el dinero ya está comprometido aguas arriba), pero se registra —
-        un silencio aquí volvería a convertir el hueco en mentira por omisión.
+        un silencio aquí volvería a convertir el hueco en mentira por omisión. Devuelve
+        ``False`` solo si el sink falló (M6: el llamante decide si reencolar).
         """
         sink = self._operational_audit_sink
         if sink is None or entry is None:
-            return
+            return True
         try:
             await sink(entry)
         except Exception:  # noqa: BLE001 — publicar no puede tumbar el turno.
             logger.exception("auto_sim operational audit failed (%s)", label)
+            return False
+        return True
 
     async def _v2_journal_cycle_regime(self, reservations: Sequence[PortfolioReservation]) -> None:
         """AUTO-10 — publica el régimen del ciclo recién abierto en el journal durable.
@@ -7449,12 +7467,27 @@ class AutoSimulationWorker:
         en hermético) y un fallo se registra pero no tumba el turno (el dinero ya está
         comprometido aguas arriba). La cola se VACÍA siempre para no reintentar un hecho
         ya fallido en cada tick restante del día.
+
+        M6: los eventos cuyo sink falló se REENCOLAN (acotado a ``_POSITION_JOURNAL_RETRY_CAP``,
+        descartando los más antiguos con error) en vez de perderse: la evidencia no se pierde por
+        un fallo transitorio del sink.
         """
         pending, self._v2_position_journal_pending = self._v2_position_journal_pending, []
+        failed: list[Any] = []
         for entry in pending:
-            await self._v2_audit_emit(
+            ok = await self._v2_audit_emit(
                 self._v2_seal_audit_identity(entry), label="position_management"
             )
+            if not ok:
+                failed.append(entry)
+        if failed:
+            keep = failed[-_POSITION_JOURNAL_RETRY_CAP:]
+            if len(keep) < len(failed):
+                logger.error(
+                    "auto_sim position journal overflow: %d eventos descartados",
+                    len(failed) - len(keep),
+                )
+            self._v2_position_journal_pending = keep + self._v2_position_journal_pending
 
     async def _v2_track_entry(self, symbol: str, price: Decimal, qty: Decimal) -> None:
         """Crea el ``PositionState`` V2 al abrir (desde el TradePlan que lo originó).
