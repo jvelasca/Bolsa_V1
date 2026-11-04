@@ -82,7 +82,10 @@ def _optimize_result() -> object:
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7, "wfe": 0.7},
-        edge_report={"dsr": 0.7},
+        # S2 (auditoría .183): el gate ``risk`` exige una muestra medida. El doble declara
+        # la del EdgeReport lite (``sampleTradesCount``) para seguir certificando lo suyo
+        # —el ciclo de vida— sin depender de la calibración del LAB.
+        edge_report={"dsr": 0.7, "suite": {"dsr": 0.7, "sampleTradesCount": 40}},
     )
 
 
@@ -791,7 +794,8 @@ async def test_promotion_persists_champion_and_coach_pg(
         cpcv = {"pbo": 0.1}
         pbo = {"pbo": 0.1}
         walk_forward = {"walkForwardEfficiency": 0.8, "wfe": 0.8}
-        edge_report = {"dsr": 0.7}
+        # S2: la muestra medida viaja en la suite del EdgeReport lite (gate ``risk``).
+        edge_report = {"dsr": 0.7, "suite": {"dsr": 0.7, "sampleTradesCount": 40}}
 
     class _Resolution:
         status = "ok"
