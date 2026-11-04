@@ -2,6 +2,69 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.183-beta] — **SELLO CORRECTOR del `.182`: el job offline se comía sus propios `--ignore` (un `#` dentro de un `run: >`) y `GP-V190-04` medía la cadena exacta antes de que el zoom pintara** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** re-sello **de infraestructura de pruebas y de un E2E**. El **código de producto es idéntico** a
+`2.11.182-beta`: no cambia motor, indicadores, umbrales, pesos, sizing, régimen ni replay (**`Δ motor = 0`**), no
+se decide distinto (**`Δ decisión = 0`**) y **no se toca el contrato HTTP** (`openapi.json`/`schema.d.ts` sin
+diff; `contract:check` **OK**). **Sin migración**: `head` sigue `062_sync_settings_check_backfill`.
+**Bump** `2.11.182-beta` → **`2.11.183-beta`** (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` **no** se toca).
+
+**Por qué existe este sello.** El `Release tag CI`
+[`41827981582`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41827981582) del tag `v2.88.182-beta` quedó
+**ROJO** en dos jobs y, por arrastre, en `certify`; el resto (11 jobs, entre ellos `lifecycle-pg`, `replay-repro`,
+`a7-gate`, `dr-verify`, `frontend` y `spine`) fue `success`. `.182` **no se mueve**: queda publicado como el
+objeto que falló, y este `.183` es el que se puede auditar. Detalle medido abajo.
+
+**(1) `python (ruff/imports/mypy/pytest offline)` — 8 fallos `connection refused` contra `127.0.0.1:5432`.** El
+log da `8 failed, 6105 passed, 210 skipped` en `110.10s`, y los ocho son de tres ficheros:
+`test_f3b_alembic_data_epoch.py` (1), `test_mandate_sync_orphan_instrument.py` (2) y
+`test_workspace_persistence.py` (5). **Dos causas distintas, ninguna en la lista de `--ignore` como tal:**
+- **Causa A (la del `.182`):** al cerrar DS-1 se añadieron comentarios `#` **dentro** del `run: >` del step. YAML
+  pliega ese bloque en **una sola línea** de shell, así que el primer `#` intercalado convierte en comentario
+  **todo lo que sigue**, incluidos los `--ignore` posteriores. El step ejecutó la selección hasta ese punto y los
+  tres ficheros PG entraron en un job sin PostgreSQL. Se corrige **sacando los comentarios fuera del bloque
+  plegado**; el contenido del comando no cambia.
+- **Causa B (hueco real):** `apps/api-python/tests/test_workspace_persistence.py` **no estaba en ninguna lista**
+  de `--ignore` y **no tiene guarda de skip** (sin PG falla, que es lo correcto: un skip silencioso sería peor).
+  Se añade al job offline; su certificación con PostgreSQL real pertenece a los jobs con servicio.
+
+**(2) `playwright (mock E2E)` — `GP-V190-04`, 1 fallo de 155.** El test comparaba la **cadena exacta** de
+`data-visible-range` contra una muestra «estabilizada» (`settledVisibleRange`) obtenida con un `expect.poll`
+**anidado dentro** del `expect.poll` del test. El clic de zoom se aplica en el **frame siguiente**, así que el
+reintento exterior consumía su presupuesto esperando una muestra quieta y, en el runner, se quedaba con
+`0.00:64.00` (rango sin mover). Se corrige midiendo lo que el test dice medir: la **amplitud** del rango
+(`visibleSpan`, `to - from`) leída del atributo **crudo**, con reintento único y presupuesto de 10 s; el reset se
+compara con tolerancia (`toBeCloseTo(..., 1)`), no con igualdad de cadena.
+
+**(3) El hazard queda anclado por test, no por comentario.** NUEVO
+`apps/api-python/tests/test_release_tag_ci_folded_run_blocks.py` (4 casos) parsea el workflow por líneas y exige:
+ningún `#` al inicio de línea dentro de un `run: >`; el bloque del pytest offline presente; los **tres** ficheros
+PG del fallo en `--ignore`; y la forma completa del comando (`uv run pytest` … `-q`, con el último `--ignore`).
+Se comprobó que **muerde**: reintroducir un comentario dentro del bloque hace fallar el caso con el ofensor
+nombrado. Es el mismo criterio que `test_release_tag_ci_a7_gate_wiring.py`: el YAML del sello no lo ejecuta nadie
+en local, así que sin test un refactor puede volver a dejarlo rojo solo en el tag.
+
+**Verificación (medida, local).** `pnpm --filter @bolsa/web typecheck` **limpio** · `eslint` de los ficheros
+tocados **0 problemas** · E2E `gp-v190` mock **12/12 passed** y `GP-V190-04` **4/4** con `--repeat-each=4` ·
+`test_release_tag_ci_folded_run_blocks` + `test_release_tag_ci_a7_gate_wiring` + `test_dia_d_bump_guard`
+**11 passed** · sonda del tripwire (comentario inyectado) **1 failed, 3 passed** y revertida · `pytest
+--collect-only` de la selección **exacta** del job offline: **6 035 tests**, **0** referencias a los tres ficheros
+PG (`test_workspace_persistence`, `test_mandate_sync_orphan_instrument`, `test_f3b_alembic_data_epoch`).
+
+**Lo que este sello NO acredita.** La suite offline completa **no** se terminó en local (el runner de Windows se
+quedó colgado en un punto no identificado y se cortó; no se usa como evidencia): la medida que cuenta es el job
+del tag `.183`. Los E2E `gp-v190` **live/integrated** siguen exigiendo API + PostgreSQL + barras y su `skipped`
+**no** certifica. Este sello **no re-certifica** el producto de `.182`: solo corrige el instrumento que lo
+certifica. PAPER sigue **`INCONCLUSIVE`**, AUTO **OFF**, operativa **100 % SIM**; rentabilidad **no demostrada**
+y sin órdenes reales.
+
+**Publicación.** Rama `fix/059-060-proveedores`, **sin PR** (la de integración es ancestro). Tag anotado
+`v2.88.183-beta` sobre el commit del pin re-anclado; el sello es el `Release tag CI` del tag. `.182` se conserva
+como el run rojo que motivó esta corrección.
+
+
 ## [2.11.182-beta] — **MERCADO v1.90: el gráfico deja de romperse con la vela viva y de medir un 0 inventado; `Escape` devuelve al cursor y borrar una orden vinculada pide confirmación** (**`Δ reglas = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO · SIN migración · head `062_sync_settings_check_backfill`**)
 
 **Naturaleza:** sello de **producto** sobre `fix/059-060-proveedores`, posterior a `2.11.176-beta`. No cambia
