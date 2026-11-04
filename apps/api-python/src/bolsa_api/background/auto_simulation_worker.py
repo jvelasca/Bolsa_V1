@@ -1545,6 +1545,10 @@ class AutoSimulationWorker:
         # Barra (inicio ISO) a la que pertenece ``_v2_consumed_signals``: al cambiar de
         # barra la memoria se reinicia (solo la barra corriente deduplica).
         self._v2_consumed_bar: str = ""
+        # P5: marcas cuyo ``mark`` durable falló (signal_id → (símbolo, barra)); se reintentan.
+        self._v2_consumed_unpersisted: dict[str, tuple[str, str]] = {}
+        # P6: transiciones del INTENT de salida cuyo guardado falló (exit_order_id → orden).
+        self._v2_exit_unpersisted: dict[str, ExitOrder] = {}
         # AUTO 2.0 · P4: planes V2 rehidratados del espejo durable al readoptar
         # (``symbol → PositionState.to_dict()``), pendientes de primer uso. Se usa una
         # sola vez: una vez rehidratado, el ``PositionState`` vivo manda.
@@ -4236,6 +4240,23 @@ class AutoSimulationWorker:
             return False
         return True
 
+    async def _v2_save_exit_order_or_pend(self, order: ExitOrder) -> bool:
+        """P6: persiste una transición del INTENT; si falla, queda pendiente de reintento.
+
+        La versión más reciente por ``exit_order_id`` sustituye a la anterior. Antes el retorno
+        se ignoraba y el INTENT durable se quedaba atrás del fill real sin rastro.
+        """
+        if await self._v2_save_exit_order(order):
+            self._v2_exit_unpersisted.pop(order.exit_order_id, None)
+            return True
+        logger.error("auto_sim v2 exit order transition pending retry id=%s", order.exit_order_id)
+        self._v2_exit_unpersisted[order.exit_order_id] = order
+        return False
+
+    async def _v2_retry_unpersisted_exit_orders(self) -> None:
+        for order in list(self._v2_exit_unpersisted.values()):
+            await self._v2_save_exit_order_or_pend(order)
+
     async def _v2_apply_exit_fill(self, exit_order_id: str | None, qty: Any, *, at: str) -> None:
         """Aplica un fill materializado al INTENT de salida (V2.43.3 · separación I/O/F).
 
@@ -4246,6 +4267,7 @@ class AutoSimulationWorker:
         key = str(exit_order_id or "").strip()
         if not key:
             return
+        await self._v2_retry_unpersisted_exit_orders()
         order = self._v2_exit_orders.get(key)
         if order is None:
             store = self._exit_order_store
@@ -4261,7 +4283,7 @@ class AutoSimulationWorker:
         updated = order.apply_fill(qty, at=at)
         if updated is order:
             return
-        await self._v2_save_exit_order(updated)
+        await self._v2_save_exit_order_or_pend(updated)
         if updated.is_open:
             self._v2_exit_orders[key] = updated
         else:
@@ -4378,7 +4400,7 @@ class AutoSimulationWorker:
             self._v2_exit_orders[exit_order_id] = emergency
             return exit_order_id
         reserved = order.with_reserved(reservation.reservation_id, at=at)
-        await self._v2_save_exit_order(reserved)
+        await self._v2_save_exit_order_or_pend(reserved)
         self._v2_exit_orders[exit_order_id] = reserved
         # OBS-14.b — la reserva de salida también es de ESTA sesión: si su orden no llega
         # a materializarse dentro del turno, el cierre de turno es quien debe retirarla.
@@ -4985,6 +5007,7 @@ class AutoSimulationWorker:
         if bar_start and bar_start != self._v2_consumed_bar:
             self._v2_consumed_bar = bar_start
             self._v2_consumed_signals.clear()
+            self._v2_consumed_unpersisted.clear()
 
     # ---- W2 · Fase A: short-circuit por barra (seam en ``auto_turn``) ----------------
     def _v2_bar_short_circuit_applies(self) -> bool:
@@ -5040,6 +5063,7 @@ class AutoSimulationWorker:
         bar_start = self._v2_current_bar_start()
         if not bar_start:
             return
+        await self._v2_retry_unpersisted_consumed()
         try:
             stored = await self._consumed_signal_store.list_bar(
                 self._account_id, self._engine_id, bar_start
@@ -5087,6 +5111,10 @@ class AutoSimulationWorker:
         bar_start = self._v2_current_bar_start()
         if not bar_start:
             return
+        if not await self._v2_persist_consumed(signal_id, symbol, bar_start):
+            self._v2_consumed_unpersisted[signal_id] = (symbol, bar_start)
+
+    async def _v2_persist_consumed(self, signal_id: str, symbol: str, bar_start: str) -> bool:
         try:
             await self._consumed_signal_store.mark(
                 self._account_id,
@@ -5095,9 +5123,21 @@ class AutoSimulationWorker:
                 instrument_id=symbol,
                 bar_timestamp=bar_start,
             )
-        except Exception:  # noqa: BLE001 — el fill ya ocurrió; la marca durable se
-            # reintenta (la RAM ya la tiene y el tick siguiente la re-marcará).
+        except Exception:  # noqa: BLE001 — el fill ya ocurrió; se reintenta en el tick siguiente.
             logger.exception("auto_sim v2 consumed signal persist failed symbol=%s", symbol)
+            return False
+        return True
+
+    async def _v2_retry_unpersisted_consumed(self) -> None:
+        """P5: reintenta las marcas durables que fallaron (sin esto un crash re-autoriza la señal)."""
+        if self._consumed_signal_store is None or not self._account_id:
+            return
+        current = self._v2_current_bar_start()
+        for signal_id, (symbol, bar_start) in list(self._v2_consumed_unpersisted.items()):
+            if bar_start != current or await self._v2_persist_consumed(
+                signal_id, symbol, bar_start
+            ):
+                self._v2_consumed_unpersisted.pop(signal_id, None)
 
     async def _v2_plan_tick(self, *, reuse_bar_datum: bool = False) -> Any:
         """Planifica el tick completo (entradas) por el pipeline AUTO 2.0.
