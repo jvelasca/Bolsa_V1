@@ -5708,8 +5708,13 @@ class AutoSimulationWorker:
         Mismo patrón que ``_v2_adaptive_policy``: derivar los umbrales de dos construcciones
         distintas permitiría que divergieran en silencio y el ancla se mediría con reglas que no son
         las que sella la versión.
+
+        P4 (auditoría .183): ``require_evidence=True``. En producción el gate **no puede** publicar
+        ``OK`` cuando el tick no midió completitud, ventana reciente o antigüedad del journal: eso
+        se declaraba ``evidence_not_provided`` y se trataba como salud. Ahora degrada (``LIMITS``),
+        que es la respuesta honesta a una deuda de datos.
         """
-        return DataGatePolicy()
+        return DataGatePolicy(require_evidence=True)
 
     @staticmethod
     def _v2_regime_available(regime: str | None) -> bool:
@@ -5764,9 +5769,13 @@ class AutoSimulationWorker:
                 getattr(self, "_v2_adaptive_sink_failures_durable", False)
             ),
             journal_age_cycles=self._v2_adaptive_gate_journal_age(),
-            # Sin lectura durable registrada NO se declara un fallo de lectura: no se observó
-            # ninguno (el hueco de "sin lector" lo declara AUTO-11 en el arranque, no el gate).
-            read_ok=True if reading is None else bool(reading.read_ok),
+            # P4 (auditoría .183): tri-estado, no un ``read_ok=True`` fabricado. Sin lectura
+            # durable registrada el estado es ``unknown`` (no se leyó; tampoco se observó un
+            # fallo); con lectura, ``ok``/``failed`` según lo que la lectura declaró. El gate de
+            # producción degrada con ``unknown``: "no leí" ya no equivale a "está sano".
+            read_state=(
+                "unknown" if reading is None else ("ok" if reading.read_ok else "failed")
+            ),
             measurement_completeness=completeness,
             recent_available=recent_available,
             regime_available=self._v2_regime_available(regime),
