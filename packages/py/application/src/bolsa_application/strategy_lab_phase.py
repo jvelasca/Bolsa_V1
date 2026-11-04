@@ -172,14 +172,27 @@ def gate_from_metrics(
 
 @dataclass(frozen=True, slots=True)
 class LabThresholds:
-    """Umbrales cuantitativos del LAB (defaults honestos, ajustables por env/doc)."""
+    """Umbrales cuantitativos del LAB (S2: no triviales; rollback por env en el orquestador).
 
-    min_oos_score: float = 0.0
-    min_wfe: float = 0.0
-    max_pbo: float = 1.0
+    Defaults exigentes: un OOS/WFE de 0 o un PBO de 1.0 no filtran nada. ``max_drawdown_pct``
+    es un techo (magnitud positiva) y ``min_trades`` la muestra mínima del campeón
+    (``0`` la desactiva).
+    """
+
+    min_oos_score: float = 0.1
+    min_wfe: float = 0.5
+    max_pbo: float = 0.5
     min_dsr: float = 0.7
+    max_drawdown_pct: float = 25.0
+    min_trades: int = 30
     zero_tolerance: float = 1e-9
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+def _int_or_none(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return int(value)
 
 
 def _best_trial(result: Any) -> Any | None:
@@ -293,14 +306,24 @@ def evaluate_optimize_result(
         gates.append(_gate("oos", None, detail="oos_ausente"))
 
     dd = getattr(champion, "max_drawdown_pct", None) if champion is not None else None
-    gates.append(
-        _gate(
-            "risk",
-            (dd is not None and float(dd) >= 0.0),
-            metrics={"max_drawdown_pct": float(dd)} if dd is not None else None,
-            detail="drawdown_ok" if dd is not None else "risk_ausente",
-        )
-    )
+    sample_trades = _int_or_none(edge_suite.get("sampleTradesCount"))
+    if dd is None:
+        gates.append(_gate("risk", None, detail="risk_ausente"))
+    elif th.min_trades > 0 and sample_trades is None:
+        gates.append(_gate("risk", None, detail="trades_ausentes"))
+    else:
+        dd_value = float(dd)
+        within = 0.0 <= dd_value <= th.max_drawdown_pct
+        enough = th.min_trades <= 0 or (sample_trades or 0) >= th.min_trades
+        metrics_risk: dict[str, Any] = {"max_drawdown_pct": dd_value}
+        if sample_trades is not None:
+            metrics_risk["sample_trades"] = sample_trades
+        detail = "drawdown_ok"
+        if not within:
+            detail = "drawdown_excede_techo"
+        elif not enough:
+            detail = "muestra_insuficiente"
+        gates.append(_gate("risk", within and enough, metrics=metrics_risk, detail=detail))
 
     dsr = None
     if isinstance(edge_report, dict):

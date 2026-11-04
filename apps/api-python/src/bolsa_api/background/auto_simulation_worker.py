@@ -526,6 +526,9 @@ def flat_price_script(_symbol: str, _tick: int) -> float:
 # object con delegación.
 ProtectionConfig = ProtectionPolicy
 
+#: M6: tope de eventos de gestión de posición pendientes de reintento (cola acotada).
+_POSITION_JOURNAL_RETRY_CAP = 500
+
 
 def _protection_config_from_env() -> ProtectionPolicy:
     """Lee la política de protección de env (default OFF = fail-closed).
@@ -939,6 +942,14 @@ async def read_account_book_equity(session: Any, account_id: str | None) -> floa
         SqlAlchemyPortfolioRepository(session),
     ).execute(account_id=account_id)
     return float(summary.total_equity)
+
+
+def _blend_entry_price(prior: Decimal, held: Decimal, price: Decimal, qty: Decimal) -> Decimal:
+    """Coste medio ponderado tras ampliar una posición viva (M15)."""
+    total = held + qty
+    if total <= 0:
+        return prior
+    return (prior * held + price * qty) / total
 
 
 def _canonical_entry_prices(events: Any) -> dict[str, float]:
@@ -1545,6 +1556,10 @@ class AutoSimulationWorker:
         # Barra (inicio ISO) a la que pertenece ``_v2_consumed_signals``: al cambiar de
         # barra la memoria se reinicia (solo la barra corriente deduplica).
         self._v2_consumed_bar: str = ""
+        # P5: marcas cuyo ``mark`` durable falló (signal_id → (símbolo, barra)); se reintentan.
+        self._v2_consumed_unpersisted: dict[str, tuple[str, str]] = {}
+        # P6: transiciones del INTENT de salida cuyo guardado falló (exit_order_id → orden).
+        self._v2_exit_unpersisted: dict[str, ExitOrder] = {}
         # AUTO 2.0 · P4: planes V2 rehidratados del espejo durable al readoptar
         # (``symbol → PositionState.to_dict()``), pendientes de primer uso. Se usa una
         # sola vez: una vez rehidratado, el ``PositionState`` vivo manda.
@@ -2145,6 +2160,14 @@ class AutoSimulationWorker:
         return self._time
 
     # ---- W4 (v2.88.17): precio con estado «NO HAY PRECIO» (fail-closed) ------------
+    def _safe_price_script(self, symbol: str, tick: int) -> Any:
+        """M9: una excepción del ``price_script`` es «no hay precio» (como en ``PriceSource``)."""
+        try:
+            return self._price_script(symbol, tick)
+        except Exception:  # noqa: BLE001 — un fallo de precio ES «no hay precio».
+            logger.exception("auto_sim v2 price_script failed symbol=%s", symbol)
+            return None
+
     def _v2_price_exec(self, symbol: str, tick: int) -> float | None:
         """Precio de EJECUCIÓN/MARCA del tick — o ``None`` si **no hay precio**.
 
@@ -2154,7 +2177,7 @@ class AutoSimulationWorker:
         """
         source = self._price_source
         if source is None:
-            value = self._price_script(symbol, tick)
+            value = self._safe_price_script(symbol, tick)
             if value is None:
                 return None
             # P9: ``NaN``/``inf`` de la fuente hermética tampoco es un precio.
@@ -2180,7 +2203,7 @@ class AutoSimulationWorker:
         """
         source = self._price_source
         if source is None:
-            value = self._price_script(symbol, tick)
+            value = self._safe_price_script(symbol, tick)
             return None if value is None else finite_float(value)
         try:
             price = finite_float(source.mid(symbol))
@@ -3720,8 +3743,12 @@ class AutoSimulationWorker:
             persisted.append(reservation)
         try:
             await store.commit()
-        except Exception:  # noqa: BLE001 — con autocommit ya es durable; se declara.
+        except Exception:  # noqa: BLE001 — sin commit no hay compromiso durable: no se emite.
             logger.exception("auto_sim v2 reservation commit failed")
+            # M5: no se asume autocommit. Lo no confirmado no cuenta como reservado y su
+            # instrumento queda vetado este turno (fail-closed).
+            blocked.update(row.instrument_id for row in persisted)
+            persisted = []
         # AUTO-10 — el ciclo que acaba de abrir deja su régimen en el journal DURABLE. Se
         # publica DESPUÉS del commit de la reserva: primero el compromiso de capital, después
         # la traza (si la traza falla, el dinero sigue comprometido y el hueco se declara).
@@ -3757,20 +3784,23 @@ class AutoSimulationWorker:
             self._audit_session_id = session
         return session
 
-    async def _v2_audit_emit(self, entry: Any, *, label: str) -> None:
+    async def _v2_audit_emit(self, entry: Any, *, label: str) -> bool:
         """Publica UNA entrada de auditoría; best-effort declarado (``M2``).
 
         Sin sink es un no-op silencioso: no hay nada que fingir. Un fallo del sink NO puede
         tumbar el turno (el dinero ya está comprometido aguas arriba), pero se registra —
-        un silencio aquí volvería a convertir el hueco en mentira por omisión.
+        un silencio aquí volvería a convertir el hueco en mentira por omisión. Devuelve
+        ``False`` solo si el sink falló (M6: el llamante decide si reencolar).
         """
         sink = self._operational_audit_sink
         if sink is None or entry is None:
-            return
+            return True
         try:
             await sink(entry)
         except Exception:  # noqa: BLE001 — publicar no puede tumbar el turno.
             logger.exception("auto_sim operational audit failed (%s)", label)
+            return False
+        return True
 
     async def _v2_journal_cycle_regime(self, reservations: Sequence[PortfolioReservation]) -> None:
         """AUTO-10 — publica el régimen del ciclo recién abierto en el journal durable.
@@ -4236,6 +4266,23 @@ class AutoSimulationWorker:
             return False
         return True
 
+    async def _v2_save_exit_order_or_pend(self, order: ExitOrder) -> bool:
+        """P6: persiste una transición del INTENT; si falla, queda pendiente de reintento.
+
+        La versión más reciente por ``exit_order_id`` sustituye a la anterior. Antes el retorno
+        se ignoraba y el INTENT durable se quedaba atrás del fill real sin rastro.
+        """
+        if await self._v2_save_exit_order(order):
+            self._v2_exit_unpersisted.pop(order.exit_order_id, None)
+            return True
+        logger.error("auto_sim v2 exit order transition pending retry id=%s", order.exit_order_id)
+        self._v2_exit_unpersisted[order.exit_order_id] = order
+        return False
+
+    async def _v2_retry_unpersisted_exit_orders(self) -> None:
+        for order in list(self._v2_exit_unpersisted.values()):
+            await self._v2_save_exit_order_or_pend(order)
+
     async def _v2_apply_exit_fill(self, exit_order_id: str | None, qty: Any, *, at: str) -> None:
         """Aplica un fill materializado al INTENT de salida (V2.43.3 · separación I/O/F).
 
@@ -4246,6 +4293,7 @@ class AutoSimulationWorker:
         key = str(exit_order_id or "").strip()
         if not key:
             return
+        await self._v2_retry_unpersisted_exit_orders()
         order = self._v2_exit_orders.get(key)
         if order is None:
             store = self._exit_order_store
@@ -4261,7 +4309,7 @@ class AutoSimulationWorker:
         updated = order.apply_fill(qty, at=at)
         if updated is order:
             return
-        await self._v2_save_exit_order(updated)
+        await self._v2_save_exit_order_or_pend(updated)
         if updated.is_open:
             self._v2_exit_orders[key] = updated
         else:
@@ -4378,7 +4426,7 @@ class AutoSimulationWorker:
             self._v2_exit_orders[exit_order_id] = emergency
             return exit_order_id
         reserved = order.with_reserved(reservation.reservation_id, at=at)
-        await self._v2_save_exit_order(reserved)
+        await self._v2_save_exit_order_or_pend(reserved)
         self._v2_exit_orders[exit_order_id] = reserved
         # OBS-14.b — la reserva de salida también es de ESTA sesión: si su orden no llega
         # a materializarse dentro del turno, el cierre de turno es quien debe retirarla.
@@ -4985,6 +5033,7 @@ class AutoSimulationWorker:
         if bar_start and bar_start != self._v2_consumed_bar:
             self._v2_consumed_bar = bar_start
             self._v2_consumed_signals.clear()
+            self._v2_consumed_unpersisted.clear()
 
     # ---- W2 · Fase A: short-circuit por barra (seam en ``auto_turn``) ----------------
     def _v2_bar_short_circuit_applies(self) -> bool:
@@ -5040,6 +5089,7 @@ class AutoSimulationWorker:
         bar_start = self._v2_current_bar_start()
         if not bar_start:
             return
+        await self._v2_retry_unpersisted_consumed()
         try:
             stored = await self._consumed_signal_store.list_bar(
                 self._account_id, self._engine_id, bar_start
@@ -5087,6 +5137,10 @@ class AutoSimulationWorker:
         bar_start = self._v2_current_bar_start()
         if not bar_start:
             return
+        if not await self._v2_persist_consumed(signal_id, symbol, bar_start):
+            self._v2_consumed_unpersisted[signal_id] = (symbol, bar_start)
+
+    async def _v2_persist_consumed(self, signal_id: str, symbol: str, bar_start: str) -> bool:
         try:
             await self._consumed_signal_store.mark(
                 self._account_id,
@@ -5095,9 +5149,21 @@ class AutoSimulationWorker:
                 instrument_id=symbol,
                 bar_timestamp=bar_start,
             )
-        except Exception:  # noqa: BLE001 — el fill ya ocurrió; la marca durable se
-            # reintenta (la RAM ya la tiene y el tick siguiente la re-marcará).
+        except Exception:  # noqa: BLE001 — el fill ya ocurrió; se reintenta en el tick siguiente.
             logger.exception("auto_sim v2 consumed signal persist failed symbol=%s", symbol)
+            return False
+        return True
+
+    async def _v2_retry_unpersisted_consumed(self) -> None:
+        """P5: reintenta las marcas durables que fallaron (sin esto un crash re-autoriza la señal)."""
+        if self._consumed_signal_store is None or not self._account_id:
+            return
+        current = self._v2_current_bar_start()
+        for signal_id, (symbol, bar_start) in list(self._v2_consumed_unpersisted.items()):
+            if bar_start != current or await self._v2_persist_consumed(
+                signal_id, symbol, bar_start
+            ):
+                self._v2_consumed_unpersisted.pop(signal_id, None)
 
     async def _v2_plan_tick(self, *, reuse_bar_datum: bool = False) -> Any:
         """Planifica el tick completo (entradas) por el pipeline AUTO 2.0.
@@ -7409,12 +7475,27 @@ class AutoSimulationWorker:
         en hermético) y un fallo se registra pero no tumba el turno (el dinero ya está
         comprometido aguas arriba). La cola se VACÍA siempre para no reintentar un hecho
         ya fallido en cada tick restante del día.
+
+        M6: los eventos cuyo sink falló se REENCOLAN (acotado a ``_POSITION_JOURNAL_RETRY_CAP``,
+        descartando los más antiguos con error) en vez de perderse: la evidencia no se pierde por
+        un fallo transitorio del sink.
         """
         pending, self._v2_position_journal_pending = self._v2_position_journal_pending, []
+        failed: list[Any] = []
         for entry in pending:
-            await self._v2_audit_emit(
+            ok = await self._v2_audit_emit(
                 self._v2_seal_audit_identity(entry), label="position_management"
             )
+            if not ok:
+                failed.append(entry)
+        if failed:
+            keep = failed[-_POSITION_JOURNAL_RETRY_CAP:]
+            if len(keep) < len(failed):
+                logger.error(
+                    "auto_sim position journal overflow: %d eventos descartados",
+                    len(failed) - len(keep),
+                )
+            self._v2_position_journal_pending = keep + self._v2_position_journal_pending
 
     async def _v2_track_entry(self, symbol: str, price: Decimal, qty: Decimal) -> None:
         """Crea el ``PositionState`` V2 al abrir (desde el TradePlan que lo originó).
@@ -7988,6 +8069,14 @@ class AutoSimulationWorker:
                 if held <= 0 and price > 0:
                     self._entry_price[symbol] = price
                     self._high_price[symbol] = price
+                elif held > 0 and price > 0 and applied_qty > 0:
+                    # M15: una ampliación mezcla el coste; el P&L parcial y el no realizado
+                    # se miden contra el coste medio ponderado, no contra la primera entrada.
+                    prior = self._entry_price.get(symbol)
+                    if prior is not None and prior > 0:
+                        self._entry_price[symbol] = _blend_entry_price(
+                            prior, held, price, applied_qty
+                        )
                 # V2.28/A10 (P1-02 real): recuerda la versión que abrió la posición para
                 # atribuir después los fills de cierre. Solo al abrir desde plano (una
                 # ampliación sobre posición viva conserva la versión original).
@@ -9361,6 +9450,9 @@ class AutoSimRuntime:
                 price_source=price_source,
             )
         self._worker = worker
+        # P7: un único turno a la vez por runtime; ``run_tick`` muta ``_open`` y sustituye
+        # stores del worker, así que dos turnos solapados corromperían el estado.
+        self._tick_lock = asyncio.Lock()
 
     @property
     def worker(self) -> AutoSimulationWorker:
@@ -9377,6 +9469,20 @@ class AutoSimRuntime:
         self._worker._decider = decider  # noqa: SLF001 — seam interno documentado.
 
     async def run_tick(self) -> TurnReport | None:
+        """Un turno real serializado: si ya hay uno en curso, este se omite (no se encola).
+
+        Omitir en vez de esperar evita una cola de turnos sobre barras ya viejas; el
+        siguiente tick del loop lo retoma.
+        """
+        if self._tick_lock.locked():
+            logger.warning(
+                "auto_sim tick omitido: turno anterior aún en curso engine=%s", self._engine_id
+            )
+            return None
+        async with self._tick_lock:
+            return await self._run_tick_unlocked()
+
+    async def _run_tick_unlocked(self) -> TurnReport | None:
         """Un turno real: abre sesión, compone stores PG + finanzas, y lo conduce.
 
         Cada tick compone también el espejo durable de posición (``sim_auto_positions``,

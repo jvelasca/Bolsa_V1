@@ -64,6 +64,10 @@ class HealthThresholds:
     max_observed_drawdown_pct: float | None = None
     min_observed_win_rate: float | None = None
     min_observed_profit_factor: float | None = None
+    # S7: con ``True`` un indicador con umbral configurado pero SIN medición degrada
+    # (``<metric>_unmeasured``). Default ``False``: se conserva el comportamiento histórico,
+    # pero la decisión siempre declara ``unmeasured`` para que no pase por "sana".
+    fail_on_unmeasured: bool = False
     extra: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, float]:
@@ -104,7 +108,14 @@ class VigilanceDecision:
     degraded: bool
     breaches: tuple[str, ...] = ()
     health: StrategyHealth | None = None
+    unmeasured: tuple[str, ...] = ()
 
+    @property
+    def health_state(self) -> str:
+        """``degraded`` / ``unmeasured`` / ``healthy``: ausencia de medida no es salud."""
+        if self.degraded:
+            return "degraded"
+        return "unmeasured" if self.unmeasured else "healthy"
     @property
     def relab(self) -> bool:
         return self.decision == DECISION_RELAB
@@ -170,6 +181,10 @@ def evaluate_active_health(
     if health.observed_degraded:
         breaches.extend(_observed_breaches(health, th))
 
+    unmeasured = _unmeasured_metrics(health, th)
+    if th.fail_on_unmeasured:
+        breaches.extend(f"{name}_unmeasured" for name in unmeasured)
+
     degraded = bool(breaches)
     return VigilanceDecision(
         version_id=version_id,
@@ -177,7 +192,27 @@ def evaluate_active_health(
         degraded=degraded,
         breaches=tuple(breaches),
         health=health,
+        unmeasured=unmeasured,
     )
+
+
+def _unmeasured_metrics(health: StrategyHealth, th: HealthThresholds) -> tuple[str, ...]:
+    """Indicadores con umbral configurado y valor ausente (S7)."""
+    checks = (
+        ("edge", th.min_edge, health.edge),
+        ("walk_forward_efficiency", th.min_wfe, health.walk_forward_efficiency),
+        ("dsr", th.min_dsr, health.dsr),
+        ("credibility", th.min_credibility, health.credibility),
+        ("observed_return_pct", th.min_observed_return_pct, health.observed_return_pct),
+        (
+            "observed_max_drawdown_pct",
+            th.max_observed_drawdown_pct,
+            health.observed_max_drawdown_pct,
+        ),
+        ("observed_win_rate", th.min_observed_win_rate, health.observed_win_rate),
+        ("observed_profit_factor", th.min_observed_profit_factor, health.observed_profit_factor),
+    )
+    return tuple(name for name, threshold, value in checks if threshold is not None and value is None)
 
 
 def _observed_breaches(health: StrategyHealth, th: HealthThresholds) -> list[str]:

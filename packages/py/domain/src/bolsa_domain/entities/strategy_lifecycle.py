@@ -668,6 +668,9 @@ def _evaluate_promotion(
         reasons.append("coach_veto")
     if shadow is None or not shadow.passed:
         reasons.append("shadow_validation_requerida")
+    reasons.extend(
+        _evidence_identity_reasons(validation=validation, shadow=shadow, finalist=finalist)
+    )
     promoted = not reasons
     return StrategyPromotion(
         finalist_id=finalist.version_id,
@@ -704,6 +707,22 @@ def _shadow_override(
     )
 
 
+def _evidence_identity_reasons(
+    *,
+    validation: StrategyValidation,
+    shadow: ShadowValidationResult | None,
+    finalist: StrategyFinalist | None,
+) -> tuple[str, ...]:
+    """S6: la validación y el shadow deben ser del MISMO finalista (versión), no de otro."""
+    reasons: list[str] = []
+    expected = finalist.version_id if finalist is not None else validation.finalist_id
+    if validation.finalist_id != expected:
+        reasons.append("evidencia_validacion_otra_version")
+    if shadow is not None and shadow.version_id != expected:
+        reasons.append("evidencia_shadow_otra_version")
+    return tuple(reasons)
+
+
 def can_transition(
     *,
     state: StrategyLifecycleState,
@@ -711,6 +730,8 @@ def can_transition(
     coach: CoachAssessment | None = None,
     validation: StrategyValidation | None = None,
     shadow: ShadowValidationResult | None = None,
+    finalist: StrategyFinalist | None = None,
+    required_gates: tuple[str, ...] = (),
 ) -> TransitionResult:
     """Máquina de estados: ¿puede avanzar desde ``state`` y con qué motivos?
 
@@ -722,6 +743,11 @@ def can_transition(
     V2.35.1 (auditoría P2-01): la máquina de estados es ruta AUTOMÁTICA, así que ya no
     acepta el override booleano ``shadow_validated``. El override administrativo vive
     exclusivamente en :func:`evaluate_admin_promotion`.
+
+    S1: ``PROMOCION → ACTIVE`` exige los siete gates, COACH sin veto y shadow que pase.
+    S5: ``required_gates`` (opcional) obliga a que esos gates concretos estén presentes y en
+    PASS en los estados intermedios; un gate requerido ausente bloquea.
+    S6: la evidencia debe corresponder al mismo finalista/versión.
     """
     target = next_state(state)
     if state in {StrategyLifecycleState.REJECTED, StrategyLifecycleState.ACTIVE}:
@@ -747,11 +773,18 @@ def can_transition(
         # (el propio default de la firma) NO puede autorizar el salto de estado.
         if not gates:
             return TransitionResult(state, target, False, ("gates_no_evaluados",))
+        present = {g.gate for g in gates if g.passed}
+        absent = tuple(g for g in required_gates if g not in present)
+        if absent:
+            return TransitionResult(
+                state, target, False, (f"gates_requeridos_ausentes:{','.join(absent)}",)
+            )
         if state == StrategyLifecycleState.COACH and coach is not None and coach.vetoes:
             return TransitionResult(state, target, False, ("coach_veto",))
         return TransitionResult(state, target, True)
 
-    if state == StrategyLifecycleState.VALIDACION:
+    if state in {StrategyLifecycleState.VALIDACION, StrategyLifecycleState.PROMOCION}:
+        # PROMOCION → ACTIVE re-exige TODA la evidencia: no basta con llegar al estado.
         if validation is None:
             return TransitionResult(state, target, False, ("validacion_ausente",))
         if not validation.passed:
@@ -761,14 +794,20 @@ def can_transition(
                 False,
                 (f"gates_no_superados:{','.join(validation.missing_gates)}",),
             )
+        if state == StrategyLifecycleState.PROMOCION:
+            if coach is None:
+                return TransitionResult(state, target, False, ("coach_ausente",))
+            if coach.vetoes:
+                return TransitionResult(state, target, False, ("coach_veto",))
         effective = shadow
         if effective is None or not effective.passed:
             return TransitionResult(state, target, False, ("shadow_validation_requerida",))
+        identity = _evidence_identity_reasons(
+            validation=validation, shadow=effective, finalist=finalist
+        )
+        if identity:
+            return TransitionResult(state, target, False, identity)
         return TransitionResult(state, target, True)
-
-    if state == StrategyLifecycleState.PROMOCION:
-        return TransitionResult(state, StrategyLifecycleState.ACTIVE, True)
-
     if state == StrategyLifecycleState.DEGRADED:
         # Degradación vuelve al LAB (nunca swap directo de la activa).
         return TransitionResult(state, StrategyLifecycleState.LABORATORIO, True)

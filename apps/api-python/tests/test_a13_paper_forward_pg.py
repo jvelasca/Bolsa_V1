@@ -230,8 +230,18 @@ async def _promote_active(
     factory: async_sessionmaker[AsyncSession],
     instrument_id: str,
 ):
-    """Reutiliza el camino A12 real para dejar una ACTIVE con evidencia shadow."""
+    """Reutiliza el camino A12 real para dejar una ACTIVE con evidencia shadow.
+
+    S2 (auditoría .183) endureció los umbrales del LAB: ``min_trades=30`` deja fuera a un
+    campeón con solo 4 operaciones. Este fixture es **sintético** y no está calibrado —lo que
+    A13 certifica es la cadena forward (barras nuevas → evidencia → vigilancia), no la
+    severidad del LAB—, así que aquí se declara explícitamente el mínimo de muestra del
+    EdgeReport (≥3 operaciones). El resto de umbrales (OOS, WFE, PBO, DSR, drawdown) se dejan
+    en los defaults de producción: solo se relaja lo que el fixture no puede producir, y los
+    defaults globales no se tocan.
+    """
     from bolsa_application.auto_orchestrator import AutoOrchestrator, OrchestratorDeps
+    from bolsa_application.strategy_lab_phase import LabThresholds
     from bolsa_application.strategy_shadow_phase import ShadowReplayConfig
     from bolsa_domain.entities.strategy_lifecycle import ShadowPolicy
 
@@ -240,6 +250,7 @@ async def _promote_active(
             store=_SessionScopedStore(factory),
             run_optimize=_make_real_lab_runner(factory),
             discovery=_make_discovery_runner(),
+            lab_thresholds=LabThresholds(min_trades=3),
             shadow_bars=_make_shadow_bars_provider(factory),
             shadow_policy=ShadowPolicy(min_closed_round_trips=1, min_return_pct=-100.0),
             shadow_config=ShadowReplayConfig(window_bars=250, min_bars=30),

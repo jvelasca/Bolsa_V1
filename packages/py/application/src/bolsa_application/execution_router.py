@@ -491,6 +491,41 @@ class ExecutionRouter:
             "require_incident_veto": require_incident,
         }
 
+    async def _refresh_equity_marks(
+        self, account_key: str, equity: float, initial: float
+    ) -> tuple[Any, bool]:
+        """P3: marcas de equity para el circuit breaker de drawdown, sin tragar fallos.
+
+        Devuelve ``(drawdowns, marks_unavailable)``. Si la hidratación desde ``settings_json``
+        falla y el libro no tiene marcas en memoria, el ``dayOpen``/``peak`` se reiniciarían al
+        equity actual (drawdown 0 tras un reinicio) y el breaker no dispararía: se pide veto.
+        Un fallo al persistir se registra; las marcas siguen en memoria y se re-exportan enteras
+        en la siguiente evaluación.
+        """
+        from bolsa_application.account_drawdown import GLOBAL_EQUITY_MARK_BOOK
+
+        hydrate_failed = False
+        try:
+            raw_settings = await self._accounts.get_settings_json(account_key)
+            GLOBAL_EQUITY_MARK_BOOK.load_from_settings(account_key, raw_settings)
+        except Exception:  # noqa: BLE001
+            logger.exception("equity marks hydrate failed account=%s", account_key)
+            hydrate_failed = True
+        marks_unavailable = hydrate_failed and not GLOBAL_EQUITY_MARK_BOOK.has_marks(account_key)
+        dds = GLOBAL_EQUITY_MARK_BOOK.update(
+            account_key,
+            equity,
+            initial_deposit=initial if initial > 0 else None,
+        )
+        try:
+            await self._accounts.merge_settings_json(
+                account_key,
+                GLOBAL_EQUITY_MARK_BOOK.export_settings_fragment(account_key),
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("equity marks persist failed account=%s", account_key)
+        return dds, marks_unavailable
+
     async def _resolve_account_mandate_for_opening(
         self,
         account_id: str,
@@ -945,29 +980,10 @@ class ExecutionRouter:
                 profile = await self._profile_store.get(scope.account.active_profile_id)
             equity = float(summary.total_equity)
             initial = float(scope.account.initial_deposit or 0.0)
-            from bolsa_application.account_drawdown import GLOBAL_EQUITY_MARK_BOOK
-
             account_key = policy.account_id or "default"
-            # Hidratar marcas desde settings_json (cross-restart)
-            try:
-                raw_settings = await self._accounts.get_settings_json(account_key)
-                GLOBAL_EQUITY_MARK_BOOK.load_from_settings(account_key, raw_settings)
-            except Exception:  # noqa: BLE001
-                pass
-
-            dds = GLOBAL_EQUITY_MARK_BOOK.update(
-                account_key,
-                equity,
-                initial_deposit=initial if initial > 0 else None,
+            dds, marks_unavailable = await self._refresh_equity_marks(
+                account_key, equity, initial
             )
-            # Persistir marcas (best-effort)
-            try:
-                await self._accounts.merge_settings_json(
-                    account_key,
-                    GLOBAL_EQUITY_MARK_BOOK.export_settings_fragment(account_key),
-                )
-            except Exception:  # noqa: BLE001
-                pass
             mandate_ctx = await self._resolve_account_mandate_for_opening(
                 policy.account_id or "",
                 signal.instrument_id,
@@ -1059,6 +1075,10 @@ class ExecutionRouter:
                     "reasons": list(guard_decision.reasons),
                 },
             )
+            if marks_unavailable:
+                guard_decision = RiskDecision(
+                    verdict="DENY", reasons=("drawdown_marks:unavailable",), guard=None
+                )
             guard = guard_decision.guard
             lineage_base = {
                 "signalId": signal.id,
@@ -1350,26 +1370,9 @@ class ExecutionRouter:
 
         equity = float(summary.total_equity)
         initial = float(scope.account.initial_deposit or 0.0)
-        from bolsa_application.account_drawdown import GLOBAL_EQUITY_MARK_BOOK
 
         account_key = policy.account_id
-        try:
-            raw_settings = await self._accounts.get_settings_json(account_key)
-            GLOBAL_EQUITY_MARK_BOOK.load_from_settings(account_key, raw_settings)
-        except Exception:  # noqa: BLE001
-            pass
-        dds = GLOBAL_EQUITY_MARK_BOOK.update(
-            account_key,
-            equity,
-            initial_deposit=initial if initial > 0 else None,
-        )
-        try:
-            await self._accounts.merge_settings_json(
-                account_key,
-                GLOBAL_EQUITY_MARK_BOOK.export_settings_fragment(account_key),
-            )
-        except Exception:  # noqa: BLE001
-            pass
+        dds, marks_unavailable = await self._refresh_equity_marks(account_key, equity, initial)
 
         mandate_ctx = await self._resolve_account_mandate_for_opening(
             policy.account_id,
@@ -1423,6 +1426,10 @@ class ExecutionRouter:
                         sanity_warnings=sanity,
                         **recon,
                     )
+        if marks_unavailable:
+            guard_decision = RiskDecision(
+                verdict="DENY", reasons=("drawdown_marks:unavailable",), guard=None
+            )
         guard = guard_decision.guard
         lineage_live = {
             "signalId": signal.id,

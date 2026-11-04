@@ -402,11 +402,17 @@ async def test_a11_discovery_to_auto_sim_pg(
             account_id = scope.account.id
 
         # --- Orquestador real: DISCOVERY + LAB + SHADOW (evidencia ejecutada) --------
+        # S2: el fixture sintético produce 4 operaciones cerradas, así que se declara el
+        # mínimo de muestra del EdgeReport (≥3). A11 certifica la cadena discovery→AUTO,
+        # no la calibración; OOS/WFE/PBO/DSR/drawdown quedan en los defaults de producción.
+        from bolsa_application.strategy_lab_phase import LabThresholds
+
         orchestrator = AutoOrchestrator(
             OrchestratorDeps(
                 store=_SessionScopedStore(a11_factory),
                 run_optimize=_make_real_lab_runner(a11_factory),
                 discovery=_make_discovery_runner(),
+                lab_thresholds=LabThresholds(min_trades=3),
                 shadow_bars=_make_shadow_bars_provider(a11_factory),
                 shadow_policy=ShadowPolicy(min_closed_round_trips=1, min_return_pct=-100.0),
                 # V2.32.1 (P1-01) + H1: hold-out estricto respecto al LAB (invariante:

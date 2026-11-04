@@ -493,13 +493,54 @@ async def test_postgres_cancel_tracks_docs_via_upsert() -> None:
     rendered = str(stmt.compile(compile_kwargs={"literal_binds": True})).upper()
     assert "STOP-OUT" in rendered
     assert "RISK" in rendered
-    # El DO UPDATE no reescribe broker_cancel_confirmed_at (no fabrica el ack del
-    # broker). El INSERT puede listar la columna con NULL (fila nueva ignora esa
-    # columna), pero jamás la asigna a un valor en la cláusula de update.
-    do_update_tail = rendered.split("DO UPDATE SET", 1)[1]
-    assert "BROKER_CANCEL_CONFIRMED_AT" not in do_update_tail
+    # El UPDATE no toca broker_cancel_confirmed_at (no fabrica el ack del broker).
+    assert "BROKER_CANCEL_CONFIRMED_AT" not in rendered
+    assert "UPDATE" in rendered and "INSERT" not in rendered
 
     session.commit.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_postgres_cancel_does_not_rewrite_quantities_and_is_guarded() -> None:
+    """M1: el UPDATE solo toca estado/cancelación y se condiciona al estado leído."""
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    existing_row = _row_from(_make_order(order_id="lo-m1", account_id="acc-1"))
+    found = MagicMock()
+    found.scalar_one_or_none.return_value = existing_row
+    session.execute = AsyncMock(return_value=found)
+
+    store = PostgresLiveOrderStore(session)
+    await store.cancel_order("lo-m1")
+
+    stmt = session.execute.await_args_list[-1].args[0]
+    rendered = str(stmt.compile(compile_kwargs={"literal_binds": True})).upper()
+    set_clause, where_clause = rendered.split("WHERE", 1)
+    for column in ("QUANTITY", "FILLED_QUANTITY", "REMAINING_QUANTITY"):
+        assert column not in set_clause.split("SET", 1)[1]
+    assert "STATUS =" in where_clause
+
+
+@pytest.mark.asyncio
+async def test_postgres_cancel_loses_race_when_row_changed() -> None:
+    """M1: si el UPDATE condicionado no afecta filas, se devuelve el estado vigente."""
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    stale_row = _row_from(_make_order(order_id="lo-m1r", account_id="acc-1"))
+    found = MagicMock()
+    found.scalar_one_or_none.return_value = stale_row
+    lost = MagicMock()
+    lost.rowcount = 0
+
+    async def _execute(stmt: object) -> MagicMock:
+        return lost if "UPDATE" in str(stmt).upper()[:8] else found
+
+    session.execute = AsyncMock(side_effect=_execute)
+    store = PostgresLiveOrderStore(session)
+    result = await store.cancel_order("lo-m1r")
+    assert result is not None and result.status == stale_row.status
 
 
 @pytest.mark.asyncio
@@ -525,7 +566,7 @@ async def test_postgres_cancel_persists_cancelled_and_idempotent() -> None:
     put_stmt = calls[-1].args[0]
     rendered = str(put_stmt.compile(compile_kwargs={"literal_binds": True})).upper()
     assert "CANCEL_REQUESTED" in rendered
-    assert "ON CONFLICT" in rendered
+    assert "UPDATE" in rendered
 
     # Re-cancel (fila ya CANCEL_REQUESTED): get() devuelve no-terminal cancelable,
     # pero no hay auto-bucle → transición CANCEL_REQUESTED→CANCEL_REQUESTED ilegal,

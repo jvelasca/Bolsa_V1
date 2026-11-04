@@ -257,6 +257,18 @@ def compute_allocation(
             # riesgo por operación que cualquier otro. ``None`` sigue significando el
             # único contrato histórico de "sin techo por porcentaje".
             max_by_pct = eq * (pct / 100.0) if pct > 0 else 0.0
+        else:
+            # M2/M3: un techo configurado pero ilegible (NaN/inf/negativo) VETA; no es sin techo.
+            max_by_pct = 0.0
+    if risk_budget is not None and (_finite(risk_budget) is None or risk_budget < 0):
+        return AllocationResult(
+            quantity=0.0,
+            risk_amount=None,
+            risk_pct=None,
+            stop_distance=distance,
+            position_value=None,
+            approved=False,
+        )
     risk_amount: float | None = None
     if risk_budget is not None and risk_budget > 0:
         risk_amount = risk_budget
@@ -307,20 +319,22 @@ def compute_allocation(
     # 2) Tope por concentración de activo (max_position_pct).
     if cfg.max_position_pct is not None:
         pct = _finite(cfg.max_position_pct)
-        if pct is not None and pct > 0:
-            max_qty_pct = (eq * (pct / 100.0)) / e
-            if max_qty_pct < qty:
-                qty = max_qty_pct
-                capped.append(CAP_POSITION_PCT)
+        if pct is None or pct < 0:
+            pct = 0.0  # M2: ilegible/negativo veta; 0 es techo cero, no sin techo
+        max_qty_pct = (eq * (pct / 100.0)) / e
+        if max_qty_pct < qty:
+            qty = max_qty_pct
+            capped.append(CAP_POSITION_PCT)
 
     # 3) Tope por notional por orden (capacidad/liquidez).
     if cfg.max_position_value is not None:
-        mv = _finite_positive(cfg.max_position_value)
-        if mv is not None and mv > 0:
-            max_qty_value = mv / e
-            if max_qty_value < qty:
-                qty = max_qty_value
-                capped.append(CAP_POSITION_VALUE)
+        mv = _finite(cfg.max_position_value)
+        if mv is None or mv < 0:
+            mv = 0.0  # M2: ilegible/negativo veta; 0 es techo cero
+        max_qty_value = mv / e
+        if max_qty_value < qty:
+            qty = max_qty_value
+            capped.append(CAP_POSITION_VALUE)
 
     # 4) Tope por poder de compra disponible, NETO del capital ya reservado por órdenes
     #    pendientes (V2.40.4): si la reserva es lo que rebaja el tope, el motivo es

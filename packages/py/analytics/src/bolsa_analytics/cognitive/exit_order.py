@@ -300,11 +300,14 @@ def build_exit_order(
     filled = _finite(filled_qty) or 0.0
     filled = round4(min(requested, max(0.0, filled)))
     remaining_value = _finite(remaining_qty)
-    remaining = (
-        round4(max(0.0, remaining_value))
-        if remaining_value is not None
-        else round4(max(0.0, requested - filled))
-    )
+    derived_remaining = round4(max(0.0, requested - filled))
+    if remaining_value is None:
+        remaining = derived_remaining
+    elif remaining_value < 0 or remaining_value > requested + 1e-9:
+        # M4: un remanente fuera de [0, solicitado] es inconsistente: no se cree, se deriva.
+        remaining = derived_remaining
+    else:
+        remaining = round4(remaining_value)
     resolved_state = coerce_exit_order_state(state) or "INTENT"
     return ExitOrder(
         exit_order_id=trimmed_id,

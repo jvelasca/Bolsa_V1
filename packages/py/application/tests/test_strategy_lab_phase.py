@@ -113,7 +113,7 @@ def test_lab_full_evidence_passes_quantitative_gates() -> None:
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7},
-        edge_report={"dsr": 0.5},
+        edge_report={"dsr": 0.5, "suite": {"sampleTradesCount": 60}},
     )
     evaluation = evaluate_optimize_result(
         candidate=_candidate(),
@@ -143,7 +143,7 @@ def test_lab_champion_is_oos_aware() -> None:
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7},
-        edge_report={"dsr": 0.5},
+        edge_report={"dsr": 0.5, "suite": {"sampleTradesCount": 60}},
     )
     evaluation = evaluate_optimize_result(
         candidate=_candidate(),
@@ -180,7 +180,7 @@ def test_lab_dsr_threshold_vetoes_overfit() -> None:
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7},
-        edge_report={"dsr": 0.5},
+        edge_report={"dsr": 0.5, "suite": {"sampleTradesCount": 60}},
     )
     evaluation = evaluate_optimize_result(
         candidate=_candidate(),
@@ -195,7 +195,7 @@ def test_lab_dsr_threshold_vetoes_overfit() -> None:
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7},
-        edge_report={"dsr": 0.8},
+        edge_report={"dsr": 0.8, "suite": {"sampleTradesCount": 60}},
     )
     ok_eval = evaluate_optimize_result(
         candidate=_candidate(),
@@ -211,3 +211,48 @@ def test_gate_from_metrics_fail_closed() -> None:
     assert gate_from_metrics("x", {"score": "n/a"}).status == GateStatus.NOT_EVALUATED
     assert gate_from_metrics("x", {"score": 0.5}, min_value=0.4).status == GateStatus.PASS
     assert gate_from_metrics("x", {"score": 0.1}, min_value=0.4).status == GateStatus.FAIL
+
+
+# ── S2: umbrales no triviales y gate de riesgo ──────────────────────────────────
+
+
+def _risk_gate(dd: float | None, trades: int | None, **th: Any) -> Any:
+    suite = {} if trades is None else {"suite": {"sampleTradesCount": trades}}
+    result = _Result(
+        trials=[_Trial(score=1.0, oos_metrics={"score": 0.9}, max_drawdown_pct=dd)],
+        edge_report={"dsr": 0.9, **suite},
+    )
+    evaluation = evaluate_optimize_result(
+        candidate=_candidate(), result=result, thresholds=LabThresholds(**th)
+    )
+    return {g.gate: g for g in evaluation.gates}["risk"]
+
+
+def test_s2_default_thresholds_are_not_trivial() -> None:
+    th = LabThresholds()
+    assert th.min_oos_score > 0.0
+    assert th.min_wfe > 0.0
+    assert th.max_pbo < 1.0
+    assert th.max_drawdown_pct > 0.0
+    assert th.min_trades > 0
+
+
+def test_s2_risk_fails_when_drawdown_exceeds_ceiling() -> None:
+    gate = _risk_gate(40.0, 100)
+    assert gate.status == GateStatus.FAIL
+    assert gate.detail == "drawdown_excede_techo"
+
+
+def test_s2_risk_fails_with_insufficient_sample() -> None:
+    gate = _risk_gate(5.0, 10)
+    assert gate.status == GateStatus.FAIL
+    assert gate.detail == "muestra_insuficiente"
+
+
+def test_s2_risk_not_evaluated_without_trade_count() -> None:
+    assert _risk_gate(5.0, None).status == GateStatus.NOT_EVALUATED
+
+
+def test_s2_risk_passes_and_min_trades_zero_disables_sample_gate() -> None:
+    assert _risk_gate(5.0, 100).status == GateStatus.PASS
+    assert _risk_gate(5.0, None, min_trades=0).status == GateStatus.PASS

@@ -564,7 +564,15 @@ def _lab_thresholds() -> Any:
     """
     from bolsa_application.strategy_lab_phase import LabThresholds
 
-    return LabThresholds(min_dsr=_float_env(AUTO_ORCHESTRATOR_LAB_MIN_DSR, 0.7))
+    base = LabThresholds()
+    return LabThresholds(
+        min_oos_score=_float_env("AUTO_ORCHESTRATOR_LAB_MIN_OOS_SCORE", base.min_oos_score),
+        min_wfe=_float_env("AUTO_ORCHESTRATOR_LAB_MIN_WFE", base.min_wfe),
+        max_pbo=_float_env("AUTO_ORCHESTRATOR_LAB_MAX_PBO", base.max_pbo),
+        min_dsr=_float_env(AUTO_ORCHESTRATOR_LAB_MIN_DSR, 0.7),
+        max_drawdown_pct=_float_env("AUTO_ORCHESTRATOR_LAB_MAX_DRAWDOWN_PCT", base.max_drawdown_pct),
+        min_trades=int(_float_env("AUTO_ORCHESTRATOR_LAB_MIN_TRADES", float(base.min_trades))),
+    )
 
 
 def _float_env(name: str, default: float) -> float:
