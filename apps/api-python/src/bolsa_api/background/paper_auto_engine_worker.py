@@ -332,9 +332,19 @@ class PaperAutoEngine:
         self._last_reason: tuple[str, ...] = ("idle",)
         self._decider = decider
         self._engine_id = engine_id
+        # M4: el store durable con el que se construyó el motor. Sin esta referencia el
+        # bucle tenía que leer ``engine._store`` de un atributo que nunca existía (mypy lo
+        # señalaba) y cada tick caía en ``AttributeError``: el motor quedaba ``DEGRADED``
+        # sin haber corrido ni una vez.
+        self._store: AutoEngineStore | None = store
         # P7: ``durable_tick`` es read→readopt→run→persist con awaits; sin lock dos
         # llamadas solapadas se pisarían el estado.
         self._tick_lock = asyncio.Lock()
+
+    @property
+    def store(self) -> AutoEngineStore | None:
+        """Store durable del motor (``None`` = en memoria, igual que V2.21/A8)."""
+        return self._store
 
     def readopt(self, snapshot: AutoEngineSnapshot | None) -> None:
         """Readopta del store durable (tras crash/relaunch; M4). Sin fila aún
@@ -473,8 +483,9 @@ async def paper_auto_engine_loop(
             except Exception:  # noqa: BLE001 — un refresh fallido no tumba el motor.
                 logger.exception("paper_auto_engine watch refresh failed")
         try:
-            if engine._store is not None:  # noqa: SLF001 — M4 durable
-                await durable_tick(engine, engine._store)
+            store = engine.store
+            if store is not None:
+                await durable_tick(engine, store)
             else:
                 engine.run_tick()
         except Exception:  # noqa: BLE001 — un tick no tumba el motor.

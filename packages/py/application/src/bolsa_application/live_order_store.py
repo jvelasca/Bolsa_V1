@@ -24,11 +24,12 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from sqlalchemy import or_, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -681,7 +682,7 @@ class PostgresLiveOrderStore:
         except IntegrityError:
             await self._session.rollback()
             raise
-        if not result.rowcount:
+        if not cast(CursorResult[Any], result).rowcount:
             return await self.get(key)
         return requested
 
