@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from policy_metrics_fakes import MeasuredInstruments
 
 from bolsa_application.daily_ops_report import (
     ESTUDIO_STATUS_EMPTY,
@@ -644,6 +645,8 @@ def _estudio_router(store: _FillStore, *, book_max: int | None = None, summary: 
         profile_store=None,
         enforce_cognitive_gate=book_max is not None,
         position_from_fill=PersistPositionFromFill(store),
+        # P2 (auditoría .183): sin catálogo medido el veto sería por dato, no por book.
+        instrument_repo=MeasuredInstruments(),  # type: ignore[arg-type]
     ), policy
 
 

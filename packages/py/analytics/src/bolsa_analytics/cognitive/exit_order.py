@@ -42,6 +42,10 @@ from bolsa_analytics.cognitive.position_ledger import (
     normalize_side,
 )
 
+# P9 (auditoría .183): normalizador canónico del dominio (``isfinite``), no una copia que
+# aceptaba ``inf``.
+from bolsa_domain.numeric import finite_float as _finite
+
 #: Ciclo de vida del INTENT de salida (contrato con el journal y el store).
 ExitOrderState = Literal[
     "INTENT",  # decidida y persistida; aún sin reserva
@@ -116,16 +120,8 @@ def new_exit_order_id(
     return f"{_encode_crockford(timestamp, 10)}{_encode_crockford(entropy, 16)}"
 
 
-def _finite(value: Any) -> float | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    if number != number:
-        return None
-    return number
+# P9 (auditoría .183): normalizador canónico del dominio (``isfinite``), no una copia que
+# aceptaba ``inf``.
 
 
 @dataclass(frozen=True, slots=True)

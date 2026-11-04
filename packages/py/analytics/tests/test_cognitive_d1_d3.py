@@ -146,6 +146,11 @@ def test_policy_gate_passes_clean_moderate_trade():
         portfolio_concentration_pct=5.0,
         hours_to_earnings=72,
         auto_live=False,
+        # P2 (auditoría .183): un trade "limpio" es un trade MEDIDO. Sin drawdown ni
+        # encaje de cesta el gate veta con `<Regla>_unmeasured`, que es lo correcto.
+        account_daily_drawdown_pct=0.0,
+        account_weekly_drawdown_pct=0.0,
+        basket_max_sector_weight_pct=5.0,
     )
     assert result.passed is True
     assert result.veto_reasons == ()

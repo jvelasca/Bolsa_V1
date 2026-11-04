@@ -266,6 +266,7 @@ from bolsa_application.execution_event import (
     ExecutionEventStore,
 )
 from bolsa_application.exit_order_store import ExitOrderStore
+from bolsa_application.flags import env_finite_float, env_flag
 from bolsa_application.kill_switch_store import KillState, KillSwitchStore
 from bolsa_application.operative_granularity_policy import resolve_operative_granularity
 from bolsa_application.position_manager import (
@@ -300,6 +301,11 @@ from bolsa_application.top3_opportunities import (
     HISTORICAL_SCORING_NO_CHAMPION,
     select_top3_records,
 )
+
+# P9 (auditoría .183): normalizadores FINITOS del dominio (``isfinite``). Los locales del camino
+# de dinero solo filtraban ``NaN``, así que un ``inf`` de una división por cero llegaba a precios,
+# cantidades y marcas y pasaba el filtro ``> 0``.
+from bolsa_domain.numeric import finite_float, finite_positive, finite_range, positive_quantity
 
 logger = logging.getLogger(__name__)
 
@@ -435,14 +441,12 @@ def settlement_snapshot_from_fills(fills: Sequence[Any]) -> dict[str, Any] | Non
 
 
 def sim_worker_enabled() -> bool:
-    """Env de habilitación (default OFF) del worker SIM-ONLY de A9/M5."""
-    return (os.getenv(AUTO_SIM_WORKER_ENABLED) or "").strip().lower() not in {
-        "",
-        "0",
-        "false",
-        "no",
-        "off",
-    }
+    """Env de habilitación (default OFF) del worker SIM-ONLY de A9/M5.
+
+    P1 (auditoría .183): lista blanca. ``disabled``/``n``/``of`` ya NO encienden AUTO;
+    un valor desconocido deja el default OFF y avisa con el valor crudo.
+    """
+    return env_flag(AUTO_SIM_WORKER_ENABLED, default=False)
 
 
 #: W4 (v2.88.17): interruptor DECLARADO del precio REAL. Default **OFF** ⇒ el runtime conserva
@@ -454,14 +458,13 @@ AUTO_REAL_PRICE_ENV = "AUTO_ENGINE_SIM_REAL_PRICE"
 
 
 def real_price_enabled() -> bool:
-    """¿Está habilitado el proveedor de precio REAL? (default OFF = costura inerte)."""
-    return (os.getenv(AUTO_REAL_PRICE_ENV) or "").strip().lower() not in {
-        "",
-        "0",
-        "false",
-        "no",
-        "off",
-    }
+    """¿Está habilitado el proveedor de precio REAL? (default OFF = costura inerte).
+
+    P1 (auditoría .183): lista blanca, igual que ``sim_worker_enabled``. Que un valor
+    basura encienda el precio real era el peor caso del fail-open: cambia de dónde sale
+    el precio de ejecución.
+    """
+    return env_flag(AUTO_REAL_PRICE_ENV, default=False)
 
 
 # ── Base de coste de una ADOPCIÓN (W-159-2 · C-4) ───────────────────────────────
@@ -533,21 +536,19 @@ def _protection_config_from_env() -> ProtectionPolicy:
     """
 
     def _f(name: str, default: float) -> float:
-        raw = (os.getenv(name) or "").strip()
-        if not raw:
-            return default
-        try:
-            return float(raw)
-        except ValueError:
-            return default
+        # P9: un ``NaN``/``inf`` de entorno no es configuración: cae al default con warning.
+        value = env_finite_float(name, default=None)
+        return default if value is None else value
 
     def _i(name: str, default: int) -> int:
-        raw = (os.getenv(name) or "").strip()
-        if not raw:
+        # P9: se valida como float finito ANTES de convertir (``int`` de ``inf`` revienta con
+        # ``OverflowError``, que nadie capturaba) y un valor raro cae al default.
+        value = env_finite_float(name, default=None)
+        if value is None:
             return default
         try:
-            return int(raw)
-        except ValueError:
+            return int(value)
+        except (OverflowError, ValueError):
             return default
 
     enabled = (os.getenv("AUTO_ENGINE_SIM_PROTECTION") or "").strip().lower() in {
@@ -2154,12 +2155,23 @@ class AutoSimulationWorker:
         source = self._price_source
         if source is None:
             value = self._price_script(symbol, tick)
-            return None if value is None else float(value)
+            if value is None:
+                return None
+            # P9: ``NaN``/``inf`` de la fuente hermética tampoco es un precio.
+            price = finite_float(value)
+            if price is None:
+                self._v2_note_price_missing(symbol)
+            return price
         try:
-            return source.execution(symbol)
+            price = finite_float(source.execution(symbol))
         except Exception:  # noqa: BLE001 — un fallo de precio ES «no hay precio».
             logger.exception("auto_sim v2 price_source.execution failed symbol=%s", symbol)
             return None
+        if price is None:
+            # P9: la fuente respondió algo que no es un número finito. Se declara como precio
+            # AUSENTE en vez de propagar ``inf`` a precios, marcas y equity.
+            self._v2_note_price_missing(symbol)
+        return price
 
     def _v2_price_mid(self, symbol: str, tick: int) -> float | None:
         """Precio de DECISIÓN (con fuente real, ``close`` de la última barra cerrada).
@@ -2169,12 +2181,16 @@ class AutoSimulationWorker:
         source = self._price_source
         if source is None:
             value = self._price_script(symbol, tick)
-            return None if value is None else float(value)
+            return None if value is None else finite_float(value)
         try:
-            return source.mid(symbol)
+            price = finite_float(source.mid(symbol))
         except Exception:  # noqa: BLE001
             logger.exception("auto_sim v2 price_source.mid failed symbol=%s", symbol)
             return None
+        if price is None:
+            # P9: el precio de DECISIÓN no puede ser ``inf``: se trata como ausente.
+            self._v2_note_price_missing(symbol)
+        return price
 
     def _v2_bar_extremes(self, symbol: str) -> tuple[float | None, float | None]:
         """``(low, high)`` de la barra corriente — ``(None, None)`` si la fuente no los da.
@@ -2196,9 +2212,10 @@ class AutoSimulationWorker:
             except Exception:  # noqa: BLE001 — un extremo ilegible no tumba el tick.
                 logger.exception("auto_sim v2 price_source.%s failed symbol=%s", name, symbol)
                 return None
-            return None if value is None else float(value)
+            return None if value is None else finite_float(value)
 
-        return (_read("low"), _read("high"))
+        # P9: un rango invertido o no finito es un dato corrupto, no una señal: ``(None, None)``.
+        return finite_range(_read("low"), _read("high")) or (None, None)
 
     def _v2_note_price_missing(self, symbol: str) -> None:
         """Declara y CUENTA una ausencia de precio (una vez por símbolo en el log).
@@ -3308,10 +3325,8 @@ class AutoSimulationWorker:
             return None
         if value is None:
             return None
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
+        # P9: la liquidez es un DENOMINADOR; un ``inf``/``NaN`` aquí no es un dato medido.
+        return finite_positive(value)
 
     def _v2_edge(self, pkg: Any, strategy_version: str | None) -> float | None:
         """Edge de la oportunidad: ``memo edge=`` > EdgeReport persistido > nada.
@@ -5710,8 +5725,13 @@ class AutoSimulationWorker:
         Mismo patrón que ``_v2_adaptive_policy``: derivar los umbrales de dos construcciones
         distintas permitiría que divergieran en silencio y el ancla se mediría con reglas que no son
         las que sella la versión.
+
+        P4 (auditoría .183): ``require_evidence=True``. En producción el gate **no puede** publicar
+        ``OK`` cuando el tick no midió completitud, ventana reciente o antigüedad del journal: eso
+        se declaraba ``evidence_not_provided`` y se trataba como salud. Ahora degrada (``LIMITS``),
+        que es la respuesta honesta a una deuda de datos.
         """
-        return DataGatePolicy()
+        return DataGatePolicy(require_evidence=True)
 
     @staticmethod
     def _v2_regime_available(regime: str | None) -> bool:
@@ -5766,9 +5786,13 @@ class AutoSimulationWorker:
                 getattr(self, "_v2_adaptive_sink_failures_durable", False)
             ),
             journal_age_cycles=self._v2_adaptive_gate_journal_age(),
-            # Sin lectura durable registrada NO se declara un fallo de lectura: no se observó
-            # ninguno (el hueco de "sin lector" lo declara AUTO-11 en el arranque, no el gate).
-            read_ok=True if reading is None else bool(reading.read_ok),
+            # P4 (auditoría .183): tri-estado, no un ``read_ok=True`` fabricado. Sin lectura
+            # durable registrada el estado es ``unknown`` (no se leyó; tampoco se observó un
+            # fallo); con lectura, ``ok``/``failed`` según lo que la lectura declaró. El gate de
+            # producción degrada con ``unknown``: "no leí" ya no equivale a "está sano".
+            read_state=(
+                "unknown" if reading is None else ("ok" if reading.read_ok else "failed")
+            ),
             measurement_completeness=completeness,
             recent_available=recent_available,
             regime_available=self._v2_regime_available(regime),
@@ -7750,7 +7774,13 @@ class AutoSimulationWorker:
             # ``pkg`` no nulo (``action`` se deriva de él). Sin esto, el tipo
             # ``DecisionPackage | None`` no estrecha y el RiskGate/plan lo rechazan.
             assert pkg is not None
-            qty = Decimal(str(getattr(pkg, "quantity", None) or 0)).quantize(Decimal("0.000001"))
+            qty = positive_quantity(getattr(pkg, "quantity", None))
+            if qty is None:
+                # P9: una cantidad ``NaN``/``inf``/basura ya no revienta el tick en el
+                # ``Decimal(...).quantize()`` ni viaja al libro: se veta y se declara.
+                _veto("non_positive_qty")
+                continue
+            qty = qty.quantize(Decimal("0.000001"))
             if qty <= 0:
                 _veto("non_positive_qty")
                 continue
@@ -9571,7 +9601,9 @@ def _default_spine_decider() -> DecisionProvider:
         "yes",
         "on",
     }
-    lot = float(os.getenv("AUTO_ENGINE_SIM_LOT_QTY") or "100.0")
+    lot = env_finite_float("AUTO_ENGINE_SIM_LOT_QTY", default=100.0, minimum=0.0)
+    if lot is None or lot <= 0:
+        lot = 100.0
     # V2.24.2 (P2-D): retén configurable para poder certificar un restart con la
     # posición ABIERTA (default 3 = comportamiento histórico).
     try:
@@ -9795,8 +9827,9 @@ def _sim_interval_seconds(default: float = 60.0) -> float:
     raw = (os.getenv("AUTO_ENGINE_SIM_INTERVAL_SECONDS") or "").strip()
     if not raw:
         return default
-    try:
-        value = float(raw)
-    except ValueError:
+    # P9: ``Infinity``/``NaN`` no son intervalos. El helper declara el valor crudo y cae al
+    # default; sin esto un ``Infinity`` suspendía el loop para siempre.
+    value = env_finite_float("AUTO_ENGINE_SIM_INTERVAL_SECONDS", default=default, minimum=0.0)
+    if value is None or value <= 0:
         return default
-    return value if value > 0 else default
+    return value

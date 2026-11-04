@@ -40,6 +40,12 @@ from bolsa_analytics.cognitive.measurement import (
     measurement_from_counts,
 )
 
+# P9 (auditoría .183): el normalizador canónico vive en ``bolsa_domain`` y exige ``isfinite``.
+# Antes esta copia solo descartaba ``NaN``, así que ``inf`` (una división por cero, un parser
+# roto) llegaba a precios, cantidades y reservas y pasaba el filtro ``> 0``.
+from bolsa_domain.numeric import finite_float as _finite
+from bolsa_domain.numeric import finite_positive as _finite_positive
+
 # Estados de un ``ExecutionEvent`` que NO han materializado dinero. Son los únicos en
 # los que una orden existe sin haber movido caja (``APPLIED`` es terminal: ya movió).
 OpenOrderStatus = Literal["CAPTURED", "APPLYING", "RETRY", "FAILED"]
@@ -62,23 +68,9 @@ SIDE_BUY = "buy"
 SIDE_SELL = "sell"
 
 
-def _finite(value: Any) -> float | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    if number != number:
-        return None
-    return number
-
-
-def _finite_positive(value: Any) -> float | None:
-    number = _finite(value)
-    if number is None or number <= 0:
-        return None
-    return number
+# P9 (auditoría .183): el normalizador canónico vive en ``bolsa_domain`` y exige ``isfinite``.
+# Antes esta copia solo descartaba ``NaN``, así que ``inf`` (una división por cero, un parser
+# roto) llegaba a precios, cantidades y reservas y pasaba el filtro ``> 0``.
 
 
 def _round4(value: float) -> float:

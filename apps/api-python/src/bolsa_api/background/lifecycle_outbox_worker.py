@@ -16,11 +16,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from collections.abc import Awaitable, Callable
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from bolsa_application.flags import env_flag
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,8 @@ AfterAppendIndexHook = Callable[[int, Any], Awaitable[None] | None]
 
 
 def _worker_enabled() -> bool:
-    raw = (os.getenv(_ENV_ENABLED) or "1").strip().lower()
-    return raw not in {"0", "false", "no", "off"}
+    # P1 (auditoría .183): lista blanca con default ON declarado.
+    return env_flag(_ENV_ENABLED, default=True)
 
 
 async def _drain_once(

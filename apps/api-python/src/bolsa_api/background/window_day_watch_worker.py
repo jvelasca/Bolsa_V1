@@ -76,6 +76,7 @@ from pathlib import Path
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
+from bolsa_application.flags import env_flag
 from bolsa_infrastructure.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
@@ -618,8 +619,8 @@ def send_alert_email(settings: Settings, watch: WindowDayWatch) -> bool:
 
 
 def _worker_enabled() -> bool:
-    raw = (os.getenv(_ENV_ENABLED) or "1").strip().lower()
-    return raw not in {"0", "false", "no", "off"}
+    # P1 (auditoría .183): lista blanca con default ON declarado.
+    return env_flag(_ENV_ENABLED, default=True)
 
 
 async def _announce(settings: Settings, watch: WindowDayWatch) -> bool:

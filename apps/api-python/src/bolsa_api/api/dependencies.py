@@ -1732,6 +1732,9 @@ def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
             sessions=get_cognitive_repository(session),
         ),
         opening_fill_handles=JournalOpeningFillHandleStore(journal, journal),
+        # P2 (auditoría .183): el Policy Gate necesita market cap, ADV y sector para no
+        # saltarse MinMarketCap/MinADV por falta de dato. El catálogo es la fuente.
+        instrument_repo=get_instrument_repository(session),
     )
 
 

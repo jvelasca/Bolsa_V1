@@ -59,6 +59,12 @@ def _opening(*, existing: list[BasketPosition], sector: str) -> RiskDecision:
         equity=200.0,
         portfolio_positions=existing,
         proposal_sector=sector,
+        # P2 (auditoría .183): el escenario mide el encaje de cesta; el resto medido.
+        market_cap_usd=3e12,
+        average_daily_volume_usd=1e9,
+        sector=sector,
+        account_daily_drawdown_pct=0.0,
+        account_weekly_drawdown_pct=0.0,
     )
 
 

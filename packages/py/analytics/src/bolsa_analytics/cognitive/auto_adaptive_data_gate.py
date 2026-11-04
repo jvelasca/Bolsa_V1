@@ -53,6 +53,9 @@ DataGateStatus = Literal["OK", "DEGRADED", "STALE", "BLOCKED"]
 #: Efecto declarado del estado sobre la adaptación. ``FREEZES`` es la lectura fina de "limita
 #: más": conserva lo vigente y no admite reactivaciones nuevas.
 DataGateEffect = Literal["ADAPTS", "LIMITS", "FREEZES", "NO_ADAPT"]
+#: P4: tri-estado de la lectura durable. ``unknown`` = "no se leyó / no hay evidencia durable
+#: disponible en este tick"; sustituye al ``read_ok=True`` fabricado de antes.
+DataGateReadState = Literal["ok", "failed", "unknown"]
 
 DATA_GATE_OK: DataGateStatus = "OK"
 DATA_GATE_DEGRADED: DataGateStatus = "DEGRADED"
@@ -109,6 +112,11 @@ DATA_GATE_NOTE_RECENT_UNAVAILABLE = "recent_unavailable"
 DATA_GATE_NOTE_REGIME_ABSENT = "regime_absent"
 DATA_GATE_NOTE_JOURNAL_AGE_UNKNOWN = "journal_age_unknown"
 DATA_GATE_NOTE_EVIDENCE_NOT_PROVIDED = "evidence_not_provided"
+#: P4 (auditoría .183): lectura durable en estado **desconocido**. ``unknown`` no es ``failed``
+#: (no se observó un fallo) pero tampoco es ``ok``: sin ``require_evidence`` se declara y no gradúa;
+#: con ``require_evidence`` degrada, porque el gate de producción no puede afirmar salud de datos
+#: que nunca leyó.
+DATA_GATE_NOTE_READ_STATE_UNKNOWN = "read_state_unknown"
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +130,12 @@ class DataGatePolicy:
     journal_gap_blocked: int = DATA_GATE_JOURNAL_GAP_BLOCKED_DEFAULT
     #: Segundos que dura un ciclo de evaluación Adaptive (cadencia declarada del tick).
     evaluation_cycle_seconds: float = DATA_GATE_EVALUATION_CYCLE_SECONDS_DEFAULT
+    #: P4 (auditoría .183): exigir **evidencia**. Con ``False`` (default, y el de todo llamador
+    #: histórico) la ausencia de una medición se declara pero no gradúa — así el comportamiento
+    #: previo queda byte-idéntico donde el gate es informativo. Con ``True`` (el gate de
+    #: producción) un dato que falta o una lectura durable ``unknown`` **degradan**: no se puede
+    #: publicar ``OK`` afirmando salud de evidencia que no se midió.
+    require_evidence: bool = False
 
     def __post_init__(self) -> None:
         for field_name in ("sink_failures_stale", "journal_gap_blocked"):
@@ -152,6 +166,9 @@ class DataGateReading:
     sink_failures_durable: bool = False
     journal_age_cycles: int | None = None
     read_ok: bool = True
+    #: P4 (auditoría .183): tri-estado de la lectura durable. ``None`` = el llamante no lo declaró
+    #: (se conserva el ``read_ok`` histórico); ``ok``/``failed``/``unknown`` lo sustituyen.
+    read_state: DataGateReadState | None = None
     measurement_completeness: str | None = None
     recent_available: bool | None = None
     regime_available: bool | None = None
@@ -189,6 +206,7 @@ class DataGateReading:
             "sinkFailuresDurable": self.sink_failures_durable,
             "journalAgeCycles": self.journal_age_cycles,
             "readOk": self.read_ok,
+            "readState": self.read_state,
             "measurementCompleteness": self.measurement_completeness,
             "recentAvailable": self.recent_available,
             "regimeAvailable": self.regime_available,
@@ -200,7 +218,7 @@ class DataGateReading:
 
 
 def _reading(status: DataGateStatus, *, notes: list[str], **facts: Any) -> DataGateReading:
-    return DataGateReading(status=status, notes=tuple(sorted(notes)), **facts)
+    return DataGateReading(status=status, notes=tuple(sorted(set(notes))), **facts)
 
 
 def _instant(value: str | None) -> datetime | None:
@@ -253,6 +271,7 @@ def assess_data_gate(
     sink_failures_durable: bool = False,
     journal_age_cycles: int | None = None,
     read_ok: bool = True,
+    read_state: DataGateReadState | None = None,
     measurement_completeness: str | None = None,
     recent_available: bool | None = None,
     regime_available: bool | None = None,
@@ -282,6 +301,16 @@ def assess_data_gate(
     "no se pidió medir" y **no** degradan: solo se declaran. ``journal_age_cycles`` en ``None``
     tampoco bloquea (no se puede juzgar la antigüedad), pero se declara.
 
+    P4 (auditoría .183): ese "no degrada" es el default (`require_evidence=False`) y solo vale
+    para el gate informativo. Con ``policy.require_evidence=True`` —el de producción— la ausencia
+    de ``measurement_completeness``, de ``recent_available`` o de ``journal_age_cycles`` **sí**
+    degrada (``evidence_not_provided`` / ``journal_age_unknown``), igual que un ``read_state``
+    ``unknown``: no se publica ``OK`` afirmando una evidencia que no se midió.
+
+    ``read_state`` es el **tri-estado** de la lectura durable (``ok``/``failed``/``unknown``) y
+    sustituye a ``read_ok`` cuando viene: ``failed`` ⇒ ``STALE`` (``durable_state_unread``),
+    ``unknown`` ⇒ se declara y solo degrada con ``require_evidence``.
+
     ``sink_failures_durable`` (AUTO-15) es la **procedencia** de la racha, no un criterio: dice si
     el contador se leyó/persistió en estado durable o si nació en el proceso. **No** cambia el
     estado —la racha vale lo mismo venga de donde venga— y existe para que un ``0`` no se lea como
@@ -291,11 +320,18 @@ def assess_data_gate(
     failures = max(0, int(sink_failures or 0))
     unreadable = max(0, int(unreadable_rows or 0))
     age = None if journal_age_cycles is None else max(0, int(journal_age_cycles))
+    # P4: el tri-estado manda cuando viene; ``read_ok`` queda como compatibilidad histórica.
+    # ``unknown`` NO es un fallo de lectura: no se observó ninguno. Pero tampoco es salud.
+    if read_state is not None:
+        effective_read_ok = read_state != "failed"
+    else:
+        effective_read_ok = bool(read_ok)
     facts: dict[str, Any] = {
         "sink_failures": failures,
         "sink_failures_durable": bool(sink_failures_durable),
         "journal_age_cycles": age,
-        "read_ok": bool(read_ok),
+        "read_ok": effective_read_ok,
+        "read_state": read_state,
         "measurement_completeness": measurement_completeness,
         "recent_available": recent_available,
         "regime_available": regime_available,
@@ -311,7 +347,7 @@ def assess_data_gate(
     stale_notes: list[str] = []
     if failures >= int(resolved.sink_failures_stale):
         stale_notes.append(DATA_GATE_NOTE_SINK_FAILURES)
-    if not read_ok:
+    if not effective_read_ok:
         stale_notes.append(DATA_GATE_NOTE_DURABLE_UNREAD)
     if unreadable > 0:
         stale_notes.append(DATA_GATE_NOTE_UNREADABLE_ROWS)
@@ -333,6 +369,22 @@ def assess_data_gate(
         degraded_notes.append(DATA_GATE_NOTE_RECENT_UNAVAILABLE)
     if regime_available is False:
         degraded_notes.append(DATA_GATE_NOTE_REGIME_ABSENT)
+    if resolved.require_evidence:
+        # P4: en producción la ausencia de medición NO es inocua. Antes, un tick sin lectura
+        # durable y sin completitud se publicaba ``OK``/``ADAPTS`` y Adaptive repartía riesgo
+        # afirmando una salud de datos que nadie había medido.
+        if measurement_completeness is None:
+            degraded_notes.append(DATA_GATE_NOTE_EVIDENCE_NOT_PROVIDED)
+        if recent_available is None:
+            degraded_notes.append(DATA_GATE_NOTE_EVIDENCE_NOT_PROVIDED)
+        if read_state == "unknown":
+            degraded_notes.append(DATA_GATE_NOTE_READ_STATE_UNKNOWN)
+        # La antigüedad del journal solo es deuda cuando además NO hay lectura durable sana. Con
+        # ``read_state == "ok"`` el proceso tiene constancia del estado, y el ancla sin corroborar
+        # (``None``) es el caso SANO por diseño de AUTO-15: la antigüedad solo cuenta cuando el
+        # propio proceso falló al publicar. Degradar ahí congelaría el reparto para siempre.
+        if age is None and read_state != "ok":
+            degraded_notes.append(DATA_GATE_NOTE_JOURNAL_AGE_UNKNOWN)
     if degraded_notes:
         return _reading(DATA_GATE_DEGRADED, notes=degraded_notes, **facts)
 
@@ -359,6 +411,7 @@ __all__ = [
     "DATA_GATE_STALE",
     "DataGateEffect",
     "DataGatePolicy",
+    "DataGateReadState",
     "DataGateReading",
     "DataGateStatus",
     "assess_data_gate",

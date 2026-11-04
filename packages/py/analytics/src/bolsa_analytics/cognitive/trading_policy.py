@@ -18,7 +18,6 @@ AllowedOrderType = Literal[
 @dataclass(frozen=True, slots=True)
 class UniverseConstraints:
     allowed_asset_classes: tuple[AssetClass, ...]
-    min_average_daily_volume_usd: float
     excluded_sectors: tuple[str, ...]
     excluded_tickers: tuple[str, ...]
     allow_shorting: bool
@@ -28,6 +27,10 @@ class UniverseConstraints:
     allowed_universes: tuple[str, ...] = ()
     min_market_cap_usd: float | None = None
     max_spread_bps: float | None = None
+    #: P2 (auditoría .183): ``None`` = la política NO exige un mínimo de liquidez, que es
+    #: distinto de "el dato no está". Un mínimo declarado y sin medición es ``FAILED``
+    #: (``MinADV_unmeasured``), nunca ``SKIPPED``.
+    min_average_daily_volume_usd: float | None = None
     min_atr_pct: float | None = None
     max_atr_pct: float | None = None
 
@@ -108,6 +111,10 @@ class TradingPolicy:
     description: str | None = None
     weight_rule_set_id: str | None = None
     exit_policy: ExitPolicy | None = None
+    #: P2 (auditoría .183): reglas que ESTA política declara no medibles todavía. Solo
+    #: estas pueden quedar ``SKIPPED`` por falta de dato (con motivo
+    #: ``<Regla>_unmeasured_declared``). Vacío ⇒ toda regla activa exige medición.
+    optional_measurements: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         u = self.universe
@@ -185,6 +192,7 @@ class TradingPolicy:
                 "requireEdgeReportForAutoLive": self.evidence.require_edge_report_for_auto_live,
             },
             "weightRuleSetId": self.weight_rule_set_id,
+            "optionalMeasurements": list(self.optional_measurements),
             "exit": None if self.exit_policy is None else self.exit_policy.to_dict(),
             "updatedAt": self.updated_at,
             "createdAt": self.created_at,

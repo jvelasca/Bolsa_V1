@@ -54,6 +54,36 @@ def _rule(name: str, limit: str, actual: str, ok: bool, message: str | None = No
     )
 
 
+def _unmeasured(rule: str, limit: str, *, declared_optional: bool) -> PolicyRuleResult:
+    """Resultado de una regla ACTIVA cuyo dato no vino.
+
+    P2 (auditoría .183): antes la ausencia de dato se codificaba como ``SKIPPED`` y
+    ``SKIPPED`` no veta, así que MinMarketCap, MinADV, MaxSpread, MaxSectorExposure y los
+    circuit breakers de drawdown quedaban **muertos** en el camino AUTO: la política
+    exigía un mínimo y el gate lo saltaba por no tener con qué compararlo.
+
+    La regla es ahora: si la regla está activa y el dato falta, la respuesta es *no
+    verificable* ⇒ ``FAILED`` con motivo ``<Regla>_unmeasured``. Solo las reglas que la
+    POLÍTICA declara opcionales (``optional_measurements``) pueden quedar ``SKIPPED``, y
+    ese ``SKIPPED`` viaja con su propio motivo para que nadie lo lea como "cumplida".
+    """
+    if declared_optional:
+        return PolicyRuleResult(
+            rule=rule,
+            limit=limit,
+            actual="n/a",
+            status="SKIPPED",
+            message=f"{rule}_unmeasured_declared",
+        )
+    return PolicyRuleResult(
+        rule=rule,
+        limit=limit,
+        actual="n/a",
+        status="FAILED",
+        message=f"{rule}_unmeasured",
+    )
+
+
 def evaluate_policy_gate(
     policy: TradingPolicy,
     *,
@@ -87,7 +117,22 @@ def evaluate_policy_gate(
     basket_max_sector_weight_pct: float | None = None,
     basket_violating_asset: str | None = None,
     basket_violating_sector: str | None = None,
+    optional_measurements: tuple[str, ...] | None = None,
 ) -> PolicyGateResult:
+    """Evalúa la política sobre una propuesta concreta.
+
+    ``optional_measurements``: reglas que la política declara NO medibles hoy y que por
+    tanto pueden quedar ``SKIPPED`` con motivo. ``None`` (default) usa la declaración de
+    la propia política —``policy.optional_measurements``— para que la decisión viaje con
+    la política y no dependa de que cada llamador se acuerde de pasarla. Un valor
+    explícito manda sobre el de la política (tests y caminos ad-hoc).
+
+    ``optional_measurements=()`` ⇒ **todo** dato exigido es obligatorio: es el modo
+    estricto y el default de una política que no declara excepciones.
+    """
+    declared_optional = frozenset(
+        policy.optional_measurements if optional_measurements is None else optional_measurements
+    )
     rules: list[PolicyRuleResult] = []
     vetos: list[str] = []
 
@@ -110,33 +155,60 @@ def evaluate_policy_gate(
     if sector and sector in u.excluded_sectors:
         push(_rule("ExcludedSector", f"not in {('|'.join(u.excluded_sectors))}", sector, False))
 
-    if u.min_market_cap_usd is not None and market_cap_usd is not None:
-        push(
-            _rule(
-                "MinMarketCap",
-                str(u.min_market_cap_usd),
-                str(market_cap_usd),
-                market_cap_usd >= u.min_market_cap_usd,
+    if u.min_market_cap_usd is not None:
+        if market_cap_usd is None:
+            push(
+                _unmeasured(
+                    "MinMarketCap",
+                    str(u.min_market_cap_usd),
+                    declared_optional="MinMarketCap" in declared_optional,
+                )
             )
-        )
-    if average_daily_volume_usd is not None:
-        push(
-            _rule(
-                "MinADV",
-                str(u.min_average_daily_volume_usd),
-                str(average_daily_volume_usd),
-                average_daily_volume_usd >= u.min_average_daily_volume_usd,
+        else:
+            push(
+                _rule(
+                    "MinMarketCap",
+                    str(u.min_market_cap_usd),
+                    str(market_cap_usd),
+                    market_cap_usd >= u.min_market_cap_usd,
+                )
             )
-        )
-    if u.max_spread_bps is not None and spread_bps is not None:
-        push(
-            _rule(
-                "MaxSpreadBps",
-                str(u.max_spread_bps),
-                str(spread_bps),
-                spread_bps <= u.max_spread_bps,
+    if u.min_average_daily_volume_usd is not None:
+        if average_daily_volume_usd is None:
+            push(
+                _unmeasured(
+                    "MinADV",
+                    str(u.min_average_daily_volume_usd),
+                    declared_optional="MinADV" in declared_optional,
+                )
             )
-        )
+        else:
+            push(
+                _rule(
+                    "MinADV",
+                    str(u.min_average_daily_volume_usd),
+                    str(average_daily_volume_usd),
+                    average_daily_volume_usd >= u.min_average_daily_volume_usd,
+                )
+            )
+    if u.max_spread_bps is not None:
+        if spread_bps is None:
+            push(
+                _unmeasured(
+                    "MaxSpreadBps",
+                    str(u.max_spread_bps),
+                    declared_optional="MaxSpreadBps" in declared_optional,
+                )
+            )
+        else:
+            push(
+                _rule(
+                    "MaxSpreadBps",
+                    str(u.max_spread_bps),
+                    str(spread_bps),
+                    spread_bps <= u.max_spread_bps,
+                )
+            )
 
     x = policy.exposure
     push(_rule("MaxLeverage", str(x.max_leverage), str(leverage), leverage <= x.max_leverage))
@@ -173,10 +245,9 @@ def evaluate_policy_gate(
             )
         )
 
-    # MaxSectorExposure: usa `x.max_sector_exposure_pct` (ExposureConstraints), que hoy
-    # existe pero nunca se evalúa. Si no hay datos de sector o la señal no evaluó, la
-    # regla va SKIPPED (no bloquea por falta de datos), coherente con el fail-closed
-    # del resto del gate (None = SKIPPED).
+    # MaxSectorExposure: usa `x.max_sector_exposure_pct` (ExposureConstraints). La regla
+    # está SIEMPRE activa (el límite siempre existe); lo que puede faltar es la medición
+    # del encaje de cesta. Sin ella, P2 (auditoría .183) la declara no verificable.
     if basket_max_sector_weight_pct is not None:
         push(
             _rule(
@@ -190,13 +261,11 @@ def evaluate_policy_gate(
             )
         )
     else:
-        rules.append(
-            PolicyRuleResult(
-                rule="MaxSectorExposure",
-                limit=f"{x.max_sector_exposure_pct}%",
-                actual="n/a",
-                status="SKIPPED",
-                message="Sin datos de encaje de cesta por sector",
+        push(
+            _unmeasured(
+                "MaxSectorExposure",
+                f"{x.max_sector_exposure_pct}%",
+                declared_optional="MaxSectorExposure" in declared_optional,
             )
         )
 
@@ -228,7 +297,8 @@ def evaluate_policy_gate(
             )
         )
 
-    # Circuit breaker — drawdowns de cuenta (F4). None = SKIPPED (sin telemetría).
+    # Circuit breaker — drawdowns de cuenta (F4). Sin telemetría la regla es no
+    # verificable: P2 (auditoría .183) la veta salvo declaración explícita en la política.
     if account_daily_drawdown_pct is not None:
         push(
             _rule(
@@ -240,12 +310,11 @@ def evaluate_policy_gate(
             )
         )
     else:
-        rules.append(
-            PolicyRuleResult(
-                rule="HardDailyDrawdown",
-                limit=f"<= {risk.hard_daily_drawdown_limit_pct}%",
-                actual="n/a",
-                status="SKIPPED",
+        push(
+            _unmeasured(
+                "HardDailyDrawdown",
+                f"<= {risk.hard_daily_drawdown_limit_pct}%",
+                declared_optional="HardDailyDrawdown" in declared_optional,
             )
         )
     if risk.hard_weekly_drawdown_limit_pct is not None:
@@ -260,12 +329,11 @@ def evaluate_policy_gate(
                 )
             )
         else:
-            rules.append(
-                PolicyRuleResult(
-                    rule="HardWeeklyDrawdown",
-                    limit=f"<= {risk.hard_weekly_drawdown_limit_pct}%",
-                    actual="n/a",
-                    status="SKIPPED",
+            push(
+                _unmeasured(
+                    "HardWeeklyDrawdown",
+                    f"<= {risk.hard_weekly_drawdown_limit_pct}%",
+                    declared_optional="HardWeeklyDrawdown" in declared_optional,
                 )
             )
     if account_max_drawdown_pct is not None:
@@ -279,12 +347,11 @@ def evaluate_policy_gate(
             )
         )
     else:
-        rules.append(
-            PolicyRuleResult(
-                rule="HardMaxDrawdown",
-                limit=f"<= {risk.hard_max_drawdown_limit_pct}%",
-                actual="n/a",
-                status="SKIPPED",
+        push(
+            _unmeasured(
+                "HardMaxDrawdown",
+                f"<= {risk.hard_max_drawdown_limit_pct}%",
+                declared_optional="HardMaxDrawdown" in declared_optional,
             )
         )
 

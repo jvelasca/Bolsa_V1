@@ -120,6 +120,7 @@ from bolsa_application.estudio_daily_proposals import (
     PROPOSAL_MAX_ENTRY_DIVERGENCE_PCT,
     proposal_price_conflict,
 )
+from bolsa_application.flags import env_finite_float, env_flag
 from bolsa_application.portfolio_decision_engine import (
     DecisionReasonCode,
     PortfolioDecision,
@@ -166,30 +167,22 @@ def v2_engine_enabled() -> bool:
 
 
 def _env_float(name: str, default: float | None) -> float | None:
-    raw = (os.getenv(name) or "").strip()
-    if not raw:
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        return default
+    """Alias histórico de :func:`bolsa_application.flags.env_finite_float`.
+
+    Se conserva el nombre porque el módulo lo llama en varios sitios; la regla (finito
+    y en rango) vive en ``flags`` desde la auditoría P9.
+    """
+    return env_finite_float(name, default=default)
 
 
 def _env_flag(name: str, default: bool) -> bool:
-    """Flag de entorno booleano, con el default EXPLÍCITO de la casa.
+    """Alias histórico de :func:`bolsa_application.flags.env_flag` (lista blanca).
 
     Familia "off" (``0/false/off/no/none``) ⇒ ``False``; familia "on"
     (``1/true/on/yes``) ⇒ ``True``; cualquier otra cosa (vacío incluido) ⇒ ``default``.
     Un valor basura NO activa un veto de dinero: se queda en el default.
     """
-    raw = (os.getenv(name) or "").strip().lower()
-    if not raw:
-        return default
-    if raw in {"0", "false", "off", "no", "none"}:
-        return False
-    if raw in {"1", "true", "on", "yes"}:
-        return True
-    return default
+    return env_flag(name, default=default)
 
 
 @dataclass(frozen=True, slots=True)

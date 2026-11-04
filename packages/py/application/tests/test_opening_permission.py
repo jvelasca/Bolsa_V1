@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from policy_metrics_fakes import MeasuredInstruments
 
 from bolsa_application.opening_permission import allow_opening_fill
 from bolsa_application.operational_incident_store import InMemoryOperationalIncidentStore
@@ -55,6 +56,9 @@ def _kwargs(**extra: Any) -> dict[str, Any]:
         "quantity": 1.0,
         "price": 10.0,
         "signal_kind": "recommend_long",
+        # P2 (auditoría .183): una apertura "permitida" exige catálogo que mida
+        # market cap y ADV; sin ellos el gate veta con `<Regla>_unmeasured`.
+        "instruments": MeasuredInstruments(),
     }
     base.update(extra)
     return base

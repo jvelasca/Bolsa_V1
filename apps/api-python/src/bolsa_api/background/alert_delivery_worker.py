@@ -27,11 +27,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.api.dependencies import get_process_alert_deliveries_use_case
+from bolsa_application.flags import env_flag
 from bolsa_infrastructure.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -42,8 +42,9 @@ _ENV_ENABLED = "ALERT_DELIVERY_WORKER_ENABLED"
 
 
 def _worker_enabled() -> bool:
-    raw = (os.getenv(_ENV_ENABLED) or "1").strip().lower()
-    return raw not in {"0", "false", "no", "off"}
+    # P1 (auditoría .183): lista blanca con default ON declarado. Un valor basura deja
+    # el default y avisa por log en vez de decidir por ausencia de coincidencia.
+    return env_flag(_ENV_ENABLED, default=True)
 
 
 async def _process_once(

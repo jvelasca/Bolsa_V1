@@ -89,6 +89,11 @@ def test_ds05_fresh_bar_allows() -> None:
         last_bar_timestamp="2026-08-24",
         require_fresh_data=True,
         freshness_now=now,
+        # P2 (auditoría .183): trade medido.
+        market_cap_usd=3e12,
+        average_daily_volume_usd=1e9,
+        account_daily_drawdown_pct=0.0,
+        account_weekly_drawdown_pct=0.0,
     )
     assert d.verdict == "ALLOW"
     assert d.allowed is True
@@ -205,6 +210,11 @@ def test_ds03_open_tenure_allows() -> None:
         mandate_strategy_id="st-mandate",
         require_account_mandate=True,
         proposal_strategy_id="st-mandate",
+        # P2 (auditoría .183): trade medido.
+        market_cap_usd=3e12,
+        average_daily_volume_usd=1e9,
+        account_daily_drawdown_pct=0.0,
+        account_weekly_drawdown_pct=0.0,
     )
     assert d.verdict == "ALLOW"
 
@@ -303,6 +313,12 @@ def test_or4_live_unavailable_ignored_on_paper() -> None:
         live_recon_status="unavailable",
         broker_venue="paper",
         require_recon_veto=True,
+        # P2 (auditoría .183): trade medido, con cesta vacía (encaje computable).
+        portfolio_positions=[],
+        market_cap_usd=3e12,
+        average_daily_volume_usd=1e9,
+        account_daily_drawdown_pct=0.0,
+        account_weekly_drawdown_pct=0.0,
     )
     assert d.verdict == "ALLOW"
     assert not any(r.startswith("reconciliation:") for r in d.reasons)

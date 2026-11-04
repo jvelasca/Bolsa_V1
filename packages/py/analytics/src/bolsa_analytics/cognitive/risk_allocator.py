@@ -40,6 +40,11 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
     estimate_trading_cost,
 )
 
+# P9 (auditoría .183): normalizadores canónicos del dominio (``isfinite``), no copias que
+# aceptaban ``inf``.
+from bolsa_domain.numeric import finite_float as _finite
+from bolsa_domain.numeric import finite_positive as _finite_positive
+
 TradePlanDirection = Literal["long", "short", "none"]
 
 # Razones de acotación (reason codes observables en el Decision Journal).
@@ -62,24 +67,8 @@ CAP_TRADING_COST = "trading_cost"
 CAP_COST_UNMEASURED = "cost_unmeasured"
 
 
-def _finite_positive(value: Any) -> float | None:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    if number != number or number <= 0:
-        return None
-    return number
-
-
-def _finite(value: Any) -> float | None:
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    if number != number:
-        return None
-    return number
+# P9 (auditoría .183): normalizadores canónicos del dominio (``isfinite``), no copias que
+# aceptaban ``inf``.
 
 
 def _round4(value: float) -> float:

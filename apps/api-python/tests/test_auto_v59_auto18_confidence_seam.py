@@ -19,6 +19,7 @@ import pytest
 
 from bolsa_analytics.cognitive.auto_adaptive import AdaptivePolicy
 from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
+from bolsa_application.auto_adaptive_recovery import AdaptiveStateReading
 from bolsa_application.sim_durable_store import SimFillFinanceContext
 
 _ACCOUNT = "acc-1"
@@ -100,6 +101,10 @@ def _worker(*, store: Any | None = None, reservations: Any | None = None) -> Aut
     worker._v2_adaptive_paused_cycles = {}
     worker._v2_adaptive_reactivated_at = {}
     worker._v2_adaptive_paused_cycles_entered = {}
+    # P4: el gate de producción exige evidencia; una lectura durable sana es el estado del worker
+    # que arrancó y leyó su journal (antes este arnés la dejaba a ``None`` y el gate la daba por
+    # buena, que era el fail-open).
+    worker._v2_adaptive_state_reading = AdaptiveStateReading()
     worker._v2_tunables = SimpleNamespace(
         adaptive_enabled=True,
         adaptive_win_rate_floor=_FLOOR,
