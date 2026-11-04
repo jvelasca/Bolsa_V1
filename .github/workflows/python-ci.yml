@@ -477,6 +477,9 @@ jobs:
           --ignore=apps/api-python/tests/test_dia_d_cycle_verification_pg.py
           --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
           --ignore=apps/api-python/tests/test_scan_queue_health_pg.py
+          --ignore=apps/api-python/tests/test_scan_job_lease_pg.py
+          --ignore=apps/api-python/tests/test_auto_chain_read_gaps_pg.py
+          --ignore=apps/api-python/tests/test_estudio_daily_proposal_savepoint_pg.py
           --ignore=apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
@@ -558,6 +561,14 @@ jobs:
       STRATEGY_LIFECYCLE_PG_REQUIRED: '1'
       # T-1/T-2: salud de ``scan_jobs`` y dedupe durable del scan diario (JSONB real).
       SCAN_QUEUE_PG_REQUIRED: '1'
+      # DS-1 (auditoría 2.88.179): concurrencia del reaper, carrera con el latido del lease,
+      # identidad del reencolado y tope persistente. Lo comparten ``test_scan_queue_health_pg``
+      # y ``test_scan_job_lease_pg``: un skip silencioso dejaría el lease sin certificar.
+      # C-1: el fallo de lectura de propuestas dentro de SAVEPOINT no aborta la sesión del
+      # tick y ``readGaps`` se publica en la evidencia.
+      AUTO_CHAIN_READ_GAPS_PG_REQUIRED: '1'
+      # O-2: el desenlace de propuestas se revierte en su SAVEPOINT y commitea durability.
+      AUTO_PROPOSAL_OUTCOMES_PG_REQUIRED: '1'
       # 059/060: configuración de proveedores y política de comprobación.
       MARKET_PROVIDERS_PG_REQUIRED: '1'
       # 061: ``alembic check`` como gate real. La allowlist declara la deuda histórica;
@@ -598,6 +609,9 @@ jobs:
           apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
           apps/api-python/tests/test_strategy_lifecycle_pg.py
           apps/api-python/tests/test_scan_queue_health_pg.py
+          apps/api-python/tests/test_scan_job_lease_pg.py
+          apps/api-python/tests/test_auto_chain_read_gaps_pg.py
+          apps/api-python/tests/test_estudio_daily_proposal_savepoint_pg.py
           apps/api-python/tests/test_market_providers_pg.py
           apps/api-python/tests/test_schema_drift_gate_pg.py
           apps/api-python/tests/test_database_maintenance_pg.py

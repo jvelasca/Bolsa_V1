@@ -68,6 +68,7 @@ async def _insert(
     status: str,
     created_at: datetime,
     payload: dict[str, Any],
+    updated_at: datetime | None = None,
 ) -> str:
     job_id = f"test-scanq-{uuid.uuid4().hex[:12]}"
     async with factory() as session:
@@ -82,7 +83,7 @@ async def _insert(
                 cache_misses=None,
                 tracker_definition_id=None,
                 created_at=created_at,
-                updated_at=created_at,
+                updated_at=updated_at or created_at,
                 completed_at=None,
             )
         )
@@ -224,3 +225,165 @@ async def test_list_payloads_since_filters_by_status_for_the_daily_dedupe(
         assert {payload["universe"]["listId"] for payload in every} == {"estudio", "otro"}
     finally:
         await _delete(pg_factory, live_id, failed_id)
+
+
+# ── DS-1 (auditoría 2.88.179): el ``processing`` huérfano se mide y se recupera ──
+
+
+@pytest.mark.asyncio
+async def test_stale_processing_is_measured_by_its_lease(pg_factory: Any) -> None:
+    """DS-1: ``processing`` se mide por ``updated_at`` (el lease), no por ``created_at``."""
+    now = datetime.now(UTC)
+    stale = await _insert(
+        pg_factory,
+        status="processing",
+        created_at=now - timedelta(hours=3),
+        updated_at=now - timedelta(hours=2),
+        payload=_payload(discovery=True),
+    )
+    fresh = await _insert(
+        pg_factory,
+        status="processing",
+        created_at=now - timedelta(hours=3),
+        updated_at=now - timedelta(seconds=30),
+        payload=_payload(discovery=True),
+    )
+    try:
+        async with pg_factory() as session:
+            health = await inspect_scan_queue(
+                session,
+                backend="inline",
+                now=now,
+                stale_processing_after_seconds=3600.0,
+            )
+        assert health.processing == 2
+        assert health.stale_processing == 1
+        assert health.stalled is True
+        assert health.reason == "scan_queue_processing_stale"
+        assert health.oldest_processing_seconds is not None
+        assert health.oldest_processing_seconds >= 7200
+    finally:
+        await _delete(pg_factory, stale, fresh)
+
+
+@pytest.mark.asyncio
+async def test_reaper_requeues_a_stale_processing_job(pg_factory: Any) -> None:
+    """DS-1: con autoridad inline el huérfano vuelve a ``pending`` y se cuenta el intento."""
+    now = datetime.now(UTC)
+    job_id = await _insert(
+        pg_factory,
+        status="processing",
+        created_at=now - timedelta(hours=3),
+        updated_at=now - timedelta(hours=2),
+        payload=_payload(discovery=True),
+    )
+    try:
+        async with pg_factory() as session:
+            reaped = await SqlAlchemyScanJobRepository(session).reap_stale_processing(
+                stale_before=now - timedelta(hours=1),
+                requeue=True,
+                max_reaps=3,
+                now=now,
+            )
+            await session.commit()
+
+        assert [job.id for job in reaped] == [job_id]
+        assert reaped[0].status == "pending"
+        assert reaped[0].payload["_reapCount"] == 1
+        assert reaped[0].error is None
+
+        async with pg_factory() as session:
+            again = await SqlAlchemyScanJobRepository(session).get_by_id(job_id)
+        assert again is not None
+        assert again.status == "pending"
+    finally:
+        await _delete(pg_factory, job_id)
+
+
+@pytest.mark.asyncio
+async def test_reaper_leaves_a_fresh_processing_job_untouched(pg_factory: Any) -> None:
+    """DS-1: un scan en curso NO se toca (solo caduca el lease vencido)."""
+    now = datetime.now(UTC)
+    job_id = await _insert(
+        pg_factory,
+        status="processing",
+        created_at=now - timedelta(hours=3),
+        updated_at=now - timedelta(seconds=30),
+        payload=_payload(discovery=True),
+    )
+    try:
+        async with pg_factory() as session:
+            reaped = await SqlAlchemyScanJobRepository(session).reap_stale_processing(
+                stale_before=now - timedelta(hours=1),
+                requeue=True,
+                now=now,
+            )
+            await session.commit()
+        assert reaped == []
+
+        async with pg_factory() as session:
+            still = await SqlAlchemyScanJobRepository(session).get_by_id(job_id)
+        assert still is not None
+        assert still.status == "processing"
+    finally:
+        await _delete(pg_factory, job_id)
+
+
+@pytest.mark.asyncio
+async def test_reaper_declares_failed_when_the_arq_authority_cannot_replay_it(
+    pg_factory: Any,
+) -> None:
+    """DS-1: con ``arq`` no se devuelve a ``pending`` (Redis no republica): se declara failed."""
+    now = datetime.now(UTC)
+    job_id = await _insert(
+        pg_factory,
+        status="processing",
+        created_at=now - timedelta(hours=3),
+        updated_at=now - timedelta(hours=2),
+        payload=_payload(discovery=True),
+    )
+    try:
+        async with pg_factory() as session:
+            reaped = await SqlAlchemyScanJobRepository(session).reap_stale_processing(
+                stale_before=now - timedelta(hours=1),
+                requeue=False,
+                now=now,
+            )
+            await session.commit()
+
+        assert [job.id for job in reaped] == [job_id]
+        assert reaped[0].status == "failed"
+        assert reaped[0].error is not None
+        assert "processing_stale" in reaped[0].error
+        assert reaped[0].completed_at is not None
+    finally:
+        await _delete(pg_factory, job_id)
+
+
+@pytest.mark.asyncio
+async def test_reaper_stops_cycling_after_the_reap_cap(pg_factory: Any) -> None:
+    """DS-1: un job veneno (cae siempre al reclamar) se declara failed tras el tope."""
+    now = datetime.now(UTC)
+    job_id = await _insert(
+        pg_factory,
+        status="processing",
+        created_at=now - timedelta(hours=3),
+        updated_at=now - timedelta(hours=2),
+        payload={**_payload(discovery=True), "_reapCount": 3},
+    )
+    try:
+        async with pg_factory() as session:
+            reaped = await SqlAlchemyScanJobRepository(session).reap_stale_processing(
+                stale_before=now - timedelta(hours=1),
+                requeue=True,
+                max_reaps=3,
+                now=now,
+            )
+            await session.commit()
+
+        assert [job.id for job in reaped] == [job_id]
+        assert reaped[0].status == "failed"
+        assert reaped[0].payload["_reapCount"] == 4
+        assert reaped[0].error == "processing_stale: reap cap reached"
+    finally:
+        await _delete(pg_factory, job_id)

@@ -311,3 +311,62 @@ async def test_champion_definition_is_rematerialized_from_winning_params() -> No
     assert executable["entries"]["rules"]
     assert executable["exits"]["rules"]
 
+
+
+# ── Cierre del "flaky": la vía declarativa es determinista por construcción ─────
+#
+# La auditoría reportó una falla de este fichero «en suite» que no se reproducía aislado.
+# El fichero es hermético (sin BD, sin reloj, sin red, sin aleatoriedad), así que un fallo
+# solo podía venir de un resultado NO determinista dado el mismo input. En vez de dejar la
+# duda abierta, este test la convierte en una aserción: la MISMA entrada debe producir la
+# MISMA salida dos veces seguidas en el mismo proceso. Si alguien introduce orden de ``set``,
+# muestreo con ``random`` o una mutación del ``definition`` compartido, esto falla aquí y no
+# como un flaky intermitente en otra máquina.
+
+
+def _comparable(result: Any) -> dict[str, Any]:
+    return {
+        "engine": result.engine,
+        "family": result.strategy_family,
+        "baseline": result.baseline,
+        "trials": [
+            {
+                "params": dict(trial.params),
+                "score": trial.score,
+                "oosScore": (trial.oos_metrics or {}).get("score")
+                if isinstance(trial.oos_metrics, dict)
+                else None,
+            }
+            for trial in result.trials
+        ],
+        "cpcv": result.cpcv,
+        "walkForward": result.walk_forward,
+        "pbo": result.pbo,
+    }
+
+
+@pytest.mark.asyncio
+async def test_the_declarative_pipeline_is_deterministic_across_runs() -> None:
+    """Misma definición y mismas barras ⇒ mismo campeón, mismos trials y mismos gates."""
+    use_case = RunSmaGridOptimize(_Instruments(), _Ohlcv(count=400))
+    first = await use_case.execute(
+        instrument_id="AAA",
+        strategy_family="ema_crossover",
+        definition=_ema_crossover_definition(),
+        bar_limit=400,
+        max_trials=10,
+        cpcv_groups=4,
+    )
+    second = await use_case.execute(
+        instrument_id="AAA",
+        strategy_family="ema_crossover",
+        definition=_ema_crossover_definition(),
+        bar_limit=400,
+        max_trials=10,
+        cpcv_groups=4,
+    )
+
+    assert _comparable(first) == _comparable(second)
+    # Control mínimo: si el pipeline dejara de producir evidencia, la igualdad sería trivial.
+    assert first.cpcv is not None
+    assert first.trials

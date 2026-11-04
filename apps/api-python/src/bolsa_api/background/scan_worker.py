@@ -8,7 +8,12 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.api.dependencies import get_process_scan_job_use_case
+from bolsa_api.background.scan_job_lease import (
+    start_scan_job_lease_heartbeat,
+    stop_scan_job_lease_heartbeat,
+)
 from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.repositories.scan_job_repository import ScanJobRecord
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
 logger = logging.getLogger(__name__)
@@ -42,10 +47,22 @@ async def scan_worker_loop(session_factory: async_sessionmaker[AsyncSession]) ->
 
                 async with session_factory() as session:
                     processor = get_process_scan_job_use_case(session)
-                    if job_id is not None:
-                        result = await processor.execute(job_id)
-                    else:
-                        result = await processor.execute()
+                    # DS-1: el latido arranca con el claim y se cancela ANTES del commit del
+                    # job. Cancelarlo después dejaría un tick en vuelo esperando el lock de la
+                    # fila que esta misma sesión tiene sin commitear.
+                    lease_task: asyncio.Task[None] | None = None
+
+                    def _on_claimed(job: ScanJobRecord) -> None:
+                        nonlocal lease_task
+                        lease_task = start_scan_job_lease_heartbeat(session_factory, job.id)
+
+                    try:
+                        if job_id is not None:
+                            result = await processor.execute(job_id, on_claimed=_on_claimed)
+                        else:
+                            result = await processor.execute(on_claimed=_on_claimed)
+                    finally:
+                        await stop_scan_job_lease_heartbeat(lease_task)
                     await session.commit()
 
                 if result.processed and result.job_id:

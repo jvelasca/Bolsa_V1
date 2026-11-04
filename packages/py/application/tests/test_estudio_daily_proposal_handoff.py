@@ -38,6 +38,7 @@ from bolsa_application.estudio_daily_proposals import (
     proposal_candidate_from_value,
     proposal_identity_matches,
     proposal_price_conflict,
+    record_outcomes_in_savepoint,
     select_adoptable,
 )
 
@@ -558,3 +559,54 @@ def test_without_proposal_the_tick_is_the_historical_one() -> None:
     assert str(payload["tradePlan"]["decisionId"]).startswith("dec-")
     # Sin propuesta no se sella una propuesta inventada.
     assert "dailyProposal" not in payload
+
+# ── O-2 (auditoría 2.88.179): el sumidero no puede abortar la sesión del tick ─────
+
+
+class _NestedTransaction:
+    async def __aenter__(self) -> _NestedTransaction:
+        return self
+
+    async def __aexit__(self, *_exc: object) -> bool:
+        return False
+
+
+class _SavepointSession:
+    """Sesión mínima: SAVEPOINT + ``commit`` contado."""
+
+    def __init__(self) -> None:
+        self.commits = 0
+
+    def begin_nested(self) -> _NestedTransaction:
+        return _NestedTransaction()
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+
+@pytest.mark.asyncio
+async def test_a_failing_outcome_sink_does_not_escape_nor_commit() -> None:
+    """O-2: el error del sumidero se revierte en el SAVEPOINT y NO se commitea nada."""
+    async def _boom(_outcomes: Any) -> Any:
+        raise RuntimeError("SQL roto")
+
+    session = _SavepointSession()
+    result = await record_outcomes_in_savepoint(session, _boom, [{"proposalId": "p-1"}])
+
+    assert result is None
+    assert session.commits == 0, "un fallo no puede cerrar la transacción del tick"
+
+
+@pytest.mark.asyncio
+async def test_a_healthy_outcome_sink_is_committed_before_the_order() -> None:
+    """O-2: el desenlace se sella DURABLE (commit) antes de emitir la orden."""
+    async def _ok(outcomes: Any) -> Any:
+        return {"consumed": len(outcomes)}
+
+    session = _SavepointSession()
+    result = await record_outcomes_in_savepoint(
+        session, _ok, [{"proposalId": "p-1", "status": "consumed"}]
+    )
+
+    assert result == {"consumed": 1}
+    assert session.commits == 1

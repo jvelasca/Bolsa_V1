@@ -30,8 +30,9 @@ Reglas duras
 
 from __future__ import annotations
 
+import logging
 import math
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any, Protocol
@@ -59,8 +60,11 @@ __all__ = [
     "proposal_candidate_from_value",
     "proposal_identity_matches",
     "proposal_price_conflict",
+    "record_outcomes_in_savepoint",
     "select_adoptable",
 ]
+
+logger = logging.getLogger(__name__)
 
 #: Días de calendario que una propuesta sigue siendo adoptable. Acota la atribución
 #: de un plan viejo al ciclo de hoy sin convertir la cadena en una inferencia.
@@ -689,3 +693,37 @@ def proposal_identity_matches(
     ):
         return ADOPTION_EXACT
     return ADOPTION_MISMATCH
+
+
+async def record_outcomes_in_savepoint(
+    session: Any,
+    execute: Callable[[Sequence[Mapping[str, Any]]], Awaitable[Any]],
+    outcomes: Sequence[Mapping[str, Any]],
+) -> Any | None:
+    """Sella el desenlace de las propuestas SIN arrastrar la sesión del tick si falla (O-2).
+
+    El sumidero del productor vive en la **misma sesión** del turno (``scan_jobs``, reservas,
+    journal, TOP3…). Con un ``except`` que solo logueaba, un error SQL del ``UPDATE`` dejaba la
+    transacción **abortada** en PostgreSQL: el resto del turno fallaba en cascada y la propuesta
+    no cambiaba de estado (seguía adoptable en la barra siguiente hasta
+    ``PROPOSAL_MAX_BAR_LAG_DAYS``).
+
+    El desenlace va en un SAVEPOINT (``begin_nested``): si falla se revierte SOLO esta parte y
+    la sesión sigue sana; si va bien, el ``commit`` lo hace DURABLE antes de emitir la orden
+    (mismo orden que ``mark_consumed``: el compromiso se persiste antes que la traza de la
+    orden). Devuelve el resultado del sumidero o ``None`` si falló.
+
+    El repositorio debe construirse con ``autocommit=False``: un ``session.commit()`` dentro
+    del SAVEPOINT lo cerraría y el ``__aexit__`` fallaría.
+    """
+    try:
+        async with session.begin_nested():
+            result = await execute(outcomes)
+    except Exception:  # noqa: BLE001 — el desenlace es traza, no dinero.
+        logger.exception(
+            "Desenlace de propuestas diarias fallido (savepoint revertido; la sesión del "
+            "turno sigue viva y la propuesta sigue pendiente)"
+        )
+        return None
+    await session.commit()
+    return result

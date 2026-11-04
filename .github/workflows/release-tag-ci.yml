@@ -163,11 +163,13 @@ jobs:
       # V1.86 tip honesty: gp-e2e + certification mocks V1.73–V1.86 (no PG · no LIVE)
       # V2.45: filtro `gp-e2e` ya incluye gp-e2e-v25/v26/v28 (cabin cert) — sin glob extra.
       # S5: el puente AUTO → estrategia #1 → DÍA-D (mock) se cablea con token explícito.
-      - name: Run mock browser E2E (gp-e2e + gp-v173..gp-v186)
+      # GP-V190: operativa gráfica de MERCADO (mock). El spec live homónimo se
+      # auto-skip sin E2E_INTEGRATION=1, así que entra por el mismo filtro sin escribir.
+      - name: Run mock browser E2E (gp-e2e + gp-v173..gp-v186 + gp-v190)
         working-directory: apps/web
         env:
           E2E_RUN: '1'
-        run: pnpm e2e -- "gp-e2e|gp-e2e-s5|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179|gp-v181|gp-v183|gp-v184|gp-v185|gp-v186"
+        run: pnpm e2e -- "gp-e2e|gp-e2e-s5|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179|gp-v181|gp-v183|gp-v184|gp-v185|gp-v186|gp-v190"
 
   playwright-integrated:
     name: playwright (integrated E2E, opt-in)
@@ -1202,6 +1204,13 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_dia_d_trace_pg.py
           --ignore=apps/api-python/tests/test_auto_ops_job_attempt_cap_pg.py
           --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
+          # DS-1/C-1/O-2 (auditoría 2.88.179): certificación de INTEGRACIÓN. Sin PG real
+          # skipearían en mudo (``test_scan_queue_health_pg`` ni siquiera estaba aquí: sus 5
+          # tests aparecían como SKIPPED en este job). Corren en el paso dedicado con gate.
+          --ignore=apps/api-python/tests/test_scan_queue_health_pg.py
+          --ignore=apps/api-python/tests/test_scan_job_lease_pg.py
+          --ignore=apps/api-python/tests/test_auto_chain_read_gaps_pg.py
+          --ignore=apps/api-python/tests/test_estudio_daily_proposal_savepoint_pg.py
           --ignore=apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
@@ -1413,6 +1422,19 @@ jobs:
       # reclamarse para siempre, y que un ``running`` con latido VIVO no se toca (control
       # negativo). Un skip mudo invalidaría la certificación; su paso lleva guard anti-skip.
       AUTO_OPS_JOB_ATTEMPT_CAP_PG_REQUIRED: '1'
+      # DS-1 (auditoría 2.88.179): la salud de la cola ``scan_jobs`` y la recuperación del
+      # ``processing`` huérfano. Con PG real se mide lo que un stub no puede: concurrencia de
+      # dos reconciliadores, carrera entre la renovación del lease y el reaper, identidad del
+      # reencolado y tope persistente. Un skip mudo invalidaría la certificación ⇒ paso
+      # dedicado con guard anti-skip.
+      SCAN_QUEUE_PG_REQUIRED: '1'
+      # C-1: el fallo de lectura de propuestas DENTRO de SAVEPOINT no aborta la transacción del
+      # tick, ``readGaps`` se publica y la atribución declara ``unmeasured``/``not_proposed``
+      # según se midiera o no.
+      AUTO_CHAIN_READ_GAPS_PG_REQUIRED: '1'
+      # O-2: el desenlace de propuestas va en SAVEPOINT — rollback solo de esa parte y commit
+      # duradero antes de emitir la orden.
+      AUTO_PROPOSAL_OUTCOMES_PG_REQUIRED: '1'
       # v111 (remediación de la auditoría): las ALERTAS DE SEÑAL se certifican sobre PG real —
       # el claim atómico por ``(suscripción, barra)`` (worker vs. evaluación manual no pueden
       # despachar dos veces), el OUTBOX ``alert_deliveries`` (PENDING → DELIVERED |
@@ -1797,6 +1819,43 @@ jobs:
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-dia-d-pg.log; then
             echo "::error::AUTO universo/DÍA-D dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/auto-dia-d-pg.log || true
+            exit 1
+          fi
+
+      # DS-1 / C-1 / O-2 (auditoría 2.88.179): certificación de INTEGRACIÓN que el dictamen
+      # exige antes de sellar. El bloque quedó validado offline; esto cierra las condiciones
+      # que solo se pueden medir con PostgreSQL:
+      #   (1) fallo de lectura de propuestas dentro de SAVEPOINT y continuidad de la
+      #       transacción exterior (``test_auto_chain_read_gaps_pg.py``);
+      #   (2) reconciliación concurrente del mismo ``processing`` obsoleto y (3) renovación
+      #       de lease concurrente con el reaper (``test_scan_job_lease_pg.py``);
+      #   (4) reencolado con identidad, agotamiento del máximo y estado ``failed``
+      #       (``test_scan_job_lease_pg.py`` + ``test_scan_queue_health_pg.py``);
+      #   (5) rollback de ``record_outcomes_in_savepoint`` ante fallo intermedio
+      #       (``test_estudio_daily_proposal_savepoint_pg.py``);
+      #   (6) persistencia de ``readGaps`` y de los estados de atribución resultantes.
+      # ``-rs`` imprime los SKIPPED y el paso siguiente FALLA si aparece alguno: un skip por
+      # entorno no puede confundirse con un verde.
+      - name: Pytest DS-1 lease + C-1 readGaps + O-2 savepoint (PG, fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_scan_queue_health_pg.py \
+            apps/api-python/tests/test_scan_job_lease_pg.py \
+            apps/api-python/tests/test_auto_chain_read_gaps_pg.py \
+            apps/api-python/tests/test_estudio_daily_proposal_savepoint_pg.py \
+            -q --tb=short -rs | tee /tmp/scan-lease-readgaps-pg.log
+
+      - name: Fail on skipped DS-1 lease / C-1 readGaps / O-2 savepoint (no skip silencioso)
+        if: always()
+        run: |
+          if [ ! -s /tmp/scan-lease-readgaps-pg.log ]; then
+            echo "::error::DS-1/C-1/O-2 no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/scan-lease-readgaps-pg.log; then
+            echo "::error::DS-1/C-1/O-2 dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/scan-lease-readgaps-pg.log || true
             exit 1
           fi
 

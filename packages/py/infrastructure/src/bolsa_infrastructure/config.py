@@ -70,6 +70,21 @@ class Settings(BaseSettings):
     )
     environment: str = "development"
     scan_queue_backend: str = Field(default="postgres", validation_alias="SCAN_QUEUE_BACKEND")
+    #: DS-1 (auditoría 2.88.179) — caducidad del LEASE de un job ``processing``. ``claim_next``
+    #: no tiene latido: un proceso que cae tras reclamar deja el job ``processing`` para
+    #: siempre, y ese estado bloquea el dedupe diario del descubrimiento. Pasado este umbral
+    #: (edad de ``updated_at``) el job se considera huérfano y se reencola o se marca fallido.
+    scan_job_processing_stale_seconds: float = Field(
+        default=3600.0, validation_alias="SCAN_JOB_PROCESSING_STALE_SECONDS"
+    )
+    #: Tope de resurrecciones de un mismo job: superado se declara ``failed`` (no se cicla).
+    scan_job_processing_max_reaps: int = Field(
+        default=3, validation_alias="SCAN_JOB_PROCESSING_MAX_REAPS"
+    )
+    #: Cadencia del vigía de la cola (antes solo se miraba UNA vez, al arrancar el scheduler).
+    scan_queue_health_interval_seconds: float = Field(
+        default=300.0, validation_alias="SCAN_QUEUE_HEALTH_INTERVAL_SECONDS"
+    )
     alert_webhook_timeout_seconds: float = Field(
         default=10.0,
         validation_alias="ALERT_WEBHOOK_TIMEOUT_SECONDS",
@@ -253,6 +268,14 @@ class Settings(BaseSettings):
     opportunity_daily_scan_interval_seconds: float = Field(
         default=86400.0,
         validation_alias="OPPORTUNITY_DAILY_SCAN_INTERVAL_SECONDS",
+    )
+    #: DS-1 — cadencia de REEVALUACIÓN del descubrimiento del día. Con el default de
+    #: ``interval`` (24 h) un fallo dentro del mismo día no se reintentaba hasta el día UTC
+    #: siguiente; el dedupe durable sigue siendo el gate real, así que estos ticks extra solo
+    #: detectan huecos y reintentan como mucho una vez por tick.
+    opportunity_daily_scan_retry_interval_seconds: float = Field(
+        default=900.0,
+        validation_alias="OPPORTUNITY_DAILY_SCAN_RETRY_INTERVAL_SECONDS",
     )
     opportunity_daily_universe_list_id: str = Field(
         default="estudio",

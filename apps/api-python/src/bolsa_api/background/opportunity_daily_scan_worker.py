@@ -265,10 +265,19 @@ async def opportunity_daily_scan_worker_loop(
 ) -> None:
     settings = get_settings()
     interval = max(300, int(settings.opportunity_daily_scan_interval_seconds))
+    # DS-1: con el default de ``interval`` (86 400 s) un fallo del día no se reintentaba hasta
+    # el día UTC siguiente. El dedupe durable sigue siendo el gate REAL: estos ticks extra solo
+    # REEVALÚAN (ven fallidos/huérfanos y reintentan como mucho una vez por tick), no reencolan
+    # el mismo universo del día.
+    retry_interval = max(
+        300, int(settings.opportunity_daily_scan_retry_interval_seconds)
+    )
+    tick_seconds = min(interval, retry_interval)
     logger.info(
-        "Worker OPPORTUNITY_DAILY_SCAN iniciado — intervalo %ds · list=%s · primer tick "
-        "inmediato",
+        "Worker OPPORTUNITY_DAILY_SCAN iniciado — intervalo %ds (reevaluación %ds) · list=%s · "
+        "primer tick inmediato",
         interval,
+        tick_seconds,
         clamp_daily_ops_list_id(settings.opportunity_daily_universe_list_id),
     )
     # T-2: el primer intento es YA. Dormir el intervalo antes del primer trabajo dejaba al
@@ -279,7 +288,7 @@ async def opportunity_daily_scan_worker_loop(
             await _run_opportunity_daily_once(session_factory)
         except Exception:
             logger.exception("Error en worker Opportunity daily scan")
-        await asyncio.sleep(interval)
+        await asyncio.sleep(tick_seconds)
 
 
 def start_opportunity_daily_scan_worker(

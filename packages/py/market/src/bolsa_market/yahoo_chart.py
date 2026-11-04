@@ -9,6 +9,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from bolsa_domain.ohlcv_time import parse_bar_timestamp
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_market.ingest import OhlcvBarIngest
 from bolsa_market.ohlcv_quarantine import get_ohlcv_quarantine_stats
@@ -144,6 +145,43 @@ def parse_intraday_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> 
     return bars
 
 
+def strip_live_bar_from_payload(
+    payload: dict[str, Any],
+    bars: list[IntradayOhlcvBar],
+) -> list[IntradayOhlcvBar]:
+    """Descarta la vela «viva» que Yahoo añade con la hora actual.
+
+    Yahoo v8 devuelve, para intradía y mensual, una última entrada cuyo
+    timestamp es ``meta.regularMarketTime`` en lugar del inicio del periodo.
+    Si se persiste, ensucia ``ohlcv_bars`` (una fila nueva por refresco) y
+    dibuja una vela en una posición temporal arbitraria. Se elimina para que
+    el gráfico solo muestre velas con inicio de periodo verificable.
+    """
+    if not bars:
+        return bars
+    result = payload.get("chart", {}).get("result") or []
+    if not result:
+        return bars
+    regular_market_time = result[0].get("meta", {}).get("regularMarketTime")
+    if regular_market_time is None:
+        return bars
+    try:
+        last = parse_bar_timestamp(bars[-1].timestamp)
+        if abs(last.timestamp() - float(regular_market_time)) <= 2:
+            return bars[:-1]
+    except (TypeError, ValueError):
+        return bars
+    return bars
+
+
+def dedupe_intraday_bars(bars: list[IntradayOhlcvBar]) -> list[IntradayOhlcvBar]:
+    """Elimina timestamps repetidos conservando la última lectura del payload."""
+    ordered: dict[str, IntradayOhlcvBar] = {}
+    for bar in bars:
+        ordered[bar.timestamp] = bar
+    return list(ordered.values())
+
+
 class YahooMarketDataProvider:
     def __init__(self, client: YahooFinanceClient | None = None) -> None:
         self._client = client or get_yahoo_finance_client()
@@ -193,6 +231,8 @@ class YahooMarketDataProvider:
                 interval=yahoo_interval,
             )
             bars = parse_intraday_chart_payload(payload, yahoo_symbol)
+            bars = strip_live_bar_from_payload(payload, bars)
+            bars = dedupe_intraday_bars(bars)
             if limit > 0 and len(bars) > limit:
                 bars = bars[-limit:]
             return bars

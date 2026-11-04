@@ -1818,6 +1818,49 @@ def test_without_hold_declarations_the_list_is_empty_not_invented() -> None:
     assert dto["signalHolds"] == []
 
 
+def test_a_hold_without_a_reason_is_not_complete() -> None:
+    """H-1 — el motivo es el dato que la tarjeta existe para explicar.
+
+    ``facts`` no vacío (barra declarada) hacía ``COMPLETE`` un HOLD sin ``reasonCodes``:
+    la medición afirmaba que el HOLD estaba explicado cuando faltaba justo lo esencial.
+    """
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        journal=[_hold_entry(reason="")],
+    )
+
+    hold = dto["signalHolds"][0]
+    assert hold["reason"] is None
+    assert hold["measurement"] == "PARTIAL"
+    assert {fact["key"] for fact in hold["facts"]} == {"barTimestamp"}
+
+
+def test_a_hold_with_neither_reason_nor_facts_is_unknown() -> None:
+    """H-1 — sin motivo ni ningún otro hecho no hay nada medido: ``UNKNOWN``."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        journal=[_hold_entry(reason="", bar="")],
+    )
+
+    hold = dto["signalHolds"][0]
+    assert hold["reason"] is None
+    assert hold["facts"] == []
+    assert hold["measurement"] == "UNKNOWN"
+
+
+def test_a_hold_with_its_reason_is_complete() -> None:
+    """H-1 — con motivo el HOLD sí está explicado: ``COMPLETE``."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        journal=[_hold_entry(reason="no_snapshot")],
+    )
+
+    assert dto["signalHolds"][0]["measurement"] == "COMPLETE"
+
+
 def test_the_signal_step_publishes_the_provenance_of_the_decision() -> None:
     """``SIGNAL reached`` decía con qué se llegó; ahora lo declara (u omite si no hay dato)."""
     entry = SimpleNamespace(

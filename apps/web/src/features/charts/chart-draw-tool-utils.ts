@@ -1,4 +1,4 @@
-import type { ChartDrawTool } from "@bolsa/shared";
+import type { ChartDrawTool, DrawingToolGroupId } from "@bolsa/shared";
 
 /** Modos del grupo Cursor (mutuamente excluyentes; solo uno activo). */
 export const CURSOR_GROUP_TOOLS: ChartDrawTool[] = [
@@ -95,6 +95,48 @@ export function blocksChartPointerPan(
 /** Separadores precio/indicadores inactivos mientras se dibuja o mide en el gráfico. */
 export function shouldDisablePanelResize(tool: ChartDrawTool): boolean {
   return blocksChartPointerPan(tool, null);
+}
+
+/** Cursor neutro de último recurso cuando no hay un cursor previo recordado. */
+export const CHART_CURSOR_TOOL: ChartDrawTool = "select";
+
+/**
+ * Cursores *puros*: no crean objetos al hacer clic. Son el único destino válido
+ * de `Escape`. `arrow` queda fuera a propósito aunque viva en el grupo Cursor:
+ * deja flechas fijas, así que es un modo de dibujo y debe poder abandonarse.
+ */
+export const PURE_CURSOR_TOOLS: ChartDrawTool[] = [
+  "select",
+  "cross",
+  "dot",
+  "dot-halo",
+];
+
+export function isPureCursorTool(tool: ChartDrawTool): boolean {
+  return PURE_CURSOR_TOOLS.includes(tool);
+}
+
+/**
+ * `Escape` sale del modo de dibujo. No actúa si ya se está en un cursor puro
+ * (Puntero, Cruz, Punto, Punto resaltado): no hay nada de lo que salir.
+ */
+export function shouldExitDrawModeOnEscape(tool: ChartDrawTool): boolean {
+  return !isPureCursorTool(tool);
+}
+
+/**
+ * Herramienta a la que vuelve `Escape`: el **último cursor puro usado**
+ * (p. ej. Cruz), no el puntero por defecto. Si no hay cursor recordado válido,
+ * cae a `CHART_CURSOR_TOOL`.
+ */
+export function resolveEscapeDrawTool(input: {
+  currentTool: ChartDrawTool;
+  lastDrawToolByGroup: Partial<Record<DrawingToolGroupId, ChartDrawTool>>;
+}): ChartDrawTool {
+  if (isPureCursorTool(input.currentTool)) return input.currentTool;
+  const remembered = input.lastDrawToolByGroup.cursor;
+  if (remembered && isPureCursorTool(remembered)) return remembered;
+  return CHART_CURSOR_TOOL;
 }
 
 /** Puntero sobre un dibujo: priorizar edición frente a pan del gráfico. */

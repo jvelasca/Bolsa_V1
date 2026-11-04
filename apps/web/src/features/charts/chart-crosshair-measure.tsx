@@ -32,6 +32,13 @@ function countBarsBetween(bars: OhlcvBarDto[], t1: string, t2: string): number {
   }).length;
 }
 
+/** Un clic sin arrastre no es una medición (evita la caja degenerada 1×1). */
+const MIN_MEASURE_DRAG_PX = 4;
+
+function barsLabel(count: number): string {
+  return `${count} ${count === 1 ? "vela" : "velas"}`;
+}
+
 function formatDuration(ms: number): string {
   const minutes = Math.round(ms / 60_000);
   if (minutes < 60) return `${minutes} min`;
@@ -104,6 +111,8 @@ export function ChartCrosshairMeasure({
   const [cursor, setCursor] = useState<MeasurePoint | null>(null);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
   const measuringRef = useRef(false);
+  const startRef = useRef<MeasurePoint | null>(null);
+  const latestRef = useRef<MeasurePoint | null>(null);
   const layerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -112,7 +121,33 @@ export function ChartCrosshairMeasure({
       setCursor(null);
       setHover(null);
       measuringRef.current = false;
+      startRef.current = null;
+      latestRef.current = null;
     }
+  }, [active]);
+
+  useEffect(() => {
+    if (!active) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      measuringRef.current = false;
+      startRef.current = null;
+      latestRef.current = null;
+      setAnchor(null);
+      setCursor(null);
+      setHover(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [active]);
 
   useEffect(() => {
@@ -160,28 +195,58 @@ export function ChartCrosshairMeasure({
     const point = pointerToData(event.clientX, event.clientY);
     if (!point) return;
 
-    if (anchor && !measuringRef.current) {
-      setAnchor(point);
-      setCursor(point);
-      measuringRef.current = true;
-    } else {
-      measuringRef.current = true;
-      setAnchor(point);
-      setCursor(point);
+    startRef.current = point;
+    latestRef.current = point;
+    measuringRef.current = true;
+    setAnchor(point);
+    setCursor(point);
+    setHover(null);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      /* captura no disponible: la medición sigue por pointermove del layer */
     }
-    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!measuringRef.current) return;
     const point = pointerToData(event.clientX, event.clientY);
-    if (point) setCursor(point);
+    if (!point) return;
+    latestRef.current = point;
+    setCursor(point);
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!measuringRef.current) return;
     measuringRef.current = false;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+
+    const start = startRef.current;
+    const end = latestRef.current;
+    startRef.current = null;
+    latestRef.current = null;
+
+    // Decidir ANTES de soltar la captura: `releasePointerCapture` puede lanzar
+    // si el puntero no llegó a capturarse y abortaría la limpieza posterior.
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      /* sin captura activa */
+    }
+
+    if (!start || !end) return;
+
+    const dragPx = Math.hypot(end.x - start.x, end.y - start.y);
+    if (dragPx < MIN_MEASURE_DRAG_PX) {
+      // Clic sin arrastre: se descarta la medición en lugar de dejar una caja
+      // de 1×1 px sin forma de quitarla salvo cambiando de herramienta.
+      setAnchor(null);
+      setCursor(null);
+      setHover(null);
+      return;
+    }
+
+    setAnchor(start);
+    setCursor(end);
   };
 
   const width = container.clientWidth;
@@ -236,7 +301,7 @@ export function ChartCrosshairMeasure({
           midX,
           Math.max(top - 4, 28),
           [
-            `H · ${barCount} velas · ${duration}`,
+            `H · ${barsLabel(barCount)} · ${duration}`,
             `Δt ${timePct.toFixed(1)}% del rango visible`,
           ],
           "center",

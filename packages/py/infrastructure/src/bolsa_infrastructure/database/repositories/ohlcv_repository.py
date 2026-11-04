@@ -11,6 +11,19 @@ from bolsa_infrastructure.database.models import OhlcvBarRow
 from bolsa_infrastructure.ids import new_id
 
 
+def dedupe_bars_by_timestamp(bars: list[OhlcvBar]) -> list[tuple[datetime, OhlcvBar]]:
+    """Colapsa timestamps repetidos conservando la última lectura.
+
+    PostgreSQL aborta un ``INSERT ... ON CONFLICT`` que toca la misma clave dos
+    veces; el payload de Yahoo puede repetir la vela viva. Esta función es la
+    frontera única para blindar el bulk upsert.
+    """
+    deduped: dict[datetime, OhlcvBar] = {}
+    for bar in bars:
+        deduped[parse_bar_timestamp(bar.timestamp)] = bar
+    return list(deduped.items())
+
+
 class SqlAlchemyOhlcvRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -190,13 +203,14 @@ class SqlAlchemyOhlcvRepository:
         if not bars:
             return 0
 
+        deduped = dedupe_bars_by_timestamp(bars)
         now = datetime.now(UTC)
         rows = [
             {
                 "id": new_id(),
                 "instrument_id": instrument_id,
                 "timeframe": timeframe,
-                "timestamp": parse_bar_timestamp(bar.timestamp),
+                "timestamp": timestamp,
                 "open": bar.open,
                 "high": bar.high,
                 "low": bar.low,
@@ -206,7 +220,7 @@ class SqlAlchemyOhlcvRepository:
                 "source": bar.source,
                 "created_at": now,
             }
-            for bar in bars
+            for timestamp, bar in deduped
         ]
         stmt = insert(OhlcvBarRow).values(rows)
         stmt = stmt.on_conflict_do_update(
@@ -225,4 +239,4 @@ class SqlAlchemyOhlcvRepository:
         # loop 1×1 previo (N+1). `excluded` se resuelve a nivel de BD.
         await self._session.execute(stmt)
         await self._session.flush()
-        return len(bars)
+        return len(rows)

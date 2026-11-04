@@ -286,7 +286,15 @@ def _signal_holds(
                 "barTimestamp": bar or None,
                 "at": _iso(_parse_instant(_get(entry, "created_at", "createdAt"))),
                 "reason": reason or None,
-                "measurement": MEASUREMENT_COMPLETE if facts else MEASUREMENT_UNKNOWN,
+                # H-1 (auditoría 2.88.179): el MOTIVO es el dato que esta tarjeta existe
+                # para explicar. Sin él la medición NO puede ser ``COMPLETE``: un HOLD con
+                # barra/procedencia pero sin ``reasonCodes`` es ``PARTIAL`` (hay algo, falta
+                # lo esencial) y sin ningún hecho es ``UNKNOWN``.
+                "measurement": (
+                    MEASUREMENT_COMPLETE
+                    if reason
+                    else (MEASUREMENT_PARTIAL if facts else MEASUREMENT_UNKNOWN)
+                ),
                 "facts": facts,
             }
         )

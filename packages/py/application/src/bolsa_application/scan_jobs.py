@@ -1,6 +1,7 @@
 """Use-cases de jobs de escáner (enqueue/process)."""
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -198,14 +199,29 @@ class ProcessScanJob:
         self._router = execution_router
         self._opportunity_propose = opportunity_propose
 
-    async def execute(self, job_id: str | None = None) -> ProcessScanJobResult:
-        """Procesa un job. Restaura ``ownerUserId`` del payload como principal para ``scan.completed``."""
+    async def execute(
+        self,
+        job_id: str | None = None,
+        *,
+        on_claimed: Callable[[ScanJobRecord], None] | None = None,
+    ) -> ProcessScanJobResult:
+        """Procesa un job. Restaura ``ownerUserId`` del payload como principal para ``scan.completed``.
+
+        ``on_claimed`` (DS-1) se invoca en cuanto la fila pasa a ``processing``, antes de
+        ejecutar el scan. El worker lo usa para arrancar el latido del lease: sin él, un scan
+        más largo que ``SCAN_JOB_PROCESSING_STALE_SECONDS`` era declarado huérfano por el
+        reaper mientras seguía vivo. Es opcional para no cambiar el contrato de los llamantes
+        que no necesitan lease (CLI, tests).
+        """
         if job_id is not None:
             job = await self._jobs.claim_by_id(job_id)
         else:
             job = await self._jobs.claim_next()
         if job is None:
             return ProcessScanJobResult(processed=False)
+
+        if on_claimed is not None:
+            on_claimed(job)
 
         if job.payload.get("jobKind") == JOB_KIND_PARENT:
             await self._jobs.mark_failed(job.id, error="Los jobs parent no se procesan directamente")

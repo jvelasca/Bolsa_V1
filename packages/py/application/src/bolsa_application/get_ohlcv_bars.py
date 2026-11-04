@@ -1,11 +1,32 @@
 """Use-case: barras OHLCV."""
 
+import asyncio
+
 from bolsa_domain.entities.ohlcv_bar import OhlcvBar
 from bolsa_domain.ohlcv_time import is_cache_stale
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_market.yahoo_chart import YahooMarketDataProvider
+
+# Single-flight por (instrumento, timeframe): varias peticiones concurrentes
+# (gráfico, panel de alertas, indicadores) no deben lanzar fetch duplicados
+# contra Yahoo para el mismo dato.
+_REFRESH_LOCKS: dict[
+    tuple[str, TimeFrame], tuple[asyncio.AbstractEventLoop, asyncio.Lock]
+] = {}
+
+
+def _refresh_lock(instrument_id: str, timeframe: TimeFrame) -> asyncio.Lock:
+    key = (instrument_id, timeframe)
+    loop = asyncio.get_running_loop()
+    entry = _REFRESH_LOCKS.get(key)
+    # Un Lock queda ligado al loop en el que se usa; los tests crean loops
+    # nuevos por caso, así que se recrea si cambia el loop en curso.
+    if entry is None or entry[0] is not loop:
+        entry = (loop, asyncio.Lock())
+        _REFRESH_LOCKS[key] = entry
+    return entry[1]
 
 
 class GetOhlcvBars:
@@ -94,8 +115,18 @@ class GetOhlcvBars:
 
         cached = await self._ohlcv.get_bars(instrument_id, limit=limit, timeframe=timeframe)
         latest = cached[-1].timestamp if cached else None
+        if cached and not is_cache_stale(timeframe, latest):
+            return cached
 
-        if not cached or is_cache_stale(timeframe, latest):
+        async with _refresh_lock(instrument_id, timeframe):
+            # Otra petición pudo refrescar mientras esperábamos el lock.
+            cached = await self._ohlcv.get_bars(
+                instrument_id, limit=limit, timeframe=timeframe
+            )
+            latest = cached[-1].timestamp if cached else None
+            if cached and not is_cache_stale(timeframe, latest):
+                return cached
+
             refreshed = await self._fetch_and_cache(
                 instrument_id,
                 instrument.yahoo_symbol,
@@ -104,5 +135,4 @@ class GetOhlcvBars:
             )
             if refreshed:
                 return refreshed
-
-        return cached
+            return cached

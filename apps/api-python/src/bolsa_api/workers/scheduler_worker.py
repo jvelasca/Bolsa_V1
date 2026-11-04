@@ -54,7 +54,7 @@ from bolsa_api.background.paper_auto_engine_worker import start_paper_auto_engin
 from bolsa_api.background.paper_evidence_snapshot_worker import (
     start_paper_evidence_snapshot_worker,
 )
-from bolsa_api.background.scan_queue_health import report_scan_queue_health
+from bolsa_api.background.scan_queue_health import start_scan_queue_health_worker
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
 from bolsa_api.background.window_day_watch_worker import start_window_day_watch
@@ -101,6 +101,10 @@ def _event_loop_starters() -> list[Any]:
         # v2.88.140: vigía diario de la ventana PAPER (alerta de "día perdido"),
         # ON por defecto. Read-only sobre el ledger del runner; no toca la ventana.
         start_window_day_watch,
+        # DS-1 (auditoría 2.88.179): vigía periódico de ``scan_jobs``. Declara la autoridad de
+        # la cola Y recupera los ``processing`` huérfanos que bloqueaban el dedupe del scan
+        # diario. Antes se miraba una sola vez, al arrancar. NO drena la cola (R12-SCHED).
+        start_scan_queue_health_worker,
     ]
 
 
@@ -139,9 +143,10 @@ async def _run_scheduler(
     # FastAPI con --workers N) mediante advisory lock, fuera del path de petición.
     await database_bootstrap(engine=engine, session_factory=session_factory)
 
-    # T-1: este proceso NO drena ``scan_jobs`` (R12-SCHED, una autoridad por concern). Se
-    # declara quién lo hace y se avisa con motivo accionable si la cola está atascada.
-    await report_scan_queue_health(session_factory)
+    # T-1 / DS-1: este proceso NO drena ``scan_jobs`` (R12-SCHED, una autoridad por
+    # concern). El vigía de cola (starter ``start_scan_queue_health_worker``) declara quién
+    # lo hace, avisa con motivo accionable si hay atasco y recupera los ``processing``
+    # huérfanos en CADA ciclo, no solo al arrancar.
 
     tasks = _start_workers(_event_loop_starters(), session_factory)
 

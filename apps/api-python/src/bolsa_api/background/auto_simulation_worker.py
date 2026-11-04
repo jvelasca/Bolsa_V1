@@ -9434,14 +9434,29 @@ class AutoSimRuntime:
             from bolsa_application.estudio_daily_proposals import (  # noqa: PLC0415
                 LoadAdoptableDailyProposals,
                 RecordDailyProposalOutcomes,
+                record_outcomes_in_savepoint,
             )
             from bolsa_infrastructure.database.repositories.estudio_daily_proposal_repository import (  # noqa: PLC0415, E501
                 SqlAlchemyEstudioDailyProposalRepository,
             )
 
+            # Lectura: un fallo no debe escribir nada, así que el repo del loader conserva el
+            # autocommit histórico. Sumidero (O-2): ``autocommit=False`` porque el desenlace va
+            # en un SAVEPOINT y lo commitea el helper; un ``commit`` dentro del savepoint lo
+            # cerraría en falso.
             proposal_repository = SqlAlchemyEstudioDailyProposalRepository(session)
             proposal_loader = LoadAdoptableDailyProposals(proposal_repository)
-            proposal_outcomes = RecordDailyProposalOutcomes(proposal_repository)
+            proposal_outcomes = RecordDailyProposalOutcomes(
+                SqlAlchemyEstudioDailyProposalRepository(session, autocommit=False)
+            )
+
+            async def _daily_proposal_sink(
+                outcomes: list[dict[str, Any]],
+            ) -> Any:
+                """Sella el desenlace aislado en un SAVEPOINT (no aborta la sesión del tick)."""
+                return await record_outcomes_in_savepoint(
+                    session, proposal_outcomes.execute, outcomes
+                )
 
             async def _daily_proposal_source(
                 account_id: str,
@@ -9503,7 +9518,7 @@ class AutoSimRuntime:
                 # Handoff durable ESTUDIO → AUTO (058): la propuesta del parte manda en la
                 # identidad del plan/ciclo; el desenlace se sella con el ``cycle_id``.
                 daily_proposal_source=_daily_proposal_source,
-                daily_proposal_sink=proposal_outcomes.execute,
+                daily_proposal_sink=_daily_proposal_sink,
                 atr_source=self._atr_source
                 or _compose_atr_source(
                     session,

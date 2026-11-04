@@ -2248,6 +2248,11 @@ export function ChartDrawingsLayer({
   return (
     <div
       ref={layerRef}
+      data-testid="chart-drawings-layer"
+      data-drawing-count={drawings.length}
+      data-selected-drawing-id={selectedId ?? ""}
+      data-draw-tool={tool}
+      data-layer-locked={layerLocked ? "true" : "false"}
       className="absolute inset-0 z-10"
       style={{
         height,
@@ -2267,7 +2272,13 @@ export function ChartDrawingsLayer({
     >
       <svg className="h-full w-full" style={{ pointerEvents: "none" }}>
         {drawings.map((drawing) => (
-          <g key={drawing.id}>
+          <g
+            key={drawing.id}
+            data-drawing-id={drawing.id}
+            data-drawing-kind={drawing.type}
+            data-selected={drawing.id === selectedId ? "true" : "false"}
+            data-locked={drawing.locked ? "true" : "false"}
+          >
             {renderDrawing(drawing)}
             {renderVertices(drawing)}
           </g>

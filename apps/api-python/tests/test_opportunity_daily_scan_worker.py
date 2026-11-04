@@ -76,12 +76,19 @@ async def test_daily_scan_runs_immediately_when_due(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(worker.asyncio, "sleep", _sleep)
 
     interval = max(300, int(worker.get_settings().opportunity_daily_scan_interval_seconds))
+    retry_interval = max(
+        300,
+        int(worker.get_settings().opportunity_daily_scan_retry_interval_seconds),
+    )
     with pytest.raises(_SentinelStop):
         await worker.opportunity_daily_scan_worker_loop(_StubSession)  # type: ignore[arg-type]
 
     assert events[0] == "run", "el primer tick debe ejecutarse antes de dormir"
-    assert events[1] == ("sleep", interval)
-    assert interval >= 300
+    # DS-1: se duerme la cadencia de REEVALUACIÓN (min del intervalo y del reintento), no el
+    # intervalo de 24 h: un fallo del día debe poder reintentarse dentro del mismo día.
+    assert events[1] == ("sleep", min(interval, retry_interval))
+    assert events[1][1] <= interval
+    assert events[1][1] >= 300
 
 
 @pytest.mark.asyncio
