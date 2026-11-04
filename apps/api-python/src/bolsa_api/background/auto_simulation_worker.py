@@ -944,6 +944,14 @@ async def read_account_book_equity(session: Any, account_id: str | None) -> floa
     return float(summary.total_equity)
 
 
+def _blend_entry_price(prior: Decimal, held: Decimal, price: Decimal, qty: Decimal) -> Decimal:
+    """Coste medio ponderado tras ampliar una posición viva (M15)."""
+    total = held + qty
+    if total <= 0:
+        return prior
+    return (prior * held + price * qty) / total
+
+
 def _canonical_entry_prices(events: Any) -> dict[str, float]:
     """Coste medio por instrumento derivado de los fills APLICADOS del libro canónico.
 
@@ -8061,6 +8069,14 @@ class AutoSimulationWorker:
                 if held <= 0 and price > 0:
                     self._entry_price[symbol] = price
                     self._high_price[symbol] = price
+                elif held > 0 and price > 0 and applied_qty > 0:
+                    # M15: una ampliación mezcla el coste; el P&L parcial y el no realizado
+                    # se miden contra el coste medio ponderado, no contra la primera entrada.
+                    prior = self._entry_price.get(symbol)
+                    if prior is not None and prior > 0:
+                        self._entry_price[symbol] = _blend_entry_price(
+                            prior, held, price, applied_qty
+                        )
                 # V2.28/A10 (P1-02 real): recuerda la versión que abrió la posición para
                 # atribuir después los fills de cierre. Solo al abrir desde plano (una
                 # ampliación sobre posición viva conserva la versión original).
