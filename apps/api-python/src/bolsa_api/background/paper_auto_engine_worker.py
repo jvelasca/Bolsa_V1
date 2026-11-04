@@ -331,8 +331,10 @@ class PaperAutoEngine:
         self._pending_plans = 0
         self._last_reason: tuple[str, ...] = ("idle",)
         self._decider = decider
-        self._store: AutoEngineStore | None = store
         self._engine_id = engine_id
+        # P7: ``durable_tick`` es read→readopt→run→persist con awaits; sin lock dos
+        # llamadas solapadas se pisarían el estado.
+        self._tick_lock = asyncio.Lock()
 
     def readopt(self, snapshot: AutoEngineSnapshot | None) -> None:
         """Readopta del store durable (tras crash/relaunch; M4). Sin fila aún
@@ -442,14 +444,15 @@ async def durable_tick(
     3. Persiste via ``engine.persist_tick``.
     Devuelve el snapshot final (la vista que un crash/relaunch releería).
     """
-    snap = await store.read(engine._engine_id)
-    if snap is not None:
-        engine.readopt(snap)
-    engine.run_tick()
-    return await engine.persist_tick(
-        store,
-        occurred_at=occurred_at,
-    )
+    async with engine._tick_lock:  # noqa: SLF001 — P7: un durable_tick a la vez por motor.
+        snap = await store.read(engine._engine_id)
+        if snap is not None:
+            engine.readopt(snap)
+        engine.run_tick()
+        return await engine.persist_tick(
+            store,
+            occurred_at=occurred_at,
+        )
 
 
 async def paper_auto_engine_loop(

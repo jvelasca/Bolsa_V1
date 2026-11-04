@@ -9434,6 +9434,9 @@ class AutoSimRuntime:
                 price_source=price_source,
             )
         self._worker = worker
+        # P7: un único turno a la vez por runtime; ``run_tick`` muta ``_open`` y sustituye
+        # stores del worker, así que dos turnos solapados corromperían el estado.
+        self._tick_lock = asyncio.Lock()
 
     @property
     def worker(self) -> AutoSimulationWorker:
@@ -9450,6 +9453,20 @@ class AutoSimRuntime:
         self._worker._decider = decider  # noqa: SLF001 — seam interno documentado.
 
     async def run_tick(self) -> TurnReport | None:
+        """Un turno real serializado: si ya hay uno en curso, este se omite (no se encola).
+
+        Omitir en vez de esperar evita una cola de turnos sobre barras ya viejas; el
+        siguiente tick del loop lo retoma.
+        """
+        if self._tick_lock.locked():
+            logger.warning(
+                "auto_sim tick omitido: turno anterior aún en curso engine=%s", self._engine_id
+            )
+            return None
+        async with self._tick_lock:
+            return await self._run_tick_unlocked()
+
+    async def _run_tick_unlocked(self) -> TurnReport | None:
         """Un turno real: abre sesión, compone stores PG + finanzas, y lo conduce.
 
         Cada tick compone también el espejo durable de posición (``sim_auto_positions``,
