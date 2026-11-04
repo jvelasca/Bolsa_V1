@@ -505,6 +505,9 @@ async def test_a11_discovery_to_auto_sim_pg(
         )
 
         # --- Crash/restart: readopción conserva la atribución de la versión ---------
+        # P7: el proceso anterior se apaga ORDENADAMENTE y suelta el lease; el nuevo
+        # conduce y readopta del espejo durable (la RAM del primero ya no existe).
+        await runtime.close()
         worker2 = AutoSimulationWorker(
             decider=decider,
             engine_id=engine_id,

@@ -415,7 +415,9 @@ async def test_auto_scheduler_real_pg_zero_human_intervention(
 
         # Reinicio a mitad de jornada: nuevo worker/proceso sobre la MISMA BD debe
         # readoptar la posición durable ⇒ un BUY siguiente NO apila (G7) y NO duplica
-        # efecto financiero.
+        # efecto financiero. P7: el proceso anterior se apaga ordenadamente y suelta el
+        # lease; sin soltarlo el nuevo runtime no conduciría hasta vencer el TTL.
+        await runtime.close()
         events_before_restart = counts_after_open["execution_events"]
         worker2 = AutoSimulationWorker(
             decider=spine,  # sigue proponiendo BUY sobre el mismo símbolo

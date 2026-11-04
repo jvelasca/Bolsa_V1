@@ -80,6 +80,7 @@ from tests.test_golden_day_v2_process_pg import (  # noqa: E402
     _day_progress,
     _durable_fact_health,
     _env_for,
+    _expire_engine_lease,
     _expire_holding_deadlines,
     _proc_failure,
     _seed_account,
@@ -374,6 +375,11 @@ async def test_crash_recovery_day_real_process_survives_dirty_kill_pg(
         # ── MUERTE SUCIA (RAM perdida; sólo sobrevive lo durable) ─────────────────
         await _kill_hard(proc)
         proc = None
+        # P7: un SIGKILL no suelta el lease (nadie ejecuta ``close()``); en producción el
+        # sustituto conduce cuando vence el TTL. El test lo da por vencido en vez de
+        # esperar 180 s con el motor parado — la propiedad medida es la recuperación
+        # durable, no la duración del TTL.
+        await _expire_engine_lease(golden_pg_factory, engine_id)
 
         # ── REINICIO · el techo vencido ⇒ reconciliación (readopt) + ``time_exit`` ─────────
         expired = await _expire_holding_deadlines(golden_pg_factory, account_id)

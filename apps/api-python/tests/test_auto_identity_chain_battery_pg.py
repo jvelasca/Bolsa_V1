@@ -51,6 +51,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tests._estudio_pg_helpers import cleanup_instrument, restore_estudio, set_estudio
 from tests.test_golden_day_v2_process_pg import (
     _CANONICAL_STEPS,
+    _expire_engine_lease,
     _expire_holding_deadlines,
     _filling_instrument_id,
     _seed_account,
@@ -285,6 +286,9 @@ async def _drive_cycle(
         state["cycleId"] = await _single_open_cycle_id(factory, account_id)
 
         # 2) REINICIO EN CALIENTE — readopta la posición durable y NO apila un segundo BUY.
+        #    El runtime anterior "murió" (nadie suelta su lease): se da por vencido, que es
+        #    el estado que deja un crash en producción (P7).
+        await _expire_engine_lease(factory, engine_id)
         worker2 = AutoSimulationWorker(
             decider=spine, engine_id=engine_id, account_id=account_id
         )
@@ -306,6 +310,7 @@ async def _drive_cycle(
         assert expired >= 1, "el ciclo abierto debe declarar su techo durable de mantenimiento"
 
         # 4) CIERRE — un worker NUEVO rehidrata el plan ya vencido y lo liquida.
+        await _expire_engine_lease(factory, engine_id)
         worker3 = AutoSimulationWorker(
             decider=spine, engine_id=engine_id, account_id=account_id
         )

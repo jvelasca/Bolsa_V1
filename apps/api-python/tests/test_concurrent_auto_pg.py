@@ -288,6 +288,12 @@ async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
 
     El claim atómico por identidad determinista (``RES-dec-<hash>``) no puede depender del
     número de contendientes: la carrera se parametriza para medirlo con 2, 3 y 5 sesiones.
+
+    P7 (auditoría .183): entre procesos del MISMO ``engine_id`` arbitra el lease durable de
+    ``auto_engine_runs``, así que la oleada 1 ya no deja a ``N`` workers compitiendo por la
+    señal —sólo uno conduce y los demás declaran ``lease_not_held``—. Lo que se mide aquí
+    sigue siendo el contrato terminal: ``N`` procesos no pueden duplicar intent, reserva,
+    capital retenido ni hechos durables, sea cual sea ``N``.
     """
     instrument_id = _partial_buy_instrument_id(_INSTRUMENT_PREFIX)
     engine_id = f"auto-cn46-{uuid.uuid4().hex[:8]}"
@@ -340,12 +346,22 @@ async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
         held = opened[0]._open[instrument_id]
         assert held > 0
 
-        # (3) Los perdedores declaran POR QUÉ (claim perdido o señal ya consumida),
-        #     nunca un veto silencioso.
-        from bolsa_application.auto_reason_codes import RESERVATION_ALREADY_LIVE
+        # (3) Los perdedores declaran POR QUÉ (lease de otro proceso, claim perdido o
+        #     señal ya consumida), nunca un veto silencioso. Desde P7 el arbitrio entre
+        #     procesos es el lease: sólo un runtime conduce el turno y los demás ni
+        #     siquiera llegan al claim de la señal.
+        from bolsa_application.auto_reason_codes import (
+            LEASE_NOT_HELD,
+            RESERVATION_ALREADY_LIVE,
+        )
 
         losers = [worker for worker in workers if worker is not opened[0]]
-        allowed = {RESERVATION_ALREADY_LIVE, "hold_no_op", "signal_already_consumed"}
+        allowed = {
+            LEASE_NOT_HELD,
+            RESERVATION_ALREADY_LIVE,
+            "hold_no_op",
+            "signal_already_consumed",
+        }
         for loser in losers:
             raw = loser._last_gate_reason  # noqa: SLF001
             codes = (
@@ -436,6 +452,10 @@ async def test_concurrent_auto_n_sessions_claim_one_signal_pg(
         )
 
         # ── OLEADA 2 · N instancias NUEVAS (RAM vacía) sobre la MISMA base ─────────
+        # La oleada 1 se apaga ORDENADAMENTE: su lease se suelta (``close``) y la nueva
+        # generación puede conducir. Sin esto la oleada 2 mediría el TTL del lease (P7),
+        # no la readopción — y un reinicio de despliegue no debe esperar 180 s.
+        await asyncio.gather(*(runtime.close() for runtime in wave))
         events_before = len(await _execution_rows(concurrent_pg_factory, account_id))
         second = [
             await _make_runtime(

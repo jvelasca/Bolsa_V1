@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
@@ -292,6 +292,29 @@ async def _durable_rows(
     return position_state, int(consumed or 0)
 
 
+async def _expire_engine_lease(
+    factory: async_sessionmaker[AsyncSession], engine_id: str
+) -> None:
+    """Simula que el dueño anterior MURIÓ: su lease queda huérfano hasta vencer (P7).
+
+    Un crash no suelta el lease (nadie ejecuta ``close()``), así que el sustituto espera
+    al TTL: aquí se mueve el reloj de la FILA (``lease_expires_at`` al pasado), que es la
+    columna que decide el CAS de ``acquire_lease`` — no el reloj del proceso. Sin esto el
+    runtime nuevo omitiría el tick durante los 180 s del TTL y el test mediría el TTL, no
+    la rehidratación.
+    """
+    from bolsa_infrastructure.database.models.tables import AutoEngineRunRow
+
+    async with factory() as session:
+        await session.execute(
+            update(AutoEngineRunRow)
+            .where(AutoEngineRunRow.engine_id == engine_id)
+            .values(lease_expires_at=datetime.now(UTC) - timedelta(seconds=1))
+        )
+        await session.commit()
+
+
+
 @pytest.mark.asyncio
 async def test_v2_durable_plan_and_consumed_signal_survive_real_restart(
     v2_pg_factory: async_sessionmaker[AsyncSession],
@@ -354,6 +377,9 @@ async def test_v2_durable_plan_and_consumed_signal_survive_real_restart(
         assert stored_consumed == 1, "la señal consumida quedó persistida"
 
         # ── Crash + restart: proceso nuevo (worker nuevo) sobre la MISMA BD ──────
+        # El muerto NO soltó el lease (nadie ejecuta ``close()`` en un crash): se deja
+        # vencer como en producción y el sustituto toma el motor con generación nueva.
+        await _expire_engine_lease(v2_pg_factory, engine_id)
         worker2 = AutoSimulationWorker(
             decider=_BuyOnce(instrument_id, lot=100.0),
             engine_id=engine_id,
