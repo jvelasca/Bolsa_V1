@@ -1069,6 +1069,13 @@ jobs:
         # y sumidero de auditoría) y la costura del worker entran con ANCLA explícita; su
         # certificación PG (``test_auto_operational_monitor_pg.py``) va en ``--ignore`` aquí y
         # corre en el job ``lifecycle-pg`` de este workflow con gate fail-if-skipped.
+        # DS-1/C-1/O-2 (auditoría 2.88.179): la certificación de INTEGRACIÓN de la cola
+        # (``test_scan_queue_health_pg``, ``test_scan_job_lease_pg``, ``test_auto_chain_read_gaps_pg``,
+        # ``test_estudio_daily_proposal_savepoint_pg``) vive en ``lifecycle-pg`` con gate.
+        # OJO: dentro de este ``run: >`` NO se admiten ``#`` intercalados —un comentario convierte
+        # el resto del comando en comentario de shell y anula TODOS los ``--ignore`` posteriores—.
+        # Persistencia del workspace: ``test_workspace_persistence.py`` exige PG real y no lleva
+        # guarda de skip (sin PG falla: es lo correcto), así que va en ``--ignore`` aquí.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -1168,6 +1175,7 @@ jobs:
           --ignore=apps/api-python/tests/test_platform_events_isolation.py
           --ignore=apps/api-python/tests/test_trackers_policies_isolation.py
           --ignore=apps/api-python/tests/test_workspaces_isolation.py
+          --ignore=apps/api-python/tests/test_workspace_persistence.py
           --ignore=apps/api-python/tests/test_lifecycle_auth.py
           --ignore=apps/api-python/tests/test_lifecycle_golden_v188.py
           --ignore=apps/api-python/tests/test_lifecycle_golden_v190.py
@@ -1204,9 +1212,6 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_dia_d_trace_pg.py
           --ignore=apps/api-python/tests/test_auto_ops_job_attempt_cap_pg.py
           --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
-          # DS-1/C-1/O-2 (auditoría 2.88.179): certificación de INTEGRACIÓN. Sin PG real
-          # skipearían en mudo (``test_scan_queue_health_pg`` ni siquiera estaba aquí: sus 5
-          # tests aparecían como SKIPPED en este job). Corren en el paso dedicado con gate.
           --ignore=apps/api-python/tests/test_scan_queue_health_pg.py
           --ignore=apps/api-python/tests/test_scan_job_lease_pg.py
           --ignore=apps/api-python/tests/test_auto_chain_read_gaps_pg.py

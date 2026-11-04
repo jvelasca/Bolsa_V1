@@ -102,24 +102,23 @@ async function selectDrawingFromInspector(page: Page, name: RegExp) {
 }
 
 /**
- * Espera a que `data-visible-range` se estabilice (lightweight-charts ajusta el
- * rango tras `setData` en varios frames) y devuelve el valor estable.
+ * Amplitud del rango lógico visible (`from:to`). El reset de lightweight-charts
+ * (`fitContent`) recoloca el borde a `0.00` mientras el rango inicial puede
+ * conservar una fracción dependiente del ancho del contenedor: comparar la
+ * cadena EXACTA es frágil y no mide lo que el test dice medir (que el zoom
+ * cambie la amplitud y que el reset la restaure).
+ *
+ * Se lee el atributo CRUDO y se deja que el `expect.poll` del test reintente:
+ * envolverlo en un polling de «estabilización» anidaba dos `expect.poll` y
+ * hacía que el exterior esperase una muestra quieta que llega un frame tarde.
  */
-async function settledVisibleRange(page: Page): Promise<string> {
-  const chart = page.getByTestId("ohlcv-chart");
-  let previous = "";
-  await expect
-    .poll(
-      async () => {
-        const current = (await chart.getAttribute("data-visible-range")) ?? "";
-        const stable = current !== "" && current === previous;
-        previous = current;
-        return stable;
-      },
-      { timeout: 5_000 },
-    )
-    .toBe(true);
-  return previous;
+async function visibleSpan(page: Page): Promise<number> {
+  const raw =
+    (await page
+      .getByTestId("ohlcv-chart")
+      .getAttribute("data-visible-range")) ?? "";
+  const [from, to] = raw.split(":").map(Number);
+  return to - from;
 }
 
 /** Dibuja una línea de tendencia con el rectángulo actual de la capa. */
@@ -230,31 +229,29 @@ test.describe("GP-V190 — MERCADO gráficos operativa (mock)", () => {
   }) => {
     const errors = collectErrors(page);
     await openChart(page);
-    const chart = page.getByTestId("ohlcv-chart");
 
-    const initial = await settledVisibleRange(page);
-    expect(initial).toBeTruthy();
+    // Normaliza con un reset explícito: `fitContent` es determinista, mientras
+    // el rango del primer montaje conserva una fracción según el ancho.
+    await page.getByTitle("Ajustar a ventana", { exact: true }).click();
+    await expect
+      .poll(() => visibleSpan(page), { timeout: 10_000 })
+      .toBeGreaterThan(0);
+    const initial = await visibleSpan(page);
 
     await page.getByTitle("Acercar", { exact: true }).click();
     await expect
-      .poll(() => chart.getAttribute("data-visible-range"), {
-        timeout: 5_000,
-      })
-      .not.toBe(initial);
+      .poll(() => visibleSpan(page), { timeout: 10_000 })
+      .toBeLessThan(initial - 0.5);
 
     await page.getByTitle("Ajustar a ventana", { exact: true }).click();
     await expect
-      .poll(() => chart.getAttribute("data-visible-range"), {
-        timeout: 5_000,
-      })
-      .toBe(initial);
+      .poll(() => visibleSpan(page), { timeout: 10_000 })
+      .toBeCloseTo(initial, 1);
 
     await page.getByTitle("Alejar", { exact: true }).click();
     await expect
-      .poll(() => chart.getAttribute("data-visible-range"), {
-        timeout: 5_000,
-      })
-      .not.toBe(initial);
+      .poll(() => visibleSpan(page), { timeout: 10_000 })
+      .toBeGreaterThan(initial + 0.5);
     expect(errors).toEqual([]);
   });
 
