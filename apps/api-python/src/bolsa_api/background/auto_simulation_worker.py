@@ -9433,8 +9433,11 @@ async def auto_sim_loop(
         # P7 (auditoría .183): el scheduler cancela este task en SIGTERM/SIGINT. Soltar el
         # lease aquí es lo que hace que un reinicio ORDENADO conduzca de inmediato en vez
         # de esperar el TTL (180 s) con el motor parado. El fence no se debilita: sólo se
-        # suelta si dueño y generación siguen siendo los de este runtime.
-        await runtime.close()
+        # suelta si dueño y generación siguen siendo los de este runtime. Los dobles de
+        # test que sólo implementan ``run_tick`` no tienen lease que soltar.
+        closer = getattr(runtime, "close", None)
+        if closer is not None:
+            await closer()
 
 
 class AutoSimRuntime:
