@@ -36,11 +36,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from bolsa_analytics.cognitive.auto_adaptive import (
     ADAPTIVE_REGIME_UNKNOWN,
@@ -170,9 +171,16 @@ from bolsa_application.auto_cycle_regime_reader import CycleRegimeReading, read_
 from bolsa_application.auto_daily_journal import OperationMeasurement, OpportunityRow, SimJournalRow
 from bolsa_application.auto_engine_state_store import (
     AutoActivity,
+    AutoEngineCycleClaim,
+    AutoEngineLease,
+    AutoEngineLeaseLost,
+    AutoEngineLeaseStore,
     AutoEngineSnapshot,
     AutoEngineStore,
     AutoEngineTickInput,
+)
+from bolsa_application.auto_engine_state_store import (
+    lease_ttl_seconds as auto_engine_lease_ttl_seconds,
 )
 from bolsa_application.auto_exit_gate import (
     AUTO_EXIT_PERMISSION_EVENT,
@@ -204,6 +212,7 @@ from bolsa_application.auto_reason_codes import (
     EXIT_QTY_OVER_POSITION,
     FILL_NOT_MATERIALIZED,
     FILL_PARTIALLY_MATERIALIZED,
+    LEASE_NOT_HELD,
     LIFECYCLE_TRANSITION_REJECTED,
     OPPORTUNITY_TRADED,
     POSITION_ROW_UNRECONCILED,
@@ -1594,6 +1603,25 @@ class AutoSimulationWorker:
         self._v2_position_journal_pending: list[Any] = []
         # V2.23/A9: última razón del gate determinista (para telemetría/durable).
         self._last_gate_reason: tuple[str, ...] = ("idle",)
+
+    def require_position_readopt(self) -> None:
+        """P7 (auditoría .183) — exige readoptar la posición en el PRÓXIMO turno.
+
+        ``real_turn`` readopta una sola vez por proceso. Cuando el lease cambia de
+        generación (otro proceso condujo el motor y murió, o lo soltó), la RAM de este
+        proceso ya no es la verdad: hay que reconstruir ``_open`` desde
+        ``sim_auto_positions`` en vez de heredar una memoria que dejó de ser suya.
+        """
+        self._readopted = False
+
+    def declare_skip(self, reason: str) -> None:
+        """Declara POR QUÉ este proceso no ejecutó el turno (nunca un veto silencioso).
+
+        P7: cuando otro proceso es el dueño del lease, este runtime no toca la cartera.
+        Sin esta declaración el turno quedaría con el ``idle`` por defecto y el motivo
+        real —no ser el dueño— se perdería, que es justo lo que la traza debe explicar.
+        """
+        self._last_gate_reason = (str(reason),)
 
     async def readopt_positions(self) -> Mapping[str, Decimal]:
         """Readopta del espejo durable la posición abierta (Bloque 5 · P1-06 / G7).
@@ -8305,6 +8333,10 @@ class AutoSimulationWorker:
             Callable[[str, str, Sequence[str]], Awaitable[Any]] | None
         ) = None,
         daily_proposal_sink: Callable[[list[dict[str, Any]]], Awaitable[Any]] | None = None,
+        # P7/P8 (auditoría .183): el ciclo RECLAMADO antes de ejecutar y el lease con el
+        # que se conduce. Sin ellos el turno se matricula como siempre (hermético/tests).
+        cycle_claim: AutoEngineCycleClaim | None = None,
+        lease: AutoEngineLease | None = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
 
@@ -8515,7 +8547,14 @@ class AutoSimulationWorker:
             )
             if auto_store is not None:
                 snap: AutoEngineSnapshot | None = await auto_store.read(self._engine_id)
-                seq = (snap.ticks + 1) if snap is not None else 1
+                # P8: con ciclo RECLAMADO, la fila del ledger ya existe (``seq`` y
+                # ``tick_id`` del claim): el turno la LIQUIDA en vez de matricular otra.
+                # Sin claim se conserva la matrícula histórica (seq = ticks + 1).
+                seq = (
+                    cycle_claim.seq
+                    if cycle_claim is not None
+                    else ((snap.ticks + 1) if snap is not None else 1)
+                )
                 # P3 — estado durable = operativa permitida (no «proceso vivo»). Kill activo
                 # (env o parada dura latcheada) ⇒ BLOCKED, en coherencia con derive_activity.
                 blocked = self._kill_active() or self._v2_kill_switch_halted()
@@ -8530,6 +8569,9 @@ class AutoSimulationWorker:
                         pending_plans=len(self.open_symbols),
                         last_reason=(self._last_gate_reason or ("idle",)),
                         occurred_at=self._time,
+                        claim_tick_id=(cycle_claim.tick_id if cycle_claim is not None else None),
+                        lease_owner=(lease.owner if lease is not None else None),
+                        lease_generation=(lease.generation if lease is not None else None),
                         activity=derive_activity(
                             kill_active=blocked,
                             decided=report.decided,
@@ -9364,28 +9406,35 @@ async def auto_sim_loop(
     el turno (y los sources que se componen por tick) vean el universo vigente.
     """
     logger.info("AutoSimulationWorker (SIM-ONLY) loop iniciado (tick=%ss)", interval_seconds)
-    while True:
-        await asyncio.sleep(interval_seconds)
-        if not sim_worker_enabled():
-            continue
-        # V2.88.123/S2: watch (universo ESTUDIO) ANTES del decider, para que el
-        # refresco de la estrategia ACTIVE ya vea el universo del turno.
-        if watch_refresher is not None:
+    try:
+        while True:
+            await asyncio.sleep(interval_seconds)
+            if not sim_worker_enabled():
+                continue
+            # V2.88.123/S2: watch (universo ESTUDIO) ANTES del decider, para que el
+            # refresco de la estrategia ACTIVE ya vea el universo del turno.
+            if watch_refresher is not None:
+                try:
+                    await watch_refresher()
+                except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
+                    logger.exception("auto_sim watch refresh failed")
+            if decider_refresher is not None:
+                try:
+                    refreshed = await decider_refresher()
+                    if refreshed is not None:
+                        runtime.set_decider(refreshed)
+                except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
+                    logger.exception("auto_sim decider refresh failed")
             try:
-                await watch_refresher()
-            except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
-                logger.exception("auto_sim watch refresh failed")
-        if decider_refresher is not None:
-            try:
-                refreshed = await decider_refresher()
-                if refreshed is not None:
-                    runtime.set_decider(refreshed)
-            except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
-                logger.exception("auto_sim decider refresh failed")
-        try:
-            await runtime.run_tick()
-        except Exception:  # noqa: BLE001 — un turno no debe tumbar el loop.
-            logger.exception("auto_sim tick failed")
+                await runtime.run_tick()
+            except Exception:  # noqa: BLE001 — un turno no debe tumbar el loop.
+                logger.exception("auto_sim tick failed")
+    finally:
+        # P7 (auditoría .183): el scheduler cancela este task en SIGTERM/SIGINT. Soltar el
+        # lease aquí es lo que hace que un reinicio ORDENADO conduzca de inmediato en vez
+        # de esperar el TTL (180 s) con el motor parado. El fence no se debilita: sólo se
+        # suelta si dueño y generación siguen siendo los de este runtime.
+        await runtime.close()
 
 
 class AutoSimRuntime:
@@ -9417,6 +9466,9 @@ class AutoSimRuntime:
         # W4: fuente de precio inyectable (tests). Con ``None`` (producción) se compone el
         # ``OhlcvPriceSource`` real por sesión/tick, que es lo que mata el ``100.0``.
         price_source: Any = None,
+        # P7 (auditoría .183): TTL del lease entre procesos. ``None`` ⇒ se lee del entorno
+        # (``AUTO_ENGINE_LEASE_TTL_SECONDS``, default 180 s).
+        lease_ttl_seconds: float | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._engine_id = engine_id
@@ -9453,6 +9505,17 @@ class AutoSimRuntime:
         # P7: un único turno a la vez por runtime; ``run_tick`` muta ``_open`` y sustituye
         # stores del worker, así que dos turnos solapados corromperían el estado.
         self._tick_lock = asyncio.Lock()
+        # P7 (auditoría .183) — el lock de arriba es INTRA-proceso. Entre procesos arbitra
+        # el lease durable de ``auto_engine_runs`` (migración 063): identidad de ESTE
+        # proceso, lease vigente y la generación con la que se conduce el motor.
+        self._lease_ttl_seconds = (
+            lease_ttl_seconds
+            if lease_ttl_seconds is not None
+            else auto_engine_lease_ttl_seconds()
+        )
+        self._lease_owner = f"auto-sim-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+        self._lease: AutoEngineLease | None = None
+        self._lease_generation_seen: int | None = None
 
     @property
     def worker(self) -> AutoSimulationWorker:
@@ -9480,7 +9543,92 @@ class AutoSimRuntime:
             )
             return None
         async with self._tick_lock:
-            return await self._run_tick_unlocked()
+            try:
+                return await self._run_tick_unlocked()
+            except AutoEngineLeaseLost:
+                # P7 — el fence rechazó la escritura porque otro proceso pasó a conducir el
+                # motor. El turno se DESCARTA (no se reintenta a ciegas): el siguiente tick
+                # re-adquiere lease, y si la generación cambió, readopta la posición.
+                logger.warning(
+                    "auto_sim tick descartado: el lease cambió de dueño engine=%s",
+                    self._engine_id,
+                )
+                self._lease = None
+                return None
+
+    async def _hold_lease(self, store: AutoEngineLeaseStore) -> AutoEngineLease | None:
+        """Renueva el lease de ESTE proceso para el motor, o lo adquiere si lo perdió.
+
+        El lease es lo que arbitra entre procesos: renovarlo antes de cada ciclo mantiene
+        la exclusividad mientras el proceso conduce, y ``None`` significa que otro proceso
+        pasó a ser el dueño (lease vencido y reclamado, o soltado). En ese caso NO se
+        ejecuta el ciclo: es exactamente la carrera que P7 cierra.
+
+        Deja anotada la generación vigente: si cambió respecto de la última vista, exige
+        readoptar la posición (la RAM de este proceso dejó de ser la verdad).
+        """
+        if self._lease is not None:
+            renewed = await store.renew_lease(
+                self._lease, ttl_seconds=self._lease_ttl_seconds
+            )
+            if renewed is not None:
+                self._lease = renewed
+                self._note_lease_generation(renewed)
+                return renewed
+            logger.warning(
+                "auto_sim lease perdido: otro proceso conduce el motor engine=%s", self._engine_id
+            )
+            self._lease = None
+        lease = await store.acquire_lease(
+            self._engine_id, owner=self._lease_owner, ttl_seconds=self._lease_ttl_seconds
+        )
+        self._lease = lease
+        if lease is not None:
+            self._note_lease_generation(lease)
+        return lease
+
+    def _note_lease_generation(self, lease: AutoEngineLease) -> None:
+        """P7 — si la generación del lease cambió, la RAM dejó de ser la verdad.
+
+        El dueño anterior pudo abrir/cerrar posiciones antes de morir. Este proceso
+        reconstruye ``_open`` desde ``sim_auto_positions`` (``readopt_positions``) en vez
+        de heredar una memoria que ya no le corresponde.
+        """
+        previous = self._lease_generation_seen
+        self._lease_generation_seen = lease.generation
+        if previous is not None and previous != lease.generation:
+            logger.warning(
+                "auto_sim lease generation cambió (%s → %s): se readopta posición engine=%s",
+                previous,
+                lease.generation,
+                self._engine_id,
+            )
+            self._worker.require_position_readopt()
+
+    async def close(self) -> None:
+        """Suelta el lease al apagar ORDENADAMENTE (no en un crash).
+
+        Sin esto, un reinicio espera el TTL completo (180 s por defecto) aunque el dueño
+        anterior se apagó limpiamente: el lease arbitra entre procesos VIVOS, no castiga
+        un apagado ordenado. La valla no se debilita: ``release_lease`` sólo suelta si
+        dueño Y generación siguen siendo los de este runtime, así que un ``close()`` de
+        un proceso que ya perdió el lease es un no-op (y la generación no retrocede).
+        """
+        lease, self._lease = self._lease, None
+        if lease is None:
+            return
+        from bolsa_application.auto_engine_state_store import (  # noqa: PLC0415
+            PostgresAutoEngineStore,
+        )
+
+        try:
+            async with self._session_factory() as session:
+                await PostgresAutoEngineStore(session).release_lease(lease)
+        except Exception:  # noqa: BLE001 — apagar nunca debe romperse por el lease.
+            logger.exception(
+                "auto_sim lease release falló al apagar (se deja vencer) engine=%s",
+                self._engine_id,
+            )
 
     async def _run_tick_unlocked(self) -> TurnReport | None:
         """Un turno real: abre sesión, compone stores PG + finanzas, y lo conduce.
@@ -9608,6 +9756,33 @@ class AutoSimRuntime:
             # v2.88.70: la equity del turno es la del libro. Si falla, las aperturas
             # quedan vetadas dentro de ``auto_turn``. No se sustituye por 100_000.
             await self._worker.load_book_equity(session)
+            # P7/P8 (auditoría .183) — exclusividad entre PROCESOS y claim por barra lógica,
+            # ANTES de tocar la cartera. Sin lease vigente o con la barra ya reclamada, este
+            # proceso no ejecuta el ciclo (no se inventa un turno que otro ya conduce).
+            if auto_store is None:  # pragma: no cover — el runtime real siempre lo compone.
+                logger.error("auto_sim tick sin store durable engine=%s", self._engine_id)
+                return None
+            lease_store = cast(AutoEngineLeaseStore, auto_store)
+            lease = await self._hold_lease(lease_store)
+            if lease is None:
+                logger.warning(
+                    "auto_sim tick omitido: otro proceso posee el lease engine=%s",
+                    self._engine_id,
+                )
+                self._worker.declare_skip(LEASE_NOT_HELD)
+                return None
+            self._note_lease_generation(lease)
+            logical_bar = self._worker._v2_current_bar_start()  # noqa: SLF001 — seam interno.
+            claim = await lease_store.claim_cycle(
+                self._engine_id, logical_bar=logical_bar, lease=lease
+            )
+            if claim is None:
+                logger.info(
+                    "auto_sim ciclo ya reclamado para la barra %s engine=%s",
+                    logical_bar or "(sin barra)",
+                    self._engine_id,
+                )
+                return None
             # AUTO 2.0 · V2.40.1: fuentes de DATO reales del tick sobre la misma sesión.
             # Antes no se cableaba ninguna ⇒ régimen UNKNOWN (exit-only) y sector/edge
             # inexistentes; el AUTO "parecía prudente" estando a ciegas. Ahora el motor
@@ -9678,6 +9853,10 @@ class AutoSimRuntime:
                     if real_price_enabled()
                     else None
                 ),
+                # P7/P8: el turno liquida el ciclo RECLAMADO y escribe bajo la valla del
+                # lease con el que se conduce el motor.
+                cycle_claim=claim,
+                lease=lease,
             )
 
 
@@ -9689,6 +9868,9 @@ class _HermeticRuntime:
 
     async def run_tick(self) -> None:
         await self._worker.auto_turn()
+
+    async def close(self) -> None:
+        """Sin lease durable no hay nada que soltar (contrato paralelo a ``AutoSimRuntime``)."""
 
 
 def _default_spine_decider() -> DecisionProvider:

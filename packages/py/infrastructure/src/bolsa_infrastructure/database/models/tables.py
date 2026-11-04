@@ -2321,7 +2321,10 @@ class AutoEngineRunRow(Base):
     """
 
     __tablename__ = "auto_engine_runs"
-    __table_args__ = (Index("auto_engine_runs_updated_at_idx", "updated_at"),)
+    __table_args__ = (
+        Index("auto_engine_runs_updated_at_idx", "updated_at"),
+        Index("auto_engine_runs_lease_expires_idx", "lease_expires_at"),
+    )
 
     engine_id: Mapped[str] = mapped_column("engine_id", String, primary_key=True)
     venue: Mapped[str] = mapped_column(String, nullable=False)
@@ -2344,6 +2347,24 @@ class AutoEngineRunRow(Base):
     # ``RUNNING``). ``NULL`` = fila anterior al sello o tick sin actividad medida; la UI
     # lo declara «Sin dato todavía», nunca una fase inventada.
     activity: Mapped[str | None] = mapped_column("activity", String(32), nullable=True)
+    # P7 (auditoría .183, migración 063) — lease de ownership del ciclo entre PROCESOS.
+    # ``lease_owner`` identifica al proceso que conduce el motor (``NULL`` = sin dueño);
+    # ``lease_generation`` es la valla monótona que se incrementa en cada adquisición y
+    # que un tick debe presentar para poder escribir; ``lease_expires_at`` es el TTL tras
+    # el cual otro proceso puede adquirirlo (el dueño renueva antes de cada ciclo).
+    lease_owner: Mapped[str | None] = mapped_column("lease_owner", String(), nullable=True)
+    lease_generation: Mapped[int] = mapped_column(
+        "lease_generation",
+        BigInteger,
+        nullable=False,
+        default=0,
+        server_default=text("0"),
+    )
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        "lease_expires_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         DateTime(timezone=True),
