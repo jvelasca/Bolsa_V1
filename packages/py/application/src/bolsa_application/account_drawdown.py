@@ -65,6 +65,9 @@ class EquityMarkBook:
     def export_settings_fragment(self, account_id: str) -> dict[str, Any]:
         return {"equityMarks": dict(self._by_account.get(account_id) or {})}
 
+    def has_marks(self, account_id: str) -> bool:
+        return bool(self._by_account.get(account_id))
+
     def reset(self) -> None:
         """Olvida todas las marcas (arranque en frío y aislamiento entre tests).
 
