@@ -60,6 +60,15 @@ del tag `.183`. Los E2E `gp-v190` **live/integrated** siguen exigiendo API + Pos
 certifica. PAPER sigue **`INCONCLUSIVE`**, AUTO **OFF**, operativa **100 % SIM**; rentabilidad **no demostrada**
 y sin órdenes reales.
 
+**CI del tag (medido, POST-PUSH).** `Release tag CI`
+[`41833961611`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41833961611) sobre el tag `v2.88.183-beta`
+(`2ffc037b`): **GREEN**, con **13 jobs `success`** + `certify` y el único `skipped` del E2E integrado opt-in.
+Los dos jobs que tumbaron `.182` quedan verdes y **con sus recuentos**: `python (ruff/imports/mypy/pytest offline)`
+**`5945 passed, 94 skipped`** en **105.56s** (antes: `8 failed, 6105 passed, 210 skipped`) y
+`playwright (mock E2E)` **`156 passed`** (antes: `154 passed` + `1 failed`). También `success` en
+`lifecycle-pg`, `replay-repro`, `a7-gate`, `dr-verify`, `frontend`, `spine`, `shared`, `security`, `live AUTO
+daily`, `integrated AUTO S5` y `axe`. El artefacto de `certify` cierra el sello.
+
 **Publicación.** Rama `fix/059-060-proveedores`, **sin PR** (la de integración es ancestro). Tag anotado
 `v2.88.183-beta` sobre el commit del pin re-anclado; el sello es el `Release tag CI` del tag. `.182` se conserva
 como el run rojo que motivó esta corrección.
