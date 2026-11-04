@@ -65,7 +65,7 @@ y sin órdenes reales.
 (`2ffc037b`): **GREEN**, con **13 jobs `success`** + `certify` y el único `skipped` del E2E integrado opt-in.
 Los dos jobs que tumbaron `.182` quedan verdes y **con sus recuentos**: `python (ruff/imports/mypy/pytest offline)`
 **`5945 passed, 94 skipped`** en **105.56s** (antes: `8 failed, 6105 passed, 210 skipped`) y
-`playwright (mock E2E)` **`156 passed`** (antes: `154 passed` + `1 failed`). También `success` en
+`playwright (mock E2E)` **`156 passed`** (antes, en `.182`: **`1 failed`**, `GP-V190-04`). También `success` en
 `lifecycle-pg`, `replay-repro`, `a7-gate`, `dr-verify`, `frontend`, `spine`, `shared`, `security`, `live AUTO
 daily`, `integrated AUTO S5` y `axe`. El artefacto de `certify` cierra el sello.
 
