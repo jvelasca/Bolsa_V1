@@ -2,6 +2,80 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.182-beta] — **MERCADO v1.90: el gráfico deja de romperse con la vela viva y de medir un 0 inventado; `Escape` devuelve al cursor y borrar una orden vinculada pide confirmación** (**`Δ reglas = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** sello de **producto** sobre `fix/059-060-proveedores`, posterior a `2.11.176-beta`. No cambia
+ninguna regla, indicador, umbral, peso, sizing ni replay (**`Δ reglas = 0`**; el motor de decisión no se toca) y
+no cambia el contrato de decisión (**`Δ decisión = 0`**). **Sin migración**: no hay revisión nueva; `head` sigue
+`062_sync_settings_check_backfill`. El contrato HTTP es **aditivo** (`getInstrumentDataStatus` publica la
+desviación XTB↔cierre y la salud de la cola de scan).
+
+**Bump** `2.11.176-beta` → **`2.11.182-beta`** (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` **no** se toca).
+**Por qué `.182` y no `.177`:** los sellos `v2.88.177-beta`…`v2.88.181-beta` ya existen en ramas `seal/*`
+(no fusionadas aquí); reutilizar el número habría colisionado con artefactos publicados. El siguiente libre es
+`.182`.
+
+**Los tres bloques del sello.**
+
+| Bloque | Qué cierra |
+| --- | --- |
+| MERCADO v1.90 (gráfico) | barras deduplicadas antes del `ON CONFLICT`, desviación XTB vs cierre D1 declarada y no usada como precio, confirmación explícita al borrar una orden vinculada, `data-testid` estables para el E2E |
+| DS-1 (cola de scan) | latido del lease de un job `processing`, reaper de huérfanos con tope de resurrecciones, vigía periódico de la cola y reevaluación del descubrimiento del día |
+| Medición y dibujo | `Escape` sale del modo de dibujo y **devuelve el cursor que se estaba usando**, la regla no crea una caja 1×1, el texto concuerda («1 vela»), borrar del editor limpia la selección y el cambio de estilo de precio ya no deja capas y hub con la serie destruida |
+
+**MERCADO v1.90 — lo que se corrige, medido.** `dedupe_bars_by_timestamp` colapsa los timestamps repetidos
+conservando la última lectura **antes** del bulk upsert: PostgreSQL aborta un `INSERT … ON CONFLICT` que toca la
+misma clave dos veces y el payload de Yahoo puede repetir la vela viva. La ficha de calidad de datos marca en
+ámbar una desviación XTB↔cierre D1 **> 5 %** y **declara** que esa cifra no sirve como referencia de precio
+(desajuste de símbolo, divisa o bridge), en vez de mostrarla como un dato más. El borrado de un dibujo con orden
+vinculada pasa por `ConfirmActionDialog`: la orden no se elimina por un clic de arrastre. Se añaden identidades
+estables (`chart-quick-buy`/`chart-quick-sell`, `chart-tab-<id>`) para que el E2E afirme sobre el DOM real y no
+sobre posiciones.
+
+**DS-1 — el `processing` deja de ser una tumba.** `claim_next` escribía `updated_at` una sola vez: un scan más
+largo que el umbral se reencolaba **estando vivo** (doble ejecución posible) y un job realmente colgado tardaba
+en recuperarse. El latido vive en `scan_job_lease.py` con dos reglas duras: **sesión propia** (un `UPDATE` en la
+sesión del scan se encolaría detrás de su transacción) y **parada al dejar de estar `processing`** (un job
+reencolado no debe refrescar su lease). La cadencia se deriva del umbral (`stale / 3`, suelo 5 s) para que dos
+ticks perdidos no fabriquen un falso huérfano; el reaper declara `failed` tras `SCAN_JOB_PROCESSING_MAX_REAPS` y
+el vigía de la cola deja de mirarse una sola vez al arrancar (`SCAN_QUEUE_HEALTH_INTERVAL_SECONDS`, 300 s). La
+reevaluación del descubrimiento (`OPPORTUNITY_DAILY_SCAN_RETRY_INTERVAL_SECONDS`, 900 s) detecta huecos dentro
+del mismo día UTC; el dedupe durable sigue siendo el gate real.
+
+**Medición y dibujo — cuatro defectos de la auditoría QA, cerrados.** (1) `Escape` cancela la medición y el
+trazo en curso; **D2**. (2) Un clic suelto ya no crea una caja degenerada: `MIN_MEASURE_DRAG_PX = 4` y la captura
+de puntero se libera con `try/catch` — el `releasePointerCapture` sin captura abortaba la limpieza; **D3**.
+(3) «1 vela» y no «1 velas»; **D4**. (4) Borrar desde el editor de dibujo limpia `selectedDrawingId`; **D6**.
+Además, `Escape` **no** cae siempre al puntero: `resolveEscapeDrawTool` restaura el cursor puro recordado
+(`lastDrawToolByGroup.cursor`, p. ej. Cruz) y excluye `arrow` porque deja marcadores permanentes. Si hay un
+diálogo abierto o el foco está en un campo editable, el primer `Escape` es del diálogo/campo.
+
+**El hallazgo de la auditoría externa (Bugbot) y su cierre.** La revisión del árbol previo al sello encontró
+**1 defecto medium**: al cambiar el estilo de precio (velas ↔ línea ↔ Renko) se sustituía `mainSeriesRef.current`
+sin re-registrar el pane en el hub de sincronización ni forzar re-render, así que las capas
+(`ChartCursorStyleOverlay`, `ChartCrosshairMeasure`, `ChartDrawingsLayer`, proyección F3 y niveles operativos) y
+el hub conservaban la **serie liberada** y podían reproducir `Object is disposed` sobre el crosshair. Se cierra
+con un espejo **reactivo** de la serie principal (`overlayMainSeries`): se actualiza al crear y al sustituir, el
+hub se re-registra con la serie viva y las cinco capas reciben la misma referencia. Verificado con `tsc`,
+`eslint` y las **128** pruebas de `charts`.
+
+**Lo que este sello NO acredita.** Los E2E `gp-v190` **live/integrated** requieren API + PostgreSQL + barras y
+**no se ejecutaron aquí**: entran por el filtro del CI del tag y un `skipped` no certifica. Las pruebas de
+navegador de la medición se hicieron en la sesión de QA anterior; el arreglo del hub se valida aquí por tipos y
+tests, **no** por navegador. La ventana PAPER sigue **`INCONCLUSIVE`**, **AUTO sigue OFF** y la operativa es
+**100 % SIM**: este sello no demuestra rentabilidad ni autoriza órdenes reales. La re-ancla del pin PAPER viaja
+en su propio commit (los `meta.bump` viven en `apps/` y mueven `appsHash`).
+
+**Verificación (medida, local).** web **366 ficheros / 2 743 tests passed** · `charts`+`stores` **193 passed** ·
+`charts` solo **128 passed** · Python focalizado (mercado, OHLCV, estado de dato, rutas de gráfico, latido)
+**164 passed** · `typecheck` **4/4** · `eslint` del fichero tocado **0 problemas** · `ruff` **`All checks passed!`**
+· `mypy` del área **39 ficheros, 0 issues** · `test_dia_d_bump_guard` **2 passed**.
+
+**Publicación.** Rama `fix/059-060-proveedores`, **sin PR** (la de integración es ancestro). Tag anotado
+`v2.88.182-beta` sobre el commit del pin re-anclado; el sello es el `Release tag CI` del tag.
+
+
 ## [2.11.176-beta] — **la pantalla de entrada deja de repetir la navegación y de hablar en jerga interna: Overview responde a una sola pregunta** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
 
 **Naturaleza:** sello de **producto**, solo frontend, posterior a `2.11.175-beta`. No cambia ninguna regla,
