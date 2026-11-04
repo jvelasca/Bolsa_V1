@@ -11,6 +11,18 @@ import {
 
 const now = "2026-07-22T00:00:00.000Z";
 
+/**
+ * P2 (auditoría .183) — reglas que las plantillas declaran NO medibles hoy.
+ *
+ * `MaxSpreadBps`: no hay fuente de cotización bid/ask en el camino AUTO (el spread del
+ * coste es una constante de modelo, no una medición del libro).
+ * `HardMaxDrawdown`: depende de `initialDeposit`; hallazgo P3, se corrige aparte.
+ *
+ * Todo lo demás es ESTRICTO: sin market cap, ADV, sector o drawdown diario, el gate veta
+ * con `<Regla>_unmeasured`.
+ */
+const OPTIONAL_MEASUREMENTS = ["MaxSpreadBps", "HardMaxDrawdown"] as const;
+
 function baseMeta(
   templateId: TradingPolicyV1["templateId"],
   name: string,
@@ -27,6 +39,7 @@ function baseMeta(
   | "updatedAt"
   | "createdAt"
   | "weightRuleSetId"
+  | "optionalMeasurements"
 > {
   return {
     artifactType: "ART-TRADING-POLICY",
@@ -37,6 +50,7 @@ function baseMeta(
     name,
     description,
     weightRuleSetId: null,
+    optionalMeasurements: [...OPTIONAL_MEASUREMENTS],
     updatedAt: now,
     createdAt: now,
   };

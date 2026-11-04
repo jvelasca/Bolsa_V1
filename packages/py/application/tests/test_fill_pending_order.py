@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from policy_metrics_fakes import MeasuredInstruments
 
 from bolsa_application.fill_pending_order import FillPendingOrder
 from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary, TradeResult, Transaction
@@ -113,6 +114,8 @@ async def test_fill_pending_buy_executes_when_gate_allows() -> None:
         _FakeAccountRepo(),  # type: ignore[arg-type]
         execute_trade=fake_trade,
         portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): el catálogo debe medir market cap/ADV o el gate veta.
+        instruments=MeasuredInstruments(),
     )
     result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
     assert result["status"] == "executed"
@@ -165,6 +168,8 @@ async def test_fill_pending_execute_boom_unknown_keeps_order() -> None:
         _FakeAccountRepo(),  # type: ignore[arg-type]
         execute_trade=_Boom(),
         portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): el catálogo debe medir market cap/ADV o el gate veta.
+        instruments=MeasuredInstruments(),
     )
     result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
     assert result["status"] == "unknown"
@@ -186,6 +191,8 @@ async def test_fill_pending_mock_live_does_not_fill() -> None:
         execute_trade=fake_trade,
         broker_adapter=MockBrokerAdapter(),
         portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): el catálogo debe medir market cap/ADV o el gate veta.
+        instruments=MeasuredInstruments(),
     )
     result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
     assert result["status"] == "skipped"
@@ -220,6 +227,8 @@ async def test_fill_pending_xtb_rejected_keeps_order() -> None:
             execution_unlocked_check=lambda: True,
         ),
         portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): el catálogo debe medir market cap/ADV o el gate veta.
+        instruments=MeasuredInstruments(),
     )
     result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
     assert result["status"] == "skipped"
@@ -256,6 +265,8 @@ async def test_fill_pending_xtb_submitted_keeps_order() -> None:
             execution_unlocked_check=lambda: True,
         ),
         portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): el catálogo debe medir market cap/ADV o el gate veta.
+        instruments=MeasuredInstruments(),
     )
     result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
     assert result["status"] == "unknown"
@@ -294,6 +305,8 @@ async def test_fill_pending_xtb_filled_is_blocked_keeps_order() -> None:
             execution_unlocked_check=lambda: True,
         ),
         portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): el catálogo debe medir market cap/ADV o el gate veta.
+        instruments=MeasuredInstruments(),
     )
     result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
     # Sin atajo a ledger: la orden pendiente NO se auto-cierra/liquida; queda para

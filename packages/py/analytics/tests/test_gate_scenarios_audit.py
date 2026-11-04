@@ -128,6 +128,10 @@ def test_paper_auto_pass_allows_execution():
             reward_to_risk_ratio=2.5,
             has_stop_loss=True,
             hours_to_earnings=72,
+            # P2 (auditoría .183): trade medido = trade evaluable.
+            account_daily_drawdown_pct=0.0,
+            account_weekly_drawdown_pct=0.0,
+            basket_max_sector_weight_pct=5.0,
         ),
     )
     assert gated.execution_allowed is True

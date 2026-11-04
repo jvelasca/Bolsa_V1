@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from policy_metrics_fakes import MeasuredInstruments, MeasuredInstrumentsMixin
 
 from bolsa_application.accounts import ExecuteTrade
 from bolsa_application.confirm_recommendation import (
@@ -813,6 +814,8 @@ async def test_confirm_apertura_cesta_permite_fill() -> None:
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
         portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): una apertura permitida exige catálogo que mida.
+        instruments=MeasuredInstruments(),
     )
 
     result = await use_case.execute(
@@ -1045,8 +1048,8 @@ class _FakeInstrument:
         self.sector = sector
 
 
-class _FakeInstruments:
-    """Lookup mínimo `get_by_id` (H1) — mismo contrato que InstrumentSectorLookup."""
+class _FakeInstruments(MeasuredInstrumentsMixin):
+    """Lookup mínimo `get_by_id` (H1) + métricas de política (P2 .183)."""
 
     def __init__(self, by_id: dict[str, _FakeInstrument]) -> None:
         self._by_id = by_id
@@ -1288,6 +1291,8 @@ async def test_confirm_apertura_stale_bar_risk_veto() -> None:
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
         portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): una apertura permitida exige catálogo que mida.
+        instruments=MeasuredInstruments(),
         ohlcv=_FakeOhlcv(stale),
     )
 
@@ -1318,6 +1323,8 @@ async def test_confirm_apertura_fresh_bar_permite_fill() -> None:
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
         portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): una apertura permitida exige catálogo que mida.
+        instruments=MeasuredInstruments(),
         ohlcv=_FakeOhlcv(fresh),
     )
 
@@ -1343,6 +1350,8 @@ async def test_confirm_apertura_ohlcv_falla_fail_closed() -> None:
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
         portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): una apertura permitida exige catálogo que mida.
+        instruments=MeasuredInstruments(),
         ohlcv=_RaisingOhlcv(),
     )
 
@@ -1393,6 +1402,8 @@ async def test_confirm_apertura_no_open_mandate_risk_veto() -> None:
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
         portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): una apertura permitida exige catálogo que mida.
+        instruments=MeasuredInstruments(),
         mandates=_FakeMandatesNoOpen(),
     )
 
@@ -1419,6 +1430,8 @@ async def test_confirm_apertura_open_mandate_permite_fill() -> None:
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
         portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): una apertura permitida exige catálogo que mida.
+        instruments=MeasuredInstruments(),
         mandates=_FakeMandatesOpen(),
     )
 
@@ -1444,6 +1457,8 @@ async def test_confirm_apertura_mandates_falla_fail_closed() -> None:
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
         portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): una apertura permitida exige catálogo que mida.
+        instruments=MeasuredInstruments(),
         mandates=_RaisingMandates(),
     )
 
@@ -1480,6 +1495,8 @@ async def test_confirm_apertura_portfolio_drift_risk_veto() -> None:
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
         portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): una apertura permitida exige catálogo que mida.
+        instruments=MeasuredInstruments(),
         portfolio_recon=_FakePortfolioReconDrift(),  # type: ignore[arg-type]
     )
 
@@ -1506,6 +1523,8 @@ async def test_confirm_apertura_portfolio_clean_permite_fill() -> None:
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
         portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        # P2 (auditoría .183): una apertura permitida exige catálogo que mida.
+        instruments=MeasuredInstruments(),
         portfolio_recon=_FakePortfolioReconClean(),  # type: ignore[arg-type]
     )
 

@@ -23,6 +23,7 @@ V1.51: tras fill PAPER de apertura AUTO nace PositionState vía
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -70,8 +71,10 @@ from bolsa_application.risk_runtime import (
 from bolsa_application.trading_policy_guard import CognitiveGuardResult
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 from bolsa_domain.entities.market_event import MarketEventCalendar
+from bolsa_domain.numeric import finite_positive
 from bolsa_domain.platform_kernel import PAPER_ACCOUNT_TYPES
 from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
+from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
 from bolsa_infrastructure.alerts.alert_channels import (
     AlertChannelDispatchResult,
@@ -89,6 +92,17 @@ from bolsa_infrastructure.database.repositories.scan_job_repository import (
 from bolsa_infrastructure.database.repositories.signal_alert_repository import (
     SignalAlertSubscriptionRecord,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _finite_positive(value: Any) -> float | None:
+    """``float`` finito y > 0, o ``None`` (nunca se inventa una métrica).
+
+    P9 (auditoría .183): el patrón ``float(x) if x else None`` deja pasar ``NaN`` (que
+    atraviesa ``> 0`` con resultado ``False`` pero llega al gate) y ``inf``.
+    """
+    return finite_positive(value)
 
 
 def enrich_opening_trade_plan_for_position(
@@ -322,6 +336,7 @@ class ExecutionRouter:
         instrument_data_status: Any | None = None,
         position_from_fill: PersistPositionFromFill | None = None,
         opening_fill_handles: Any | None = None,
+        instrument_repo: InstrumentRepository | None = None,
     ) -> None:
         self._policies = policy_repo
         self._accounts = account_repo
@@ -344,6 +359,45 @@ class ExecutionRouter:
         self._instrument_data_status = instrument_data_status
         self._position_from_fill = position_from_fill
         self._opening_fill_handles = opening_fill_handles
+        self._instrument_repo = instrument_repo
+
+    async def _resolve_policy_measurements(
+        self, instrument_id: str
+    ) -> tuple[float | None, float | None, str | None, str | None]:
+        """Métricas del catálogo que el Policy Gate exige (P2, auditoría .183).
+
+        Devuelve ``(market_cap_usd, adv_usd, sector, denial_reason)``.
+
+        El gate se cerró en P2: una regla activa sin dato veta con
+        ``<Regla>_unmeasured``. Para que ese veto no sea el estado normal, el router
+        resuelve aquí lo que el catálogo SÍ sabe (``InstrumentTradeContext`` ya expone
+        ``adv_usd`` y ``sector``; ``get_fundamentals`` da ``marketCap``).
+
+        Nada se inventa: si el catálogo no tiene el dato se devuelve ``None`` y veta el
+        gate, con el nombre de la regla en el motivo. Solo la ausencia de repositorio o
+        un fallo de lectura —errores de composición, no de dato— devuelven motivo de
+        denegación directo, para que un despliegue mal cableado se vea de inmediato.
+        """
+        repo = self._instrument_repo
+        if repo is None:
+            return (None, None, None, "policy_metrics:instrument_repo_missing")
+        try:
+            contexts = await repo.list_trade_context_by_ids([instrument_id])
+        except Exception:  # noqa: BLE001 — un catálogo ilegible no autoriza aperturas.
+            logger.exception("policy metrics: trade context lookup failed id=%s", instrument_id)
+            return (None, None, None, "policy_metrics:trade_context_lookup_failed")
+        ctx = contexts.get(instrument_id) if isinstance(contexts, dict) else None
+        adv_usd = _finite_positive(getattr(ctx, "adv_usd", None))
+        sector = getattr(ctx, "sector", None)
+        market_cap: float | None = None
+        try:
+            fundamentals = await repo.get_fundamentals(instrument_id)
+        except Exception:  # noqa: BLE001 — sin fundamentales no hay market cap.
+            logger.exception("policy metrics: fundamentals lookup failed id=%s", instrument_id)
+            fundamentals = None
+        if isinstance(fundamentals, dict):
+            market_cap = _finite_positive(fundamentals.get("marketCap"))
+        return (market_cap, adv_usd, sector if isinstance(sector, str) else None, None)
 
     async def _resolve_sanity_warnings(
         self, instrument_id: str
@@ -938,38 +992,60 @@ class ExecutionRouter:
                     if isinstance(sanity, RiskDecision):
                         guard_decision = sanity
                     else:
-                        guard_decision = check_opening(
-                            profile=profile,
-                            instrument_id=signal.instrument_id,
-                            symbol=symbol,
-                            trade_type=trade_type,
-                            quantity=quantity,
-                            price=price,
-                            signal_kind=str(signal.kind),
-                            equity=equity,
-                            open_positions_count=len(summary.positions),
-                            event_calendar=self._event_calendar,
-                            auto_live=False,  # paper_auto ≠ live
-                            enforce_edge_thresholds=True,
-                            edge_report=edge_report,
-                            account_daily_drawdown_pct=dds.daily_pct,
-                            account_weekly_drawdown_pct=dds.weekly_pct,
-                            account_max_drawdown_pct=dds.max_pct,
-                            kill_switch=await effective_kill_switch(),
-                            book_max_open_positions=_book_max_open_positions(policy),
-                            portfolio_positions=_basket_positions_from_summary(summary),
-                            proposal_sector=(
-                                hit.get("sector") if isinstance(hit, dict) else None
-                            ),
-                            last_bar_timestamp=getattr(signal, "timestamp", None) or None,
-                            require_fresh_data=True,
-                            has_open_mandate=has_open_mandate,
-                            mandate_strategy_id=mandate_strategy_id,
-                            require_account_mandate=require_account_mandate,
-                            proposal_strategy_id=self._proposal_strategy_id(signal),
-                            sanity_warnings=sanity,
-                            **recon,
-                        )
+                        (
+                            market_cap_usd,
+                            average_daily_volume_usd,
+                            catalog_sector,
+                            metrics_denial,
+                        ) = await self._resolve_policy_measurements(signal.instrument_id)
+                        if metrics_denial is not None:
+                            # Composición o lectura del catálogo rota: no se decide a
+                            # ciegas. El motivo nombra la causa, no la regla.
+                            guard_decision = RiskDecision(
+                                verdict="DENY",
+                                reasons=(metrics_denial,),
+                                guard=None,
+                            )
+                        else:
+                            guard_decision = check_opening(
+                                profile=profile,
+                                instrument_id=signal.instrument_id,
+                                symbol=symbol,
+                                trade_type=trade_type,
+                                quantity=quantity,
+                                price=price,
+                                signal_kind=str(signal.kind),
+                                equity=equity,
+                                open_positions_count=len(summary.positions),
+                                event_calendar=self._event_calendar,
+                                auto_live=False,  # paper_auto ≠ live
+                                enforce_edge_thresholds=True,
+                                edge_report=edge_report,
+                                account_daily_drawdown_pct=dds.daily_pct,
+                                account_weekly_drawdown_pct=dds.weekly_pct,
+                                account_max_drawdown_pct=dds.max_pct,
+                                kill_switch=await effective_kill_switch(),
+                                book_max_open_positions=_book_max_open_positions(policy),
+                                portfolio_positions=_basket_positions_from_summary(summary),
+                                proposal_sector=(
+                                    hit.get("sector") if isinstance(hit, dict) else None
+                                ),
+                                # P2 (auditoría .183): sin estas tres métricas el Policy
+                                # Gate no podía evaluar MinMarketCap, MinADV ni sector, y
+                                # las saltaba sin decirlo. El catálogo las da; si no las
+                                # tiene, el gate veta con `<Regla>_unmeasured`.
+                                market_cap_usd=market_cap_usd,
+                                average_daily_volume_usd=average_daily_volume_usd,
+                                sector=catalog_sector,
+                                last_bar_timestamp=getattr(signal, "timestamp", None) or None,
+                                require_fresh_data=True,
+                                has_open_mandate=has_open_mandate,
+                                mandate_strategy_id=mandate_strategy_id,
+                                require_account_mandate=require_account_mandate,
+                                proposal_strategy_id=self._proposal_strategy_id(signal),
+                                sanity_warnings=sanity,
+                                **recon,
+                            )
             auto_decision_id = str(signal.id or idem_key)
             await append_journal_event(
                 self._journal_writer,

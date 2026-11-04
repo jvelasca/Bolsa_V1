@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from policy_metrics_fakes import MeasuredInstruments
 
 from bolsa_application.execution_router import ExecutionRouter, signal_kind_to_trade_type
 from bolsa_application.paper_auto_http_gate import (
@@ -653,6 +654,8 @@ async def test_gp_desk_05b_real_opening_gate_no_position(monkeypatch) -> None:
         profile_store=None,
         enforce_cognitive_gate=True,
         position_from_fill=PersistPositionFromFill(store),
+        # P2 (auditoría .183): el veto esperado es por book max, no por dato ausente.
+        instrument_repo=MeasuredInstruments(),  # type: ignore[arg-type]
     )
     # DS-05 data-freshness gate compara vs now; timestamp relativo evita que un
     # ws fijo (p.ej. 2026-09-01) envejezca >5 días y vete antes del gate del book.

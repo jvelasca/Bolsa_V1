@@ -10,6 +10,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from policy_metrics_fakes import MeasuredInstruments
 
 from bolsa_analytics.cognitive.operational_incident import (
     open_incident,
@@ -49,6 +50,8 @@ def _open_kwargs(**extra: Any) -> dict[str, Any]:
         "quantity": 1.0,
         "price": 10.0,
         "signal_kind": "recommend_long",
+        # P2 (auditoría .183): catálogo medido; el test mide recon/incidente.
+        "instruments": MeasuredInstruments(),
     }
     base.update(extra)
     return base

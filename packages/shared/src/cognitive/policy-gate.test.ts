@@ -94,6 +94,9 @@ const passingInput = {
     openPositionsCount: 3,
     portfolioConcentrationPct: 10,
   },
+  // P2: las reglas de drawdown exigen medición; sin esta cuenta quedarían
+  // `FAILED ..._unmeasured` (antes eran `SKIPPED`, que no vetaba).
+  accountDrawdown: { dailyPct: 1, weeklyPct: 2, maxPct: 3 },
 };
 
 describe("Policy Gate — paridad TS↔Py (policy-gate.ts)", () => {
@@ -102,11 +105,65 @@ describe("Policy Gate — paridad TS↔Py (policy-gate.ts)", () => {
     expect(r.passed).toBe(true);
     expect(r.policyId).toBe("fixture-1");
     expect(r.vetoReasons).toEqual([]);
-    // Sin cuenta abierta de circuit-breaker → drawdowns SKIPPED.
-    const skipped = r.evaluatedRules
-      .filter((x) => x.status === "SKIPPED")
-      .map((x) => x.rule);
-    expect(skipped).toContain("HardDailyDrawdown");
+    expect(r.evaluatedRules.filter((x) => x.status === "SKIPPED")).toEqual([]);
+  });
+
+  it("sin medición de drawdown veta con <Regla>_unmeasured (no SKIPPED)", () => {
+    const { accountDrawdown: _omit, ...withoutDrawdown } = passingInput;
+    const r = evaluatePolicyGate(withoutDrawdown);
+    expect(r.passed).toBe(false);
+    for (const name of [
+      "HardDailyDrawdown",
+      "HardWeeklyDrawdown",
+      "HardMaxDrawdown",
+    ]) {
+      const found = r.evaluatedRules.find((x) => x.rule === name);
+      expect(found?.status).toBe("FAILED");
+      expect(found?.message).toBe(`${name}_unmeasured`);
+      expect(found?.actual).toBe("n/a");
+    }
+  });
+
+  it("una regla declarada en optionalMeasurements queda SKIPPED con motivo", () => {
+    const { accountDrawdown: _omit, ...withoutDrawdown } = passingInput;
+    const r = evaluatePolicyGate({
+      ...withoutDrawdown,
+      policy: buildPolicy({
+        optionalMeasurements: ["HardDailyDrawdown", "HardMaxDrawdown"],
+      }),
+    });
+    const daily = r.evaluatedRules.find((x) => x.rule === "HardDailyDrawdown");
+    expect(daily?.status).toBe("SKIPPED");
+    expect(daily?.message).toBe("HardDailyDrawdown_unmeasured_declared");
+    // La semanal no está declarada: sigue vetando de forma explícita.
+    const weekly = r.evaluatedRules.find(
+      (x) => x.rule === "HardWeeklyDrawdown",
+    );
+    expect(weekly?.status).toBe("FAILED");
+    expect(weekly?.message).toBe("HardWeeklyDrawdown_unmeasured");
+  });
+
+  it("sin capitalización medida veta MinMarketCap_unmeasured", () => {
+    const r = evaluatePolicyGate({
+      ...passingInput,
+      instrument: { ...passingInput.instrument, marketCapUSD: undefined },
+    });
+    const cap = r.evaluatedRules.find((x) => x.rule === "MinMarketCap");
+    expect(cap?.status).toBe("FAILED");
+    expect(cap?.message).toBe("MinMarketCap_unmeasured");
+  });
+
+  it("sin ADV medido veta MinADV_unmeasured", () => {
+    const r = evaluatePolicyGate({
+      ...passingInput,
+      instrument: {
+        ...passingInput.instrument,
+        averageDailyVolumeUSD: undefined,
+      },
+    });
+    const adv = r.evaluatedRules.find((x) => x.rule === "MinADV");
+    expect(adv?.status).toBe("FAILED");
+    expect(adv?.message).toBe("MinADV_unmeasured");
   });
 
   it("veto por ticker excluido", () => {

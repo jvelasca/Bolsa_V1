@@ -35,7 +35,8 @@ export interface UniverseConstraints {
   /** p.ej. nasdaq100, sp500, europe_large */
   allowedUniverses?: string[];
   minMarketCapUSD?: number;
-  minAverageDailyVolumeUSD: number;
+  /** `null`/ausente = la política no exige mínimo; distinto de "sin dato" (P2 .183). */
+  minAverageDailyVolumeUSD?: number | null;
   maxSpreadBps?: number;
   minAtrPct?: number;
   maxAtrPct?: number;
@@ -118,6 +119,12 @@ export interface TradingPolicyV1 {
   exit?: ExitPolicyV1;
   /** refs a WeightRules versionadas (D6); vacío en D1 */
   weightRuleSetId?: string | null;
+  /**
+   * P2 (auditoría .183): reglas que esta política declara NO medibles todavía. Solo estas
+   * pueden quedar `SKIPPED` por falta de dato (`<Regla>_unmeasured_declared`); el resto
+   * veta con `<Regla>_unmeasured`.
+   */
+  optionalMeasurements?: string[];
   updatedAt: string;
   createdAt: string;
 }

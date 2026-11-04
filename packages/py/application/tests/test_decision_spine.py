@@ -18,6 +18,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from policy_metrics_fakes import MeasuredInstruments
 
 from bolsa_analytics.signals.strategy import SignalEventV1
 from bolsa_application.execution_router import ExecutionRouter
@@ -179,6 +180,8 @@ def _router(summary: _FakePortfolioSummary, trade: _FakeExecuteTrade) -> Executi
         execute_trade=trade,  # type: ignore[arg-type]
         portfolio_summary=summary,  # type: ignore[arg-type]
         profile_store=None,
+        # P2 (auditoría .183): el gate necesita market cap/ADV/sector medidos.
+        instrument_repo=MeasuredInstruments(),  # type: ignore[arg-type]
     )
 
 
@@ -252,6 +255,7 @@ def _router_with_mandates(
         portfolio_summary=summary,  # type: ignore[arg-type]
         profile_store=None,
         mandates=mandates,  # type: ignore[arg-type]
+        instrument_repo=MeasuredInstruments(),  # type: ignore[arg-type]
     )
 
 
@@ -408,6 +412,7 @@ async def test_paper_auto_sanity_lookup_failed_vetoes() -> None:
         profile_store=None,
         mandates=_FakeMandatesOpen("st-1"),  # type: ignore[arg-type]
         instrument_data_status=_FakeInstrumentDataStatusBoom(),
+        instrument_repo=MeasuredInstruments(),  # type: ignore[arg-type]
     )
     await _attach_passing_edge(router)
     result = await router._execute_paper_trade(
@@ -436,6 +441,7 @@ def _router_with_sanity(
         profile_store=None,
         mandates=_FakeMandatesOpen("st-1"),  # type: ignore[arg-type]
         instrument_data_status=_FakeInstrumentDataStatus(warnings),
+        instrument_repo=MeasuredInstruments(),  # type: ignore[arg-type]
     )
 
 

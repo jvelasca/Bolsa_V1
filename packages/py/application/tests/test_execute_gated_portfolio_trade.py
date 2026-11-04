@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 import pytest
+from policy_metrics_fakes import MeasuredInstruments
 
 from bolsa_application.execute_gated_portfolio_trade import (
     ExecuteGatedPortfolioTrade,
@@ -65,6 +66,8 @@ def _uc(*, summary: Any, trade: _FakeExecuteTrade) -> ExecuteGatedPortfolioTrade
     return ExecuteGatedPortfolioTrade(
         trade,  # type: ignore[arg-type]
         portfolio_summary=summary,
+        # P2 (auditoría .183): catálogo que mide market cap/ADV.
+        instruments=MeasuredInstruments(),  # type: ignore[arg-type]
     )
 
 
@@ -367,6 +370,7 @@ async def test_gated_http_buy_persists_manual_position() -> None:
     uc = ExecuteGatedPortfolioTrade(
         trade,  # type: ignore[arg-type]
         portfolio_summary=_AllowSummary(),
+        instruments=MeasuredInstruments(),  # type: ignore[arg-type]
         position_from_fill=PersistPositionFromFill(fill_store),
         position_from_exit=PersistPositionFromExit(_ExitStore()),
     )
@@ -417,6 +421,7 @@ def _uc_with_sanity(*, warnings: tuple[str, ...], trade: _FakeExecuteTrade) -> E
     return ExecuteGatedPortfolioTrade(
         trade,  # type: ignore[arg-type]
         portfolio_summary=_AllowSummary(),
+        instruments=MeasuredInstruments(),  # type: ignore[arg-type]
         ohlcv=_FakeOhlcv(datetime.now(UTC).isoformat()),  # type: ignore[arg-type]
         mandates=_FakeMandatesOpen(),  # type: ignore[arg-type]
         instrument_data_status=_FakeInstrumentDataStatus(warnings),

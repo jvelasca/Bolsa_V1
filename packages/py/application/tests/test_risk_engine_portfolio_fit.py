@@ -32,6 +32,13 @@ def _open(
         equity=equity,
         portfolio_positions=existing,
         proposal_sector=sector,
+        # P2 (auditoría .183): sin estas mediciones el gate no evalúa, veta por
+        # `<Regla>_unmeasured`. El test mide el encaje de cesta, así que el resto del
+        # trade debe llegar medido.
+        market_cap_usd=3e12,
+        average_daily_volume_usd=1e9,
+        account_daily_drawdown_pct=0.0,
+        account_weekly_drawdown_pct=0.0,
     )
 
 

@@ -40,10 +40,24 @@ def test_max_drawdown_pass_under_limit():
     assert all(r.rule != "HardMaxDrawdown" or r.status != "FAILED" for r in gate.evaluated_rules)
 
 
-def test_drawdown_skipped_without_telemetry():
+def test_drawdown_without_telemetry_is_not_verified():
+    """P2 (auditoría .183) — sin telemetría la regla NO se salta en silencio.
+
+    El contrato anterior (SKIPPED, sin motivo) dejaba el circuit breaker muerto: la
+    política exigía un máximo de drawdown y el gate lo daba por bueno sin medirlo.
+    Ahora diario y semanal VETAN con `<Regla>_unmeasured`. ``HardMaxDrawdown`` sigue
+    declarado opcional por la plantilla porque depende de ``initial_deposit``
+    (hallazgo P3, se corrige aparte), pero su ``SKIPPED`` lleva motivo propio.
+    """
     gate = evaluate_policy_gate(MODERATE_POLICY, **_base_kwargs())
-    assert any(r.rule == "HardMaxDrawdown" and r.status == "SKIPPED" for r in gate.evaluated_rules)
-    assert any(r.rule == "HardDailyDrawdown" and r.status == "SKIPPED" for r in gate.evaluated_rules)
+    assert gate.passed is False
+    by_rule = {r.rule: r for r in gate.evaluated_rules}
+    assert by_rule["HardDailyDrawdown"].status == "FAILED"
+    assert by_rule["HardDailyDrawdown"].message == "HardDailyDrawdown_unmeasured"
+    assert by_rule["HardWeeklyDrawdown"].status == "FAILED"
+    assert by_rule["HardWeeklyDrawdown"].message == "HardWeeklyDrawdown_unmeasured"
+    assert by_rule["HardMaxDrawdown"].status == "SKIPPED"
+    assert by_rule["HardMaxDrawdown"].message == "HardMaxDrawdown_unmeasured_declared"
 
 
 def test_weekly_drawdown_veto():

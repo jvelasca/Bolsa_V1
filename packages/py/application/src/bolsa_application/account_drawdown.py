@@ -65,6 +65,15 @@ class EquityMarkBook:
     def export_settings_fragment(self, account_id: str) -> dict[str, Any]:
         return {"equityMarks": dict(self._by_account.get(account_id) or {})}
 
+    def reset(self) -> None:
+        """Olvida todas las marcas (arranque en frío y aislamiento entre tests).
+
+        El libro es estado de PROCESO compartido. Sin este punto de reseteo, el orden de
+        los tests (o un reinicio del proceso) cambiaba la referencia de drawdown de una
+        cuenta y, desde P2, un drawdown heredado veta aperturas legítimas.
+        """
+        self._by_account.clear()
+
     def update(
         self,
         account_id: str,

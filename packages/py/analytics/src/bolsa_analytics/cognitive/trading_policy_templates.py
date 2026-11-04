@@ -22,6 +22,19 @@ from bolsa_analytics.cognitive.trading_policy import (
 
 _NOW = "2026-07-22T00:00:00.000Z"
 
+#: P2 (auditoría .183) — reglas que las plantillas de la casa declaran NO medibles hoy.
+#:
+#: * ``MaxSpreadBps``: no hay fuente de cotización bid/ask en el camino AUTO (el
+#:   ``spread_bps`` del coste es una constante de modelo, no una medición del libro), así
+#:   que exigirla vetaría toda apertura por un dato que el sistema nunca mide.
+#: * ``HardMaxDrawdown``: depende de ``initial_deposit``; sin depósito inicial la marca de
+#:   máximo no es comparable. Es el hallazgo **P3**, que se corrige aparte.
+#:
+#: Todo lo demás queda ESTRICTO: si falta market cap, ADV, sector o drawdown diario, el
+#: gate veta con ``<Regla>_unmeasured``. Declarar aquí es una decisión explícita y
+#: auditable; no declarar nada es el modo estricto.
+OPTIONAL_MEASUREMENTS: tuple[str, ...] = ("MaxSpreadBps", "HardMaxDrawdown")
+
 
 CONSERVATIVE_POLICY = TradingPolicy(
     policy_id="POL-CONSERVATIVE-V1",
@@ -91,6 +104,7 @@ CONSERVATIVE_POLICY = TradingPolicy(
     exit_policy=CONSERVATIVE_EXIT_POLICY,
     updated_at=_NOW,
     created_at=_NOW,
+    optional_measurements=OPTIONAL_MEASUREMENTS,
 )
 
 MODERATE_POLICY = TradingPolicy(
@@ -160,6 +174,7 @@ MODERATE_POLICY = TradingPolicy(
     exit_policy=MODERATE_EXIT_POLICY,
     updated_at=_NOW,
     created_at=_NOW,
+    optional_measurements=OPTIONAL_MEASUREMENTS,
 )
 
 AGGRESSIVE_SWING_POLICY = TradingPolicy(
@@ -228,6 +243,7 @@ AGGRESSIVE_SWING_POLICY = TradingPolicy(
     exit_policy=AGGRESSIVE_SWING_EXIT_POLICY,
     updated_at=_NOW,
     created_at=_NOW,
+    optional_measurements=OPTIONAL_MEASUREMENTS,
 )
 
 POLICY_TEMPLATES: dict[str, TradingPolicy] = {
