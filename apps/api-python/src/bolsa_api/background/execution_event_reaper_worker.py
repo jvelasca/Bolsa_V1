@@ -30,6 +30,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_application.execution_event import reap_stale_applying
+from bolsa_application.flags import env_flag
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,8 @@ LEASE_GRACE_SECONDS = 30
 
 
 def _worker_enabled() -> bool:
-    raw = (os.getenv(_ENV_ENABLED) or "1").strip().lower()
-    return raw not in {"0", "false", "no", "off"}
+    # P1 (auditoría .183): lista blanca con default ON declarado.
+    return env_flag(_ENV_ENABLED, default=True)
 
 
 def _owner_identity() -> str:

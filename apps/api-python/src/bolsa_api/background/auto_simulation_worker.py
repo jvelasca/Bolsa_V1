@@ -266,6 +266,7 @@ from bolsa_application.execution_event import (
     ExecutionEventStore,
 )
 from bolsa_application.exit_order_store import ExitOrderStore
+from bolsa_application.flags import env_flag
 from bolsa_application.kill_switch_store import KillState, KillSwitchStore
 from bolsa_application.operative_granularity_policy import resolve_operative_granularity
 from bolsa_application.position_manager import (
@@ -435,14 +436,12 @@ def settlement_snapshot_from_fills(fills: Sequence[Any]) -> dict[str, Any] | Non
 
 
 def sim_worker_enabled() -> bool:
-    """Env de habilitación (default OFF) del worker SIM-ONLY de A9/M5."""
-    return (os.getenv(AUTO_SIM_WORKER_ENABLED) or "").strip().lower() not in {
-        "",
-        "0",
-        "false",
-        "no",
-        "off",
-    }
+    """Env de habilitación (default OFF) del worker SIM-ONLY de A9/M5.
+
+    P1 (auditoría .183): lista blanca. ``disabled``/``n``/``of`` ya NO encienden AUTO;
+    un valor desconocido deja el default OFF y avisa con el valor crudo.
+    """
+    return env_flag(AUTO_SIM_WORKER_ENABLED, default=False)
 
 
 #: W4 (v2.88.17): interruptor DECLARADO del precio REAL. Default **OFF** ⇒ el runtime conserva
@@ -454,14 +453,13 @@ AUTO_REAL_PRICE_ENV = "AUTO_ENGINE_SIM_REAL_PRICE"
 
 
 def real_price_enabled() -> bool:
-    """¿Está habilitado el proveedor de precio REAL? (default OFF = costura inerte)."""
-    return (os.getenv(AUTO_REAL_PRICE_ENV) or "").strip().lower() not in {
-        "",
-        "0",
-        "false",
-        "no",
-        "off",
-    }
+    """¿Está habilitado el proveedor de precio REAL? (default OFF = costura inerte).
+
+    P1 (auditoría .183): lista blanca, igual que ``sim_worker_enabled``. Que un valor
+    basura encienda el precio real era el peor caso del fail-open: cambia de dónde sale
+    el precio de ejecución.
+    """
+    return env_flag(AUTO_REAL_PRICE_ENV, default=False)
 
 
 # ── Base de coste de una ADOPCIÓN (W-159-2 · C-4) ───────────────────────────────

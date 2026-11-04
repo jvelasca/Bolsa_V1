@@ -30,6 +30,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from bolsa_application.flags import env_flag
 from bolsa_application.live_order_query import LiveOrderQueryPort
 from bolsa_application.live_order_store import PostgresLiveOrderStore
 from bolsa_domain.errors import PermanentRejectionError
@@ -72,8 +73,8 @@ def _worker_identity() -> str:
 
 
 def _worker_enabled() -> bool:
-    raw = (os.getenv(_ENV_ENABLED) or "1").strip().lower()
-    return raw not in {"0", "false", "no", "off"}
+    # P1 (auditoría .183): lista blanca con default ON declarado.
+    return env_flag(_ENV_ENABLED, default=True)
 
 
 # V2.19 (P2-01/C3) — go fail-closed del apply financiero en el recovery.

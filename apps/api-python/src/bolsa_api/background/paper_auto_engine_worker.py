@@ -54,6 +54,7 @@ from bolsa_application.decision_contract import (
     derive_execution_plan,
     risk_gate_auto_paper_dry,
 )
+from bolsa_application.flags import env_flag
 from bolsa_application.paper_desk_entry import EstudioListPort
 
 logger = logging.getLogger(__name__)
@@ -94,7 +95,13 @@ def _prefer_sim(name_sim: str, name_dry: str) -> str | None:
 
 
 def _env_on(name: str) -> bool:
-    return (os.getenv(name) or "").strip().lower() not in {"", "0", "false", "no", "off"}
+    """Alias histórico del flag con lista blanca (auditoría P1).
+
+    El patrón anterior (``not in {"", "0", "false", "no", "off"}``) encendía con
+    cualquier valor no reconocido; ahora solo ``1/true/yes/on`` enciende y el resto deja
+    el default de cada interruptor.
+    """
+    return env_flag(name, default=False)
 
 
 def _enabled() -> bool:
