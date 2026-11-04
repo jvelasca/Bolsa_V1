@@ -111,6 +111,10 @@ RESERVATION_UNMEASURABLE = "reservation_unmeasurable"
 # AUTO-1b — no se apila un segundo compromiso sobre un instrumento ya reservado.
 RESERVATION_ALREADY_LIVE = "reservation_already_live"
 
+# P7 (auditoría .183) — otro PROCESO es el dueño del lease del motor: este runtime no
+# conduce el turno. El motivo se declara en vez de dejar el ``idle`` por defecto.
+LEASE_NOT_HELD = "lease_not_held"
+
 # D-1 (auditoría 2) — handoff ESTUDIO → AUTO: la geometría que publicó el parte NO es
 # ejecutable al precio VIVO del tick (mercado en/por debajo del stop, objetivo alcanzado o
 # divergencia fuera de tolerancia). Veto de ENTRADA con motivo propio: sin él la orden se

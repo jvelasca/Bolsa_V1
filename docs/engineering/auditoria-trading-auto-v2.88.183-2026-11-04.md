@@ -12,8 +12,11 @@
 > Postgres, ni los E2E, ni se comprobó el número de workers del despliegue.
 > **Trazabilidad de las correcciones:** `P1`, `P2`, `P4` y `P9` se cierran en la rama
 > `fix/auto-fail-closed-p1-p2-p4-p9` (flags con lista blanca, `<Regla>_unmeasured`, `DataGatePolicy.require_evidence`
-> y normalizador finito en `bolsa_domain`). `P3`, `P5`-`P8`, la severidad media `M*` y `S1`-`S10` quedan abiertos:
-> este documento sigue siendo el snapshot del estado auditado, no el estado corregido.
+> y normalizador finito en `bolsa_domain`). `P5` y `P6` se cierran en la PR
+> [#78](https://github.com/jvelasca/Bolsa_V1/pull/78) (`fix/auto-p5-p6-persistence`). `P7` y `P8` se cierran en la
+> rama `fix/auto-p7p8-crossprocess-lease` (lease durable por `engine_id`, migración `063_auto_engine_lease`, claim
+> del ciclo ANTES de ejecutar y reconstrucción de `_open` al cambiar de generación). `P3`, la severidad media `M*` y
+> `S1`-`S10` quedan abiertos: este documento sigue siendo el snapshot del estado auditado, no el estado corregido.
 
 Alcance detallado: lógica de decisión, riesgo, ejecución, workers AUTO, `auto_simulation_worker.py` (9.802 líneas) y lógica de estrategia y señales.
 Modo: solo lectura. No se modificó el repositorio. Las referencias `archivo:línea` son del tag `v2.88.183-beta`.
@@ -72,11 +75,13 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 - **Dónde:** `auto_sim_loop` (`:9224-9269`), `paper_auto_engine_loop`.
 - **Fallo:** los schedulers usan advisory lock; estos loops no. Dentro del mismo proceso, `run_tick()` no está serializado y muta estado compartido (`_open`, stores sustituidos temporalmente; `:8330-8450`).
 - **Debería ser:** `asyncio.Lock` por runtime, y advisory lock o lease en BD por `engine_id`, con un único líder si hay varios workers.
+- **Cerrado (`fix/auto-p7p8-crossprocess-lease`):** `AutoSimRuntime` serializa con `asyncio.Lock` y arbitra entre procesos con un **lease durable** en `auto_engine_runs` (migración `063_auto_engine_lease`: `lease_owner`, `lease_generation`, `lease_expires_at`), adquirido por CAS atómico (`UPDATE … WHERE lease_owner IS NULL OR lease_expires_at <= now()`) y renovado antes de cada turno. El que no es dueño **no ejecuta** y **declara** `lease_not_held`. `lease_generation` es valla (fence) de escritura: un tick del dueño anterior lanza `AutoEngineLeaseLost` y se descarta; al cambiar de generación el worker exige `readopt_positions()` en vez de heredar `_open` de otra RAM. El apagado ordenado suelta el lease (`AutoSimRuntime.close()` desde el `finally` del loop); un crash lo deja vencer por TTL (`AUTO_ENGINE_LEASE_TTL_SECONDS`, default 180 s).
 
 ### P8 — Idempotencia de tick no es idempotencia de ciclo · 🟠 Alta · Por lectura
 - **Dónde:** `auto_engine_state_store.py:204-331`.
 - **Fallo:** se deduplica `(engine_id, seq)` tras ejecutar. El estado `_open` vive en RAM (`:8351-8353`, `:9330-9337`).
 - **Debería ser:** clave `(engine, barra lógica)` reclamada antes de ejecutar; estado derivado reconstruible desde eventos durables.
+- **Cerrado (`fix/auto-p7p8-crossprocess-lease`):** el `seq` y la identidad del ciclo (`tick_id = cycle-<engine>-<barra>-<seq>`) se **reservan antes** de ejecutar (`claim_cycle`, `reason='cycle_claimed'`), y el cierre **liquida esa fila** con los totales del turno en vez de crear otra. **Desvío declarado y medido de la auditoría:** la clave es `(engine, seq)`, no `(engine, barra)`: el reloj de decisión es `1d` y el motor ticka varias veces dentro de la MISMA barra (stops, gestión, salidas), así que bloquear por barra pararía el motor el resto del día; la idempotencia del ciclo la dan el lease, la señal consumida y la posición readoptada. Un ciclo interrumpido deja su fila `cycle_claimed` como traza y el siguiente proceso reanuda en `seq + 1`.
 
 ### P9 — Precios, cantidades y configuración no finitos · 🟠 Alta · Reproducido (parcial) y por lectura
 - **Dónde:** `:2150-2199` (precios exec/mid/low/high), `:2561`, `:2956`, `:3112` (marks y señales), `:3299-3317` (liquidez), `:7659` (precio), `:7753` (cantidad), `:536-550` (`STOP_PCT` etc.), `:9574` (`AUTO_ENGINE_SIM_LOT_QTY`), `:9799-9802` (intervalo). También `exit_order.py:119`, `open_order.py:65`, `risk_allocator.py` con `inf`.
