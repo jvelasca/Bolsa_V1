@@ -36,15 +36,15 @@ import time
 from dataclasses import dataclass, replace
 from typing import Any, Literal, cast
 
-# P9 (auditoría .183): normalizador canónico del dominio (``isfinite``), no una copia que
-# aceptaba ``inf``.
-from bolsa_domain.numeric import finite_float as _finite
-
 from bolsa_analytics.cognitive.position_ledger import (
     SIDE_BUY,
     SIDE_SELL,
     normalize_side,
 )
+
+# P9 (auditoría .183): normalizador canónico del dominio (``isfinite``), no una copia que
+# aceptaba ``inf``.
+from bolsa_domain.numeric import finite_float as _finite
 
 #: Ciclo de vida del INTENT de salida (contrato con el journal y el store).
 ExitOrderState = Literal[

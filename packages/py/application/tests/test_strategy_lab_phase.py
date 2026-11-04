@@ -10,14 +10,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from bolsa_domain.entities.strategy_lifecycle import GateStatus, StrategyCandidate
-
 from bolsa_application.strategy_lab_phase import (
     LabThresholds,
     build_estudio_candidates,
     evaluate_optimize_result,
     gate_from_metrics,
 )
+from bolsa_domain.entities.strategy_lifecycle import GateStatus, StrategyCandidate
 
 
 @dataclass

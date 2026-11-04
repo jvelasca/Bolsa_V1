@@ -34,16 +34,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-# P9 (auditoría .183): normalizadores canónicos del dominio (``isfinite``), no copias que
-# aceptaban ``inf``.
-from bolsa_domain.numeric import finite_float as _finite
-from bolsa_domain.numeric import finite_positive as _finite_positive
-
 from bolsa_analytics.cognitive.portfolio_reservation import (
     TradingCost,
     TradingCostModel,
     estimate_trading_cost,
 )
+
+# P9 (auditoría .183): normalizadores canónicos del dominio (``isfinite``), no copias que
+# aceptaban ``inf``.
+from bolsa_domain.numeric import finite_float as _finite
+from bolsa_domain.numeric import finite_positive as _finite_positive
 
 TradePlanDirection = Literal["long", "short", "none"]
 
