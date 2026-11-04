@@ -57,6 +57,9 @@ from bolsa_application.decision_contract import (
 from bolsa_application.flags import env_flag
 from bolsa_application.paper_desk_entry import EstudioListPort
 
+# P9 (auditoría .183): un intervalo ``Infinity``/``NaN`` no es configuración válida.
+from bolsa_domain.numeric import finite_float
+
 logger = logging.getLogger(__name__)
 
 TICK_SECONDS = 60
@@ -124,10 +127,14 @@ def _watch_from_estudio_enabled() -> bool:
 
 def _interval_seconds(default: float) -> float:
     raw = (_prefer_sim(_ENV_SIM_INTERVAL, _ENV_INTERVAL) or "").strip()
-    try:
-        return float(raw) if raw and float(raw) > 0 else default
-    except ValueError:
+    if not raw:
         return default
+    # P9: ``Infinity``/``NaN`` no son intervalos; se declara el valor crudo y se usa el default.
+    value = finite_float(raw)
+    if value is None or value <= 0:
+        logger.warning("paper auto interval %r no es un numero finito > 0; se usa %r", raw, default)
+        return default
+    return value
 
 
 # V2.88.123 / S2: cache del watch canónico (universo ESTUDIO ∩ allowlist). Solo se

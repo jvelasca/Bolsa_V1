@@ -13,6 +13,10 @@ from uuid import uuid4
 
 from bolsa_analytics.cognitive.exit_plan import ExitPlan, ExitReason, ExitSuggestedAction
 
+# P9 (auditoría .183): normalizador canónico del dominio (``isfinite``), no una copia que
+# aceptaba ``inf``.
+from bolsa_domain.numeric import finite_positive as _finite_positive
+
 ExecutionVenue = Literal["PAPER", "BROKER"]
 ExecutionPlanStatus = Literal[
     "DRAFT",
@@ -30,14 +34,8 @@ TradePlanDirection = Literal["long", "short", "none"]
 EXECUTION_PLAN_KEY = "executionPlan"
 
 
-def _finite_positive(value: object) -> float | None:
-    try:
-        number = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-    if number != number or number <= 0:
-        return None
-    return number
+# P9 (auditoría .183): normalizador canónico del dominio (``isfinite``), no una copia que
+# aceptaba ``inf``.
 
 
 def _round4(value: float) -> float:

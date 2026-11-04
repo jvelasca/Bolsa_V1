@@ -57,6 +57,11 @@ from bolsa_analytics.cognitive.measurement import (
 )
 from bolsa_domain.account_settings import AccountSettings, calculate_trade_fees
 
+# P9 (auditoría .183): normalizadores canónicos del dominio (``isfinite``), no copias que
+# aceptaban ``inf``.
+from bolsa_domain.numeric import finite_float as _finite
+from bolsa_domain.numeric import finite_positive as _finite_positive
+
 SIDE_BUY = "buy"
 SIDE_SELL = "sell"
 
@@ -107,23 +112,8 @@ _RESERVATION_EVENT_KINDS: frozenset[str] = frozenset(
 _QTY_EPS = 1e-9
 
 
-def _finite(value: Any) -> float | None:
-    if value is None or isinstance(value, bool):
-        return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    if number != number:
-        return None
-    return number
-
-
-def _finite_positive(value: Any) -> float | None:
-    number = _finite(value)
-    if number is None or number <= 0:
-        return None
-    return number
+# P9 (auditoría .183): normalizadores canónicos del dominio (``isfinite``), no copias que
+# aceptaban ``inf``.
 
 
 def _non_negative(value: Any) -> float | None:

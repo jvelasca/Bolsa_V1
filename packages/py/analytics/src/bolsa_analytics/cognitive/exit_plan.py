@@ -7,7 +7,6 @@ Thin exitRadar / trail / protect siguen advisory aparte; este módulo
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
@@ -15,6 +14,11 @@ from uuid import uuid4
 
 from bolsa_analytics.cognitive.exit_policy import ExitPolicy, suggestion_from_exit_policy
 from bolsa_analytics.cognitive.position_state import PositionState
+
+# P9 (auditoría .183): normalizador canónico del dominio; el local ya era finito, se unifica
+# para que el camino de dinero tenga UNA sola respuesta.
+from bolsa_domain.numeric import finite_float as _finite
+from bolsa_domain.numeric import finite_positive as _finite_positive
 
 ExitReason = Literal[
     "KILL_SWITCH",
@@ -101,22 +105,8 @@ PROTECTIVE_EXIT_REASONS: frozenset[ExitReason] = frozenset(
 )
 
 
-def _finite(value: object) -> float | None:
-    """Número finito (admite signo). ``nan``/``inf`` no son hechos utilizables."""
-    try:
-        number = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-    if not math.isfinite(number):
-        return None
-    return number
-
-
-def _finite_positive(value: object) -> float | None:
-    number = _finite(value)
-    if number is None or number <= 0:
-        return None
-    return number
+# P9 (auditoría .183): normalizador canónico del dominio; el local ya era finito, se unifica
+# para que el camino de dinero tenga UNA sola respuesta.
 
 
 def _now_iso(at: str | None = None) -> str:
