@@ -3767,7 +3767,9 @@ class AutoSimulationWorker:
                 continue
             # OBS-14.b — ``save_claim`` ganado: esta sesión es la DUEÑA del compromiso y
             # es la única con autoridad para retirarlo al cerrar SU turno.
-            self._v2_owned_reservations.add(reservation.reservation_id)
+            # M5: la propiedad se REGISTRA tras el commit (abajo), no aquí: un ``save_claim``
+            # ganado que no llegue a commitear no es un compromiso de nadie. Declararse dueño
+            # de una reserva inexistente hacía que el cierre de turno intentara retirarla.
             persisted.append(reservation)
         try:
             await store.commit()
@@ -3776,7 +3778,14 @@ class AutoSimulationWorker:
             # M5: no se asume autocommit. Lo no confirmado no cuenta como reservado y su
             # instrumento queda vetado este turno (fail-closed).
             blocked.update(row.instrument_id for row in persisted)
+            # M5: los claims GANADOS que no llegaron a ser durables NO se publican como
+            # hechos: el journal afirmaría la propiedad de un capital que no está reservado
+            # y el monitor de concurrencia leería un dueño que no existe en el libro. Las
+            # carreras PERDIDAS sí se publican (ocurrieron antes y sin depender del commit).
+            claim_audits = [(row, won) for row, won in claim_audits if not won]
             persisted = []
+        # M5: solo ahora (compromiso confirmado) esta sesión es dueña de las reservas.
+        self._v2_owned_reservations.update(row.reservation_id for row in persisted)
         # AUTO-10 — el ciclo que acaba de abrir deja su régimen en el journal DURABLE. Se
         # publica DESPUÉS del commit de la reserva: primero el compromiso de capital, después
         # la traza (si la traza falla, el dinero sigue comprometido y el hueco se declara).
