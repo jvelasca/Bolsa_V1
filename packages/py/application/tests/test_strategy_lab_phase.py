@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+import pytest
+
 from bolsa_application.strategy_lab_phase import (
     LabThresholds,
     build_estudio_candidates,
@@ -256,3 +258,88 @@ def test_s2_risk_not_evaluated_without_trade_count() -> None:
 def test_s2_risk_passes_and_min_trades_zero_disables_sample_gate() -> None:
     assert _risk_gate(5.0, 100).status == GateStatus.PASS
     assert _risk_gate(5.0, None, min_trades=0).status == GateStatus.PASS
+
+
+# ── S3 (auditoría .183): universo probado y corrección por pruebas múltiples ─────────
+
+
+def _s3_result(*, trials: int, dsr: float) -> _Result:
+    return _Result(
+        trials=[
+            _Trial(score=1.0 + index * 0.01, oos_metrics={"score": 0.8}, max_drawdown_pct=4.0)
+            for index in range(trials)
+        ],
+        cpcv={"pbo": 0.1},
+        pbo={"pbo": 0.1},
+        walk_forward={"walkForwardEfficiency": 0.7},
+        edge_report={"dsr": dsr, "suite": {"sampleTradesCount": 60}},
+    )
+
+
+def _s3_gate(*, trials: int, dsr: float, **th: Any) -> Any:
+    evaluation = evaluate_optimize_result(
+        candidate=_candidate(),
+        result=_s3_result(trials=trials, dsr=dsr),
+        thresholds=LabThresholds(**th),
+    )
+    return evaluation, {g.gate: g for g in evaluation.gates}["dsr"]
+
+
+def test_s3_registers_the_trials_universe_without_correction() -> None:
+    """El universo probado se declara SIEMPRE: es lo que hace interpretable el DSR."""
+    evaluation, dsr_gate = _s3_gate(trials=7, dsr=0.8)
+
+    assert evaluation.metrics["discovery_trials"] == 7
+    assert evaluation.metrics["multiple_testing_correction"] == "none"
+    assert evaluation.metrics["dsr_min"] == 0.7
+    assert dsr_gate.metrics["trials"] == 7
+    assert dsr_gate.detail == "dsr_ok"
+
+
+def test_s3_flag_corrects_the_dsr_threshold_bonferroni_style() -> None:
+    """10 configuraciones probadas ⇒ alpha por hipótesis 0.3/10 ⇒ umbral DSR 0.97."""
+    evaluation, dsr_gate = _s3_gate(trials=10, dsr=0.9, correct_multiple_testing=True)
+
+    assert evaluation.metrics["multiple_testing_correction"] == "bonferroni"
+    assert evaluation.metrics["dsr_min"] == pytest.approx(0.97)
+    assert dsr_gate.metrics["dsr_min"] == pytest.approx(0.97)
+    # El MISMO DSR que pasaba sin corrección ahora no alcanza: el campeón elegido entre
+    # diez configuraciones no se juzga con el nivel de una sola.
+    assert dsr_gate.status == GateStatus.FAIL
+    assert dsr_gate.detail == "dsr_bajo_bonferroni"
+
+    _, without_flag = _s3_gate(trials=10, dsr=0.9)
+    assert without_flag.status == GateStatus.PASS
+
+
+def test_s3_single_trial_is_never_corrected() -> None:
+    """Con una sola hipótesis la corrección es la identidad: el umbral no se mueve."""
+    evaluation, dsr_gate = _s3_gate(trials=1, dsr=0.75, correct_multiple_testing=True)
+
+    assert evaluation.metrics["discovery_trials"] == 1
+    assert evaluation.metrics["multiple_testing_correction"] == "none"
+    assert evaluation.metrics["dsr_min"] == pytest.approx(0.7)
+    assert dsr_gate.status == GateStatus.PASS
+
+
+def test_s3_correction_is_monotone_in_the_universe_size() -> None:
+    from bolsa_application.strategy_lab_phase import multiple_testing_correction
+
+    _, few = multiple_testing_correction(min_dsr=0.7, trials_n=5, enabled=True)
+    _, many = multiple_testing_correction(min_dsr=0.7, trials_n=500, enabled=True)
+    assert 0.7 < few < many <= 1.0
+    # Sin flag el umbral es exactamente el declarado, sea cual sea el universo.
+    name, plain = multiple_testing_correction(min_dsr=0.7, trials_n=500, enabled=False)
+    assert (name, plain) == ("none", 0.7)
+
+
+def test_s3_missing_dsr_stays_not_evaluated_but_registers_the_universe() -> None:
+    result = _Result(
+        trials=[_Trial(score=1.0, oos_metrics={"score": 0.8})],
+        cpcv={"pbo": 0.1},
+        pbo={"pbo": 0.1},
+    )
+    evaluation = evaluate_optimize_result(candidate=_candidate(), result=result)
+    by_gate = {g.gate: g for g in evaluation.gates}
+    assert by_gate["dsr"].status == GateStatus.NOT_EVALUATED
+    assert evaluation.metrics["discovery_trials"] == 1

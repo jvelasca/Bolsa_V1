@@ -358,6 +358,18 @@ def test_lab_thresholds_dsr_calibrated(monkeypatch: pytest.MonkeyPatch) -> None:
     assert w._lab_thresholds().min_dsr == 0.7
 
 
+def test_lab_multiple_testing_correction_defaults_off_and_is_reversible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """S3: la corrección por pruebas múltiples se enciende SOLO con el flag explícito."""
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING, raising=False)
+    assert w._lab_thresholds().correct_multiple_testing is False
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING, "1")
+    assert w._lab_thresholds().correct_multiple_testing is True
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING, "0")
+    assert w._lab_thresholds().correct_multiple_testing is False
+
+
 # ── V2.33/A13: forward paper (default OFF, reversible) ───────────────────────────
 
 

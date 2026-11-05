@@ -133,6 +133,11 @@ AUTO_ORCHESTRATOR_HEALTH_MIN_DSR = "AUTO_ORCHESTRATOR_HEALTH_MIN_DSR"
 AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY = "AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY"
 # V2.88 (DSR gate exigible): umbral de promoción DSR del LAB (anti-overfit).
 AUTO_ORCHESTRATOR_LAB_MIN_DSR = "AUTO_ORCHESTRATOR_LAB_MIN_DSR"
+# S3 (auditoría .183): corrección por pruebas múltiples del campeón del LAB. Default OFF:
+# con un solo trial es la identidad y encenderla es una decisión explícita del operador.
+AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING = (
+    "AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING"
+)
 
 
 def _truthy(raw: str | None) -> bool:
@@ -561,6 +566,11 @@ def _lab_thresholds() -> Any:
     ``min_dsr`` manda sobre el gate ``dsr`` del Promotion Gate: con el default 0.7,
     una estrategia con DSR inferior queda fuera de la promoción (fail-closed). Ajustable
     por env ``AUTO_ORCHESTRATOR_LAB_MIN_DSR``; si no se fija, conserva el default.
+
+    S3 (auditoría .183): ``AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING`` enciende la
+    corrección de Bonferroni sobre el umbral DSR según el número de configuraciones
+    probadas (``result.trials``). Default OFF: el universo se registra igual, pero el
+    umbral no cambia hasta que el operador lo pida.
     """
     from bolsa_application.strategy_lab_phase import LabThresholds
 
@@ -572,6 +582,9 @@ def _lab_thresholds() -> Any:
         min_dsr=_float_env(AUTO_ORCHESTRATOR_LAB_MIN_DSR, 0.7),
         max_drawdown_pct=_float_env("AUTO_ORCHESTRATOR_LAB_MAX_DRAWDOWN_PCT", base.max_drawdown_pct),
         min_trades=int(_float_env("AUTO_ORCHESTRATOR_LAB_MIN_TRADES", float(base.min_trades))),
+        correct_multiple_testing=_truthy(
+            os.getenv(AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING)
+        ),
     )
 
 

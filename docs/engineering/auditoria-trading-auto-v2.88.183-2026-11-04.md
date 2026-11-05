@@ -142,7 +142,7 @@ Fuente: lectura de módulos de señales, ciclo de vida y promoción. No verifica
 ### Alta
 - **S1 — La máquina de estados admite `PROMOCION → ACTIVE` sin comprobar gates** (`strategy_lifecycle.py:769-770`, `can_transition` devuelve `allowed=True`). `evaluate_promotion()` sí exige los siete gates, COACH sin veto y shadow, pero un llamador directo puede saltárselos. **Debería ser:** que la transición exija `validation.passed`, COACH y shadow, centralizada en el resultado de `evaluate_promotion()`.
 - **S2 — Umbrales de LAB triviales por defecto:** `min_oos_score=0.0`, `min_wfe=0.0`, `max_pbo=1.0`, y el gate de riesgo solo exige `max_drawdown_pct >= 0` (`strategy_lab_phase.py:228-235`, `:356-365`). **Debería ser:** umbrales no triviales, límite máximo de drawdown, muestra mínima de operaciones y retorno neto de costes.
-- **S3 — Sin corrección por pruebas múltiples en discovery** (`strategy_lab_phase.py:237-305`): se elige un campeón y se evalúa su OOS sin registrar el número de configuraciones. Riesgo de data snooping. **Debería ser:** registrar el universo probado y aplicar DSR, PBO o un hold-out intocable.
+- **S3 — Sin corrección por pruebas múltiples en discovery** (`strategy_lab_phase.py:237-305`): se elige un campeón y se evalúa su OOS sin registrar el número de configuraciones. Riesgo de data snooping. **Debería ser:** registrar el universo probado y aplicar DSR, PBO o un hold-out intocable. · **✅ Cerrado (`fix/auto-s3-multiple-testing`)** — ver cierre al final de la sección.
 - **S4 — Lookahead potencial por contrato:** `SignalEventV1` publica la señal con `closes[index]` y el timestamp de la barra `t` (`rules_engine.py:639-692`). El simulador lo evita (`rules_grid.py:91-96`: señal en `index-1`, ejecución al `open(index)`). El worker usa la barra cerrada anterior para decidir y el `open` actual para ejecutar, lo cual es correcto, pero el contrato general no lo impone. **Debería ser:** `signal_bar=t` y `execution_bar=t+1` explícitos en el contrato.
 
 ### Media
@@ -158,6 +158,12 @@ Fuente: lectura de módulos de señales, ciclo de vida y promoción. No verifica
 - El cruce usa `<=`/`>=` en la barra previa, así que la igualdad cuenta como cruce (`rules_engine.py:246-263`).
 - Las métricas observadas usan una única cola FIFO para todos los instrumentos (`strategy_observed_metrics.py:116-125`).
 - `profit_factor` sin pérdidas devuelve `None`, indistinguible de "no medido".
+
+### Cierres de la sección de estrategia
+
+#### S3 — Universo probado registrado y corrección por pruebas múltiples · ✅ Cerrado (`fix/auto-s3-multiple-testing`)
+- **Fallo:** el LAB traducía el campeón a gates sin dejar constancia de cuántas configuraciones se habían probado. El gate `dsr` comparaba el Deflated Sharpe con `min_dsr` como si el campeón fuera la única hipótesis: con N configuraciones probadas, exigir el mismo nivel de significación es *data snooping*, y a posteriori el DSR era ininterpretable porque nadie sabía el N.
+- **Cerrado:** toda `StrategyEvaluation` publica en `metrics` el universo probado —`discovery_trials` (configuraciones evaluadas por el optimizador, `len(result.trials)`)— junto con `multiple_testing_correction` y el umbral efectivo `dsr_min`; el gate `dsr` lleva los mismos tres datos. La corrección de Bonferroni (`multiple_testing_correction()`) reparte el nivel de significación `alpha = 1 - min_dsr` entre las N hipótesis ⇒ `umbral' = 1 - alpha/N`, es monótona en N y es la identidad con N ≤ 1. Se aplica **con flag** (`LabThresholds.correct_multiple_testing`, env `AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING`, default OFF): el registro es siempre, el endurecimiento del umbral es una decisión explícita y reversible.
 
 ---
 
