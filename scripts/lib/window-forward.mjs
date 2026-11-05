@@ -859,10 +859,18 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-11-05 — pin del arbol re-anclado a `3e092888`
+ * (`apps` `7a8077163e5a8904f06b46e1cda67294a90b95a4` / `packages` `cf261bc0a34ec0657a2f8b97d8a4e2b6919218f8`).
+ * Motivo: pin operativo en la punta verde de fix/059-060-proveedores (3e092888, con 065); el sello SemVer espera a #96/#97
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'ccdb69a1',
-  appsHash: '5526ee9fafae0fe79d0d2576c4e6babddbee98f5',
-  packagesHash: '8bcbd92d69b106833ab765cc4a5fd28fb3b30893',
+  commit: '3e092888',
+  appsHash: '7a8077163e5a8904f06b46e1cda67294a90b95a4',
+  packagesHash: 'cf261bc0a34ec0657a2f8b97d8a4e2b6919218f8',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
