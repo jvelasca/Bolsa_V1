@@ -2981,6 +2981,16 @@ class AutoEngineIntentRow(Base):
     """
 
     __tablename__ = "auto_engine_intent"
+    # La restricción es parte del contrato, no un detalle de la migración: un
+    # ``desired_state`` fuera de ``ON``/``OFF`` no es una decisión y no debe poder
+    # escribirse. Declararla en el modelo mantiene ``Base.metadata`` y la base en sincronía
+    # (``test_schema_drift_gate_pg``).
+    __table_args__ = (
+        CheckConstraint(
+            "desired_state IN ('ON', 'OFF')",
+            name="auto_engine_intent_desired_state_ck",
+        ),
+    )
 
     account_id: Mapped[str] = mapped_column("account_id", String, primary_key=True)
     engine_id: Mapped[str] = mapped_column("engine_id", String, primary_key=True)
