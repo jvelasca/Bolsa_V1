@@ -6,9 +6,11 @@ from bolsa_domain.entities.strategy_lifecycle import (
     PROMOTION_GATES,
     CoachAssessment,
     GateResult,
+    GateStatus,
     ShadowValidationResult,
     StrategyLifecycleState,
     StrategyValidation,
+    can_advance_to,
     can_transition,
 )
 
@@ -74,7 +76,90 @@ def test_s5_required_gates_must_be_present() -> None:
     )
     assert not blocked.allowed
     assert "oos" in blocked.reasons[0]
+    # S5: `required_gates` solo AÑADE. La tabla del dominio ya exige `robustness` para
+    # entrar en TOP3, así que un llamador no puede rebajar la exigencia a "backtest".
     ok = can_transition(
         state=StrategyLifecycleState.LABORATORIO, gates=gates, required_gates=("backtest",)
     )
+    assert not ok.allowed
+    assert "robustness" in ok.reasons[0]
+
+
+def test_s5_state_table_cannot_be_lowered_by_the_caller() -> None:
+    """La fase exige los gates de `REQUIRED_GATES_BY_STATE`, no los que elija el llamador."""
+    only_backtest = (GateResult.passed_gate("backtest"),)
+    for state, needed in (
+        (StrategyLifecycleState.TOP3, "robustness"),
+        (StrategyLifecycleState.COACH, "robustness"),
+        (StrategyLifecycleState.FINALISTA, "oos"),
+    ):
+        result = can_transition(state=state, gates=only_backtest)
+        assert not result.allowed, f"{state} no debe cruzar solo con backtest"
+        assert needed in result.reasons[0], result.reasons
+
+
+def test_s5_not_evaluated_gate_blocks_the_phase() -> None:
+    """`NOT_EVALUATED` no es PASS: un gate requerido sin evaluar bloquea la fase."""
+    result = can_transition(
+        state=StrategyLifecycleState.LABORATORIO,
+        gates=(
+            GateResult.passed_gate("backtest"),
+            GateResult(gate="robustness", status=GateStatus.NOT_EVALUATED),
+        ),
+    )
+    assert not result.allowed
+    assert "robustness" in result.reasons[0]
+
+
+def test_s5_can_advance_to_walks_the_whole_funnel() -> None:
+    """Un ciclo real cruza varias fases: se exige la evidencia de TODAS, no de la última."""
+    full = tuple(
+        GateResult.passed_gate(g) for g in ("backtest", "robustness", "walk_forward", "oos")
+    )
+    ok = can_advance_to(
+        current=StrategyLifecycleState.ESTUDIO,
+        target=StrategyLifecycleState.FINALISTA,
+        gates=full,
+    )
     assert ok.allowed
+    assert ok.to_state == StrategyLifecycleState.FINALISTA
+
+    short = tuple(GateResult.passed_gate(g) for g in ("backtest", "robustness"))
+    blocked = can_advance_to(
+        current=StrategyLifecycleState.ESTUDIO,
+        target=StrategyLifecycleState.FINALISTA,
+        gates=short,
+    )
+    assert not blocked.allowed
+    assert "walk_forward" in blocked.reasons[0]
+
+
+def test_s5_can_advance_to_ignores_failures_outside_the_phase_requirement() -> None:
+    """Un FAIL en un gate que la fase NO exige no bloquea el avance (alcance declarado).
+
+    ``dsr`` es obligatorio para entrar en PROMOCION, no en FINALISTA: si falla, el
+    Promotion Gate no promocionará, pero la fase puede materializar el finalista y correr
+    su evidencia shadow. Así el corte de S5 no se confunde con el veredicto completo.
+    """
+    gates = (
+        *(GateResult.passed_gate(g) for g in ("backtest", "robustness", "walk_forward", "oos")),
+        GateResult.failed("dsr"),
+        GateResult.failed("risk"),
+    )
+    result = can_advance_to(
+        current=StrategyLifecycleState.ESTUDIO,
+        target=StrategyLifecycleState.FINALISTA,
+        gates=gates,
+    )
+    assert result.allowed
+
+
+def test_s5_can_advance_to_refuses_to_decide_the_promotion() -> None:
+    """VALIDACION/PROMOCION/ACTIVE los decide `evaluate_promotion`, no esta función."""
+    result = can_advance_to(
+        current=StrategyLifecycleState.ESTUDIO,
+        target=StrategyLifecycleState.ACTIVE,
+        gates=tuple(GateResult.passed_gate(g) for g in PROMOTION_GATES),
+    )
+    assert not result.allowed
+    assert "validacion_ausente" in result.reasons

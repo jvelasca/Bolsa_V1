@@ -107,6 +107,39 @@ PROMOTION_GATES: tuple[str, ...] = (
     "coach",
 )
 
+# S5 (auditoría .183) — gates que deben estar en PASS para **entrar** en cada estado.
+#
+# El defecto anterior: avanzar de fase solo exigía que *algún* `GateResult` estuviera
+# sin fallo, así que un estado exigente podía cruzarse con la evidencia de otro. La
+# tabla es CUMULATIVA (el embudo no retrocede la exigencia) y el dominio la aplica por
+# defecto: un llamador ya no puede elegir un contrato más laxo, solo **añadir** gates.
+#
+# `DEGRADED`/`REJECTED` no exigen nada: son las dos salidas de seguridad y cerrar (o
+# volver al LAB) nunca depende de evidencia a favor.
+REQUIRED_GATES_BY_STATE: dict[StrategyLifecycleState, tuple[str, ...]] = {
+    StrategyLifecycleState.ESTUDIO: (),
+    StrategyLifecycleState.LABORATORIO: ("backtest",),
+    StrategyLifecycleState.TOP3: ("backtest", "robustness"),
+    StrategyLifecycleState.COACH: ("backtest", "robustness", "walk_forward"),
+    StrategyLifecycleState.FINALISTA: ("backtest", "robustness", "walk_forward", "oos"),
+    StrategyLifecycleState.VALIDACION: (
+        "backtest",
+        "robustness",
+        "walk_forward",
+        "oos",
+        "risk",
+    ),
+    StrategyLifecycleState.PROMOCION: PROMOTION_GATES,
+    StrategyLifecycleState.ACTIVE: PROMOTION_GATES,
+    StrategyLifecycleState.DEGRADED: (),
+    StrategyLifecycleState.REJECTED: (),
+}
+
+
+def required_gates_for(state: StrategyLifecycleState) -> tuple[str, ...]:
+    """Gates que hay que tener en PASS para ENTRAR en ``state`` (S5, auditoría .183)."""
+    return REQUIRED_GATES_BY_STATE.get(state, ())
+
 
 @dataclass(frozen=True, slots=True)
 class StrategyCandidate:
@@ -751,8 +784,10 @@ def can_transition(
     exclusivamente en :func:`evaluate_admin_promotion`.
 
     S1: ``PROMOCION → ACTIVE`` exige los siete gates, COACH sin veto y shadow que pase.
-    S5: ``required_gates`` (opcional) obliga a que esos gates concretos estén presentes y en
-    PASS en los estados intermedios; un gate requerido ausente bloquea.
+    S5: los gates obligatorios de la fase los fija `REQUIRED_GATES_BY_STATE` y se aplican
+    SIEMPRE; ``required_gates`` (opcional) solo **añade** exigencias, nunca las relaja. Un
+    gate requerido ausente bloquea (``gates_requeridos_ausentes``) y uno NOT_EVALUATED
+    cuenta como no superado.
     S6: la evidencia debe corresponder al mismo finalista/versión.
     """
     target = next_state(state)
@@ -780,7 +815,12 @@ def can_transition(
         if not gates:
             return TransitionResult(state, target, False, ("gates_no_evaluados",))
         present = {g.gate for g in gates if g.passed}
-        absent = tuple(g for g in required_gates if g not in present)
+        # S5: la exigencia de la fase la fija el dominio y no se puede rebajar desde el
+        # llamador; ``required_gates`` solo añade. `target` nunca es None aquí porque
+        # los estados del embudo tienen siguiente.
+        base = required_gates_for(target) if target is not None else ()
+        mandatory = tuple(dict.fromkeys((*base, *required_gates)))
+        absent = tuple(g for g in mandatory if g not in present)
         if absent:
             return TransitionResult(
                 state, target, False, (f"gates_requeridos_ausentes:{','.join(absent)}",)
@@ -821,8 +861,61 @@ def can_transition(
     return TransitionResult(state, target, False, ("estado_desconocido",))
 
 
+def can_advance_to(
+    *,
+    current: StrategyLifecycleState,
+    target: StrategyLifecycleState,
+    gates: tuple[GateResult, ...] = (),
+    coach: CoachAssessment | None = None,
+    required_gates: tuple[str, ...] = (),
+) -> TransitionResult:
+    """¿Puede la candidata ir de ``current`` a ``target`` cruzando el embudo? (S5)
+
+    Un ciclo real del orquestador cruza VARIAS fases (ESTUDIO → … → FINALISTA), así que
+    comprobar solo el salto inmediato dejaría pasar la evidencia de una fase por la de
+    otra: se exige la unión de los gates obligatorios de **todas** las fases recorridas
+    (``REQUIRED_GATES_BY_STATE``), más los que añada el llamador.
+
+    Alcance declarado:
+
+    * cubre las fases cuantitativas (ESTUDIO … FINALISTA). Para ``VALIDACION``,
+      ``PROMOCION`` y ``ACTIVE`` la autoridad es la evidencia shadow y la decide
+      :func:`evaluate_promotion`; aquí se rechazan con ``validacion_ausente`` en vez de
+      inventar una comprobación distinta a la del Promotion Gate.
+    * exige los gates **obligatorios** de la fase en PASS, no que todo gate aportado esté
+      en PASS: un FAIL en un gate que esa fase no exige (p. ej. ``dsr`` antes de
+      ``PROMOCION``) no bloquea el avance de fase, lo evalúa el Promotion Gate con los
+      siete antes de ACTIVE.
+    """
+    if target not in _ORDER or current not in _ORDER:
+        return TransitionResult(current, None, False, ("ruta_de_estados_invalida",))
+    start = _ORDER.index(current)
+    end = _ORDER.index(target)
+    if end <= start:
+        return TransitionResult(current, target, False, ("ruta_de_estados_invalida",))
+    # La promoción no se decide con gates sueltos: se delega en `evaluate_promotion`.
+    if end >= _ORDER.index(StrategyLifecycleState.VALIDACION):
+        return TransitionResult(current, target, False, ("validacion_ausente",))
+    path = _ORDER[start + 1 : end + 1]
+    mandatory = tuple(
+        dict.fromkeys(
+            (*[g for state in path for g in required_gates_for(state)], *required_gates)
+        )
+    )
+    present = {g.gate for g in gates if g.passed}
+    absent = tuple(g for g in mandatory if g not in present)
+    if absent:
+        return TransitionResult(
+            current, target, False, (f"gates_requeridos_ausentes:{','.join(absent)}",)
+        )
+    if coach is not None and coach.vetoes and StrategyLifecycleState.COACH in path:
+        return TransitionResult(current, target, False, ("coach_veto",))
+    return TransitionResult(current, target, True)
+
+
 __all__ = [
     "PROMOTION_GATES",
+    "REQUIRED_GATES_BY_STATE",
     "ActiveStrategy",
     "CoachAssessment",
     "GateResult",
@@ -840,8 +933,10 @@ __all__ = [
     "StrategyTop3",
     "StrategyValidation",
     "TransitionResult",
+    "can_advance_to",
     "can_transition",
     "evaluate_admin_promotion",
     "evaluate_promotion",
     "next_state",
+    "required_gates_for",
 ]

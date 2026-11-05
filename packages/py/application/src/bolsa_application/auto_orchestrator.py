@@ -63,6 +63,8 @@ from bolsa_domain.entities.strategy_lifecycle import (
     ShadowPolicy,
     StrategyCandidate,
     StrategyEvaluation,
+    StrategyLifecycleState,
+    can_advance_to,
 )
 
 logger = logging.getLogger(__name__)
@@ -361,6 +363,31 @@ class AutoOrchestrator:
         # FINALISTA: versión inmutable (V2.29/A10: con los parámetros del CAMPEÓN y la
         # definición ejecutable para que la ACTIVE pueda evaluar su propia señal).
         best_candidate = next(c for c in candidates if c.id == best_id)
+        # S5 (auditoría .183): el avance de fase se decide con la MÁQUINA DE ESTADOS, no
+        # por haber llegado hasta aquí. El ciclo cruza varias fases (ESTUDIO → … →
+        # FINALISTA), así que se exigen los gates obligatorios de todas: si falta uno —o
+        # no se evaluó— la candidata NO se materializa como finalista y el ciclo lo
+        # declara con sus motivos. Antes se escribía `state='finalista'` sin comprobar
+        # nada, así que la tabla de gates del dominio no se aplicaba en ningún sitio.
+        # Los siete gates completos (incluido `coach`) los sigue exigiendo el Promotion
+        # Gate para ACTIVE; aquí solo manda la evidencia de la fase.
+        transition = can_advance_to(
+            current=best_candidate.state,
+            target=StrategyLifecycleState.FINALISTA,
+            gates=best_eval.gates,
+            coach=coach,
+        )
+        if not transition.allowed:
+            return OrchestratorResult(
+                instrument_id=instrument_id,
+                status="transicion_refusada",
+                candidates=len(candidates),
+                evaluated=len(evaluations),
+                reasons=transition.reasons,
+                catalog_candidates=catalog_candidates,
+                grammar_candidates=grammar_candidates,
+                lab_grammar_evaluated=lab_grammar_evaluated,
+            )
         finalist = build_strategy_version(
             candidate=best_candidate,
             name=best_candidate.id,
