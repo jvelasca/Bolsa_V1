@@ -25,8 +25,11 @@ Contrato de medición (fail-closed, misma disciplina que el resto del repo):
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from decimal import Decimal
+from itertools import pairwise
+from typing import Any
 
 from bolsa_application.closed_bars import bar_day
 
@@ -59,10 +62,17 @@ _BPS = 10_000.0
 
 
 def _finite(value: Any) -> float | None:
-    """``float`` finito, o ``None``. ``bool`` no es un número (convención del repo)."""
-    if isinstance(value, bool) or not isinstance(value, int | float):
+    """``float`` finito, o ``None``. ``bool`` no es un número (convención del repo).
+
+    Acepta ``Decimal`` porque los fills durables transportan ``quantity``/``price`` como
+    ``Decimal``: rechazarlos convertía TODA la curva en un hueco (0 flujos medidos).
+    """
+    if isinstance(value, bool) or not isinstance(value, int | float | Decimal):
         return None
-    number = float(value)
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
     return number if math.isfinite(number) else None
 
 
@@ -115,10 +125,24 @@ def flows_from_fill_rows(
     ``day_by_cycle`` es el respaldo cuando el fill no trae instante (dobles herméticos): se
     usa el día de ENTRADA del ciclo. Sin instante y sin ciclo, el flujo no es medible.
     """
+    flows, reasons = measure_fills(rows, day_by_cycle=day_by_cycle)
+    return flows, sum(reasons.values())
+
+
+def measure_fills(
+    rows: Sequence[Any],
+    *,
+    day_by_cycle: Mapping[str, str] | None = None,
+) -> tuple[list[CashFlow], dict[str, int]]:
+    """Igual que ``flows_from_fill_rows`` pero con el hueco ATRIBUIDO por motivo.
+
+    Las claves son las carencias de la fila (``day``, ``quantity+price``, ...). Un motivo con
+    conteo es una fila declarada fuera de la curva, nunca un cero silencioso.
+    """
 
     fallback = {str(k): _day(v) for k, v in (day_by_cycle or {}).items() if _day(v)}
     flows: list[CashFlow] = []
-    unmeasured = 0
+    reasons: dict[str, int] = {}
     for row in rows or ():
         if isinstance(row, Mapping):
             side = str(row.get("side") or "").strip().lower()
@@ -136,8 +160,19 @@ def flows_from_fill_rows(
             symbol = getattr(row, "instrument_id", None)
         cycle_key = str(cycle_id or "").strip() or None
         day = _day(instant) or (fallback.get(cycle_key or "") or "")
-        if side not in {"buy", "sell"} or quantity is None or price is None or quantity <= 0 or price <= 0 or not day:
-            unmeasured += 1
+        missing = [
+            label
+            for label, bad in (
+                ("side", side not in {"buy", "sell"}),
+                ("quantity", quantity is None or quantity <= 0),
+                ("price", price is None or price <= 0),
+                ("day", not day),
+            )
+            if bad
+        ]
+        if missing:
+            # Cada fila cae por un motivo CONCRETO: el hueco se declara atribuido.
+            reasons["+".join(missing)] = reasons.get("+".join(missing), 0) + 1
             continue
         gross = quantity * price
         flows.append(
@@ -149,7 +184,7 @@ def flows_from_fill_rows(
             )
         )
     flows.sort(key=lambda flow: (flow.day, flow.amount, flow.cycle_id or "", flow.symbol or ""))
-    return flows, unmeasured
+    return flows, reasons
 
 
 def _curve(flows: Sequence[CashFlow], initial_equity: float) -> list[tuple[str, float]]:
@@ -230,7 +265,7 @@ def window_returns(
     if granularity == "day":
         # Una ventana es el SALTO de un punto al siguiente: el día sin movimiento no es una
         # ventana medida (no hubo operación cerrada que la mida).
-        for (_day_a, before), (_day_b, after) in zip(curve, curve[1:]):
+        for (_day_a, before), (_day_b, after) in pairwise(curve):
             if before <= 0:
                 continue
             change = after - before
@@ -282,7 +317,12 @@ def buy_and_hold_pct(
     start = _day(start_day)
     end = _day(end_day)
     if not start or not end or start > end:
-        return {"pct": None, "symbolsMeasured": 0, "symbolsRequested": len(list(watch or ())), "reason": "ventana_invalida"}
+        return {
+            "pct": None,
+            "symbolsMeasured": 0,
+            "symbolsRequested": len(list(watch or ())),
+            "reason": "ventana_invalida",
+        }
     closes: list[float] = []
     for symbol in watch or ():
         table: dict[str, float] = {}
@@ -297,7 +337,12 @@ def buy_and_hold_pct(
             continue
         closes.append((last / first - 1.0) * 100.0)
     if not closes:
-        return {"pct": None, "symbolsMeasured": 0, "symbolsRequested": len(list(watch or ())), "reason": "sin_barras_en_los_extremos"}
+        return {
+            "pct": None,
+            "symbolsMeasured": 0,
+            "symbolsRequested": len(list(watch or ())),
+            "reason": "sin_barras_en_los_extremos",
+        }
     return {
         "pct": sum(closes) / len(closes),
         "symbolsMeasured": len(closes),
@@ -353,7 +398,9 @@ def _at_least(name: str, threshold: float | None, measured: float | None) -> Pol
     value = _finite(measured)
     if limit is None or value is None:
         return PolicyCheck(name=name, threshold=limit, measured=value, verdict="NOT_MEASURED")
-    return PolicyCheck(name=name, threshold=limit, measured=value, verdict="PASS" if value >= limit else "FAIL")
+    return PolicyCheck(
+        name=name, threshold=limit, measured=value, verdict="PASS" if value >= limit else "FAIL"
+    )
 
 
 def _at_most(name: str, threshold: float | None, measured: float | None) -> PolicyCheck:
@@ -389,7 +436,9 @@ def evaluate_evidence_policy(
         _at_least("minWindows", getattr(policy, "min_windows", None), measured_windows),
         _at_least("minTradesTotal", getattr(policy, "min_trades_total", None), measured_trades),
         _at_least(
-            "minPositiveWindowPct", getattr(policy, "min_positive_window_pct", None), positive_window_pct
+            "minPositiveWindowPct",
+            getattr(policy, "min_positive_window_pct", None),
+            positive_window_pct,
         ),
         _at_least("minNetReturnPct", getattr(policy, "min_net_return_pct", None), net_return),
         _at_most("maxDrawdownPct", getattr(policy, "max_drawdown_pct", None), drawdown),
@@ -461,7 +510,8 @@ def build_equity_evidence(
     Devuelve un artefacto autocontenido con la curva, las métricas en % y —si se pasa
     ``policy``— el veredicto umbral a umbral. Todo dato que no se pueda medir viaja ``None``.
     """
-    flows, unmeasured_rows = flows_from_fill_rows(fill_rows, day_by_cycle=day_by_cycle)
+    flows, unmeasured_reasons = measure_fills(fill_rows, day_by_cycle=day_by_cycle)
+    unmeasured_rows = sum(unmeasured_reasons.values())
     curve = _curve(flows, initial_equity)
     days = [day for day, _equity in curve]
     start_day = days[0] if days else ""
@@ -477,7 +527,12 @@ def build_equity_evidence(
             bars_by_symbol=bars_by_symbol, watch=watch, start_day=start_day, end_day=end_day
         )
         if start_day and end_day
-        else {"pct": None, "symbolsMeasured": 0, "symbolsRequested": len(list(watch or ())), "reason": "sin_curva"}
+        else {
+            "pct": None,
+            "symbolsMeasured": 0,
+            "symbolsRequested": len(list(watch or ())),
+            "reason": "sin_curva",
+        }
     )
     bench_pct = _finite(benchmark.get("pct"))
     excess = None if bench_pct is None or net is None else net - bench_pct
@@ -515,13 +570,22 @@ def build_equity_evidence(
         },
         "flowsMeasured": len(flows),
         "flowsUnmeasured": unmeasured_rows,
+        "unmeasuredReasons": unmeasured_reasons,
         "measuredTrades": len(list(round_trips or ())),
+        "caveats": [
+            "La curva es de CAJA realizada: una posición viva al cierre queda como caja salida "
+            "(no se marca a mercado) y no se convierte a la divisa de la cuenta."
+        ],
         "notMeasured": [],
     }
 
     if unmeasured_rows:
+        detail = ", ".join(
+            f"{reason}={count}" for reason, count in sorted(unmeasured_reasons.items())
+        )
         evidence["notMeasured"].append(
-            f"{unmeasured_rows} fills sin lado/cantidad/precio/día: fuera de la curva (no son un 0)"
+            f"{unmeasured_rows} fills sin dato obligatorio ({detail}): fuera de la curva "
+            "(no son un 0)"
         )
     if net is None:
         evidence["notMeasured"].append("netReturnPct: sin curva de al menos dos puntos")
@@ -537,7 +601,9 @@ def build_equity_evidence(
     if cost is None:
         evidence["notMeasured"].append("realizedCostBps: ningún fill declara reference_mid")
     if not split.get("outOfSampleDays"):
-        evidence["notMeasured"].append("holdout: sin días suficientes para reservar fuera de muestra")
+        evidence["notMeasured"].append(
+            "holdout: sin días suficientes para reservar fuera de muestra"
+        )
 
     if policy is not None:
         evidence["policyEvaluation"] = evaluate_evidence_policy(

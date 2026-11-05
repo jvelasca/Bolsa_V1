@@ -55,7 +55,15 @@ class _Policy:
         return {"accountId": self.account_id}
 
 
-def _fill(side: str, quantity: float, price: float, day: str, *, cycle: str | None = None, mid: float | None = None) -> dict[str, Any]:
+def _fill(
+    side: str,
+    quantity: float,
+    price: float,
+    day: str,
+    *,
+    cycle: str | None = None,
+    mid: float | None = None,
+) -> dict[str, Any]:
     return {
         "side": side,
         "quantity": quantity,
@@ -108,6 +116,47 @@ def test_a_fill_without_instant_falls_back_to_its_cycle_entry_day() -> None:
 
     assert unmeasured == 0
     assert flows[0].day == "2025-03-04"
+
+
+def test_decimal_fills_are_measured_not_discarded() -> None:
+    """Los fills durables traen ``Decimal``: rechazarlos vaciaba la curva entera."""
+
+    from dataclasses import dataclass
+    from decimal import Decimal
+
+    @dataclass(frozen=True)
+    class _Row:
+        side: str
+        quantity: Decimal
+        price: Decimal
+        reference_mid: Decimal | None
+        created_at: Any
+        cycle_id: str | None
+        instrument_id: str | None = None
+
+    flows, unmeasured = flows_from_fill_rows(
+        [
+            _Row(
+                "buy", Decimal("10"), Decimal("100"), Decimal("99.9"), "2025-01-02T10:00:00Z", "c1"
+            ),
+            _Row(
+                "sell",
+                Decimal("10"),
+                Decimal("110"),
+                Decimal("110.1"),
+                "2025-01-09T10:00:00Z",
+                "c1",
+            ),
+        ]
+    )
+
+    assert unmeasured == 0
+    assert [flow.amount for flow in flows] == [-1000.0, 1100.0]
+    assert realized_cost_bps(
+        [
+            _Row("buy", Decimal("10"), Decimal("100"), Decimal("99.9"), "2025-01-02", "c1"),
+        ]
+    ) == pytest.approx(abs(100.0 / 99.9 - 1.0) * 10_000.0)
 
 
 # --- curva, retorno y drawdown --------------------------------------------------------------

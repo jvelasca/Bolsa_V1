@@ -134,9 +134,7 @@ def _year_watch(
     if provider is not None:
         from bolsa_application.universe_point_in_time import candidate_ids
 
-        candidates = candidate_ids(
-            provider.all_members, f"{int(year)}-01-01", f"{int(year)}-12-31"
-        )
+        candidates = candidate_ids(provider.all_members, f"{int(year)}-01-01", f"{int(year)}-12-31")
         watch = candidates[: max(1, int(args.watch_size))]
         return "pit", watch, provider.coverage()
     return "catalog", list(catalog_watch or []), None
@@ -229,7 +227,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                     factory, int(args.watch_size), min_bars=int(args.min_bars)
                 )
                 if not catalog_watch:
-                    raise RuntimeError("el catálogo no aportó ningún instrumento con sector e historia")
+                    raise RuntimeError(
+                        "el catálogo no aportó ningún instrumento con sector e historia"
+                    )
 
         # Determinismo: el precio del replay es el ``price_script`` histórico inyectado.
         os.environ["AUTO_ENGINE_SIM_REAL_PRICE"] = "0"
@@ -249,6 +249,10 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         # Capa v6 (DÍA-D-3g): eventos de gestión (``auto_position_management``) unidos a su
         # ``cycle_id`` (join por instrumento+día hecho en la costura). Acumulados entre ventanas.
         all_management_by_cycle: dict[str, list[dict[str, Any]]] = {}
+        # Evidencia monetaria (V2.94·DÍA-D-4): el benchmark «comprar y mantener» se mide entre
+        # el PRIMER y el ÚLTIMO día medidos, así que se guardan las dos fotos (barras y watch).
+        bench_start: dict[str, Any] | None = None
+        bench_tail: dict[str, Any] | None = None
         regime_all: dict[str, Any] = {}
         operational_all: dict[str, Any] = {}
 
@@ -262,7 +266,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 catalog_watch=catalog_watch,
             )
             if not watch:
-                windows.append({"year": year_label, "measured": False, "reason": "sin_universo_pit"})
+                windows.append(
+                    {"year": year_label, "measured": False, "reason": "sin_universo_pit"}
+                )
                 continue
             v86._configure_env(watch=watch, venue=str(args.venue), edge=float(args.edge))  # noqa: SLF001
             bars_by_symbol = await v86._read_bars(factory, watch)  # noqa: SLF001
@@ -348,6 +354,10 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 windows.append({"year": year_label, "measured": False, "reason": "replay_sin_dias"})
                 continue
             window_set = set(window_days)
+            bench_snapshot = {"day": window_days[0], "bars": bars_by_symbol, "watch": list(watch)}
+            if bench_start is None:
+                bench_start = bench_snapshot
+            bench_tail = {"day": window_days[-1], "bars": bars_by_symbol, "watch": list(watch)}
             round_trips = [
                 dict(row)
                 for row in score.get("roundTrips", [])
@@ -370,9 +380,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             # Capa v6: agrupa los eventos de gestión por ``cycle_id`` (los del día de entrada
             # sin ciclo previo quedan fuera: hueco declarado, nunca un ciclo inventado).
             for management_row in detail.get("managementRows") or []:
-                management_cycle = str(
-                    (management_row or {}).get("cycleId") or ""
-                ).strip()
+                management_cycle = str((management_row or {}).get("cycleId") or "").strip()
                 if not management_cycle:
                     continue
                 all_management_by_cycle.setdefault(management_cycle, []).append(
@@ -451,6 +459,54 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         artifact["crossCheck"] = v92._cross_check_summary(  # noqa: SLF001
             reference, current=artifact["summary"]
         )
+        if args.equity_evidence:
+            # Capa DÍA-D-4: la evidencia en % que la política por cuenta exige (retorno neto,
+            # drawdown, ventanas positivas, exceso vs comprar y mantener y reserva fuera de
+            # muestra). Se deriva de los FLUJOS REALES de los fills, no de R × constante.
+            from bolsa_application.account_evidence_policy import (
+                PostgresAccountEvidencePolicyStore,
+                default_evidence_policy,
+            )
+            from bolsa_application.dia_d_equity_evidence import build_equity_evidence
+
+            policy = default_evidence_policy(str(args.account_id))
+            if args.policy_account:
+                async with factory() as session:
+                    policy = await PostgresAccountEvidencePolicyStore(session).load(
+                        str(args.policy_account)
+                    )
+
+            merged_bars: dict[str, list[Any]] = {}
+            merged_watch: list[str] = []
+            for snapshot in (bench_start, bench_tail):
+                if not snapshot:
+                    continue
+                for symbol in snapshot["watch"]:
+                    if symbol not in merged_watch:
+                        merged_watch.append(str(symbol))
+                for symbol, bars in snapshot["bars"].items():
+                    merged_bars.setdefault(str(symbol), []).extend(list(bars))
+            day_by_cycle = {
+                str(trip.get("cycleId")): str(trip.get("entryDay") or "")
+                for trip in all_trips
+                if trip.get("cycleId")
+            }
+            initial_equity = float(os.environ.get("AUTO_ENGINE_SIM_V2_EQUITY") or 100_000.0)
+            artifact["equityEvidence"] = build_equity_evidence(
+                fill_rows=all_cost_rows,
+                round_trips=all_trips,
+                bars_by_symbol=merged_bars,
+                watch=merged_watch,
+                initial_equity=initial_equity,
+                day_by_cycle=day_by_cycle,
+                holdout_pct=float(policy.holdout_pct),
+                policy=policy,
+            )
+            if not all_cost_rows:
+                artifact["limits"].append(
+                    "equityEvidence: sin filas de fill (hace falta --cycle-detail) la curva de "
+                    "equity no se mide; el bloque lo declara NOT_MEASURED en vez de un 0 %."
+                )
         if args.cycles_out:
             # Ledger de ciclos (muestra cruda del sorteo): lo consume el bootstrap de ``v2_95``.
             # No cambia la forma del artefacto ``dia-d-multi-v1``.
@@ -472,7 +528,8 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 ledger_path = _REPO_ROOT / ledger_path
             ledger_path.parent.mkdir(parents=True, exist_ok=True)
             ledger_path.write_text(
-                json.dumps(ledger, indent=2, sort_keys=True, ensure_ascii=False, default=str) + "\n",
+                json.dumps(ledger, indent=2, sort_keys=True, ensure_ascii=False, default=str)
+                + "\n",
                 encoding="utf-8",
             )
         return artifact
@@ -503,13 +560,17 @@ def _print_text(artifact: dict[str, Any]) -> None:
         f"hit {_fmt(summary['hitRate'], '.2f')} · ciclos {summary['measuredCycles']}"
     )
     not_measured = [row["year"] for row in coverage["yearsNotMeasured"]]
-    print(f"cobertura                 medidos {coverage['yearsMeasured']} · no medidos {not_measured}")
+    print(
+        f"cobertura                 medidos {coverage['yearsMeasured']} · no medidos {not_measured}"
+    )
     print()
     for key, title, dim in (
         ("byYear", "AÑO", "year"),
         ("byRegime", "RÉGIMEN", "regime"),
     ):
-        print(f"{title:<10} ETIQUETA            CICLOS   R/CICLO     HIT   MAE MED   CAPTURA   -1R (perdedores)")
+        print(
+            f"{title:<10} ETIQUETA            CICLOS   R/CICLO     HIT   MAE MED   CAPTURA   -1R (perdedores)"
+        )
         print("-" * 78)
         for row in artifact[key]:
             populations = (row.get("maeSeverity") or {}).get("populations") or {}
@@ -533,13 +594,59 @@ def _print_text(artifact: dict[str, Any]) -> None:
         print("LÍMITES DECLARADOS")
         for item in artifact["limits"]:
             print(f"  - {item}")
+    equity = artifact.get("equityEvidence")
+    if equity:
+        print()
+        print("EVIDENCIA MONETARIA (política por cuenta)")
+        print("-" * 78)
+        print(
+            f"tramo                     {equity['startDay']} .. {equity['endDay']} "
+            f"({equity['curvePoints']} puntos, equity inicial {_fmt(equity['initialEquity'], '.0f')})"
+        )
+        print(
+            f"retorno neto              {_fmt(equity['netReturnPct'], '+.3f')} %   "
+            f"drawdown máx {_fmt(equity['maxDrawdownPct'], '.3f')} %"
+        )
+        print(
+            f"ventanas positivas        {_fmt(equity['positiveWindowPct'], '.2f')} % "
+            f"({equity['positiveWindows']['positiveWindows']}/"
+            f"{equity['positiveWindows']['measuredWindows']} medidas)"
+        )
+        buy_hold = equity.get("buyHold") or {}
+        print(
+            f"comprar y mantener        {_fmt(buy_hold.get('pct'), '+.3f')} %   "
+            f"exceso {_fmt(buy_hold.get('excessPct'), '+.3f')} % "
+            f"({buy_hold.get('symbolsMeasured')}/{buy_hold.get('symbolsRequested')} símbolos)"
+        )
+        holdout = equity.get("holdout") or {}
+        print(
+            f"fuera de muestra          {holdout.get('outOfSampleDays')} días · "
+            f"retorno {_fmt(holdout.get('outOfSampleNetReturnPct'), '+.3f')} %"
+        )
+        print(
+            f"coste realizado           {_fmt(equity.get('realizedCostBps'), '.2f')} bps por lado"
+        )
+        evaluation = equity.get("policyEvaluation") or {}
+        if evaluation:
+            print(
+                f"veredicto de política     {evaluation['verdict']} ({evaluation['verdictReason']})"
+            )
+            for check in evaluation["checks"]:
+                print(
+                    f"  {check['name']:<26} {check['verdict']:<13} "
+                    f"medido {_fmt(check['measured'], '.3f')} · umbral {_fmt(check['threshold'], '.3f')}"
+                )
+        for gap in equity.get("notMeasured") or ():
+            print(f"  · no medido: {gap}")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--from-year", type=int, default=None, help="primer año (YYYY) del rango")
     parser.add_argument("--to-year", type=int, default=None, help="último año (YYYY) del rango")
-    parser.add_argument("--years", default=None, help="años separados por coma (alternativa a --from/--to)")
+    parser.add_argument(
+        "--years", default=None, help="años separados por coma (alternativa a --from/--to)"
+    )
     parser.add_argument(
         "--watch", default=None, help="instrumentos separados por coma (si falta, universo)"
     )
@@ -554,7 +661,10 @@ def main(argv: list[str] | None = None) -> int:
         "--min-bars", type=int, default=60, help="barras D1 mínimas en el watch derivado"
     )
     parser.add_argument(
-        "--history-days", type=int, default=_DEFAULT_HISTORY_DAYS, help="días previos a D0 simulados"
+        "--history-days",
+        type=int,
+        default=_DEFAULT_HISTORY_DAYS,
+        help="días previos a D0 simulados",
     )
     parser.add_argument(
         "--horizon-days",
@@ -562,14 +672,18 @@ def main(argv: list[str] | None = None) -> int:
         default=_DEFAULT_HORIZON_DAYS,
         help="días posteriores a D1 simulados",
     )
-    parser.add_argument("--edge", type=float, default=_DEFAULT_EDGE, help="valor declarado del seam de edge")
+    parser.add_argument(
+        "--edge", type=float, default=_DEFAULT_EDGE, help="valor declarado del seam de edge"
+    )
     parser.add_argument(
         "--attribution-top-k", type=int, default=5, help="mejores/peores ciclos de la concentración"
     )
     parser.add_argument(
         "--check-against", default=None, help="artefacto sellado para cruzar el resumen global"
     )
-    parser.add_argument("--account-id", default=_DEFAULT_ACCOUNT, help="cuenta de la ventana (etiqueta)")
+    parser.add_argument(
+        "--account-id", default=_DEFAULT_ACCOUNT, help="cuenta de la ventana (etiqueta)"
+    )
     parser.add_argument("--version-a", default=_DEFAULT_VERSION_A, help="versión A de la ventana")
     parser.add_argument("--venue", default="paper", choices=("paper", "simulated"))
     parser.add_argument(
@@ -599,6 +713,23 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=_DEFAULT_ENTRY_WINDOW_DAYS,
         help="barras D1 de la ventana de excursión adversa TEMPRANA post-entrada",
+    )
+    parser.add_argument(
+        "--equity-evidence",
+        action="store_true",
+        help=(
+            "añade el bloque de evidencia MONETARIA (curva de equity, retorno neto, drawdown, "
+            "ventanas positivas, exceso vs comprar y mantener, holdout) y el veredicto umbral a "
+            "umbral de la política por cuenta; exige --cycle-detail para tener los fills"
+        ),
+    )
+    parser.add_argument(
+        "--policy-account",
+        default=None,
+        help=(
+            "cuenta cuya política de evidencia se aplica (lectura); si falta se usan los "
+            "DEFAULTS estrictos para --account-id"
+        ),
     )
     args = parser.parse_args(argv)
 
