@@ -219,6 +219,97 @@ async def test_watch_without_active_is_noop() -> None:
     assert result.status == "sin_activa"
 
 
+# ── S7 (auditoría .183): frescura y ausencia de medida en la vigilancia ──────────
+
+
+@pytest.mark.asyncio
+async def test_watch_carries_predictive_evidence_forward() -> None:
+    """S7: la evidencia del LAB no se re-mide cada ciclo; se arrastra del snapshot.
+
+    Sin arrastre, ``fail_on_unmeasured`` (fail-closed) degradaría a la activa en CADA
+    pasada por «edge sin medir» y el re-LAB sería un bucle perpetuo.
+    """
+    from bolsa_application.strategy_vigilance_phase import HealthThresholds
+
+    deps, store = _deps(
+        runner=lambda c: _good_result(),
+        resolution=_Resolution(),
+        health_thresholds=HealthThresholds(min_edge=0.1, min_wfe=0.3, min_dsr=0.5),
+    )
+    _with_shadow_evidence(deps)
+    orchestrator = AutoOrchestrator(deps)
+    promoted = await orchestrator.run_cycle(instrument_id="AAA")
+    assert promoted.status == "active", promoted.reasons
+
+    watched = await orchestrator.watch_active(instrument_id="AAA", as_of="vigilancia:1")
+    assert watched.status == "active", watched.reasons
+    assert not watched.degraded
+    assert not watched.stale
+    # El snapshot de vigilancia conserva el ancla de la evidencia, no la de la pasada.
+    history = await store.list_health(promoted.active_version_id)
+    assert len(history) >= 2
+    assert history[-1].as_of == history[0].as_of
+
+
+@pytest.mark.asyncio
+async def test_promotion_snapshot_records_real_measurement_instant() -> None:
+    """S7: el snapshot nace con una fecha REAL (parseable), ancla del TTL."""
+    from datetime import datetime
+
+    deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    _with_shadow_evidence(deps)
+    orchestrator = AutoOrchestrator(deps)
+    promoted = await orchestrator.run_cycle(instrument_id="AAA", run_id="auto-orchestrator")
+    assert promoted.status == "active", promoted.reasons
+    history = await store.list_health(promoted.active_version_id)
+    assert history
+    parsed = datetime.fromisoformat(history[0].as_of)
+    assert parsed.tzinfo is not None
+
+
+@pytest.mark.asyncio
+async def test_watch_degrades_when_predictive_evidence_expires() -> None:
+    """S7: con TTL, una evidencia predictiva caducada degrada (re-LAB, no swap)."""
+    from datetime import UTC, datetime, timedelta
+
+    from bolsa_application.strategy_vigilance_phase import (
+        EVIDENCE_STALE,
+        HealthThresholds,
+    )
+    from bolsa_domain.entities.strategy_lifecycle import StrategyHealth
+
+    deps, store = _deps(
+        runner=lambda c: _good_result(),
+        resolution=_Resolution(),
+        health_thresholds=HealthThresholds(
+            min_edge=0.1, min_wfe=0.3, min_dsr=0.5, max_metric_age_days=30.0
+        ),
+    )
+    _with_shadow_evidence(deps)
+    orchestrator = AutoOrchestrator(deps)
+    promoted = await orchestrator.run_cycle(instrument_id="AAA")
+    assert promoted.status == "active", promoted.reasons
+    version_id = promoted.active_version_id
+    assert version_id is not None
+
+    old_as_of = (datetime.now(UTC) - timedelta(days=60)).isoformat()
+    await store.save_health(
+        version_id,
+        StrategyHealth(
+            version_id=version_id,
+            as_of=old_as_of,
+            edge=0.9,
+            walk_forward_efficiency=0.7,
+            dsr=0.7,
+        ),
+    )
+
+    watched = await orchestrator.watch_active(instrument_id="AAA", as_of="vigilancia:2")
+    assert watched.degraded and watched.relab_triggered
+    assert watched.stale
+    assert EVIDENCE_STALE in watched.reasons
+
+
 # ── Seam DecisionProvider (SIM-only) ────────────────────────────────────────────
 
 
