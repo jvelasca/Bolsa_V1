@@ -482,6 +482,12 @@ async def paper_auto_engine_loop(
                 await watch_refresher()
             except Exception:  # noqa: BLE001 — un refresh fallido no tumba el motor.
                 logger.exception("paper_auto_engine watch refresh failed")
+                # M7 (auditoría .183): el motor SAFE/dry tampoco puede callar que decidió
+                # con el universo anterior. ``refresh_watch_from_estudio`` ya es fail-closed
+                # ante ESTUDIO no disponible (cache vacía ⇒ no opera); lo que antes se
+                # perdía era la EXCEPCIÓN, que dejaba el estado en RUNNING como si el dato
+                # fuera fresco. Mismo token que ya usa el tick fallido.
+                engine._state = "DEGRADED"  # noqa: SLF001 — estado del motor SAFE.
         try:
             store = engine.store
             if store is not None:

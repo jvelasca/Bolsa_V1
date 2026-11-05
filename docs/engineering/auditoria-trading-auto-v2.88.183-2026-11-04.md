@@ -44,14 +44,17 @@
 > ganando al env, y `book_equity` como snapshot atómico con `as_of`). `M1`-`M4` y `M11` se cierran en la PR
 > [#93](https://github.com/jvelasca/Bolsa_V1/pull/93) (`fix/auto-m1m4-cierre-verificado`: el ack del broker pasa a
 > `UPDATE` condicionado —lo que faltaba de `M1`— y se certifica con tests mordientes el resto, que ya estaba en el
-> árbol desde `53f6845a` y `e295092c`). Las catorce PR están
+> árbol desde `53f6845a` y `e295092c`). `M7` y `M15` se cierran en la PR
+> [#94](https://github.com/jvelasca/Bolsa_V1/pull/94) (`fix/auto-m7-m15-control-plane`: `M15` ya estaba en `4d3082fd` y
+> aquí se certifica; `M7` deja de tragarse los fallos del loop). Las quince PR están
 > fusionadas en `fix/059-060-proveedores`; **no** hay sello ni bump, y las únicas migraciones son las citadas.
 > **Sincronización del documento (`2026-11-05`, sin PR de código):** al verificar la sección de estrategia contra el
 > árbol, `S1` y `S2` ya estaban resueltos en código y con pruebas (`test_strategy_lifecycle_s1_s5_s6.py`, `LabThresholds`),
 > así que el documento los daba por abiertos **por desfase**, no por defecto. **Sincronización de la sección de
 > ejecución/riesgo (`2026-11-05`):** `M1` (`53f6845a`) y `M2`/`M3`/`M4`/`M11` (`e295092c`) también estaban resueltos en
 > el árbol con pruebas, y sus tests se verificaron **mordientes** contra el código previo (6 fallos sin el arreglo, 2
-> más del ack condicionado de `M1`), así que pasan a cerrados. **Abiertos:** `M7`, `M15` y `S8`-`S10`.
+> más del ack condicionado de `M1`), así que pasan a cerrados. **Abiertos:** de la sección media no queda ninguno; siguen
+> abiertos los de severidad baja `S8`-`S10`.
 
 Alcance detallado: lógica de decisión, riesgo, ejecución, workers AUTO, `auto_simulation_worker.py` (9.802 líneas) y lógica de estrategia y señales.
 Modo: solo lectura. No se modificó el repositorio. Las referencias `archivo:línea` son del tag `v2.88.183-beta`.
@@ -136,7 +139,7 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 | M4 | `remaining_qty` > `requested_qty` aceptado (reproducido: pedir 10, quedar 100) · ✅ Cerrado | `exit_order.py:299-323` | `0 ≤ remaining ≤ requested` y `filled + remaining ≈ requested` |
 | M5 | `commit()` de reservas fallido se registra y se continúa. Seguro solo si el store es autocommit (el comentario lo asume; no verificado) · ✅ Cerrado | `auto_simulation_worker.py:3707` | Contrato explícito; si falla, no emitir órdenes |
 | M6 | Pérdida de eventos de journal: la cola se vacía antes de publicar, y si el sink falla se pierde la evidencia · ✅ Cerrado | `:7373-7395` | Outbox con `pending/posted/failed` |
-| M7 | Excepciones del tick, del refresco de watch y del refresco del decider se tragan; se opera con universo o estrategia caducados, sin backoff ni estado durable de fallo | `:9253-9267` | Marcar snapshot no fiable y vetar aperturas; backoff exponencial y circuit breaker a `PAUSED`; persistir tick `ERROR` |
+| M7 | Excepciones del tick, del refresco de watch y del refresco del decider se tragan; se opera con universo o estrategia caducados, sin backoff ni estado durable de fallo · ✅ Cerrado | `:9253-9267` | Marcar snapshot no fiable y vetar aperturas; backoff exponencial y circuit breaker a `PAUSED`; persistir tick `ERROR` |
 | M8 | Sin stores durables inyectados, kill switch, posiciones, T1, P&L y journal viven solo en RAM; el modo estructural marca fills como `applied` sin libro financiero · ✅ Cerrado | `:1200-1470`, `:2275-2281`, `:2368-2375` | Stores obligatorios en modo operativo; rechazar el arranque si faltan |
 | M9 | Excepción de `price_script` escapa sin el fail-closed que sí tiene `PriceSource` · ✅ Cerrado | `:2150-2172` | `try/except` → `None` → HOLD |
 | M10 | AUTO se activa solo por variable de entorno; tras un reinicio con la variable puesta, arranca. Sin latch durable de OFF · ✅ Cerrado | workers AUTO | Intención del operador en BD; rearranque con confirmación |
@@ -144,7 +147,7 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 | M12 | Lock y latido de ventana en fichero no atómicos; un `.run.lock` obsoleto silencia alertas · ✅ Cerrado | `window_day_watch_worker.py:341-535` | `os.replace`, lock con PID y TTL |
 | M13 | El monitor devuelve un DTO coherente con lecturas caídas · ✅ Cerrado | `auto_operational_monitor.py:1897-2120` | Estado `INCOMPLETE` explícito |
 | M14 | `load_book_equity` puede dejar equity de un tick anterior visible tras un fallo de lectura · ✅ Cerrado | `:2524-2544` | Snapshot atómico con `as_of` |
-| M15 | P&L parcial contra `_entry_price` único, no contra coste medio del ledger · Por lectura, impacto sin verificar | `:8027-8044` | Coste medio ponderado o lotes |
+| M15 | P&L parcial contra `_entry_price` único, no contra coste medio del ledger · ✅ Cerrado (`4d3082fd` + certificado) | `:8027-8044` | Coste medio ponderado o lotes |
 | M16 | `AutoSimRuntime` carga la estrategia ACTIVE con `instrument_id=effective_account` · ✅ Cerrado | `:9723-9727` | Separar `account_id` de `instrument_id` |
 
 ### M5 — El commit fallido no deja dueño ni claim · ✅ Cerrado (`fix/auto-m5-m6-m9-commit`)
@@ -249,6 +252,21 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 - **Fallo:** `AutoSimRuntime` pedía la estrategia ACTIVE con `load_active_strategy_decider(instrument_id=effective_account)`, es decir, la **cuenta** viajaba por la ruta del **instrumento** (y el símbolo de reserva sin watch era la cuenta). Funcionaba sólo porque la semilla de la ventana escribía la cuenta en `strategy_promotions.instrument_id`: una promoción de estudio (`inst-v229-…`) y una activa atribuida a una cuenta quedaban indistinguibles, y cualquier lectura por instrumento podía devolver la de la cuenta.
 - **Cerrado:** migración `064_strategy_account_scope` añade `strategy_promotions.account_id` (nullable, **sin backfill**: rellenarla desde `instrument_id` sería repetir la confusión) con índice `(account_id, promoted)`. `ActiveStrategy` declara `account_id`, el store expone `get_active_for_account()` y `get_active()` sigue siendo la ruta de instrumento; `load_active_strategy_decider` recibe `account_id` **o** `instrument_id` (sin ninguno: `ValueError`, no un `None` mudo) y el runtime pide la cuenta por cuenta. La fila histórica (`instrument_id = <cuenta>`, `account_id = NULL`) se sigue leyendo por la ruta de compatibilidad, pero la ACTIVE devuelta declara `account_id = None`: el ámbito ausente no se inventa. La semilla de la ventana y el runner forward siembran/leen el ámbito correcto.
 
+### M7 — Los fallos del control plane y del turno dejan de ser mudos · ✅ Cerrado (`fix/auto-m7-m15-control-plane`)
+- **Fallo:** `auto_sim_loop` envolvía en `try/except: logger.exception(...)` tres cosas distintas —el refresco del watch, el del decider y el turno— y seguía como si nada. Un watch roto dejaba el **universo** del día anterior (y el turno abría con él, indistinguible de un turno sano), un decider roto dejaba la **estrategia** anterior, y un turno que reventaba se reintentaba cada 60 s sin backoff y **sin dejar rastro durable**: el ledger seguía en `RUNNING` con el último tick bueno.
+- **Cerrado:** el fallo se declara, se propaga y acota el daño en tres capas.
+  1. **Frescura declarada y veto de aperturas.** El worker mantiene tokens de control plane caducado (`watch_refresh_failed`, `decider_refresh_failed`, `tick_failed`, `circuit_breaker_paused`). Con cualquiera vigente, `auto_turn` veta el `BUY` con el motivo propio `control_plane_stale` (no disfrazado de `position_reconciliation_not_ok`) y **el SELL sigue permitido**: reducir/cerrar nunca empeora el riesgo, así que una salida protectora no puede quedarse colgada porque el universo no refresque. Cada token se levanta **sólo** con el éxito de su propio refresco.
+  2. **Backoff exponencial acotado.** `auto_sim_backoff_seconds(base, failures)` duplica la espera por fallo consecutivo hasta `AUTO_SIM_BACKOFF_MAX_SECONDS` (300 s por defecto) y vuelve al intervalo base con el primer turno bueno. Sin fallos devuelve el intervalo configurado (Δ = 0 respecto del loop anterior).
+  3. **Circuit breaker a `PAUSED` y rastro durable.** `AutoSimRuntime.note_tick_failure(streak)` marca el turno como caducado y, al llegar a `AUTO_SIM_TICK_BREAKER_FAILURES` fallos consecutivos (3 por defecto; `0` desactiva el breaker), **pausa** el motor: `run_tick` no se intenta (`declare_skip` con el motivo) hasta un `resume()` explícito del operador —un motor que revienta tres turnos seguidos necesita que alguien mire—. Cada fallo se matricula en el ledger con el siguiente `seq`, `activity=BLOCKED` y estado `DEGRADED` (`PAUSED` al abrir el breaker) con `reason=tick_failed:<racha>`. **Desvío declarado del texto «persistir tick `ERROR`»:** el vocabulario de estado es cerrado (`RUNNING/PAUSED/BLOCKED/DEGRADED/REQUIRES_ATTENTION`) e inventar `ERROR` haría que `_state_of` lo degradara a `REQUIRES_ATTENTION` por desconocido; `DEGRADED` + `last_reason` es el mismo hecho, legible por el monitor y por un reinicio.
+- **También la lane SAFE/dry:** `paper_auto_engine_loop` ya marcaba `DEGRADED` cuando el tick fallaba; ahora un `watch_refresher` que **lanza** también lo marca (antes sólo quedaba el log). Su resolución de watch ya era fail-closed (sin ESTUDIO ⇒ cache vacía ⇒ no opera), así que lo que faltaba era declarar la excepción, no cambiar la política.
+- **Certificado** en `apps/api-python/tests/test_auto_m7_control_plane_health.py`: con el control plane caducado el turno **no abre** y **sí cierra**, el motivo declarado es `control_plane_stale`; el backoff da `[60, 120, 240, 300]` con rachas `[1, 2, 3]`; el breaker pausa al umbral y sólo `resume()` lo rearma; el turno fallido queda en `auto_engine_ticks`/`auto_engine_runs` (test PG). Contra el código previo fallan por construcción (los tokens, los hooks y el backoff no existían y el `BUY` se ejecutaba).
+
+### M15 — El P&L parcial se mide contra el coste medio ponderado · ✅ Cerrado (`4d3082fd` + certificado)
+- **Fallo:** al ampliar una posición viva, `_entry_price` conservaba el precio de la **primera** entrada, así que el P&L realizado (y el no realizado, y el trailing, que usan la misma referencia) se medían contra un coste que ya no era el de la posición.
+- **Cerrado:** `_blend_entry_price(prior, held, price, qty)` mezcla el coste por cantidades en la rama de ampliación del fill `BUY`. La referencia sigue siendo **una sola** (`_entry_price`), que es exactamente lo que hace que la corrección llegue a todo lo que la usa: `entry_ref = self._entry_price.get(symbol)` en el P&L realizado de la venta parcial/total, el no realizado y la protección. `_canonical_entry_prices` reconstruye la base desde los fills aplicados del libro canónico, así que un reinicio también la readopta mezclada.
+- **Alcance medido (por qué el impacto era bajo):** el turno **no apila** —`if action == "BUY" and held > 0: continue`—, de modo que la rama de ampliación no se alcanza decidiendo un segundo `BUY`; se alcanza cuando un fill se aplica sobre una posición ya viva (materialización de una orden pendiente de un turno anterior / re-liquidación idempotente). La mezcla sigue siendo la respuesta correcta en ese caso; lo que se corrige es que la base de coste no mintiera.
+- **Certificado** en `apps/api-python/tests/test_auto_m15_blended_entry.py`: `100@100 + 100@110 ⇒ 105` (y `300@100 + 100@120 ⇒ 105`), total nulo conserva la base previa, el P&L de `200@115` sobre coste 105 son `2.000` (no los `3.000` del primer fill) y tres ampliaciones seguidas convergen al promedio directo `112,5`.
+
 ## 3. Severidad baja
 
 - Conversión `Decimal → float → Decimal` en precios, equity, stops y cantidades de fills (`:971`, `:1052`, `:2561`, `:4570-4588`, `:6671-6699`, `live_order_recovery_worker.py:184,326,339`). Mantener `Decimal` hasta el borde.
@@ -338,7 +356,8 @@ Fuente: lectura de módulos de señales, ciclo de vida y promoción. No verifica
 3. **Circuit breaker y estado durable:** P3, P8, M8, M10, M14 · ✅ cerrado.
 4. **Concurrencia:** P7, M1 · ✅ cerrado.
 5. **Gates de estrategia:** S1, S2, S5, S6, S7, S3 · ✅ cerrado.
-6. **Validaciones de bordes:** M2, M3, M4, M11 · ✅ cerrado; queda la severidad baja, `M7`, `M15` y `S8`-`S10`.
+6. **Validaciones de bordes:** M2, M3, M4, M11 · ✅ cerrado.
+7. **Resiliencia del loop y coste de la posición:** M7, M15 · ✅ cerrado. Queda la severidad baja y `S8`-`S10`.
 
 Cada corrección debería ir con un test que muerda (entrada `NaN`, `None`, valor desconocido o fallo de persistencia inyectado) para que el comportamiento fail-closed quede protegido.
 
