@@ -96,3 +96,29 @@ un sello que caduca en días.
 - Un hueco se declara: no se rellena con 0 ni se cuenta como medido.
 - El orden correcto es **fusionar → sellar → re-anclar → medir**; medir antes de fusionar gasta días
   que el siguiente sello convierte en `STALE`.
+
+## 5. Ejecución del 2026-11-05 (en curso al cerrar esta nota)
+
+`run-day --force` desde el worktree pinneado (`d8a5d0f9`, freeze OK), arrancado a las **19:39**.
+
+| medida | valor |
+| --- | --- |
+| preflight | `HIGH_VOLATILITY` · LONG permitidas · **57/80** operables · `exit 0` |
+| cadencia | **~65 s/tick** (60 s de espera + trabajo) |
+| material durable | **13 fills**, **3 posiciones**, **4 reservas**, **1 intención de salida** |
+| journal | 10 699 → **10 740** entradas en una hora |
+| gate | `cycles=0/0` · `verdict=BLOCKED` (bloqueador `no closed cycles`) |
+
+`BLOCKED` **no** es un fallo: con fills y `closedCycles = 0` el bloqueador es que ninguna posición ha
+cerrado todavía, y un ciclo solo nace al salir la posición. En el día 1 de una serie re-sembrada es
+el estado esperado; la ventana se mide en **días**, no en ticks.
+
+**Parón observado:** entre las **19:49 y las 20:40** el contador de ticks no avanzó (`12`) y se
+recuperó solo. Es el *modern standby* ya documentado (`506`/`507`); la corrida **se congela sin
+fallar**, así que un hueco de horas en `forward.err.txt` no es un error del runner.
+
+**Qué mirar al día siguiente:** que el manifiesto de `operability_runs/window-runs/20261105/` esté
+escrito con su `gate` y su `windowProvenance` (sha256 del `window.json`), y que la fila del ledger
+haya pasado de `HARD_ERROR · PREFLIGHT_ERROR` a `MEDIDO` o `NO_MEDIDO_*`. Mientras el proceso siga
+vivo, la fila vieja es **histórica**, no el resultado de esta corrida.
+
