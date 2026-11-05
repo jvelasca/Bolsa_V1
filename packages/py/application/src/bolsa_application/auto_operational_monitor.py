@@ -41,7 +41,6 @@ from bolsa_analytics.cognitive.measurement import (
     MeasurementStatus,
     coerce_measurement,
 )
-
 from bolsa_application.auto_cycle_journal import cycle_decision_id
 from bolsa_application.auto_reason_codes import ACTIVE_STRATEGY_HOLD_EVENT
 from bolsa_application.auto_self_evaluation_feed import cycles_from_fills
@@ -1977,16 +1976,15 @@ async def read_operational_monitor(
     ignora el filtro por instrumento. Sin ``cycle_id``, ``instrument_id`` acota la ventana de
     reservas a ESE valor (los ciclos derivan de ellas); ``None`` conserva la ventana global.
     """
-    from bolsa_infrastructure.database.repositories.journal_repository import (
-        SqlAlchemyJournalRepository,
-    )
-
     from bolsa_application.auto_engine_state_store import PostgresAutoEngineStore
     from bolsa_application.exit_order_store import PostgresExitOrderStore
     from bolsa_application.reservation_store import PostgresReservationStore
     from bolsa_application.sim_durable_store import (
         PostgresSimAutoPositionStore,
         PostgresSimFillFinanceContextStore,
+    )
+    from bolsa_infrastructure.database.repositories.journal_repository import (
+        SqlAlchemyJournalRepository,
     )
 
     reservation_store = PostgresReservationStore(session, autocommit=False)
@@ -2098,6 +2096,7 @@ async def read_operational_monitor(
     engine_ticks = 0
     try:
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import AutoEngineTickRow
 
         engine_ticks = int(

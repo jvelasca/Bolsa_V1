@@ -18,7 +18,6 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
-from bolsa_infrastructure.config import get_settings
 
 from bolsa_api.background import window_day_watch_worker as watch_worker
 from bolsa_api.background.window_day_watch_worker import (
@@ -37,6 +36,7 @@ from bolsa_api.background.window_day_watch_worker import (
     start_window_day_watch,
     write_status,
 )
+from bolsa_infrastructure.config import get_settings
 
 MADRID = ZoneInfo("Europe/Madrid")
 DUE_HOUR = 20

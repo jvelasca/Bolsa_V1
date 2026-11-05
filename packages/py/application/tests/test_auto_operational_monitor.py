@@ -2032,14 +2032,13 @@ class _FakeJournal:
 
 
 def _patch_reader_stores(monkeypatch: Any, *, reservations: type) -> None:
-    from bolsa_infrastructure.database.repositories import journal_repository
-
     from bolsa_application import (
         auto_engine_state_store,
         exit_order_store,
         reservation_store,
         sim_durable_store,
     )
+    from bolsa_infrastructure.database.repositories import journal_repository
 
     monkeypatch.setattr(reservation_store, "PostgresReservationStore", reservations)
     monkeypatch.setattr(exit_order_store, "PostgresExitOrderStore", _FakeExitOrders)

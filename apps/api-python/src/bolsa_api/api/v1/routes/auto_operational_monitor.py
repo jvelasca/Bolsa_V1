@@ -15,10 +15,6 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from bolsa_application.auto_operational_monitor import (
-    build_operational_monitor,
-    read_operational_monitor,
-)
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +23,10 @@ from bolsa_api.api.dependencies import (
     get_account_id_header,
     get_db_session,
     resolve_account_scope_or_default,
+)
+from bolsa_application.auto_operational_monitor import (
+    build_operational_monitor,
+    read_operational_monitor,
 )
 
 router = APIRouter()
