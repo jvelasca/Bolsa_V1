@@ -24,9 +24,11 @@
 > [#83](https://github.com/jvelasca/Bolsa_V1/pull/83) (`fix/auto-s3-multiple-testing`: universo probado registrado y
 > corrección de Bonferroni tras flag). `S4` se cierra en la PR
 > [#84](https://github.com/jvelasca/Bolsa_V1/pull/84) (`fix/auto-s4-signal-timing`: `signal_bar`/`execution_bar` en el
-> contrato y guarda anti-lookahead). Las siete PR están fusionadas en `fix/059-060-proveedores`; **no** hay sello,
-> bump ni migración fuera de las citadas. **Abiertos:** `P3`, el resto de la severidad media `M*` (`M1`-`M11`,
-> `M14`, `M15`) y `S1`, `S2`, `S5`-`S10`.
+> contrato y guarda anti-lookahead). `P3` se cierra en la PR
+> [#86](https://github.com/jvelasca/Bolsa_V1/pull/86) (`fix/auto-p3-drawdown-breaker`: una referencia no medible es
+> `None` y no `0 %`, el libro no se envenena con equity no finito y una marca no persistida veta aperturas). Las ocho
+> PR están fusionadas en `fix/059-060-proveedores`; **no** hay sello, bump ni migración fuera de las citadas.
+> **Abiertos:** el resto de la severidad media `M*` (`M1`-`M11`, `M14`, `M15`) y `S1`, `S2`, `S5`-`S10`.
 
 Alcance detallado: lógica de decisión, riesgo, ejecución, workers AUTO, `auto_simulation_worker.py` (9.802 líneas) y lógica de estrategia y señales.
 Modo: solo lectura. No se modificó el repositorio. Las referencias `archivo:línea` son del tag `v2.88.183-beta`.
@@ -61,10 +63,11 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 - **Fallo:** MinMarketCap, MinADV, MaxSpread, sector y drawdown quedan `SKIPPED` si el dato es `None`, y SKIPPED no veta. El comentario "fail-closed" es falso. El router no pasa market cap, ADV ni spread, así que esas tres reglas están muertas en paper_auto.
 - **Debería ser:** si la regla está activa y falta el dato, `FAILED` con motivo `*_unmeasured`. Las reglas opcionales se declaran en la política, no se deducen de la ausencia del dato.
 
-### P3 — Circuit breaker de drawdown dependiente de un `except: pass` · 🟠 Alta · Por lectura
+### P3 — Circuit breaker de drawdown dependiente de un `except: pass` · 🟠 Alta · Por lectura · ✅ Cerrado ([#86](https://github.com/jvelasca/Bolsa_V1/pull/86))
 - **Dónde:** `execution_router.py:~899-914`, `account_drawdown.py`.
 - **Fallo:** si falla hidratar o persistir las marcas de equity, el día "abre" con el equity actual y el drawdown diario es 0. Sin `initial_deposit`, `max_pct` es `None` (SKIPPED). `_dd_pct` devuelve 0,0 si la referencia ≤ 0. El día es UTC.
 - **Debería ser:** sin marca de apertura fiable, vetar aperturas. Persistir transaccionalmente. Referencia ≤ 0 equivale a no medido, no a 0 %.
+- **Cerrado (`fix/auto-p3-drawdown-breaker`):** `_dd_pct` devuelve `None` —no `0.0`— cuando la referencia es `≤ 0` o no finita, y `EquityMarkBook.update` no muta el libro con equity `NaN`/`inf` (la marca buena anterior sigue siendo la referencia). Sin `initial_deposit` el `max_pct` sigue sin medirse y el Policy Gate lo veta como `HardMaxDrawdown_unmeasured` (cerrado ya en P2). La hidratación fallida sin marcas en memoria veta con `drawdown_marks:unavailable` y, a partir de aquí, un fallo al **persistir** veta con `drawdown_marks:not_persisted`: la marca vale para el tick pero no para sobrevivir a un reinicio, así que no se acepta una apertura contra una referencia que un crash convertiría en 0 %. El libro reintenta la escritura en cada evaluación y deja de vetar cuando vuelve a persistir. La frontera del día se mantiene en **UTC** y queda declarada en el propio libro (`dayKey`/`weekKey` viajan con las marcas, así que una marca de otro día se descarta).
 
 ### P4 — Data gate abre con evidencia vacía · 🟠 Alta · Reproducido · ✅ Cerrado ([#77](https://github.com/jvelasca/Bolsa_V1/pull/77))
 - **Dónde:** `auto_adaptive_data_gate.py:340-345`; llamador `auto_simulation_worker.py:~5745-5790`.
