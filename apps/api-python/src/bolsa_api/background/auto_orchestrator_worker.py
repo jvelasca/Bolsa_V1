@@ -532,13 +532,18 @@ def _forward_window_bars() -> int:
     return value if value > 0 else _FORWARD_WINDOW_BARS_DEFAULT
 
 
+def _utc_now() -> datetime:
+    """Único punto de reloj del orquestador: los tests lo parchean en vez de dormir."""
+    return datetime.now(UTC)
+
+
 def _new_cycle_id() -> str:
     """Identidad única por ciclo AUTO (UTC timestamp + sufijo aleatorio corto).
 
     V2.32.1 (auditoría P2-05): permite distinguir ciclos, reintentos, re-LAB y shadow
     en la trazabilidad (antes todos compartían ``orchestrator:{instrument}``).
     """
-    now = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    now = _utc_now().strftime("%Y%m%dT%H%M%SZ")
     return f"{now}-{uuid.uuid4().hex[:8]}"
 
 
@@ -870,7 +875,7 @@ async def _refresh_adaptive_snapshot(
     # (catálogo + gramática) en lugar de gobernar con aprendizaje stale.
     max_staleness = adaptive_max_staleness_days()
     if max_staleness > 0 and not snapshot.is_fresh(
-        now=datetime.now(UTC).isoformat(), max_staleness_days=max_staleness
+        now=_utc_now().isoformat(), max_staleness_days=max_staleness
     ):
         logger.warning(
             "auto_orchestrator adaptive_snapshot STALE hash=%s window_to=%s "

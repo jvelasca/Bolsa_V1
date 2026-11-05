@@ -121,6 +121,10 @@ LEASE_NOT_HELD = "lease_not_held"
 # ejecutaba al precio vivo con el stop publicado encima del mercado.
 PROPOSAL_PRICE_INVALID = "proposal_price_invalid"
 
+# R1 (auditoría precio entrada/salida) — el hueco entre el precio de DECISIÓN (``close(B-1)``) y
+# el de EJECUCIÓN (``open(B)``) supera ``max_entry_gap_atr``·ATR: el riesgo realmente asumido ya no
+# es el presupuestado. Veto de ENTRADA con motivo propio.
+ENTRY_GAP_EXCEEDED = "entry_gap_exceeded"
 # AUTO-2 — FSM de la posición: ratchet de stop y degradación de protección.
 STOP_RATCHET_APPLIED = "stop_ratchet_applied"
 STOP_RATCHET_REJECTED = "stop_ratchet_rejected"
@@ -435,6 +439,7 @@ __all__ = [
     "POSITION_SKIP_REASONS",
     "POSITION_UNMANAGED",
     "PROPOSAL_PRICE_INVALID",
+    "ENTRY_GAP_EXCEEDED",
     "PROTECTION_MISSING",
     "PROTECT_REQUESTED",
     "RECONCILIATION_REQUIRED",

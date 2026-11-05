@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
 import json
+import os
 import pickle
 from collections.abc import Callable
 from typing import Any, TypeVar
@@ -13,18 +15,27 @@ import redis
 
 T = TypeVar("T")
 
-REDIS_KEY_PREFIX = "bolsa:features:v2:"
+REDIS_KEY_PREFIX = "bolsa:features:v3:"
+HMAC_KEY_ENV = "FEATURE_CACHE_HMAC_KEY"
 
 
 def _checksum(blob: bytes) -> str:
-    return hashlib.sha256(blob).hexdigest()
+    """HMAC-SHA256 con clave secreta: un sha256 junto al blob no autentica nada.
+
+    Sin clave no se (de)serializa: ``pickle.loads`` sobre un blob de Redis sin autenticar
+    es ejecución de código para quien pueda escribir en Redis. Sin clave la caché es un miss.
+    """
+    key = (os.getenv(HMAC_KEY_ENV) or "").encode("utf-8")
+    if not key:
+        raise ValueError(f"{HMAC_KEY_ENV} ausente: la caché Redis no se usa sin clave")
+    return hmac.new(key, blob, hashlib.sha256).hexdigest()
 
 
 def encode_feature_payload(value: Any) -> str:
     blob = pickle.dumps(value)
     return json.dumps(
         {
-            "sha256": _checksum(blob),
+            "hmac": _checksum(blob),
             "blob": base64.b64encode(blob).decode("ascii"),
         }
     )
@@ -32,9 +43,9 @@ def encode_feature_payload(value: Any) -> str:
 
 def decode_feature_payload(raw: str) -> Any:
     payload = json.loads(raw)
-    digest = payload["sha256"]
+    digest = str(payload["hmac"])
     blob = base64.b64decode(str(payload["blob"]).encode("ascii"))
-    if _checksum(blob) != digest:
+    if not hmac.compare_digest(_checksum(blob), digest):
         raise ValueError("Feature cache checksum mismatch")
     return pickle.loads(blob)
 

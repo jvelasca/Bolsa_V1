@@ -251,7 +251,9 @@ async def test_v2_protective_stop_managed_by_position_manager(
 
     def script(_symbol: str, _minute: int) -> float:
         prices["n"] += 1
-        return 100.0 if prices["n"] <= 1 else 96.0
+        # El tick de ENTRADA consume DOS lecturas (decisión + ejecución): el hueco
+        # decisión→ejecución es 0 en esta barra y la geometría (R1) se ancla al fill.
+        return 100.0 if prices["n"] <= 2 else 96.0
 
     worker = _worker(price_script=script)
     worker._decider = _buy_lot()
@@ -270,7 +272,7 @@ async def test_v2_target1_reduces_not_full_exit(v2_env: None) -> None:
 
     def script(_symbol: str, _minute: int) -> float:
         prices["n"] += 1
-        return 100.0 if prices["n"] <= 1 else 103.5  # ≥ T1 103
+        return 100.0 if prices["n"] <= 2 else 103.5  # ≥ T1 103
 
     worker = _worker(price_script=script)
     worker._decider = _buy_lot()
@@ -767,7 +769,7 @@ async def test_v2_same_bar_signal_does_not_reopen_after_stop_out(
 
     def script(_symbol: str, _minute: int) -> float:
         prices["n"] += 1
-        return 100.0 if prices["n"] <= 1 else 96.0  # 2º tick rompe el stop (97)
+        return 100.0 if prices["n"] <= 2 else 96.0  # 2º tick rompe el stop (97)
 
     worker = _worker(price_script=script)
     worker._decider = _buy_lot()
@@ -802,7 +804,7 @@ async def test_v2_new_bar_signal_can_open_again(v2_env: None) -> None:
 
     def script(_symbol: str, _minute: int) -> float:
         prices["n"] += 1
-        return 100.0 if prices["n"] <= 1 else 96.0
+        return 100.0 if prices["n"] <= 2 else 96.0
 
     worker = AutoSimulationWorker(
         clock=clock,
