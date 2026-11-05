@@ -31,6 +31,11 @@ class SignalEventV1Dto(BaseModel):
     data_version: str | None = Field(default=None, alias="dataVersion")
     indicator_snapshot_hash: str | None = Field(default=None, alias="indicatorSnapshotHash")
     preset_key: str | None = Field(default=None, alias="presetKey")
+    # S4 — contrato de tiempo explícito. Opcionales para clientes históricos; el
+    # serializador siempre los publica resueltos (``signalBar = t``,
+    # ``executionBar = t + 1``).
+    signal_bar: int | None = Field(default=None, alias="signalBar")
+    execution_bar: int | None = Field(default=None, alias="executionBar")
 
 
 class EvaluateSignalsResponseDto(BaseModel):
@@ -50,4 +55,6 @@ def to_signal_event_v1_dto(event: SignalEventV1) -> SignalEventV1Dto:
         data_version=event.data_version,
         indicator_snapshot_hash=event.indicator_snapshot_hash,
         preset_key=event.preset_key,
+        signal_bar=event.resolved_signal_bar,
+        execution_bar=event.resolved_execution_bar,
     )

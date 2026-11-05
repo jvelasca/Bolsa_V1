@@ -22304,6 +22304,17 @@
             ],
             "title": "Dataversion"
           },
+          "executionBar": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executionbar"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -22341,6 +22352,17 @@
           "price": {
             "title": "Price",
             "type": "number"
+          },
+          "signalBar": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signalbar"
           },
           "strategyDefinitionId": {
             "title": "Strategydefinitionid",

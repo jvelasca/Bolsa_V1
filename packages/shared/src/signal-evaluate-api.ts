@@ -1,9 +1,9 @@
-import type { DrawingReplayMarkerDto } from './drawing-replay-api.js';
-import type { StrategyDefinitionV1 } from './research-platform.js';
-import type { OhlcvBarDto } from './types.js';
-import type { SignalEventV1, SignalKind } from './signal-events.js';
+import type { DrawingReplayMarkerDto } from "./drawing-replay-api.js";
+import type { StrategyDefinitionV1 } from "./research-platform.js";
+import type { OhlcvBarDto } from "./types.js";
+import type { SignalEventV1, SignalKind } from "./signal-events.js";
 
-export type SignalEvaluationMode = 'raw' | 'gated';
+export type SignalEvaluationMode = "raw" | "gated";
 
 export interface EvaluateSignalsRequestDto {
   definition: StrategyDefinitionV1 | Record<string, unknown>;
@@ -29,12 +29,12 @@ export function drawingMarkerToSignalEventV1(
   },
 ): SignalEventV1 {
   let kind: SignalKind;
-  if (marker.direction === 'up') {
-    kind = 'entry_long';
-  } else if (marker.direction === 'down') {
-    kind = 'exit';
+  if (marker.direction === "up") {
+    kind = "entry_long";
+  } else if (marker.direction === "down") {
+    kind = "exit";
   } else {
-    kind = 'watch';
+    kind = "watch";
   }
 
   return {
@@ -46,5 +46,8 @@ export function drawingMarkerToSignalEventV1(
     strategyVersion: options.strategyVersion,
     barIndex: options.barIndex,
     price: marker.price,
+    // S4: la señal se decide con la barra cerrada y se ejecuta en la siguiente.
+    signalBar: options.barIndex,
+    executionBar: options.barIndex + 1,
   };
 }

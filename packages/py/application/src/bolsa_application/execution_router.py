@@ -265,6 +265,35 @@ def _unsupported_short_skip(instrument_id: str, kind: str) -> ExecutionActionRes
     return None
 
 
+def _lookahead_skip(signal: SignalEventV1) -> ExecutionActionResult:
+    """S4 — no se ejecuta una señal cuya barra de ejecución no es posterior.
+
+    Fail-closed: el contrato declara ``execution_bar = signal_bar + 1``; si un hit
+    trae una ejecución en la misma barra (o anterior) viene de datos con lookahead y
+    se descarta en vez de operar con información del futuro.
+    """
+    return ExecutionActionResult(
+        instrument_id=signal.instrument_id,
+        signal_kind=str(signal.kind),
+        status="skipped",
+        reason=(
+            "signal_timing:lookahead "
+            f"(signalBar={signal.resolved_signal_bar}, "
+            f"executionBar={signal.resolved_execution_bar})"
+        ),
+    )
+
+
+def _optional_int(value: Any) -> int | None:
+    """Entero opcional sin inventarlo: ``None`` si falta o no es convertible."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _signal_from_hit(hit: dict[str, Any]) -> SignalEventV1:
     raw = hit.get("signal") or {}
     return SignalEventV1(
@@ -279,6 +308,10 @@ def _signal_from_hit(hit: dict[str, Any]) -> SignalEventV1:
         data_version=raw.get("dataVersion"),
         indicator_snapshot_hash=raw.get("indicatorSnapshotHash"),
         preset_key=raw.get("presetKey"),
+        # S4: opcionales; si el hit no los trae, el contrato los resuelve desde
+        # ``barIndex`` (señal en ``t``, ejecución en ``t + 1``).
+        signal_bar=_optional_int(raw.get("signalBar", raw.get("signal_bar"))),
+        execution_bar=_optional_int(raw.get("executionBar", raw.get("execution_bar"))),
     )
 
 
@@ -682,6 +715,9 @@ class ExecutionRouter:
             for hit in hits:
                 signal = _signal_from_hit(hit)
                 kind = str(signal.kind)
+                if signal.has_lookahead():
+                    actions.append(_lookahead_skip(signal))
+                    continue
                 if kind not in allowed_kinds:
                     actions.append(
                         ExecutionActionResult(
@@ -715,6 +751,9 @@ class ExecutionRouter:
         for hit in hits:
             signal = _signal_from_hit(hit)
             kind = str(signal.kind)
+            if signal.has_lookahead():
+                actions.append(_lookahead_skip(signal))
+                continue
             if kind not in allowed_kinds:
                 actions.append(
                     ExecutionActionResult(

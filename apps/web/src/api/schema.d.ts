@@ -12101,6 +12101,8 @@ export interface components {
             barIndex: number;
             /** Dataversion */
             dataVersion?: string | null;
+            /** Executionbar */
+            executionBar?: number | null;
             /** Id */
             id: string;
             /** Indicatorsnapshothash */
@@ -12113,6 +12115,8 @@ export interface components {
             presetKey?: string | null;
             /** Price */
             price: number;
+            /** Signalbar */
+            signalBar?: number | null;
             /** Strategydefinitionid */
             strategyDefinitionId: string;
             /** Strategyversion */

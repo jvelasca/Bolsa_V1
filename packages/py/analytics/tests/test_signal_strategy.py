@@ -96,6 +96,80 @@ def test_drawing_marker_to_signal_event_v1() -> None:
     assert event.kind == "entry_long"
     assert event.bar_index == 9
     assert event.strategy_version == 2
+    assert event.signal_bar == 9
+    assert event.execution_bar == 10
+
+
+# ── S4: contrato de tiempo explícito (señal en t, ejecución en t + 1) ──────────
+
+
+def test_signals_declare_signal_and_execution_bar() -> None:
+    """S4: cada señal nace de una barra cerrada y se ejecuta en la siguiente."""
+    bars = _v_bars()
+    events = evaluate_strategy(_sma_crossover_definition(), bars, mode="raw")
+
+    assert events, "la serie debe producir señales para comprobar el contrato"
+    for event in events:
+        assert event.signal_bar == event.bar_index
+        assert event.execution_bar == event.bar_index + 1
+        assert event.resolved_signal_bar == event.signal_bar
+        assert event.resolved_execution_bar == event.execution_bar
+        assert not event.has_lookahead()
+
+
+def test_legacy_signal_without_timing_fields_resolves_from_bar_index() -> None:
+    """S4: los campos son opcionales; un evento histórico no queda sin contrato."""
+    from bolsa_analytics.signals.strategy import SignalEventV1
+
+    event = SignalEventV1(
+        id="sig:legacy",
+        instrument_id="inst-1",
+        timestamp="2024-01-10",
+        kind="entry_long",
+        strategy_definition_id="strat-1",
+        strategy_version=1,
+        bar_index=7,
+        price=100.0,
+    )
+
+    assert event.signal_bar is None
+    assert event.execution_bar is None
+    assert event.resolved_signal_bar == 7
+    assert event.resolved_execution_bar == 8
+    assert not event.has_lookahead()
+
+
+def test_lookahead_is_detected_when_execution_is_not_after_signal() -> None:
+    """S4: ejecutar en la misma barra (o antes) es lookahead y se detecta."""
+    from bolsa_analytics.signals.strategy import SignalEventV1
+
+    same_bar = SignalEventV1(
+        id="sig:same",
+        instrument_id="inst-1",
+        timestamp="2024-01-10",
+        kind="entry_long",
+        strategy_definition_id="strat-1",
+        strategy_version=1,
+        bar_index=7,
+        price=100.0,
+        signal_bar=7,
+        execution_bar=7,
+    )
+    before_signal = SignalEventV1(
+        id="sig:before",
+        instrument_id="inst-1",
+        timestamp="2024-01-10",
+        kind="entry_long",
+        strategy_definition_id="strat-1",
+        strategy_version=1,
+        bar_index=7,
+        price=100.0,
+        signal_bar=7,
+        execution_bar=6,
+    )
+
+    assert same_bar.has_lookahead()
+    assert before_signal.has_lookahead()
 
 
 # ── B-3: el estado ``gated`` viene del libro, no de un replay de la ventana ──────

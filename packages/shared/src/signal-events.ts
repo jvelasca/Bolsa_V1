@@ -1,7 +1,7 @@
-import type { BacktestStrategyType } from './types.js';
+import type { BacktestStrategyType } from "./types.js";
 
 /** Tipos de señal discretos — alineado SC-0/SC-1 y ADR-006 backtest_marker. */
-export type SignalKind = 'entry_long' | 'entry_short' | 'exit' | 'watch';
+export type SignalKind = "entry_long" | "entry_short" | "exit" | "watch";
 
 /** Subset H0 emitido por evaluate_preset (SC-0). */
 export interface PresetSignalEventDto {
@@ -25,4 +25,8 @@ export interface SignalEventV1 {
   dataVersion?: string;
   indicatorSnapshotHash?: string;
   presetKey?: BacktestStrategyType;
+  /** S4 — barra cerrada usada para decidir; si falta, `barIndex`. */
+  signalBar?: number;
+  /** S4 — barra de ejecución; si falta, `signalBar + 1`. Nunca <= `signalBar`. */
+  executionBar?: number;
 }

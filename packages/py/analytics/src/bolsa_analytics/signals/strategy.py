@@ -32,7 +32,18 @@ class StrategyBarInput:
 
 @dataclass(frozen=True, slots=True)
 class SignalEventV1:
-    """Tipo analytics: Signal Event 1."""
+    """Tipo analytics: Signal Event 1.
+
+    S4 (auditoría .183) — contrato de tiempo explícito: la señal se decide sobre la
+    barra **cerrada** ``signal_bar`` y se ejecuta en la barra **siguiente**
+    ``execution_bar = signal_bar + 1``. Los dos campos son opcionales para no romper a
+    los consumidores históricos: si faltan, se resuelven con ``bar_index`` y
+    ``bar_index + 1`` respectivamente.
+
+    Un evento cuyo ``execution_bar`` no sea posterior a ``signal_bar`` es **lookahead**
+    y quien vaya a ejecutarlo debe rechazarlo: ``has_lookahead()`` lo expone y
+    ``ExecutionRouter`` lo filtra fail-closed.
+    """
     id: str
     instrument_id: str
     timestamp: str
@@ -44,6 +55,24 @@ class SignalEventV1:
     data_version: str | None = None
     indicator_snapshot_hash: str | None = None
     preset_key: PresetStrategyType | None = None
+    signal_bar: int | None = None
+    execution_bar: int | None = None
+
+    @property
+    def resolved_signal_bar(self) -> int:
+        """Barra cerrada usada para decidir; ``bar_index`` si el campo es ``None``."""
+        return self.bar_index if self.signal_bar is None else self.signal_bar
+
+    @property
+    def resolved_execution_bar(self) -> int:
+        """Barra de ejecución; ``signal_bar + 1`` si el campo es ``None``."""
+        if self.execution_bar is not None:
+            return self.execution_bar
+        return self.resolved_signal_bar + 1
+
+    def has_lookahead(self) -> bool:
+        """``True`` si la ejecución declarada no es posterior a la señal."""
+        return self.resolved_execution_bar <= self.resolved_signal_bar
 
 
 def _infer_preset_from_indicator_specs(specs: list[dict[str, Any]]) -> PresetStrategyType | None:
@@ -108,6 +137,9 @@ def _to_signal_event_v1(
         data_version=data_version,
         indicator_snapshot_hash=indicator_snapshot_hash,
         preset_key=event.preset_key,
+        # S4: la señal nace de la barra cerrada ``t``; su ejecución es la ``t + 1``.
+        signal_bar=event.bar_index,
+        execution_bar=event.bar_index + 1,
     )
 
 
@@ -257,4 +289,6 @@ def drawing_marker_to_signal_event_v1(
         strategy_version=strategy_version,
         bar_index=bar_index,
         price=price,
+        signal_bar=bar_index,
+        execution_bar=bar_index + 1,
     )

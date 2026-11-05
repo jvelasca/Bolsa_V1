@@ -75,6 +75,9 @@ def _signal_to_hit(signal: SignalEventV1, *, symbol: str) -> dict[str, Any]:
             "dataVersion": signal.data_version,
             "indicatorSnapshotHash": signal.indicator_snapshot_hash,
             "presetKey": signal.preset_key,
+            # S4 — señal en la barra cerrada, ejecución en la siguiente.
+            "signalBar": signal.resolved_signal_bar,
+            "executionBar": signal.resolved_execution_bar,
         },
     }
 
@@ -249,6 +252,9 @@ class EvaluatePositionExits:
                 "barIndex": signal.bar_index,
                 "price": signal.price,
                 "presetKey": signal.preset_key,
+                # S4 — mismo contrato de tiempo en el dict que consume el router.
+                "signalBar": signal.resolved_signal_bar,
+                "executionBar": signal.resolved_execution_bar,
             }
 
             if policy.mode == "exit_strategy" or not execute_trades or self._router is None:
