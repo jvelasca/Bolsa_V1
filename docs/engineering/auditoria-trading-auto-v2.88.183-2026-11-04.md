@@ -10,15 +10,23 @@
 > SIM; los hallazgos son fail-open ante dato ausente y persistencia fallida ignorada.
 > **Certificación:** limitada a lo ejecutado en §7. No se ejecutó el motor con datos reales, ni los tests con
 > Postgres, ni los E2E, ni se comprobó el número de workers del despliegue.
-> **Trazabilidad de las correcciones:** `P1`, `P2`, `P4` y `P9` se cierran en la rama
-> `fix/auto-fail-closed-p1-p2-p4-p9` (flags con lista blanca, `<Regla>_unmeasured`, `DataGatePolicy.require_evidence`
-> y normalizador finito en `bolsa_domain`). `P5` y `P6` se cierran en la PR
-> [#78](https://github.com/jvelasca/Bolsa_V1/pull/78) (`fix/auto-p5-p6-persistence`). `P7` y `P8` se cierran en la
-> rama `fix/auto-p7p8-crossprocess-lease` (lease durable por `engine_id`, migración `063_auto_engine_lease`, claim
-> del ciclo ANTES de ejecutar y reconstrucción de `_open` al cambiar de generación). `M12` y `M13` se cierran en la
-> rama `fix/auto-m12-m13-watch-monitor` (lock del vigía con dueño probado PID/TTL + latido atómico, y estado
-> `INCOMPLETE` explícito en el monitor). `P3`, el resto de la severidad media `M*` y `S1`-`S10` quedan abiertos:
-> este documento sigue siendo el snapshot del estado auditado, no el estado corregido.
+> **Trazabilidad de las correcciones:** `P1`, `P2`, `P4` y `P9` se cierran en la PR
+> [#77](https://github.com/jvelasca/Bolsa_V1/pull/77) (`fix/auto-fail-closed-p1-p2-p4-p9`: flags con lista blanca,
+> `<Regla>_unmeasured`, `DataGatePolicy.require_evidence` y normalizador finito en `bolsa_domain`). `P5` y `P6` se
+> cierran en la PR [#78](https://github.com/jvelasca/Bolsa_V1/pull/78) (`fix/auto-p5-p6-persistence`). `P7` y `P8` se
+> cierran en la PR [#80](https://github.com/jvelasca/Bolsa_V1/pull/80) (`fix/auto-p7p8-crossprocess-lease`: lease
+> durable por `engine_id`, migración `063_auto_engine_lease`, claim del ciclo ANTES de ejecutar y reconstrucción de
+> `_open` al cambiar de generación). `M12` y `M13` se cierran en la PR
+> [#81](https://github.com/jvelasca/Bolsa_V1/pull/81) (`fix/auto-m12-m13-watch-monitor`: lock del vigía con dueño
+> probado PID/TTL + latido atómico, y estado `INCOMPLETE` explícito en el monitor). `M16` se cierra en la PR
+> [#82](https://github.com/jvelasca/Bolsa_V1/pull/82) (`fix/auto-m16-account-scope`: `account_id` separado de
+> `instrument_id`, migración `064_strategy_account_scope`). `S3` se cierra en la PR
+> [#83](https://github.com/jvelasca/Bolsa_V1/pull/83) (`fix/auto-s3-multiple-testing`: universo probado registrado y
+> corrección de Bonferroni tras flag). `S4` se cierra en la PR
+> [#84](https://github.com/jvelasca/Bolsa_V1/pull/84) (`fix/auto-s4-signal-timing`: `signal_bar`/`execution_bar` en el
+> contrato y guarda anti-lookahead). Las siete PR están fusionadas en `fix/059-060-proveedores`; **no** hay sello,
+> bump ni migración fuera de las citadas. **Abiertos:** `P3`, el resto de la severidad media `M*` (`M1`-`M11`,
+> `M14`, `M15`) y `S1`, `S2`, `S5`-`S10`.
 
 Alcance detallado: lógica de decisión, riesgo, ejecución, workers AUTO, `auto_simulation_worker.py` (9.802 líneas) y lógica de estrategia y señales.
 Modo: solo lectura. No se modificó el repositorio. Las referencias `archivo:línea` son del tag `v2.88.183-beta`.
@@ -43,12 +51,12 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 
 ## 1. Hallazgos prioritarios (corregir primero)
 
-### P1 — Flags de activación fail-open · 🟠 Alta · Verificado a mano
+### P1 — Flags de activación fail-open · 🟠 Alta · Verificado a mano · ✅ Cerrado ([#77](https://github.com/jvelasca/Bolsa_V1/pull/77))
 - **Dónde:** `auto_simulation_worker.py:439-444` (`sim_worker_enabled`), `:458-463` (`AUTO_ENGINE_SIM_REAL_PRICE`), `paper_auto_engine_worker.py:96-102` (`_env_on`).
 - **Fallo:** cualquier valor distinto de `""/0/false/no/off` activa. `disabled`, `n` u `of` encienden AUTO o el precio real.
 - **Debería ser:** lista blanca (`1/true/yes/on`). Un valor desconocido es OFF con warning.
 
-### P2 — El gate de política salta reglas sin dato · 🟠 Alta · Por lectura y verificado
+### P2 — El gate de política salta reglas sin dato · 🟠 Alta · Por lectura y verificado · ✅ Cerrado ([#77](https://github.com/jvelasca/Bolsa_V1/pull/77))
 - **Dónde:** `policy_gate.py:113-285`; `execution_router.py:942-962`.
 - **Fallo:** MinMarketCap, MinADV, MaxSpread, sector y drawdown quedan `SKIPPED` si el dato es `None`, y SKIPPED no veta. El comentario "fail-closed" es falso. El router no pasa market cap, ADV ni spread, así que esas tres reglas están muertas en paper_auto.
 - **Debería ser:** si la regla está activa y falta el dato, `FAILED` con motivo `*_unmeasured`. Las reglas opcionales se declaran en la política, no se deducen de la ausencia del dato.
@@ -58,17 +66,17 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 - **Fallo:** si falla hidratar o persistir las marcas de equity, el día "abre" con el equity actual y el drawdown diario es 0. Sin `initial_deposit`, `max_pct` es `None` (SKIPPED). `_dd_pct` devuelve 0,0 si la referencia ≤ 0. El día es UTC.
 - **Debería ser:** sin marca de apertura fiable, vetar aperturas. Persistir transaccionalmente. Referencia ≤ 0 equivale a no medido, no a 0 %.
 
-### P4 — Data gate abre con evidencia vacía · 🟠 Alta · Reproducido
+### P4 — Data gate abre con evidencia vacía · 🟠 Alta · Reproducido · ✅ Cerrado ([#77](https://github.com/jvelasca/Bolsa_V1/pull/77))
 - **Dónde:** `auto_adaptive_data_gate.py:340-345`; llamador `auto_simulation_worker.py:~5745-5790`.
 - **Fallo:** `assess_data_gate()` sin evidencia devuelve `OK` con `evidence_not_provided`. En producción, si `by_strategy` está vacío, `completeness` y `recent_available` son `None` y el gate sale OK. `journal_age=None` nunca bloquea.
 - **Debería ser:** `None` en un campo exigido es `DEGRADED`. "No se pidió medir" no debe poder expresarse en producción.
 
-### P5 — Consumo de señal no durable tras el fill · 🟠 Alta · Verificado a mano
+### P5 — Consumo de señal no durable tras el fill · 🟠 Alta · Verificado a mano · ✅ Cerrado ([#78](https://github.com/jvelasca/Bolsa_V1/pull/78))
 - **Dónde:** `auto_simulation_worker.py:5066-5086`.
 - **Fallo:** la señal se añade a RAM (`:5069`) y después se persiste. Si `mark()` falla, el comentario promete reintento, pero el tick siguiente ve la señal ya en RAM y no vuelve a marcar. Un crash posterior permite una segunda entrada sobre la misma oportunidad.
 - **Debería ser:** claim durable antes del fill, o un outbox con estados `reserved → filled → consumed` y reconciliación al arrancar. Mantener `pending_durable` aparte, con reintento y backoff.
 
-### P6 — Escrituras de INTENT de salida con resultado ignorado · 🟠 Alta · Verificado a mano
+### P6 — Escrituras de INTENT de salida con resultado ignorado · 🟠 Alta · Verificado a mano · ✅ Cerrado ([#78](https://github.com/jvelasca/Bolsa_V1/pull/78))
 - **Dónde:** `auto_simulation_worker.py:4249` (aplicar fill) y `:4366` (INTENT reservado).
 - **Fallo:** `_v2_save_exit_order(...)` devuelve `False` si falla y el código lo ignora, actualizando RAM igualmente. Tras un reinicio, el INTENT durable difiere del aplicado: la salida puede reemitirse o quedar huérfana. La rama de emergencia (`:4358-4362`) sí hace HALT, así que el patrón correcto ya existe en el propio archivo.
 - **Debería ser:** si la persistencia falla, no mutar RAM, declarar medición desconocida y activar reconciliación o kill switch. Idealmente, reserva e INTENT en una transacción.
@@ -85,7 +93,7 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 - **Debería ser:** clave `(engine, barra lógica)` reclamada antes de ejecutar; estado derivado reconstruible desde eventos durables.
 - **Cerrado (`fix/auto-p7p8-crossprocess-lease`):** el `seq` y la identidad del ciclo (`tick_id = cycle-<engine>-<barra>-<seq>`) se **reservan antes** de ejecutar (`claim_cycle`, `reason='cycle_claimed'`), y el cierre **liquida esa fila** con los totales del turno en vez de crear otra. **Desvío declarado y medido de la auditoría:** la clave es `(engine, seq)`, no `(engine, barra)`: el reloj de decisión es `1d` y el motor ticka varias veces dentro de la MISMA barra (stops, gestión, salidas), así que bloquear por barra pararía el motor el resto del día; la idempotencia del ciclo la dan el lease, la señal consumida y la posición readoptada. Un ciclo interrumpido deja su fila `cycle_claimed` como traza y el siguiente proceso reanuda en `seq + 1`.
 
-### P9 — Precios, cantidades y configuración no finitos · 🟠 Alta · Reproducido (parcial) y por lectura
+### P9 — Precios, cantidades y configuración no finitos · 🟠 Alta · Reproducido (parcial) y por lectura · ✅ Cerrado ([#77](https://github.com/jvelasca/Bolsa_V1/pull/77))
 - **Dónde:** `:2150-2199` (precios exec/mid/low/high), `:2561`, `:2956`, `:3112` (marks y señales), `:3299-3317` (liquidez), `:7659` (precio), `:7753` (cantidad), `:536-550` (`STOP_PCT` etc.), `:9574` (`AUTO_ENGINE_SIM_LOT_QTY`), `:9799-9802` (intervalo). También `exit_order.py:119`, `open_order.py:65`, `risk_allocator.py` con `inf`.
 - **Fallo:** `NaN` e `inf` pasan los filtros `> 0`/`is None`, o provocan `OverflowError`, y el loop traga la excepción. Un lote inválido (`abc`, `NaN`) puede abortar `start_auto_sim_worker()`. Un intervalo `Infinity` suspende el worker indefinidamente.
 - **Debería ser:** una función única de normalización de precio (finito, > 0, `low ≤ high`) y un parser de configuración (finito, rango, error explícito). Entrada inválida produce un veto auditable, nunca una excepción.
