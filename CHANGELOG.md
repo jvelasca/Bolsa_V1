@@ -2,6 +2,60 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.184-beta] — **SELLO FUNCIONAL del bloque de auditoría AUTO/TRADING (`P`/`M`/`S`), la política de evidencia por cuenta y la evidencia monetaria del DÍA-D** (**`Δ motor ≠ 0` · 4 migraciones nuevas · head `066_account_evidence_policy`**)
+
+**Naturaleza:** sello **funcional**, no de infraestructura de pruebas. A diferencia de `.183`, aquí **sí** cambia
+el motor: se cierran los hallazgos de la auditoría AUTO/TRADING del `.183` (`P1`-`P9`, `M1`-`M16`,
+`S1`-`S10`), se añade la política de evidencia de rentabilidad por cuenta y se instrumenta la evidencia
+monetaria del DÍA-D. **Bump** `2.11.183-beta` → **`2.11.184-beta`** (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` **no** se toca).
+
+**Gobernanza (no cambia por este sello).** **AUTO sigue `OFF`** y **PAPER sigue `INCONCLUSIVE`**: el DÍA-D
+medido 2021-2026 contra los defaults de la política da **`REFUTED`** tanto en R (`−0,2037 R/ciclo`, hit
+`41,67 %`) como en porcentaje de cuenta (retorno neto `−42,13 %`, drawdown `47,50 %`, ventanas positivas
+`42,62 %`, exceso vs comprar-y-mantener `−115,00 %`, coste realizado `12,71 bps < 22` exigidos). Este sello
+**no** acredita ninguna estrategia; publica el código con el que se midió el veredicto negativo.
+
+**Migraciones (cadena única, 4 nuevas).** `063_auto_engine_lease` (P7/P8: un solo dueño del motor entre
+procesos) → `064_strategy_account_scope` (M16: la cuenta de la `ACTIVE` se declara como cuenta) →
+`065_auto_engine_intent` (intención de salida durable, P5/P6) → **`066_account_evidence_policy`** (política de
+evidencia por cuenta). El `head` pasa de `062_sync_settings_check_backfill` a **`066_account_evidence_policy`**.
+
+**(1) AUTO — fail-closed en el camino de dinero.** `P1` cierra el *fail-open* de los interruptores de entorno;
+`P2` el gate de política no salta reglas sin dato; `P9` exige numéricos finitos en el camino de dinero; `P3`
+un drawdown no medible es `None` y una marca no persistida **veta**; `P4` el data gate no abre con evidencia
+vacía; `P5`/`P6` la persistencia fallida de consumo de señal y la transición de `INTENT` de salida se
+reintentan; `P7`/`P8` serializan turnos y el ciclo se reclama antes de ejecutar.
+
+**(2) AUTO — ejecución y conciliación.** `M1` el *ack* del broker escribe condicionado (y `cancel_order` con
+`UPDATE` condicionado); `M2`/`M3`/`M4`/`M11` techos ilegibles vetan, remanente de salida coherente, *fold* OOS
+cero no es positivo; `M5` la propiedad de una reserva solo existe tras el commit; `M8`/`M10`/`M14` estado
+durable y fail-closed; `M15` coste medio ponderado al ampliar una posición viva; `M12` el vigía prueba el dueño
+del lock y escribe el latido atómico; `M13` el monitor declara `INCOMPLETE` cuando una lectura cae.
+
+**(3) Estrategia y laboratorio.** `S1`/`S5`/`S6` la `PROMOCION` exige evidencia, gates requeridos e identidad
+de versión; `S2` umbrales no triviales y gate de riesgo con techo de drawdown y muestra mínima; `S3` el
+laboratorio registra el universo probado y corrige el umbral `DSR` por pruebas múltiples; `S4` `signal_bar` y
+`execution_bar` se declaran en el contrato y se veta el *lookahead*; `S7` la vigilancia distingue frescura de
+ausencia de medida (`TTL` + `version_id`); `S8` datos fabricados declarados; `S9` validación de indicadores;
+`S10` *claim* de identidad.
+
+**(4) Cuentas — política de evidencia (migración `066`).** Tabla, store `Postgres`/in-memory, validación de
+rangos, `ON CONFLICT` y `autocommit` explícito: número de fechas D, operaciones mínimas, `%` de ventanas
+positivas, retorno neto, drawdown máximo, exceso sobre comprar y mantener, reserva fuera de muestra y costes
+**mínimos** obligatorios. Sin fila se aplican **defaults estrictos** (`is_default=True`): la ausencia nunca
+relaja un umbral ni convierte un backtest «gratis» en evidencia. Incluye pantalla web.
+
+**(5) DÍA-D — evidencia monetaria.** `dia_d_equity_evidence.py` (`dia-d-equity-evidence-v1`) convierte los
+**flujos reales de los fills** en curva de equity (no una regla de tres sobre `R`) y emite veredicto
+`PASS`/`FAIL`/`NOT_MEASURED` por umbral. Un umbral no medido deja el global en `NOT_ACCREDITED`; uno
+incumplido, en `REFUTED`. Se engancha a `v2_93` como `--equity-evidence` (opt-in, read-only, `Δ motor = 0`).
+Los artefactos del barrido quedan sellados con la versión con la que se produjeron (`2.11.183-beta`).
+
+**Límites de este sello.** No acredita la ventana PAPER (sigue `INCONCLUSIVE`), no convierte un replay en
+evidencia y no emite `CONFIRMED`. La corrida PAPER en vuelo del `2026-11-05` corre desde un árbol pinneado
+anterior (`.183`), de modo que el código con el que se midió ese día **no** es el de este sello.
+
 ## [2.11.183-beta] — **SELLO CORRECTOR del `.182`: el job offline se comía sus propios `--ignore` (un `#` dentro de un `run: >`) y `GP-V190-04` medía la cadena exacta antes de que el zoom pintara** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
 
 **Naturaleza:** re-sello **de infraestructura de pruebas y de un E2E**. El **código de producto es idéntico** a
