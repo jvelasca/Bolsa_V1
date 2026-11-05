@@ -270,11 +270,13 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 
 ## 3. Severidad baja
 
-- Conversión `Decimal → float → Decimal` en precios, equity, stops y cantidades de fills (`:971`, `:1052`, `:2561`, `:4570-4588`, `:6671-6699`, `live_order_recovery_worker.py:184,326,339`). Mantener `Decimal` hasta el borde.
-- `auto_engine_ticks` sin retención; frescura con `datetime.now` (`auto_orchestrator_worker.py:620-628`). Retención e inyección de reloj.
-- `TIME_STOP` inalcanzable si falta `created_at` o el holding period (`position_state.py:231-249`). Está documentado como intencional, pero sin alarma.
-- `signal_id` ausente cae a UUID aleatorio (`auto_v2_entry.py:2140-2208`). Documentado como intencional; confirmar que un `signal_id` vacío se veta antes.
-- Pickle en la caché Redis, con el sha256 guardado junto al blob (`redis_feature_cache.py:20-39`, `lightgbm_direction.py:185`): la integridad no es autenticación. Usar HMAC con clave o un formato sin pickle.
+- Conversión `Decimal → float → Decimal` en precios, equity, stops y cantidades de fills (`:971`, `:1052`, `:2561`, `:4570-4588`, `:6671-6699`, `live_order_recovery_worker.py:184,326,339`). Mantener `Decimal` hasta el borde. · **⏸ Diferido:** demasiado extenso para un cambio seguro.
+- `auto_engine_ticks` sin retención; frescura con `datetime.now` (`auto_orchestrator_worker.py:620-628`). Retención e inyección de reloj. · **Reloj ✅ cerrado** (`_utc_now()` parcheable). **Retención ⏸ diferida:** `seq` se deriva del recuento de filas, así que borrar rompería la numeración; exige un contador monótono.
+- `TIME_STOP` inalcanzable si falta `created_at` o el holding period (`position_state.py:231-249`). Está documentado como intencional, pero sin alarma. · **✅ Cerrado:** warning + evento `holding_deadline_missing` al nacer la posición sin techo.
+- `signal_id` ausente cae a UUID aleatorio (`auto_v2_entry.py:2140-2208`). Documentado como intencional; confirmar que un `signal_id` vacío se veta antes. · **✅ Cubierto por S10** (`SignalClaim`).
+- Pickle en la caché Redis, con el sha256 guardado junto al blob (`redis_feature_cache.py:20-39`, `lightgbm_direction.py:185`): la integridad no es autenticación. Usar HMAC con clave o un formato sin pickle. · **Redis ✅ cerrado:** HMAC-SHA256 con `FEATURE_CACHE_HMAC_KEY`; sin clave la caché es un miss. **LightGBM ⏸ sin tocar.**
+
+Precio de compra/venta en el rango diario: ver [`auditoria-precio-entrada-salida-auto-2026-11-05.md`](auditoria-precio-entrada-salida-auto-2026-11-05.md).
 
 ---
 
