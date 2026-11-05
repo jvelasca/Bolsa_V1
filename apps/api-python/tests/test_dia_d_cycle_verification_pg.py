@@ -34,7 +34,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 _REQUIRED = "DIA_D_CYCLE_VERIFICATION_PG_REQUIRED"
-_ALEMBIC_HEAD = "065_auto_engine_intent"
+_ALEMBIC_HEAD = "066_account_evidence_policy"
 _TABLE = "dia_d_cycle_verifications"
 _CYCLE_PREFIX = "itest-p2-"
 

@@ -45,7 +45,7 @@ if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
 _DOTENV = Path(__file__).resolve().parents[3] / ".env"
 _REQUIRED_ENV = "AUTO_P7_LEASE_PG_REQUIRED"
 _PREVIOUS_REVISION = "062_sync_settings_check_backfill"
-_HEAD = "065_auto_engine_intent"
+_HEAD = "066_account_evidence_policy"
 _RUNS = "auto_engine_runs"
 _LEASE_INDEX = "auto_engine_runs_lease_expires_idx"
 _BAR = "2026-11-04T08:30:00+00:00"
