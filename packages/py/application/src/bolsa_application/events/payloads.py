@@ -14,6 +14,10 @@ def signal_event_payload(signal: SignalEventV1, **extra: Any) -> dict[str, Any]:
         "strategyDefinitionId": signal.strategy_definition_id,
         "strategyVersion": signal.strategy_version,
         "barIndex": signal.bar_index,
+        # S4 — contrato de tiempo explícito en el evento: señal en ``t``, ejecución
+        # en ``t + 1``. Los consumidores no tienen que adivinarlo a partir de barIndex.
+        "signalBar": signal.resolved_signal_bar,
+        "executionBar": signal.resolved_execution_bar,
         **extra,
     }
 

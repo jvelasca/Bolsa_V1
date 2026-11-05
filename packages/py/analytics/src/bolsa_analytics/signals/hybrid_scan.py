@@ -170,6 +170,9 @@ def evaluate_hybrid_candidate(
         bar_index=last_index,
         price=last_bar.close,
         preset_key=definition.get("presetKey"),
+        # S4: la señal se decide con la barra cerrada ``last_index``.
+        signal_bar=last_index,
+        execution_bar=last_index + 1,
     )
 
     return HybridScanCandidate(

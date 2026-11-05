@@ -112,6 +112,10 @@ def scan_run_result_to_dict(result: ScanRunResult) -> dict[str, Any]:
             "dataVersion": signal.data_version,
             "indicatorSnapshotHash": signal.indicator_snapshot_hash,
             "presetKey": signal.preset_key,
+            # S4 — el hit declara la barra de señal y la de ejecución; el router de
+            # ejecución rechaza cualquier señal con lookahead.
+            "signalBar": signal.resolved_signal_bar,
+            "executionBar": signal.resolved_execution_bar,
         }
 
     def hit_to_dict(hit: ScanHit) -> dict[str, Any]:

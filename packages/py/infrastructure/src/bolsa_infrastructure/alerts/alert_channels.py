@@ -307,6 +307,9 @@ def signal_event_to_payload(
             "dataVersion": signal.data_version,
             "indicatorSnapshotHash": signal.indicator_snapshot_hash,
             "presetKey": signal.preset_key,
+            # S4 — contrato de tiempo explícito también en la alerta.
+            "signalBar": signal.resolved_signal_bar,
+            "executionBar": signal.resolved_execution_bar,
         },
     }
 
