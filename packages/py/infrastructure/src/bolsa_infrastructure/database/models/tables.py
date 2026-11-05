@@ -2654,7 +2654,11 @@ class StrategyPromotionRow(Base):
     """Promoción (o rechazo) de un finalista a ACTIVE, con motivos auditables."""
 
     __tablename__ = "strategy_promotions"
-    __table_args__ = (Index("strategy_promotions_finalist_idx", "finalist_id"),)
+    __table_args__ = (
+        Index("strategy_promotions_finalist_idx", "finalist_id"),
+        # M16: predicado de ``get_active_for_account`` (migración 064).
+        Index("strategy_promotions_account_idx", "account_id", "promoted"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     finalist_id: Mapped[str] = mapped_column("finalist_id", String, nullable=False)
