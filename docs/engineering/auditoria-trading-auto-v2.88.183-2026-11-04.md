@@ -34,7 +34,7 @@
 > snapshot o del mismo tramo de barras que el LAB). `S7` se cierra en la PR [#90](https://github.com/jvelasca/Bolsa_V1/pull/90)
 > (`fix/auto-s7-vigilance-freshness`: la vigilancia distingue `stale`/`unmeasured`/`healthy`, con TTL de la evidencia
 > predictiva, identidad por `version_id` y ausencia de medida fail-closed sobre el bloque predictivo). Las once PR están
-> fusionadas o abiertas sobre `fix/059-060-proveedores`; **no** hay sello, bump ni migración fuera de las citadas.
+> fusionadas en `fix/059-060-proveedores` (`ef2a9c8f`); **no** hay sello, bump ni migración fuera de las citadas.
 > **Sincronización del documento (`2026-11-05`, sin PR de código):** al verificar la sección de estrategia contra el
 > árbol, `S1` y `S2` ya estaban resueltos en código y con pruebas (`test_strategy_lifecycle_s1_s5_s6.py`, `LabThresholds`),
 > así que el documento los daba por abiertos **por desfase**, no por defecto. **Abiertos:** el resto de la severidad media
