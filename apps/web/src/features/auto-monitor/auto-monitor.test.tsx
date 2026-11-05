@@ -313,4 +313,36 @@ describe("AutoMonitorPage", () => {
     expect(screen.getByTestId("auto-monitor-cycles")).toBeTruthy();
     vi.doUnmock("@/features/auto-monitor/use-auto-operational-monitor");
   });
+
+  // M13 — una lectura caída se declara en la UI: nunca se pinta como corte limpio.
+  it("declara la lectura incompleta con sus fuentes (M13)", async () => {
+    vi.resetModules();
+    const incompleteDto: AutoOperationalMonitorV1 = {
+      ...dtoFixture(),
+      state: "INCOMPLETE",
+      incompleteReads: ["journal", "fill_counts"],
+    };
+    vi.doMock("@/features/auto-monitor/use-auto-operational-monitor", () => ({
+      useAutoOperationalMonitor: () => ({
+        view: buildAutoOperationalMonitorView(incompleteDto),
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+        accountId: "acc-1",
+      }),
+    }));
+    const { AutoMonitorPage } =
+      await import("@/features/auto-monitor/auto-monitor-page");
+    render(
+      <MemoryRouter initialEntries={["/auto-monitor?mode=current"]}>
+        <AutoMonitorPage />
+      </MemoryRouter>,
+    );
+    const banner = screen.getByTestId("auto-monitor-incomplete");
+    expect(banner.textContent).toContain("Lectura incompleta");
+    expect(banner.textContent).toContain("journal de decisión");
+    expect(banner.textContent).toContain("completitud de fills");
+    vi.doUnmock("@/features/auto-monitor/use-auto-operational-monitor");
+  });
 });

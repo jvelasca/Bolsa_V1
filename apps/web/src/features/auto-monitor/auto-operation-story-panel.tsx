@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   buildAutoOperationStory,
+  isMonitorIncomplete,
   type AutoOperationStoryExplanationIdentity,
   type AutoOperationStoryExplanationInput,
   type AutoOperationStoryExplanationResolution,
@@ -236,6 +237,10 @@ export function AutoOperationStoryPanel({
   const navigate = useNavigate();
 
   const cycles = view?.cycles ?? [];
+  // M13 — una lectura caída NO es «sin operaciones»: el DTO lo declara y la UI lo pinta antes
+  // de cualquier lista vacía, para que el vacío no se lea como ausencia demostrada.
+  const incomplete = view !== null && isMonitorIncomplete(view);
+  const incompleteReads = view?.incompleteReadLabels ?? [];
   const cycleParam = searchParams.get("cycle");
   const hasLoaded = !isLoading && !isError && view != null;
   // B-5 / ADR-048 — las declaraciones de HOLD de la ACTIVE, con su motivo y su procedencia.
@@ -494,12 +499,33 @@ export function AutoOperationStoryPanel({
               No se pudo cargar la operación.
             </p>
           ) : null}
+          {incomplete ? (
+            <div
+              role="status"
+              data-testid="auto-operation-story-incomplete"
+              className="rounded border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs"
+            >
+              <p className="font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                Lectura incompleta
+              </p>
+              <p className="mt-0.5 text-muted-foreground">
+                No se pudo leer:{" "}
+                {incompleteReads.length > 0
+                  ? incompleteReads.join(", ")
+                  : "fuente no declarada"}
+                . Lo que falta no se pinta como «sin operaciones».
+              </p>
+            </div>
+          ) : null}
+
           {!isLoading && !isError && cycles.length === 0 ? (
             <p
               className="text-sm text-muted-foreground"
               data-testid="auto-operation-story-empty"
             >
-              Sin ciclos en la ventana.
+              {incomplete
+                ? "No se puede afirmar que no haya ciclos: la lectura está incompleta."
+                : "Sin ciclos en la ventana."}
             </p>
           ) : null}
           {notFound ? (

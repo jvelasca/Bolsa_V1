@@ -10,18 +10,26 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
+
 from bolsa_application.auto_operational_monitor import (
     AUTO_ACTIVE_STRATEGY_HOLD_EVENT,
     AUTO_CYCLE_SETTLEMENT_EVENT,
     AUTO_ENTRY_DECISION_EVENT,
     AUTO_ENTRY_ORDER_EVENT,
     AUTO_PROTECTION_EVENT,
+    MONITOR_READ_SOURCES,
+    MONITOR_STATE_COMPLETE,
+    MONITOR_STATE_INCOMPLETE,
     OPERATIONAL_STEPS,
+    READ_COMPLETE,
+    READ_FAILED,
     STEP_ABSENT,
     STEP_REACHED,
     STEP_UNKNOWN,
     _entry_reservation,
     build_operational_monitor,
+    read_operational_monitor,
 )
 
 
@@ -1905,3 +1913,184 @@ def test_the_signal_step_omits_the_provenance_when_the_producer_did_not_declare_
     keys = {fact["key"] for fact in _step(dto["cycles"][0]["steps"], "SIGNAL")["facts"]}
     assert "featureSource" not in keys
     assert "gatedState" not in keys
+
+
+# ---------------------------------------------------------------------------
+# M13 (auditoría .183) — estado INCOMPLETO explícito frente a lecturas caídas
+# ---------------------------------------------------------------------------
+
+
+def test_monitor_state_is_complete_when_every_read_is_complete() -> None:
+    """Sin declaración de fallos el DTO se publica COMPLETO con TODAS las fuentes medidas."""
+    dto = build_operational_monitor(account_id="acc-1", reservations=[_reservation()])
+
+    assert dto["state"] == MONITOR_STATE_COMPLETE
+    assert dto["incompleteReads"] == []
+    assert list(dto["readStatus"]) == list(MONITOR_READ_SOURCES)
+    assert set(dto["readStatus"].values()) == {READ_COMPLETE}
+
+
+def test_monitor_state_is_incomplete_and_names_the_failed_reads() -> None:
+    """Una lectura caída se declara: estado INCOMPLETO + fuentes + nota (nunca silencio)."""
+    dto = build_operational_monitor(
+        account_id="acc-1",
+        reservations=[_reservation()],
+        read_status={"journal": READ_FAILED, "claims": READ_FAILED},
+    )
+
+    assert dto["state"] == MONITOR_STATE_INCOMPLETE
+    # El orden es el canónico de las fuentes, no el del dict de entrada.
+    assert dto["incompleteReads"] == ["journal", "claims"]
+    assert dto["readStatus"]["journal"] == READ_FAILED
+    assert dto["readStatus"]["claims"] == READ_FAILED
+    assert dto["readStatus"]["reservations"] == READ_COMPLETE
+    # La nota va PRIMERO: cambia el significado del resto de huecos del DTO.
+    assert dto["notes"][:2] == ["read_failed:journal", "read_failed:claims"]
+
+
+def test_monitor_state_complete_with_an_empty_but_proven_scope() -> None:
+    """Un ámbito vacío DEMOSTRADO (sin ciclos) no es una lectura caída."""
+    dto = build_operational_monitor(account_id="acc-1")
+
+    assert dto["cycles"] == []
+    assert dto["state"] == MONITOR_STATE_COMPLETE
+    assert dto["incompleteReads"] == []
+    assert not any(note.startswith("read_failed:") for note in dto["notes"])
+
+
+class _FakeSession:
+    async def scalar(self, *_args: Any, **_kwargs: Any) -> int:
+        return 0
+
+
+class _FakeReservations:
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        pass
+
+    async def list_recent_with_cycle(self, *_args: Any, **_kwargs: Any) -> list[Any]:
+        return []
+
+    async def list_by_cycle_ids(self, *_args: Any, **_kwargs: Any) -> list[Any]:
+        return []
+
+    async def count_forced_releases(self, *_args: Any, **_kwargs: Any) -> int:
+        return 0
+
+
+class _BrokenReservations(_FakeReservations):
+    async def list_recent_with_cycle(self, *_args: Any, **_kwargs: Any) -> list[Any]:
+        raise RuntimeError("db caída")
+
+    async def list_by_cycle_ids(self, *_args: Any, **_kwargs: Any) -> list[Any]:
+        raise RuntimeError("db caída")
+
+
+class _FakeFills:
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        pass
+
+    async def list_by_cycle_ids(self, *_args: Any, **_kwargs: Any) -> list[Any]:
+        return []
+
+    async def count_by_cycle_ids(self, *_args: Any, **_kwargs: Any) -> dict[str, int]:
+        return {}
+
+    async def read_projection(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        return {}
+
+
+class _FakeExitOrders:
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        pass
+
+    async def list_by_cycle_ids(self, *_args: Any, **_kwargs: Any) -> list[Any]:
+        return []
+
+
+class _FakeEngine:
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        pass
+
+    async def read(self, *_args: Any, **_kwargs: Any) -> None:
+        return None
+
+
+class _FakeJournal:
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        pass
+
+    async def list_by_decision_ids(self, *_args: Any, **_kwargs: Any) -> list[Any]:
+        return []
+
+    async def list_entries(self, *_args: Any, **_kwargs: Any) -> tuple[list[Any], int]:
+        return [], 0
+
+    async def aggregate_auto_operational_audit(
+        self, *_args: Any, **_kwargs: Any
+    ) -> dict[str, Any]:
+        return {}
+
+
+def _patch_reader_stores(monkeypatch: Any, *, reservations: type) -> None:
+    from bolsa_infrastructure.database.repositories import journal_repository
+
+    from bolsa_application import (
+        auto_engine_state_store,
+        exit_order_store,
+        reservation_store,
+        sim_durable_store,
+    )
+
+    monkeypatch.setattr(reservation_store, "PostgresReservationStore", reservations)
+    monkeypatch.setattr(exit_order_store, "PostgresExitOrderStore", _FakeExitOrders)
+    monkeypatch.setattr(sim_durable_store, "PostgresSimAutoPositionStore", _FakeFills)
+    monkeypatch.setattr(
+        sim_durable_store, "PostgresSimFillFinanceContextStore", _FakeFills
+    )
+    monkeypatch.setattr(auto_engine_state_store, "PostgresAutoEngineStore", _FakeEngine)
+    monkeypatch.setattr(
+        journal_repository, "SqlAlchemyJournalRepository", _FakeJournal
+    )
+
+
+@pytest.mark.asyncio
+async def test_read_operational_monitor_declares_incomplete_when_a_read_falls(
+    monkeypatch: Any,
+) -> None:
+    """(I/O) La reserva caída NO es una ventana vacía: el DTO sale INCOMPLETO y lo nombra."""
+    _patch_reader_stores(monkeypatch, reservations=_BrokenReservations)
+
+    dto = await read_operational_monitor(_FakeSession(), "acc-1")
+
+    assert dto["state"] == MONITOR_STATE_INCOMPLETE
+    # La caída de reservas arrastra a las fuentes que dependen de su ámbito: sin saber si hay
+    # ciclos, no se puede afirmar que no haya fills, órdenes ni decisiones.
+    assert dto["incompleteReads"] == [
+        "reservations",
+        "fills",
+        "fill_counts",
+        "exit_orders",
+        "journal",
+    ]
+    assert dto["readStatus"]["reservations"] == READ_FAILED
+    # Las lecturas independientes sí respondieron: no se contaminan con el fallo ajeno.
+    assert dto["readStatus"]["engine"] == READ_COMPLETE
+    assert dto["readStatus"]["positions"] == READ_COMPLETE
+    assert dto["readStatus"]["claims"] == READ_COMPLETE
+    assert dto["cycles"] == []
+    assert "read_failed:reservations" in dto["notes"]
+
+
+@pytest.mark.asyncio
+async def test_read_operational_monitor_is_complete_with_an_empty_but_healthy_scope(
+    monkeypatch: Any,
+) -> None:
+    """(I/O) Todo responde y no hay ciclos: COMPLETO (el vacío es un hecho, no un fallo)."""
+    _patch_reader_stores(monkeypatch, reservations=_FakeReservations)
+
+    dto = await read_operational_monitor(_FakeSession(), "acc-1")
+
+    assert dto["state"] == MONITOR_STATE_COMPLETE
+    assert dto["incompleteReads"] == []
+    assert set(dto["readStatus"].values()) == {READ_COMPLETE}
+    assert not any(note.startswith("read_failed:") for note in dto["notes"])

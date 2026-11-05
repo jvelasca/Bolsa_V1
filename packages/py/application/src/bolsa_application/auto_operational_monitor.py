@@ -41,6 +41,7 @@ from bolsa_analytics.cognitive.measurement import (
     MeasurementStatus,
     coerce_measurement,
 )
+
 from bolsa_application.auto_cycle_journal import cycle_decision_id
 from bolsa_application.auto_reason_codes import ACTIVE_STRATEGY_HOLD_EVENT
 from bolsa_application.auto_self_evaluation_feed import cycles_from_fills
@@ -60,7 +61,12 @@ __all__ = [
     "AUTO_PROTECTION_EVENT",
     "AUTO_RESERVATION_CLAIM_EVENT",
     "AUTO_RESERVATION_RECONCILIATION_EVENT",
+    "MONITOR_READ_SOURCES",
+    "MONITOR_STATE_COMPLETE",
+    "MONITOR_STATE_INCOMPLETE",
     "OPERATIONAL_STEPS",
+    "READ_COMPLETE",
+    "READ_FAILED",
     "STEP_ABSENT",
     "STEP_PENDING",
     "STEP_REACHED",
@@ -89,6 +95,36 @@ STEP_REACHED = "reached"
 STEP_PENDING = "pending"
 STEP_ABSENT = "absent"
 STEP_UNKNOWN = "unknown"
+
+#: M13 (auditoría .183) — estado EXPLÍCITO del DTO frente a las lecturas que lo alimentan.
+#: ``INCOMPLETE`` significa que al menos una consulta cayó y el DTO NO representa el estado
+#: durable completo: lo que falta se declara en ``incompleteReads``/``readStatus``/``notes``.
+#: Sin esto, una lectura caída y una cuenta sin operaciones producían el MISMO DTO.
+MONITOR_STATE_COMPLETE = "COMPLETE"
+MONITOR_STATE_INCOMPLETE = "INCOMPLETE"
+
+#: Estado de UNA lectura. No hay un tercer valor: ``COMPLETE`` también cubre el ámbito
+#: demostrablemente vacío (sin ciclos no hay fills que leer), que no es una lectura caída.
+READ_COMPLETE = "COMPLETE"
+READ_FAILED = "FAILED"
+
+#: Orden canónico de las lecturas que sostienen el DTO. Es la lista que se publica en
+#: ``readStatus`` y el vocabulario de ``incompleteReads`` (nunca se inventa una fuente).
+MONITOR_READ_SOURCES: tuple[str, ...] = (
+    "reservations",
+    "fills",
+    "fill_counts",
+    "exit_orders",
+    "engine",
+    "engine_ticks",
+    "positions",
+    "journal",
+    "last_decision",
+    "reconciliations",
+    "claims",
+    "concurrency",
+    "forced_releases",
+)
 
 #: ``event_type`` de las entradas del spine que este lector consume. El de decisión de entrada
 #: ya lo produce ``auto_v2_entry``; los de claim/reconciliación los produce el sumidero de ``M2``
@@ -1702,6 +1738,7 @@ def build_operational_monitor(
     fills_window_full: bool = False,
     fills_total_by_cycle: Mapping[str, int] | None = None,
     instrument_id: str | None = None,
+    read_status: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """(PURA) construye el DTO del monitor desde el estado durable ya leído. Sin I/O.
 
@@ -1716,6 +1753,12 @@ def build_operational_monitor(
     ``header_decision_entries`` es la lectura GLOBAL del último ``auto_entry_decision`` durable
     (independiente de los ciclos/reservas visibles): sin ella, el header cae al ``journal`` del
     ciclo para no romper llamadas puras antiguas.
+
+    ``read_status`` (M13) declara el resultado de cada lectura que alimentó el DTO. Una fuente
+    ausente de este mapa se asume ``COMPLETE`` (compatibilidad con llamadas puras); si alguna
+    declara ``READ_FAILED`` el DTO publica ``state = INCOMPLETE``, la lista ``incompleteReads``
+    y una nota ``read_failed:<fuente>``. Una lectura caída deja de ser indistinguible de un
+    estado durable vacío.
     """
     positions = dict(positions or {})
     granularity_view = dict(granularity or {})
@@ -1864,6 +1907,18 @@ def build_operational_monitor(
         reservations_window_full=limit > 0 and len(reservations) >= limit,
     )
     notes: list[str] = []
+    # M13 — una lectura CAÍDA no es un hueco semántico del motor: se declara PRIMERO, porque
+    # cambia el significado de todo lo demás (un ``cycles == []`` por consulta caída no dice
+    # «no hubo operaciones»). Un estado vacío demostrado (sin ciclos) NO entra aquí.
+    statuses = {
+        source: str((read_status or {}).get(source) or READ_COMPLETE)
+        for source in MONITOR_READ_SOURCES
+    }
+    incomplete_reads = [
+        source for source in MONITOR_READ_SOURCES if statuses[source] != READ_COMPLETE
+    ]
+    for source in incomplete_reads:
+        notes.append(f"read_failed:{source}")
     if not journal:
         notes.append("decision_journal_not_durable")
     if not reconciliations:
@@ -1880,6 +1935,11 @@ def build_operational_monitor(
     return {
         "key": "auto_operational_monitor_v1",
         "readOnly": True,
+        # M13 — estado EXPLÍCITO del DTO: ``INCOMPLETE`` si alguna lectura cayó. Sin esto la UI
+        # no podía distinguir «sin operaciones» de «no se pudo leer el estado durable».
+        "state": MONITOR_STATE_INCOMPLETE if incomplete_reads else MONITOR_STATE_COMPLETE,
+        "readStatus": statuses,
+        "incompleteReads": incomplete_reads,
         "accountId": account_id,
         "asOf": stamp,
         "header": header,
@@ -1907,22 +1967,26 @@ async def read_operational_monitor(
 ) -> dict[str, Any]:
     """(I/O) lee el estado durable de la cadena AUTO y devuelve el DTO canónico.
 
-    Read-only: solo hay ``SELECT``. Un fallo de lectura de un bloque opcional se declara (el
-    ``notes`` del DTO) y NO tumba el resto — un hueco declarado, nunca un ``0`` fingido.
+    Read-only: solo hay ``SELECT``. Un fallo de lectura de un bloque NO tumba el resto — un
+    hueco declarado, nunca un ``0`` fingido — y desde M13 tampoco pasa desapercibido: cada
+    consulta deja su resultado en ``readStatus`` y, si alguna cayó, el DTO viaja con
+    ``state = INCOMPLETE`` e ``incompleteReads`` (más la nota ``read_failed:<fuente>``). Así un
+    «sin operaciones» demostrado y un «no se pudo leer» dejan de producir el mismo DTO.
 
     ``cycle_id`` acota a UN ciclo (drill-down) y MANDA: si también llega ``instrument_id``, se
     ignora el filtro por instrumento. Sin ``cycle_id``, ``instrument_id`` acota la ventana de
     reservas a ESE valor (los ciclos derivan de ellas); ``None`` conserva la ventana global.
     """
+    from bolsa_infrastructure.database.repositories.journal_repository import (
+        SqlAlchemyJournalRepository,
+    )
+
     from bolsa_application.auto_engine_state_store import PostgresAutoEngineStore
     from bolsa_application.exit_order_store import PostgresExitOrderStore
     from bolsa_application.reservation_store import PostgresReservationStore
     from bolsa_application.sim_durable_store import (
         PostgresSimAutoPositionStore,
         PostgresSimFillFinanceContextStore,
-    )
-    from bolsa_infrastructure.database.repositories.journal_repository import (
-        SqlAlchemyJournalRepository,
     )
 
     reservation_store = PostgresReservationStore(session, autocommit=False)
@@ -1932,16 +1996,39 @@ async def read_operational_monitor(
     engine_store = PostgresAutoEngineStore(session)
     repository = SqlAlchemyJournalRepository(session)
 
+    # M13 — resultado de CADA lectura, declarado en el DTO. Se marca ``FAILED`` en el ``except``
+    # que ya existía (que sigue degradando en vez de tumbar el monitor): lo que cambia es que el
+    # hueco deja de ser silencioso y el DTO se publica con ``state = INCOMPLETE``.
+    read_status: dict[str, str] = {}
+
+    def _mark(source: str, ok: bool) -> None:
+        read_status[source] = READ_COMPLETE if ok else READ_FAILED
+
     if cycle_id:
         # ``cycleId`` MANDA: el drill-down a un ciclo ignora el filtro por instrumento (así un
         # ciclo ajeno no hereda hechos por un ``instrumentId`` que no le corresponde).
-        reservations = await reservation_store.list_by_cycle_ids(
-            account_id, [cycle_id], limit=limit
-        )
+        try:
+            reservations = await reservation_store.list_by_cycle_ids(
+                account_id, [cycle_id], limit=limit
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("auto monitor: reservations read unavailable", exc_info=True)
+            reservations = []
+            reservations_ok = False
+        else:
+            reservations_ok = True
     else:
-        reservations = await reservation_store.list_recent_with_cycle(
-            account_id, limit=limit, instrument_id=instrument_id
-        )
+        try:
+            reservations = await reservation_store.list_recent_with_cycle(
+                account_id, limit=limit, instrument_id=instrument_id
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("auto monitor: reservations read unavailable", exc_info=True)
+            reservations = []
+            reservations_ok = False
+        else:
+            reservations_ok = True
+    _mark("reservations", reservations_ok)
 
     cycle_ids: list[str] = []
     seen: set[str] = set()
@@ -1960,9 +2047,16 @@ async def read_operational_monitor(
     fills_total_by_cycle: Mapping[str, int] | None = None
     if cycle_ids:
         fill_limit = max(limit * 50, 200)
-        fills = await context_store.list_by_cycle_ids(
-            account_id, cycle_ids, limit=fill_limit
-        )
+        try:
+            fills = await context_store.list_by_cycle_ids(
+                account_id, cycle_ids, limit=fill_limit
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("auto monitor: fills read unavailable", exc_info=True)
+            fills = []
+            _mark("fills", False)
+        else:
+            _mark("fills", True)
         # ``len == limit`` ⇒ la ventana pudo truncarse: el suelo GLOBAL que se declara cuando
         # no hay agregado por ciclo. Con el agregado (abajo) la completitud se decide ciclo a
         # ciclo y una ventana global llena con ciclos cortos NO degrada a los que están completos.
@@ -1975,13 +2069,35 @@ async def read_operational_monitor(
             )
         except Exception:  # noqa: BLE001
             logger.warning("auto monitor: fill per-cycle counts unavailable", exc_info=True)
-        exit_orders = await exit_store.list_by_cycle_ids(account_id, cycle_ids)
+            _mark("fill_counts", False)
+        else:
+            _mark("fill_counts", True)
+        try:
+            exit_orders = await exit_store.list_by_cycle_ids(account_id, cycle_ids)
+        except Exception:  # noqa: BLE001
+            logger.warning("auto monitor: exit orders read unavailable", exc_info=True)
+            exit_orders = []
+            _mark("exit_orders", False)
+        else:
+            _mark("exit_orders", True)
+    else:
+        # Sin ciclos no hay fills/órdenes que leer: el ámbito está demostrablemente vacío, pero
+        # SOLO si la lectura que lo demuestra (reservas) respondió. Si cayó, la ausencia de
+        # ciclos no prueba nada y las fuentes dependientes se declaran también fallidas.
+        for source in ("fills", "fill_counts", "exit_orders"):
+            _mark(source, reservations_ok)
 
-    engine = await engine_store.read(engine_id)
+    try:
+        engine = await engine_store.read(engine_id)
+    except Exception:  # noqa: BLE001
+        logger.warning("auto monitor: engine snapshot unavailable", exc_info=True)
+        engine = None
+        _mark("engine", False)
+    else:
+        _mark("engine", True)
     engine_ticks = 0
     try:
         import sqlalchemy as sa
-
         from bolsa_infrastructure.database.models.tables import AutoEngineTickRow
 
         engine_ticks = int(
@@ -1994,8 +2110,18 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001 — telemetría opcional: el hueco se declara, no se finge.
         logger.warning("auto monitor: tick count unavailable", exc_info=True)
+        _mark("engine_ticks", False)
+    else:
+        _mark("engine_ticks", True)
 
-    projections = await position_store.read_projection(account_id, engine_id)
+    try:
+        projections = await position_store.read_projection(account_id, engine_id)
+    except Exception:  # noqa: BLE001
+        logger.warning("auto monitor: positions read unavailable", exc_info=True)
+        projections = {}
+        _mark("positions", False)
+    else:
+        _mark("positions", True)
     positions = {
         symbol: {
             "symbol": row.symbol,
@@ -2021,6 +2147,14 @@ async def read_operational_monitor(
             journal = await repository.list_by_decision_ids(decision_ids)
         except Exception:  # noqa: BLE001
             logger.warning("auto monitor: decision journal unavailable", exc_info=True)
+            journal = []
+            _mark("journal", False)
+        else:
+            _mark("journal", True)
+    else:
+        # Sin ciclos no hay decisiones que leer: ámbito vacío si las reservas respondieron (si
+        # cayeron, no hay forma de saber si faltan ciclos y el hueco se propaga).
+        _mark("journal", reservations_ok)
     # v2.88.25 — HECHOS durables del ciclo que viajan en el spine y NO requieren query nueva:
     # la orden de entrada y la liquidación. El PnL del settlement se publica con su medición;
     # sin evento, el paso ``SETTLEMENT`` sigue declarando ``settlement_not_durable``.
@@ -2054,6 +2188,9 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001
         logger.warning("auto monitor: latest decision unavailable", exc_info=True)
+        _mark("last_decision", False)
+    else:
+        _mark("last_decision", True)
     try:
         reconciliation_entries, reconciliation_total = await repository.list_entries(
             account_id=account_id,
@@ -2062,6 +2199,9 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001
         logger.warning("auto monitor: reconciliation journal unavailable", exc_info=True)
+        _mark("reconciliations", False)
+    else:
+        _mark("reconciliations", True)
     try:
         claim_entries, claim_total = await repository.list_entries(
             account_id=account_id,
@@ -2070,6 +2210,9 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001
         logger.warning("auto monitor: claim journal unavailable", exc_info=True)
+        _mark("claims", False)
+    else:
+        _mark("claims", True)
 
     # Contadores GLOBALES de concurrencia agregados en base: NO dependen del ``limit`` de lectura
     # (cargar las filas truncaba el universo y lo declaraba ``COMPLETE``). Si el agregado falla,
@@ -2084,6 +2227,9 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001
         logger.warning("auto monitor: concurrency aggregate unavailable", exc_info=True)
+        _mark("concurrency", False)
+    else:
+        _mark("concurrency", True)
 
     # ``forcedReleases`` también es agregado en base: la ventana de reservas está limitada y no
     # puede sostener un conteo global sin declararlo truncado.
@@ -2094,6 +2240,9 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001
         logger.warning("auto monitor: forced releases aggregate unavailable", exc_info=True)
+        _mark("forced_releases", False)
+    else:
+        _mark("forced_releases", True)
 
     return build_operational_monitor(
         account_id=account_id,
@@ -2122,6 +2271,7 @@ async def read_operational_monitor(
         fills_window_full=fills_window_full,
         fills_total_by_cycle=fills_total_by_cycle,
         instrument_id=instrument_id,
+        read_status=read_status,
     )
 
 

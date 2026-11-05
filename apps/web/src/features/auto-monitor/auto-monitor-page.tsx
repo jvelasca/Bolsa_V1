@@ -142,6 +142,31 @@ export function AutoMonitorPage() {
           <>
             <AutoMonitorHeader header={view.header} />
 
+            {/* M13 — estado EXPLÍCITO de la proyección: una lectura caída se declara aquí y con
+                sus fuentes, para que el vacío de los paneles no se lea como «no hay nada». */}
+            {view.stateLabel === "INCOMPLETO" ? (
+              <Card
+                className="rounded-xl border border-destructive/40 bg-destructive/5"
+                data-testid="auto-monitor-incomplete"
+              >
+                <CardContent className="py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-destructive">
+                    Lectura incompleta
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    No se pudieron leer:{" "}
+                    <span className="font-mono text-xs">
+                      {view.incompleteReadLabels.length > 0
+                        ? view.incompleteReadLabels.join(", ")
+                        : "fuente no declarada"}
+                    </span>
+                    . El resto de la cadena se pinta tal cual se midió; lo que
+                    falta no se rellena.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : null}
+
             {view.notes && view.notes.length > 0 ? (
               <Card className="rounded-xl border border-amber-500/30 bg-amber-500/5">
                 <CardContent className="py-3">

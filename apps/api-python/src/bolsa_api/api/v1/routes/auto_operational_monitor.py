@@ -15,6 +15,10 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
+from bolsa_application.auto_operational_monitor import (
+    build_operational_monitor,
+    read_operational_monitor,
+)
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,10 +27,6 @@ from bolsa_api.api.dependencies import (
     get_account_id_header,
     get_db_session,
     resolve_account_scope_or_default,
-)
-from bolsa_application.auto_operational_monitor import (
-    build_operational_monitor,
-    read_operational_monitor,
 )
 
 router = APIRouter()
@@ -244,6 +244,15 @@ class AutoOperationalMonitorDto(BaseModel):
 
     key: str
     readOnly: bool
+    #: M13 — estado EXPLÍCITO de la proyección: ``COMPLETE`` sólo si TODAS las lecturas que la
+    #: sostienen respondieron; ``INCOMPLETE`` si alguna cayó. Sin este campo, un fallo de
+    #: consulta y una cuenta sin operaciones producían un DTO indistinguible.
+    state: str = "COMPLETE"
+    #: Resultado por fuente (``COMPLETE``/``FAILED``), en el orden canónico del lector.
+    readStatus: dict[str, str] = Field(default_factory=dict)
+    #: Fuentes cuya lectura cayó (subconjunto de ``readStatus``, mismo orden). Es el hueco que
+    #: la UI rotula; nunca se rellena con una fuente que sí respondió.
+    incompleteReads: list[str] = Field(default_factory=list)
     accountId: str | None = None
     asOf: str
     header: AutoMonitorHeaderDto

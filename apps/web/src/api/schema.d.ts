@@ -5102,16 +5102,27 @@ export interface components {
             /** Filterinstrumentid */
             filterInstrumentId?: string | null;
             header: components["schemas"]["AutoMonitorHeaderDto"];
+            /** Incompletereads */
+            incompleteReads?: string[];
             /** Key */
             key: string;
             /** Notes */
             notes?: string[];
             /** Readonly */
             readOnly: boolean;
+            /** Readstatus */
+            readStatus?: {
+                [key: string]: string;
+            };
             /** Reservations */
             reservations?: components["schemas"]["AutoMonitorReservationDto"][];
             /** Signalholds */
             signalHolds?: components["schemas"]["AutoMonitorSignalHoldDto"][];
+            /**
+             * State
+             * @default COMPLETE
+             */
+            state: string;
         };
         /** AutoOpsJobCreateDto */
         AutoOpsJobCreateDto: {
