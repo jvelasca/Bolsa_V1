@@ -127,6 +127,8 @@ DecisionReasonCode = Literal[
     # es ejecutable al precio VIVO del tick (mercado en/por debajo del stop, objetivo ya
     # alcanzado o divergencia fuera de tolerancia). Veto de ENTRADA con motivo propio.
     "proposal_price_invalid",
+    # R1 — hueco decisión→ejecución fuera de tolerancia (veto de ENTRADA).
+    "entry_gap_exceeded",
     # AUTO-1 — no se pudo materializar la reserva de una aprobación (no existe aprobación
     # sin reserva): la decisión se degrada a veto con este motivo.
     "reservation_failed",
@@ -165,6 +167,8 @@ _NO_TRADE_REASONS: frozenset[str] = frozenset(
         "plan_invalid",
         # D-1 (auditoría 2) — plan del parte no ejecutable al precio vivo.
         "proposal_price_invalid",
+        # R1 — hueco decisión→ejecución fuera de tolerancia.
+        "entry_gap_exceeded",
         # AUTO-1 — aprobación que no pudo materializarse en reserva.
         "reservation_failed",
         # V2.43/AUTO-3 — veto de PERMISO del gobernador (sin entradas / parada total).

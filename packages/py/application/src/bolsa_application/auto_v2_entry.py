@@ -104,6 +104,7 @@ from bolsa_application.auto_reason_codes import (
     ACTIVE_HOLD_REASONS,
     ACTIVE_STRATEGY_HOLD_EVENT,
     ADAPTIVE_STRATEGY_PAUSED,
+    ENTRY_GAP_EXCEEDED,
     OPPORTUNITY_EXPIRED,
     OPPORTUNITY_REJECTED,
     OPPORTUNITY_TRADED,
@@ -212,6 +213,9 @@ class V2Tunables:
     risk_budget_pct: float = 6.0
     # ATR de reserva cuando la señal no lo aporta (fracción del precio).
     atr_pct_fallback: float = 0.02
+    # R1: tolerancia del hueco decisión→ejecución, en ATR. ``|open(B) − close(B-1)|`` por
+    # encima de este múltiplo veta la entrada (el riesgo real ya no es el presupuestado).
+    max_entry_gap_atr: float = 1.0
     # V2.42 slice 2b (E2 · decisión D3): el veto por ATR real nace DESACTIVADO y detrás de
     # un tunable (``AUTO_ENGINE_SIM_V2_ATR_REQUIRED``). Primero se cablea y se MIDE qué
     # fracción de señales trae ATR real; el veto se flipea con el número delante, porque
@@ -446,6 +450,10 @@ def tunables_from_env() -> V2Tunables:
             "AUTO_ENGINE_SIM_V2_ATR_PCT", base.atr_pct_fallback
         )
         or base.atr_pct_fallback,
+        max_entry_gap_atr=_env_float(
+            "AUTO_ENGINE_SIM_V2_MAX_ENTRY_GAP_ATR", base.max_entry_gap_atr
+        )
+        or base.max_entry_gap_atr,
         exit_template=(os.getenv("AUTO_ENGINE_SIM_V2_EXIT_TEMPLATE") or "").strip()
         or base.exit_template,
         regime_override=regime_raw or None,
@@ -1643,6 +1651,23 @@ def plan_v2_tick(
         # en la geometría publicada. Sin propuesta el camino es el histórico (Δ = 0).
         proposal = _proposal_for(signal)
         entry_price = signal.price if signal.price > 0 else None
+        # R1: el fill ocurre a ``execution_price`` (``open(B)``), no a ``price``
+        # (``close(B-1)``). Con ejecución declarada, el sizing y la geometría (stop, T1, T2) se
+        # anclan a ella: el riesgo por acción que se presupuesta es el que se asume. Sin
+        # ejecución declarada (hermético) el tick es el histórico (Δ = 0).
+        exec_px = signal.execution_price
+        exec_known = exec_px is not None and math.isfinite(exec_px) and exec_px > 0
+        if exec_known and entry_price is not None:
+            assert exec_px is not None
+            entry_price = exec_px
+        entry_gap_conflict = bool(
+            exec_known
+            and signal.price > 0
+            and atr is not None
+            and atr > 0
+            and cfg.max_entry_gap_atr > 0
+            and abs(cast("float", exec_px) - signal.price) > cfg.max_entry_gap_atr * atr
+        )
         # Geometría PUBLICADA por el parte (entrada/stop/objetivo). Solo se aporta cuando
         # la propuesta se ADOPTA: sin propuesta ``stop_price``/``target_price`` son
         # ``None`` —exactamente el valor por defecto histórico— y el motor deriva ambos
@@ -1729,6 +1754,18 @@ def plan_v2_tick(
             # identidad que la del claim, a propósito (la reserva no cambia de clave).
             plan_id=str((adopted_proposal or {}).get("planId") or ""),
         )
+        if entry_gap_conflict and proposal_conflict is None:
+            decision = replace(
+                decision,
+                approved=False,
+                action="HOLD",
+                reason_codes=cast(
+                    "tuple[DecisionReasonCode, ...]", (ENTRY_GAP_EXCEEDED,)
+                ),
+                trade_plan=None,
+                allocation=None,
+                plan_violations=(),
+            )
         if proposal_conflict is not None:
             # D-1 — veto ANTES de construir el paquete: una aprobación con el plan del
             # motor NO es adoptable cuando la geometría del parte no cuadra con el precio

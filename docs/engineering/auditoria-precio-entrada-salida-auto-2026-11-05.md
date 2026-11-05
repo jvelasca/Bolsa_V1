@@ -37,6 +37,11 @@ Es decir: se compra a la **apertura** del día siguiente a la señal y se vende 
 ## 3. Hallazgos
 
 ### R1 — Hueco decisión→ejecución sin guarda ni re-dimensionado · 🟠 Alta · Por lectura
+
+> ✅ **Cerrado.** Con `execution_price` declarado, sizing, stop, T1 y T2 se anclan a `open(B)`; si
+> `|open(B) − close(B-1)| > max_entry_gap_atr·ATR` (defecto 1,0; env `AUTO_ENGINE_SIM_V2_MAX_ENTRY_GAP_ATR`)
+> la entrada se veta con `entry_gap_exceeded` (bucket RISK). Sin `execution_price` o sin ATR: Δ = 0.
+> Tests: `test_auto_r1_entry_gap.py`.
 - **Dónde:** `auto_v2_entry.py:1645` (entrada = `close(B-1)`), `position_state.py:584-692`.
 - **Fallo:** el sizing y la geometría se calculan sobre `close(B-1)`, pero se ejecuta a `open(B)`. Ante un hueco
   alcista, la distancia real al stop es mayor que la presupuestada: el riesgo efectivo por operación **supera**
