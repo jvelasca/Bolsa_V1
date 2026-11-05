@@ -26,13 +26,16 @@
 > [#84](https://github.com/jvelasca/Bolsa_V1/pull/84) (`fix/auto-s4-signal-timing`: `signal_bar`/`execution_bar` en el
 > contrato y guarda anti-lookahead). `P3` se cierra en la PR
 > [#86](https://github.com/jvelasca/Bolsa_V1/pull/86) (`fix/auto-p3-drawdown-breaker`: una referencia no medible es
-> `None` y no `0 %`, el libro no se envenena con equity no finito y una marca no persistida veta aperturas). Las ocho
-> PR están fusionadas en `fix/059-060-proveedores`; **no** hay sello, bump ni migración fuera de las citadas.
+> `None` y no `0 %`, el libro no se envenena con equity no finito y una marca no persistida veta aperturas). `S5` se
+> cierra en la PR [#88](https://github.com/jvelasca/Bolsa_V1/pull/88) (`fix/auto-s5-required-gates`: tabla
+> `estado → gates obligatorios` aplicada por el dominio y consultada por el orquestador antes de materializar el
+> finalista). Las nueve PR están fusionadas en `fix/059-060-proveedores`; **no** hay sello, bump ni migración fuera
+> de las citadas.
 > **Sincronización del documento (`2026-11-05`, sin PR de código):** al verificar la sección de estrategia contra el
 > árbol, `S1` y `S2` ya estaban resueltos en código y con pruebas (`test_strategy_lifecycle_s1_s5_s6.py`, `LabThresholds`),
 > así que el documento los daba por abiertos **por desfase**, no por defecto; `S5`, `S6` y `S7` quedan **parciales** con el
-> detalle de qué falta exactamente. **Abiertos:** el resto de la severidad media `M*` (`M1`-`M11`, `M14`, `M15`) y
-> `S5`-`S10`.
+> detalle de qué falta exactamente. **Abiertos:** el resto de la severidad media `M*` (`M1`-`M11`, `M14`, `M15`),
+> `S6`, `S7` y `S8`-`S10`.
 
 Alcance detallado: lógica de decisión, riesgo, ejecución, workers AUTO, `auto_simulation_worker.py` (9.802 líneas) y lógica de estrategia y señales.
 Modo: solo lectura. No se modificó el repositorio. Las referencias `archivo:línea` son del tag `v2.88.183-beta`.
