@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+
+
+def _finite(value: Any) -> float | None:
+    """``float`` finito, o ``None`` si no es un número medible.
+
+    P3 (auditoría .183): ``bool`` no es un número y ``NaN``/``inf`` no son referencias.
+    Tratarlos como cifra envenena el pico y convierte la caída en ``0 %``: el circuit
+    breaker dejaría de disparar.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) else None
 
 
 def _utc_now() -> datetime:
@@ -39,10 +53,20 @@ class AccountDrawdowns:
         }
 
 
-def _dd_pct(reference: float, current: float) -> float:
-    if reference <= 0:
-        return 0.0
-    return max(0.0, (reference - current) / reference * 100.0)
+def _dd_pct(reference: float, current: float) -> float | None:
+    """Caída porcentual desde ``reference``; ``None`` cuando **no es medible**.
+
+    P3 (auditoría .183): ``reference <= 0`` no es "sin caída", es ausencia de marca
+    (cuenta sin equity al abrir el día/semana). Devolver ``0.0`` afirmaba un cero
+    medido y el circuit breaker no disparaba nunca. Lo mismo con valores no finitos:
+    el resultado honesto es "no medido", y quien consume decide (el gate de política
+    lo convierte en ``*_unmeasured`` → veto).
+    """
+    reference_f = _finite(reference)
+    current_f = _finite(current)
+    if reference_f is None or current_f is None or reference_f <= 0:
+        return None
+    return max(0.0, (reference_f - current_f) / reference_f * 100.0)
 
 
 class EquityMarkBook:
@@ -50,6 +74,15 @@ class EquityMarkBook:
     Marcas de apertura día/semana por cuenta (proceso + opcional settings_json).
     Al primer equity del día/semana se fija la referencia; DD = caída desde esa marca.
     max_pct se computa desde el pico de equity (high-water-mark), no desde el depósito inicial.
+
+    P3 (auditoría .183) — contrato de medición:
+
+    * ``daily_pct``/``weekly_pct`` son ``None`` cuando la referencia **no es medible**
+      (``<= 0`` o no finita). ``None`` significa "no medido"; nunca se colapsa a ``0 %``.
+    * Un equity no finito devuelve todas las métricas en ``None`` y **no** muta el libro:
+      la marca buena anterior sigue siendo la referencia del día.
+    * La frontera del día es **UTC** (``dayKey``/``weekKey`` viajan dentro de las marcas),
+      así que una marca de otro día se descarta, no se reinterpreta en otra zona.
     """
 
     def __init__(self) -> None:
@@ -86,48 +119,68 @@ class EquityMarkBook:
         now: datetime | None = None,
     ) -> AccountDrawdowns:
         now_dt = now or _utc_now()
+        # P3: sin equity medible no hay drawdown medible y NO se toca el libro (una marca
+        # envenenada con NaN sobreviviría a todos los ticks siguientes).
+        equity_f = _finite(equity)
+        if equity_f is None:
+            return AccountDrawdowns(
+                daily_pct=None,
+                weekly_pct=None,
+                max_pct=None,
+                day_open_equity=None,
+                week_open_equity=None,
+            )
         day = _day_key(now_dt)
         week = _week_key(now_dt)
         state = self._by_account.setdefault(account_id, {})
 
-        if state.get("dayKey") != day or state.get("dayOpen") is None:
+        # Una marca guardada no finita no es referencia: se reabre el día igual que si no
+        # existiera. Una marca a 0 SÍ se conserva: `_dd_pct` la declara "no medible"
+        # (`None`) en vez de reabrir el día y fabricar un 0 % que borraría la caída real.
+        day_open = _finite(state.get("dayOpen"))
+        if state.get("dayKey") != day or day_open is None:
             state["dayKey"] = day
-            state["dayOpen"] = float(equity)
-        if state.get("weekKey") != week or state.get("weekOpen") is None:
+            day_open = equity_f
+            state["dayOpen"] = day_open
+        week_open = _finite(state.get("weekOpen"))
+        if state.get("weekKey") != week or week_open is None:
             state["weekKey"] = week
-            state["weekOpen"] = float(equity)
+            week_open = equity_f
+            state["weekOpen"] = week_open
 
-        state["lastEquity"] = float(equity)
+        state["lastEquity"] = equity_f
         state["updatedAt"] = now_dt.isoformat().replace("+00:00", "Z")
 
-        day_open = float(state["dayOpen"])
-        week_open = float(state["weekOpen"])
-
-        peak = state.get("peakEquity")
+        peak = _finite(state.get("peakEquity"))
         if peak is None:
-            seed = float(equity)
-            if initial_deposit is not None and initial_deposit > 0:
-                seed = max(seed, float(initial_deposit))
+            seed = equity_f
+            deposit = _finite(initial_deposit)
+            if deposit is not None and deposit > 0:
+                seed = max(seed, deposit)
             peak = seed
-        else:
-            peak = float(peak)
-        peak = max(peak, float(equity))
+        peak = max(peak, equity_f)
         state["peakEquity"] = peak
-        new_high = float(equity) >= peak
+        new_high = equity_f >= peak
 
-        max_dd = None
-        if initial_deposit is not None and initial_deposit > 0:
-            cur = _dd_pct(peak, float(equity))
+        max_dd: float | None = None
+        deposit = _finite(initial_deposit)
+        if deposit is not None and deposit > 0:
             if new_high:
                 max_dd = 0.0
             else:
-                prev = state.get("maxDrawdownPct")
-                max_dd = cur if prev is None else max(float(prev), cur)
+                cur = _dd_pct(peak, equity_f)
+                prev = _finite(state.get("maxDrawdownPct"))
+                if cur is None:
+                    max_dd = None
+                else:
+                    max_dd = cur if prev is None else max(prev, cur)
             state["maxDrawdownPct"] = max_dd
 
+        daily = _dd_pct(day_open, equity_f)
+        weekly = _dd_pct(week_open, equity_f)
         return AccountDrawdowns(
-            daily_pct=round(_dd_pct(day_open, float(equity)), 4),
-            weekly_pct=round(_dd_pct(week_open, float(equity)), 4),
+            daily_pct=None if daily is None else round(daily, 4),
+            weekly_pct=None if weekly is None else round(weekly, 4),
             max_pct=None if max_dd is None else round(max_dd, 4),
             day_open_equity=day_open,
             week_open_equity=week_open,
