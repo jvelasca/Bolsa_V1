@@ -10127,6 +10127,235 @@
         "title": "EvaluateTrackerSchedulesResponseDto",
         "type": "object"
       },
+      "EvidencePolicyBody": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "holdoutPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdoutpct"
+          },
+          "maxDrawdownPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxdrawdownpct"
+          },
+          "minCommissionBps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mincommissionbps"
+          },
+          "minExcessVsBuyHoldPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minexcessvsbuyholdpct"
+          },
+          "minNetReturnPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minnetreturnpct"
+          },
+          "minPositiveWindowPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minpositivewindowpct"
+          },
+          "minSlippageBps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minslippagebps"
+          },
+          "minSpreadBps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minspreadbps"
+          },
+          "minTradesTotal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mintradestotal"
+          },
+          "minWindows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minwindows"
+          }
+        },
+        "title": "EvidencePolicyBody",
+        "type": "object"
+      },
+      "EvidencePolicyDto": {
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "holdoutPct": {
+            "title": "Holdoutpct",
+            "type": "number"
+          },
+          "isDefault": {
+            "title": "Isdefault",
+            "type": "boolean"
+          },
+          "maxDrawdownPct": {
+            "title": "Maxdrawdownpct",
+            "type": "number"
+          },
+          "minCommissionBps": {
+            "title": "Mincommissionbps",
+            "type": "number"
+          },
+          "minExcessVsBuyHoldPct": {
+            "title": "Minexcessvsbuyholdpct",
+            "type": "number"
+          },
+          "minNetReturnPct": {
+            "title": "Minnetreturnpct",
+            "type": "number"
+          },
+          "minPositiveWindowPct": {
+            "title": "Minpositivewindowpct",
+            "type": "number"
+          },
+          "minRoundTripCostBps": {
+            "title": "Minroundtripcostbps",
+            "type": "number"
+          },
+          "minSlippageBps": {
+            "title": "Minslippagebps",
+            "type": "number"
+          },
+          "minSpreadBps": {
+            "title": "Minspreadbps",
+            "type": "number"
+          },
+          "minTradesTotal": {
+            "title": "Mintradestotal",
+            "type": "integer"
+          },
+          "minWindows": {
+            "title": "Minwindows",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updatedat"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accountId",
+          "minWindows",
+          "minTradesTotal",
+          "minPositiveWindowPct",
+          "minNetReturnPct",
+          "maxDrawdownPct",
+          "minExcessVsBuyHoldPct",
+          "holdoutPct",
+          "minCommissionBps",
+          "minSlippageBps",
+          "minSpreadBps",
+          "minRoundTripCostBps",
+          "version",
+          "isDefault"
+        ],
+        "title": "EvidencePolicyDto",
+        "type": "object"
+      },
       "ExecutePositionPolicyAutoRequestDto": {
         "properties": {
           "dryRun": {
@@ -25640,6 +25869,112 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/account-evidence-policy": {
+      "get": {
+        "operationId": "get_account_evidence_policy_api_account_evidence_policy_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidencePolicyDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Account Evidence Policy",
+        "tags": [
+          "accounts"
+        ]
+      },
+      "put": {
+        "operationId": "put_account_evidence_policy_api_account_evidence_policy_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidencePolicyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidencePolicyDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Account Evidence Policy",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
     "/api/accounts": {
       "get": {
         "operationId": "list_accounts_api_accounts_get",

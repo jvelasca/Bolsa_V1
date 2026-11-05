@@ -18,6 +18,7 @@ import {
   resolveCommissionProfile,
 } from "@bolsa/shared";
 import { FieldRow, inputClassName } from "@/components/ui/dialog";
+import { AccountEvidencePolicy } from "@/features/accounts/account-evidence-policy";
 import { AccountVenuePreference } from "@/features/accounts/account-venue-preference";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { api } from "@/lib/api";
@@ -202,6 +203,7 @@ export function AccountSettingsPanel({
   return (
     <div className={cn("space-y-4", compact && "text-sm")}>
       <AccountVenuePreference accountId={accountId} />
+      <AccountEvidencePolicy accountId={accountId} />
 
       <div className="flex gap-1 border-b border-border" role="tablist">
         {(

@@ -4,6 +4,24 @@
  */
 
 export interface paths {
+    "/api/account-evidence-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Account Evidence Policy */
+        get: operations["get_account_evidence_policy_api_account_evidence_policy_get"];
+        /** Put Account Evidence Policy */
+        put: operations["put_account_evidence_policy_api_account_evidence_policy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/accounts": {
         parameters: {
             query?: never;
@@ -8140,6 +8158,66 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** EvidencePolicyBody */
+        EvidencePolicyBody: {
+            /** Actor */
+            actor?: string | null;
+            /** Holdoutpct */
+            holdoutPct?: number | null;
+            /** Maxdrawdownpct */
+            maxDrawdownPct?: number | null;
+            /** Mincommissionbps */
+            minCommissionBps?: number | null;
+            /** Minexcessvsbuyholdpct */
+            minExcessVsBuyHoldPct?: number | null;
+            /** Minnetreturnpct */
+            minNetReturnPct?: number | null;
+            /** Minpositivewindowpct */
+            minPositiveWindowPct?: number | null;
+            /** Minslippagebps */
+            minSlippageBps?: number | null;
+            /** Minspreadbps */
+            minSpreadBps?: number | null;
+            /** Mintradestotal */
+            minTradesTotal?: number | null;
+            /** Minwindows */
+            minWindows?: number | null;
+        };
+        /** EvidencePolicyDto */
+        EvidencePolicyDto: {
+            /** Accountid */
+            accountId: string;
+            /** Actor */
+            actor?: string | null;
+            /** Holdoutpct */
+            holdoutPct: number;
+            /** Isdefault */
+            isDefault: boolean;
+            /** Maxdrawdownpct */
+            maxDrawdownPct: number;
+            /** Mincommissionbps */
+            minCommissionBps: number;
+            /** Minexcessvsbuyholdpct */
+            minExcessVsBuyHoldPct: number;
+            /** Minnetreturnpct */
+            minNetReturnPct: number;
+            /** Minpositivewindowpct */
+            minPositiveWindowPct: number;
+            /** Minroundtripcostbps */
+            minRoundTripCostBps: number;
+            /** Minslippagebps */
+            minSlippageBps: number;
+            /** Minspreadbps */
+            minSpreadBps: number;
+            /** Mintradestotal */
+            minTradesTotal: number;
+            /** Minwindows */
+            minWindows: number;
+            /** Updatedat */
+            updatedAt?: string | null;
+            /** Version */
+            version: number;
+        };
         /** ExecutePositionPolicyAutoRequestDto */
         ExecutePositionPolicyAutoRequestDto: {
             /**
@@ -13188,6 +13266,72 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_account_evidence_policy_api_account_evidence_policy_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidencePolicyDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_account_evidence_policy_api_account_evidence_policy_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidencePolicyBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidencePolicyDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_accounts_api_accounts_get: {
         parameters: {
             query?: {

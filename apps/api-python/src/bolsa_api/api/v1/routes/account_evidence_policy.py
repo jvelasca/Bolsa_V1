@@ -44,6 +44,25 @@ class EvidencePolicyBody(BaseModel):
     actor: str | None = Field(default=None, max_length=200)
 
 
+class EvidencePolicyDto(BaseModel):
+    accountId: str
+    minWindows: int
+    minTradesTotal: int
+    minPositiveWindowPct: float
+    minNetReturnPct: float
+    maxDrawdownPct: float
+    minExcessVsBuyHoldPct: float
+    holdoutPct: float
+    minCommissionBps: float
+    minSlippageBps: float
+    minSpreadBps: float
+    minRoundTripCostBps: float
+    updatedAt: str | None = None
+    actor: str | None = None
+    version: int
+    isDefault: bool
+
+
 async def _scope(request: Request, account_id: str | None) -> str:
     scope = await resolve_account_scope_or_default(request, account_id)
     if scope is None:
@@ -51,23 +70,24 @@ async def _scope(request: Request, account_id: str | None) -> str:
     return str(scope)
 
 
-@router.get("/account-evidence-policy")
+@router.get("/account-evidence-policy", response_model=EvidencePolicyDto)
 async def get_account_evidence_policy(
     request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: Annotated[str | None, Depends(get_account_id_header)] = None,
-) -> dict[str, object]:
+) -> EvidencePolicyDto:
     account = await _scope(request, account_id)
-    return (await PostgresAccountEvidencePolicyStore(session).load(account)).to_dict()
+    policy = await PostgresAccountEvidencePolicyStore(session).load(account)
+    return EvidencePolicyDto(**policy.to_dict())
 
 
-@router.put("/account-evidence-policy")
+@router.put("/account-evidence-policy", response_model=EvidencePolicyDto)
 async def put_account_evidence_policy(
     body: EvidencePolicyBody,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: Annotated[str | None, Depends(get_account_id_header)] = None,
-) -> dict[str, object]:
+) -> EvidencePolicyDto:
     account = await _scope(request, account_id)
     store = PostgresAccountEvidencePolicyStore(session)
     current = await store.load(account)
@@ -79,7 +99,7 @@ async def put_account_evidence_policy(
     from dataclasses import replace
 
     await store.save(replace(policy, actor=body.actor, updated_at=datetime.now(UTC).isoformat()))
-    return (await store.load(account)).to_dict()
+    return EvidencePolicyDto(**(await store.load(account)).to_dict())
 
 
 __all__ = ["router"]

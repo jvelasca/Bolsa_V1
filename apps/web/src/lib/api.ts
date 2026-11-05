@@ -221,6 +221,27 @@ export const api = {
       }),
     ),
 
+  /** Política de evidencia de rentabilidad por cuenta (umbrales fijados antes de medir). */
+  getAccountEvidencePolicy: (accountId: string) =>
+    call<import("@/api/schema").components["schemas"]["EvidencePolicyDto"]>(
+      () =>
+        client.GET("/api/account-evidence-policy", {
+          headers: { "X-Account-Id": accountId },
+        }),
+    ),
+
+  putAccountEvidencePolicy: (
+    accountId: string,
+    body: import("@/api/schema").components["schemas"]["EvidencePolicyBody"],
+  ) =>
+    call<import("@/api/schema").components["schemas"]["EvidencePolicyDto"]>(
+      () =>
+        client.PUT("/api/account-evidence-policy", {
+          headers: { "X-Account-Id": accountId },
+          body,
+        }),
+    ),
+
   /** OE-1 — scorecard SEMI + AUTO (read-only; measure ≠ Accept). */
   getOpsSelfEval: (accountId?: string, lookbackDays = 120) =>
     call<{
