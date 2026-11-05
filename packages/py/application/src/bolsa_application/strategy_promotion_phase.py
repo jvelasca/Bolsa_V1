@@ -102,6 +102,29 @@ class PromotionDecision:
         return self.promotion.promoted
 
 
+def _validation_with_identity(
+    *,
+    finalist: StrategyFinalist,
+    gates: Sequence[GateResult],
+    lab_bars_hash: str | None,
+) -> StrategyValidation:
+    """S6: la validación declara SOBRE QUÉ identidad se calcularon los gates.
+
+    El hash de definición sale del finalista inmutable y el snapshot de su definición;
+    el ``bars_hash`` del tramo LAB lo aporta quien ejecutó el LAB (el orquestador), para
+    que la evidencia shadow pueda contrastarse contra el tramo que NO debía ver.
+    """
+    definition = finalist.definition if isinstance(finalist.definition, Mapping) else {}
+    snapshot = definition.get("data_snapshot_id")
+    return StrategyValidation(
+        finalist_id=finalist.version_id,
+        gates=tuple(gates),
+        strategy_definition_hash=finalist.definition_hash,
+        data_snapshot_id=str(snapshot) if snapshot else None,
+        bars_hash=lab_bars_hash,
+    )
+
+
 def decide_promotion(
     *,
     finalist: StrategyFinalist,
@@ -110,6 +133,7 @@ def decide_promotion(
     shadow: ShadowValidationResult | None = None,
     active: ActiveStrategyRef | None = None,
     require_gate_for_active: bool = True,
+    validation_bars_hash: str | None = None,
 ) -> PromotionDecision:
     """Promotion Gate AUTOMÁTICO: siete gates + COACH + evidencia shadow.
 
@@ -122,6 +146,10 @@ def decide_promotion(
     reemplazo exige que TODOS los gates estén PASS, que el COACH no vete y que haya
     shadow/paper validado. Además, si el candidato es el MISMO que la activa, no hay
     nada que promover (no se re-promociona a sí mismo).
+
+    S6 (auditoría .183): ``validation_bars_hash`` es el hash del tramo LAB usado para
+    calcular los gates; la validación lo declara y el Promotion Gate veta la evidencia
+    shadow que reutilice ese mismo tramo (``evidencia_shadow_mismo_dataset``).
     """
     return _decide_promotion(
         finalist=finalist,
@@ -129,7 +157,9 @@ def decide_promotion(
         coach=coach,
         promotion=evaluate_promotion(
             finalist=finalist,
-            validation=StrategyValidation(finalist_id=finalist.version_id, gates=tuple(gates)),
+            validation=_validation_with_identity(
+                finalist=finalist, gates=gates, lab_bars_hash=validation_bars_hash
+            ),
             coach=coach,
             shadow=shadow,
         ),
@@ -146,6 +176,7 @@ def decide_admin_promotion(
     shadow_validated: bool,
     active: ActiveStrategyRef | None = None,
     require_gate_for_active: bool = True,
+    validation_bars_hash: str | None = None,
 ) -> PromotionDecision:
     """Promotion Gate ADMIN/MANUAL: única vía que acepta el override ``shadow_validated``.
 
@@ -163,7 +194,9 @@ def decide_admin_promotion(
         coach=coach,
         promotion=evaluate_admin_promotion(
             finalist=finalist,
-            validation=StrategyValidation(finalist_id=finalist.version_id, gates=tuple(gates)),
+            validation=_validation_with_identity(
+                finalist=finalist, gates=gates, lab_bars_hash=validation_bars_hash
+            ),
             coach=coach,
             shadow_validated=shadow_validated,
         ),

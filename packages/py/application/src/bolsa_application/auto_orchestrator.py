@@ -44,6 +44,7 @@ from bolsa_application.strategy_promotion_phase import (
 )
 from bolsa_application.strategy_shadow_phase import (
     ShadowReplayConfig,
+    lab_window_bars_hash,
     run_shadow_replay,
 )
 from bolsa_application.strategy_top3_coach_phase import (
@@ -436,12 +437,28 @@ class AutoOrchestrator:
             else None
         )
         gates = _promotion_gates(best_eval, coach)
+        # S6 (auditoría .183): la validación declara el tramo LAB exacto sobre el que se
+        # calcularon los gates, para poder demostrar que la evidencia shadow NO lo
+        # reutilizó. Se calcula aquí porque el orquestador es quien fijó la frontera y
+        # quien tiene la serie; sin shadow no hay promoción y el hash es innecesario.
+        lab_bars_hash = (
+            lab_window_bars_hash(
+                finalist=finalist,
+                bars=shadow_bars_series,
+                config=replace(
+                    deps.shadow_config, lab_end=lab_end, require_holdout=True
+                ),
+            )
+            if shadow_result is not None and lab_end is not None
+            else None
+        )
         decision = decide_promotion(
             finalist=finalist,
             gates=gates,
             coach=coach,
             shadow=shadow_result,
             active=active_ref,
+            validation_bars_hash=lab_bars_hash,
         )
         await deps.store.save_promotion(
             _promotion_record(decision, instrument_id=instrument_id)

@@ -29,13 +29,15 @@
 > `None` y no `0 %`, el libro no se envenena con equity no finito y una marca no persistida veta aperturas). `S5` se
 > cierra en la PR [#88](https://github.com/jvelasca/Bolsa_V1/pull/88) (`fix/auto-s5-required-gates`: tabla
 > `estado → gates obligatorios` aplicada por el dominio y consultada por el orquestador antes de materializar el
-> finalista). Las nueve PR están fusionadas en `fix/059-060-proveedores`; **no** hay sello, bump ni migración fuera
-> de las citadas.
+> finalista). `S6` se cierra en la PR [#89](https://github.com/jvelasca/Bolsa_V1/pull/89) (`fix/auto-s6-evidence-identity`:
+> la validación declara definición y dataset, y el Promotion Gate veta la evidencia de otra definición, de otro
+> snapshot o del mismo tramo de barras que el LAB). Las diez PR están fusionadas en `fix/059-060-proveedores`; **no**
+> hay sello, bump ni migración fuera de las citadas.
 > **Sincronización del documento (`2026-11-05`, sin PR de código):** al verificar la sección de estrategia contra el
 > árbol, `S1` y `S2` ya estaban resueltos en código y con pruebas (`test_strategy_lifecycle_s1_s5_s6.py`, `LabThresholds`),
 > así que el documento los daba por abiertos **por desfase**, no por defecto; `S5`, `S6` y `S7` quedan **parciales** con el
 > detalle de qué falta exactamente. **Abiertos:** el resto de la severidad media `M*` (`M1`-`M11`, `M14`, `M15`),
-> `S6`, `S7` y `S8`-`S10`.
+> `S7` y `S8`-`S10`.
 
 Alcance detallado: lógica de decisión, riesgo, ejecución, workers AUTO, `auto_simulation_worker.py` (9.802 líneas) y lógica de estrategia y señales.
 Modo: solo lectura. No se modificó el repositorio. Las referencias `archivo:línea` son del tag `v2.88.183-beta`.
@@ -193,9 +195,10 @@ Fuente: lectura de módulos de señales, ciclo de vida y promoción. No verifica
 - **Cerrado:** el dominio declara `REQUIRED_GATES_BY_STATE` (gates que deben estar en PASS para **entrar** en cada estado, acumulativos) y `can_transition` los aplica **siempre**; `required_gates` del llamador solo **añade**, nunca rebaja. `NOT_EVALUATED` no es PASS y bloquea con `gates_requeridos_ausentes:<lista>`. `can_advance_to(current, target, …)` recorre todos los saltos intermedios —un ciclo real cruza varias fases— y el orquestador lo consulta **antes** de materializar el finalista: si falta un gate de la fase devuelve `transicion_refusada` con sus motivos y no ejecuta la evidencia shadow. El TOP3 (`select_top3`) deja de tener su propia lista paralela y usa `required_gates_for(FINALISTA)`, así que la barrera de entrada y el avance de fase hablan del mismo contrato.
 - **Alcance declarado:** `can_advance_to` exige los gates **obligatorios** de las fases recorridas en PASS; un `FAIL` en un gate que la fase no exige (`dsr`/`risk` antes de `PROMOCION`) no corta el avance —de eso responde el Promotion Gate con los siete—, y `VALIDACION`/`PROMOCION`/`ACTIVE` no se deciden con gates sueltos (`can_advance_to` responde `validacion_ausente`). Con el LAB actual el TOP3 ya exige esos cuatro gates, así que el corte es defensa en profundidad para cualquier relajación futura (`min_gates`) o llamador que salte fases.
 
-#### S6 — Identidad de la evidencia · 🟡 Parcial (verificado `2026-11-05`)
-- **Qué hay:** `_evidence_identity_reasons` compara `version_id` —la validación y el shadow contra el finalista— y veta con `evidencia_validacion_otra_version` / `evidencia_shadow_otra_version`.
-- **Qué falta:** la comparación de **definición y dataset** (`strategy_definition_hash`, `bars_hash`, `data_snapshot_id`). El fingerprint existe en `ShadowValidationResult`, pero `StrategyValidation` no transporta ninguno, así que no hay con qué cruzarlo sin ampliar el tipo de dominio.
+#### S6 — Identidad de la evidencia · ✅ Cerrado (`fix/auto-s6-evidence-identity`)
+- **Fallo:** `_evidence_identity_reasons` solo comparaba `version_id`. El fingerprint del dataset existía en `ShadowValidationResult`, pero `StrategyValidation` no transportaba ninguno, así que una validación de otra **definición** o de otro **dataset** era indistinguible de la correcta, y nada demostraba que el tramo shadow no fuera el tramo del LAB.
+- **Cerrado:** `StrategyValidation` **declara** su identidad (`strategy_definition_hash`, `data_snapshot_id`, `bars_hash` del tramo LAB) y el Promotion Gate la contrasta: definición de la validación y del shadow contra el hash inmutable del finalista (`evidencia_validacion_otra_definicion` / `evidencia_shadow_otra_definicion`), snapshot compartido validación↔shadow (`evidencia_shadow_otro_dataset`) y **anti-solape** (`evidencia_shadow_mismo_dataset`) cuando el `bars_hash` del shadow es el mismo que el del tramo LAB. `decide_promotion`/`decide_admin_promotion` estampan la identidad del finalista y aceptan `validation_bars_hash`; el orquestador calcula ese hash con `lab_window_bars_hash` (misma identidad de dataset y mismo algoritmo que el shadow) y lo aporta a la decisión.
+- **Límite declarado:** un fingerprint **ausente no se compara** —no se inventa—: los finalistas históricos y el override administrativo no los llevan, y esa ausencia sigue siendo un hueco declarado. El hash de definición del shadow lo estampa el replay desde el finalista, así que la comparación **corrobora procedencia** (que la evidencia emparejada es de esta definición), no recalcula el hash desde las barras ejecutadas.
 
 #### S7 — Vigilancia: ausencia de medida y frescura · 🟡 Parcial (verificado `2026-11-05`)
 - **Qué hay:** `VigilanceDecision.unmeasured` enumera los indicadores con umbral configurado y valor ausente, `health_state` distingue `degraded`/`unmeasured`/`healthy`, y `HealthThresholds.fail_on_unmeasured` convierte la ausencia en degradación — pero **apagado por defecto**, así que en la ruta por defecto la ausencia sigue sin degradar.

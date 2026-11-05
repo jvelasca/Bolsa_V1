@@ -721,6 +721,33 @@ async def test_s5_orchestrator_consults_the_state_machine_before_finalist(
 
 
 @pytest.mark.asyncio
+async def test_s6_orchestrator_declares_the_lab_window_hash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """S6: el orquestador aporta el hash del tramo LAB a la validación de la promoción."""
+    import bolsa_application.auto_orchestrator as orchestrator_module
+
+    seen: list[str | None] = []
+    original = orchestrator_module.lab_window_bars_hash
+
+    def _spy(**kwargs: Any) -> str | None:
+        value = original(**kwargs)
+        seen.append(value)
+        return value
+
+    monkeypatch.setattr(orchestrator_module, "lab_window_bars_hash", _spy)
+
+    deps, _store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    _with_shadow_evidence(deps)
+    result = await AutoOrchestrator(deps).run_cycle(
+        instrument_id="AAA", data_snapshot_id="snap-1"
+    )
+
+    assert result.status == "active", result.reasons
+    assert seen and seen[0] is not None, "la validación debe declarar el tramo LAB"
+
+
+@pytest.mark.asyncio
 async def test_s5_cycle_with_full_phase_gates_reaches_finalist_and_promotes() -> None:
     """Control positivo: con los gates de la fase en PASS el cruce se autoriza."""
     deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
