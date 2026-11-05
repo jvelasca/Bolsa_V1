@@ -45,6 +45,9 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@/features/accounts/account-venue-preference", () => ({
   AccountVenuePreference: () => null,
 }));
+vi.mock("@/features/accounts/account-evidence-policy", () => ({
+  AccountEvidencePolicy: () => null,
+}));
 
 import {
   AccountSettingsPanel,

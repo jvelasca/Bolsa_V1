@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from bolsa_api.api.v1.routes import (
+    account_evidence_policy,
     accounts,
     ai_governance,
     alerts,
@@ -82,6 +83,7 @@ api_v1_router.include_router(accounts.router, tags=["accounts"])
 api_v1_router.include_router(auto_self_evaluation.router, tags=["auto"])
 api_v1_router.include_router(auto_operational_monitor.router, tags=["auto"])
 api_v1_router.include_router(auto_engine_intent.router, tags=["auto"])
+api_v1_router.include_router(account_evidence_policy.router, tags=["accounts"])
 api_v1_router.include_router(auto_paper_evidence.router, tags=["auto"])
 api_v1_router.include_router(auto_dia_d.router, tags=["auto"])
 api_v1_router.include_router(auto_dia_d_feedback.router, tags=["auto"])

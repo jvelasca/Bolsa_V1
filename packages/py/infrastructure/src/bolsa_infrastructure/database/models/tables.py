@@ -3005,6 +3005,80 @@ class AutoEngineIntentRow(Base):
     )
 
 
+class AccountEvidencePolicyRow(Base):
+    """Umbrales de evidencia de rentabilidad por cuenta, fijados ANTES de medir (migración 066).
+
+    Una fila por cuenta; sin fila rigen los defaults estrictos de
+    ``bolsa_application.account_evidence_policy``. Los CHECK replican sus rangos.
+    """
+
+    __tablename__ = "account_evidence_policy"
+    __table_args__ = (
+        CheckConstraint("min_windows BETWEEN 5 AND 1000", name="account_evidence_policy_min_windows_ck"),
+        CheckConstraint(
+            "min_trades_total BETWEEN 30 AND 100000",
+            name="account_evidence_policy_min_trades_total_ck",
+        ),
+        CheckConstraint(
+            "min_positive_window_pct BETWEEN 50 AND 100",
+            name="account_evidence_policy_min_positive_window_pct_ck",
+        ),
+        CheckConstraint(
+            "min_net_return_pct BETWEEN 0 AND 1000",
+            name="account_evidence_policy_min_net_return_pct_ck",
+        ),
+        CheckConstraint(
+            "max_drawdown_pct BETWEEN 1 AND 50",
+            name="account_evidence_policy_max_drawdown_pct_ck",
+        ),
+        CheckConstraint(
+            "min_excess_vs_buy_hold_pct BETWEEN 0 AND 1000",
+            name="account_evidence_policy_min_excess_vs_buy_hold_pct_ck",
+        ),
+        CheckConstraint("holdout_pct BETWEEN 20 AND 60", name="account_evidence_policy_holdout_pct_ck"),
+        CheckConstraint(
+            "min_commission_bps BETWEEN 1 AND 200",
+            name="account_evidence_policy_min_commission_bps_ck",
+        ),
+        CheckConstraint(
+            "min_slippage_bps BETWEEN 1 AND 200",
+            name="account_evidence_policy_min_slippage_bps_ck",
+        ),
+        CheckConstraint(
+            "min_spread_bps BETWEEN 0 AND 200",
+            name="account_evidence_policy_min_spread_bps_ck",
+        ),
+    )
+
+    account_id: Mapped[str] = mapped_column(
+        "account_id",
+        String,
+        ForeignKey("investment_accounts.id", ondelete="CASCADE", name="account_evidence_policy_account_fkey"),
+        primary_key=True,
+    )
+    min_windows: Mapped[int] = mapped_column("min_windows", Integer, nullable=False)
+    min_trades_total: Mapped[int] = mapped_column("min_trades_total", Integer, nullable=False)
+    min_positive_window_pct: Mapped[float] = mapped_column(
+        "min_positive_window_pct", Float, nullable=False
+    )
+    min_net_return_pct: Mapped[float] = mapped_column("min_net_return_pct", Float, nullable=False)
+    max_drawdown_pct: Mapped[float] = mapped_column("max_drawdown_pct", Float, nullable=False)
+    min_excess_vs_buy_hold_pct: Mapped[float] = mapped_column(
+        "min_excess_vs_buy_hold_pct", Float, nullable=False
+    )
+    holdout_pct: Mapped[float] = mapped_column("holdout_pct", Float, nullable=False)
+    min_commission_bps: Mapped[float] = mapped_column("min_commission_bps", Float, nullable=False)
+    min_slippage_bps: Mapped[float] = mapped_column("min_slippage_bps", Float, nullable=False)
+    min_spread_bps: Mapped[float] = mapped_column("min_spread_bps", Float, nullable=False)
+    actor: Mapped[str | None] = mapped_column("actor", String, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(
+        "updated_at", DateTime(timezone=True), nullable=True
+    )
+    version: Mapped[int] = mapped_column(
+        "version", Integer, nullable=False, default=1, server_default="1"
+    )
+
+
 class AdaptiveGateStateRow(Base):
     """AUTO-15 (V2.56) — la racha de fallos del sink del gate Adaptive, durable.
 
