@@ -29,6 +29,7 @@ from bolsa_application.auto_reason_codes import (
     ACTIVE_EVALUATION_FAILED,
     ACTIVE_GATED_UNAVAILABLE,
     ACTIVE_HOLD_REASONS,
+    ACTIVE_INSUFFICIENT_DATA,
     ACTIVE_NO_EXECUTABLE,
     ACTIVE_NO_SIGNAL,
     ACTIVE_NO_SNAPSHOT,
@@ -286,6 +287,8 @@ def test_every_declared_reason_belongs_to_the_closed_vocabulary() -> None:
         ACTIVE_NO_SIGNAL,
         ACTIVE_WARMUP_UNMEASURABLE,
         ACTIVE_GATED_UNAVAILABLE,
+        # S8: la ventana no trae rango/volumen y la definición los exige.
+        ACTIVE_INSUFFICIENT_DATA,
         WARMUP_INSUFFICIENT,
     } == set(ACTIVE_HOLD_REASONS)
 

@@ -34,6 +34,7 @@ from typing import Any, Protocol
 from bolsa_application.auto_reason_codes import (
     ACTIVE_EVALUATION_FAILED,
     ACTIVE_GATED_UNAVAILABLE,
+    ACTIVE_INSUFFICIENT_DATA,
     ACTIVE_NO_EXECUTABLE,
     ACTIVE_NO_SIGNAL,
     ACTIVE_NO_SNAPSHOT,
@@ -47,7 +48,10 @@ from bolsa_application.decision_contract import (
     GatedState,
     format_active_strategy_source,
 )
-from bolsa_application.signal_feature_context import feature_source
+from bolsa_application.signal_feature_context import (
+    feature_source,
+    missing_bar_fields,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -184,9 +188,10 @@ def make_active_strategy_decider(
     ``auto_reason_codes.ACTIVE_HOLD_REASONS``: ``no_executable`` (la definición no trae
     ``executable``), ``no_snapshot`` (sin cargador o sin barras), ``evaluation_failed`` (la
     evaluación lanzó), ``warmup_insufficient`` (la ventana no alcanza), ``no_signal`` (se
-    evaluó y no había señal) y ``warmup_unmeasurable`` (el warmup no se pudo medir, así que
-    la ventana no se puede dimensionar). El worker los journaliza con su propio evento; así
-    «no pudo evaluar» deja de ser indistinguible de «no quiso operar».
+    evaluó y no había señal), ``warmup_unmeasurable`` (el warmup no se pudo medir, así que
+    la ventana no se puede dimensionar) e ``insufficient_data`` (S8: la definición usa
+    indicadores de rango/volumen y la ventana es close-only). El worker los journaliza con
+    su propio evento; así «no pudo evaluar» deja de ser indistinguible de «no quiso operar».
 
     **B-1 (ventana derivada).** El warmup del preset se mide UNA vez, al construir el
     decisor, con ``preset_evaluability.measured_warmup_bars``. El número viaja en toda
@@ -273,6 +278,33 @@ def make_active_strategy_decider(
         # misma fila. Sin barras no se declara nada: no se evaluó, y eso no es "synthetic".
         declared_source = feature_source(bars)
         window_bars = len(bars)
+        # S8 (auditoría .183) — la ventana puede traer cierres y nada más. La síntesis
+        # ``open = high = low = close`` + ``volume = 0`` permite EVALUAR, pero un
+        # ATR/CCI/Stochastic/VWAP calculado así es un número con forma correcta y
+        # significado inventado. Cuando la definición exige rango o volumen y la ventana no
+        # lo trae:
+        #   * sin abrir: HOLD ``insufficient_data`` (no se arriesga capital sobre el número);
+        #   * con ``entry_long`` propuesto: el mismo HOLD — es un veto de ENTRADA;
+        #   * con ``exit``: se deja pasar. Cerrar reduce riesgo y el código ya no veta
+        #     reducciones por datos degradados (misma regla que ``control_plane_stale``).
+        # El detalle de qué falta viaja en ``memo`` (→ ``hold_detail`` del journal).
+        missing_fields = missing_bar_fields(bars, executable)
+        if missing_fields and signal_kind in (None, "entry_long"):
+            detail = f"{ACTIVE_INSUFFICIENT_DATA}:" + ",".join(sorted(missing_fields))
+            logger.info("signal evaluator %s: %s", symbol, detail)
+            return DecisionPackage(
+                action="HOLD",
+                instrument_id=symbol,
+                quantity=0,
+                source=source,
+                memo=detail,
+                hold_reason=ACTIVE_INSUFFICIENT_DATA,
+                feature_source=declared_source,
+                signal_window_bars=window_bars,
+                warmup_bars=measured_warmup,
+                signal_window_source=signal_window_source,
+                gated_state=gated,
+            )
         if warmup_reason is not None:
             # B-1: la ventana no alcanza el warmup del preset. Se sigue en HOLD
             # (fail-closed), pero el motivo viaja en ``memo``: un HOLD por falta de
