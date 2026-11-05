@@ -48,19 +48,48 @@ def test_multiple_breaches_reported() -> None:
         metrics={"edge": 0.0, "wfe": 0.1, "credibility": 0.1},
         thresholds=_TH,
     )
-    assert set(decision.breaches) == {"edge", "walk_forward_efficiency", "credibility"}
+    assert set(decision.breaches) == {
+        "edge",
+        "walk_forward_efficiency",
+        "credibility",
+        # S7: ``min_dsr`` está configurado y el DSR no se midió ⇒ fail-closed.
+        "dsr_unmeasured",
+    }
 
 
-def test_missing_metrics_do_not_invent_degradation() -> None:
+def test_missing_metrics_degrades_by_default_fail_closed() -> None:
+    """S7: con umbral configurado, una métrica ausente NO se reporta como salud."""
     decision = evaluate_active_health(
         version_id="ver-1",
         as_of="2026-09-10",
         metrics={},
         thresholds=_TH,
     )
-    assert not decision.degraded
+    assert decision.degraded and decision.relab
     assert decision.health is not None
     assert decision.health.edge is None
+    # Se declara la ausencia con nombre y apellido, no un cero inventado.
+    assert decision.unmeasured == (
+        "edge",
+        "walk_forward_efficiency",
+        "dsr",
+        "credibility",
+    )
+    assert "edge_unmeasured" in decision.breaches
+    assert decision.health_state == "degraded"
+
+
+def test_missing_metrics_can_opt_out_of_fail_closed() -> None:
+    """El endurecimiento es reversible: ``fail_on_unmeasured=False`` declara sin degradar."""
+    decision = evaluate_active_health(
+        version_id="ver-1",
+        as_of="2026-09-10",
+        metrics={},
+        thresholds=HealthThresholds(min_edge=0.2, fail_on_unmeasured=False),
+    )
+    assert not decision.degraded
+    assert decision.unmeasured == ("edge",)
+    assert decision.health_state == "unmeasured"
 
 
 def test_health_snapshot_carries_thresholds() -> None:

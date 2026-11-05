@@ -58,6 +58,29 @@ def _iso(value: datetime | str | None) -> str:
     return str(value)
 
 
+def _health_as_of(health: Any) -> datetime:
+    """Fecha con la que se persiste un snapshot de salud (S7).
+
+    ``StrategyHealth.as_of`` es la fecha de la **evidencia** (el ancla del TTL de
+    frescura), no la de la escritura: si el orquestador arrastra métricas del LAB, la
+    edad de esa evidencia debe seguir creciendo entre pasadas. Cuando el ``as_of`` no es
+    una marca temporal legible (p. ej. la identidad de una pasada), se cae a ``_now()``
+    en vez de inventar una fecha de medición.
+    """
+    raw = getattr(health, "as_of", None)
+    if isinstance(raw, datetime):
+        return raw if raw.tzinfo is not None else raw.replace(tzinfo=UTC)
+    text = str(raw or "").strip()
+    if not text:
+        return _now()
+    iso = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(iso)
+    except ValueError:
+        return _now()
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
 @dataclass(frozen=True, slots=True)
 class StrategyPromotionRecord:
     """Promoción persistida (unión del veredicto del dominio + identidad)."""
@@ -825,7 +848,8 @@ class PostgresStrategyLifecycleStore:
             .values(
                 id=new_id(),
                 version_id=version_id,
-                as_of=_now(),
+                # S7: la fecha de ESTA evidencia (no la del insert) es el ancla del TTL.
+                as_of=_health_as_of(health),
                 edge=health.edge,
                 walk_forward_efficiency=health.walk_forward_efficiency,
                 dsr=health.dsr,

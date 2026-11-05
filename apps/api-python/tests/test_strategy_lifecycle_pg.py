@@ -1088,3 +1088,51 @@ async def test_active_by_account_uses_its_own_scope_pg(
         await _cleanup()
 
 
+async def test_health_snapshot_persists_evidence_as_of_pg(
+    lifecycle_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """S7 (auditoría .183): el snapshot conserva la fecha de la EVIDENCIA.
+
+    Es el ancla del TTL de frescura: si el INSERT estampara ``now()``, la edad de la
+    evidencia predictiva nunca crecería entre pasadas y ``max_metric_age_days`` sería
+    decorativo. Un ``as_of`` no temporal cae a ``now()`` (no se inventa una medición).
+    """
+    from sqlalchemy import delete
+
+    from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
+    from bolsa_domain.entities.strategy_lifecycle import StrategyHealth
+    from bolsa_infrastructure.database.models.tables import StrategyHealthRow
+
+    version_id = f"ver-s7-{uuid.uuid4().hex[:10]}"
+    evidence_as_of = "2026-09-01T09:00:00+00:00"
+
+    async def _cleanup() -> None:
+        async with lifecycle_factory() as session:
+            await session.execute(
+                delete(StrategyHealthRow).where(StrategyHealthRow.version_id == version_id)
+            )
+            await session.commit()
+
+    await _cleanup()
+    try:
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            await store.save_health(
+                version_id,
+                StrategyHealth(version_id=version_id, as_of=evidence_as_of, edge=0.5),
+            )
+            # Identidad de pasada (no temporal): no se fabrica una fecha de medición.
+            await store.save_health(
+                version_id,
+                StrategyHealth(version_id=version_id, as_of="vigilancia:AAA:ciclo-1", dsr=0.8),
+            )
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            history = await store.list_health(version_id)
+        assert [h.as_of for h in history][:1] == [evidence_as_of]
+        # El no temporal se persiste como ``now()`` (parseable), nunca como el texto.
+        fallback = datetime.fromisoformat(history[-1].as_of)
+        assert fallback.tzinfo is not None
+        assert fallback.year >= 2026
+    finally:
+        await _cleanup()

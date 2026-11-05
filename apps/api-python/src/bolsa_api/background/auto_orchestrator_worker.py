@@ -131,6 +131,7 @@ AUTO_ORCHESTRATOR_HEALTH_MIN_EDGE = "AUTO_ORCHESTRATOR_HEALTH_MIN_EDGE"
 AUTO_ORCHESTRATOR_HEALTH_MIN_WFE = "AUTO_ORCHESTRATOR_HEALTH_MIN_WFE"
 AUTO_ORCHESTRATOR_HEALTH_MIN_DSR = "AUTO_ORCHESTRATOR_HEALTH_MIN_DSR"
 AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY = "AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY"
+AUTO_ORCHESTRATOR_HEALTH_MAX_METRIC_AGE_DAYS = "AUTO_ORCHESTRATOR_HEALTH_MAX_METRIC_AGE_DAYS"
 # V2.88 (DSR gate exigible): umbral de promoción DSR del LAB (anti-overfit).
 AUTO_ORCHESTRATOR_LAB_MIN_DSR = "AUTO_ORCHESTRATOR_LAB_MIN_DSR"
 # S3 (auditoría .183): corrección por pruebas múltiples del campeón del LAB. Default OFF:
@@ -542,13 +543,22 @@ def _new_cycle_id() -> str:
 
 
 def _health_thresholds() -> Any:
-    """Umbrales de vigilancia del AUTO (V2.32.1, auditoría 2b).
+    """Umbrales de vigilancia del AUTO (V2.32.1, auditoría 2b; S7, auditoría .183).
 
-    Los predictivos (edge/wfe/dsr/credibilidad) usan ``None`` por defecto en el
-    dataclass (honesto: "sin configurar"), así que el AUTO fija aquí valores
-    conservadores explícitos para que la vigilancia no sea ciega. Ajustables por env
-    ``AUTO_ORCHESTRATOR_HEALTH_*``; ``AUTO_ORCHESTRATOR_HEALTH_*`` no fijado conserva
-    el default calibrado.
+    Los predictivos (edge/wfe/dsr) usan ``None`` por defecto en el dataclass (honesto:
+    "sin configurar"), así que el AUTO fija aquí valores conservadores explícitos para
+    que la vigilancia no sea ciega. Ajustables por env ``AUTO_ORCHESTRATOR_HEALTH_*``;
+    ``AUTO_ORCHESTRATOR_HEALTH_*`` no fijado conserva el default calibrado.
+
+    S7 — coherencia entre umbral y medida:
+    * ``min_credibility`` queda **sin configurar** por defecto: el LAB del AUTO no
+      publica ``credibility``, así que un umbral ahí sería un veto fantasma que, con
+      ``fail_on_unmeasured`` fail-closed (default), degradaría a toda activa en cada
+      ciclo. Si el operador lo fija por env, se respeta y su ausencia degrada — es su
+      decisión explícita, no un default silencioso.
+    * ``max_metric_age_days`` (``AUTO_ORCHESTRATOR_HEALTH_MAX_METRIC_AGE_DAYS``) es el
+      TTL de frescura de la evidencia predictiva. Default ``None``: la edad se declara
+      pero no caduca, igual que el resto de endurecimientos opt-in del proyecto.
     """
     from bolsa_application.strategy_vigilance_phase import HealthThresholds
 
@@ -556,7 +566,8 @@ def _health_thresholds() -> Any:
         min_edge=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_EDGE, 0.0),
         min_wfe=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_WFE, 0.0),
         min_dsr=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_DSR, 0.0),
-        min_credibility=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY, 0.1),
+        min_credibility=_float_env_opt(AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY),
+        max_metric_age_days=_float_env_opt(AUTO_ORCHESTRATOR_HEALTH_MAX_METRIC_AGE_DAYS),
     )
 
 
@@ -596,6 +607,21 @@ def _float_env(name: str, default: float) -> float:
         return float(raw)
     except ValueError:
         return default
+
+
+def _float_env_opt(name: str) -> float | None:
+    """Env numérico **opcional**: sin variable (o ilegible) devuelve ``None``.
+
+    S7: un umbral que nadie fijó no se inventa con un default numérico — un umbral
+    fantasma sobre una métrica que el pipeline no produce degradaría por ausencia.
+    """
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
 
 
 def _collapse_regions(snapshot: Any) -> Any:
@@ -1103,10 +1129,21 @@ async def auto_orchestrator_loop(
                 # ``observed_metrics`` (fills atribuidos a la versión). Aquí ya no se
                 # pasa ``metrics={}``: sin evidencia observada suficiente, la vigilancia
                 # no degrada por ruido (guarda de muestra mínima en el dominio).
-                await orchestrator.watch_active(
+                # S7: el ``as_of`` es la identidad del ciclo (antes se pasaba el
+                # ``status`` del ciclo, que no identifica ningún instante).
+                watched = await orchestrator.watch_active(
                     instrument_id=instrument_id,
-                    as_of=result.status,
+                    as_of=f"vigilancia:{instrument_id}:{cycle_id}",
                 )
+                if watched.degraded or watched.stale:
+                    logger.warning(
+                        "auto_orchestrator vigilance instrument=%s degraded=%s stale=%s "
+                        "reasons=%s",
+                        instrument_id,
+                        watched.degraded,
+                        watched.stale,
+                        tuple(watched.reasons),
+                    )
             except Exception:  # noqa: BLE001 — un fallo por instrumento no tumba el bucle.
                 logger.exception("auto_orchestrator cycle failed for %s", instrument_id)
         # V2.35/A15 — resumen agregado por ciclo (observabilidad de la gramática).
