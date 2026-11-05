@@ -422,9 +422,7 @@ def settlement_snapshot_from_fills(fills: Sequence[Any]) -> dict[str, Any] | Non
     hecho a medias.
     """
     sells = [
-        fill
-        for fill in fills
-        if str(getattr(fill, "side", "") or "").strip().lower() == "sell"
+        fill for fill in fills if str(getattr(fill, "side", "") or "").strip().lower() == "sell"
     ]
     if not sells:
         return None
@@ -563,6 +561,75 @@ OPERATOR_INTENT_OFF = "operator_intent_off"
 
 #: M10 — la intención no se pudo LEER: no hay permiso declarado, así que no se opera.
 OPERATOR_INTENT_UNREADABLE = "operator_intent_unreadable"
+
+#: M7 (auditoría .183) — el CONTROL PLANE (universo del watch o estrategia ACTIVE) dejó
+#: de refrescarse. El proceso sigue vivo y conserva el último dato válido, así que no se
+#: detiene —un cierre reduce riesgo y debe seguir siendo posible—, pero NINGUNA apertura
+#: se autoriza: elegir un instrumento con un universo caducado es inventar una
+#: oportunidad que este proceso no vio.
+CONTROL_PLANE_STALE = "control_plane_stale"
+
+#: M7 — tokens concretos de frescura. Cada uno se levanta cuando su refresco vuelve a
+#: funcionar; el veto de aperturas sólo depende de que la lista no esté vacía.
+WATCH_REFRESH_FAILED = "watch_refresh_failed"
+DECIDER_REFRESH_FAILED = "decider_refresh_failed"
+TICK_FAILED = "tick_failed"
+CIRCUIT_BREAKER_PAUSED = "circuit_breaker_paused"
+
+#: M7 — fallos CONSECUTIVOS del turno que abren el breaker a ``PAUSED``. ``0`` lo
+#: desactiva (queda el backoff). Un turno que revienta no es «un turno sin actividad»:
+#: si se repite, el motor deja de ser fiable y se PAUSA en vez de reintentar a ciegas.
+AUTO_SIM_TICK_BREAKER_FAILURES = "AUTO_SIM_TICK_BREAKER_FAILURES"
+
+#: M7 — tope del backoff exponencial entre reintentos (segundos).
+AUTO_SIM_BACKOFF_MAX_SECONDS = "AUTO_SIM_BACKOFF_MAX_SECONDS"
+
+
+def auto_sim_breaker_failures() -> int:
+    """M7 — umbral de fallos consecutivos del breaker (default 3; ``0`` = sin breaker).
+
+    Se valida como finito antes de convertir (un ``inf`` de entorno reventaría en
+    ``int``) y un valor ilegible cae al default: la protección no depende de que la
+    configuración sea correcta.
+    """
+    value = env_finite_float(AUTO_SIM_TICK_BREAKER_FAILURES, default=None)
+    if value is None:
+        return 3
+    try:
+        return max(0, int(value))
+    except (OverflowError, ValueError):  # pragma: no cover — ``env_finite_float`` ya filtra.
+        return 3
+
+
+def auto_sim_backoff_seconds(
+    base: float,
+    failures: int,
+    *,
+    cap: float | None = None,
+) -> float:
+    """M7 — espera antes del siguiente intento tras ``failures`` fallos consecutivos.
+
+    Sin fallos se respeta el intervalo configurado (Δ = 0 respecto del loop histórico).
+    Con fallos, el intervalo se duplica por fallo hasta el tope: un motor que sólo falla
+    deja de martillear la BD cada 60 s, pero sigue reintentando (el breaker es el que
+    detiene del todo). La exponenciación va acotada por el tope ANTES de multiplicar para
+    que ``2 ** 10**9`` no sea un número que haya que calcular.
+    """
+    intervalo = max(0.0, float(base))
+    if failures <= 0:
+        return intervalo
+    techo: float = float(cap) if cap is not None else _auto_sim_backoff_cap()
+    techo = max(intervalo, techo)
+    factor: int = 2 ** min(int(failures), 16)
+    espera: float = min(intervalo * factor, techo)
+    return max(intervalo, espera)
+
+
+def _auto_sim_backoff_cap() -> float:
+    value = env_finite_float(AUTO_SIM_BACKOFF_MAX_SECONDS, default=None)
+    if value is None or value <= 0:
+        return 300.0
+    return float(value)
 
 
 def _protection_config_from_env() -> ProtectionPolicy:
@@ -1063,9 +1130,7 @@ def _canonical_applied_facts(events: Any) -> list[Any]:
             qty = getattr(event, "quantity", None)
         fact = coerce_applied_fill_fact(
             execution_id=getattr(event, "execution_id", None),
-            instrument_id=(
-                getattr(event, "instrument_id", None) or getattr(event, "symbol", None)
-            ),
+            instrument_id=(getattr(event, "instrument_id", None) or getattr(event, "symbol", None)),
             side=getattr(event, "side", None),
             quantity=qty,
             price=getattr(event, "price", None),
@@ -1115,9 +1180,7 @@ def _canonical_open_attribution(events: Any) -> dict[str, dict[str, Any]]:
             "strategyVersion": latest.strategy_version_id,
             "cycleId": latest.cycle_id,
             "openedAt": latest.applied_at,
-            "entry": float(position.average_entry)
-            if position.average_entry is not None
-            else None,
+            "entry": float(position.average_entry) if position.average_entry is not None else None,
         }
     return attribution
 
@@ -1210,9 +1273,7 @@ class AutoSimulationWorker:
         # (``AdoptionResult``); el SUMIDERO recibe los desenlaces (consumida/rechazada) y
         # los sella. Sin ellos el motor no adopta nada y la cadena publica
         # ``not_attributed``: nunca se infiere por símbolo.
-        daily_proposal_source: (
-            Callable[[str, str, Sequence[str]], Awaitable[Any]] | None
-        ) = None,
+        daily_proposal_source: (Callable[[str, str, Sequence[str]], Awaitable[Any]] | None) = None,
         daily_proposal_sink: Callable[[list[dict[str, Any]]], Awaitable[Any]] | None = None,
         # AUTO-1b: espejo durable de las RESERVAS de cartera (``portfolio_reservations``).
         # Con él, las reservas vivas son la autoridad de ``reserved_cash``/``pending_risk``
@@ -1347,9 +1408,7 @@ class AutoSimulationWorker:
         # este incremento es un SEAM INERTE: la configuración por defecto (``1d``)
         # reproduce el comportamiento previo byte a byte. ``signal_timeframe`` deja de
         # leerse suelto y se DERIVA del ``DecisionClock`` (ver ``operative_granularity_policy``).
-        self._v2_granularity = resolve_operative_granularity(
-            self._v2_tunables.signal_timeframe
-        )
+        self._v2_granularity = resolve_operative_granularity(self._v2_tunables.signal_timeframe)
         # W2 · Fase A — short-circuit por barra. Con el reloj de DECISIÓN en D1, todo el
         # I/O de DATO del tick (régimen, espejo de señales consumidas, contexto de cartera,
         # órdenes pendientes, Adaptive, poda) relee dentro de la MISMA barra un dato que ya
@@ -1586,9 +1645,9 @@ class AutoSimulationWorker:
         # Handoff ESTUDIO → AUTO (migración 058): el LECTOR de propuestas pendientes y el
         # SUMIDERO de desenlaces. Se inyectan por sesión/tick como los demás espejos; sin
         # ellos el camino es el histórico (Δ = 0) y la cadena declara ``not_attributed``.
-        self._daily_proposal_source: (
-            Callable[[str, str, Sequence[str]], Awaitable[Any]] | None
-        ) = daily_proposal_source
+        self._daily_proposal_source: Callable[[str, str, Sequence[str]], Awaitable[Any]] | None = (
+            daily_proposal_source
+        )
         self._daily_proposal_sink: Callable[[list[dict[str, Any]]], Awaitable[Any]] | None = (
             daily_proposal_sink
         )
@@ -1655,6 +1714,32 @@ class AutoSimulationWorker:
         self._v2_position_journal_pending: list[Any] = []
         # V2.23/A9: última razón del gate determinista (para telemetría/durable).
         self._last_gate_reason: tuple[str, ...] = ("idle",)
+        # M7 (auditoría .183) — tokens de control plane CADUCADO (watch/estrategia/turno).
+        # No es un kill switch: el motor sigue gestionando lo abierto (cerrar reduce
+        # riesgo) pero no puede ABRIR con un universo o una estrategia que ya no refresca.
+        self._control_plane_stale: set[str] = set()
+
+    def mark_control_stale(self, reason: str) -> None:
+        """M7 — declara que el control plane dejó de estar fresco (veta aperturas)."""
+        token = str(reason or "").strip()
+        if not token:
+            return
+        if token not in self._control_plane_stale:
+            logger.warning(
+                "auto_sim control plane NO fresco (%s): aperturas vetadas engine=%s",
+                token,
+                self._engine_id,
+            )
+        self._control_plane_stale.add(token)
+
+    def clear_control_stale(self, reason: str) -> None:
+        """M7 — el refresco volvió a funcionar: se levanta SÓLO ese token."""
+        self._control_plane_stale.discard(str(reason or "").strip())
+
+    @property
+    def control_plane_stale(self) -> tuple[str, ...]:
+        """Tokens vigentes de control plane caducado (orden estable, para trazas)."""
+        return tuple(sorted(self._control_plane_stale))
 
     def require_position_readopt(self) -> None:
         """P7 (auditoría .183) — exige readoptar la posición en el PRÓXIMO turno.
@@ -1675,9 +1760,7 @@ class AutoSimulationWorker:
         que es la que deja el estado únicamente en RAM.
         """
         return tuple(
-            name
-            for name in OPERATIVE_DURABLE_SEAMS
-            if getattr(self, f"_{name}", None) is None
+            name for name in OPERATIVE_DURABLE_SEAMS if getattr(self, f"_{name}", None) is None
         )
 
     def declare_skip(self, reason: str) -> None:
@@ -2037,6 +2120,10 @@ class AutoSimulationWorker:
 
     def _openings_vetoed(self, symbol: str) -> bool:
         """True si la reconciliación de ese símbolo impide nuevas aperturas."""
+        # M7: con el control plane caducado (watch/estrategia/turno) no hay universo ni
+        # propuesta fresca que autorice una apertura, sea cual sea el símbolo.
+        if self._control_plane_stale:
+            return True
         # R-1: un fallo de LECTURA veta globalmente, sin depender de que el símbolo esté
         # enumerado en ``_watch_symbols()`` (que puede venir vacío con el universo ESTUDIO).
         if self._projection_read_failed:
@@ -2939,7 +3026,10 @@ class AutoSimulationWorker:
         store = self._kill_switch_store
         state = self._v2_kill_state(at=at)
         if store is None or state is None:
-            if self._v2_kill_switch.engaged and self._v2_kill_switch.reason == KILL_STATE_UNREADABLE:
+            if (
+                self._v2_kill_switch.engaged
+                and self._v2_kill_switch.reason == KILL_STATE_UNREADABLE
+            ):
                 logger.warning(
                     "auto_sim v2 kill state NOT persisted: placeholder %s is not a durable fact",
                     KILL_STATE_UNREADABLE,
@@ -3266,9 +3356,10 @@ class AutoSimulationWorker:
                 # callara aquí, «la señal de la ACTIVE está apagada» desaparecería justo en el
                 # caso en que el operador más necesita leerlo. Se declara con precio 0 y sin
                 # geometría; el precio ausente sigue declarándose por su propio canal (W4).
-                if str(getattr(pkg, "action", "HOLD")).upper() == "HOLD" and str(
-                    getattr(pkg, "hold_reason", None) or ""
-                ).strip():
+                if (
+                    str(getattr(pkg, "action", "HOLD")).upper() == "HOLD"
+                    and str(getattr(pkg, "hold_reason", None) or "").strip()
+                ):
                     signals.append(self._v2_hold_signal(symbol, pkg))
                 continue
             price = Decimal(str(raw_price))
@@ -4045,9 +4136,7 @@ class AutoSimulationWorker:
                 continue
             self._v2_active_hold_journaled.add(key)
             entries.append(
-                build_active_strategy_hold_journal_entry(
-                    hold, actor=self._engine_id, as_of=at
-                )
+                build_active_strategy_hold_journal_entry(hold, actor=self._engine_id, as_of=at)
             )
         return entries
 
@@ -4119,9 +4208,7 @@ class AutoSimulationWorker:
             account_id=self._account_id,
             structural=structural,
         )
-        await self._v2_audit_emit(
-            self._v2_seal_audit_identity(entry), label="entry_order"
-        )
+        await self._v2_audit_emit(self._v2_seal_audit_identity(entry), label="entry_order")
 
     async def _v2_journal_position_materialized(
         self,
@@ -4177,9 +4264,7 @@ class AutoSimulationWorker:
             return
         pnl, pnl_measurement = await self._v2_cycle_pnl(cycle_id)
         entry = build_cycle_settlement_entry(
-            settlement_id=(
-                f"settle-{cycle_id}" if cycle_id else None
-            ),
+            settlement_id=(f"settle-{cycle_id}" if cycle_id else None),
             instrument_id=instrument_id,
             side="sell",
             closed_qty=closed_qty,
@@ -4194,9 +4279,7 @@ class AutoSimulationWorker:
             account_id=self._account_id,
             structural=structural,
         )
-        await self._v2_audit_emit(
-            self._v2_seal_audit_identity(entry), label="cycle_settlement"
-        )
+        await self._v2_audit_emit(self._v2_seal_audit_identity(entry), label="cycle_settlement")
 
     async def _v2_journal_protection(
         self,
@@ -4242,13 +4325,9 @@ class AutoSimulationWorker:
             as_of=self._v2_instant(),
             account_id=self._account_id,
         )
-        await self._v2_audit_emit(
-            self._v2_seal_audit_identity(entry), label="protection"
-        )
+        await self._v2_audit_emit(self._v2_seal_audit_identity(entry), label="protection")
 
-    async def _v2_read_cycle_fills(
-        self, cycle_id: str
-    ) -> tuple[list[Any], MeasurementStatus]:
+    async def _v2_read_cycle_fills(self, cycle_id: str) -> tuple[list[Any], MeasurementStatus]:
         """Fills durables de UN ciclo, con la completitud de la ventana DECLARADA.
 
         Fail-closed: sin store o con la ventana LLENA (``len == limit``, pudo perderse una pata)
@@ -4269,9 +4348,7 @@ class AutoSimulationWorker:
             return list(fills), MEASUREMENT_PARTIAL
         return list(fills), MEASUREMENT_COMPLETE
 
-    async def _v2_cycle_pnl(
-        self, cycle_id: str | None
-    ) -> tuple[float | None, MeasurementStatus]:
+    async def _v2_cycle_pnl(self, cycle_id: str | None) -> tuple[float | None, MeasurementStatus]:
         """PnL del ciclo desde el material durable (``cycles_from_fills``), o un hueco declarado.
 
         Sin ``cycle_id``/store se declara ``UNKNOWN``. Con la ventana de fills truncada
@@ -4342,9 +4419,7 @@ class AutoSimulationWorker:
                 if measurement != MEASUREMENT_COMPLETE or not fills:
                     continue
                 rows = cycles_from_fills(fills)
-                row = next(
-                    (r for r in rows if str(r.get("cycleId") or "").strip() == cycle), None
-                )
+                row = next((r for r in rows if str(r.get("cycleId") or "").strip() == cycle), None)
                 if row is None:
                     # El FIFO no da el ciclo por cerrado (o no lo puede afirmar): no hay settlement.
                     continue
@@ -4380,9 +4455,7 @@ class AutoSimulationWorker:
                     "auto_sim durable facts recovery failed cycle=%s (declared, ignored)", cycle
                 )
         if recovered:
-            logger.info(
-                "auto_sim durable facts recovery: re-emitted %d settlement(s)", recovered
-            )
+            logger.info("auto_sim durable facts recovery: re-emitted %d settlement(s)", recovered)
 
     async def _v2_save_exit_order(self, order: ExitOrder) -> bool:
         """Persiste un INTENT de salida; ``False`` si el store falta o no fue durable."""
@@ -4870,11 +4943,7 @@ class AutoSimulationWorker:
                 dead_reason = (
                     RELEASE_REASON_RESTART
                     if startup
-                    else (
-                        RELEASE_REASON_DEAD_TAIL
-                        if materialized > 0.0
-                        else RELEASE_REASON_CANCEL
-                    )
+                    else (RELEASE_REASON_DEAD_TAIL if materialized > 0.0 else RELEASE_REASON_CANCEL)
                 )
                 released = await self._v2_release_reservation(
                     reservation,
@@ -4906,9 +4975,7 @@ class AutoSimulationWorker:
         self._v2_reservations = tuple(row for row in resolved if row.is_live)
         # OBS-14.b — la PROPIEDAD solo se conserva mientras la reserva siga viva: una ya
         # liberada no vuelve a ser autoridad de retirada de nadie.
-        self._v2_owned_reservations &= {
-            row.reservation_id for row in self._v2_reservations
-        }
+        self._v2_owned_reservations &= {row.reservation_id for row in self._v2_reservations}
         self._v2_reservations_measurement = (
             book_measurement
             if measurable
@@ -5202,8 +5269,7 @@ class AutoSimulationWorker:
             return
         entries = getattr(plan, "entry_packages", None) or {}
         self._v2_bar_pending = any(
-            self._v2_tick_signals.get(symbol) not in self._v2_consumed_signals
-            for symbol in entries
+            self._v2_tick_signals.get(symbol) not in self._v2_consumed_signals for symbol in entries
         )
 
     async def _v2_load_consumed_signals(self) -> None:
@@ -5564,9 +5630,7 @@ class AutoSimulationWorker:
                 continue
             cycle_id = str(payload.get("cycleId") or "").strip()
             approved = bool(payload.get("approved"))
-            reason = ",".join(
-                str(code) for code in (payload.get("reasonCodes") or []) if code
-            )
+            reason = ",".join(str(code) for code in (payload.get("reasonCodes") or []) if code)
             outcomes.append(
                 {
                     "proposalId": proposal_id,
@@ -5576,9 +5640,7 @@ class AutoSimulationWorker:
                 }
             )
         for proposal_id, reason in self._v2_tick_expired:
-            outcomes.append(
-                {"proposalId": proposal_id, "status": "expired", "reason": reason}
-            )
+            outcomes.append({"proposalId": proposal_id, "status": "expired", "reason": reason})
         if not outcomes:
             return
         try:
@@ -5714,9 +5776,7 @@ class AutoSimulationWorker:
         confidence = build_adaptive_confidence_from_fills(fills=fills, cycle_risk=cycle_risk)
         if confidence.by_strategy and not confidence.recent_available:
             # Hueco DECLARADO (no hay instantes legibles): la ventana reciente no se inventa.
-            logger.warning(
-                "auto_sim v2 adaptive confidence gaps %s", confidence.as_dict()["notes"]
-            )
+            logger.warning("auto_sim v2 adaptive confidence gaps %s", confidence.as_dict()["notes"])
         # AUTO-19A — la INCERTIDUMBRE del edge (intervalo por episodios + ``edgeConfidence``) desde
         # el MISMO material ya leído: no añade I/O ni un segundo FIFO. Es un hecho MEDIDO, así que se
         # publica aunque el gate limite el encogimiento (igual que la banda): lo que el gate apaga es
@@ -5725,9 +5785,7 @@ class AutoSimulationWorker:
             fills=fills, cycle_risk=cycle_risk, confidence=confidence
         )
         if uncertainty.by_strategy:
-            gaps = sorted(
-                {note for row in uncertainty.by_strategy for note in row.notes}
-            )
+            gaps = sorted({note for row in uncertainty.by_strategy for note in row.notes})
             if gaps:
                 # Huecos DECLARADOS del intervalo (sin ciclos o sin rachas suficientes). Un
                 # intervalo que no se pudo medir no se disfraza de estrecho: se nombra.
@@ -5759,6 +5817,7 @@ class AutoSimulationWorker:
         # que ENTRÓ, no el de salida.
         self._v2_adaptive_paused_cycles_entered = dict(self._v2_adaptive_paused_cycles)
         policy = self._v2_adaptive_policy()
+
         # AUTO-13 (§24) — la RAMPA de reincorporación. Solo se aporta a las versiones que el lector
         # durable (o la transición observada en el proceso) declara RECUPERADAS (``reactivated_at``):
         # una que nunca estuvo pausada no tiene rampa y el plan sigue siendo el histórico. Se mide
@@ -5971,25 +6030,19 @@ class AutoSimulationWorker:
                 )
             )
         recent_available = (
-            bool(confidence.recent_available)
-            if getattr(confidence, "by_strategy", None)
-            else None
+            bool(confidence.recent_available) if getattr(confidence, "by_strategy", None) else None
         )
         return assess_data_gate(
             sink_failures=int(getattr(self, "_v2_adaptive_sink_failures", 0) or 0),
             # AUTO-15: se DECLARA la procedencia de la racha (no cambia el estado): un 0 no puede
             # leerse como "el sink está sano" si en realidad no hay constancia durable.
-            sink_failures_durable=bool(
-                getattr(self, "_v2_adaptive_sink_failures_durable", False)
-            ),
+            sink_failures_durable=bool(getattr(self, "_v2_adaptive_sink_failures_durable", False)),
             journal_age_cycles=self._v2_adaptive_gate_journal_age(),
             # P4 (auditoría .183): tri-estado, no un ``read_ok=True`` fabricado. Sin lectura
             # durable registrada el estado es ``unknown`` (no se leyó; tampoco se observó un
             # fallo); con lectura, ``ok``/``failed`` según lo que la lectura declaró. El gate de
             # producción degrada con ``unknown``: "no leí" ya no equivale a "está sano".
-            read_state=(
-                "unknown" if reading is None else ("ok" if reading.read_ok else "failed")
-            ),
+            read_state=("unknown" if reading is None else ("ok" if reading.read_ok else "failed")),
             measurement_completeness=completeness,
             recent_available=recent_available,
             regime_available=self._v2_regime_available(regime),
@@ -5997,9 +6050,7 @@ class AutoSimulationWorker:
             policy_version_mismatch=(
                 False if reading is None else bool(reading.policy_version_mismatch)
             ),
-            insufficient_history=(
-                False if reading is None else bool(reading.insufficient_history)
-            ),
+            insufficient_history=(False if reading is None else bool(reading.insufficient_history)),
             policy=self._v2_data_gate_policy(),
         )
 
@@ -6032,9 +6083,7 @@ class AutoSimulationWorker:
             )
             return live
         return {
-            version: min(int(count), ceiling)
-            for version, count in live.items()
-            if int(count) > 0
+            version: min(int(count), ceiling) for version, count in live.items() if int(count) > 0
         }
 
     def _v2_measure_adaptive_journal_anchor(self, reading: AdaptiveStateReading) -> None:
@@ -6188,9 +6237,7 @@ class AutoSimulationWorker:
             )
         except Exception:  # noqa: BLE001 — un store roto no puede tumbar el turno.
             self._v2_adaptive_sink_failures_durable = False
-            logger.exception(
-                "auto_sim v2 adaptive gate streak NOT durable consecutive=%s", local
-            )
+            logger.exception("auto_sim v2 adaptive gate streak NOT durable consecutive=%s", local)
             return local
         self._v2_adaptive_sink_failures_durable = True
         return int(persisted)
@@ -6663,9 +6710,7 @@ class AutoSimulationWorker:
                 logger.exception("auto_sim live row invariant: canonical read failed")
             else:
                 if canonical is not None:
-                    canonical_map = {
-                        str(s): Decimal(str(q)) for s, q in dict(canonical).items()
-                    }
+                    canonical_map = {str(s): Decimal(str(q)) for s, q in dict(canonical).items()}
         try:
             own_rows = await store.read_projection(account, self._engine_id)
         except Exception:  # noqa: BLE001 — la fila propia ilegible se declara como tal.
@@ -6676,7 +6721,9 @@ class AutoSimulationWorker:
             try:
                 engines = tuple(str(e) for e in await engines_reader(account, symbol))
             except Exception:  # noqa: BLE001 — sin lector fiable no hay informe.
-                logger.exception("auto_sim live row invariant: engines read failed symbol=%s", symbol)
+                logger.exception(
+                    "auto_sim live row invariant: engines read failed symbol=%s", symbol
+                )
                 continue
             if not engines:
                 continue
@@ -6701,9 +6748,7 @@ class AutoSimulationWorker:
             canonical_qty = (
                 None if canonical_map is None else canonical_map.get(symbol, Decimal("0"))
             )
-            delta = (
-                None if canonical_qty is None or unreadable else total - canonical_qty
-            )
+            delta = None if canonical_qty is None or unreadable else total - canonical_qty
             own = own_rows.get(symbol)
             entry: dict[str, Any] = {
                 "engines": list(engines),
@@ -7004,9 +7049,7 @@ class AutoSimulationWorker:
             # como dato: ``_v2_adopt_position`` se mantiene síncrona (batería de crash).
             account_id = self._account_id or ""
             ledger_cost_ambiguous = (
-                await self._cost_basis_is_ambiguous(account_id, symbol)
-                if account_id
-                else False
+                await self._cost_basis_is_ambiguous(account_id, symbol) if account_id else False
             )
             position = self._v2_adopt_position(
                 symbol, price, ledger_cost_ambiguous=ledger_cost_ambiguous
@@ -7092,9 +7135,7 @@ class AutoSimulationWorker:
         # S-6 — el plan que produjo la decisión queda disponible para F5. ``None`` cuando
         # no hay gestión (hold benigno): la salida no existe, así que no hay nada que
         # autorizar y no se inventa un plan.
-        self._v2_last_exit_plans[symbol] = (
-            outcome.exit_plan if outcome is not None else None
-        )
+        self._v2_last_exit_plans[symbol] = outcome.exit_plan if outcome is not None else None
         # V2.44 — AUTO-3 slice 2: si el motivo DECISORIO es un exit de gobernador
         # (``RISK_EXIT``/``REGIME_EXIT``/``KILL_SWITCH``) se journaliza como evento de
         # gestión propio, con el detalle de la decisión, para que el operador vea POR QUÉ
@@ -7214,9 +7255,7 @@ class AutoSimulationWorker:
                     "plannedEvent": intent.event,
                     "thesisInvalid": intent.thesis_invalid,
                     "exitReasons": list(intent.exit_reasons),
-                    "lifecycle": (
-                        derive_lifecycle_state(current) if current is not None else None
-                    ),
+                    "lifecycle": (derive_lifecycle_state(current) if current is not None else None),
                     "emitted": False,
                 },
             )
@@ -7787,7 +7826,9 @@ class AutoSimulationWorker:
                 kind=protection_events[0][0],
                 origin=(
                     "trail"
-                    if any(kind in ("TRAIL_ARMED", "TRAIL_ADVANCED") for kind, _ in protection_events)
+                    if any(
+                        kind in ("TRAIL_ARMED", "TRAIL_ADVANCED") for kind, _ in protection_events
+                    )
                     else "protect"
                 ),
                 at=at,
@@ -8032,6 +8073,11 @@ class AutoSimulationWorker:
                 continue  # ya expuesto: sin apilar (HOLD implícito).
             # V2.24/A9.1 (P1-01): una proyección divergente/no verificada NO autoriza
             # abrir. (SELL sí se permite: reducir/cerrar nunca empeora el riesgo.)
+            # M7: con el control plane caducado el motivo es suyo (no se disfraza de
+            # «reconciliación»): el operador debe poder leer por qué no se abrió.
+            if action == "BUY" and self._control_plane_stale:
+                _veto(CONTROL_PLANE_STALE)
+                continue
             if action == "BUY" and self._openings_vetoed(symbol):
                 _veto("position_reconciliation_not_ok")
                 continue
@@ -8432,9 +8478,7 @@ class AutoSimulationWorker:
         # AUTO-15: la racha durable de fallos del sink, sobre la MISMA sesión del tick.
         adaptive_gate_store: AdaptiveGateStore | None = None,
         # Handoff durable ESTUDIO → AUTO (migración 058), atado a la MISMA sesión del tick.
-        daily_proposal_source: (
-            Callable[[str, str, Sequence[str]], Awaitable[Any]] | None
-        ) = None,
+        daily_proposal_source: (Callable[[str, str, Sequence[str]], Awaitable[Any]] | None) = None,
         daily_proposal_sink: Callable[[list[dict[str, Any]]], Awaitable[Any]] | None = None,
         # P7/P8 (auditoría .183): el ciclo RECLAMADO antes de ejecutar y el lease con el
         # que se conduce. Sin ellos el turno se matricula como siempre (hermético/tests).
@@ -8528,9 +8572,7 @@ class AutoSimulationWorker:
                 else prev_daily_proposal_source
             )
             self._daily_proposal_sink = (
-                daily_proposal_sink
-                if daily_proposal_sink is not None
-                else prev_daily_proposal_sink
+                daily_proposal_sink if daily_proposal_sink is not None else prev_daily_proposal_sink
             )
             # E2: la fuente de ATR del tick se enlaza igual que el régimen (misma sesión).
             self._v2_atr_source = atr_source if atr_source is not None else prev_atr
@@ -9522,6 +9564,24 @@ async def _build_signal_decider(
     )
 
 
+async def _runtime_hook(runtime: Any, name: str, *args: Any) -> Any:
+    """M7 — invoca un hook de salud del runtime SI existe; un hook roto no tumba el loop.
+
+    Los dobles de test del loop (p. ej. el ``_Runtime`` de la suite del watch) sólo
+    implementan ``run_tick``. Exigirles el contrato de salud convertiría una mejora de
+    observabilidad en un fallo de arranque, así que el hook es opcional y su excepción
+    se declara y se descarta (la salud del motor ya está degradada por definición).
+    """
+    hook = getattr(runtime, name, None)
+    if hook is None:
+        return None
+    try:
+        return await hook(*args)
+    except Exception:  # noqa: BLE001 — la salud del motor no puede romper su loop.
+        logger.exception("auto_sim runtime hook %s failed", name)
+        return None
+
+
 async def auto_sim_loop(
     runtime: AutoSimRuntime,
     *,
@@ -9544,11 +9604,20 @@ async def auto_sim_loop(
     V2.88.123/S2: ``watch_refresher`` (opcional) refresca el watch diario desde el
     universo ESTUDIO **antes** de resolver el decider y de operar, de modo que todo
     el turno (y los sources que se componen por tick) vean el universo vigente.
+
+    M7 (auditoría .183): un refresco o un turno fallido NO se traga en silencio. El
+    fallo se declara al runtime (``note_control_failure`` / ``note_tick_failure``), que
+    marca el control plane como NO fresco —vetando APERTURAS mientras dure el fallo— y,
+    si el turno falla de forma consecutiva, abre el breaker a ``PAUSED``. El loop deja de
+    martillear: el intervalo se duplica por fallo consecutivo (``auto_sim_backoff_seconds``)
+    hasta el tope. Los hooks son OPCIONALES (``getattr``) para no romper dobles de test.
     """
     logger.info("AutoSimulationWorker (SIM-ONLY) loop iniciado (tick=%ss)", interval_seconds)
+    base = max(0.0, float(interval_seconds))
+    failures = 0
     try:
         while True:
-            await asyncio.sleep(interval_seconds)
+            await asyncio.sleep(auto_sim_backoff_seconds(base, failures))
             if not sim_worker_enabled():
                 continue
             # V2.88.123/S2: watch (universo ESTUDIO) ANTES del decider, para que el
@@ -9558,6 +9627,9 @@ async def auto_sim_loop(
                     await watch_refresher()
                 except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
                     logger.exception("auto_sim watch refresh failed")
+                    await _runtime_hook(runtime, "note_control_failure", WATCH_REFRESH_FAILED)
+                else:
+                    await _runtime_hook(runtime, "note_control_success", WATCH_REFRESH_FAILED)
             if decider_refresher is not None:
                 try:
                     refreshed = await decider_refresher()
@@ -9565,10 +9637,25 @@ async def auto_sim_loop(
                         runtime.set_decider(refreshed)
                 except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
                     logger.exception("auto_sim decider refresh failed")
+                    await _runtime_hook(runtime, "note_control_failure", DECIDER_REFRESH_FAILED)
+                else:
+                    await _runtime_hook(runtime, "note_control_success", DECIDER_REFRESH_FAILED)
             try:
                 await runtime.run_tick()
             except Exception:  # noqa: BLE001 — un turno no debe tumbar el loop.
-                logger.exception("auto_sim tick failed")
+                failures += 1
+                logger.exception("auto_sim tick failed (fallos consecutivos=%d)", failures)
+                paused = await _runtime_hook(runtime, "note_tick_failure", failures)
+                if paused is not None:
+                    logger.error(
+                        "auto_sim circuit breaker: motor PAUSADO tras %d turnos fallidos",
+                        failures,
+                    )
+            else:
+                if failures:
+                    logger.warning("auto_sim tick recuperado tras %d fallos consecutivos", failures)
+                failures = 0
+                await _runtime_hook(runtime, "note_tick_success")
     finally:
         # P7 (auditoría .183): el scheduler cancela este task en SIGTERM/SIGINT. Soltar el
         # lease aquí es lo que hace que un reinicio ORDENADO conduzca de inmediato en vez
@@ -9656,13 +9743,16 @@ class AutoSimRuntime:
         # el lease durable de ``auto_engine_runs`` (migración 063): identidad de ESTE
         # proceso, lease vigente y la generación con la que se conduce el motor.
         self._lease_ttl_seconds = (
-            lease_ttl_seconds
-            if lease_ttl_seconds is not None
-            else auto_engine_lease_ttl_seconds()
+            lease_ttl_seconds if lease_ttl_seconds is not None else auto_engine_lease_ttl_seconds()
         )
         self._lease_owner = f"auto-sim-{os.getpid()}-{uuid.uuid4().hex[:8]}"
         self._lease: AutoEngineLease | None = None
         self._lease_generation_seen: int | None = None
+        # M7 (auditoría .183) — fallos CONSECUTIVOS del turno y motivo de la pausa. El
+        # breaker NO se levanta solo: un motor que revienta tres turnos seguidos necesita
+        # que alguien mire. ``resume()`` es la salida explícita del operador.
+        self._tick_failure_streak = 0
+        self._paused_reason: str | None = None
 
     @property
     def worker(self) -> AutoSimulationWorker:
@@ -9678,12 +9768,134 @@ class AutoSimRuntime:
             return
         self._worker._decider = decider  # noqa: SLF001 — seam interno documentado.
 
+    # ---- M7 (auditoría .183): salud del control plane y breaker del turno ----------
+
+    @property
+    def paused_reason(self) -> str | None:
+        """Motivo del breaker abierto (``None`` = el motor puede conducir turnos)."""
+        return self._paused_reason
+
+    @property
+    def tick_failure_streak(self) -> int:
+        """Fallos consecutivos vistos por este proceso (se reinicia con un turno bueno)."""
+        return self._tick_failure_streak
+
+    async def note_control_failure(self, reason: str) -> None:
+        """M7 — watch o estrategia dejaron de refrescarse: el turno sigue, las APERTURAS no.
+
+        Cerrar reduce riesgo y debe seguir siendo posible con el último dato bueno; abrir
+        con un universo o una estrategia caducados elige un instrumento que este proceso ya
+        no está mirando. El token se levanta sólo cuando ese refresco vuelve a funcionar.
+        """
+        self._worker.mark_control_stale(reason)
+
+    async def note_control_success(self, reason: str) -> None:
+        """M7 — ese refresco volvió a funcionar: se retira su token (los demás siguen)."""
+        self._worker.clear_control_stale(reason)
+
+    async def note_tick_success(self) -> None:
+        """M7 — turno bueno: cierra la racha de fallos y retira el token del turno."""
+        if self._tick_failure_streak:
+            logger.info(
+                "auto_sim turno recuperado tras %d fallos consecutivos engine=%s",
+                self._tick_failure_streak,
+                self._engine_id,
+            )
+        self._tick_failure_streak = 0
+        self._worker.clear_control_stale(TICK_FAILED)
+
+    async def note_tick_failure(self, streak: int) -> bool:
+        """M7 — un turno reventó: se declara, se veta abrir y, por racha, se PAUSA.
+
+        Devuelve ``True`` si ESTE fallo abrió el breaker. El fallo queda en el ledger
+        durable (``DEGRADED`` y, al abrir el breaker, ``PAUSED``) para que el monitor y un
+        reinicio no lean un motor «sano» que en realidad sólo estaba fallando en silencio.
+        """
+        self._tick_failure_streak = max(0, int(streak))
+        self._worker.mark_control_stale(TICK_FAILED)
+        threshold = auto_sim_breaker_failures()
+        if threshold <= 0 or self._tick_failure_streak < threshold:
+            await self.record_failure_tick("DEGRADED", f"{TICK_FAILED}:{self._tick_failure_streak}")
+            return False
+        self.pause(f"{CIRCUIT_BREAKER_PAUSED}:{self._tick_failure_streak}")
+        await self.record_failure_tick("PAUSED", self._paused_reason or CIRCUIT_BREAKER_PAUSED)
+        return True
+
+    def pause(self, reason: str) -> None:
+        """M7 — abre el breaker: no se ejecutan turnos hasta ``resume()`` explícito."""
+        self._paused_reason = str(reason or CIRCUIT_BREAKER_PAUSED)
+        self._worker.mark_control_stale(CIRCUIT_BREAKER_PAUSED)
+        self._worker.declare_skip(self._paused_reason)
+        logger.error(
+            "auto_sim PAUSED por circuit breaker (%s) engine=%s",
+            self._paused_reason,
+            self._engine_id,
+        )
+
+    def resume(self) -> None:
+        """M7 — rearma el breaker (decisión del operador, no un reintento automático)."""
+        self._paused_reason = None
+        self._tick_failure_streak = 0
+        self._worker.clear_control_stale(CIRCUIT_BREAKER_PAUSED)
+        self._worker.clear_control_stale(TICK_FAILED)
+
+    async def record_failure_tick(self, state: str, reason: str) -> None:
+        """M7 — matricula el turno FALLIDO en el ledger durable del motor.
+
+        Antes, una excepción del tick no dejaba rastro durable: el ledger seguía diciendo
+        ``RUNNING`` con el último tick bueno y nadie podía distinguir «motor sano» de
+        «motor que reventó y el loop lo reintentó». La fila se escribe con el siguiente
+        ``seq`` (un turno fallido ES un turno) y ``activity=BLOCKED``.
+
+        Un fallo al persistir no puede tumbar el loop (ya está degradado): se declara.
+        """
+        try:
+            from bolsa_application.auto_engine_state_store import (  # noqa: PLC0415
+                AutoEngineTickInput,
+                PostgresAutoEngineStore,
+            )
+
+            async with self._session_factory() as session:
+                store = PostgresAutoEngineStore(session)
+                snap = await store.read(self._engine_id)
+                seq = (snap.ticks if snap is not None else 0) + 1
+                await store.record_tick(
+                    AutoEngineTickInput(
+                        engine_id=self._engine_id,
+                        venue=(snap.venue if snap is not None else "sim"),
+                        state=cast(Any, state),
+                        seq=seq,
+                        proposals=(snap.proposals if snap is not None else 0),
+                        vetoes=(snap.vetoes if snap is not None else 0),
+                        pending_plans=(snap.pending_plans if snap is not None else 0),
+                        last_reason=(reason,),
+                        activity="BLOCKED",
+                    )
+                )
+        except Exception:  # noqa: BLE001 — persistir el fallo no puede romper el loop.
+            logger.exception(
+                "auto_sim no se pudo persistir el turno fallido (%s) engine=%s",
+                reason,
+                self._engine_id,
+            )
+
     async def run_tick(self) -> TurnReport | None:
         """Un turno real serializado: si ya hay uno en curso, este se omite (no se encola).
 
         Omitir en vez de esperar evita una cola de turnos sobre barras ya viejas; el
         siguiente tick del loop lo retoma.
+
+        M7: con el breaker abierto (``PAUSED``) el turno NI se intenta. Reintentarlo a
+        ciegas es lo que convertía un fallo repetido en un martilleo silencioso.
         """
+        if self._paused_reason is not None:
+            logger.warning(
+                "auto_sim tick bloqueado por circuit breaker (%s) engine=%s",
+                self._paused_reason,
+                self._engine_id,
+            )
+            self._worker.declare_skip(self._paused_reason)
+            return None
         if self._tick_lock.locked():
             logger.warning(
                 "auto_sim tick omitido: turno anterior aún en curso engine=%s", self._engine_id
@@ -9715,9 +9927,7 @@ class AutoSimRuntime:
         readoptar la posición (la RAM de este proceso dejó de ser la verdad).
         """
         if self._lease is not None:
-            renewed = await store.renew_lease(
-                self._lease, ttl_seconds=self._lease_ttl_seconds
-            )
+            renewed = await store.renew_lease(self._lease, ttl_seconds=self._lease_ttl_seconds)
             if renewed is not None:
                 self._lease = renewed
                 self._note_lease_generation(renewed)
@@ -9945,6 +10155,7 @@ class AutoSimRuntime:
                     instruments=instruments,
                     decision_bar_day=decision_bar_day,
                 )
+
             # v2.88.70: la equity del turno es la del libro. Si falla, las aperturas
             # quedan vetadas dentro de ``auto_turn``. No se sustituye por 100_000.
             await self._worker.load_book_equity(session)
