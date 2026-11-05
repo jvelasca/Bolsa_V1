@@ -2,7 +2,7 @@
 
 Cubre la tabla aditiva ``dia_d_cycle_verifications`` y su repositorio:
 
-* la tabla/índices están en head y la head es ``065_auto_engine_intent``;
+* la tabla/índices están en head y la head es ``066_account_evidence_policy``;
 * ``upsert`` es idempotente y ATÓMICO por ``(account_id, cycle_id, dia_d, end_date, mode)``;
 * ``list_verifications`` acota por cuenta y por ciclo;
 * el ciclo ya verificado por OTRA cuenta se RECHAZA (nunca se reasigna ni se duplica);

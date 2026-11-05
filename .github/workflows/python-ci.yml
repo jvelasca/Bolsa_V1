@@ -488,6 +488,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v46_crash_injection_pg.py
           --ignore=apps/api-python/tests/test_auto_v46_multiprocess_pg.py
           --ignore=apps/api-python/tests/test_auto_p7_lease_claim_pg.py
+          --ignore=apps/api-python/tests/test_account_evidence_policy_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           --ignore=packages/py/application/tests/test_auto_engine_state_store_hermetic.py
           --ignore=packages/py/application/tests/test_custody_idempotency.py
@@ -902,6 +903,11 @@ jobs:
       # lógica solo se certifican contra PG real (CAS atómico, valla de la generación y
       # claim que sobrevive al proceso que lo hizo). Sin PG el test skipearía en mudo.
       AUTO_P7_LEASE_PG_REQUIRED: '1'
+      # 066 (política de evidencia por cuenta): el upsert ``ON CONFLICT`` con versionado, el
+      # default estricto sin fila, los 10 ``CHECK`` como segunda barrera y el CASCADE desde
+      # ``investment_accounts`` solo se certifican contra PG real. Sin PG el test skipearía
+      # en mudo y la tabla entraría sin certificación durable.
+      ACCOUNT_EVIDENCE_POLICY_PG_REQUIRED: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -987,6 +993,7 @@ jobs:
             apps/api-python/tests/test_signal_alerts_v111_pg.py \
             apps/api-python/tests/test_auto_fill_cycle_seal_pg.py \
             apps/api-python/tests/test_auto_p7_lease_claim_pg.py \
+            apps/api-python/tests/test_account_evidence_policy_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 
       - name: Fail on skipped AUTO 2.0 durable PG (no skip silencioso)

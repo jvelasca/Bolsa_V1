@@ -213,7 +213,7 @@ async def test_migration_063_roundtrip_adds_and_drops_the_lease_columns(
     cfg = _alembic_config()
     columns = ("lease_owner", "lease_generation", "lease_expires_at")
     try:
-        assert alembic_head() == _HEAD, "la guardia de la head tiene que apuntar a 065"
+        assert alembic_head() == _HEAD, "la guardia de la head tiene que apuntar a 066"
         with engine.connect() as connection:
             for column in columns:
                 assert _column_present(connection, _RUNS, column), f"063 debe crear {column}"
