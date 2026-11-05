@@ -38,12 +38,15 @@
 > el documento los seguía listando como abiertos; la PR
 > [#91](https://github.com/jvelasca/Bolsa_V1/pull/91) (`fix/auto-m5-m6-m9-commit`) cierra el resto que quedaba en `M5`
 > —la sesión se declaraba dueña y publicaba sus claims **antes** del commit— y añade el certificado que faltaba de los
-> tres. Las doce PR están
-> fusionadas en `fix/059-060-proveedores` (`ef2a9c8f`); **no** hay sello, bump ni migración fuera de las citadas.
+> tres. `M8`, `M10` y `M14` se cierran en la PR
+> [#92](https://github.com/jvelasca/Bolsa_V1/pull/92) (`fix/auto-m8-m10-m14-durable-state`: espejos durables
+> obligatorios en el turno operativo, intención del operador durable en `auto_engine_intent` con migración `065` y
+> ganando al env, y `book_equity` como snapshot atómico con `as_of`). Las trece PR están
+> fusionadas en `fix/059-060-proveedores`; **no** hay sello ni bump, y las únicas migraciones son las citadas.
 > **Sincronización del documento (`2026-11-05`, sin PR de código):** al verificar la sección de estrategia contra el
 > árbol, `S1` y `S2` ya estaban resueltos en código y con pruebas (`test_strategy_lifecycle_s1_s5_s6.py`, `LabThresholds`),
 > así que el documento los daba por abiertos **por desfase**, no por defecto. **Abiertos:** el resto de la severidad media
-> `M*` (`M1`-`M4`, `M7`, `M8`, `M10`, `M11`, `M14`, `M15`) y `S8`-`S10`.
+> `M*` (`M1`-`M4`, `M7`, `M11`, `M15`) y `S8`-`S10`.
 
 Alcance detallado: lógica de decisión, riesgo, ejecución, workers AUTO, `auto_simulation_worker.py` (9.802 líneas) y lógica de estrategia y señales.
 Modo: solo lectura. No se modificó el repositorio. Las referencias `archivo:línea` son del tag `v2.88.183-beta`.
@@ -129,13 +132,13 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 | M5 | `commit()` de reservas fallido se registra y se continúa. Seguro solo si el store es autocommit (el comentario lo asume; no verificado) · ✅ Cerrado | `auto_simulation_worker.py:3707` | Contrato explícito; si falla, no emitir órdenes |
 | M6 | Pérdida de eventos de journal: la cola se vacía antes de publicar, y si el sink falla se pierde la evidencia · ✅ Cerrado | `:7373-7395` | Outbox con `pending/posted/failed` |
 | M7 | Excepciones del tick, del refresco de watch y del refresco del decider se tragan; se opera con universo o estrategia caducados, sin backoff ni estado durable de fallo | `:9253-9267` | Marcar snapshot no fiable y vetar aperturas; backoff exponencial y circuit breaker a `PAUSED`; persistir tick `ERROR` |
-| M8 | Sin stores durables inyectados, kill switch, posiciones, T1, P&L y journal viven solo en RAM; el modo estructural marca fills como `applied` sin libro financiero | `:1200-1470`, `:2275-2281`, `:2368-2375` | Stores obligatorios en modo operativo; rechazar el arranque si faltan |
+| M8 | Sin stores durables inyectados, kill switch, posiciones, T1, P&L y journal viven solo en RAM; el modo estructural marca fills como `applied` sin libro financiero · ✅ Cerrado | `:1200-1470`, `:2275-2281`, `:2368-2375` | Stores obligatorios en modo operativo; rechazar el arranque si faltan |
 | M9 | Excepción de `price_script` escapa sin el fail-closed que sí tiene `PriceSource` · ✅ Cerrado | `:2150-2172` | `try/except` → `None` → HOLD |
-| M10 | AUTO se activa solo por variable de entorno; tras un reinicio con la variable puesta, arranca. Sin latch durable de OFF | workers AUTO | Intención del operador en BD; rearranque con confirmación |
+| M10 | AUTO se activa solo por variable de entorno; tras un reinicio con la variable puesta, arranca. Sin latch durable de OFF · ✅ Cerrado | workers AUTO | Intención del operador en BD; rearranque con confirmación |
 | M11 | Calibración `positiveOosFoldShare` usa `>= 0.0`; el replay usa `R > 0`. Los folds planos inflan la métrica | `auto_adaptive_calibration.py:638` | Criterio único `> 0` |
 | M12 | Lock y latido de ventana en fichero no atómicos; un `.run.lock` obsoleto silencia alertas · ✅ Cerrado | `window_day_watch_worker.py:341-535` | `os.replace`, lock con PID y TTL |
 | M13 | El monitor devuelve un DTO coherente con lecturas caídas · ✅ Cerrado | `auto_operational_monitor.py:1897-2120` | Estado `INCOMPLETE` explícito |
-| M14 | `load_book_equity` puede dejar equity de un tick anterior visible tras un fallo de lectura | `:2524-2544` | Snapshot atómico con `as_of` |
+| M14 | `load_book_equity` puede dejar equity de un tick anterior visible tras un fallo de lectura · ✅ Cerrado | `:2524-2544` | Snapshot atómico con `as_of` |
 | M15 | P&L parcial contra `_entry_price` único, no contra coste medio del ledger · Por lectura, impacto sin verificar | `:8027-8044` | Coste medio ponderado o lotes |
 | M16 | `AutoSimRuntime` carga la estrategia ACTIVE con `instrument_id=effective_account` · ✅ Cerrado | `:9723-9727` | Separar `account_id` de `instrument_id` |
 
@@ -164,6 +167,46 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 - **Cerrado:** `_safe_price_script` envuelve la llamada y registra la excepción; `_v2_price_exec`/`_v2_price_mid`
   devuelven `None`, que es la misma declaración de «sin precio» que usa la fuente real. Certificado en
   `apps/api-python/tests/test_auto_m6_m9_fail_closed.py`.
+
+### M8 — Un turno operativo sin sus espejos durables se RECHAZA · ✅ Cerrado (`fix/auto-m8-m10-m14-durable-state`)
+- **Fallo:** el runtime real componía sus stores por sesión, pero nada **exigía** que existieran. Sin `kill_switch_store`
+  la parada dura vivía en RAM; sin `position_store`/`reservation_store` el compromiso de capital y la posición morían en
+  el reinicio; sin `finance_applier` el turno «estructural» marcaba fills como `applied` sin libro financiero. El
+  camino hermético (tests, replay) los omite **a propósito**, y esa misma laxitud dejaba que un cableado real
+  incompleto operase con media cartera olvidada.
+- **Cerrado:** `OPERATIVE_DURABLE_SEAMS` declara los seis espejos que hacen honesto un turno operativo
+  (`exec_store`, `auto_store`, `finance_applier`, `position_store`, `reservation_store`, `kill_switch_store`) y
+  `AutoSimRuntime` compone con `require_durable_stores=True`. Si a un turno le falta uno, `real_turn` **no muta
+  estado**: declara `durable_stores_missing:<seams>` y devuelve el turno sin operar. El fallback estructural deja de
+  ser una salida silenciosa en modo operativo. Certificado en `apps/api-python/tests/test_auto_m8_durable_stores.py`
+  (falta un seam ⇒ rechazo con la lista exacta; todos presentes ⇒ el turno pasa; en operativo un settlement sin libro
+  no se marca `applied`).
+
+### M10 — La intención del operador es un hecho durable y gana al env · ✅ Cerrado (`fix/auto-m8-m10-m14-durable-state`)
+- **Fallo:** AUTO se habilitaba **sólo** por `AUTO_SIMULATION_WORKER_ENABLED`. Un operador que apagaba el motor y
+  reiniciaba el proceso con la variable todavía puesta lo veía arrancar otra vez: «apagar» era un acto del proceso, no
+  una decisión registrada.
+- **Cerrado:** migración `065_auto_engine_intent` crea `auto_engine_intent` (una fila por `(account_id, engine_id)` con
+  `desired_state`, `reason`, `actor`, `updated_at`, `version`), `AutoEngineIntentStore` (§ PG + gemelo in-memory) y
+  `GET/POST /api/auto/engine-intent` para declararla. `AutoSimRuntime` la lee **antes** de componer stores: un `OFF`
+  explícito gana al env y el turno se omite declarando `operator_intent_off`; una intención **ilegible** también
+  detiene el turno (`operator_intent_unreadable`).
+- **Asimetría declarada:** la **ausencia** de fila **no** es `OFF` —el env sigue decidiendo— porque inventar un apagado
+  al desplegar apagaría motores que hoy funcionan; y un `desired_state` fuera de `ON`/`OFF` no se escribe ni se
+  interpreta como permiso. La fila es durable: `OFF` sobrevive a un reinicio en otro proceso.
+  Certificado en `apps/api-python/tests/test_auto_m10_engine_intent.py` (store y versionado, gate del runtime,
+  fail-closed de lectura) y `test_auto_m10_engine_intent_pg.py` (migración, `OFF` leído desde otra sesión, última
+  intención gana, estado inválido no persistido).
+
+### M14 — `book_equity` como snapshot atómico con `as_of` · ✅ Cerrado (`fix/auto-m8-m10-m14-durable-state`)
+- **Fallo:** `load_book_equity` escribía tres atributos mutables (`_book_equity`, `_book_equity_required`,
+  `_book_equity_unreadable`). Una cancelación o excepción **entre** las escrituras dejaba visible el equity del tick
+  anterior como si fuera el actual; y nada declaraba a qué instante correspondía.
+- **Cerrado:** `BookEquitySnapshot(equity, as_of, unreadable)` inmutable sustituye a los tres atributos. La lectura
+  **invalida antes** de esperar (`unreadable=True`), de modo que una `CancelledError` o un fallo del libro no puede
+  heredar el valor previo, y el snapshot captura el `as_of` de la lectura. `_v2_equity` decide con la foto completa.
+  Certificado en `apps/api-python/tests/test_auto_m14_book_equity_snapshot.py` (stampado, veto por lectura fallida,
+  `CancelledError` sin fuga del valor anterior, inmutabilidad).
 
 ### M12 — Lock del vigía con dueño probado y latido atómico · ✅ Cerrado (`fix/auto-m12-m13-watch-monitor`)
 - **Fallo:** `day_is_running()` sólo comprobaba que existiera el directorio `.run.lock`; un lock **huérfano** (proceso muerto, host apagado o `lock.json` corrupto) silenciaba el «día perdido» para siempre. El latido se escribía con `write_text`, que deja una ventana en la que un lector ve el fichero truncado y pierde también las marcas de aviso.
@@ -263,7 +306,7 @@ Fuente: lectura de módulos de señales, ciclo de vida y promoción. No verifica
 
 1. **Fail-open de configuración y datos:** P1, P2, P4, P9 (bajo riesgo de cambio, alto impacto) · ✅ cerrado.
 2. **Persistencia fallida ignorada:** P5, P6, M5, M6, M9 · ✅ cerrado.
-3. **Circuit breaker y estado durable:** P3, P8, M8, M10, M14.
+3. **Circuit breaker y estado durable:** P3, P8, M8, M10, M14 · ✅ cerrado.
 4. **Concurrencia:** P7, M1.
 5. **Gates de estrategia:** S1, S2, S5, S6, S7, S3 · ✅ cerrado.
 6. **Validaciones de bordes:** M2, M3, M4, M11 y la severidad baja.

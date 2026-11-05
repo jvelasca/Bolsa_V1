@@ -47,7 +47,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 _REQUIRED = "SIGNAL_ALERTS_PG_REQUIRED"
-_ALEMBIC_HEAD = "064_strategy_account_scope"
+_ALEMBIC_HEAD = "065_auto_engine_intent"
 _SUBSCRIPTIONS = "signal_alert_subscriptions"
 _DELIVERIES = "alert_deliveries"
 

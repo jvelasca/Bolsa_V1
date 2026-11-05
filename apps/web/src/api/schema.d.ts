@@ -1198,6 +1198,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/engine-intent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Engine Intent
+         * @description Intención durable + lo que el motor haría ahora mismo (read-only).
+         */
+        get: operations["get_auto_engine_intent_api_auto_engine_intent_get"];
+        put?: never;
+        /**
+         * Post Auto Engine Intent
+         * @description Declara la intención del operador; un ``OFF`` gana al env en todos los ticks.
+         */
+        post: operations["post_auto_engine_intent_api_auto_engine_intent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/estudio-audit": {
         parameters: {
             query?: never;
@@ -4749,6 +4773,38 @@ export interface components {
         /** AuthStatusResponseDto */
         AuthStatusResponseDto: {
             data: components["schemas"]["AuthStatusDataDto"];
+        };
+        /** AutoEngineIntentBody */
+        AutoEngineIntentBody: {
+            /** Actor */
+            actor?: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** AutoEngineIntentDto */
+        AutoEngineIntentDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Actor */
+            actor?: string | null;
+            /** Effectiveenabled */
+            effectiveEnabled: boolean;
+            /** Engineid */
+            engineId: string;
+            /** Envenabled */
+            envEnabled: boolean;
+            /** Notes */
+            notes?: string[];
+            /** Operatorstate */
+            operatorState?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Updatedat */
+            updatedAt?: string | null;
+            /** Version */
+            version?: number | null;
         };
         /** AutoMonitorConcurrencyDto */
         AutoMonitorConcurrencyDto: {
@@ -15493,6 +15549,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiaDCycleVerificationResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_engine_intent_api_auto_engine_intent_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoEngineIntentDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_auto_engine_intent_api_auto_engine_intent_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoEngineIntentBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoEngineIntentDto"];
                 };
             };
             /** @description Validation Error */

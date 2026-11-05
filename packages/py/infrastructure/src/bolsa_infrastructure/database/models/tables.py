@@ -2967,6 +2967,34 @@ class AutoKillStateRow(Base):
     )
 
 
+class AutoEngineIntentRow(Base):
+    """M10 (auditoría .183) — la INTENCIÓN del operador sobre AUTO, durable.
+
+    AUTO se habilitaba sólo por variable de entorno: tras un reinicio con la variable puesta
+    el worker arrancaba aunque el operador lo hubiera apagado. Esta tabla es el latch durable
+    del apagado —un ``OFF`` explícito sobrevive a reinicios y a que el env siga en ``ON``—.
+
+    Una fila por ``(account_id, engine_id)``. ``desired_state`` sólo admite ``ON``/``OFF``
+    (un valor desconocido NO es una decisión: el store lo trata como ausente). ``reason`` y
+    ``actor`` hacen auditable quién apagó el motor y por qué; ``version`` cuenta escrituras
+    para que la última intención gane sin perder el rastro.
+    """
+
+    __tablename__ = "auto_engine_intent"
+
+    account_id: Mapped[str] = mapped_column("account_id", String, primary_key=True)
+    engine_id: Mapped[str] = mapped_column("engine_id", String, primary_key=True)
+    desired_state: Mapped[str] = mapped_column("desired_state", String(8), nullable=False)
+    reason: Mapped[str | None] = mapped_column("reason", String, nullable=True)
+    actor: Mapped[str | None] = mapped_column("actor", String, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(
+        "updated_at", DateTime(timezone=True), nullable=True
+    )
+    version: Mapped[int] = mapped_column(
+        "version", Integer, nullable=False, default=1, server_default="1"
+    )
+
+
 class AdaptiveGateStateRow(Base):
     """AUTO-15 (V2.56) — la racha de fallos del sink del gate Adaptive, durable.
 
