@@ -9233,7 +9233,8 @@ def _signal_window(executable: Any, *, env_limit: int) -> tuple[int, int | None,
 async def load_active_strategy_decider(
     session_factory: Any,
     *,
-    instrument_id: str,
+    instrument_id: str | None = None,
+    account_id: str | None = None,
     watch: Sequence[str],
     lot_qty: float = 100.0,
     ohlcv: Any = None,
@@ -9247,6 +9248,12 @@ async def load_active_strategy_decider(
     hot path del AUTO. Si no hay estrategia activa, o falla la lectura, devuelve
     ``None`` y el worker sigue con el spine determinista (comportamiento previo a
     V2.31, válido cuando la señal de la ACTIVE está deshabilitada).
+
+    M16 (auditoría .183): el ámbito se declara con el id que TOCA. La cuenta se pide con
+    ``account_id`` (``get_active_for_account``) y el instrumento con ``instrument_id``
+    (``get_active``); la cuenta NUNCA viaja como si fuera un instrumento. Si llegan los
+    dos, manda la cuenta: es el ámbito que conduce el motor. Sin ninguno de los dos es un
+    error del llamante, no un ``None`` silencioso.
 
     V2.29/A10: con ``signal_enabled=True`` la ACTIVE evalúa su PROPIA señal sobre las
     últimas barras (SignalEvaluator real).
@@ -9267,13 +9274,26 @@ async def load_active_strategy_decider(
     """
     if not active_strategy_enabled():
         return None
+    if account_id is None and instrument_id is None:
+        # Error del llamante, declarado ANTES del try: dentro se convertiría en un
+        # ``None`` silencioso y el AUTO seguiría sin estrategia por un bug, no por diseño.
+        raise ValueError(
+            "load_active_strategy_decider necesita account_id o instrument_id: "
+            "el ámbito de la ACTIVE no se adivina"
+        )
     try:
         from bolsa_application.auto_orchestrator import active_strategy_decider
         from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
 
         async with session_factory() as session:
             store = PostgresStrategyLifecycleStore(session)
-            record = await store.get_active(instrument_id=instrument_id)
+            # M16: la cuenta se resuelve por su propia columna; el instrumento por la suya.
+            if account_id is not None:
+                record = await store.get_active_for_account(account_id=account_id)
+            else:
+                if instrument_id is None:  # ya validado arriba; estrecha el tipo
+                    return None
+                record = await store.get_active(instrument_id=instrument_id)
             if record is None:
                 return None
             if signal_enabled:
@@ -9287,7 +9307,9 @@ async def load_active_strategy_decider(
                     watch=watch,
                     lot_qty=lot_qty,
                     ohlcv=repo,
-                    instrument_id=instrument_id,
+                    # B-1: sin watch, el símbolo de reserva es el INSTRUMENTO de la
+                    # ACTIVE (no la cuenta: pedir barras de una cuenta era el M16).
+                    instrument_id=record.active.instrument_id,
                     as_of=as_of,
                     long_by_symbol=long_by_symbol,
                 )
@@ -10051,7 +10073,9 @@ def start_auto_sim_worker(
             async def _refresh_active_decider() -> DecisionProvider | None:
                 return await load_active_strategy_decider(
                     session_factory,
-                    instrument_id=effective_account,
+                    # M16 (auditoría .183): el runtime conduce una CUENTA; se pide como
+                    # cuenta (``get_active_for_account``), nunca pasándola por instrumento.
+                    account_id=effective_account,
                     # V2.88.123/S2: con el flag ON el universo ACTIVE sigue a ESTUDIO
                     # (cache vigente); con OFF, el CSV histórico ``AUTO_ENGINE_SIM_WATCH``.
                     watch=_active_decider_watch(),
