@@ -86,9 +86,15 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
 from bolsa_analytics.cognitive.position_state import PositionState
 from bolsa_analytics.cognitive.risk_allocator import RiskAllocatorConfig
 from bolsa_analytics.cognitive.signal_identity import (
+    # S10 — los motivos y el claim viven en analytics (dueño de la identidad); aquí solo se
+    # consumen, para que el journal y el claim no puedan divergir en el literal.
+    SIGNAL_DUPLICATE,
+    SIGNAL_IDENTITY_MISSING,
+    SIGNAL_STALE,
     SignalIdentity,
     bar_window,
     build_signal_identity,
+    claim_signal_id,
 )
 from bolsa_analytics.cognitive.trade_context import DEFAULT_MAX_AGE_DAYS, TradeContext
 from bolsa_analytics.indicators.compute import compute_atr
@@ -2443,11 +2449,14 @@ def _stamp(as_of: str) -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-# Motivos de descarte de una señal ANTES de decidir (auditables en el journal).
-SIGNAL_DUPLICATE = "signal_duplicate"
-SIGNAL_STALE = "signal_stale"
-# V2.40.1: sin identidad no hay idempotencia, deduplicación, auditoría ni replay posibles.
-SIGNAL_IDENTITY_MISSING = "signal_identity_missing"
+# Motivos de descarte de una señal ANTES de decidir (auditables en el journal). El DUEÑO de
+# los tres literales es ``bolsa_analytics.cognitive.signal_identity`` (S10) y se importan de
+# allí: se re-exportan por este módulo (``__all__`` los lista) para que el contrato público
+# del journal no cambie, pero el literal vive en un solo sitio.
+# ``signal_duplicate``: la MISMA señal sobre la MISMA barra ya se consumió.
+# ``signal_stale``: la señal caducó.
+# ``signal_identity_missing`` (V2.40.1): sin identidad no hay idempotencia, deduplicación,
+# auditoría ni replay posibles.
 # V2.47 — el dedupe por instrumento YA NO es silencioso: cada candidata descartada porque
 # otra de la misma clave canónica (mismo instrumento — y misma versión salvo
 # ``allow_distinct_strategies``) la superó queda journalizada con AMBOS ``signal_id`` y
@@ -2480,16 +2489,20 @@ def _signal_rejection(
        siguiente (worker 60s sobre señal D1), no una oportunidad nueva.
     2. ``signal_stale`` — la señal caducó (``valid_until < as_of``): alimentar una
        decisión con una barra vieja sería decidir sobre datos que ya no rigen.
+
+    S10: las tres reglas NO se reescriben aquí — se delegan en ``claim_signal_id``, que es
+    el dueño del vocabulario y del orden. Un llamador no puede "olvidar" el resultado del
+    claim: el objeto o trae identidad reclamada o trae motivo, nunca un ``None`` neutro.
     """
-    signal_id = str(signal.signal_id or "").strip()
-    if not signal_id:
-        return SIGNAL_IDENTITY_MISSING
-    if signal_id in consumed:
-        return SIGNAL_DUPLICATE
-    valid_until = str(signal.valid_until or "").strip()
-    if valid_until and as_of and str(as_of) > valid_until:
-        return SIGNAL_STALE
-    return None
+    claim = claim_signal_id(
+        str(signal.signal_id or "").strip(),
+        valid_until=str(signal.valid_until or ""),
+        as_of=as_of,
+        consumed=consumed,
+    )
+    if claim.is_claimed:
+        return None
+    return claim.reason
 
 
 def _opportunity_row(

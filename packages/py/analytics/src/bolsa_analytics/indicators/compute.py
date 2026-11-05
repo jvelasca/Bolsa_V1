@@ -6,7 +6,14 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
+from bolsa_analytics.indicators.validation import invalid_period, is_positive_finite
+
 STYLE_PARAMETER_IDS = frozenset({"color"})
+
+# S9 (auditoría .183) — cada indicador periódico abre con ``invalid_period``: sin la guarda
+# un ``period`` 0 divide por cero DENTRO del turno (``ZeroDivisionError``) y uno negativo
+# produce una ventana invertida que "existe" pero no corresponde a ninguna ventana real.
+# La respuesta uniforme es ``[None] * n``: no hay indicador, y por tanto no hay señal.
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,6 +105,8 @@ def _series_from_values(bars: list[OhlcvBar], values: list[float | None]) -> lis
 
 def compute_sma(closes: list[float], period: int) -> list[float | None]:
     """Calcula serie/indicador ``sma``."""
+    if invalid_period(period):
+        return [None] * len(closes)
     result: list[float | None] = []
     for index in range(len(closes)):
         if index + 1 < period:
@@ -110,6 +119,8 @@ def compute_sma(closes: list[float], period: int) -> list[float | None]:
 
 def compute_ema(closes: list[float], period: int) -> list[float | None]:
     """Calcula serie/indicador ``ema``."""
+    if invalid_period(period):
+        return [None] * len(closes)
     result: list[float | None] = []
     smoothing = 2 / (period + 1)
     ema: float | None = None
@@ -130,6 +141,8 @@ def compute_ema(closes: list[float], period: int) -> list[float | None]:
 
 def compute_wma(closes: list[float], period: int) -> list[float | None]:
     """Calcula serie/indicador ``wma``."""
+    if invalid_period(period):
+        return [None] * len(closes)
     result: list[float | None] = []
     denominator = (period * (period + 1)) / 2
     for index in range(len(closes)):
@@ -145,6 +158,8 @@ def compute_wma(closes: list[float], period: int) -> list[float | None]:
 
 def compute_rsi(closes: list[float], period: int) -> list[float | None]:
     """Calcula serie/indicador ``rsi``."""
+    if invalid_period(period):
+        return [None] * len(closes)
     if not closes:
         return []
     result: list[float | None] = [None]
@@ -174,6 +189,8 @@ def compute_rsi(closes: list[float], period: int) -> list[float | None]:
 
 def compute_atr(bars: list[OhlcvBar], period: int) -> list[float | None]:
     """Calcula serie/indicador ``atr``."""
+    if invalid_period(period):
+        return [None] * len(bars)
     result: list[float | None] = []
     atr: float | None = None
     for index in range(len(bars)):
@@ -213,6 +230,8 @@ def compute_atr(bars: list[OhlcvBar], period: int) -> list[float | None]:
 
 def compute_cci(bars: list[OhlcvBar], period: int) -> list[float | None]:
     """Calcula serie/indicador ``cci``."""
+    if invalid_period(period):
+        return [None] * len(bars)
     typical = [(bar.high + bar.low + bar.close) / 3 for bar in bars]
     result: list[float | None] = []
     for index in range(len(typical)):
@@ -231,6 +250,8 @@ def compute_cci(bars: list[OhlcvBar], period: int) -> list[float | None]:
 
 def compute_stoch_k(bars: list[OhlcvBar], k_period: int) -> list[float | None]:
     """Calcula serie/indicador ``stoch_k``."""
+    if invalid_period(k_period):
+        return [None] * len(bars)
     result: list[float | None] = []
     for index in range(len(bars)):
         if index + 1 < k_period:
@@ -249,6 +270,8 @@ def compute_stoch_k(bars: list[OhlcvBar], k_period: int) -> list[float | None]:
 
 def compute_macd_line(closes: list[float], fast: int, slow: int) -> list[float | None]:
     """Calcula serie/indicador ``macd_line``."""
+    if invalid_period(fast) or invalid_period(slow):
+        return [None] * len(closes)
     fast_ema = compute_ema(closes, fast)
     slow_ema = compute_ema(closes, slow)
     result: list[float | None] = []
@@ -284,7 +307,7 @@ def compute_macd_signal_from_line(
     """EMA of a (possibly leading-None) MACD line — classic seed, no zero-fill."""
     n = len(macd_line)
     result: list[float | None] = [None] * n
-    if signal_period < 1 or n == 0:
+    if invalid_period(signal_period) or n == 0:
         return result
     first = next((i for i, value in enumerate(macd_line) if value is not None), None)
     if first is None:
@@ -308,6 +331,8 @@ def compute_bollinger(
     std_dev: float,
 ) -> tuple[list[float | None], list[float | None], list[float | None]]:
     """Calcula serie/indicador ``bollinger``."""
+    if invalid_period(period):
+        return [None] * len(closes), [None] * len(closes), [None] * len(closes)
     mid = compute_sma(closes, period)
     upper: list[float | None] = []
     lower: list[float | None] = []
@@ -327,6 +352,8 @@ def compute_bollinger(
 
 def compute_williams_r(bars: list[OhlcvBar], period: int) -> list[float | None]:
     """Williams %R = -100 * (HH - Close) / (HH - LL)."""
+    if invalid_period(period):
+        return [None] * len(bars)
     result: list[float | None] = []
     for index in range(len(bars)):
         if index + 1 < period:
@@ -345,6 +372,8 @@ def compute_williams_r(bars: list[OhlcvBar], period: int) -> list[float | None]:
 
 def compute_momentum(closes: list[float], period: int) -> list[float | None]:
     """Momentum = Close(t) - Close(t - period)."""
+    if invalid_period(period):
+        return [None] * len(closes)
     result: list[float | None] = []
     for index in range(len(closes)):
         if index < period:
@@ -356,6 +385,8 @@ def compute_momentum(closes: list[float], period: int) -> list[float | None]:
 
 def compute_std_dev(closes: list[float], period: int) -> list[float | None]:
     """Rolling population stddev of close (misma convención que BB mid window)."""
+    if invalid_period(period):
+        return [None] * len(closes)
     result: list[float | None] = []
     for index in range(len(closes)):
         if index + 1 < period:
@@ -373,6 +404,9 @@ def compute_donchian(
     period: int,
 ) -> tuple[list[float | None], list[float | None], list[float | None]]:
     """Donchian: upper=max(high), lower=min(low), mid=(upper+lower)/2."""
+    if invalid_period(period):
+        empty: list[float | None] = [None] * len(bars)
+        return empty, list(empty), list(empty)
     upper: list[float | None] = []
     lower: list[float | None] = []
     mid: list[float | None] = []
@@ -394,7 +428,7 @@ def compute_donchian(
 def _wilder_smooth(values: list[float], period: int) -> list[float | None]:
     """Wilder smoothing: first = SMA, then prev - prev/period + value."""
     result: list[float | None] = [None] * len(values)
-    if len(values) < period:
+    if invalid_period(period) or len(values) < period:
         return result
     seed = sum(values[:period]) / period
     result[period - 1] = seed
@@ -411,6 +445,9 @@ def compute_adx(
 ) -> tuple[list[float | None], list[float | None], list[float | None]]:
     """ADX, +DI, −DI (Wilder)."""
     n = len(bars)
+    if invalid_period(period):
+        empty: list[float | None] = [None] * n
+        return empty, list(empty), list(empty)
     plus_dm = [0.0] * n
     minus_dm = [0.0] * n
     tr = [0.0] * n
@@ -471,6 +508,8 @@ def compute_adx(
 
 
 def _sma_of_series(values: list[float | None], period: int) -> list[float | None]:
+    if invalid_period(period):
+        return [None] * len(values)
     result: list[float | None] = []
     for index in range(len(values)):
         if index + 1 < period:
@@ -492,6 +531,9 @@ def compute_stoch_rsi(
     d_period: int,
 ) -> tuple[list[float | None], list[float | None]]:
     """Stochastic RSI → %K, %D (0–100)."""
+    if any(invalid_period(p) for p in (rsi_period, stoch_period, k_period, d_period)):
+        empty: list[float | None] = [None] * len(closes)
+        return empty, list(empty)
     rsi = compute_rsi(closes, rsi_period)
     raw: list[float | None] = []
     for index in range(len(rsi)):
@@ -523,6 +565,8 @@ def compute_supertrend(
     multiplier: float,
 ) -> list[float | None]:
     """SuperTrend line (ATR-based)."""
+    if invalid_period(atr_period):
+        return [None] * len(bars)
     atr = compute_atr(bars, atr_period)
     n = len(bars)
     result: list[float | None] = [None] * n
@@ -599,6 +643,8 @@ def compute_obv(bars: list[OhlcvBar]) -> list[float | None]:
 
 def compute_roc(closes: list[float], period: int) -> list[float | None]:
     """Calcula serie/indicador ``roc``."""
+    if invalid_period(period):
+        return [None] * len(closes)
     result: list[float | None] = []
     for index, close in enumerate(closes):
         if index < period:
@@ -614,6 +660,8 @@ def compute_roc(closes: list[float], period: int) -> list[float | None]:
 
 def compute_mfi(bars: list[OhlcvBar], period: int) -> list[float | None]:
     """Calcula serie/indicador ``mfi``."""
+    if invalid_period(period):
+        return [None] * len(bars)
     result: list[float | None] = []
     typical = [(b.high + b.low + b.close) / 3.0 for b in bars]
     raw_mf = [typical[i] * float(bars[i].volume) for i in range(len(bars))]
@@ -642,6 +690,9 @@ def compute_aroon(
     period: int,
 ) -> tuple[list[float | None], list[float | None]]:
     """Calcula serie/indicador ``aroon``."""
+    if invalid_period(period):
+        empty: list[float | None] = [None] * len(bars)
+        return empty, list(empty)
     up: list[float | None] = []
     down: list[float | None] = []
     for index in range(len(bars)):
@@ -669,7 +720,7 @@ def compute_aroon(
 
 def _smma(values: list[float], period: int) -> list[float | None]:
     result: list[float | None] = [None] * len(values)
-    if len(values) < period:
+    if invalid_period(period) or len(values) < period:
         return result
     seed = sum(values[:period]) / period
     result[period - 1] = seed
@@ -729,6 +780,14 @@ def compute_psar(
     n = len(bars)
     if n == 0:
         return []
+    if (
+        not is_positive_finite(step)
+        or not is_positive_finite(max_af)
+        or float(max_af) < float(step)
+    ):
+        # Un ``step``/``maxAf`` no finito o no positivo hace que el SAR deje de converger
+        # (``af = 0`` congela el acelerador en el primer punto): no hay serie.
+        return [None] * n
     result: list[float | None] = [None] * n
     bull = True
     af = step
@@ -786,7 +845,7 @@ def compute_fractals(
 
 
 def _midpoint_hl(bars: list[OhlcvBar], period: int, index: int) -> float | None:
-    if index + 1 < period:
+    if invalid_period(period) or index + 1 < period:
         return None
     window = bars[index - period + 1 : index + 1]
     return (max(b.high for b in window) + min(b.low for b in window)) / 2.0
@@ -807,6 +866,16 @@ def compute_ichimoku(
 ]:
     """Calcula serie/indicador ``ichimoku``."""
     n = len(bars)
+    try:
+        displacement_value = int(displacement)
+    except (TypeError, ValueError):
+        displacement_value = -1
+    if displacement_value < 0 or any(
+        invalid_period(p) for p in (tenkan_period, kijun_period, senkou_b_period)
+    ):
+        empty: list[float | None] = [None] * n
+        return empty, list(empty), list(empty), list(empty), list(empty)
+    displacement = displacement_value
     tenkan: list[float | None] = [_midpoint_hl(bars, tenkan_period, i) for i in range(n)]
     kijun: list[float | None] = [_midpoint_hl(bars, kijun_period, i) for i in range(n)]
     span_b_raw: list[float | None] = [_midpoint_hl(bars, senkou_b_period, i) for i in range(n)]

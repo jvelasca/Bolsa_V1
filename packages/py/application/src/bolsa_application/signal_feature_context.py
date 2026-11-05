@@ -15,6 +15,13 @@ Regla: si una barra no declara ``open``/``high``/``low``/``volume``, se usa ``cl
 ``volume = 0``. Es *fail-closed* en el sentido de que no inventa rango; y es **idéntico** al
 comportamiento previo del motor para datos close-only, de modo que las pruebas que solo
 tienen cierres no cambian.
+
+S8 (auditoría .183) — la síntesis es aceptable para alimentar el motor, pero **no** para
+decidir: con rango y volumen fabricados, ATR/CCI/Stochastic/VWAP devuelven un número que no
+significa nada. ``missing_bar_fields`` declara qué exige la definición y la ventana no trae,
+y el decisor ACTIVE convierte esa ausencia en ``HOLD`` con motivo ``insufficient_data`` en
+vez de operar sobre el número inventado. La síntesis sigue existiendo (para que una
+estrategia de cierres —SMA/EMA/RSI— se pueda evaluar igual que ayer).
 """
 
 from __future__ import annotations
@@ -23,12 +30,19 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from bolsa_analytics.indicators.compute import OhlcvBar
+from bolsa_analytics.indicators.validation import is_finite
+from bolsa_analytics.signals.bar_requirements import (
+    RANGE_FIELD,
+    VOLUME_FIELD,
+    required_bar_fields,
+)
 from bolsa_analytics.signals.rules_engine import build_indicator_context
 
 __all__ = [
     "bar_field",
     "build_signal_indicator_context",
     "feature_source",
+    "missing_bar_fields",
     "to_ohlcv_bars",
 ]
 
@@ -47,12 +61,21 @@ def bar_field(bar: Any, name: str) -> Any:
 
 
 def _as_float(value: Any) -> float | None:
+    """``value`` como float FINITO; ``None`` si falta o no es un dato (S9).
+
+    ``NaN``/``inf`` no son precios: aceptarlos convertía una fila corrupta en una barra
+    con la forma correcta, y el ``NaN`` se propagaba en silencio hasta el indicador (donde
+    una comparación contra ``NaN`` es siempre ``False``: la regla se apaga sin rastro).
+    Devolver ``None`` lo declara como lo que es —ausencia— y deja actuar al resto de
+    guardas (barra descartada o campo sintetizado, procedencia ``synthetic``).
+    """
     if value is None:
         return None
     try:
-        return float(value)
+        number = float(value)
     except (TypeError, ValueError):
         return None
+    return number if is_finite(number) else None
 
 
 def to_ohlcv_bars(bars: Sequence[Any]) -> list[OhlcvBar]:
@@ -123,3 +146,49 @@ def feature_source(bars: Sequence[Any]) -> str | None:
         ):
             return FEATURE_SOURCE_SYNTHETIC
     return FEATURE_SOURCE_REAL
+
+
+def _declares_range(bar: Any) -> bool:
+    """True si la barra declara ``high`` y ``low`` finitos (``open`` no se usa)."""
+    return _as_float(bar_field(bar, "high")) is not None and (
+        _as_float(bar_field(bar, "low")) is not None
+    )
+
+
+def missing_bar_fields(
+    bars: Sequence[Any],
+    definition: Mapping[str, Any],
+) -> frozenset[str]:
+    """Campos que la definición EXIGE y la ventana no aporta (S8, auditoría .183).
+
+    Un indicador de rango o de volumen calculado sobre ``open = high = low = close`` y
+    ``volume = 0`` no es un indicador impreciso: es un número inventado con la forma
+    correcta (ATR 0, rango de Stochastic 0, VWAP inexistente porque ``cum_vol = 0``). En vez
+    de publicarlo se declara lo que falta, y el decisor puede negarse a abrir con ello.
+
+    Sólo se exige lo que los ``indicatorSpecs`` de la definición usan: una estrategia de
+    SMA/EMA/RSI sobre cierres reales no paga nada por esta guarda, porque el cierre **sí**
+    estaba en la ventana.
+
+    El volumen se declara ausente también cuando la ventana entera viene a ``0``: un cero
+    es un valor, pero no un flujo, y VWAP/OBV/MFI no tienen nada que medir con él.
+    """
+    specs = [
+        dict(spec)
+        for spec in (definition.get("indicatorSpecs") or [])
+        if isinstance(spec, Mapping)
+    ]
+    required = required_bar_fields(specs)
+    if not required or not bars:
+        return frozenset()
+
+    missing: set[str] = set()
+    if RANGE_FIELD in required and any(not _declares_range(bar) for bar in bars):
+        missing.add(RANGE_FIELD)
+    if VOLUME_FIELD in required:
+        volumes = [_as_float(bar_field(bar, "volume")) for bar in bars]
+        if any(volume is None for volume in volumes) or not any(
+            volume and volume > 0 for volume in volumes
+        ):
+            missing.add(VOLUME_FIELD)
+    return frozenset(missing)

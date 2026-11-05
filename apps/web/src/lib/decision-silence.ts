@@ -35,6 +35,10 @@ const NOT_EVALUABLE_REASONS = new Set([
   "evaluation_failed",
   // ADR-048 — el libro no se pudo leer: no se sabe si había posición, así que no se decidió.
   "gated_unavailable",
+  // S8 — la definición usa indicadores de rango/volumen y la ventana solo trae cierres: el
+  // indicador existiría, pero mediría un rango inventado. Es un hueco de DATOS, no una
+  // conclusión de mercado: se clasifica como no evaluable, nunca como «sin señal».
+  "insufficient_data",
 ]);
 
 /** Motivos que declaran una **decisión** de no operar (no un hueco de datos). */
@@ -144,6 +148,8 @@ export function decisionSilenceReasonLabel(
       return "evaluación fallida";
     case "gated_unavailable":
       return "libro no legible";
+    case "insufficient_data":
+      return "faltan rango/volumen";
     case "no_signal":
       return "sin señal";
     case "active_signal_disabled":

@@ -325,6 +325,13 @@ ACTIVE_WARMUP_UNMEASURABLE = "warmup_unmeasurable"
 #: compra (podría doblar una posición existente) y no se vende (podría vender lo que no hay).
 #: Es fail-closed declarado, distinto de ``no_snapshot`` (faltan BARRAS, no libro).
 ACTIVE_GATED_UNAVAILABLE = "gated_unavailable"
+#: S8 (auditoría .183) — la ventana no trae el dato que EXIGE la definición: la estrategia
+#: usa ATR/CCI/Stochastic/Donchian/ADX/SuperTrend/Ichimoku/VWAP/OBV/MFI sobre barras
+#: close-only (``open = high = low = close``, ``volume = 0``). El indicador devolvería un
+#: número con la forma correcta y el significado inventado, así que no se abre con él. Es
+#: un HOLD de DATOS, no de señal: `no_signal` diría que se evaluó y no hubo nada.
+#: El detalle de qué falta (rango o volumen) viaja en el ``memo`` del paquete.
+ACTIVE_INSUFFICIENT_DATA = "insufficient_data"
 
 #: Vocabulario CERRADO de motivos de HOLD de la ACTIVE. ``warmup_insufficient`` se importa de
 #: su dueño (el evaluador de presets del scan) para no duplicar el literal: la ventana que no
@@ -338,6 +345,7 @@ ACTIVE_HOLD_REASONS: frozenset[str] = frozenset(
         ACTIVE_NO_SIGNAL,
         ACTIVE_WARMUP_UNMEASURABLE,
         ACTIVE_GATED_UNAVAILABLE,
+        ACTIVE_INSUFFICIENT_DATA,
         WARMUP_INSUFFICIENT,
     }
 )
@@ -373,6 +381,7 @@ __all__ = [
     "ACTIVE_EVALUATION_FAILED",
     "ACTIVE_GATED_UNAVAILABLE",
     "ACTIVE_HOLD_REASONS",
+    "ACTIVE_INSUFFICIENT_DATA",
     "ACTIVE_NO_EXECUTABLE",
     "ACTIVE_NO_SIGNAL",
     "ACTIVE_NO_SNAPSHOT",

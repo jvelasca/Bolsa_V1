@@ -26,6 +26,9 @@ describe("decisionSilenceCause", () => {
     expect(decisionSilenceCause("warmup_unmeasurable")).toBe("not_evaluable");
     // ADR-048 — el libro ilegible es un hueco del motor, no una conclusión de mercado.
     expect(decisionSilenceCause("gated_unavailable")).toBe("not_evaluable");
+    // S8 — faltan rango/volumen para los indicadores que la definición usa: hueco de DATOS,
+    // nunca «sin señal» (la señal no se pudo calcular, no se calculó y salió vacía).
+    expect(decisionSilenceCause("insufficient_data")).toBe("not_evaluable");
   });
 
   it("reconoce el warmup insuficiente por su prefijo estable, no por la prosa", () => {
@@ -143,6 +146,10 @@ describe("etiquetas", () => {
   it("el motivo concreto se traduce sólo si es legible", () => {
     expect(decisionSilenceReasonLabel("gated_unavailable")).toBe(
       "libro no legible",
+    );
+    // S8 — el operador tiene que ver QUÉ falta, no solo «no evaluable».
+    expect(decisionSilenceReasonLabel("insufficient_data")).toBe(
+      "faltan rango/volumen",
     );
     expect(decisionSilenceReasonLabel(WARMUP_INSUFFICIENT)).toBe(
       "warmup insuficiente",
