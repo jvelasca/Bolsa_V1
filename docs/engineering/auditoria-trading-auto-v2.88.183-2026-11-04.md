@@ -33,12 +33,17 @@
 > la validación declara definición y dataset, y el Promotion Gate veta la evidencia de otra definición, de otro
 > snapshot o del mismo tramo de barras que el LAB). `S7` se cierra en la PR [#90](https://github.com/jvelasca/Bolsa_V1/pull/90)
 > (`fix/auto-s7-vigilance-freshness`: la vigilancia distingue `stale`/`unmeasured`/`healthy`, con TTL de la evidencia
-> predictiva, identidad por `version_id` y ausencia de medida fail-closed sobre el bloque predictivo). Las once PR están
+> predictiva, identidad por `version_id` y ausencia de medida fail-closed sobre el bloque predictivo). `M5`, `M6` y
+> `M9` viajaron dentro de la PR [#78](https://github.com/jvelasca/Bolsa_V1/pull/78) (`fix/auto-p5-p6-persistence`), pero
+> el documento los seguía listando como abiertos; la PR
+> [#91](https://github.com/jvelasca/Bolsa_V1/pull/91) (`fix/auto-m5-m6-m9-commit`) cierra el resto que quedaba en `M5`
+> —la sesión se declaraba dueña y publicaba sus claims **antes** del commit— y añade el certificado que faltaba de los
+> tres. Las doce PR están
 > fusionadas en `fix/059-060-proveedores` (`ef2a9c8f`); **no** hay sello, bump ni migración fuera de las citadas.
 > **Sincronización del documento (`2026-11-05`, sin PR de código):** al verificar la sección de estrategia contra el
 > árbol, `S1` y `S2` ya estaban resueltos en código y con pruebas (`test_strategy_lifecycle_s1_s5_s6.py`, `LabThresholds`),
 > así que el documento los daba por abiertos **por desfase**, no por defecto. **Abiertos:** el resto de la severidad media
-> `M*` (`M1`-`M11`, `M14`, `M15`) y `S8`-`S10`.
+> `M*` (`M1`-`M4`, `M7`, `M8`, `M10`, `M11`, `M14`, `M15`) y `S8`-`S10`.
 
 Alcance detallado: lógica de decisión, riesgo, ejecución, workers AUTO, `auto_simulation_worker.py` (9.802 líneas) y lógica de estrategia y señales.
 Modo: solo lectura. No se modificó el repositorio. Las referencias `archivo:línea` son del tag `v2.88.183-beta`.
@@ -121,11 +126,11 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 | M2 | `max_position_pct`/`max_position_value` ≤ 0 significa "sin techo" (reproducido: qty 100 aprobada). Solo `max_risk_per_trade_pct=0` veta | `risk_allocator.py:319-337` | 0 = techo cero (veto), negativo = error; solo `None` = sin techo |
 | M3 | `risk_budget` NaN/inf/≤0 cae al presupuesto por pct (reproducido). **Latente**: el único llamador (`portfolio_decision_engine.py:544`) veta antes | `risk_allocator.py:272-289` | Defensa en profundidad en la propia función |
 | M4 | `remaining_qty` > `requested_qty` aceptado (reproducido: pedir 10, quedar 100) | `exit_order.py:299-323` | `0 ≤ remaining ≤ requested` y `filled + remaining ≈ requested` |
-| M5 | `commit()` de reservas fallido se registra y se continúa. Seguro solo si el store es autocommit (el comentario lo asume; no verificado) | `auto_simulation_worker.py:3707` | Contrato explícito; si falla, no emitir órdenes |
-| M6 | Pérdida de eventos de journal: la cola se vacía antes de publicar, y si el sink falla se pierde la evidencia | `:7373-7395` | Outbox con `pending/posted/failed` |
+| M5 | `commit()` de reservas fallido se registra y se continúa. Seguro solo si el store es autocommit (el comentario lo asume; no verificado) · ✅ Cerrado | `auto_simulation_worker.py:3707` | Contrato explícito; si falla, no emitir órdenes |
+| M6 | Pérdida de eventos de journal: la cola se vacía antes de publicar, y si el sink falla se pierde la evidencia · ✅ Cerrado | `:7373-7395` | Outbox con `pending/posted/failed` |
 | M7 | Excepciones del tick, del refresco de watch y del refresco del decider se tragan; se opera con universo o estrategia caducados, sin backoff ni estado durable de fallo | `:9253-9267` | Marcar snapshot no fiable y vetar aperturas; backoff exponencial y circuit breaker a `PAUSED`; persistir tick `ERROR` |
 | M8 | Sin stores durables inyectados, kill switch, posiciones, T1, P&L y journal viven solo en RAM; el modo estructural marca fills como `applied` sin libro financiero | `:1200-1470`, `:2275-2281`, `:2368-2375` | Stores obligatorios en modo operativo; rechazar el arranque si faltan |
-| M9 | Excepción de `price_script` escapa sin el fail-closed que sí tiene `PriceSource` | `:2150-2172` | `try/except` → `None` → HOLD |
+| M9 | Excepción de `price_script` escapa sin el fail-closed que sí tiene `PriceSource` · ✅ Cerrado | `:2150-2172` | `try/except` → `None` → HOLD |
 | M10 | AUTO se activa solo por variable de entorno; tras un reinicio con la variable puesta, arranca. Sin latch durable de OFF | workers AUTO | Intención del operador en BD; rearranque con confirmación |
 | M11 | Calibración `positiveOosFoldShare` usa `>= 0.0`; el replay usa `R > 0`. Los folds planos inflan la métrica | `auto_adaptive_calibration.py:638` | Criterio único `> 0` |
 | M12 | Lock y latido de ventana en fichero no atómicos; un `.run.lock` obsoleto silencia alertas · ✅ Cerrado | `window_day_watch_worker.py:341-535` | `os.replace`, lock con PID y TTL |
@@ -133,6 +138,32 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 | M14 | `load_book_equity` puede dejar equity de un tick anterior visible tras un fallo de lectura | `:2524-2544` | Snapshot atómico con `as_of` |
 | M15 | P&L parcial contra `_entry_price` único, no contra coste medio del ledger · Por lectura, impacto sin verificar | `:8027-8044` | Coste medio ponderado o lotes |
 | M16 | `AutoSimRuntime` carga la estrategia ACTIVE con `instrument_id=effective_account` · ✅ Cerrado | `:9723-9727` | Separar `account_id` de `instrument_id` |
+
+### M5 — El commit fallido no deja dueño ni claim · ✅ Cerrado (`fix/auto-m5-m6-m9-commit`)
+- **Fallo:** el `commit()` de reservas se daba por implícito («el store es autocommit», no verificado). Dos restos
+  sobrevivían al primer endurecimiento: la sesión se registraba como **dueña** de cada reserva al ganar el claim y
+  **antes** de confirmar, así que el cierre de turno intentaba retirar una fila que nunca se escribió; y el journal
+  publicaba `claimed=True` de ese capital no reservado, dejando al monitor de concurrencia un dueño inexistente.
+- **Cerrado:** no se asume autocommit. Un `commit()` fallido veta el instrumento (`reservation_unmeasurable`), deja el
+  libro vivo como estaba, **no** registra propiedad y **no** publica claims ganados (las carreras perdidas sí, porque
+  ocurrieron antes y sin depender del commit). La propiedad se registra sólo tras el commit confirmado.
+  Certificado en `apps/api-python/tests/test_auto_m5_reservation_commit_fail_closed.py`: los dos tests de propiedad y
+  claim **fallan** contra el código previo.
+
+### M6 — La evidencia del journal no se pierde con un sink caído · ✅ Cerrado (`fix/auto-p5-p6-persistence` + certificado)
+- **Fallo:** la cola de eventos de gestión de posición se vaciaba antes de publicar; si el sink fallaba, el hecho se
+  perdía y el turno seguía como si la traza estuviera escrita.
+- **Cerrado:** los eventos cuyo sink falla se **reencolan** (acotados por `_POSITION_JOURNAL_RETRY_CAP`, descartando
+  los MÁS ANTIGUOS con un `ERROR` explícito) y se publican en el turno siguiente conservando el orden. Un evento
+  descartado por tope es un hueco declarado, no un silencio. El descarte por tope y la publicación diferida quedan
+  certificados en `test_auto_m5_reservation_commit_fail_closed.py`.
+
+### M9 — `price_script` que lanza es «no hay precio» · ✅ Cerrado (`fix/auto-p5-p6-persistence`)
+- **Fallo:** la fuente real (`PriceSource`) ya convertía una excepción en ausencia de precio, pero el `price_script`
+  inyectado dejaba escapar la excepción del proveedor: el tick moría en vez de quedarse en HOLD.
+- **Cerrado:** `_safe_price_script` envuelve la llamada y registra la excepción; `_v2_price_exec`/`_v2_price_mid`
+  devuelven `None`, que es la misma declaración de «sin precio» que usa la fuente real. Certificado en
+  `apps/api-python/tests/test_auto_m6_m9_fail_closed.py`.
 
 ### M12 — Lock del vigía con dueño probado y latido atómico · ✅ Cerrado (`fix/auto-m12-m13-watch-monitor`)
 - **Fallo:** `day_is_running()` sólo comprobaba que existiera el directorio `.run.lock`; un lock **huérfano** (proceso muerto, host apagado o `lock.json` corrupto) silenciaba el «día perdido» para siempre. El latido se escribía con `write_text`, que deja una ventana en la que un lector ve el fichero truncado y pierde también las marcas de aviso.
@@ -230,11 +261,11 @@ Fuente: lectura de módulos de señales, ciclo de vida y promoción. No verifica
 
 ## 6. Orden de corrección recomendado
 
-1. **Fail-open de configuración y datos:** P1, P2, P4, P9 (bajo riesgo de cambio, alto impacto).
-2. **Persistencia fallida ignorada:** P5, P6, M5, M6, M9.
+1. **Fail-open de configuración y datos:** P1, P2, P4, P9 (bajo riesgo de cambio, alto impacto) · ✅ cerrado.
+2. **Persistencia fallida ignorada:** P5, P6, M5, M6, M9 · ✅ cerrado.
 3. **Circuit breaker y estado durable:** P3, P8, M8, M10, M14.
 4. **Concurrencia:** P7, M1.
-5. **Gates de estrategia:** S1, S2, S5, S6, S7, S3.
+5. **Gates de estrategia:** S1, S2, S5, S6, S7, S3 · ✅ cerrado.
 6. **Validaciones de bordes:** M2, M3, M4, M11 y la severidad baja.
 
 Cada corrección debería ir con un test que muerda (entrada `NaN`, `None`, valor desconocido o fallo de persistencia inyectado) para que el comportamiento fail-closed quede protegido.
