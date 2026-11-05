@@ -203,8 +203,16 @@ semántica `fail-closed` del código, el artefacto publicado y la trazabilidad d
 | Fichero | Qué es | `sha256` |
 | --- | --- | --- |
 | `README.md` | Este expediente | — |
-| `v2_93_policy_equity_2026-11-05.json` | Artefacto completo del barrido (`v2.93`, 118 KB): cobertura, resumen, curva, ventanas, benchmark, holdout, evaluación por umbral y límites declarados | `91af8603205c8144297d4c3ee38031ed5ee0ad77da49b4f176192321b37eb5f8` |
+| `v2_93_policy_equity_2026-11-05.json` | Artefacto completo del barrido (`v2.93`, 114 KB en LF): cobertura, resumen, curva, ventanas, benchmark, holdout, evaluación por umbral y límites declarados | `6693c7b3700c6f48d14e3914ec39fb615cf5d3666bf63bb7374e80467488cecb` |
 | `SHA256SUMS.txt` | Manifiesto verificable con `sha256sum -c` | — |
+
+> **Sobre el hash (importante para no confundir «alterado» con «normalizado»).** El fichero se
+> generó en Windows con finales de línea `CRLF`; el repositorio los normaliza a `LF`
+> (`.gitattributes`: `* text=auto eol=lf`). El `sha256` publicado es el del **fichero tal como se
+> clona** (LF, 116 445 bytes). El artefacto **originalmente producido** (CRLF, 120 930 bytes) tenía
+> `sha256 = 91af8603205c8144297d4c3ee38031ed5ee0ad77da49b4f176192321b37eb5f8`. Ambos describen el
+> mismo JSON: se declaran los dos para que una diferencia de fin de línea no se confunda con una
+> manipulación. El contenido semántico (verificado) es idéntico.
 
 Trazabilidad de commits (rama `fix/059-060-proveedores`):
 
