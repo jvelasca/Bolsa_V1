@@ -1355,9 +1355,8 @@ def _default_orchestrator(session_factory: Any) -> Any:
 
 def _estudio_universe_resolver(session_factory: Any) -> Any:
     """``resolve_universe`` real: universo canónico ESTUDIO (fail-closed)."""
-    from bolsa_application.orchestrator_universe import make_estudio_universe_resolver
-
     from bolsa_api.background.estudio_watch import SessionScopedEstudioList
+    from bolsa_application.orchestrator_universe import make_estudio_universe_resolver
 
     return make_estudio_universe_resolver(SessionScopedEstudioList(session_factory))
 
