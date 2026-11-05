@@ -158,7 +158,9 @@ async def test_v2_halt_forces_protective_exit_not_congelation(v2_env: None) -> N
 
     def script(_symbol: str, _minute: int) -> float:
         prices["n"] += 1
-        return 100.0 if prices["n"] <= 1 else 96.0
+        # El tick de ENTRADA consume DOS lecturas (decisión + ejecución): mismo precio en
+        # ambas y hueco = 0, así la geometría (R1) se ancla al fill sin mover el stop.
+        return 100.0 if prices["n"] <= 2 else 96.0
 
     worker = _worker(price_script=script)
     worker._decider = _buy()
@@ -181,7 +183,9 @@ async def test_v2_stale_market_data_vetoes_entry_but_allows_protective_exit(
 
     def script(_symbol: str, _minute: int) -> float:
         prices["n"] += 1
-        return 100.0 if prices["n"] <= 1 else 96.0
+        # El tick de ENTRADA consume DOS lecturas (decisión + ejecución): mismo precio en
+        # ambas y hueco = 0, así la geometría (R1) se ancla al fill sin mover el stop.
+        return 100.0 if prices["n"] <= 2 else 96.0
 
     worker = _worker(price_script=script)
     worker._decider = _buy()
@@ -223,7 +227,9 @@ async def test_v2_exit_leaves_a_live_sell_reservation_released_by_fill(
 
     def script(_symbol: str, _minute: int) -> float:
         prices["n"] += 1
-        return 100.0 if prices["n"] <= 1 else 96.0
+        # El tick de ENTRADA consume DOS lecturas (decisión + ejecución): mismo precio en
+        # ambas y hueco = 0, así la geometría (R1) se ancla al fill sin mover el stop.
+        return 100.0 if prices["n"] <= 2 else 96.0
 
     worker = _worker(
         exec_store=store,

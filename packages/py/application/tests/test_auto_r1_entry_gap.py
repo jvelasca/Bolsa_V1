@@ -107,3 +107,57 @@ def test_tolerance_is_configurable() -> None:
         tunables=V2Tunables(optimizer_enabled=False, max_entry_gap_atr=2.0),
     )
     assert _decision(plan)["approved"] is True
+
+
+def test_synthetic_atr_cannot_veto_the_entry() -> None:
+    """Sin ATR MEDIDO no hay tolerancia: el sintético (2 % del precio) no es una medición.
+
+    Con ``atr=None`` el motor sigue derivando la geometría del fallback (R5 declarada), pero
+    el hueco NO se veta: un umbral calculado sobre un ATR inventado sería un umbral
+    disfrazado (un 2 % de hueco vetaría siempre). El anclaje a la ejecución SÍ se aplica.
+    """
+    identity = signal_identity_for_bar(
+        instrument_id="AAA",
+        action="BUY",
+        strategy_version="v42",
+        timeframe="1d",
+        moment=_MOMENT,
+    )
+    assert identity is not None
+    signal = V2Signal(
+        "AAA",
+        "BUY",
+        price=100.0,
+        atr=None,
+        edge=0.9,
+        sector="tech",
+        liquidity_notional=1_000_000.0,
+        strategy_version="v42",
+        signal_id=identity.signal_id,
+        bar_timestamp=identity.bar_timestamp,
+        valid_until=identity.valid_until,
+        p_win=0.5,
+        avg_loss_r=-1.0,
+        execution_price=104.0,  # 2 ATR sintéticos (2 % de 100) — vetaría si se midiera así.
+    )
+    snapshot = build_worker_snapshot(
+        account_id="acc-1",
+        equity=100_000.0,
+        cash=80_000.0,
+        open_positions={},
+        entry_prices={},
+        regime="BULL_TREND",
+        risk_budget_pct=6.0,
+    )
+    plan = plan_v2_tick(
+        snapshot=snapshot,
+        signals=[signal],
+        regime="BULL_TREND",
+        as_of="2026-10-05T09:00:00Z",
+        tunables=V2Tunables(optimizer_enabled=False),
+    )
+    assert _decision(plan)["approved"] is True
+    decision = next(d for d in plan.decisions if d.instrument_id == "AAA")
+    assert decision.trade_plan is not None
+    # El anclaje a la ejecución NO depende de que el ATR esté medido.
+    assert decision.trade_plan.entry == 104.0

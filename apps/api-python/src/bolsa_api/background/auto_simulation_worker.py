@@ -3420,10 +3420,13 @@ class AutoSimulationWorker:
                 # Recuperación del dato real: se re-arma el memo para que una caída
                 # posterior a sintético vuelva a declararse (una sola vez más).
                 self._v2_atr_journaled[symbol] = ATR_SOURCE_REAL
-            if self._v2_tunables.atr_required and atr_source != ATR_SOURCE_REAL:
-                # Veto explícito: no se sustituye por el sintético. ``plan_v2_tick``
-                # recibe ``atr=None`` y aplica su camino normal de NO ENTRY (que ya está
-                # probado y journaliza su motivo), en vez de inventar geometría.
+            if atr_source != ATR_SOURCE_REAL:
+                # R1 — un ATR de FALLBACK no es una MEDICIÓN. El journal ya lo declara
+                # (``ATR_GEOMETRY``/``atrSource``) y ``plan_v2_tick`` deriva la MISMA
+                # geometría sintética desde ``atr_pct_fallback``: pasar ``None`` no cambia
+                # el tamaño ni el stop, pero impide medir el hueco decisión→ejecución
+                # contra un ATR inventado (un «1 ATR» sintético vetaría todo hueco > 2 %).
+                # Con ``atr_required`` el efecto es el de siempre: el candidato NO entra.
                 signal_atr: float | None = None
             else:
                 signal_atr = atr

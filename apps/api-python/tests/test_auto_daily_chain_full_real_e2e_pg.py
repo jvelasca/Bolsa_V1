@@ -76,6 +76,24 @@ def daily_chain_pg() -> None:
     chain.gate_pg(_REQUIRED_ENV)
 
 
+@pytest.fixture(autouse=True)
+def no_live_macro(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Certificación SIN red: el feed macro de Yahoo NO participa en el parte.
+
+    El parte cablea ``YahooMacroSnapshotPort`` (VIX vivo + curva). Un percentil de VIX alto
+    clasifica el régimen como ``crisis`` y el TradePlan nace ``BLOCKED`` con ``whyNot=['regime']``
+    —por diseño, Golden G—, así que el resultado de la cadena dependería del día del run y no
+    sería hermético (se observó en rojo con VIX 23,8 / percentil 91,3). Aquí la ausencia de
+    macro es el caso declarado: sin evaluación macro el régimen es ``neutral`` y no veta.
+    """
+    from bolsa_market import macro_snapshot
+
+    async def _no_snapshot(**_kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(macro_snapshot, "fetch_macro_snapshot_dict", _no_snapshot)
+
+
 # ── Reloj, sonda de fill y entorno de la ruta real ─────────────────────────────────
 
 
