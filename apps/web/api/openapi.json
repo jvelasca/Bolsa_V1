@@ -1710,6 +1710,13 @@
           "header": {
             "$ref": "#/components/schemas/AutoMonitorHeaderDto"
           },
+          "incompleteReads": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Incompletereads",
+            "type": "array"
+          },
           "key": {
             "title": "Key",
             "type": "string"
@@ -1725,6 +1732,13 @@
             "title": "Readonly",
             "type": "boolean"
           },
+          "readStatus": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Readstatus",
+            "type": "object"
+          },
           "reservations": {
             "items": {
               "$ref": "#/components/schemas/AutoMonitorReservationDto"
@@ -1738,6 +1752,11 @@
             },
             "title": "Signalholds",
             "type": "array"
+          },
+          "state": {
+            "default": "COMPLETE",
+            "title": "State",
+            "type": "string"
           }
         },
         "required": [

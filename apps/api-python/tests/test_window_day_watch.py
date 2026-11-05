@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime
+import os
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -38,6 +41,9 @@ from bolsa_infrastructure.config import get_settings
 MADRID = ZoneInfo("Europe/Madrid")
 DUE_HOUR = 20
 DUE_MINUTE = 0
+
+#: Instante de referencia (UTC) de los tests de política del lock (M12).
+_NOW = datetime(2026, 10, 16, 12, 0, tzinfo=UTC)
 
 #: Viernes 2026-10-16 20:30 Europe/Madrid — día laborable, ya vencida la hora del vigía.
 _WEEKDAY_AFTER_DUE = datetime(2026, 10, 16, 20, 30, tzinfo=MADRID)
@@ -465,6 +471,113 @@ def test_day_is_running_reads_the_lock_from_the_override(monkeypatch, tmp_path: 
     lock = tmp_path / "20261016" / ".run.lock"
     lock.mkdir(parents=True)
     assert watch_worker.day_is_running("20261016") is True
+
+
+# ---------------------------------------------------------------------------
+# M12: lock con dueño probado (PID/TTL) y escritura atómica del vigía
+# ---------------------------------------------------------------------------
+
+
+def _lock_owner(tmp_path: Path, *, pid: int | None, host: str, started: datetime) -> Path:
+    """Escribe un ``lock.json`` como el runner y devuelve el directorio del lock."""
+    lock_dir = tmp_path / "20261016" / watch_worker.LOCK_DIR_NAME
+    lock_dir.mkdir(parents=True)
+    payload: dict[str, object] = {"host": host, "startedAt": started.isoformat()}
+    if pid is not None:
+        payload["pid"] = pid
+    (lock_dir / watch_worker.LOCK_FILE).write_text(json.dumps(payload), encoding="utf-8")
+    return lock_dir
+
+
+def _live(lock_dir: Path | None, lock: Mapping[str, Any] | None, *, alive: bool = True) -> bool:
+    return watch_worker.lock_is_live(
+        lock,
+        lock_dir=lock_dir,
+        now=_NOW,
+        host="host-a",
+        is_process_alive=lambda _pid: alive,
+    )
+
+
+def test_lock_policy_missing_lock_is_orphan(tmp_path: Path) -> None:
+    """Sin ``lock.json`` y sin directorio reciente no hay dueño → no silencia (M12)."""
+    assert _live(None, None) is False
+
+
+def test_lock_policy_same_host_live_pid_holds(tmp_path: Path) -> None:
+    """Mismo host y PID vivo ⇒ el run puede seguir trabajando."""
+    lock_dir = _lock_owner(
+        tmp_path, pid=4242, host="host-a", started=_NOW - timedelta(minutes=5)
+    )
+    assert _live(lock_dir, watch_worker.read_day_lock(lock_dir), alive=True) is True
+
+
+def test_lock_policy_same_host_dead_pid_is_orphan(tmp_path: Path) -> None:
+    """Mismo host y PID muerto ⇒ lock huérfano: el «día perdido» vuelve a avisar."""
+    lock_dir = _lock_owner(
+        tmp_path, pid=4242, host="host-a", started=_NOW - timedelta(minutes=5)
+    )
+    assert _live(lock_dir, watch_worker.read_day_lock(lock_dir), alive=False) is False
+
+
+def test_lock_policy_same_host_without_pid_is_orphan(tmp_path: Path) -> None:
+    """Un ``lock.json`` del propio host sin ``pid`` no se puede probar vivo."""
+    lock_dir = _lock_owner(tmp_path, pid=None, host="host-a", started=_NOW)
+    assert _live(lock_dir, watch_worker.read_day_lock(lock_dir)) is False
+
+
+def test_lock_policy_other_host_respects_ttl(tmp_path: Path) -> None:
+    """Otro host no se puede probar: corre hasta 12 h y después es huérfano."""
+    fresh = _lock_owner(
+        tmp_path, pid=4242, host="host-b", started=_NOW - timedelta(hours=1)
+    )
+    assert _live(fresh, watch_worker.read_day_lock(fresh)) is True
+
+    stale_dir = tmp_path / "20261017" / watch_worker.LOCK_DIR_NAME
+    stale_dir.mkdir(parents=True)
+    stale = {"host": "host-b", "startedAt": (_NOW - timedelta(hours=13)).isoformat()}
+    (stale_dir / watch_worker.LOCK_FILE).write_text(json.dumps(stale), encoding="utf-8")
+    assert _live(stale_dir, watch_worker.read_day_lock(stale_dir)) is False
+
+
+def test_lock_policy_unreadable_lock_only_trusts_acquisition_grace(tmp_path: Path) -> None:
+    """Lock corrupto: se respeta sólo la ventana de adquisición, luego es huérfano."""
+    lock_dir = tmp_path / "20261016" / watch_worker.LOCK_DIR_NAME
+    lock_dir.mkdir(parents=True)
+    (lock_dir / watch_worker.LOCK_FILE).write_text("{no es json", encoding="utf-8")
+    assert watch_worker.read_day_lock(lock_dir) is None
+
+    fresh = _NOW - timedelta(seconds=30)
+    os.utime(lock_dir, (fresh.timestamp(), fresh.timestamp()))
+    assert _live(lock_dir, None) is True
+
+    old = _NOW - timedelta(seconds=watch_worker.LOCK_READ_GRACE_SECONDS + 60)
+    os.utime(lock_dir, (old.timestamp(), old.timestamp()))
+    assert _live(lock_dir, None) is False
+
+
+def test_write_atomic_never_leaves_partial_file(tmp_path: Path) -> None:
+    """M12: se escribe a temporal + ``os.replace``, sin temporales huérfanos."""
+    target = tmp_path / "day-watch.json"
+    watch_worker._write_atomic(target, '{"a": 1}')
+    assert target.read_text(encoding="utf-8") == '{"a": 1}'
+
+    watch_worker._write_atomic(target, '{"a": 2}')
+    assert target.read_text(encoding="utf-8") == '{"a": 2}'
+    assert [p.name for p in tmp_path.iterdir()] == ["day-watch.json"]
+
+
+def test_write_atomic_cleans_temp_on_failure(tmp_path: Path, monkeypatch) -> None:
+    """Si ``os.replace`` falla, el temporal no queda tirado en el directorio."""
+    target = tmp_path / "day-watch.json"
+
+    def boom(*_args, **_kwargs):
+        raise OSError("disco lleno")
+
+    monkeypatch.setattr(watch_worker.os, "replace", boom)
+    with pytest.raises(OSError):
+        watch_worker._write_atomic(target, "x")
+    assert list(tmp_path.iterdir()) == []
 
 
 @pytest.mark.asyncio

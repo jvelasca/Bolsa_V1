@@ -15,8 +15,10 @@
 > y normalizador finito en `bolsa_domain`). `P5` y `P6` se cierran en la PR
 > [#78](https://github.com/jvelasca/Bolsa_V1/pull/78) (`fix/auto-p5-p6-persistence`). `P7` y `P8` se cierran en la
 > rama `fix/auto-p7p8-crossprocess-lease` (lease durable por `engine_id`, migración `063_auto_engine_lease`, claim
-> del ciclo ANTES de ejecutar y reconstrucción de `_open` al cambiar de generación). `P3`, la severidad media `M*` y
-> `S1`-`S10` quedan abiertos: este documento sigue siendo el snapshot del estado auditado, no el estado corregido.
+> del ciclo ANTES de ejecutar y reconstrucción de `_open` al cambiar de generación). `M12` y `M13` se cierran en la
+> rama `fix/auto-m12-m13-watch-monitor` (lock del vigía con dueño probado PID/TTL + latido atómico, y estado
+> `INCOMPLETE` explícito en el monitor). `P3`, el resto de la severidad media `M*` y `S1`-`S10` quedan abiertos:
+> este documento sigue siendo el snapshot del estado auditado, no el estado corregido.
 
 Alcance detallado: lógica de decisión, riesgo, ejecución, workers AUTO, `auto_simulation_worker.py` (9.802 líneas) y lógica de estrategia y señales.
 Modo: solo lectura. No se modificó el repositorio. Las referencias `archivo:línea` son del tag `v2.88.183-beta`.
@@ -105,11 +107,19 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 | M9 | Excepción de `price_script` escapa sin el fail-closed que sí tiene `PriceSource` | `:2150-2172` | `try/except` → `None` → HOLD |
 | M10 | AUTO se activa solo por variable de entorno; tras un reinicio con la variable puesta, arranca. Sin latch durable de OFF | workers AUTO | Intención del operador en BD; rearranque con confirmación |
 | M11 | Calibración `positiveOosFoldShare` usa `>= 0.0`; el replay usa `R > 0`. Los folds planos inflan la métrica | `auto_adaptive_calibration.py:638` | Criterio único `> 0` |
-| M12 | Lock y latido de ventana en fichero no atómicos; un `.run.lock` obsoleto silencia alertas | `window_day_watch_worker.py:341-535` | `os.replace`, lock con PID y TTL |
-| M13 | El monitor devuelve un DTO coherente con lecturas caídas | `auto_operational_monitor.py:1897-2120` | Estado `INCOMPLETE` explícito |
+| M12 | Lock y latido de ventana en fichero no atómicos; un `.run.lock` obsoleto silencia alertas · ✅ Cerrado | `window_day_watch_worker.py:341-535` | `os.replace`, lock con PID y TTL |
+| M13 | El monitor devuelve un DTO coherente con lecturas caídas · ✅ Cerrado | `auto_operational_monitor.py:1897-2120` | Estado `INCOMPLETE` explícito |
 | M14 | `load_book_equity` puede dejar equity de un tick anterior visible tras un fallo de lectura | `:2524-2544` | Snapshot atómico con `as_of` |
 | M15 | P&L parcial contra `_entry_price` único, no contra coste medio del ledger · Por lectura, impacto sin verificar | `:8027-8044` | Coste medio ponderado o lotes |
 | M16 | `AutoSimRuntime` carga la estrategia ACTIVE con `instrument_id=effective_account` · No verificado | `:9723-9727` | Separar `account_id` de `instrument_id` |
+
+### M12 — Lock del vigía con dueño probado y latido atómico · ✅ Cerrado (`fix/auto-m12-m13-watch-monitor`)
+- **Fallo:** `day_is_running()` sólo comprobaba que existiera el directorio `.run.lock`; un lock **huérfano** (proceso muerto, host apagado o `lock.json` corrupto) silenciaba el «día perdido» para siempre. El latido se escribía con `write_text`, que deja una ventana en la que un lector ve el fichero truncado y pierde también las marcas de aviso.
+- **Cerrado:** el lector aplica la MISMA política que el runner (`lockDecision`): lee `lock.json` (`pid`, `host`, `startedAt`) y sólo calla si el dueño se puede probar vivo —mismo host + PID vivo, otro host dentro del TTL de 12 h, o lock ilegible dentro de la ventana de adquisición de 5 min—. Un lock sin dueño probado vuelve a avisar. `write_status` escribe en temporal + `os.fsync` + `os.replace` (atómico en POSIX y Windows) y limpia el temporal si falla. En Windows la sonda de PID usa `OpenProcess`/`GetExitCodeProcess`, nunca `os.kill(pid, 0)` (que allí termina el proceso).
+
+### M13 — Estado `INCOMPLETE` explícito en el monitor · ✅ Cerrado (`fix/auto-m12-m13-watch-monitor`)
+- **Fallo:** las consultas del monitor se degradaban en silencio: una lectura caída y una cuenta sin operaciones producían el MISMO DTO (`cycles: []` + notas de «no durable»). Además, las lecturas de reservas/posiciones/engine no estaban protegidas y podían tumbar la ruta entera.
+- **Cerrado:** cada lectura declara su resultado en `readStatus` (`COMPLETE`/`FAILED`, orden canónico en `MONITOR_READ_SOURCES`). Si alguna cae, el DTO publica `state: "INCOMPLETE"`, la lista `incompleteReads` y la nota `read_failed:<fuente>`. El contrato HTTP y el view model (`@bolsa/shared`) exponen `state`/`readStatus`/`incompleteReads`, y la UI (monitor experto y la historia de la operación) rotula «Lectura incompleta» con las fuentes antes de cualquier lista vacía: un vacío por fallo deja de leerse como «sin operaciones». Un ámbito demostrablemente vacío (sin ciclos) sigue declarándose `COMPLETE`.
 
 ## 3. Severidad baja
 

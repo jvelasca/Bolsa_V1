@@ -67,10 +67,11 @@ import asyncio
 import json
 import logging
 import os
+import socket
 import sys
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any, Literal
@@ -104,6 +105,15 @@ MAX_LOOKBACK_DAYS = 90
 #: Latido durable (instrumento de vigilancia): último veredicto + journal de latidos.
 STATUS_FILE = "day-watch.json"
 STATUS_JOURNAL = "day-watch.jsonl"
+#: M12 — lock del ``run-day`` que escribe el runner (``scripts/lib/window-forward.mjs``).
+LOCK_DIR_NAME = ".run.lock"
+LOCK_FILE = "lock.json"
+#: M12 — TTL del lock de OTRO host, idéntico al del runner (``LOCK_TTL_MS``).
+LOCK_TTL_SECONDS = 12 * 60 * 60
+#: M12 — margen en el que un ``lock.json`` ilegible se considera «adquisición en curso»
+#: (``mkdir`` y escritura del JSON están a milisegundos). Pasado el margen, el lock no
+#: puede probar dueño y NO silencia el aviso.
+LOCK_READ_GRACE_SECONDS = 5 * 60
 #: Código de salida del CLI cuando el día (o un día del arrastre) requiere atención.
 ALERT_EXIT_CODE = 3
 
@@ -392,16 +402,128 @@ def state_dir_override() -> Path | None:
 
 
 def day_is_running(day: str) -> bool:
-    """¿Hay un ``run-day`` en curso para ``day``? (lock presente ⇒ en curso).
+    """¿Hay un ``run-day`` **vivo** para ``day``? (lock con dueño probado y vigente).
 
-    Conservador a propósito: el runner libera el lock en un ``try/finally``, de modo que
-    un lock presente señala un run **arrancado**; se prefiere callar a avisar en falso
-    mientras el ``run-day`` aún no ha anexado su fila al ledger.
+    M12 (auditoría .183): antes bastaba con que existiera el directorio ``.run.lock`` para
+    callar el aviso, de modo que un lock **huérfano** (proceso muerto, host apagado o
+    ``lock.json`` corrupto) silenciaba el «día perdido» para siempre. Ahora se lee el
+    ``lock.json`` que escribe el runner (``pid``, ``host``, ``startedAt``) y se aplica la
+    MISMA política que ``lockDecision`` del runner:
+
+    * sin lock ⇒ no está corriendo;
+    * mismo host y PID vivo ⇒ corriendo;
+    * mismo host y PID muerto ⇒ huérfano (no silencia: se avisa);
+    * otro host ⇒ corre mientras no supere el TTL de 12 h (no se puede probar muerte);
+    * lock ilegible ⇒ corre sólo si el directorio se tocó hace menos de
+      :data:`LOCK_READ_GRACE_SECONDS` (ventana de adquisición: ``mkdir`` y ``lock.json``
+      están a milisegundos); pasado ese margen es huérfano, porque no se puede probar
+      dueño y callar es el fallo que se está corrigiendo.
     """
     base = runs_dir()
     if base is None:
         return False
-    return (base / day / ".run.lock").exists()
+    return lock_is_live(
+        read_day_lock(base / day / LOCK_DIR_NAME),
+        lock_dir=base / day / LOCK_DIR_NAME,
+        now=datetime.now(UTC),
+        host=_hostname(),
+        is_process_alive=_pid_alive,
+    )
+
+
+def read_day_lock(lock_dir: Path) -> Mapping[str, Any] | None:
+    """``lock.json`` del ``run-day`` o ``None`` si falta/está corrupto (no se inventa)."""
+    try:
+        payload = json.loads((lock_dir / LOCK_FILE).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def lock_is_live(
+    lock: Mapping[str, Any] | None,
+    *,
+    lock_dir: Path | None,
+    now: datetime,
+    host: str,
+    is_process_alive: Callable[[int], bool],
+) -> bool:
+    """Política PURA de M12: ¿el lock del día pertenece a un run que puede seguir vivo?
+
+    Reloj, host y sonda de PID se inyectan para poder falsarla sin procesos reales. Un
+    lock con dueño **probado** calla el aviso; lo que no se puede probar y ya venció no
+    calla nada (un lock huérfano no puede volver a esconder un día perdido).
+    """
+    if lock is None:
+        # Sin ``lock.json`` legible: sólo se respeta la ventana de adquisición.
+        return _lock_dir_within_grace(lock_dir, now=now)
+    owner_host = str(lock.get("host") or "")
+    if owner_host and owner_host == host:
+        pid = lock.get("pid")
+        return isinstance(pid, int) and is_process_alive(pid)
+    started_at = _parse_instant(lock.get("startedAt"))
+    if started_at is None:  # sin marca de tiempo no hay TTL que aplicar.
+        return True
+    return now - started_at <= timedelta(seconds=LOCK_TTL_SECONDS)
+
+
+def _lock_dir_within_grace(lock_dir: Path | None, *, now: datetime) -> bool:
+    if lock_dir is None:
+        return False
+    try:
+        touched = datetime.fromtimestamp(lock_dir.stat().st_mtime, UTC)
+    except OSError:
+        return False
+    return now - touched <= timedelta(seconds=LOCK_READ_GRACE_SECONDS)
+
+
+def _parse_instant(raw: Any) -> datetime | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _hostname() -> str:
+    return socket.gethostname()
+
+
+def _pid_alive(pid: int) -> bool:
+    """¿Existe el proceso ``pid``? En Windows NO se usa ``os.kill`` (terminaría el proceso).
+
+    ``os.kill(pid, 0)`` en Windows se traduce en ``TerminateProcess``: comprobar así la
+    vida de un proceso mataría justo al ``run-day`` que se quiere vigilar. Se consulta con
+    ``OpenProcess``/``GetExitCodeProcess`` (``STILL_ACTIVE`` = 259).
+    """
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    if sys.platform == "win32":
+        import ctypes
+
+        # ``windll`` solo existe en la stdlib de Windows: el ``ignore`` se necesita al
+        # analizar en Linux y sobra al analizar en Windows, de ahí los dos códigos.
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined, unused-ignore]
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == 259  # STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:  # existe, pero es de otro usuario
+        return True
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -530,13 +652,35 @@ def write_status(
     )
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"{body}\n", encoding="utf-8")
+        # M12 (auditoría .183): escritura ATÓMICA. Un ``write_text`` deja la ventana en la
+        # que un lector (la UI, ``read_alerted``, el CLI) ve un fichero truncado: el latido
+        # desaparece y con él las marcas de aviso. Se escribe en un temporal del MISMO
+        # directorio, se sincroniza a disco y se sustituye con ``os.replace`` (atómico en
+        # POSIX y en Windows).
+        _write_atomic(path, f"{body}\n")
         with journal.open("a", encoding="utf-8") as handle:
             handle.write(f"{body}\n")
     except OSError:
         logger.exception("ventana PAPER: no se pudo escribir el latido en %s", path)
         return None
     return path
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    """Escribe ``text`` en ``path`` de forma atómica (temporal + ``os.replace``)."""
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with tmp.open("w", encoding="utf-8") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except OSError:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:  # pragma: no cover — limpieza best-effort del temporal.
+            pass
+        raise
 
 
 def read_alerted(directory: Path | None = None) -> set[str]:
@@ -956,6 +1100,10 @@ __all__ = [
     "ALERT_EXIT_CODE",
     "CHECK_INTERVAL_SECONDS",
     "DEFAULT_LOOKBACK_DAYS",
+    "LOCK_DIR_NAME",
+    "LOCK_FILE",
+    "LOCK_READ_GRACE_SECONDS",
+    "LOCK_TTL_SECONDS",
     "MAX_LOOKBACK_DAYS",
     "STATUS_FILE",
     "STATUS_JOURNAL",
@@ -971,8 +1119,10 @@ __all__ = [
     "evaluate_day_watch",
     "evaluate_once",
     "ledger_path",
+    "lock_is_live",
     "main",
     "read_alerted",
+    "read_day_lock",
     "read_ledger_rows",
     "repo_root",
     "runs_dir",
