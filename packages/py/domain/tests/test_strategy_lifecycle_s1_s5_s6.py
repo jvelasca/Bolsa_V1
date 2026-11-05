@@ -8,6 +8,7 @@ from bolsa_domain.entities.strategy_lifecycle import (
     GateResult,
     GateStatus,
     ShadowValidationResult,
+    StrategyFinalist,
     StrategyLifecycleState,
     StrategyValidation,
     can_advance_to,
@@ -67,6 +68,94 @@ def test_s6_evidence_from_other_version_is_blocked() -> None:
     )
     assert not result.allowed
     assert "evidencia_shadow_otra_version" in result.reasons
+
+
+def _finalist(
+    definition_hash: str = "sha256:abc",
+    snapshot: str | None = "snap-1",
+) -> StrategyFinalist:
+    definition: dict[str, object] = {"family": "sma"}
+    if snapshot is not None:
+        definition["data_snapshot_id"] = snapshot
+    return StrategyFinalist(
+        candidate_id="c",
+        version_id="ver-1",
+        name="n",
+        definition_hash=definition_hash,
+        definition=definition,
+    )
+
+
+def test_s6_validation_of_another_definition_is_blocked() -> None:
+    validation = StrategyValidation(
+        finalist_id="ver-1",
+        gates=tuple(GateResult.passed_gate(g) for g in PROMOTION_GATES),
+        strategy_definition_hash="sha256:OTRA",
+    )
+    result = can_transition(
+        state=_P, validation=validation, shadow=_shadow(), coach=_coach(), finalist=_finalist()
+    )
+    assert not result.allowed
+    assert "evidencia_validacion_otra_definicion" in result.reasons
+
+
+def test_s6_shadow_of_another_definition_is_blocked() -> None:
+    shadow = ShadowValidationResult(
+        version_id="ver-1",
+        trades=30,
+        passed=True,
+        strategy_definition_hash="sha256:OTRA",
+    )
+    result = can_transition(
+        state=_P, validation=_validation(), shadow=shadow, coach=_coach(), finalist=_finalist()
+    )
+    assert not result.allowed
+    assert "evidencia_shadow_otra_definicion" in result.reasons
+
+
+def test_s6_shadow_from_other_dataset_snapshot_is_blocked() -> None:
+    validation = StrategyValidation(
+        finalist_id="ver-1",
+        gates=tuple(GateResult.passed_gate(g) for g in PROMOTION_GATES),
+        data_snapshot_id="snap-1",
+    )
+    shadow = ShadowValidationResult(
+        version_id="ver-1", trades=30, passed=True, data_snapshot_id="snap-OTRO"
+    )
+    result = can_transition(
+        state=_P, validation=validation, shadow=shadow, coach=_coach(), finalist=_finalist()
+    )
+    assert not result.allowed
+    assert "evidencia_shadow_otro_dataset" in result.reasons
+
+
+def test_s6_shadow_replaying_the_lab_bars_is_blocked() -> None:
+    """Si el `bars_hash` del shadow es el del tramo LAB, el "hold-out" no era hold-out."""
+    validation = StrategyValidation(
+        finalist_id="ver-1",
+        gates=tuple(GateResult.passed_gate(g) for g in PROMOTION_GATES),
+        bars_hash="hash-lab",
+    )
+    shadow = ShadowValidationResult(
+        version_id="ver-1", trades=30, passed=True, bars_hash="hash-lab"
+    )
+    result = can_transition(
+        state=_P, validation=validation, shadow=shadow, coach=_coach(), finalist=_finalist()
+    )
+    assert not result.allowed
+    assert "evidencia_shadow_mismo_dataset" in result.reasons
+
+
+def test_s6_missing_fingerprints_are_not_invented() -> None:
+    """Sin fingerprints declarados no se inventa una contradicción (límite declarado).
+
+    Los finalistas históricos y el override administrativo no los llevan: la ausencia es
+    un hueco, no una prueba de que la evidencia sea ajena.
+    """
+    result = can_transition(
+        state=_P, validation=_validation(), shadow=_shadow(), coach=_coach(), finalist=_finalist()
+    )
+    assert result.allowed
 
 
 def test_s5_required_gates_must_be_present() -> None:

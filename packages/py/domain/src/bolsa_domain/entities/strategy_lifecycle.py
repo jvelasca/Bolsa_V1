@@ -228,10 +228,22 @@ class StrategyFinalist:
 
 @dataclass(frozen=True, slots=True)
 class StrategyValidation:
-    """Validación formal del finalista (mismos siete gates, evidencia enlazada)."""
+    """Validación formal del finalista (mismos siete gates, evidencia enlazada).
+
+    S6 (auditoría .183): además del ``finalist_id``, la validación **declara** la
+    identidad de la evidencia sobre la que se calcularon los gates
+    (``strategy_definition_hash``, ``data_snapshot_id`` y ``bars_hash`` del tramo LAB).
+    Antes solo viajaba el id de versión, así que una validación de otra definición o de
+    otro dataset era indistinguible. Son opcionales para no romper llamantes históricos;
+    un campo ausente **no se compara** (no se inventa), y el orquestador los rellena
+    siempre.
+    """
 
     finalist_id: str
     gates: tuple[GateResult, ...]
+    strategy_definition_hash: str | None = None
+    data_snapshot_id: str | None = None
+    bars_hash: str | None = None
 
     @property
     def passed(self) -> bool:
@@ -752,13 +764,55 @@ def _evidence_identity_reasons(
     shadow: ShadowValidationResult | None,
     finalist: StrategyFinalist | None,
 ) -> tuple[str, ...]:
-    """S6: la validación y el shadow deben ser del MISMO finalista (versión), no de otro."""
+    """S6: la evidencia debe ser de ESTA versión, definición y dataset, no de otra.
+
+    Se comparan los fingerprints **declarados** (nunca se rellenan):
+
+    * ``version_id`` — la evidencia pertenece a este finalista;
+    * ``strategy_definition_hash`` — la definición evaluada es la misma que se promueve;
+    * ``data_snapshot_id`` — validación y shadow comparten snapshot de datos;
+    * ``bars_hash`` — el tramo shadow NO es el mismo tramo que el LAB (anti-solape).
+
+    Un fingerprint ausente no se compara: la ausencia es un hueco declarado, no una
+    contradicción (los finalistas históricos y el override administrativo no los llevan).
+    """
     reasons: list[str] = []
     expected = finalist.version_id if finalist is not None else validation.finalist_id
     if validation.finalist_id != expected:
         reasons.append("evidencia_validacion_otra_version")
     if shadow is not None and shadow.version_id != expected:
         reasons.append("evidencia_shadow_otra_version")
+
+    expected_definition = finalist.definition_hash if finalist is not None else None
+    if expected_definition is not None:
+        if (
+            validation.strategy_definition_hash is not None
+            and validation.strategy_definition_hash != expected_definition
+        ):
+            reasons.append("evidencia_validacion_otra_definicion")
+        if (
+            shadow is not None
+            and shadow.strategy_definition_hash is not None
+            and shadow.strategy_definition_hash != expected_definition
+        ):
+            reasons.append("evidencia_shadow_otra_definicion")
+
+    if (
+        shadow is not None
+        and validation.data_snapshot_id is not None
+        and shadow.data_snapshot_id is not None
+        and validation.data_snapshot_id != shadow.data_snapshot_id
+    ):
+        reasons.append("evidencia_shadow_otro_dataset")
+
+    if (
+        shadow is not None
+        and validation.bars_hash is not None
+        and shadow.bars_hash is not None
+        and validation.bars_hash == shadow.bars_hash
+    ):
+        # Mismo tramo exacto de barras ⇒ el "hold-out" era el LAB: no es evidencia nueva.
+        reasons.append("evidencia_shadow_mismo_dataset")
     return tuple(reasons)
 
 
