@@ -111,7 +111,7 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 | M13 | El monitor devuelve un DTO coherente con lecturas caídas · ✅ Cerrado | `auto_operational_monitor.py:1897-2120` | Estado `INCOMPLETE` explícito |
 | M14 | `load_book_equity` puede dejar equity de un tick anterior visible tras un fallo de lectura | `:2524-2544` | Snapshot atómico con `as_of` |
 | M15 | P&L parcial contra `_entry_price` único, no contra coste medio del ledger · Por lectura, impacto sin verificar | `:8027-8044` | Coste medio ponderado o lotes |
-| M16 | `AutoSimRuntime` carga la estrategia ACTIVE con `instrument_id=effective_account` · No verificado | `:9723-9727` | Separar `account_id` de `instrument_id` |
+| M16 | `AutoSimRuntime` carga la estrategia ACTIVE con `instrument_id=effective_account` · ✅ Cerrado | `:9723-9727` | Separar `account_id` de `instrument_id` |
 
 ### M12 — Lock del vigía con dueño probado y latido atómico · ✅ Cerrado (`fix/auto-m12-m13-watch-monitor`)
 - **Fallo:** `day_is_running()` sólo comprobaba que existiera el directorio `.run.lock`; un lock **huérfano** (proceso muerto, host apagado o `lock.json` corrupto) silenciaba el «día perdido» para siempre. El latido se escribía con `write_text`, que deja una ventana en la que un lector ve el fichero truncado y pierde también las marcas de aviso.
@@ -120,6 +120,10 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 ### M13 — Estado `INCOMPLETE` explícito en el monitor · ✅ Cerrado (`fix/auto-m12-m13-watch-monitor`)
 - **Fallo:** las consultas del monitor se degradaban en silencio: una lectura caída y una cuenta sin operaciones producían el MISMO DTO (`cycles: []` + notas de «no durable»). Además, las lecturas de reservas/posiciones/engine no estaban protegidas y podían tumbar la ruta entera.
 - **Cerrado:** cada lectura declara su resultado en `readStatus` (`COMPLETE`/`FAILED`, orden canónico en `MONITOR_READ_SOURCES`). Si alguna cae, el DTO publica `state: "INCOMPLETE"`, la lista `incompleteReads` y la nota `read_failed:<fuente>`. El contrato HTTP y el view model (`@bolsa/shared`) exponen `state`/`readStatus`/`incompleteReads`, y la UI (monitor experto y la historia de la operación) rotula «Lectura incompleta» con las fuentes antes de cualquier lista vacía: un vacío por fallo deja de leerse como «sin operaciones». Un ámbito demostrablemente vacío (sin ciclos) sigue declarándose `COMPLETE`.
+
+### M16 — La cuenta y el instrumento de una ACTIVE son ámbitos distintos · ✅ Cerrado (`fix/auto-m16-account-scope`)
+- **Fallo:** `AutoSimRuntime` pedía la estrategia ACTIVE con `load_active_strategy_decider(instrument_id=effective_account)`, es decir, la **cuenta** viajaba por la ruta del **instrumento** (y el símbolo de reserva sin watch era la cuenta). Funcionaba sólo porque la semilla de la ventana escribía la cuenta en `strategy_promotions.instrument_id`: una promoción de estudio (`inst-v229-…`) y una activa atribuida a una cuenta quedaban indistinguibles, y cualquier lectura por instrumento podía devolver la de la cuenta.
+- **Cerrado:** migración `064_strategy_account_scope` añade `strategy_promotions.account_id` (nullable, **sin backfill**: rellenarla desde `instrument_id` sería repetir la confusión) con índice `(account_id, promoted)`. `ActiveStrategy` declara `account_id`, el store expone `get_active_for_account()` y `get_active()` sigue siendo la ruta de instrumento; `load_active_strategy_decider` recibe `account_id` **o** `instrument_id` (sin ninguno: `ValueError`, no un `None` mudo) y el runtime pide la cuenta por cuenta. La fila histórica (`instrument_id = <cuenta>`, `account_id = NULL`) se sigue leyendo por la ruta de compatibilidad, pero la ACTIVE devuelta declara `account_id = None`: el ámbito ausente no se inventa. La semilla de la ventana y el runner forward siembran/leen el ámbito correcto.
 
 ## 3. Severidad baja
 

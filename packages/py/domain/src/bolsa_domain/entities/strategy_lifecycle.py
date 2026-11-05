@@ -499,6 +499,12 @@ class ActiveStrategy:
     # H1: identidad exacta de la estrategia ejecutada (``preset_key`` del motor AUTO).
     # ``None`` cuando la candidata de origen no tenía preset (no se inventa).
     preset_key: str | None = None
+    # M16 (auditoría .183): la CUENTA que conduce esta ACTIVE es una cosa y el
+    # INSTRUMENTO que investiga/opera, otra. ``instrument_id`` es el ámbito del estudio
+    # (``inst-…``); ``account_id`` sólo se declara cuando la promoción fija la estrategia
+    # a una cuenta (p. ej. la semilla de la ventana PAPER). ``None`` = ACTIVE de
+    # instrumento (caso histórico y del LAB), nunca se rellena con el otro id.
+    account_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

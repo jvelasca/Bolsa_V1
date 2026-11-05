@@ -953,3 +953,138 @@ async def test_paper_forward_result_persistence_pg(
         await _cleanup()
 
 
+# ── M16 (auditoría .183): la CUENTA y el INSTRUMENTO son ámbitos distintos ────────────
+
+
+async def test_active_by_account_uses_its_own_scope_pg(
+    lifecycle_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """M16: ``get_active_for_account`` resuelve por ``account_id``, jamás por instrumento.
+
+    Tres hechos, en orden:
+    1. una ACTIVE promovida para una CUENTA se lee por cuenta y declara su instrumento;
+    2. el id de la cuenta NO localiza nada por la ruta de instrumento (la confusión que
+       la auditoría .183 señaló deja de funcionar por accidente);
+    3. la fila HISTÓRICA (sin ``account_id``, con la cuenta en ``instrument_id``) sigue
+       siendo legible por cuenta, pero la ACTIVE resultante declara ``account_id=None``:
+       la compatibilidad no inventa el ámbito que la fila no tiene.
+    """
+    from sqlalchemy import delete
+
+    from bolsa_application.strategy_lifecycle_store import (
+        ActiveStrategyRecord,
+        PostgresStrategyLifecycleStore,
+    )
+    from bolsa_application.strategy_promotion_phase import definition_hash
+    from bolsa_domain.entities.strategy_lifecycle import ActiveStrategy
+    from bolsa_infrastructure.database.models.tables import (
+        StrategyPromotionRow,
+        StrategyVersionRow,
+    )
+    from bolsa_infrastructure.ids import new_id
+
+    suffix = uuid.uuid4().hex[:10]
+    instrument_id = f"inst-{suffix}"
+    account_id = f"acc-{suffix}"
+    legacy_account_id = f"acc-legacy-{suffix}"
+    version_id = f"ver-{suffix}"
+    legacy_version_id = f"ver-legacy-{suffix}"
+    definition: dict[str, Any] = {"family": "sma", "watch": [instrument_id]}
+
+    async def _cleanup() -> None:
+        async with lifecycle_factory() as session:
+            await session.execute(
+                delete(StrategyPromotionRow).where(
+                    StrategyPromotionRow.finalist_id.in_([version_id, legacy_version_id])
+                )
+            )
+            await session.execute(
+                delete(StrategyVersionRow).where(
+                    StrategyVersionRow.id.in_([version_id, legacy_version_id])
+                )
+            )
+            await session.commit()
+
+    try:
+        async with lifecycle_factory() as session:
+            now = datetime.now(UTC)
+            session.add_all(
+                [
+                    StrategyVersionRow(
+                        id=version_id,
+                        candidate_id=f"cand-{suffix}",
+                        instrument_id=instrument_id,
+                        name="SMA (cuenta)",
+                        definition_hash=definition_hash(definition),
+                        definition=definition,
+                        is_finalist=True,
+                        created_at=now,
+                    ),
+                    StrategyVersionRow(
+                        id=legacy_version_id,
+                        candidate_id=f"cand-legacy-{suffix}",
+                        instrument_id=legacy_account_id,
+                        name="SMA (histórica)",
+                        definition_hash=definition_hash(definition),
+                        definition=definition,
+                        is_finalist=True,
+                        created_at=now,
+                    ),
+                ]
+            )
+            await session.commit()
+
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            await store.save_active(
+                ActiveStrategyRecord(
+                    active=ActiveStrategy(
+                        version_id=version_id,
+                        candidate_id=f"cand-{suffix}",
+                        instrument_id=instrument_id,
+                        name="SMA (cuenta)",
+                        definition=definition,
+                        account_id=account_id,
+                    ),
+                    promoted_at=now.isoformat(),
+                )
+            )
+
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            # 1) por cuenta: la ACTIVE declara ambos ámbitos, cada uno el suyo.
+            by_account = await store.get_active_for_account(account_id=account_id)
+            assert by_account is not None
+            assert by_account.active.version_id == version_id
+            assert by_account.active.account_id == account_id
+            assert by_account.active.instrument_id == instrument_id
+            # 2) la cuenta NO es un instrumento: por esa ruta no aparece nada.
+            assert await store.get_active(instrument_id=account_id) is None
+            # ... y el instrumento sí localiza la promoción (no se perdió la ruta).
+            by_instrument = await store.get_active(instrument_id=instrument_id)
+            assert by_instrument is not None
+            assert by_instrument.active.account_id == account_id
+            # 3) fila histórica: legible por cuenta, sin ámbito de cuenta declarado.
+            session.add(
+                StrategyPromotionRow(
+                    id=new_id(),
+                    finalist_id=legacy_version_id,
+                    candidate_id=f"cand-legacy-{suffix}",
+                    instrument_id=legacy_account_id,
+                    account_id=None,
+                    promoted=True,
+                    reasons=["seed_legacy"],
+                    shadow_validated=False,
+                    promoted_at=now,
+                    created_at=now,
+                )
+            )
+            await session.commit()
+            legacy = await store.get_active_for_account(account_id=legacy_account_id)
+            assert legacy is not None
+            assert legacy.active.version_id == legacy_version_id
+            assert legacy.active.account_id is None  # no se inventa el ámbito
+    finally:
+        await _cleanup()
+
+

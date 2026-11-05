@@ -2660,6 +2660,9 @@ class StrategyPromotionRow(Base):
     finalist_id: Mapped[str] = mapped_column("finalist_id", String, nullable=False)
     candidate_id: Mapped[str] = mapped_column("candidate_id", String, nullable=False)
     instrument_id: Mapped[str] = mapped_column("instrument_id", String, nullable=False)
+    # M16 (auditoría .183 / migración 064): la CUENTA que conduce la ACTIVE se declara
+    # aquí, nunca copiando el ``instrument_id``. ``NULL`` = ACTIVE de instrumento.
+    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
     promoted: Mapped[bool] = mapped_column(Boolean, default=False)
     reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     shadow_validated: Mapped[bool] = mapped_column("shadow_validated", Boolean, default=False)

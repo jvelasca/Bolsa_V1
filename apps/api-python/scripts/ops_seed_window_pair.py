@@ -2,10 +2,10 @@
 """OPS · Semilla del par A/B para la ventana PAPER forward (operación, no fase de motor).
 
 Qué resuelve: el runner de la ventana (``v2_76_forward_market_material.py``) localiza la
-versión B con ``get_active(instrument_id=<cuenta>)``; las promociones reales del repo están
-keyed por **instrumento** (``inst-v229-…``), no por cuenta, así que sin una estrategia B
-ACTIVE **atribuida a la cuenta de la ventana** el par A/B queda ``CAPAZ`` sin ``ACTIVO``
-(``versionB=""`` ⇒ ``pairActive=false``).
+versión B con ``get_active_for_account(account_id=<cuenta>)``; las promociones reales del
+repo están keyed por **instrumento** (``inst-v229-…``), no por cuenta, así que sin una
+estrategia B ACTIVE **atribuida a la cuenta de la ventana** el par A/B queda ``CAPAZ`` sin
+``ACTIVO`` (``versionB=""`` ⇒ ``pairActive=false``).
 
 Este script deja el entorno listo **una sola vez, antes de D1**:
 
@@ -15,7 +15,9 @@ Este script deja el entorno listo **una sola vez, antes de D1**:
    que la señal de B se evalúe de verdad (``evaluate_strategy_last_bar``) y no quede en
    HOLD por falta de ``executable``.
 3. Inserta la **fila localizadora** en ``strategy_promotions`` con
-   ``instrument_id=$ACCOUNT`` y ``promoted=true``.
+   ``account_id=$ACCOUNT`` y ``promoted=true`` (el ``instrument_id`` de la fila y de la
+   versión es el primer instrumento real del watch: la cuenta ya no se disfraza de
+   instrumento, M16 / migración 064).
 4. Siembra el ``EdgeReport`` de **A y de B** sobre la misma cuenta (sin edge, el motor veta
    por ``edge_below_threshold``).
 5. Escribe ``operability_runs/window-setup.json`` con ``{account, versionA, versionB}`` para
@@ -177,14 +179,18 @@ async def _seed_version_b(
     }
     candidate_id = f"cand-{version_b}"
     now = datetime.now(UTC)
+    # M16: la versión se ancla a un INSTRUMENTO real (el primero del watch) y la CUENTA se
+    # declara en la promoción (``account_id``). Antes se metía la cuenta en
+    # ``instrument_id``, que es justo la confusión que cerró la migración 064.
+    scope_instrument = str(watch[0]) if watch else None
+    if not scope_instrument:
+        raise ValueError("la versión B necesita al menos un instrumento en el watch")
 
     session.add(
         StrategyVersionRow(
             id=version_b,
             candidate_id=candidate_id,
-            # El ámbito de la versión sembrada es la CUENTA de la ventana (no un instrumento):
-            # ``get_active`` localiza por la promoción, pero la fila debe ser no-nula y coherente.
-            instrument_id=account_id,
+            instrument_id=scope_instrument,
             name=f"PAPER-WINDOW {preset}",
             definition_hash=definition_hash(definition),
             definition=definition,
@@ -198,7 +204,9 @@ async def _seed_version_b(
             id=new_id(),
             finalist_id=version_b,
             candidate_id=candidate_id,
-            instrument_id=account_id,
+            instrument_id=scope_instrument,
+            # El ámbito que conduce el motor es la CUENTA de la ventana.
+            account_id=account_id,
             promoted=True,
             reasons=[SEED_PROMOTION_REASON],
             # Declarado: la fila es un localizador de ámbito, NO certifica shadow.

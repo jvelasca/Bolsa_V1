@@ -37,6 +37,10 @@ def _stub_session_factory(store: Any) -> Any:
         async def get_active(self, *, instrument_id: str) -> Any:
             return await store.get_active(instrument_id=instrument_id)
 
+        # M16: el worker pide la ACTIVE de una CUENTA por su propio ámbito.
+        async def get_active_for_account(self, *, account_id: str) -> Any:
+            return await store.get_active_for_account(account_id=account_id)
+
     return _Factory(), _Store, sls
 
 
@@ -513,3 +517,62 @@ async def test_signal_enabled_requests_the_preset_warmup(monkeypatch: pytest.Mon
     assert prop.warmup_bars == 201
     assert prop.signal_window_source == w.SIGNAL_WINDOW_SOURCE_PRESET
     assert prop.hold_reason != "warmup_insufficient"
+
+
+# ── M16 (auditoría .183): la CUENTA se pide como cuenta, no como instrumento ─────────
+
+
+@pytest.mark.asyncio
+async def test_active_decider_resolves_the_account_by_its_own_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La ACTIVE atribuida a una cuenta entra en el AUTO pidiéndola por CUENTA.
+
+    Antes se llamaba ``get_active(instrument_id=<cuenta>)``: funcionaba sólo porque la
+    semilla escribía la cuenta en la columna del instrumento. Aquí el instrumento es otro
+    y la lectura tiene que encontrarla igual — y no por la ruta de instrumento.
+    """
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY", "1")
+    from bolsa_application.strategy_lifecycle_store import (
+        ActiveStrategyRecord,
+        InMemoryStrategyLifecycleStore,
+    )
+    from bolsa_domain.entities.strategy_lifecycle import ActiveStrategy
+
+    store = InMemoryStrategyLifecycleStore()
+    await store.save_active(
+        ActiveStrategyRecord(
+            active=ActiveStrategy(
+                version_id="ver-m16",
+                candidate_id="cand-m16",
+                instrument_id="inst-real",
+                name="SMA",
+                definition={"lot_qty": 10.0, "watch": ["inst-real"]},
+                account_id="acc-ventana",
+            ),
+            promoted_at="2026-11-04",
+        )
+    )
+    factory, StoreCls, sls = _stub_session_factory(store)
+    monkeypatch.setattr(sls, "PostgresStrategyLifecycleStore", StoreCls, raising=True)
+
+    decider = await w.load_active_strategy_decider(
+        factory, account_id="acc-ventana", watch=("inst-real",)
+    )
+    assert decider is not None
+    assert decider("inst-real").source == "active-strategy:ver-m16"
+
+    # La cuenta NO localiza por instrumento: la separación es real, no cosmética.
+    assert await w.load_active_strategy_decider(
+        factory, instrument_id="acc-ventana", watch=("inst-real",)
+    ) is None
+
+
+@pytest.mark.asyncio
+async def test_active_decider_requires_an_explicit_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sin cuenta ni instrumento el fallo es del llamante: no un ``None`` mudo."""
+    monkeypatch.setenv("AUTO_ENGINE_SIM_ACTIVE_STRATEGY", "1")
+    with pytest.raises(ValueError, match="account_id o instrument_id"):
+        await w.load_active_strategy_decider(object(), watch=("AAA",))

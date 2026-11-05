@@ -394,8 +394,9 @@ async def _active_strategy_version(factory: Any, account_id: str) -> str:
 
     try:
         async with factory() as session:
-            record = await PostgresStrategyLifecycleStore(session).get_active(
-                instrument_id=account_id
+            # M16: el ámbito es la CUENTA de la ventana y se pide como cuenta.
+            record = await PostgresStrategyLifecycleStore(session).get_active_for_account(
+                account_id=account_id
             )
     except Exception:  # noqa: BLE001 — sin lectura fiable no hay versión B que declarar.
         logger.exception("no se pudo leer la estrategia ACTIVE")
@@ -417,7 +418,7 @@ async def _load_secondary_decider(
     try:
         decider = await load_active_strategy_decider(
             factory,
-            instrument_id=account_id,
+            account_id=account_id,
             watch=tuple(watch),
             signal_enabled=True,
         )
