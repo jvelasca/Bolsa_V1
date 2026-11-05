@@ -13,7 +13,6 @@ relajado. Los CHECK replican los rangos de ``bolsa_application.account_evidence_
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "066_account_evidence_policy"

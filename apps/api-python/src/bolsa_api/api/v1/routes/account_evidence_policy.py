@@ -11,10 +11,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated
 
-from bolsa_application.account_evidence_policy import (
-    PostgresAccountEvidencePolicyStore,
-    policy_from_dict,
-)
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +19,10 @@ from bolsa_api.api.dependencies import (
     get_account_id_header,
     get_db_session,
     resolve_account_scope_or_default,
+)
+from bolsa_application.account_evidence_policy import (
+    PostgresAccountEvidencePolicyStore,
+    policy_from_dict,
 )
 
 router = APIRouter()

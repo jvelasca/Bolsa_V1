@@ -6,16 +6,16 @@ from dataclasses import replace
 from typing import Any
 
 import pytest
+from httpx import ASGITransport, AsyncClient
+
+import bolsa_api.api.v1.routes.account_evidence_policy as route
+from bolsa_api.main import create_app
 from bolsa_application.account_evidence_policy import (
     InMemoryAccountEvidencePolicyStore,
     default_evidence_policy,
     policy_from_dict,
     validate_policy,
 )
-from httpx import ASGITransport, AsyncClient
-
-import bolsa_api.api.v1.routes.account_evidence_policy as route
-from bolsa_api.main import create_app
 
 _PATH = "/api/account-evidence-policy"
 

@@ -206,6 +206,7 @@ class PostgresAccountEvidencePolicyStore:
 
     async def load(self, account_id: str) -> AccountEvidencePolicy:
         import sqlalchemy as sa
+
         from bolsa_infrastructure.database.models.tables import AccountEvidencePolicyRow
 
         row = (
@@ -219,8 +220,9 @@ class PostgresAccountEvidencePolicyStore:
 
     async def save(self, policy: AccountEvidencePolicy) -> bool:
         import sqlalchemy as sa
-        from bolsa_infrastructure.database.models.tables import AccountEvidencePolicyRow
         from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        from bolsa_infrastructure.database.models.tables import AccountEvidencePolicyRow
 
         problems = validate_policy(policy)
         if problems:
