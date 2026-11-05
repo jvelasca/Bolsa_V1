@@ -28,7 +28,11 @@
 > [#86](https://github.com/jvelasca/Bolsa_V1/pull/86) (`fix/auto-p3-drawdown-breaker`: una referencia no medible es
 > `None` y no `0 %`, el libro no se envenena con equity no finito y una marca no persistida veta aperturas). Las ocho
 > PR están fusionadas en `fix/059-060-proveedores`; **no** hay sello, bump ni migración fuera de las citadas.
-> **Abiertos:** el resto de la severidad media `M*` (`M1`-`M11`, `M14`, `M15`) y `S1`, `S2`, `S5`-`S10`.
+> **Sincronización del documento (`2026-11-05`, sin PR de código):** al verificar la sección de estrategia contra el
+> árbol, `S1` y `S2` ya estaban resueltos en código y con pruebas (`test_strategy_lifecycle_s1_s5_s6.py`, `LabThresholds`),
+> así que el documento los daba por abiertos **por desfase**, no por defecto; `S5`, `S6` y `S7` quedan **parciales** con el
+> detalle de qué falta exactamente. **Abiertos:** el resto de la severidad media `M*` (`M1`-`M11`, `M14`, `M15`) y
+> `S5`-`S10`.
 
 Alcance detallado: lógica de decisión, riesgo, ejecución, workers AUTO, `auto_simulation_worker.py` (9.802 líneas) y lógica de estrategia y señales.
 Modo: solo lectura. No se modificó el repositorio. Las referencias `archivo:línea` son del tag `v2.88.183-beta`.
@@ -151,15 +155,15 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 Fuente: lectura de módulos de señales, ciclo de vida y promoción. No verificado a mano salvo indicación.
 
 ### Alta
-- **S1 — La máquina de estados admite `PROMOCION → ACTIVE` sin comprobar gates** (`strategy_lifecycle.py:769-770`, `can_transition` devuelve `allowed=True`). `evaluate_promotion()` sí exige los siete gates, COACH sin veto y shadow, pero un llamador directo puede saltárselos. **Debería ser:** que la transición exija `validation.passed`, COACH y shadow, centralizada en el resultado de `evaluate_promotion()`.
-- **S2 — Umbrales de LAB triviales por defecto:** `min_oos_score=0.0`, `min_wfe=0.0`, `max_pbo=1.0`, y el gate de riesgo solo exige `max_drawdown_pct >= 0` (`strategy_lab_phase.py:228-235`, `:356-365`). **Debería ser:** umbrales no triviales, límite máximo de drawdown, muestra mínima de operaciones y retorno neto de costes.
+- **S1 — La máquina de estados admite `PROMOCION → ACTIVE` sin comprobar gates** (`strategy_lifecycle.py:769-770`, `can_transition` devuelve `allowed=True`). `evaluate_promotion()` sí exige los siete gates, COACH sin veto y shadow, pero un llamador directo puede saltárselos. **Debería ser:** que la transición exija `validation.passed`, COACH y shadow, centralizada en el resultado de `evaluate_promotion()`. · **✅ Cerrado (V2.35.1, verificado `2026-11-05`)** — ver cierre al final de la sección.
+- **S2 — Umbrales de LAB triviales por defecto:** `min_oos_score=0.0`, `min_wfe=0.0`, `max_pbo=1.0`, y el gate de riesgo solo exige `max_drawdown_pct >= 0` (`strategy_lab_phase.py:228-235`, `:356-365`). **Debería ser:** umbrales no triviales, límite máximo de drawdown, muestra mínima de operaciones y retorno neto de costes. · **✅ Cerrado (verificado `2026-11-05`)** — ver cierre al final de la sección.
 - **S3 — Sin corrección por pruebas múltiples en discovery** (`strategy_lab_phase.py:237-305`): se elige un campeón y se evalúa su OOS sin registrar el número de configuraciones. Riesgo de data snooping. **Debería ser:** registrar el universo probado y aplicar DSR, PBO o un hold-out intocable. · **✅ Cerrado (`fix/auto-s3-multiple-testing`)** — ver cierre al final de la sección.
 - **S4 — Lookahead potencial por contrato:** `SignalEventV1` publica la señal con `closes[index]` y el timestamp de la barra `t` (`rules_engine.py:639-692`). El simulador lo evita (`rules_grid.py:91-96`: señal en `index-1`, ejecución al `open(index)`). El worker usa la barra cerrada anterior para decidir y el `open` actual para ejecutar, lo cual es correcto, pero el contrato general no lo impone. **Debería ser:** `signal_bar=t` y `execution_bar=t+1` explícitos en el contrato. · **✅ Cerrado (`fix/auto-s4-signal-timing`)** — ver cierre al final de la sección.
 
 ### Media
-- **S5 —** El avance de fase solo exige que exista algún `GateResult` sin fallo, no que sean los gates requeridos de esa fase (`strategy_lifecycle.py:727-755`). Definir `estado → gates obligatorios`; `NOT_EVALUATED` bloquea.
-- **S6 —** `PROMOCION` no comprueba que la evidencia corresponda a la misma versión, definición y dataset (`:758-766`). Verificar identidad por `version_id`, hash y fingerprint.
-- **S7 —** La vigilancia trata una métrica ausente como "sin degradación" y no valida su frescura (`strategy_vigilance_phase.py:107-178`). Una estrategia activa con el feed roto sigue operando. Distinguir `unmeasured/stale/healthy` con TTL y `version_id`.
+- **S5 —** El avance de fase solo exige que exista algún `GateResult` sin fallo, no que sean los gates requeridos de esa fase (`strategy_lifecycle.py:727-755`). Definir `estado → gates obligatorios`; `NOT_EVALUATED` bloquea. · **🟡 Parcial (verificado `2026-11-05`):** el mecanismo existe (`required_gates` + `gates_no_evaluados`), pero **ningún llamador de producción pasa `required_gates`** y no hay tabla `estado → gates obligatorios` en el dominio: en la ruta real la obligación sigue sin cablear.
+- **S6 —** `PROMOCION` no comprueba que la evidencia corresponda a la misma versión, definición y dataset (`:758-766`). Verificar identidad por `version_id`, hash y fingerprint. · **🟡 Parcial (verificado `2026-11-05`):** `_evidence_identity_reasons` compara `version_id` (validación y shadow contra el finalista) y veta `evidencia_*_otra_version`; **no** compara definición ni dataset porque `StrategyValidation` no transporta `strategy_definition_hash`/`bars_hash`/`data_snapshot_id` — el fingerprint viaja en `ShadowValidationResult` pero no hay con qué cruzarlo.
+- **S7 —** La vigilancia trata una métrica ausente como "sin degradación" y no valida su frescura (`strategy_vigilance_phase.py:107-178`). Una estrategia activa con el feed roto sigue operando. Distinguir `unmeasured/stale/healthy` con TTL y `version_id`. · **🟡 Parcial (verificado `2026-11-05`):** existe `VigilanceDecision.unmeasured` con `health_state` (`degraded`/`unmeasured`/`healthy`) y `HealthThresholds.fail_on_unmeasured`, **apagado por defecto**; la frescura (`stale`) y el TTL no existen.
 - **S8 —** Contexto close-only: `open=high=low=close`, `volume=0` (`signal_feature_context.py:36-83`). ATR, VWAP y Stochastic se calculan con datos artificiales. Sin OHLCV completo, devolver HOLD con motivo `insufficient_data`.
 - **S9 —** `NaN`/`inf` no se validan en indicadores (`indicators/legacy.py`, `signal_feature_context.py:49-55`); RSI sin validar `period > 0`.
 - **S10 —** La identidad de señal no es un claim atómico (`signal_identity.py:50-117`); `build_signal_identity()` devuelve `None` ante campos faltantes y un llamador puede ignorarlo. Las alertas sí tienen claim atómico (`signal_alerts.py:174-195`).
@@ -171,6 +175,27 @@ Fuente: lectura de módulos de señales, ciclo de vida y promoción. No verifica
 - `profit_factor` sin pérdidas devuelve `None`, indistinguible de "no medido".
 
 ### Cierres de la sección de estrategia
+
+#### S1 — `PROMOCION → ACTIVE` sin comprobar gates · ✅ Cerrado (V2.35.1, verificado `2026-11-05`)
+- **Fallo:** `can_transition(PROMOCION)` devolvía `allowed=True` sin mirar la evidencia; un llamador que no pasara por `evaluate_promotion()` podía promocionar a `ACTIVE` sin los siete gates, sin COACH y sin shadow.
+- **Cerrado:** la transición exige `validation` presente y `validation.passed` (los siete `PROMOTION_GATES` en PASS), COACH presente y sin veto, y `shadow.passed`; sin shadow o con shadow fallido responde `shadow_validation_requerida`. La ruta automática **no** acepta el override booleano `shadow_validated` (V2.35.1): el override administrativo vive solo en `evaluate_admin_promotion`. Pruebas: [`test_strategy_lifecycle_s1_s5_s6.py`](../../packages/py/domain/tests/test_strategy_lifecycle_s1_s5_s6.py) (sin evidencia ⇒ `validacion_ausente`; sin COACH ⇒ `coach_ausente`; COACH con veto ⇒ `coach_veto`; sin shadow o con shadow fallido ⇒ `shadow_validation_requerida`; con la evidencia completa ⇒ `ACTIVE`).
+
+#### S2 — Umbrales de LAB triviales por defecto · ✅ Cerrado (verificado `2026-11-05`)
+- **Fallo:** `min_oos_score=0.0`, `min_wfe=0.0`, `max_pbo=1.0` no filtraban nada y el gate de riesgo solo comprobaba `max_drawdown_pct >= 0`, así que un campeón con drawdown enorme y muestra anecdótica pasaba.
+- **Cerrado:** `LabThresholds` publica `min_oos_score=0.1`, `min_wfe=0.5`, `max_pbo=0.5`, `min_dsr=0.7`, `max_drawdown_pct=25.0` (techo) y `min_trades=30` (muestra mínima de operaciones). El gate `risk` exige `0 ≤ drawdown ≤ techo` **y** `sample_trades ≥ min_trades`, y declara `drawdown_excede_techo` / `muestra_insuficiente` / `trades_ausentes` cuando no. Un `None` en `oos` o `risk` es gate no superado (`oos_ausente` / `risk_ausente`), no un pase.
+- **Límite declarado:** "retorno neto de costes" **no** se re-verificó aquí: el `oos` mide el score del campeón tal como lo produce el LAB y el tratamiento de costes es materia de `AUTO-16/17`, no de este umbral.
+
+#### S5 — Gates obligatorios por fase · 🟡 Parcial (verificado `2026-11-05`)
+- **Qué hay:** `can_transition(required_gates=...)` exige que esos gates estén **presentes y en PASS** en los estados intermedios (`gates_requeridos_ausentes:<lista>`) y un `gates=()` vacío no autoriza ningún salto (`gates_no_evaluados`).
+- **Qué falta:** ningún llamador de producción pasa `required_gates`, y no existe en el dominio la tabla `estado → gates obligatorios` que pedía el hallazgo. El mecanismo está, la obligación no está cableada: en la ruta real sigue valiendo "algún gate sin fallo".
+
+#### S6 — Identidad de la evidencia · 🟡 Parcial (verificado `2026-11-05`)
+- **Qué hay:** `_evidence_identity_reasons` compara `version_id` —la validación y el shadow contra el finalista— y veta con `evidencia_validacion_otra_version` / `evidencia_shadow_otra_version`.
+- **Qué falta:** la comparación de **definición y dataset** (`strategy_definition_hash`, `bars_hash`, `data_snapshot_id`). El fingerprint existe en `ShadowValidationResult`, pero `StrategyValidation` no transporta ninguno, así que no hay con qué cruzarlo sin ampliar el tipo de dominio.
+
+#### S7 — Vigilancia: ausencia de medida y frescura · 🟡 Parcial (verificado `2026-11-05`)
+- **Qué hay:** `VigilanceDecision.unmeasured` enumera los indicadores con umbral configurado y valor ausente, `health_state` distingue `degraded`/`unmeasured`/`healthy`, y `HealthThresholds.fail_on_unmeasured` convierte la ausencia en degradación — pero **apagado por defecto**, así que en la ruta por defecto la ausencia sigue sin degradar.
+- **Qué falta:** el estado `stale` y el TTL de frescura con `version_id`: hoy una métrica vieja es indistinguible de una fresca.
 
 #### S3 — Universo probado registrado y corrección por pruebas múltiples · ✅ Cerrado (`fix/auto-s3-multiple-testing`)
 - **Fallo:** el LAB traducía el campeón a gates sin dejar constancia de cuántas configuraciones se habían probado. El gate `dsr` comparaba el Deflated Sharpe con `min_dsr` como si el campeón fuera la única hipótesis: con N configuraciones probadas, exigir el mismo nivel de significación es *data snooping*, y a posteriori el DSR era ininterpretable porque nadie sabía el N.
