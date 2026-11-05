@@ -538,6 +538,32 @@ ProtectionConfig = ProtectionPolicy
 #: M6: tope de eventos de gestión de posición pendientes de reintento (cola acotada).
 _POSITION_JOURNAL_RETRY_CAP = 500
 
+#: M8 (auditoría .183) — espejos DURABLES que hacen honesto un turno OPERATIVO.
+#:
+#: Sin ellos el estado vive sólo en RAM y el motor puede operar con media cartera
+#: olvidada: la parada dura, la posición, el compromiso de capital y el libro financiero
+#: desaparecen en el siguiente reinicio. El camino hermético (tests, replay) los deja
+#: fuera a propósito; el runtime real los compone por sesión y declara
+#: ``require_durable_stores=True``, de modo que un turno al que le falte uno se RECHAZA
+#: en vez de operar a medias.
+OPERATIVE_DURABLE_SEAMS: tuple[str, ...] = (
+    "exec_store",
+    "auto_store",
+    "finance_applier",
+    "position_store",
+    "reservation_store",
+    "kill_switch_store",
+)
+
+#: Motivo declarado (``declare_skip``) cuando el turno operativo no tiene sus espejos.
+DURABLE_STORES_MISSING = "durable_stores_missing"
+
+#: M10 — motivo declarado cuando una intención durable ``OFF`` impide conducir el turno.
+OPERATOR_INTENT_OFF = "operator_intent_off"
+
+#: M10 — la intención no se pudo LEER: no hay permiso declarado, así que no se opera.
+OPERATOR_INTENT_UNREADABLE = "operator_intent_unreadable"
+
 
 def _protection_config_from_env() -> ProtectionPolicy:
     """Lee la política de protección de env (default OFF = fail-closed).
@@ -799,6 +825,25 @@ class _AppliedFill:
     @property
     def instrument_id(self) -> str:
         return self.symbol
+
+
+@dataclass(frozen=True, slots=True)
+class BookEquitySnapshot:
+    """M14 — la equity del LIBRO como foto inmutable de un turno.
+
+    Tres campos que antes eran tres atributos sueltos y se escribían por separado: un
+    lector entre asignaciones podía ver «equity nueva» junto a «unreadable viejo» (o al
+    revés). Con la foto, el turno se publica de una sola vez.
+
+    ``equity=None`` + ``unreadable=True`` es «no medido» y veta aperturas. La exigencia de
+    haber leído el libro no vive aquí (es ``_book_equity_required``, un hecho del turno, no
+    de la foto): el camino hermético nunca llama a ``load_book_equity`` y conserva el env o
+    100_000.
+    """
+
+    equity: float | None = None
+    as_of: str | None = None
+    unreadable: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1134,6 +1179,11 @@ class AutoSimulationWorker:
         kill_switch_source: Callable[[], bool] | None = None,
         canonical_positions_reader: Any = None,
         require_account_id: bool = False,
+        # M8 (auditoría .183): el runtime que conduce la operativa REAL exige sus espejos
+        # durables. Un turno al que le falte uno se rechaza (``durable_stores_missing``)
+        # en vez de operar con la mitad del estado en RAM. Default ``False`` conserva el
+        # camino hermético (tests/replay), que nunca hizo esa promesa.
+        require_durable_stores: bool = False,
         regime_source: Callable[[], str | None] | None = None,
         sector_source: Callable[[str], str | None] | None = None,
         liquidity_source: Callable[[str], float | None] | None = None,
@@ -1255,6 +1305,8 @@ class AutoSimulationWorker:
         # (fail-closed). Los tests herméticos que ejercitan la mecánica SIM sin PG
         # pueden relajarlo explícitamente con ``require_account_id=False``.
         self._require_account_id = require_account_id
+        # M8: el turno operativo exige sus espejos durables (ver ``OPERATIVE_DURABLE_SEAMS``).
+        self._require_durable_stores = require_durable_stores
         self._reconciliation: dict[str, str] = {}
         # R-2 (cierre 2026-10-26): símbolos con MÁS de un motor vivo en la cuenta. El
         # total de la cuenta no identifica a esta fila, así que su cantidad no está
@@ -1482,9 +1534,9 @@ class AutoSimulationWorker:
         # v2.88.70: el turno real fija la equity del libro (cash + valor de mercado).
         # Sin esa lectura las aperturas quedan vetadas. El fallback de env/100k solo
         # vive en el camino hermético, que nunca llama a ``load_book_equity``.
-        self._book_equity: float | None = None
+        # M14: UNA foto inmutable por lectura (no tres atributos) con su ``as_of``.
+        self._book_equity_snapshot = BookEquitySnapshot()
         self._book_equity_required = False
-        self._book_equity_unreadable = False
         # AUTO 2.0 (V2): fuente del régimen operativo (inyectable). Sin fuente y sin
         # override de env, el régimen es UNKNOWN ⇒ exit-only (fail-closed: sin régimen
         # no se abren entradas nuevas).
@@ -1613,6 +1665,20 @@ class AutoSimulationWorker:
         ``sim_auto_positions`` en vez de heredar una memoria que dejó de ser suya.
         """
         self._readopted = False
+
+    def _v2_missing_durable_seams(self) -> tuple[str, ...]:
+        """M8 — espejos durables que faltan para conducir un turno OPERATIVO.
+
+        Sólo se consulta con ``require_durable_stores=True``: el camino hermético no
+        promete durabilidad y no debe pagar el chequeo. Un espejo presente pero degradado
+        (lectura caída) lo declara su propio canal; aquí sólo se detecta la AUSENCIA,
+        que es la que deja el estado únicamente en RAM.
+        """
+        return tuple(
+            name
+            for name in OPERATIVE_DURABLE_SEAMS
+            if getattr(self, f"_{name}", None) is None
+        )
 
     def declare_skip(self, reason: str) -> None:
         """Declara POR QUÉ este proceso no ejecutó el turno (nunca un veto silencioso).
@@ -2332,6 +2398,16 @@ class AutoSimulationWorker:
         cruza el resultado del settlement con el outcome durable del apply: solo
         ``applied``/``already_applied`` movió dinero.
         """
+        if self._require_durable_stores and self._finance_applier is None:
+            # M8: en modo operativo NO existe el modo estructural. Confirmar el schedule sin
+            # libro financiero marcaría fills como ``applied`` sin que nadie mueva dinero: el
+            # hueco se declara como settlement FALLIDO, no como fill.
+            logger.error(
+                "auto_sim settlement rechazado: modo operativo sin finance_applier symbol=%s",
+                symbol,
+            )
+            self._settlement_failures += 1
+            return _Settlement(requested_qty=qty, failed=True)
         if self._exec_store is None:
             return _Settlement(requested_qty=qty)
         # Modo ESTRUCTURAL (smoke sin dinero, documentado en el módulo): sin
@@ -2571,16 +2647,35 @@ class AutoSimulationWorker:
         El camino hermético, que no carga el libro, conserva el env o 100_000.
         """
         equity, _unreadable = turn_equity_from_book(
-            self._book_equity,
+            self._book_equity_snapshot.equity,
             required=self._book_equity_required,
-            unreadable=self._book_equity_unreadable,
+            unreadable=self._book_equity_snapshot.unreadable,
             env_raw=(os.getenv("AUTO_ENGINE_SIM_V2_EQUITY") or "").strip(),
         )
         return equity
 
+    @property
+    def book_equity_as_of(self) -> str | None:
+        """M14: instante de la foto de equity vigente (``None`` = no medido este turno)."""
+        return self._book_equity_snapshot.as_of
+
+    @property
+    def book_equity_unreadable(self) -> bool:
+        """M14: la foto vigente declara que la lectura no se pudo hacer."""
+        return self._book_equity_snapshot.unreadable
+
     async def load_book_equity(self, session: Any) -> None:
-        """Lee ``PortfolioSummary.total_equity`` y lo deja como autoridad del tick."""
+        """Lee ``PortfolioSummary.total_equity`` y lo deja como autoridad del turno.
+
+        M14: la foto se **invalida ANTES** del ``await``. Si la lectura falla —o si el
+        turno se cancela a mitad (``CancelledError`` no es ``Exception`` y no pasa por
+        el ``except``)—, el turno siguiente no puede heredar la equity del anterior: la
+        foto vigente es «no medido» y las aperturas quedan vetadas. La publicación es
+        además una sola asignación: nadie observa una mezcla de equity nueva con estado
+        viejo.
+        """
         self._book_equity_required = True
+        self._book_equity_snapshot = BookEquitySnapshot(unreadable=True)
         try:
             equity = await read_account_book_equity(session, self._account_id)
         except Exception:
@@ -2588,15 +2683,14 @@ class AutoSimulationWorker:
                 "auto_sim book equity unreadable account=%s",
                 self._account_id,
             )
-            self._book_equity = None
-            self._book_equity_unreadable = True
             return
         if equity <= 0:
-            self._book_equity = None
-            self._book_equity_unreadable = True
             return
-        self._book_equity = equity
-        self._book_equity_unreadable = False
+        self._book_equity_snapshot = BookEquitySnapshot(
+            equity=float(equity),
+            as_of=self._v2_instant(),
+            unreadable=False,
+        )
 
     def _v2_governor_drawdown_pct(self) -> float | None:
         """Drawdown diario MEDIDO de la cuenta para el gobernador (V2.43/AUTO-3).
@@ -7941,7 +8035,7 @@ class AutoSimulationWorker:
             if action == "BUY" and self._openings_vetoed(symbol):
                 _veto("position_reconciliation_not_ok")
                 continue
-            if action == "BUY" and self._book_equity_unreadable:
+            if action == "BUY" and self._book_equity_snapshot.unreadable:
                 _veto("book_equity_unreadable")
                 continue
             if action == "SELL" and held <= 0:
@@ -8502,6 +8596,21 @@ class AutoSimulationWorker:
             self._adaptive_gate_store = (
                 adaptive_gate_store if adaptive_gate_store is not None else prev_adaptive_gate_store
             )
+            # M8 (auditoría .183) — un turno OPERATIVO sin sus espejos durables operaría con
+            # la mitad del estado en RAM (parada dura, posición, compromiso de capital y libro
+            # financiero se perderían en el siguiente reinicio). Se rechaza ANTES de readoptar,
+            # reconciliar o decidir: ``real_turn`` no muta nada y el motivo queda declarado en
+            # el tick durable (``durable_stores_missing:<seams>``).
+            if self._require_durable_stores:
+                missing = self._v2_missing_durable_seams()
+                if missing:
+                    logger.error(
+                        "auto_sim turno RECHAZADO: faltan espejos durables engine=%s missing=%s",
+                        self._engine_id,
+                        ",".join(missing),
+                    )
+                    self.declare_skip(f"{DURABLE_STORES_MISSING}:{','.join(missing)}")
+                    return TurnReport(venue=self._venue())
             # V2.43.3 (P0-1) — BOOT SAFETY GATE: la parada dura se LEE de su espejo durable
             # ANTES de readoptar posición y de reconciliar. Un reinicio NO puede reabrir el
             # motor: si el HALT estaba activo, sigue activo (el in-memory lo olvidaba).
@@ -9527,6 +9636,10 @@ class AutoSimRuntime:
                 engine_id=engine_id,
                 account_id=account_id,
                 require_account_id=True,
+                # M8 (auditoría .183): este runtime conduce la operativa REAL. Sin sus
+                # espejos durables el turno se rechaza (``durable_stores_missing``) en vez
+                # de operar con la mitad del estado en RAM.
+                require_durable_stores=True,
                 regime_source=regime_source,
                 liquidity_source=liquidity_source,
                 trade_context_source=trade_context_source,
@@ -9664,6 +9777,47 @@ class AutoSimRuntime:
                 self._engine_id,
             )
 
+    async def _operator_intent_blocks_turn(self, session: Any) -> bool:
+        """M10 (auditoría .183) — ¿una intención durable ``OFF`` impide este turno?
+
+        Se lee ANTES de componer stores o tocar la cartera. Un ``OFF`` explícito gana al
+        env: sin esta lectura, un reinicio con ``AUTO_SIMULATION_WORKER_ENABLED=1`` volvía
+        a arrancar un motor que el operador había apagado.
+
+        La AUSENCIA de fila NO es ``OFF``: el operador no declaró intención y el env
+        decide. Devolver ``True`` ahí apagaría motores que hoy funcionan, que es inventar
+        una decisión que nadie tomó.
+
+        La lectura es fail-closed ante excepción: si el store no puede responder no se
+        conduce el turno (mismo criterio que el resto de espejos durables).
+        """
+        from bolsa_application.auto_engine_intent_store import (  # noqa: PLC0415
+            PostgresAutoEngineIntentStore,
+        )
+
+        try:
+            intent = await PostgresAutoEngineIntentStore(session).load(
+                self._account_id or "", self._engine_id
+            )
+        except Exception:  # noqa: BLE001 — sin lectura no hay permiso para operar.
+            logger.exception(
+                "auto_sim: intención durable ilegible; turno omitido engine=%s",
+                self._engine_id,
+            )
+            self._worker.declare_skip(OPERATOR_INTENT_UNREADABLE)
+            return True
+        if intent is None or not intent.is_off:
+            return False
+        logger.warning(
+            "auto_sim tick omitido: intención durable OFF cuenta=%s engine=%s actor=%s motivo=%s",
+            self._account_id or "-",
+            self._engine_id,
+            intent.actor or "-",
+            intent.reason or "-",
+        )
+        self._worker.declare_skip(OPERATOR_INTENT_OFF)
+        return True
+
     async def _run_tick_unlocked(self) -> TurnReport | None:
         """Un turno real: abre sesión, compone stores PG + finanzas, y lo conduce.
 
@@ -9681,6 +9835,10 @@ class AutoSimRuntime:
         )
 
         async with self._session_factory() as session:
+            # M10 (auditoría .183) — la INTENCIÓN durable del operador se lee ANTES de
+            # componer stores o tocar la cartera (ver ``_operator_intent_blocks_turn``).
+            if await self._operator_intent_blocks_turn(session):
+                return None
             exec_store, auto_store, applier, context_store = _compose_real_stores(
                 session,
                 finance_resolver=self._finance_resolver,

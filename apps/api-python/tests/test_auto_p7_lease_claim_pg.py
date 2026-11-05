@@ -45,7 +45,7 @@ if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
 _DOTENV = Path(__file__).resolve().parents[3] / ".env"
 _REQUIRED_ENV = "AUTO_P7_LEASE_PG_REQUIRED"
 _PREVIOUS_REVISION = "062_sync_settings_check_backfill"
-_HEAD = "064_strategy_account_scope"
+_HEAD = "065_auto_engine_intent"
 _RUNS = "auto_engine_runs"
 _LEASE_INDEX = "auto_engine_runs_lease_expires_idx"
 _BAR = "2026-11-04T08:30:00+00:00"
@@ -213,7 +213,7 @@ async def test_migration_063_roundtrip_adds_and_drops_the_lease_columns(
     cfg = _alembic_config()
     columns = ("lease_owner", "lease_generation", "lease_expires_at")
     try:
-        assert alembic_head() == _HEAD, "la guardia de la head tiene que apuntar a 064"
+        assert alembic_head() == _HEAD, "la guardia de la head tiene que apuntar a 065"
         with engine.connect() as connection:
             for column in columns:
                 assert _column_present(connection, _RUNS, column), f"063 debe crear {column}"

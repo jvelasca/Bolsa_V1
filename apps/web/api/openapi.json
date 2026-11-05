@@ -675,6 +675,139 @@
         "title": "AuthStatusResponseDto",
         "type": "object"
       },
+      "AutoEngineIntentBody": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "AutoEngineIntentBody",
+        "type": "object"
+      },
+      "AutoEngineIntentDto": {
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "effectiveEnabled": {
+            "title": "Effectiveenabled",
+            "type": "boolean"
+          },
+          "engineId": {
+            "title": "Engineid",
+            "type": "string"
+          },
+          "envEnabled": {
+            "title": "Envenabled",
+            "type": "boolean"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "operatorState": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operatorstate"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updatedat"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "engineId",
+          "envEnabled",
+          "effectiveEnabled"
+        ],
+        "title": "AutoEngineIntentDto",
+        "type": "object"
+      },
       "AutoMonitorConcurrencyDto": {
         "properties": {
           "activeSessions": {
@@ -29212,6 +29345,114 @@
           }
         },
         "summary": "Persist Auto Dia D Verification",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/engine-intent": {
+      "get": {
+        "description": "Intención durable + lo que el motor haría ahora mismo (read-only).",
+        "operationId": "get_auto_engine_intent_api_auto_engine_intent_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoEngineIntentDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Engine Intent",
+        "tags": [
+          "auto"
+        ]
+      },
+      "post": {
+        "description": "Declara la intención del operador; un ``OFF`` gana al env en todos los ticks.",
+        "operationId": "post_auto_engine_intent_api_auto_engine_intent_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoEngineIntentBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoEngineIntentDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Auto Engine Intent",
         "tags": [
           "auto"
         ]
