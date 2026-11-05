@@ -365,18 +365,16 @@ class AutoOrchestrator:
         best_candidate = next(c for c in candidates if c.id == best_id)
         # S5 (auditoría .183): el avance de fase se decide con la MÁQUINA DE ESTADOS, no
         # por haber llegado hasta aquí. El ciclo cruza varias fases (ESTUDIO → … →
-        # FINALISTA), así que se exige la evidencia de todas: si falta un gate de la fase
-        # —o no se evaluó— la candidata NO se materializa como finalista y el ciclo lo
+        # FINALISTA), así que se exigen los gates obligatorios de todas: si falta uno —o
+        # no se evaluó— la candidata NO se materializa como finalista y el ciclo lo
         # declara con sus motivos. Antes se escribía `state='finalista'` sin comprobar
         # nada, así que la tabla de gates del dominio no se aplicaba en ningún sitio.
-        # El gate ``coach`` del LAB llega NOT_EVALUATED a propósito (lo aporta la fase
-        # COACH), así que no cuenta como fallo aquí: el veto del COACH se comprueba con
-        # su propio dictamen, que es el que se pasa a la máquina.
-        funnel_gates = tuple(g for g in best_eval.gates if g.gate != "coach")
+        # Los siete gates completos (incluido `coach`) los sigue exigiendo el Promotion
+        # Gate para ACTIVE; aquí solo manda la evidencia de la fase.
         transition = can_advance_to(
             current=best_candidate.state,
             target=StrategyLifecycleState.FINALISTA,
-            gates=funnel_gates,
+            gates=best_eval.gates,
             coach=coach,
         )
         if not transition.allowed:

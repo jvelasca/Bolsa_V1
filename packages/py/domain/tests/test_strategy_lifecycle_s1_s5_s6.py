@@ -134,6 +134,26 @@ def test_s5_can_advance_to_walks_the_whole_funnel() -> None:
     assert "walk_forward" in blocked.reasons[0]
 
 
+def test_s5_can_advance_to_ignores_failures_outside_the_phase_requirement() -> None:
+    """Un FAIL en un gate que la fase NO exige no bloquea el avance (alcance declarado).
+
+    ``dsr`` es obligatorio para entrar en PROMOCION, no en FINALISTA: si falla, el
+    Promotion Gate no promocionará, pero la fase puede materializar el finalista y correr
+    su evidencia shadow. Así el corte de S5 no se confunde con el veredicto completo.
+    """
+    gates = (
+        *(GateResult.passed_gate(g) for g in ("backtest", "robustness", "walk_forward", "oos")),
+        GateResult.failed("dsr"),
+        GateResult.failed("risk"),
+    )
+    result = can_advance_to(
+        current=StrategyLifecycleState.ESTUDIO,
+        target=StrategyLifecycleState.FINALISTA,
+        gates=gates,
+    )
+    assert result.allowed
+
+
 def test_s5_can_advance_to_refuses_to_decide_the_promotion() -> None:
     """VALIDACION/PROMOCION/ACTIVE los decide `evaluate_promotion`, no esta función."""
     result = can_advance_to(

@@ -873,13 +873,19 @@ def can_advance_to(
 
     Un ciclo real del orquestador cruza VARIAS fases (ESTUDIO → … → FINALISTA), así que
     comprobar solo el salto inmediato dejaría pasar la evidencia de una fase por la de
-    otra. Esta función recorre cada salto con :func:`can_transition` y devuelve el primer
-    bloqueo, con sus motivos intactos.
+    otra: se exige la unión de los gates obligatorios de **todas** las fases recorridas
+    (``REQUIRED_GATES_BY_STATE``), más los que añada el llamador.
 
-    Alcance declarado: cubre las fases cuantitativas (ESTUDIO … FINALISTA). Para
-    ``VALIDACION``, ``PROMOCION`` y ``ACTIVE`` la autoridad es la evidencia shadow y la
-    decide :func:`evaluate_promotion`; aquí se rechazan con ``validacion_ausente`` en vez
-    de inventar una comprobación distinta a la del Promotion Gate.
+    Alcance declarado:
+
+    * cubre las fases cuantitativas (ESTUDIO … FINALISTA). Para ``VALIDACION``,
+      ``PROMOCION`` y ``ACTIVE`` la autoridad es la evidencia shadow y la decide
+      :func:`evaluate_promotion`; aquí se rechazan con ``validacion_ausente`` en vez de
+      inventar una comprobación distinta a la del Promotion Gate.
+    * exige los gates **obligatorios** de la fase en PASS, no que todo gate aportado esté
+      en PASS: un FAIL en un gate que esa fase no exige (p. ej. ``dsr`` antes de
+      ``PROMOCION``) no bloquea el avance de fase, lo evalúa el Promotion Gate con los
+      siete antes de ACTIVE.
     """
     if target not in _ORDER or current not in _ORDER:
         return TransitionResult(current, None, False, ("ruta_de_estados_invalida",))
@@ -890,20 +896,20 @@ def can_advance_to(
     # La promoción no se decide con gates sueltos: se delega en `evaluate_promotion`.
     if end >= _ORDER.index(StrategyLifecycleState.VALIDACION):
         return TransitionResult(current, target, False, ("validacion_ausente",))
-    state = current
-    while state != target:
-        step = can_transition(
-            state=state,
-            gates=gates,
-            coach=coach if state == StrategyLifecycleState.COACH else None,
-            required_gates=required_gates,
+    path = _ORDER[start + 1 : end + 1]
+    mandatory = tuple(
+        dict.fromkeys(
+            (*[g for state in path for g in required_gates_for(state)], *required_gates)
         )
-        if not step.allowed:
-            return TransitionResult(current, target, False, step.reasons)
-        nxt = next_state(state)
-        if nxt is None:  # pragma: no cover — la ruta ya validó los índices.
-            return TransitionResult(current, target, False, ("ruta_de_estados_invalida",))
-        state = nxt
+    )
+    present = {g.gate for g in gates if g.passed}
+    absent = tuple(g for g in mandatory if g not in present)
+    if absent:
+        return TransitionResult(
+            current, target, False, (f"gates_requeridos_ausentes:{','.join(absent)}",)
+        )
+    if coach is not None and coach.vetoes and StrategyLifecycleState.COACH in path:
+        return TransitionResult(current, target, False, ("coach_veto",))
     return TransitionResult(current, target, True)
 
 
