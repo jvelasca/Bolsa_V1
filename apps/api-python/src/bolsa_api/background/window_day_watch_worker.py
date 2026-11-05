@@ -504,7 +504,9 @@ def _pid_alive(pid: int) -> bool:
     if sys.platform == "win32":
         import ctypes
 
-        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        # ``windll`` solo existe en la stdlib de Windows: el ``ignore`` se necesita al
+        # analizar en Linux y sobra al analizar en Windows, de ahí los dos códigos.
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined, unused-ignore]
         handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
         if not handle:
             return False
