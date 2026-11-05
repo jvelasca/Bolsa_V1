@@ -7707,6 +7707,13 @@ class AutoSimulationWorker:
         )
         if position is None:
             return
+        if position.holding_deadline_at is None:
+            # Alarma: sin techo de mantenimiento TIME_STOP es inalcanzable y la posición
+            # puede vivir indefinidamente. No cambia el comportamiento: lo hace visible.
+            logger.warning("auto_sim position without holding_deadline symbol=%s", symbol)
+            self._journal_position_event(
+                symbol, "holding_deadline_missing", at=at, detail={"timeStop": "unreachable"}
+            )
         pending = replace(
             position,
             lifecycle_state="ENTRY_PENDING",
