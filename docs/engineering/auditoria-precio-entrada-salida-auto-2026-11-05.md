@@ -40,8 +40,14 @@ Es decir: se compra a la **apertura** del día siguiente a la señal y se vende 
 
 > ✅ **Cerrado.** Con `execution_price` declarado, sizing, stop, T1 y T2 se anclan a `open(B)`; si
 > `|open(B) − close(B-1)| > max_entry_gap_atr·ATR` (defecto 1,0; env `AUTO_ENGINE_SIM_V2_MAX_ENTRY_GAP_ATR`)
-> la entrada se veta con `entry_gap_exceeded` (bucket RISK). Sin `execution_price` o sin ATR: Δ = 0.
-> Tests: `test_auto_r1_entry_gap.py`.
+> la entrada se veta con `entry_gap_exceeded` (bucket RISK). El veto exige **ATR MEDIDO**: el
+> ATR de reserva (2 % del precio, R5) no es una medición y usarlo como tolerancia convertiría el
+> fallback en un umbral disfrazado (todo hueco > 2 % vetaría). Sin `execution_price` o sin ATR
+> medido: Δ = 0 en el veto; el **anclaje a la ejecución sí se aplica siempre**. El worker declara
+> el hueco de la medida con `atrSource` (`ATR_GEOMETRY`) y pasa `atr=None` cuando el ATR es de
+> reserva, de modo que `plan_v2_tick` deriva la misma geometría sintética sin fingir precisión.
+> Tests: `test_auto_r1_entry_gap.py` (incluye el caso de ATR sintético que NO veta), más los
+> bancos del worker/exit realineados al anclaje en ejecución.
 - **Dónde:** `auto_v2_entry.py:1645` (entrada = `close(B-1)`), `position_state.py:584-692`.
 - **Fallo:** el sizing y la geometría se calculan sobre `close(B-1)`, pero se ejecuta a `open(B)`. Ante un hueco
   alcista, la distancia real al stop es mayor que la presupuestada: el riesgo efectivo por operación **supera**

@@ -1597,6 +1597,10 @@ def plan_v2_tick(
         signal_key = _key_of(signal)
         entry_score = score_by_candidate.get(signal_key)
         atr = signal.atr
+        # R1 — solo un ATR MEDIDO puede servir de tolerancia. El sintético (2 % del precio)
+        # no es una medición de volatilidad (R5 de la auditoría): usarlo como múltiplo
+        # convertiría el fallback en un umbral disfrazado de «1 ATR».
+        atr_measured = atr is not None
         if atr is None and signal.price > 0 and not cfg.atr_required:
             # E2: con ``AUTO_ENGINE_SIM_V2_ATR_REQUIRED`` el sintético NO entra. La
             # reserva sigue existiendo para el régimen histórico (flag OFF), pero cuando
@@ -1663,6 +1667,9 @@ def plan_v2_tick(
         entry_gap_conflict = bool(
             exec_known
             and signal.price > 0
+            # R1 — la tolerancia se mide en ATR REAL. Sin medición no hay con qué comparar:
+            # el hueco no se veta (Δ = 0), igual que cuando falta ``execution_price``.
+            and atr_measured
             and atr is not None
             and atr > 0
             and cfg.max_entry_gap_atr > 0

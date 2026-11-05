@@ -183,12 +183,14 @@ async def test_missing_decision_price_is_declared_even_with_execution(v2_env: No
 
 
 @pytest.mark.asyncio
-async def test_decision_geometry_uses_mid_while_entry_uses_execution(v2_env: None) -> None:
-    """La geometría ancla en ``mid`` (decisión) y la entrada en ``execution`` — nunca 100.0.
+async def test_geometry_anchors_on_execution_while_entry_uses_execution(v2_env: None) -> None:
+    """R1 — la geometría se ancla al precio de EJECUCIÓN; jamás al 100.0 fabricado.
 
-    Con ``mid = 50`` y ``execution = 55``: ATR fallback = 2 % del precio de DECISIÓN = 1,
-    así que el stop es ``50 − 1.5·1 = 48.5`` y T1 ``50 + 1.5·1 = 51.5``. Si alguien hiciera
-    leer la geometría de ``execution`` (o cayera al 100.0 de antes) el stop sería otro.
+    Con ``mid = 50`` y ``execution = 55``: el ATR de reserva (sin barras) es 2 % del precio de
+    DECISIÓN = 1, así que el stop es ``55 − 1.5·1 = 53.5`` y T1 ``55 + 1.5·1 = 56.5``. Hasta
+    R1 la geometría se calculaba sobre ``mid`` (48.5/51.5), de modo que el riesgo realmente
+    asumido no era el presupuestado: ahora el anclaje es el precio al que se llena la orden.
+    El hueco (5 = 5 ATR sintéticos) NO se veta porque no hay ATR MEDIDO.
     """
     source = _SplitSource(mid={"AAA": 50.0}, exec_={"AAA": 55.0})
     worker = _worker(source)
@@ -197,10 +199,10 @@ async def test_decision_geometry_uses_mid_while_entry_uses_execution(v2_env: Non
 
     position = worker._v2_positions.get("AAA")
     assert position is not None, "con precio de decisión y de ejecución debe abrir"
-    assert position.initial_stop == pytest.approx(48.5, abs=1e-6), (
-        "el stop sale del precio de DECISIÓN (mid=50), no de la ejecución ni del 100.0"
+    assert position.initial_stop == pytest.approx(53.5, abs=1e-6), (
+        "el stop sale del precio de EJECUCIÓN (55), no del de decisión ni del 100.0"
     )
-    assert position.target1 == pytest.approx(51.5, abs=1e-6)
+    assert position.target1 == pytest.approx(56.5, abs=1e-6)
     # La referencia de PROTECCIÓN de la posición es el precio de EJECUCIÓN del tick de
     # apertura (``_entry_price``), que es lo que el motor usa para el trailing.
     assert worker._entry_price.get("AAA") == Decimal("55.0"), (
