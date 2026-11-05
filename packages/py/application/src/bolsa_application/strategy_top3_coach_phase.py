@@ -24,8 +24,15 @@ from bolsa_domain.entities.strategy_lifecycle import (
     CoachAssessment,
     GateStatus,
     StrategyEvaluation,
+    StrategyLifecycleState,
     StrategyTop3,
+    required_gates_for,
 )
+
+# La barrera del TOP3 no es una lista paralela: es la exigencia que el dominio declara
+# para entrar en la fase FINALISTA (S5, auditoría .183). Si la tabla cambia, el TOP3 y el
+# avance de fase siguen hablando del mismo contrato.
+LAB_VALIDATED_GATES: tuple[str, ...] = required_gates_for(StrategyLifecycleState.FINALISTA)
 
 __all__ = [
     "CoachThresholds",
@@ -115,16 +122,17 @@ def select_top3(
     max_candidates: int = 3,
     timeframe: str = "1d",
     expected_regime: str | None = None,
-    min_gates: tuple[str, ...] = ("backtest", "oos", "walk_forward", "robustness"),
+    min_gates: tuple[str, ...] = LAB_VALIDATED_GATES,
 ) -> Top3Selection:
     """Fase TOP 3: ranking por evidencia robusta con ``runId`` por slot.
 
-    Descarta candidatas sin los gates mínimos en PASS (por defecto los 4 gates
-    ``lab_validated``: ``backtest`` + ``oos`` + ``walk_forward`` + ``robustness``) o por
-    debajo de ``min_score`` (fail-closed: sin evidencia no entran en el TOP). El ranking
-    ya **no** se ordena por el IS puro: prefiere la evidencia fuera de muestra
-    (``oos_score`` → ``wfe`` → ``dsr`` → ``1 - pbo`` → ``regime_match``) y degrada las
-    hipótesis ``in_sample_only`` frente a las ``lab_validated``.
+    Descarta candidatas sin los gates mínimos en PASS (por defecto los que el dominio
+    exige para entrar en FINALISTA: ``backtest`` + ``oos`` + ``walk_forward`` +
+    ``robustness``, S5) o por debajo de ``min_score`` (fail-closed: sin evidencia no
+    entran en el TOP). El ranking ya **no** se ordena por el IS puro: prefiere la
+    evidencia fuera de muestra (``oos_score`` → ``wfe`` → ``dsr`` → ``1 - pbo`` →
+    ``regime_match``) y degrada las hipótesis ``in_sample_only`` frente a las
+    ``lab_validated``.
 
     ``min_gates`` permite **relajar** la barrera cuando se exige (p. ej. ``("backtest",)``
     para el flujo ``semifinal``/in_sample_only). V2.88.83 (anti-overfit II): el default

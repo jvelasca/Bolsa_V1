@@ -95,9 +95,14 @@ def test_top3_rejects_more_than_three() -> None:
 
 
 def test_coach_veto_blocks_even_with_quantitative_gates() -> None:
+    # S5: para llegar a FINALISTA hay que aportar los gates de la fase; el veto del COACH
+    # se suma a esa exigencia (no la sustituye ni la relaja).
     result = can_transition(
         state=StrategyLifecycleState.COACH,
-        gates=(GateResult.passed_gate("coach_quant"),),
+        gates=tuple(
+            GateResult.passed_gate(g)
+            for g in ("backtest", "robustness", "walk_forward", "oos", "coach_quant")
+        ),
         coach=CoachAssessment(candidate_id="cand-1", approved=False, contradictions=("regimen",)),
     )
     assert not result.allowed

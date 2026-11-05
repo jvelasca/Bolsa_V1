@@ -677,3 +677,61 @@ async def test_run_shadow_without_demonstrable_lab_end_does_not_replay(
     assert called is False
 
 
+# ── S5 (auditoría .183): la fase se cruza con sus gates, no por haber llegado ────
+
+
+@pytest.mark.asyncio
+async def test_s5_orchestrator_consults_the_state_machine_before_finalist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El orquestador PREGUNTA a la máquina de estados antes de materializar el finalista.
+
+    Nota de alcance: con el LAB actual (TOP3 exige todos los gates en PASS) el rechazo no
+    se puede provocar con datos reales, así que aquí se verifica el CABLEADO —que la
+    decisión se consulta y que un rechazo corta antes de la evidencia shadow— mientras la
+    regla de la tabla se cubre en los tests de dominio (``can_advance_to``).
+    """
+    import bolsa_application.auto_orchestrator as orchestrator_module
+    from bolsa_domain.entities.strategy_lifecycle import TransitionResult
+
+    seen: dict[str, Any] = {}
+
+    def _refuse(**kwargs: Any) -> TransitionResult:
+        seen.update(kwargs)
+        return TransitionResult(
+            kwargs["current"],
+            kwargs["target"],
+            False,
+            ("gates_requeridos_ausentes:oos",),
+        )
+
+    monkeypatch.setattr(orchestrator_module, "can_advance_to", _refuse)
+
+    deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    _with_shadow_evidence(deps)
+    orchestrator = AutoOrchestrator(deps)
+
+    result = await orchestrator.run_cycle(instrument_id="AAA", data_snapshot_id="snap-1")
+
+    assert seen["target"].value == "finalista"
+    assert result.status == "transicion_refusada", result.reasons
+    assert result.reasons == ("gates_requeridos_ausentes:oos",)
+    assert result.shadow_started == 0
+    assert await store.list_promotions() == []
+
+
+@pytest.mark.asyncio
+async def test_s5_cycle_with_full_phase_gates_reaches_finalist_and_promotes() -> None:
+    """Control positivo: con los gates de la fase en PASS el cruce se autoriza."""
+    deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    _with_shadow_evidence(deps)
+    orchestrator = AutoOrchestrator(deps)
+
+    result = await orchestrator.run_cycle(instrument_id="AAA", data_snapshot_id="snap-1")
+
+    assert result.status == "active", result.reasons
+    assert result.shadow_started == 1
+    promotions = await store.list_promotions(promoted=True)
+    assert promotions, "la evidencia completa debe permitir la promoción"
+
+
