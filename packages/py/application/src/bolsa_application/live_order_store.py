@@ -727,10 +727,32 @@ class PostgresLiveOrderStore:
         if row.cancel_requested_at is None and row.status != "CANCEL_REQUESTED":
             return None
         confirmed_at = when if when is not None else _utcnow()
-        row.broker_cancel_confirmed_at = confirmed_at
-        if row.status == "CANCEL_REQUESTED":
-            row.status = "CANCELLED"
-        row.updated_at = _utcnow()
+        # M1: el ack también se escribe con UPDATE CONDICIONADO al estado leído. Antes se
+        # mutaba la fila ORM y se hacía commit: si el broker reconciliaba un fill entre la
+        # lectura y el commit, este escritor pisaba el estado con CANCELLED y borraba la
+        # evidencia de una orden que SÍ se ejecutó (mismo hazard que ``cancel_order``, pero
+        # sobre el único sitio que materializa un CANCELLED «verdadero»).
+        promote = row.status == "CANCEL_REQUESTED"
+        values: dict[str, Any] = {
+            "broker_cancel_confirmed_at": confirmed_at,
+            "updated_at": _utcnow(),
+        }
+        if promote:
+            values["status"] = "CANCELLED"
+        stmt = (
+            sa_update(LiveOrderRow)
+            .where(
+                LiveOrderRow.order_id == key,
+                LiveOrderRow.status == row.status,
+                LiveOrderRow.filled_quantity == row.filled_quantity,
+            )
+            .values(**values)
+        )
+        result = await self._session.execute(stmt)
+        if not cast(CursorResult[Any], result).rowcount:
+            # La fila cambió después de leerla: no se estampa un ack que ya no describe
+            # nada. Se declara con ``None`` (nada confirmado), no con un ack fabricado.
+            return None
         await self._session.commit()
         return CancelDocumentation(
             order_id=row.order_id,

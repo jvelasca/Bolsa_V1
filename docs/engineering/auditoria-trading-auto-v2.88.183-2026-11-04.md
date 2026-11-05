@@ -41,12 +41,17 @@
 > tres. `M8`, `M10` y `M14` se cierran en la PR
 > [#92](https://github.com/jvelasca/Bolsa_V1/pull/92) (`fix/auto-m8-m10-m14-durable-state`: espejos durables
 > obligatorios en el turno operativo, intención del operador durable en `auto_engine_intent` con migración `065` y
-> ganando al env, y `book_equity` como snapshot atómico con `as_of`). Las trece PR están
+> ganando al env, y `book_equity` como snapshot atómico con `as_of`). `M1`-`M4` y `M11` se cierran en la PR
+> [#93](https://github.com/jvelasca/Bolsa_V1/pull/93) (`fix/auto-m1m4-cierre-verificado`: el ack del broker pasa a
+> `UPDATE` condicionado —lo que faltaba de `M1`— y se certifica con tests mordientes el resto, que ya estaba en el
+> árbol desde `53f6845a` y `e295092c`). Las catorce PR están
 > fusionadas en `fix/059-060-proveedores`; **no** hay sello ni bump, y las únicas migraciones son las citadas.
 > **Sincronización del documento (`2026-11-05`, sin PR de código):** al verificar la sección de estrategia contra el
 > árbol, `S1` y `S2` ya estaban resueltos en código y con pruebas (`test_strategy_lifecycle_s1_s5_s6.py`, `LabThresholds`),
-> así que el documento los daba por abiertos **por desfase**, no por defecto. **Abiertos:** el resto de la severidad media
-> `M*` (`M1`-`M4`, `M7`, `M11`, `M15`) y `S8`-`S10`.
+> así que el documento los daba por abiertos **por desfase**, no por defecto. **Sincronización de la sección de
+> ejecución/riesgo (`2026-11-05`):** `M1` (`53f6845a`) y `M2`/`M3`/`M4`/`M11` (`e295092c`) también estaban resueltos en
+> el árbol con pruebas, y sus tests se verificaron **mordientes** contra el código previo (6 fallos sin el arreglo, 2
+> más del ack condicionado de `M1`), así que pasan a cerrados. **Abiertos:** `M7`, `M15` y `S8`-`S10`.
 
 Alcance detallado: lógica de decisión, riesgo, ejecución, workers AUTO, `auto_simulation_worker.py` (9.802 líneas) y lógica de estrategia y señales.
 Modo: solo lectura. No se modificó el repositorio. Las referencias `archivo:línea` son del tag `v2.88.183-beta`.
@@ -125,17 +130,17 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 
 | # | Fallo | Dónde | Debería ser |
 |---|---|---|---|
-| M1 | `cancel_order` lee y hace upsert sin lock ni versión; puede borrar un fill ya reconciliado (latente: no hay órdenes reales) · Por lectura | `live_order_store.py:632-706` | `UPDATE … WHERE status IN (…) AND version=:v`, o `FOR UPDATE`; no reescribir cantidades |
-| M2 | `max_position_pct`/`max_position_value` ≤ 0 significa "sin techo" (reproducido: qty 100 aprobada). Solo `max_risk_per_trade_pct=0` veta | `risk_allocator.py:319-337` | 0 = techo cero (veto), negativo = error; solo `None` = sin techo |
-| M3 | `risk_budget` NaN/inf/≤0 cae al presupuesto por pct (reproducido). **Latente**: el único llamador (`portfolio_decision_engine.py:544`) veta antes | `risk_allocator.py:272-289` | Defensa en profundidad en la propia función |
-| M4 | `remaining_qty` > `requested_qty` aceptado (reproducido: pedir 10, quedar 100) | `exit_order.py:299-323` | `0 ≤ remaining ≤ requested` y `filled + remaining ≈ requested` |
+| M1 | `cancel_order` lee y hace upsert sin lock ni versión; puede borrar un fill ya reconciliado (latente: no hay órdenes reales) · ✅ Cerrado | `live_order_store.py:632-706` | `UPDATE … WHERE status IN (…) AND version=:v`, o `FOR UPDATE`; no reescribir cantidades |
+| M2 | `max_position_pct`/`max_position_value` ≤ 0 significa "sin techo" (reproducido: qty 100 aprobada). Solo `max_risk_per_trade_pct=0` veta · ✅ Cerrado | `risk_allocator.py:319-337` | 0 = techo cero (veto), negativo = error; solo `None` = sin techo |
+| M3 | `risk_budget` NaN/inf/≤0 cae al presupuesto por pct (reproducido). **Latente**: el único llamador (`portfolio_decision_engine.py:544`) veta antes · ✅ Cerrado | `risk_allocator.py:272-289` | Defensa en profundidad en la propia función |
+| M4 | `remaining_qty` > `requested_qty` aceptado (reproducido: pedir 10, quedar 100) · ✅ Cerrado | `exit_order.py:299-323` | `0 ≤ remaining ≤ requested` y `filled + remaining ≈ requested` |
 | M5 | `commit()` de reservas fallido se registra y se continúa. Seguro solo si el store es autocommit (el comentario lo asume; no verificado) · ✅ Cerrado | `auto_simulation_worker.py:3707` | Contrato explícito; si falla, no emitir órdenes |
 | M6 | Pérdida de eventos de journal: la cola se vacía antes de publicar, y si el sink falla se pierde la evidencia · ✅ Cerrado | `:7373-7395` | Outbox con `pending/posted/failed` |
 | M7 | Excepciones del tick, del refresco de watch y del refresco del decider se tragan; se opera con universo o estrategia caducados, sin backoff ni estado durable de fallo | `:9253-9267` | Marcar snapshot no fiable y vetar aperturas; backoff exponencial y circuit breaker a `PAUSED`; persistir tick `ERROR` |
 | M8 | Sin stores durables inyectados, kill switch, posiciones, T1, P&L y journal viven solo en RAM; el modo estructural marca fills como `applied` sin libro financiero · ✅ Cerrado | `:1200-1470`, `:2275-2281`, `:2368-2375` | Stores obligatorios en modo operativo; rechazar el arranque si faltan |
 | M9 | Excepción de `price_script` escapa sin el fail-closed que sí tiene `PriceSource` · ✅ Cerrado | `:2150-2172` | `try/except` → `None` → HOLD |
 | M10 | AUTO se activa solo por variable de entorno; tras un reinicio con la variable puesta, arranca. Sin latch durable de OFF · ✅ Cerrado | workers AUTO | Intención del operador en BD; rearranque con confirmación |
-| M11 | Calibración `positiveOosFoldShare` usa `>= 0.0`; el replay usa `R > 0`. Los folds planos inflan la métrica | `auto_adaptive_calibration.py:638` | Criterio único `> 0` |
+| M11 | Calibración `positiveOosFoldShare` usa `>= 0.0`; el replay usa `R > 0`. Los folds planos inflan la métrica · ✅ Cerrado | `auto_adaptive_calibration.py:638` | Criterio único `> 0` |
 | M12 | Lock y latido de ventana en fichero no atómicos; un `.run.lock` obsoleto silencia alertas · ✅ Cerrado | `window_day_watch_worker.py:341-535` | `os.replace`, lock con PID y TTL |
 | M13 | El monitor devuelve un DTO coherente con lecturas caídas · ✅ Cerrado | `auto_operational_monitor.py:1897-2120` | Estado `INCOMPLETE` explícito |
 | M14 | `load_book_equity` puede dejar equity de un tick anterior visible tras un fallo de lectura · ✅ Cerrado | `:2524-2544` | Snapshot atómico con `as_of` |
@@ -167,6 +172,30 @@ Límites: no se ejecutó el motor con datos reales, ni los tests con Postgres, n
 - **Cerrado:** `_safe_price_script` envuelve la llamada y registra la excepción; `_v2_price_exec`/`_v2_price_mid`
   devuelven `None`, que es la misma declaración de «sin precio» que usa la fuente real. Certificado en
   `apps/api-python/tests/test_auto_m6_m9_fail_closed.py`.
+
+### M1 — Cancelar y confirmar son escrituras CONDICIONADAS al estado leído · ✅ Cerrado (`53f6845a`, ack ampliado en esta PR)
+- **Fallo:** `cancel_order` leía la fila, mutaba el objeto ORM y hacía `commit()`: entre la lectura y la escritura el broker podía reconciliar un fill, y el `UPDATE` ciego lo pisaba (y el upsert reescribía cantidades). El mismo patrón estaba en `set_broker_cancel_confirmed`, que es el **único** sitio que materializa un `CANCELLED` «verdadero»: un ack tardío podía convertir en `CANCELLED` una orden ya `FILLED`.
+- **Cerrado:** las dos escrituras son `UPDATE … WHERE order_id=:k AND status=:leído AND filled_quantity=:leído`. Si la fila cambió, `rowcount == 0`, no se toca nada y se devuelve el estado vigente (`cancel_order`) o `None` (`set_broker_cancel_confirmed`: nada que confirmar, sin ack fabricado). Ninguna de las dos escribe `quantity`/`filled_quantity`/`remaining_quantity`; el `commit` sólo ocurre si el `UPDATE` afectó la fila.
+- **Desvío declarado:** no hay columna `version` en `live_orders`; la valla es `(status, filled_quantity)`, que es exactamente el par que un fill cambia y el que un cancel no debe pisar. Añadir `version` exigía migración sin ganancia demostrable sobre este par.
+- **Ampliación medida:** el ack condicionado (`set_broker_cancel_confirmed`) se cerró en esta PR, no en la anterior; sus dos tests nuevos **fallan** contra la implementación previa (`CancelDocumentation` devuelto con la carrera perdida, y `SET` sin condición).
+
+### M2 — Un techo de posición no legible VETA, no desaparece · ✅ Cerrado (`e295092c`)
+- **Fallo:** `max_position_pct`/`max_position_value` ≤ 0 se trataban como «sin techo»: el test de la auditoría aprobaba qty 100 con `max_position_pct=0`, y un `NaN`/`inf`/negativo de configuración daba barra libre.
+- **Cerrado:** `0` es techo **cero** (veto con `CAP_POSITION_PCT`/`CAP_POSITION_VALUE`), e ilegible (`NaN`/`inf`) o negativo también veta; **sólo `None`** significa «sin techo por porcentaje». Lo mismo para `max_risk_per_trade_pct`, donde ya era así.
+- **Desvío declarado:** un valor **negativo** veta en vez de lanzar excepción. La auditoría pedía «negativo = error»; se elige el veto porque un `raise` en el allocator tumba el turno entero y el resultado fail-closed (qty 0, `approved=False`) es el mismo que un error para el llamador, sin el riesgo de abortar el tick. La configuración ilegible sigue siendo visible en `capped_reasons`.
+
+### M3 — `risk_budget` no finito o negativo no cae al presupuesto por porcentaje · ✅ Cerrado (`e295092c`)
+- **Fallo:** un `risk_budget` `NaN`/`inf`/≤ 0 se descartaba en silencio y el sizing caía a `equity × max_risk_per_trade_pct`, es decir, un presupuesto **no medible** asignaba riesgo real.
+- **Cerrado:** defensa en profundidad en la propia función: `risk_budget` no finito o negativo devuelve `approved=False`, `quantity=0.0` (no un fallback). Certificado con `NaN`, `inf` y `-10`; el test **falla** contra el código previo.
+
+### M4 — El remanente de una salida vive en `[0, solicitado]` · ✅ Cerrado (`e295092c`)
+- **Fallo:** `build_exit_order` aceptaba `remaining_qty` sin cota: pedir 10 y declarar 100 dejaba una orden de salida por diez veces la posición.
+- **Cerrado:** un remanente negativo, no finito o mayor que lo solicitado **no se cree**: se deriva de `requested − filled` (acotado a `[0, requested]`). Un remanente consistente se conserva.
+- **Desvío declarado:** **no** se exige `filled + remaining ≈ requested`. Una cancelación parcial legítima deja menos remanente que el solicitado y esa diferencia es información del broker, no una inconsistencia; imponer la igualdad obligaría a inventar el remanente.
+
+### M11 — Un fold OOS plano no es positivo · ✅ Cerrado (`e295092c`)
+- **Fallo:** `positiveOosFoldShare` contaba con `>= 0.0`, así que los folds de `0.0` inflaban la métrica frente al `R > 0` que usa el replay.
+- **Cerrado:** criterio único `> 0` en la calibración; un fold plano no cuenta como positivo. Certificado con dos folds planos y uno positivo (`0.25`, no `0.75`); el test **falla** contra el código previo.
 
 ### M8 — Un turno operativo sin sus espejos durables se RECHAZA · ✅ Cerrado (`fix/auto-m8-m10-m14-durable-state`)
 - **Fallo:** el runtime real componía sus stores por sesión, pero nada **exigía** que existieran. Sin `kill_switch_store`
@@ -307,9 +336,9 @@ Fuente: lectura de módulos de señales, ciclo de vida y promoción. No verifica
 1. **Fail-open de configuración y datos:** P1, P2, P4, P9 (bajo riesgo de cambio, alto impacto) · ✅ cerrado.
 2. **Persistencia fallida ignorada:** P5, P6, M5, M6, M9 · ✅ cerrado.
 3. **Circuit breaker y estado durable:** P3, P8, M8, M10, M14 · ✅ cerrado.
-4. **Concurrencia:** P7, M1.
+4. **Concurrencia:** P7, M1 · ✅ cerrado.
 5. **Gates de estrategia:** S1, S2, S5, S6, S7, S3 · ✅ cerrado.
-6. **Validaciones de bordes:** M2, M3, M4, M11 y la severidad baja.
+6. **Validaciones de bordes:** M2, M3, M4, M11 · ✅ cerrado; queda la severidad baja, `M7`, `M15` y `S8`-`S10`.
 
 Cada corrección debería ir con un test que muerda (entrada `NaN`, `None`, valor desconocido o fallo de persistencia inyectado) para que el comportamiento fail-closed quede protegido.
 
