@@ -526,14 +526,23 @@ class ExecutionRouter:
 
     async def _refresh_equity_marks(
         self, account_key: str, equity: float, initial: float
-    ) -> tuple[Any, bool]:
+    ) -> tuple[Any, str | None]:
         """P3: marcas de equity para el circuit breaker de drawdown, sin tragar fallos.
 
-        Devuelve ``(drawdowns, marks_unavailable)``. Si la hidratación desde ``settings_json``
-        falla y el libro no tiene marcas en memoria, el ``dayOpen``/``peak`` se reiniciarían al
-        equity actual (drawdown 0 tras un reinicio) y el breaker no dispararía: se pide veto.
-        Un fallo al persistir se registra; las marcas siguen en memoria y se re-exportan enteras
-        en la siguiente evaluación.
+        Devuelve ``(drawdowns, denial_reason)``. El motivo es ``None`` solo cuando la marca
+        de apertura es **fiable y durable**:
+
+        * ``drawdown_marks:unavailable`` — la hidratación desde ``settings_json`` falló y el
+          libro no tiene marcas en memoria: el día "abriría" con el equity actual (drawdown
+          0 tras un reinicio) y el breaker no dispararía.
+        * ``drawdown_marks:not_persisted`` — la marca se calculó pero **no** se pudo escribir.
+          Vale para este tick, no para sobrevivir a un crash: aceptar una apertura contra una
+          referencia que un reinicio convierte en 0 % es fail-open. Las marcas siguen en
+          memoria y se reintenta en la siguiente evaluación, que seguirá vetando mientras el
+          fallo persista.
+
+        El caso "referencia no medible" no se decide aquí: ``AccountDrawdowns`` devuelve
+        ``None`` y el gate de política lo convierte en ``<Regla>_unmeasured`` (P2).
         """
         from bolsa_application.account_drawdown import GLOBAL_EQUITY_MARK_BOOK
 
@@ -544,7 +553,9 @@ class ExecutionRouter:
         except Exception:  # noqa: BLE001
             logger.exception("equity marks hydrate failed account=%s", account_key)
             hydrate_failed = True
-        marks_unavailable = hydrate_failed and not GLOBAL_EQUITY_MARK_BOOK.has_marks(account_key)
+        denial: str | None = None
+        if hydrate_failed and not GLOBAL_EQUITY_MARK_BOOK.has_marks(account_key):
+            denial = "drawdown_marks:unavailable"
         dds = GLOBAL_EQUITY_MARK_BOOK.update(
             account_key,
             equity,
@@ -557,7 +568,9 @@ class ExecutionRouter:
             )
         except Exception:  # noqa: BLE001
             logger.exception("equity marks persist failed account=%s", account_key)
-        return dds, marks_unavailable
+            if denial is None:
+                denial = "drawdown_marks:not_persisted"
+        return dds, denial
 
     async def _resolve_account_mandate_for_opening(
         self,
@@ -1020,7 +1033,7 @@ class ExecutionRouter:
             equity = float(summary.total_equity)
             initial = float(scope.account.initial_deposit or 0.0)
             account_key = policy.account_id or "default"
-            dds, marks_unavailable = await self._refresh_equity_marks(
+            dds, marks_denial = await self._refresh_equity_marks(
                 account_key, equity, initial
             )
             mandate_ctx = await self._resolve_account_mandate_for_opening(
@@ -1114,9 +1127,9 @@ class ExecutionRouter:
                     "reasons": list(guard_decision.reasons),
                 },
             )
-            if marks_unavailable:
+            if marks_denial is not None:
                 guard_decision = RiskDecision(
-                    verdict="DENY", reasons=("drawdown_marks:unavailable",), guard=None
+                    verdict="DENY", reasons=(marks_denial,), guard=None
                 )
             guard = guard_decision.guard
             lineage_base = {
@@ -1411,7 +1424,7 @@ class ExecutionRouter:
         initial = float(scope.account.initial_deposit or 0.0)
 
         account_key = policy.account_id
-        dds, marks_unavailable = await self._refresh_equity_marks(account_key, equity, initial)
+        dds, marks_denial = await self._refresh_equity_marks(account_key, equity, initial)
 
         mandate_ctx = await self._resolve_account_mandate_for_opening(
             policy.account_id,
@@ -1465,9 +1478,9 @@ class ExecutionRouter:
                         sanity_warnings=sanity,
                         **recon,
                     )
-        if marks_unavailable:
+        if marks_denial is not None:
             guard_decision = RiskDecision(
-                verdict="DENY", reasons=("drawdown_marks:unavailable",), guard=None
+                verdict="DENY", reasons=(marks_denial,), guard=None
             )
         guard = guard_decision.guard
         lineage_live = {

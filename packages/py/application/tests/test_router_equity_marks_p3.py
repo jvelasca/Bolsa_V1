@@ -28,9 +28,14 @@ class _Accounts:
         self.merged.append(fragment)
 
 
-async def _refresh(accounts, key):
+async def _refresh(accounts, key, equity: float = 100_000.0):
     stub = SimpleNamespace(_accounts=accounts)
-    return await ExecutionRouter._refresh_equity_marks(stub, key, 100_000.0, 100_000.0)  # type: ignore[arg-type]
+    return await ExecutionRouter._refresh_equity_marks(
+        stub,  # type: ignore[arg-type]
+        key,
+        equity,
+        100_000.0,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -42,26 +47,58 @@ def _clean_book():
 
 @pytest.mark.asyncio
 async def test_hydrate_failure_without_marks_requests_veto() -> None:
-    _dds, unavailable = await _refresh(_Accounts(fail_get=True), "acc-p3-a")
-    assert unavailable is True
+    _dds, denial = await _refresh(_Accounts(fail_get=True), "acc-p3-a")
+    assert denial == "drawdown_marks:unavailable"
 
 
 @pytest.mark.asyncio
 async def test_hydrate_failure_with_marks_in_memory_keeps_going() -> None:
     await _refresh(_Accounts(), "acc-p3-b")
-    _dds, unavailable = await _refresh(_Accounts(fail_get=True), "acc-p3-b")
-    assert unavailable is False
+    _dds, denial = await _refresh(_Accounts(fail_get=True), "acc-p3-b")
+    assert denial is None
 
 
 @pytest.mark.asyncio
 async def test_healthy_path_persists_and_is_available() -> None:
     accounts = _Accounts()
-    _dds, unavailable = await _refresh(accounts, "acc-p3-c")
-    assert unavailable is False
+    _dds, denial = await _refresh(accounts, "acc-p3-c")
+    assert denial is None
     assert accounts.merged and "equityMarks" in accounts.merged[0]
 
 
 @pytest.mark.asyncio
-async def test_persist_failure_does_not_raise_nor_veto() -> None:
-    _dds, unavailable = await _refresh(_Accounts(fail_merge=True), "acc-p3-d")
-    assert unavailable is False
+async def test_persist_failure_requests_veto() -> None:
+    """Una marca no durable no autoriza aperturas: un crash la convertiría en 0 %."""
+    _dds, denial = await _refresh(_Accounts(fail_merge=True), "acc-p3-d")
+    assert denial == "drawdown_marks:not_persisted"
+
+
+@pytest.mark.asyncio
+async def test_persist_failure_keeps_marks_in_memory_and_recovers() -> None:
+    """El fallo no revierte el libro: la siguiente evaluación persiste y deja de vetar."""
+    key = "acc-p3-e"
+    _dds, denial = await _refresh(_Accounts(fail_merge=True), key)
+    assert denial == "drawdown_marks:not_persisted"
+    assert GLOBAL_EQUITY_MARK_BOOK.has_marks(key)
+
+    accounts = _Accounts()
+    dds, denial = await _refresh(accounts, key)
+    assert denial is None
+    assert accounts.merged and dds.daily_pct == 0.0
+
+
+@pytest.mark.asyncio
+async def test_unavailable_takes_precedence_over_not_persisted() -> None:
+    _dds, denial = await _refresh(
+        _Accounts(fail_get=True, fail_merge=True), "acc-p3-f"
+    )
+    assert denial == "drawdown_marks:unavailable"
+
+
+@pytest.mark.asyncio
+async def test_non_finite_equity_is_unmeasured_not_zero() -> None:
+    _dds, denial = await _refresh(_Accounts(), "acc-p3-g", equity=float("nan"))
+    assert denial is None
+    assert _dds.daily_pct is None
+    assert _dds.weekly_pct is None
+    assert _dds.max_pct is None
