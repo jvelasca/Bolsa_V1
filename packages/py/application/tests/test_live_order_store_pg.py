@@ -523,6 +523,62 @@ async def test_postgres_cancel_does_not_rewrite_quantities_and_is_guarded() -> N
 
 
 @pytest.mark.asyncio
+async def test_postgres_confirm_ack_is_conditioned_and_never_rewrites_quantities() -> None:
+    """M1: el ack del broker se escribe con UPDATE condicionado al estado leído."""
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    row = _row_from(_make_order(order_id="lo-m1ack", account_id="acc-1"))
+    row.status = "CANCEL_REQUESTED"
+    row.cancel_requested_at = "2026-11-05T09:00:00Z"
+    row.cancel_requested_by = "ops"
+    row.cancel_reason = "mkt"
+    row.broker_cancel_confirmed_at = None
+    found = MagicMock()
+    found.scalar_one_or_none.return_value = row
+    session.execute = AsyncMock(return_value=found)
+
+    store = PostgresLiveOrderStore(session)
+    confirmed = await store.set_broker_cancel_confirmed("lo-m1ack")
+
+    assert confirmed is not None and confirmed.broker_confirmed is True
+    stmt = session.execute.await_args_list[-1].args[0]
+    rendered = str(stmt.compile(compile_kwargs={"literal_binds": True})).upper()
+    set_clause, where_clause = rendered.split("WHERE", 1)
+    for column in ("QUANTITY", "FILLED_QUANTITY", "REMAINING_QUANTITY"):
+        assert column not in set_clause.split("SET", 1)[1]
+    # La condición es el estado LEÍDO: si el broker reconcilió un fill en paralelo,
+    # el ack no pisa la fila.
+    assert "STATUS" in where_clause
+    assert "FILLED_QUANTITY" in where_clause
+    assert "CANCELLED" in set_clause
+
+
+@pytest.mark.asyncio
+async def test_postgres_confirm_loses_race_and_does_not_stamp() -> None:
+    """M1: si la fila cambió, el ack pierde la carrera y NO se declara confirmado."""
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    session.rollback = AsyncMock()
+    row = _row_from(_make_order(order_id="lo-m1ackr", account_id="acc-1"))
+    row.status = "CANCEL_REQUESTED"
+    row.cancel_requested_at = "2026-11-05T09:00:00Z"
+    found = MagicMock()
+    found.scalar_one_or_none.return_value = row
+    lost = MagicMock()
+    lost.rowcount = 0
+
+    async def _execute(stmt: object) -> MagicMock:
+        return lost if "UPDATE" in str(stmt).upper()[:8] else found
+
+    session.execute = AsyncMock(side_effect=_execute)
+    store = PostgresLiveOrderStore(session)
+
+    assert await store.set_broker_cancel_confirmed("lo-m1ackr") is None
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_postgres_cancel_loses_race_when_row_changed() -> None:
     """M1: si el UPDATE condicionado no afecta filas, se devuelve el estado vigente."""
     session = AsyncMock()
