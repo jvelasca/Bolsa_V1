@@ -174,6 +174,8 @@ def measure_fills(
             # Cada fila cae por un motivo CONCRETO: el hueco se declara atribuido.
             reasons["+".join(missing)] = reasons.get("+".join(missing), 0) + 1
             continue
+        if quantity is None or price is None:  # pragma: no cover — imposible tras `missing`
+            continue
         gross = quantity * price
         flows.append(
             CashFlow(
@@ -405,7 +407,7 @@ def _at_least(name: str, threshold: float | None, measured: float | None) -> Pol
 
 def _at_most(name: str, threshold: float | None, measured: float | None) -> PolicyCheck:
     check = _at_least(name, threshold, measured)
-    if check.verdict == "NOT_MEASURED":
+    if check.verdict == "NOT_MEASURED" or check.measured is None or check.threshold is None:
         return check
     return PolicyCheck(
         name=name,
