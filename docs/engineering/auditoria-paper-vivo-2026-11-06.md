@@ -442,7 +442,62 @@ No invalidan el veredicto, pero deben declararse porque afectan a la trazabilida
 - **Veredicto:** `PAPER INCONCLUSIVE` con bloqueador declarado (`no closed cycles`). No se bajan
   umbrales ni se reinterpreta el gate.
 
-## 10. Invariantes de esta auditoría
+## 10. Sello 2.11.185-beta, reanclaje y estado de la nueva medición
+
+Ejecutado **después** de §9, en este orden: fix de lease → sello → migración → pin.
+
+### 10.1 Cadena de commits
+
+| Commit | Contenido |
+| --- | --- |
+| `ab815cac` | `fix(forward)`: `_shutdown` suelta el lease antes de disponer el pool (+ 6 tests) |
+| `36e57032` | `docs(evidence)`: §4.4 y §9 de este expediente |
+| `22a6b4bd` | merge **#100** del fix de lease |
+| `3e10e243` | `chore(release)`: bump `2.11.185-beta` (paquete + 14 literales) + changelog |
+| `31c2d3cd` | merge **#101** (sello) — commit etiquetado en el pin |
+| `d66a0026` | `chore(window)`: reanclaje del pin |
+| `5e82274d` | merge **#102** (pin) — `HEAD` |
+
+### 10.2 Verificación de alineación (código ↔ pin ↔ migración)
+
+| Comprobación | Resultado |
+| --- | --- |
+| `package.json version` | **`2.11.185-beta`** |
+| `HEAD:apps` | `e9486e12f46f22dc10b535e22fb9c0d6715fd804` |
+| `pin.appsHash` | `e9486e12f46f22dc10b535e22fb9c0d6715fd804` ✅ |
+| `HEAD:packages` | `2de53cda49ed847dbd5d4b9572c826c6368ddc52` |
+| `pin.packagesHash` | `2de53cda49ed847dbd5d4b9572c826c6368ddc52` ✅ |
+| `31c2d3cd` (sello) es ancestro de `HEAD` | **sí** |
+| `alembic_version` | **`066_account_evidence_policy`** (`ensure_migrated` desde el árbol sellado: `065 → 066`, `ok = true`) |
+| `auto_simulation_worker.py` en `05926dc8..HEAD` | **sin cambios** (`Δ motor = 0`) |
+| `node scripts/window-pin.mjs --check` | **freeze OK** (la nota de etiqueta `31c2d3cd ≠ 5e82274d` es esperada: el freeze son los dos tree hashes) |
+| Pruebas | `test_dia_d_bump_guard` **2 passed** · `test_v2_76_forward_release_lease` **6 passed** · `window-forward.test.mjs` **50 pass / 0 fail** · `ruff` **All checks passed** |
+
+**Caducidad declarada:** toda evidencia anterior a `5e82274d` queda **`STALE`**. La corrida `20261105`
+nació en `d8a5d0f9` con pin `3e092888`: **no** certifica este árbol, ni el fix de lease, ni la 066.
+
+### 10.3 Estado de la nueva medición: dos precondiciones medidas, ninguna cumplida
+
+Antes de lanzar `run-day` se comprobaron las dos condiciones que el cierre de §4.4 dejó como
+obligatorias. Ninguna se cumple todavía **a las 12:19Z**:
+
+1. **La API de `:8000` no está lista.** Responde `503` con
+   `schema_status = esquema 066 ≠ head esperado 065` y
+   `provenance.package = 2.11.183-beta`, `git_sha = d8a5d0f9…`: es el proceso **anterior** al sello
+   (PID 45672, `apps/api-python/run_dev.py`). `run-day` aborta en duro si la API no está lista, así que
+   hay que **reiniciarla desde el árbol sellado**. No es una regresión: es la consecuencia esperada de
+   migrar la base por delante del proceso que la servía.
+2. **No existe barra del día corriente.** `ohlcv_bars` tiene **0** barras de `2026-11-06`; la última es
+   del `2026-11-05` (ingerida a las `13:59:59Z` del 5/11). Lanzar ahora reproduciría H-1 **desde el
+   primer tick** y el día entero sería `idle` con material cero. La barra del día llega, según el
+   histórico medido, entre las `08:15Z` y las `14:00Z`.
+
+La ventana útil de hoy es estrecha: **400 ticks × 61,3 s ≈ 6 h 50 min**, así que un arranque después de
+las `17:05Z` terminaría pasada la medianoche UTC y volvería a congelarse (§4.4.4). Arrancar en cuanto
+exista la barra —previsiblemente antes de las `14:30Z`— permite que las 400 vueltas terminen **antes
+de medianoche**, sin repetir el tramo ciego.
+
+## 11. Invariantes de esta auditoría
 
 - `Δ motor = 0` en el worktree auditado; el cambio de §6 vive en una rama aparte y no se aplicó al
   árbol que corre.
