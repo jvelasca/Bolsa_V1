@@ -1,0 +1,4485 @@
+{
+  "basis": "entryDay",
+  "byOperationalRegime": [
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6916840956961033,
+          "mean": 0.19235873204826145,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.671911337648099,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 1.0793467740207954,
+          "median": 0.9799954902488364
+        },
+        "measuredCycles": 119,
+        "notMeasuredCycles": 2,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 12
+      },
+      "cycles": 121,
+      "excursionsMeasured": 121,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.06658447916220518,
+      "hitRate": 0.45454545454545453,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 68,
+                "share": 0.5619834710743802,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 60,
+                "share": 0.49586776859504134,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 39,
+                "share": 0.32231404958677684,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 121,
+            "meanMaeR": -1.1808043405033393,
+            "minMaeR": -3.1631649056420486
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 62,
+                "share": 0.9393939393939394,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 59,
+                "share": 0.8939393939393939,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 39,
+                "share": 0.5909090909090909,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 66,
+            "meanMaeR": -1.6730083282618649,
+            "minMaeR": -3.1631649056420486
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 6,
+                "share": 0.10909090909090909,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 1,
+                "share": 0.01818181818181818,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 55,
+            "meanMaeR": -0.5901595551931084,
+            "minMaeR": -1.4275468209000277
+          }
+        }
+      },
+      "meanMaeR": -1.1808043405033393,
+      "meanMfeR": 1.721973870617318,
+      "medianR": -1.0298367673089759,
+      "realizedRTotal": -8.056721978626827,
+      "regime": "BEAR_TREND"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6986044202821264,
+          "mean": 0.14095437664994187,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.3884845556609704,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 0.8968385564048622,
+          "median": 0.8333368865516388
+        },
+        "measuredCycles": 67,
+        "notMeasuredCycles": 1,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 8
+      },
+      "cycles": 68,
+      "excursionsMeasured": 68,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.3993036533694632,
+      "hitRate": 0.36764705882352944,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 42,
+                "share": 0.6176470588235294,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 39,
+                "share": 0.5735294117647058,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 25,
+                "share": 0.36764705882352944,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 68,
+            "meanMaeR": -1.3204075841656449,
+            "minMaeR": -4.899453338539632
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 42,
+                "share": 0.9767441860465116,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 39,
+                "share": 0.9069767441860465,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 25,
+                "share": 0.5813953488372093,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 43,
+            "meanMaeR": -1.8150398161955712,
+            "minMaeR": -4.899453338539632
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 25,
+            "meanMaeR": -0.46964014507417107,
+            "minMaeR": -0.9798127708139655
+          }
+        }
+      },
+      "meanMaeR": -1.3204075841656449,
+      "meanMfeR": 1.2660490715225172,
+      "medianR": -1.049951908741869,
+      "realizedRTotal": -27.1526484291235,
+      "regime": "HIGH_VOLATILITY"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.0,
+          "mean": 0.0,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.0,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 0.5437678394105429,
+          "median": 0.5138930117915412
+        },
+        "measuredCycles": 3,
+        "notMeasuredCycles": 0,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 0
+      },
+      "cycles": 3,
+      "excursionsMeasured": 3,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -1.3013429025000063,
+      "hitRate": 0.0,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 2,
+                "share": 0.6666666666666666,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 3,
+            "meanMaeR": -1.8670434118337995,
+            "minMaeR": -2.088305523047302
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 2,
+                "share": 0.6666666666666666,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 3,
+            "meanMaeR": -1.8670434118337995,
+            "minMaeR": -2.088305523047302
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 0,
+                "share": null,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": null,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": null,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 0,
+            "meanMaeR": null,
+            "minMaeR": null
+          }
+        }
+      },
+      "meanMaeR": -1.8670434118337995,
+      "meanMfeR": 0.5437678394105429,
+      "medianR": -1.2188733289522329,
+      "realizedRTotal": -3.904028707500019,
+      "regime": "SIDEWAYS"
+    }
+  ],
+  "byRegime": [
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6986044202821264,
+          "mean": 0.14095437664994187,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.3884845556609704,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 0.8968385564048622,
+          "median": 0.8333368865516388
+        },
+        "measuredCycles": 67,
+        "notMeasuredCycles": 1,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 8
+      },
+      "cycles": 68,
+      "excursionsMeasured": 68,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.3993036533694632,
+      "hitRate": 0.36764705882352944,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 42,
+                "share": 0.6176470588235294,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 39,
+                "share": 0.5735294117647058,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 25,
+                "share": 0.36764705882352944,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 68,
+            "meanMaeR": -1.3204075841656449,
+            "minMaeR": -4.899453338539632
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 42,
+                "share": 0.9767441860465116,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 39,
+                "share": 0.9069767441860465,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 25,
+                "share": 0.5813953488372093,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 43,
+            "meanMaeR": -1.8150398161955712,
+            "minMaeR": -4.899453338539632
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 25,
+            "meanMaeR": -0.46964014507417107,
+            "minMaeR": -0.9798127708139655
+          }
+        }
+      },
+      "meanMaeR": -1.3204075841656449,
+      "meanMfeR": 1.2660490715225172,
+      "medianR": -1.049951908741869,
+      "realizedRTotal": -27.1526484291235,
+      "regime": "high_vol"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.0,
+          "mean": 0.0,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.0,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 0.5437678394105429,
+          "median": 0.5138930117915412
+        },
+        "measuredCycles": 3,
+        "notMeasuredCycles": 0,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 0
+      },
+      "cycles": 3,
+      "excursionsMeasured": 3,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -1.3013429025000063,
+      "hitRate": 0.0,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 2,
+                "share": 0.6666666666666666,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 3,
+            "meanMaeR": -1.8670434118337995,
+            "minMaeR": -2.088305523047302
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 2,
+                "share": 0.6666666666666666,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 3,
+            "meanMaeR": -1.8670434118337995,
+            "minMaeR": -2.088305523047302
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 0,
+                "share": null,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": null,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": null,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 0,
+            "meanMaeR": null,
+            "minMaeR": null
+          }
+        }
+      },
+      "meanMaeR": -1.8670434118337995,
+      "meanMfeR": 0.5437678394105429,
+      "medianR": -1.2188733289522329,
+      "realizedRTotal": -3.904028707500019,
+      "regime": "range"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6916840956961033,
+          "mean": 0.19235873204826145,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.671911337648099,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 1.0793467740207954,
+          "median": 0.9799954902488364
+        },
+        "measuredCycles": 119,
+        "notMeasuredCycles": 2,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 12
+      },
+      "cycles": 121,
+      "excursionsMeasured": 121,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.06658447916220518,
+      "hitRate": 0.45454545454545453,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 68,
+                "share": 0.5619834710743802,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 60,
+                "share": 0.49586776859504134,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 39,
+                "share": 0.32231404958677684,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 121,
+            "meanMaeR": -1.1808043405033393,
+            "minMaeR": -3.1631649056420486
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 62,
+                "share": 0.9393939393939394,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 59,
+                "share": 0.8939393939393939,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 39,
+                "share": 0.5909090909090909,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 66,
+            "meanMaeR": -1.6730083282618649,
+            "minMaeR": -3.1631649056420486
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 6,
+                "share": 0.10909090909090909,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 1,
+                "share": 0.01818181818181818,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 55,
+            "meanMaeR": -0.5901595551931084,
+            "minMaeR": -1.4275468209000277
+          }
+        }
+      },
+      "meanMaeR": -1.1808043405033393,
+      "meanMfeR": 1.721973870617318,
+      "medianR": -1.0298367673089759,
+      "realizedRTotal": -8.056721978626827,
+      "regime": "trend_down"
+    }
+  ],
+  "byYear": [
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6430587260562143,
+          "mean": 0.14737612386365503,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.34097534484852193,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 0.7505232018111888,
+          "median": 0.8309812601579564
+        },
+        "measuredCycles": 53,
+        "notMeasuredCycles": 1,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 3
+      },
+      "cycles": 54,
+      "excursionsMeasured": 54,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.5479710988514088,
+      "hitRate": 0.37037037037037035,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 35,
+                "share": 0.6481481481481481,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 33,
+                "share": 0.6111111111111112,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 24,
+                "share": 0.4444444444444444,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 54,
+            "meanMaeR": -1.3097757223556883,
+            "minMaeR": -2.699752597212981
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 34,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 32,
+                "share": 0.9411764705882353,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 24,
+                "share": 0.7058823529411765,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 34,
+            "meanMaeR": -1.7581762091316053,
+            "minMaeR": -2.699752597212981
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 1,
+                "share": 0.05,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 1,
+                "share": 0.05,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 20,
+            "meanMaeR": -0.5474948948366294,
+            "minMaeR": -1.4275468209000277
+          }
+        }
+      },
+      "meanMaeR": -1.3097757223556883,
+      "meanMfeR": 1.0708168764460195,
+      "medianR": -1.115400853287059,
+      "realizedRTotal": -29.59043933797608,
+      "year": "2022"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.5781583972020449,
+          "mean": 0.2233740536599299,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.7797956435702457,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 1.1744815191904106,
+          "median": 1.0253624867304438
+        },
+        "measuredCycles": 21,
+        "notMeasuredCycles": 1,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 3
+      },
+      "cycles": 22,
+      "excursionsMeasured": 22,
+      "excursionsUnmeasured": 0,
+      "expectancyR": 0.026692603643168986,
+      "hitRate": 0.45454545454545453,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 13,
+                "share": 0.5909090909090909,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 12,
+                "share": 0.5454545454545454,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 6,
+                "share": 0.2727272727272727,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 22,
+            "meanMaeR": -1.2019742297817961,
+            "minMaeR": -2.146544125824539
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 12,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 12,
+                "share": 1.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 6,
+                "share": 0.5,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 12,
+            "meanMaeR": -1.5726663227628543,
+            "minMaeR": -2.146544125824539
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 1,
+                "share": 0.1,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 10,
+            "meanMaeR": -0.7571437182045264,
+            "minMaeR": -1.1651677417601283
+          }
+        }
+      },
+      "meanMaeR": -1.2019742297817961,
+      "meanMfeR": 1.8644847941749874,
+      "medianR": -1.0609334013857987,
+      "realizedRTotal": 0.5872372801497177,
+      "year": "2023"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6916840956961033,
+          "mean": 0.1843449078094385,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.5833693505722978,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 1.1314141629264391,
+          "median": 1.1080208803075438
+        },
+        "measuredCycles": 47,
+        "notMeasuredCycles": 1,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 6
+      },
+      "cycles": 48,
+      "excursionsMeasured": 48,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.1082001841426397,
+      "hitRate": 0.4791666666666667,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 25,
+                "share": 0.5208333333333334,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 22,
+                "share": 0.4583333333333333,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 16,
+                "share": 0.3333333333333333,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 48,
+            "meanMaeR": -1.1538327960156705,
+            "minMaeR": -3.1631649056420486
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 22,
+                "share": 0.88,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 22,
+                "share": 0.88,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 16,
+                "share": 0.64,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 25,
+            "meanMaeR": -1.7582650654545697,
+            "minMaeR": -3.1631649056420486
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 3,
+                "share": 0.13043478260869565,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 23,
+            "meanMaeR": -0.4968411987994757,
+            "minMaeR": -1.111171697369029
+          }
+        }
+      },
+      "meanMaeR": -1.1538327960156705,
+      "meanMfeR": 1.6786479820137865,
+      "medianR": -0.0619435462737297,
+      "realizedRTotal": -5.193608838846705,
+      "year": "2024"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6537796561631807,
+          "mean": 0.18465475807796897,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.7838299930739382,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 1.1702529434993387,
+          "median": 1.0965300154001483
+        },
+        "measuredCycles": 38,
+        "notMeasuredCycles": 0,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 5
+      },
+      "cycles": 38,
+      "excursionsMeasured": 38,
+      "excursionsUnmeasured": 0,
+      "expectancyR": 0.06545011931576016,
+      "hitRate": 0.42105263157894735,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 22,
+                "share": 0.5789473684210527,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 19,
+                "share": 0.5,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 10,
+                "share": 0.2631578947368421,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 38,
+            "meanMaeR": -1.1943297702812863,
+            "minMaeR": -4.702964379493182
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 21,
+                "share": 0.9545454545454546,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 19,
+                "share": 0.8636363636363636,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 10,
+                "share": 0.45454545454545453,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 22,
+            "meanMaeR": -1.723111927020961,
+            "minMaeR": -4.702964379493182
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 1,
+                "share": 0.0625,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 16,
+            "meanMaeR": -0.4672543047642339,
+            "minMaeR": -1.1416625901278146
+          }
+        }
+      },
+      "meanMaeR": -1.1943297702812863,
+      "meanMfeR": 1.9540829365732768,
+      "medianR": -1.0192720711500494,
+      "realizedRTotal": 2.487104533998886,
+      "year": "2025"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6986044202821264,
+          "mean": 0.13839170612168494,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.47782044679181085,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 0.9357944598774296,
+          "median": 0.6762094984887294
+        },
+        "measuredCycles": 30,
+        "notMeasuredCycles": 0,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 3
+      },
+      "cycles": 30,
+      "excursionsMeasured": 30,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.24678975841920547,
+      "hitRate": 0.36666666666666664,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 18,
+                "share": 0.6,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 16,
+                "share": 0.5333333333333333,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 10,
+                "share": 0.3333333333333333,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 30,
+            "meanMaeR": -1.3442114539273844,
+            "minMaeR": -4.899453338539632
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 18,
+                "share": 0.9473684210526315,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 16,
+                "share": 0.8421052631578947,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 10,
+                "share": 0.5263157894736842,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 19,
+            "meanMaeR": -1.7658587359336753,
+            "minMaeR": -4.899453338539632
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 11,
+            "meanMaeR": -0.6159116031892453,
+            "minMaeR": -0.978011949766416
+          }
+        }
+      },
+      "meanMaeR": -1.3442114539273844,
+      "meanMfeR": 1.4136149066692405,
+      "medianR": -0.8608044395094154,
+      "realizedRTotal": -7.403692752576164,
+      "year": "2026"
+    }
+  ],
+  "byYearByRegime": [
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.4816912356849304,
+          "mean": 0.1659975931576257,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.30855703168400683,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 0.7870620352371633,
+          "median": 0.9913797003576102
+        },
+        "measuredCycles": 7,
+        "notMeasuredCycles": 1,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 0
+      },
+      "cycles": 8,
+      "excursionsMeasured": 8,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.6921588825612885,
+      "hitRate": 0.375,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 5,
+                "share": 0.625,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 5,
+                "share": 0.625,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 5,
+                "share": 0.625,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 8,
+            "meanMaeR": -1.4539922729346795,
+            "minMaeR": -2.3998660617536145
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 5,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 5,
+                "share": 1.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 5,
+                "share": 1.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 5,
+            "meanMaeR": -1.966160624592837,
+            "minMaeR": -2.3998660617536145
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 3,
+            "meanMaeR": -0.6003783535044175,
+            "minMaeR": -0.9798127708139655
+          }
+        }
+      },
+      "meanMaeR": -1.4539922729346795,
+      "meanMfeR": 0.9555027279460715,
+      "medianR": -1.260324730301278,
+      "realizedRTotal": -5.537271060490308,
+      "regime": "high_vol",
+      "year": "2022"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6430587260562143,
+          "mean": 0.14454242201457254,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.34590856641703505,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 0.7449629445507145,
+          "median": 0.8130630022431978
+        },
+        "measuredCycles": 46,
+        "notMeasuredCycles": 0,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 3
+      },
+      "cycles": 46,
+      "excursionsMeasured": 46,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.5228949625540384,
+      "hitRate": 0.3695652173913043,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 30,
+                "share": 0.6521739130434783,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 28,
+                "share": 0.6086956521739131,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 19,
+                "share": 0.41304347826086957,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 46,
+            "meanMaeR": -1.2846945831245593,
+            "minMaeR": -2.699752597212981
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 29,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 27,
+                "share": 0.9310344827586207,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 19,
+                "share": 0.6551724137931034,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 29,
+            "meanMaeR": -1.722316827155531,
+            "minMaeR": -2.699752597212981
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 1,
+                "share": 0.058823529411764705,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 1,
+                "share": 0.058823529411764705,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 17,
+            "meanMaeR": -0.538162519777608,
+            "minMaeR": -1.4275468209000277
+          }
+        }
+      },
+      "meanMaeR": -1.2846945831245593,
+      "meanMfeR": 1.0908715109677496,
+      "medianR": -1.115400853287059,
+      "realizedRTotal": -24.05316827748577,
+      "regime": "trend_down",
+      "year": "2022"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.5781583972020449,
+          "mean": 0.2233740536599299,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.7797956435702457,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 1.1744815191904106,
+          "median": 1.0253624867304438
+        },
+        "measuredCycles": 21,
+        "notMeasuredCycles": 1,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 3
+      },
+      "cycles": 22,
+      "excursionsMeasured": 22,
+      "excursionsUnmeasured": 0,
+      "expectancyR": 0.026692603643168986,
+      "hitRate": 0.45454545454545453,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 13,
+                "share": 0.5909090909090909,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 12,
+                "share": 0.5454545454545454,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 6,
+                "share": 0.2727272727272727,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 22,
+            "meanMaeR": -1.2019742297817961,
+            "minMaeR": -2.146544125824539
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 12,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 12,
+                "share": 1.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 6,
+                "share": 0.5,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 12,
+            "meanMaeR": -1.5726663227628543,
+            "minMaeR": -2.146544125824539
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 1,
+                "share": 0.1,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 10,
+            "meanMaeR": -0.7571437182045264,
+            "minMaeR": -1.1651677417601283
+          }
+        }
+      },
+      "meanMaeR": -1.2019742297817961,
+      "meanMfeR": 1.8644847941749874,
+      "medianR": -1.0609334013857987,
+      "realizedRTotal": 0.5872372801497177,
+      "regime": "trend_down",
+      "year": "2023"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.5497849176237283,
+          "mean": 0.21060732877908536,
+          "median": 0.24080123213288662
+        },
+        "capturedR": {
+          "mean": 0.48026631951698856,
+          "median": 0.3453352332455168
+        },
+        "leftOnTableR": {
+          "mean": 1.0473666583491141,
+          "median": 1.0796154211743636
+        },
+        "measuredCycles": 14,
+        "notMeasuredCycles": 0,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 2
+      },
+      "cycles": 14,
+      "excursionsMeasured": 14,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.05417879994260051,
+      "hitRate": 0.5714285714285714,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 6,
+                "share": 0.42857142857142855,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 6,
+                "share": 0.42857142857142855,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 4,
+                "share": 0.2857142857142857,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 14,
+            "meanMaeR": -0.9038058359663977,
+            "minMaeR": -2.5515746130440173
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 6,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 6,
+                "share": 1.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 4,
+                "share": 0.6666666666666666,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 6,
+            "meanMaeR": -1.8153126168091098,
+            "minMaeR": -2.5515746130440173
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 8,
+            "meanMaeR": -0.22017575033436387,
+            "minMaeR": -0.4484478796929251
+          }
+        }
+      },
+      "meanMaeR": -0.9038058359663977,
+      "meanMfeR": 1.5276329778661029,
+      "medianR": 0.3453352332455168,
+      "realizedRTotal": -0.7585031991964072,
+      "regime": "high_vol",
+      "year": "2024"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.0,
+          "mean": 0.0,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.0,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 0.5437678394105429,
+          "median": 0.5138930117915412
+        },
+        "measuredCycles": 3,
+        "notMeasuredCycles": 0,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 0
+      },
+      "cycles": 3,
+      "excursionsMeasured": 3,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -1.3013429025000063,
+      "hitRate": 0.0,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 2,
+                "share": 0.6666666666666666,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 3,
+            "meanMaeR": -1.8670434118337995,
+            "minMaeR": -2.088305523047302
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 3,
+                "share": 1.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 2,
+                "share": 0.6666666666666666,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 3,
+            "meanMaeR": -1.8670434118337995,
+            "minMaeR": -2.088305523047302
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 0,
+                "share": null,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": null,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": null,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 0,
+            "meanMaeR": null,
+            "minMaeR": null
+          }
+        }
+      },
+      "meanMaeR": -1.8670434118337995,
+      "meanMfeR": 0.5437678394105429,
+      "medianR": -1.2188733289522329,
+      "realizedRTotal": -3.904028707500019,
+      "regime": "range",
+      "year": "2024"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6916840956961033,
+          "mean": 0.19052360213788047,
+          "median": 0.05142548435108743
+        },
+        "capturedR": {
+          "mean": 0.6898210334553385,
+          "median": 0.07458734306890209
+        },
+        "leftOnTableR": {
+          "mean": 1.2294009640807806,
+          "median": 1.3148075085594089
+        },
+        "measuredCycles": 30,
+        "notMeasuredCycles": 1,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 4
+      },
+      "cycles": 31,
+      "excursionsMeasured": 31,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.017131513940331567,
+      "hitRate": 0.4838709677419355,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 16,
+                "share": 0.5161290322580645,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 13,
+                "share": 0.41935483870967744,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 10,
+                "share": 0.3225806451612903,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 31,
+            "meanMaeR": -1.1977278151522974,
+            "minMaeR": -3.1631649056420486
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 13,
+                "share": 0.8125,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 13,
+                "share": 0.8125,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 10,
+                "share": 0.625,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 16,
+            "meanMaeR": -1.7164762937505116,
+            "minMaeR": -3.1631649056420486
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 3,
+                "share": 0.2,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 15,
+            "meanMaeR": -0.6443961046475353,
+            "minMaeR": -1.111171697369029
+          }
+        }
+      },
+      "meanMaeR": -1.1977278151522974,
+      "meanMfeR": 1.8566754170420867,
+      "medianR": -0.01461059252075154,
+      "realizedRTotal": -0.5310769321502786,
+      "regime": "trend_down",
+      "year": "2024"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.4774598944486779,
+          "mean": 0.07385664355531138,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.1756390081565504,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 0.7401113762034458,
+          "median": 0.6275955825500767
+        },
+        "measuredCycles": 16,
+        "notMeasuredCycles": 0,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 3
+      },
+      "cycles": 16,
+      "excursionsMeasured": 16,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.8408238385537887,
+      "hitRate": 0.1875,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 13,
+                "share": 0.8125,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 12,
+                "share": 0.75,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 6,
+                "share": 0.375,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 16,
+            "meanMaeR": -1.573509513652207,
+            "minMaeR": -4.702964379493182
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 13,
+                "share": 1.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 12,
+                "share": 0.9230769230769231,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 6,
+                "share": 0.46153846153846156,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 13,
+            "meanMaeR": -1.8286705607577611,
+            "minMaeR": -4.702964379493182
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 3,
+            "meanMaeR": -0.46781164286147153,
+            "minMaeR": -0.5649429681847151
+          }
+        }
+      },
+      "meanMaeR": -1.573509513652207,
+      "meanMfeR": 0.9157503843599962,
+      "medianR": -1.1312742621436505,
+      "realizedRTotal": -13.45318141686062,
+      "regime": "high_vol",
+      "year": "2025"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6537796561631807,
+          "mean": 0.2652352050035381,
+          "median": 0.1967797709302945
+        },
+        "capturedR": {
+          "mean": 1.2261507093774928,
+          "median": 0.2964925887892866
+        },
+        "leftOnTableR": {
+          "mean": 1.4830831742599881,
+          "median": 1.3436443267895313
+        },
+        "measuredCycles": 22,
+        "notMeasuredCycles": 0,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 2
+      },
+      "cycles": 22,
+      "excursionsMeasured": 22,
+      "excursionsUnmeasured": 0,
+      "expectancyR": 0.7245584523117956,
+      "hitRate": 0.5909090909090909,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 9,
+                "share": 0.4090909090909091,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 7,
+                "share": 0.3181818181818182,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 4,
+                "share": 0.18181818181818182,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 22,
+            "meanMaeR": -0.9185626841933442,
+            "minMaeR": -2.164212864985085
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 8,
+                "share": 0.8888888888888888,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 7,
+                "share": 0.7777777777777778,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 4,
+                "share": 0.4444444444444444,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 9,
+            "meanMaeR": -1.5706383449566936,
+            "minMaeR": -2.164212864985085
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 1,
+                "share": 0.07692307692307693,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 13,
+            "meanMaeR": -0.467125688280256,
+            "minMaeR": -1.1416625901278146
+          }
+        }
+      },
+      "meanMaeR": -0.9185626841933442,
+      "meanMfeR": 2.709233883637481,
+      "medianR": 0.2964925887892866,
+      "realizedRTotal": 15.940285950859504,
+      "regime": "trend_down",
+      "year": "2025"
+    },
+    {
+      "capture": {
+        "captureRatio": {
+          "aboveOneCount": 0,
+          "max": 0.6986044202821264,
+          "mean": 0.13839170612168494,
+          "median": 0.0
+        },
+        "capturedR": {
+          "mean": 0.47782044679181085,
+          "median": 0.0
+        },
+        "leftOnTableR": {
+          "mean": 0.9357944598774296,
+          "median": 0.6762094984887294
+        },
+        "measuredCycles": 30,
+        "notMeasuredCycles": 0,
+        "reversalMfeMinR": 1.0,
+        "reversedCount": 3
+      },
+      "cycles": 30,
+      "excursionsMeasured": 30,
+      "excursionsUnmeasured": 0,
+      "expectancyR": -0.24678975841920547,
+      "hitRate": 0.36666666666666664,
+      "maeSeverity": {
+        "populations": {
+          "ALL": {
+            "breaches": {
+              "-1.00": {
+                "count": 18,
+                "share": 0.6,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 16,
+                "share": 0.5333333333333333,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 10,
+                "share": 0.3333333333333333,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 30,
+            "meanMaeR": -1.3442114539273844,
+            "minMaeR": -4.899453338539632
+          },
+          "LOSERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 18,
+                "share": 0.9473684210526315,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 16,
+                "share": 0.8421052631578947,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 10,
+                "share": 0.5263157894736842,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 19,
+            "meanMaeR": -1.7658587359336753,
+            "minMaeR": -4.899453338539632
+          },
+          "WINNERS": {
+            "breaches": {
+              "-1.00": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.0
+              },
+              "-1.25": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.25
+              },
+              "-1.50": {
+                "count": 0,
+                "share": 0.0,
+                "thresholdR": -1.5
+              }
+            },
+            "cycles": 11,
+            "meanMaeR": -0.6159116031892453,
+            "minMaeR": -0.978011949766416
+          }
+        }
+      },
+      "meanMaeR": -1.3442114539273844,
+      "meanMfeR": 1.4136149066692405,
+      "medianR": -0.8608044395094154,
+      "realizedRTotal": -7.403692752576164,
+      "regime": "high_vol",
+      "year": "2026"
+    }
+  ],
+  "capture": {
+    "captureRatio": {
+      "aboveOneCount": 0,
+      "max": 0.6986044202821264,
+      "mean": 0.1710827108428001,
+      "median": 0.0
+    },
+    "capturedR": {
+      "mean": 0.5607720339122159,
+      "median": 0.0
+    },
+    "leftOnTableR": {
+      "mean": 1.006146840771598,
+      "median": 0.9599697583660216
+    },
+    "measuredCycles": 189,
+    "notMeasuredCycles": 3,
+    "reversalMfeMinR": 1.0,
+    "reversedCount": 20
+  },
+  "concentration": {
+    "bestContributionR": 23.711709552285626,
+    "classification": "broad",
+    "cycles": 192,
+    "expectancyR": -0.2037156203919289,
+    "expectancyWithoutWorstR": -0.19085368653894458,
+    "realizedRTotal": -39.113399115250346,
+    "signFlipsWithoutWorst": false,
+    "topK": 5,
+    "worstContributionR": -11.618313136022174
+  },
+  "coverage": {
+    "yearsEmpty": [
+      "2021"
+    ],
+    "yearsMeasured": [
+      "2021",
+      "2022",
+      "2023",
+      "2024",
+      "2025",
+      "2026"
+    ],
+    "yearsNotMeasured": [],
+    "yearsRequested": [
+      "2021",
+      "2022",
+      "2023",
+      "2024",
+      "2025",
+      "2026"
+    ]
+  },
+  "crossCheck": {
+    "note": "no se cruzó contra un artefacto longitudinal",
+    "source": null
+  },
+  "decomposition": {
+    "avgLossR": -1.2955295850415993,
+    "avgWinR": 1.32482393011761,
+    "cycles": 192,
+    "expectancyR": -0.2037156203919289,
+    "identityGap": -1.942890293094024e-16,
+    "losses": 112,
+    "payoffRatio": 1.022611868855986,
+    "winRate": 0.4166666666666667,
+    "wins": 80
+  },
+  "equityEvidence": {
+    "buyHold": {
+      "excessPct": -114.99826942458317,
+      "pct": 72.86735537185442,
+      "reason": null,
+      "symbolsMeasured": 20,
+      "symbolsRequested": 20
+    },
+    "caveats": [
+      "La curva es de CAJA realizada: una posición viva al cierre queda como caja salida (no se marca a mercado) y no se convierte a la divisa de la cuenta."
+    ],
+    "currencyNote": "una sola divisa de la cuenta declarada; la mezcla de divisas NO se convierte",
+    "curve": [
+      {
+        "day": "2022-01-27",
+        "equity": 100000.0
+      },
+      {
+        "day": "2022-01-27",
+        "equity": 80184.9089906325
+      },
+      {
+        "day": "2022-02-14",
+        "equity": 80399.78194778989
+      },
+      {
+        "day": "2022-02-17",
+        "equity": 76516.6881121705
+      },
+      {
+        "day": "2022-02-18",
+        "equity": 75570.67755893499
+      },
+      {
+        "day": "2022-02-25",
+        "equity": 73463.55732403148
+      },
+      {
+        "day": "2022-03-08",
+        "equity": 73814.77444859929
+      },
+      {
+        "day": "2022-03-21",
+        "equity": 72868.74547410649
+      },
+      {
+        "day": "2022-04-07",
+        "equity": 71844.01802554978
+      },
+      {
+        "day": "2022-04-08",
+        "equity": 70931.42151344239
+      },
+      {
+        "day": "2022-04-11",
+        "equity": 69357.43271339718
+      },
+      {
+        "day": "2022-04-13",
+        "equity": 69235.01141117828
+      },
+      {
+        "day": "2022-04-14",
+        "equity": 65968.75666034977
+      },
+      {
+        "day": "2022-04-21",
+        "equity": 65631.38883912477
+      },
+      {
+        "day": "2022-04-25",
+        "equity": 65692.66118231187
+      },
+      {
+        "day": "2022-04-26",
+        "equity": 63608.953559036876
+      },
+      {
+        "day": "2022-04-27",
+        "equity": 62820.10309167828
+      },
+      {
+        "day": "2022-04-29",
+        "equity": 61913.73715248768
+      },
+      {
+        "day": "2022-05-10",
+        "equity": 62347.25786692828
+      },
+      {
+        "day": "2022-05-23",
+        "equity": 60876.06329377508
+      },
+      {
+        "day": "2022-05-31",
+        "equity": 59633.50237266838
+      },
+      {
+        "day": "2022-06-01",
+        "equity": 58046.70821518558
+      },
+      {
+        "day": "2022-06-02",
+        "equity": 56959.16793912677
+      },
+      {
+        "day": "2022-06-13",
+        "equity": 57118.43218307327
+      },
+      {
+        "day": "2022-06-14",
+        "equity": 57287.721556570075
+      },
+      {
+        "day": "2022-06-15",
+        "equity": 58734.40773114687
+      },
+      {
+        "day": "2022-07-15",
+        "equity": 61775.108574066064
+      },
+      {
+        "day": "2022-07-22",
+        "equity": 60548.71833431026
+      },
+      {
+        "day": "2022-08-25",
+        "equity": 57611.93616839294
+      },
+      {
+        "day": "2022-08-30",
+        "equity": 57331.77079917744
+      },
+      {
+        "day": "2022-09-02",
+        "equity": 54427.91779679614
+      },
+      {
+        "day": "2022-09-23",
+        "equity": 53425.02230784074
+      },
+      {
+        "day": "2022-10-19",
+        "equity": 52498.97939436854
+      },
+      {
+        "day": "2022-10-21",
+        "equity": 56349.13619465333
+      },
+      {
+        "day": "2022-10-24",
+        "equity": 57788.77834862713
+      },
+      {
+        "day": "2022-10-25",
+        "equity": 58532.894375467426
+      },
+      {
+        "day": "2022-10-27",
+        "equity": 59358.08416147922
+      },
+      {
+        "day": "2022-12-20",
+        "equity": 61213.177958775625
+      },
+      {
+        "day": "2023-02-28",
+        "equity": 62721.75878992942
+      },
+      {
+        "day": "2023-03-01",
+        "equity": 62980.945176716414
+      },
+      {
+        "day": "2023-03-02",
+        "equity": 64127.06463311661
+      },
+      {
+        "day": "2023-05-25",
+        "equity": 64794.61297875831
+      },
+      {
+        "day": "2023-05-26",
+        "equity": 65046.84934545781
+      },
+      {
+        "day": "2023-07-26",
+        "equity": 64121.27470350191
+      },
+      {
+        "day": "2023-07-27",
+        "equity": 63476.664607645514
+      },
+      {
+        "day": "2023-08-01",
+        "equity": 62827.132932343215
+      },
+      {
+        "day": "2023-08-03",
+        "equity": 61886.244902116916
+      },
+      {
+        "day": "2023-08-11",
+        "equity": 60458.85069117931
+      },
+      {
+        "day": "2023-08-21",
+        "equity": 61344.688983352215
+      },
+      {
+        "day": "2023-09-07",
+        "equity": 59494.847044124144
+      },
+      {
+        "day": "2023-09-11",
+        "equity": 58288.97401400735
+      },
+      {
+        "day": "2023-10-04",
+        "equity": 57662.22176113818
+      },
+      {
+        "day": "2023-10-24",
+        "equity": 56425.21241033628
+      },
+      {
+        "day": "2023-10-27",
+        "equity": 60741.486976581065
+      },
+      {
+        "day": "2023-11-06",
+        "equity": 61781.97290698187
+      },
+      {
+        "day": "2024-01-08",
+        "equity": 63114.7385473515
+      },
+      {
+        "day": "2024-01-09",
+        "equity": 62273.53041360479
+      },
+      {
+        "day": "2024-01-11",
+        "equity": 62053.29655380399
+      },
+      {
+        "day": "2024-02-02",
+        "equity": 66191.57848633807
+      },
+      {
+        "day": "2024-02-05",
+        "equity": 67281.18057542288
+      },
+      {
+        "day": "2024-03-18",
+        "equity": 66686.6144436248
+      },
+      {
+        "day": "2024-03-19",
+        "equity": 66702.4710384404
+      },
+      {
+        "day": "2024-03-21",
+        "equity": 66005.0060193575
+      },
+      {
+        "day": "2024-03-22",
+        "equity": 65846.4621444143
+      },
+      {
+        "day": "2024-04-22",
+        "equity": 63906.94631805439
+      },
+      {
+        "day": "2024-04-30",
+        "equity": 65448.26989694279
+      },
+      {
+        "day": "2024-05-02",
+        "equity": 65730.65814729079
+      },
+      {
+        "day": "2024-05-03",
+        "equity": 66111.52294348249
+      },
+      {
+        "day": "2024-06-17",
+        "equity": 67861.27596383027
+      },
+      {
+        "day": "2024-06-18",
+        "equity": 67637.23673225877
+      },
+      {
+        "day": "2024-06-20",
+        "equity": 67719.48635391367
+      },
+      {
+        "day": "2024-07-26",
+        "equity": 64334.468198659575
+      },
+      {
+        "day": "2024-07-29",
+        "equity": 62347.54884534447
+      },
+      {
+        "day": "2024-08-02",
+        "equity": 62206.232094798674
+      },
+      {
+        "day": "2024-09-26",
+        "equity": 61895.71045495439
+      },
+      {
+        "day": "2024-09-27",
+        "equity": 61966.059794423985
+      },
+      {
+        "day": "2024-10-04",
+        "equity": 59464.743443492785
+      },
+      {
+        "day": "2024-10-07",
+        "equity": 59583.32410075758
+      },
+      {
+        "day": "2024-12-11",
+        "equity": 58582.28354459598
+      },
+      {
+        "day": "2024-12-19",
+        "equity": 60269.40613813217
+      },
+      {
+        "day": "2025-02-04",
+        "equity": 61283.55273216595
+      },
+      {
+        "day": "2025-02-07",
+        "equity": 61258.13336577645
+      },
+      {
+        "day": "2025-03-10",
+        "equity": 58231.20882032953
+      },
+      {
+        "day": "2025-03-11",
+        "equity": 56862.41224371903
+      },
+      {
+        "day": "2025-03-13",
+        "equity": 56011.045762706235
+      },
+      {
+        "day": "2025-03-14",
+        "equity": 55048.08963812133
+      },
+      {
+        "day": "2025-03-17",
+        "equity": 54761.76758958403
+      },
+      {
+        "day": "2025-03-28",
+        "equity": 56697.44801096924
+      },
+      {
+        "day": "2025-04-09",
+        "equity": 57223.29953083554
+      },
+      {
+        "day": "2025-05-09",
+        "equity": 58334.82783392726
+      },
+      {
+        "day": "2025-05-13",
+        "equity": 59660.84200524906
+      },
+      {
+        "day": "2025-08-04",
+        "equity": 60519.45345006317
+      },
+      {
+        "day": "2025-09-15",
+        "equity": 61894.13188545205
+      },
+      {
+        "day": "2025-10-02",
+        "equity": 67591.48249538585
+      },
+      {
+        "day": "2025-10-08",
+        "equity": 66351.44275066664
+      },
+      {
+        "day": "2025-10-31",
+        "equity": 64513.852737418754
+      },
+      {
+        "day": "2025-11-03",
+        "equity": 63125.05146214916
+      },
+      {
+        "day": "2025-11-14",
+        "equity": 62150.55457111176
+      },
+      {
+        "day": "2025-11-18",
+        "equity": 62529.10276092996
+      },
+      {
+        "day": "2025-11-19",
+        "equity": 60877.92510713087
+      },
+      {
+        "day": "2025-11-24",
+        "equity": 61648.38264339027
+      },
+      {
+        "day": "2025-12-03",
+        "equity": 60337.48727377837
+      },
+      {
+        "day": "2025-12-18",
+        "equity": 60381.58703607507
+      },
+      {
+        "day": "2026-03-11",
+        "equity": 59828.21856250057
+      },
+      {
+        "day": "2026-03-13",
+        "equity": 60120.56892835407
+      },
+      {
+        "day": "2026-04-09",
+        "equity": 61999.825309721375
+      },
+      {
+        "day": "2026-04-13",
+        "equity": 61304.53192445447
+      },
+      {
+        "day": "2026-05-14",
+        "equity": 59362.70860726046
+      },
+      {
+        "day": "2026-05-15",
+        "equity": 60051.560212375356
+      },
+      {
+        "day": "2026-05-19",
+        "equity": 61782.40869707885
+      },
+      {
+        "day": "2026-06-01",
+        "equity": 61757.34204660745
+      },
+      {
+        "day": "2026-06-04",
+        "equity": 59467.044965189554
+      },
+      {
+        "day": "2026-06-11",
+        "equity": 60623.77059898765
+      },
+      {
+        "day": "2026-07-14",
+        "equity": 63864.96747748024
+      },
+      {
+        "day": "2026-07-16",
+        "equity": 62342.94081549764
+      },
+      {
+        "day": "2026-08-31",
+        "equity": 61118.83781279414
+      },
+      {
+        "day": "2026-09-01",
+        "equity": 60413.97548948944
+      },
+      {
+        "day": "2026-09-09",
+        "equity": 59753.947312315046
+      },
+      {
+        "day": "2026-09-10",
+        "equity": 60073.42902601754
+      },
+      {
+        "day": "2026-09-11",
+        "equity": 59381.85120544775
+      },
+      {
+        "day": "2026-09-15",
+        "equity": 59639.175472625546
+      },
+      {
+        "day": "2026-10-16",
+        "equity": 58563.174092985246
+      },
+      {
+        "day": "2026-10-26",
+        "equity": 57869.08594727125
+      }
+    ],
+    "curvePoints": 123,
+    "endDay": "2026-10-26",
+    "flowsMeasured": 2197,
+    "flowsUnmeasured": 1037,
+    "holdout": {
+      "cutDay": "2025-03-17",
+      "holdoutPct": 30.0,
+      "inSampleDays": 85,
+      "inSampleDrawdownPct": 47.50102060563145,
+      "inSampleNetReturnPct": -44.95191036187867,
+      "outOfSampleDays": 37,
+      "outOfSampleDrawdownPct": 14.384055785103254,
+      "outOfSampleNetReturnPct": 5.674247736076077
+    },
+    "initialEquity": 100000.0,
+    "kind": "dia-d-equity-evidence-v1",
+    "maxDrawdownPct": 47.50102060563145,
+    "measuredTrades": 192,
+    "netReturnPct": -42.130914052728755,
+    "notMeasured": [
+      "1037 fills sin dato obligatorio (day=1037): fuera de la curva (no son un 0)"
+    ],
+    "policyEvaluation": {
+      "checks": [
+        {
+          "measured": 122.0,
+          "name": "minWindows",
+          "threshold": 30.0,
+          "verdict": "PASS"
+        },
+        {
+          "measured": 192.0,
+          "name": "minTradesTotal",
+          "threshold": 100.0,
+          "verdict": "PASS"
+        },
+        {
+          "measured": 42.62295081967213,
+          "name": "minPositiveWindowPct",
+          "threshold": 60.0,
+          "verdict": "FAIL"
+        },
+        {
+          "measured": -42.130914052728755,
+          "name": "minNetReturnPct",
+          "threshold": 0.0,
+          "verdict": "FAIL"
+        },
+        {
+          "measured": 47.50102060563145,
+          "name": "maxDrawdownPct",
+          "threshold": 15.0,
+          "verdict": "FAIL"
+        },
+        {
+          "measured": -114.99826942458317,
+          "name": "minExcessVsBuyHoldPct",
+          "threshold": 0.0,
+          "verdict": "FAIL"
+        },
+        {
+          "measured": 12.705245966303167,
+          "name": "minRoundTripCostBps",
+          "threshold": 22.0,
+          "verdict": "FAIL"
+        }
+      ],
+      "failed": [
+        "minPositiveWindowPct",
+        "minNetReturnPct",
+        "maxDrawdownPct",
+        "minExcessVsBuyHoldPct",
+        "minRoundTripCostBps"
+      ],
+      "notMeasured": [],
+      "policy": {
+        "accountId": "1484e253d2d54645945a6b1d7",
+        "actor": null,
+        "holdoutPct": 30.0,
+        "isDefault": true,
+        "maxDrawdownPct": 15.0,
+        "minCommissionBps": 5.0,
+        "minExcessVsBuyHoldPct": 0.0,
+        "minNetReturnPct": 0.0,
+        "minPositiveWindowPct": 60.0,
+        "minRoundTripCostBps": 22.0,
+        "minSlippageBps": 5.0,
+        "minSpreadBps": 2.0,
+        "minTradesTotal": 100,
+        "minWindows": 30,
+        "updatedAt": null,
+        "version": 1
+      },
+      "verdict": "REFUTED",
+      "verdictReason": "failed:minPositiveWindowPct,minNetReturnPct,maxDrawdownPct,minExcessVsBuyHoldPct,minRoundTripCostBps"
+    },
+    "positiveWindowPct": 42.62295081967213,
+    "positiveWindows": {
+      "granularity": "day",
+      "measuredWindows": 122,
+      "negativeWindows": 70,
+      "positivePct": 42.62295081967213,
+      "positiveWindows": 52
+    },
+    "positiveYears": {
+      "granularity": "year",
+      "measuredWindows": 5,
+      "negativeWindows": 5,
+      "positivePct": 0.0,
+      "positiveWindows": 0
+    },
+    "realizedCostBps": 12.705245966303167,
+    "startDay": "2022-01-27",
+    "unmeasuredReasons": {
+      "day": 1037
+    }
+  },
+  "kind": "DIA_D_AUTO_MULTI_ATTRIBUTION",
+  "limits": [
+    "Advisory read-only: no cambia el motor, los umbrales, TOP_N ni la allocation.",
+    "Atribucion DESCRIPTIVA, no causal: descompone la muestra medida, no explica el mercado.",
+    "Evidencia de REPLAY/OOS: NO sustituye la ventana PAPER real (P3-2/P3-3 siguen abiertas).",
+    "Un hueco es None/NOT_MEASURED; nunca se rellena con 0. La media de una muestra vacia es None.",
+    "La unidad es el CICLO; la atribucion temporal es por entryDay (dia de decision).",
+    "El regimen es el agregado trial por dia (census_operable_days) y el operativo su map; la lectura multirregimen es DESCRIPTIVA y depende de la disponibilidad real de barras por ano.",
+    "El sector es el del catalogo ACTUAL (no point-in-time); aqui no se atribuye por sector.",
+    "MAE/MFE son extremos ENTRE DIAS (barras D1); el dia de entrada puede incluir excursion previa al fill.",
+    "La captura es capturedR/MFE con capturedR=max(realizedR,0): vive en [0,+inf) y NO cambia de signo.",
+    "La severidad de MAE se publica por POBLACION (ALL/WINNERS/LOSERS): la fraccion de TODOS los ciclos con MAE < -1R NO es la de PERDEDORES (un ganador puede sufrirla).",
+    "CONFIRMED sigue reservado a evidencia PAPER y NO se emite al observar el replay.",
+    "Un ano sin universo PIT elegible o sin barras se declara en coverage.yearsNotMeasured; no se inventa.",
+    "Universe(D) point-in-time POR DIA dentro del ano: el watch es el superconjunto de candidatos con algun dia elegible (candidate_ids) y las barras IN-WINDOW se podan a los dias elegibles (ids_by_day); availability_from/until son REALES (barras D1); active_from/active_until y sector_at son aproximaciones DECLARADAS. Un ano sin miembros elegibles no cae al catalogo actual (fail-closed)."
+  ],
+  "maeSeverity": {
+    "populations": {
+      "ALL": {
+        "breaches": {
+          "-1.00": {
+            "count": 113,
+            "share": 0.5885416666666666,
+            "thresholdR": -1.0
+          },
+          "-1.25": {
+            "count": 102,
+            "share": 0.53125,
+            "thresholdR": -1.25
+          },
+          "-1.50": {
+            "count": 66,
+            "share": 0.34375,
+            "thresholdR": -1.5
+          }
+        },
+        "cycles": 192,
+        "meanMaeR": -1.240969641456611,
+        "minMaeR": -4.899453338539632
+      },
+      "LOSERS": {
+        "breaches": {
+          "-1.00": {
+            "count": 107,
+            "share": 0.9553571428571429,
+            "thresholdR": -1.0
+          },
+          "-1.25": {
+            "count": 101,
+            "share": 0.9017857142857143,
+            "thresholdR": -1.25
+          },
+          "-1.50": {
+            "count": 66,
+            "share": 0.5892857142857143,
+            "thresholdR": -1.5
+          }
+        },
+        "cycles": 112,
+        "meanMaeR": -1.7327356428320897,
+        "minMaeR": -4.899453338539632
+      },
+      "WINNERS": {
+        "breaches": {
+          "-1.00": {
+            "count": 6,
+            "share": 0.075,
+            "thresholdR": -1.0
+          },
+          "-1.25": {
+            "count": 1,
+            "share": 0.0125,
+            "thresholdR": -1.25
+          },
+          "-1.50": {
+            "count": 0,
+            "share": 0.0,
+            "thresholdR": -1.5
+          }
+        },
+        "cycles": 80,
+        "meanMaeR": -0.5524972395309404,
+        "minMaeR": -1.4275468209000277
+      }
+    }
+  },
+  "meta": {
+    "account": "1484e253d2d54645945a6b1d7",
+    "bump": "2.11.183-beta",
+    "historyDays": 90,
+    "horizonDays": 20,
+    "nature": "INVESTIGACION",
+    "phase": "V2.93 DIA-D AUTO MULTI ATTRIBUTION",
+    "pitAnchoring": "per_day",
+    "realPriceForcedOff": true,
+    "topK": 5,
+    "universe": "pit",
+    "venue": "paper",
+    "versionA": "v283-window-a"
+  },
+  "readOnly": true,
+  "schemaVersion": "dia-d-multi-v1",
+  "summary": {
+    "evidenceQuality": "STRONG",
+    "expectancyR": -0.2037156203919289,
+    "hitRate": 0.4166666666666667,
+    "measuredCycles": 192,
+    "realizedRTotal": -39.113399115250346,
+    "verdict": "REFUTED",
+    "verdictReason": "negative_expectancy"
+  },
+  "windows": [
+    {
+      "cyclesMeasured": 0,
+      "days": [
+        "2021-11-01",
+        "2021-11-02",
+        "2021-11-03",
+        "2021-11-04",
+        "2021-11-05",
+        "2021-11-08",
+        "2021-11-09",
+        "2021-11-10",
+        "2021-11-11",
+        "2021-11-12",
+        "2021-11-15",
+        "2021-11-16",
+        "2021-11-17",
+        "2021-11-18",
+        "2021-11-19",
+        "2021-11-22",
+        "2021-11-23",
+        "2021-11-24",
+        "2021-11-25",
+        "2021-11-26",
+        "2021-11-29",
+        "2021-11-30",
+        "2021-12-01",
+        "2021-12-02",
+        "2021-12-03",
+        "2021-12-06",
+        "2021-12-07",
+        "2021-12-08",
+        "2021-12-09",
+        "2021-12-10",
+        "2021-12-13",
+        "2021-12-14",
+        "2021-12-15",
+        "2021-12-16",
+        "2021-12-17",
+        "2021-12-20",
+        "2021-12-21",
+        "2021-12-22",
+        "2021-12-23",
+        "2021-12-24",
+        "2021-12-27",
+        "2021-12-28",
+        "2021-12-29",
+        "2021-12-30",
+        "2021-12-31"
+      ],
+      "effectiveFrom": "2021-11-01",
+      "effectiveTo": "2022-01-28",
+      "measured": true,
+      "operableDays": 0,
+      "pitEligibleDays": 46,
+      "requestedFrom": "2021-10-29",
+      "requestedTo": "2021-12-31",
+      "truncationReason": null,
+      "universeCoverage": {
+        "excludedInsufficientBars": 0,
+        "excludedNoBars": 0,
+        "excludedNoSector": 0,
+        "historicalMode": true,
+        "instrumentsConsidered": 181,
+        "membersMaterialized": 181,
+        "provenance": {
+          "active_from": "DECLARADO (modo histórico): availability_from REAL (primera barra D1). El alta en el catálogo (instruments.created_at) NO es fecha de listado y se declara aparte.",
+          "active_until": "DECLARADO: None si is_active; última barra si is_active=False.",
+          "availability_from": "REAL: MIN(timestamp) de barras D1 durables.",
+          "availability_until": "REAL: MAX(timestamp) de barras D1 durables.",
+          "sector_at": "DECLARADO: instruments.sector actual (no point-in-time)."
+        },
+        "provider": "CatalogPointInTimeUniverse"
+      },
+      "watch": [
+        "00c9dfa339f54d8282559886c",
+        "01c68329d40947edbef8e68aa",
+        "02f4563312794f9a813d60f1a",
+        "07621d3dc7b945a3be08c1840",
+        "0777f43dabc14bc293b8860e0",
+        "07c16c6dc739457b94150ece4",
+        "083a8ec8709247a2abcef0e95",
+        "08846392fac34bd99be7370e6",
+        "0ade61bff8ea4005b1dcbbaef",
+        "0fc9b8cad8474e0f811568bb9",
+        "103c29b5256749c0a93550397",
+        "12205be6a1df43afae07f7e98",
+        "1343457a3c0c4b398f6c5b182",
+        "135b7ede352b4a33b560046ed",
+        "1455d6a314274947a89b869e1",
+        "15a313d4d66945349ec2b49c7",
+        "17a3de5bfe4341c9945013183",
+        "19340e4585da4e939a9fa879f",
+        "1a1025d561d64941838bce44e",
+        "1b514d4e76044e31abebaa799"
+      ],
+      "watchSource": "pit",
+      "windowFallback": null,
+      "year": "2021"
+    },
+    {
+      "cyclesMeasured": 54,
+      "days": [
+        "2022-01-03",
+        "2022-01-04",
+        "2022-01-05",
+        "2022-01-06",
+        "2022-01-07",
+        "2022-01-10",
+        "2022-01-11",
+        "2022-01-12",
+        "2022-01-13",
+        "2022-01-14",
+        "2022-01-17",
+        "2022-01-18",
+        "2022-01-19",
+        "2022-01-20",
+        "2022-01-21",
+        "2022-01-24",
+        "2022-01-25",
+        "2022-01-26",
+        "2022-01-27",
+        "2022-01-28",
+        "2022-01-31",
+        "2022-02-01",
+        "2022-02-02",
+        "2022-02-03",
+        "2022-02-04",
+        "2022-02-07",
+        "2022-02-08",
+        "2022-02-09",
+        "2022-02-10",
+        "2022-02-11",
+        "2022-02-14",
+        "2022-02-15",
+        "2022-02-16",
+        "2022-02-17",
+        "2022-02-18",
+        "2022-02-21",
+        "2022-02-22",
+        "2022-02-23",
+        "2022-02-24",
+        "2022-02-25",
+        "2022-02-28",
+        "2022-03-01",
+        "2022-03-02",
+        "2022-03-03",
+        "2022-03-04",
+        "2022-03-07",
+        "2022-03-08",
+        "2022-03-09",
+        "2022-03-10",
+        "2022-03-11",
+        "2022-03-14",
+        "2022-03-15",
+        "2022-03-16",
+        "2022-03-17",
+        "2022-03-18",
+        "2022-03-21",
+        "2022-03-22",
+        "2022-03-23",
+        "2022-03-24",
+        "2022-03-25",
+        "2022-03-28",
+        "2022-03-29",
+        "2022-03-30",
+        "2022-03-31",
+        "2022-04-01",
+        "2022-04-04",
+        "2022-04-05",
+        "2022-04-06",
+        "2022-04-07",
+        "2022-04-08",
+        "2022-04-11",
+        "2022-04-12",
+        "2022-04-13",
+        "2022-04-14",
+        "2022-04-18",
+        "2022-04-19",
+        "2022-04-20",
+        "2022-04-21",
+        "2022-04-22",
+        "2022-04-25",
+        "2022-04-26",
+        "2022-04-27",
+        "2022-04-28",
+        "2022-04-29",
+        "2022-05-02",
+        "2022-05-03",
+        "2022-05-04",
+        "2022-05-05",
+        "2022-05-06",
+        "2022-05-09",
+        "2022-05-10",
+        "2022-05-11",
+        "2022-05-12",
+        "2022-05-13",
+        "2022-05-16",
+        "2022-05-17",
+        "2022-05-18",
+        "2022-05-19",
+        "2022-05-20",
+        "2022-05-23",
+        "2022-05-24",
+        "2022-05-25",
+        "2022-05-26",
+        "2022-05-27",
+        "2022-05-30",
+        "2022-05-31",
+        "2022-06-01",
+        "2022-06-02",
+        "2022-06-03",
+        "2022-06-06",
+        "2022-06-07",
+        "2022-06-08",
+        "2022-06-09",
+        "2022-06-10",
+        "2022-06-13",
+        "2022-06-14",
+        "2022-06-15",
+        "2022-06-16",
+        "2022-06-17",
+        "2022-06-20",
+        "2022-06-21",
+        "2022-06-22",
+        "2022-06-23",
+        "2022-06-24",
+        "2022-06-27",
+        "2022-06-28",
+        "2022-06-29",
+        "2022-06-30",
+        "2022-07-01",
+        "2022-07-04",
+        "2022-07-05",
+        "2022-07-06",
+        "2022-07-07",
+        "2022-07-08",
+        "2022-07-11",
+        "2022-07-12",
+        "2022-07-13",
+        "2022-07-14",
+        "2022-07-15",
+        "2022-07-18",
+        "2022-07-19",
+        "2022-07-20",
+        "2022-07-21",
+        "2022-07-22",
+        "2022-07-25",
+        "2022-07-26",
+        "2022-07-27",
+        "2022-07-28",
+        "2022-07-29",
+        "2022-08-01",
+        "2022-08-02",
+        "2022-08-03",
+        "2022-08-04",
+        "2022-08-05",
+        "2022-08-08",
+        "2022-08-09",
+        "2022-08-10",
+        "2022-08-11",
+        "2022-08-12",
+        "2022-08-15",
+        "2022-08-16",
+        "2022-08-17",
+        "2022-08-18",
+        "2022-08-19",
+        "2022-08-22",
+        "2022-08-23",
+        "2022-08-24",
+        "2022-08-25",
+        "2022-08-26",
+        "2022-08-29",
+        "2022-08-30",
+        "2022-08-31",
+        "2022-09-01",
+        "2022-09-02",
+        "2022-09-05",
+        "2022-09-06",
+        "2022-09-07",
+        "2022-09-08",
+        "2022-09-09",
+        "2022-09-12",
+        "2022-09-13",
+        "2022-09-14",
+        "2022-09-15",
+        "2022-09-16",
+        "2022-09-19",
+        "2022-09-20",
+        "2022-09-21",
+        "2022-09-22",
+        "2022-09-23",
+        "2022-09-26",
+        "2022-09-27",
+        "2022-09-28",
+        "2022-09-29",
+        "2022-09-30",
+        "2022-10-03",
+        "2022-10-04",
+        "2022-10-05",
+        "2022-10-06",
+        "2022-10-07",
+        "2022-10-10",
+        "2022-10-11",
+        "2022-10-12",
+        "2022-10-13",
+        "2022-10-14",
+        "2022-10-17",
+        "2022-10-18",
+        "2022-10-19",
+        "2022-10-20",
+        "2022-10-21",
+        "2022-10-24",
+        "2022-10-25",
+        "2022-10-26",
+        "2022-10-27",
+        "2022-10-28",
+        "2022-10-31",
+        "2022-11-01",
+        "2022-11-02",
+        "2022-11-03",
+        "2022-11-04",
+        "2022-11-07",
+        "2022-11-08",
+        "2022-11-09",
+        "2022-11-10",
+        "2022-11-11",
+        "2022-11-14",
+        "2022-11-15",
+        "2022-11-16",
+        "2022-11-17",
+        "2022-11-18",
+        "2022-11-21",
+        "2022-11-22",
+        "2022-11-23",
+        "2022-11-24",
+        "2022-11-25",
+        "2022-11-28",
+        "2022-11-29",
+        "2022-11-30",
+        "2022-12-01",
+        "2022-12-02",
+        "2022-12-05",
+        "2022-12-06",
+        "2022-12-07",
+        "2022-12-08",
+        "2022-12-09",
+        "2022-12-12",
+        "2022-12-13",
+        "2022-12-14",
+        "2022-12-15",
+        "2022-12-16",
+        "2022-12-19",
+        "2022-12-20",
+        "2022-12-21",
+        "2022-12-22",
+        "2022-12-23",
+        "2022-12-27",
+        "2022-12-28",
+        "2022-12-29",
+        "2022-12-30"
+      ],
+      "effectiveFrom": "2021-11-01",
+      "effectiveTo": "2023-01-27",
+      "measured": true,
+      "operableDays": 241,
+      "pitEligibleDays": 258,
+      "requestedFrom": "2022-01-03",
+      "requestedTo": "2022-12-30",
+      "truncationReason": null,
+      "universeCoverage": {
+        "excludedInsufficientBars": 0,
+        "excludedNoBars": 0,
+        "excludedNoSector": 0,
+        "historicalMode": true,
+        "instrumentsConsidered": 181,
+        "membersMaterialized": 181,
+        "provenance": {
+          "active_from": "DECLARADO (modo histórico): availability_from REAL (primera barra D1). El alta en el catálogo (instruments.created_at) NO es fecha de listado y se declara aparte.",
+          "active_until": "DECLARADO: None si is_active; última barra si is_active=False.",
+          "availability_from": "REAL: MIN(timestamp) de barras D1 durables.",
+          "availability_until": "REAL: MAX(timestamp) de barras D1 durables.",
+          "sector_at": "DECLARADO: instruments.sector actual (no point-in-time)."
+        },
+        "provider": "CatalogPointInTimeUniverse"
+      },
+      "watch": [
+        "00c9dfa339f54d8282559886c",
+        "01c68329d40947edbef8e68aa",
+        "02f4563312794f9a813d60f1a",
+        "07621d3dc7b945a3be08c1840",
+        "0777f43dabc14bc293b8860e0",
+        "07c16c6dc739457b94150ece4",
+        "083a8ec8709247a2abcef0e95",
+        "08846392fac34bd99be7370e6",
+        "0ade61bff8ea4005b1dcbbaef",
+        "0fc9b8cad8474e0f811568bb9",
+        "103c29b5256749c0a93550397",
+        "12205be6a1df43afae07f7e98",
+        "1343457a3c0c4b398f6c5b182",
+        "135b7ede352b4a33b560046ed",
+        "1455d6a314274947a89b869e1",
+        "15a313d4d66945349ec2b49c7",
+        "17a3de5bfe4341c9945013183",
+        "19340e4585da4e939a9fa879f",
+        "1a1025d561d64941838bce44e",
+        "1b514d4e76044e31abebaa799"
+      ],
+      "watchSource": "pit",
+      "windowFallback": null,
+      "year": "2022"
+    },
+    {
+      "cyclesMeasured": 22,
+      "days": [
+        "2023-01-02",
+        "2023-01-03",
+        "2023-01-04",
+        "2023-01-05",
+        "2023-01-06",
+        "2023-01-09",
+        "2023-01-10",
+        "2023-01-11",
+        "2023-01-12",
+        "2023-01-13",
+        "2023-01-16",
+        "2023-01-17",
+        "2023-01-18",
+        "2023-01-19",
+        "2023-01-20",
+        "2023-01-23",
+        "2023-01-24",
+        "2023-01-25",
+        "2023-01-26",
+        "2023-01-27",
+        "2023-01-30",
+        "2023-01-31",
+        "2023-02-01",
+        "2023-02-02",
+        "2023-02-03",
+        "2023-02-06",
+        "2023-02-07",
+        "2023-02-08",
+        "2023-02-09",
+        "2023-02-10",
+        "2023-02-13",
+        "2023-02-14",
+        "2023-02-15",
+        "2023-02-16",
+        "2023-02-17",
+        "2023-02-20",
+        "2023-02-21",
+        "2023-02-22",
+        "2023-02-23",
+        "2023-02-24",
+        "2023-02-27",
+        "2023-02-28",
+        "2023-03-01",
+        "2023-03-02",
+        "2023-03-03",
+        "2023-03-06",
+        "2023-03-07",
+        "2023-03-08",
+        "2023-03-09",
+        "2023-03-10",
+        "2023-03-13",
+        "2023-03-14",
+        "2023-03-15",
+        "2023-03-16",
+        "2023-03-17",
+        "2023-03-20",
+        "2023-03-21",
+        "2023-03-22",
+        "2023-03-23",
+        "2023-03-24",
+        "2023-03-27",
+        "2023-03-28",
+        "2023-03-29",
+        "2023-03-30",
+        "2023-03-31",
+        "2023-04-03",
+        "2023-04-04",
+        "2023-04-05",
+        "2023-04-06",
+        "2023-04-10",
+        "2023-04-11",
+        "2023-04-12",
+        "2023-04-13",
+        "2023-04-14",
+        "2023-04-17",
+        "2023-04-18",
+        "2023-04-19",
+        "2023-04-20",
+        "2023-04-21",
+        "2023-04-24",
+        "2023-04-25",
+        "2023-04-26",
+        "2023-04-27",
+        "2023-04-28",
+        "2023-05-01",
+        "2023-05-02",
+        "2023-05-03",
+        "2023-05-04",
+        "2023-05-05",
+        "2023-05-08",
+        "2023-05-09",
+        "2023-05-10",
+        "2023-05-11",
+        "2023-05-12",
+        "2023-05-15",
+        "2023-05-16",
+        "2023-05-17",
+        "2023-05-18",
+        "2023-05-19",
+        "2023-05-22",
+        "2023-05-23",
+        "2023-05-24",
+        "2023-05-25",
+        "2023-05-26",
+        "2023-05-29",
+        "2023-05-30",
+        "2023-05-31",
+        "2023-06-01",
+        "2023-06-02",
+        "2023-06-05",
+        "2023-06-06",
+        "2023-06-07",
+        "2023-06-08",
+        "2023-06-09",
+        "2023-06-12",
+        "2023-06-13",
+        "2023-06-14",
+        "2023-06-15",
+        "2023-06-16",
+        "2023-06-19",
+        "2023-06-20",
+        "2023-06-21",
+        "2023-06-22",
+        "2023-06-23",
+        "2023-06-26",
+        "2023-06-27",
+        "2023-06-28",
+        "2023-06-29",
+        "2023-06-30",
+        "2023-07-03",
+        "2023-07-04",
+        "2023-07-05",
+        "2023-07-06",
+        "2023-07-07",
+        "2023-07-10",
+        "2023-07-11",
+        "2023-07-12",
+        "2023-07-13",
+        "2023-07-14",
+        "2023-07-17",
+        "2023-07-18",
+        "2023-07-19",
+        "2023-07-20",
+        "2023-07-21",
+        "2023-07-24",
+        "2023-07-25",
+        "2023-07-26",
+        "2023-07-27",
+        "2023-07-28",
+        "2023-07-31",
+        "2023-08-01",
+        "2023-08-02",
+        "2023-08-03",
+        "2023-08-04",
+        "2023-08-07",
+        "2023-08-08",
+        "2023-08-09",
+        "2023-08-10",
+        "2023-08-11",
+        "2023-08-14",
+        "2023-08-15",
+        "2023-08-16",
+        "2023-08-17",
+        "2023-08-18",
+        "2023-08-21",
+        "2023-08-22",
+        "2023-08-23",
+        "2023-08-24",
+        "2023-08-25",
+        "2023-08-28",
+        "2023-08-29",
+        "2023-08-30",
+        "2023-08-31",
+        "2023-09-01",
+        "2023-09-04",
+        "2023-09-05",
+        "2023-09-06",
+        "2023-09-07",
+        "2023-09-08",
+        "2023-09-11",
+        "2023-09-12",
+        "2023-09-13",
+        "2023-09-14",
+        "2023-09-15",
+        "2023-09-18",
+        "2023-09-19",
+        "2023-09-20",
+        "2023-09-21",
+        "2023-09-22",
+        "2023-09-25",
+        "2023-09-26",
+        "2023-09-27",
+        "2023-09-28",
+        "2023-09-29",
+        "2023-10-02",
+        "2023-10-03",
+        "2023-10-04",
+        "2023-10-05",
+        "2023-10-06",
+        "2023-10-09",
+        "2023-10-10",
+        "2023-10-11",
+        "2023-10-12",
+        "2023-10-13",
+        "2023-10-16",
+        "2023-10-17",
+        "2023-10-18",
+        "2023-10-19",
+        "2023-10-20",
+        "2023-10-23",
+        "2023-10-24",
+        "2023-10-25",
+        "2023-10-26",
+        "2023-10-27",
+        "2023-10-30",
+        "2023-10-31",
+        "2023-11-01",
+        "2023-11-02",
+        "2023-11-03",
+        "2023-11-06",
+        "2023-11-07",
+        "2023-11-08",
+        "2023-11-09",
+        "2023-11-10",
+        "2023-11-13",
+        "2023-11-14",
+        "2023-11-15",
+        "2023-11-16",
+        "2023-11-17",
+        "2023-11-20",
+        "2023-11-21",
+        "2023-11-22",
+        "2023-11-23",
+        "2023-11-24",
+        "2023-11-27",
+        "2023-11-28",
+        "2023-11-29",
+        "2023-11-30",
+        "2023-12-01",
+        "2023-12-04",
+        "2023-12-05",
+        "2023-12-06",
+        "2023-12-07",
+        "2023-12-08",
+        "2023-12-11",
+        "2023-12-12",
+        "2023-12-13",
+        "2023-12-14",
+        "2023-12-15",
+        "2023-12-18",
+        "2023-12-19",
+        "2023-12-20",
+        "2023-12-21",
+        "2023-12-22",
+        "2023-12-26",
+        "2023-12-27",
+        "2023-12-28",
+        "2023-12-29"
+      ],
+      "effectiveFrom": "2022-08-26",
+      "effectiveTo": "2024-01-29",
+      "measured": true,
+      "operableDays": 258,
+      "pitEligibleDays": 258,
+      "requestedFrom": "2023-01-02",
+      "requestedTo": "2023-12-29",
+      "truncationReason": null,
+      "universeCoverage": {
+        "excludedInsufficientBars": 0,
+        "excludedNoBars": 0,
+        "excludedNoSector": 0,
+        "historicalMode": true,
+        "instrumentsConsidered": 181,
+        "membersMaterialized": 181,
+        "provenance": {
+          "active_from": "DECLARADO (modo histórico): availability_from REAL (primera barra D1). El alta en el catálogo (instruments.created_at) NO es fecha de listado y se declara aparte.",
+          "active_until": "DECLARADO: None si is_active; última barra si is_active=False.",
+          "availability_from": "REAL: MIN(timestamp) de barras D1 durables.",
+          "availability_until": "REAL: MAX(timestamp) de barras D1 durables.",
+          "sector_at": "DECLARADO: instruments.sector actual (no point-in-time)."
+        },
+        "provider": "CatalogPointInTimeUniverse"
+      },
+      "watch": [
+        "00c9dfa339f54d8282559886c",
+        "01c68329d40947edbef8e68aa",
+        "02f4563312794f9a813d60f1a",
+        "07621d3dc7b945a3be08c1840",
+        "0777f43dabc14bc293b8860e0",
+        "07c16c6dc739457b94150ece4",
+        "083a8ec8709247a2abcef0e95",
+        "08846392fac34bd99be7370e6",
+        "0ade61bff8ea4005b1dcbbaef",
+        "0fc9b8cad8474e0f811568bb9",
+        "103c29b5256749c0a93550397",
+        "12205be6a1df43afae07f7e98",
+        "1343457a3c0c4b398f6c5b182",
+        "135b7ede352b4a33b560046ed",
+        "1455d6a314274947a89b869e1",
+        "15a313d4d66945349ec2b49c7",
+        "17a3de5bfe4341c9945013183",
+        "19340e4585da4e939a9fa879f",
+        "1a1025d561d64941838bce44e",
+        "1b514d4e76044e31abebaa799"
+      ],
+      "watchSource": "pit",
+      "windowFallback": null,
+      "year": "2023"
+    },
+    {
+      "cyclesMeasured": 48,
+      "days": [
+        "2024-01-02",
+        "2024-01-03",
+        "2024-01-04",
+        "2024-01-05",
+        "2024-01-08",
+        "2024-01-09",
+        "2024-01-10",
+        "2024-01-11",
+        "2024-01-12",
+        "2024-01-15",
+        "2024-01-16",
+        "2024-01-17",
+        "2024-01-18",
+        "2024-01-19",
+        "2024-01-22",
+        "2024-01-23",
+        "2024-01-24",
+        "2024-01-25",
+        "2024-01-26",
+        "2024-01-29",
+        "2024-01-30",
+        "2024-01-31",
+        "2024-02-01",
+        "2024-02-02",
+        "2024-02-05",
+        "2024-02-06",
+        "2024-02-07",
+        "2024-02-08",
+        "2024-02-09",
+        "2024-02-12",
+        "2024-02-13",
+        "2024-02-14",
+        "2024-02-15",
+        "2024-02-16",
+        "2024-02-19",
+        "2024-02-20",
+        "2024-02-21",
+        "2024-02-22",
+        "2024-02-23",
+        "2024-02-26",
+        "2024-02-27",
+        "2024-02-28",
+        "2024-02-29",
+        "2024-03-01",
+        "2024-03-04",
+        "2024-03-05",
+        "2024-03-06",
+        "2024-03-07",
+        "2024-03-08",
+        "2024-03-11",
+        "2024-03-12",
+        "2024-03-13",
+        "2024-03-14",
+        "2024-03-15",
+        "2024-03-18",
+        "2024-03-19",
+        "2024-03-20",
+        "2024-03-21",
+        "2024-03-22",
+        "2024-03-25",
+        "2024-03-26",
+        "2024-03-27",
+        "2024-03-28",
+        "2024-04-01",
+        "2024-04-02",
+        "2024-04-03",
+        "2024-04-04",
+        "2024-04-05",
+        "2024-04-08",
+        "2024-04-09",
+        "2024-04-10",
+        "2024-04-11",
+        "2024-04-12",
+        "2024-04-15",
+        "2024-04-16",
+        "2024-04-17",
+        "2024-04-18",
+        "2024-04-19",
+        "2024-04-22",
+        "2024-04-23",
+        "2024-04-24",
+        "2024-04-25",
+        "2024-04-26",
+        "2024-04-29",
+        "2024-04-30",
+        "2024-05-01",
+        "2024-05-02",
+        "2024-05-03",
+        "2024-05-06",
+        "2024-05-07",
+        "2024-05-08",
+        "2024-05-09",
+        "2024-05-10",
+        "2024-05-13",
+        "2024-05-14",
+        "2024-05-15",
+        "2024-05-16",
+        "2024-05-17",
+        "2024-05-20",
+        "2024-05-21",
+        "2024-05-22",
+        "2024-05-23",
+        "2024-05-24",
+        "2024-05-27",
+        "2024-05-28",
+        "2024-05-29",
+        "2024-05-30",
+        "2024-05-31",
+        "2024-06-03",
+        "2024-06-04",
+        "2024-06-05",
+        "2024-06-06",
+        "2024-06-07",
+        "2024-06-10",
+        "2024-06-11",
+        "2024-06-12",
+        "2024-06-13",
+        "2024-06-14",
+        "2024-06-17",
+        "2024-06-18",
+        "2024-06-19",
+        "2024-06-20",
+        "2024-06-21",
+        "2024-06-24",
+        "2024-06-25",
+        "2024-06-26",
+        "2024-06-27",
+        "2024-06-28",
+        "2024-07-01",
+        "2024-07-02",
+        "2024-07-03",
+        "2024-07-04",
+        "2024-07-05",
+        "2024-07-08",
+        "2024-07-09",
+        "2024-07-10",
+        "2024-07-11",
+        "2024-07-12",
+        "2024-07-15",
+        "2024-07-16",
+        "2024-07-17",
+        "2024-07-18",
+        "2024-07-19",
+        "2024-07-22",
+        "2024-07-23",
+        "2024-07-24",
+        "2024-07-25",
+        "2024-07-26",
+        "2024-07-29",
+        "2024-07-30",
+        "2024-07-31",
+        "2024-08-01",
+        "2024-08-02",
+        "2024-08-05",
+        "2024-08-06",
+        "2024-08-07",
+        "2024-08-08",
+        "2024-08-09",
+        "2024-08-12",
+        "2024-08-13",
+        "2024-08-14",
+        "2024-08-15",
+        "2024-08-16",
+        "2024-08-19",
+        "2024-08-20",
+        "2024-08-21",
+        "2024-08-22",
+        "2024-08-23",
+        "2024-08-26",
+        "2024-08-27",
+        "2024-08-28",
+        "2024-08-29",
+        "2024-08-30",
+        "2024-09-02",
+        "2024-09-03",
+        "2024-09-04",
+        "2024-09-05",
+        "2024-09-06",
+        "2024-09-09",
+        "2024-09-10",
+        "2024-09-11",
+        "2024-09-12",
+        "2024-09-13",
+        "2024-09-16",
+        "2024-09-17",
+        "2024-09-18",
+        "2024-09-19",
+        "2024-09-20",
+        "2024-09-23",
+        "2024-09-24",
+        "2024-09-25",
+        "2024-09-26",
+        "2024-09-27",
+        "2024-09-30",
+        "2024-10-01",
+        "2024-10-02",
+        "2024-10-03",
+        "2024-10-04",
+        "2024-10-07",
+        "2024-10-08",
+        "2024-10-09",
+        "2024-10-10",
+        "2024-10-11",
+        "2024-10-14",
+        "2024-10-15",
+        "2024-10-16",
+        "2024-10-17",
+        "2024-10-18",
+        "2024-10-21",
+        "2024-10-22",
+        "2024-10-23",
+        "2024-10-24",
+        "2024-10-25",
+        "2024-10-28",
+        "2024-10-29",
+        "2024-10-30",
+        "2024-10-31",
+        "2024-11-01",
+        "2024-11-04",
+        "2024-11-05",
+        "2024-11-06",
+        "2024-11-07",
+        "2024-11-08",
+        "2024-11-11",
+        "2024-11-12",
+        "2024-11-13",
+        "2024-11-14",
+        "2024-11-15",
+        "2024-11-18",
+        "2024-11-19",
+        "2024-11-20",
+        "2024-11-21",
+        "2024-11-22",
+        "2024-11-25",
+        "2024-11-26",
+        "2024-11-27",
+        "2024-11-28",
+        "2024-11-29",
+        "2024-12-02",
+        "2024-12-03",
+        "2024-12-04",
+        "2024-12-05",
+        "2024-12-06",
+        "2024-12-09",
+        "2024-12-10",
+        "2024-12-11",
+        "2024-12-12",
+        "2024-12-13",
+        "2024-12-16",
+        "2024-12-17",
+        "2024-12-18",
+        "2024-12-19",
+        "2024-12-20",
+        "2024-12-23",
+        "2024-12-24",
+        "2024-12-26",
+        "2024-12-27",
+        "2024-12-30",
+        "2024-12-31"
+      ],
+      "effectiveFrom": "2023-08-25",
+      "effectiveTo": "2025-01-29",
+      "measured": true,
+      "operableDays": 259,
+      "pitEligibleDays": 259,
+      "requestedFrom": "2024-01-02",
+      "requestedTo": "2024-12-31",
+      "truncationReason": null,
+      "universeCoverage": {
+        "excludedInsufficientBars": 0,
+        "excludedNoBars": 0,
+        "excludedNoSector": 0,
+        "historicalMode": true,
+        "instrumentsConsidered": 181,
+        "membersMaterialized": 181,
+        "provenance": {
+          "active_from": "DECLARADO (modo histórico): availability_from REAL (primera barra D1). El alta en el catálogo (instruments.created_at) NO es fecha de listado y se declara aparte.",
+          "active_until": "DECLARADO: None si is_active; última barra si is_active=False.",
+          "availability_from": "REAL: MIN(timestamp) de barras D1 durables.",
+          "availability_until": "REAL: MAX(timestamp) de barras D1 durables.",
+          "sector_at": "DECLARADO: instruments.sector actual (no point-in-time)."
+        },
+        "provider": "CatalogPointInTimeUniverse"
+      },
+      "watch": [
+        "00c9dfa339f54d8282559886c",
+        "01c68329d40947edbef8e68aa",
+        "02f4563312794f9a813d60f1a",
+        "07621d3dc7b945a3be08c1840",
+        "0777f43dabc14bc293b8860e0",
+        "07c16c6dc739457b94150ece4",
+        "083a8ec8709247a2abcef0e95",
+        "08846392fac34bd99be7370e6",
+        "0ade61bff8ea4005b1dcbbaef",
+        "0fc9b8cad8474e0f811568bb9",
+        "103c29b5256749c0a93550397",
+        "12205be6a1df43afae07f7e98",
+        "1343457a3c0c4b398f6c5b182",
+        "135b7ede352b4a33b560046ed",
+        "1455d6a314274947a89b869e1",
+        "15a313d4d66945349ec2b49c7",
+        "17a3de5bfe4341c9945013183",
+        "19340e4585da4e939a9fa879f",
+        "1a1025d561d64941838bce44e",
+        "1b514d4e76044e31abebaa799"
+      ],
+      "watchSource": "pit",
+      "windowFallback": null,
+      "year": "2024"
+    },
+    {
+      "cyclesMeasured": 38,
+      "days": [
+        "2025-01-02",
+        "2025-01-03",
+        "2025-01-06",
+        "2025-01-07",
+        "2025-01-08",
+        "2025-01-09",
+        "2025-01-10",
+        "2025-01-13",
+        "2025-01-14",
+        "2025-01-15",
+        "2025-01-16",
+        "2025-01-17",
+        "2025-01-20",
+        "2025-01-21",
+        "2025-01-22",
+        "2025-01-23",
+        "2025-01-24",
+        "2025-01-27",
+        "2025-01-28",
+        "2025-01-29",
+        "2025-01-30",
+        "2025-01-31",
+        "2025-02-03",
+        "2025-02-04",
+        "2025-02-05",
+        "2025-02-06",
+        "2025-02-07",
+        "2025-02-10",
+        "2025-02-11",
+        "2025-02-12",
+        "2025-02-13",
+        "2025-02-14",
+        "2025-02-17",
+        "2025-02-18",
+        "2025-02-19",
+        "2025-02-20",
+        "2025-02-21",
+        "2025-02-24",
+        "2025-02-25",
+        "2025-02-26",
+        "2025-02-27",
+        "2025-02-28",
+        "2025-03-03",
+        "2025-03-04",
+        "2025-03-05",
+        "2025-03-06",
+        "2025-03-07",
+        "2025-03-10",
+        "2025-03-11",
+        "2025-03-12",
+        "2025-03-13",
+        "2025-03-14",
+        "2025-03-17",
+        "2025-03-18",
+        "2025-03-19",
+        "2025-03-20",
+        "2025-03-21",
+        "2025-03-24",
+        "2025-03-25",
+        "2025-03-26",
+        "2025-03-27",
+        "2025-03-28",
+        "2025-03-31",
+        "2025-04-01",
+        "2025-04-02",
+        "2025-04-03",
+        "2025-04-04",
+        "2025-04-07",
+        "2025-04-08",
+        "2025-04-09",
+        "2025-04-10",
+        "2025-04-11",
+        "2025-04-14",
+        "2025-04-15",
+        "2025-04-16",
+        "2025-04-17",
+        "2025-04-21",
+        "2025-04-22",
+        "2025-04-23",
+        "2025-04-24",
+        "2025-04-25",
+        "2025-04-28",
+        "2025-04-29",
+        "2025-04-30",
+        "2025-05-01",
+        "2025-05-02",
+        "2025-05-05",
+        "2025-05-06",
+        "2025-05-07",
+        "2025-05-08",
+        "2025-05-09",
+        "2025-05-12",
+        "2025-05-13",
+        "2025-05-14",
+        "2025-05-15",
+        "2025-05-16",
+        "2025-05-19",
+        "2025-05-20",
+        "2025-05-21",
+        "2025-05-22",
+        "2025-05-23",
+        "2025-05-26",
+        "2025-05-27",
+        "2025-05-28",
+        "2025-05-29",
+        "2025-05-30",
+        "2025-06-02",
+        "2025-06-03",
+        "2025-06-04",
+        "2025-06-05",
+        "2025-06-06",
+        "2025-06-09",
+        "2025-06-10",
+        "2025-06-11",
+        "2025-06-12",
+        "2025-06-13",
+        "2025-06-16",
+        "2025-06-17",
+        "2025-06-18",
+        "2025-06-19",
+        "2025-06-20",
+        "2025-06-23",
+        "2025-06-24",
+        "2025-06-25",
+        "2025-06-26",
+        "2025-06-27",
+        "2025-06-30",
+        "2025-07-01",
+        "2025-07-02",
+        "2025-07-03",
+        "2025-07-04",
+        "2025-07-07",
+        "2025-07-08",
+        "2025-07-09",
+        "2025-07-10",
+        "2025-07-11",
+        "2025-07-14",
+        "2025-07-15",
+        "2025-07-16",
+        "2025-07-17",
+        "2025-07-18",
+        "2025-07-21",
+        "2025-07-22",
+        "2025-07-23",
+        "2025-07-24",
+        "2025-07-25",
+        "2025-07-28",
+        "2025-07-29",
+        "2025-07-30",
+        "2025-07-31",
+        "2025-08-01",
+        "2025-08-04",
+        "2025-08-05",
+        "2025-08-06",
+        "2025-08-07",
+        "2025-08-08",
+        "2025-08-11",
+        "2025-08-12",
+        "2025-08-13",
+        "2025-08-14",
+        "2025-08-15",
+        "2025-08-18",
+        "2025-08-19",
+        "2025-08-20",
+        "2025-08-21",
+        "2025-08-22",
+        "2025-08-25",
+        "2025-08-26",
+        "2025-08-27",
+        "2025-08-28",
+        "2025-08-29",
+        "2025-09-01",
+        "2025-09-02",
+        "2025-09-03",
+        "2025-09-04",
+        "2025-09-05",
+        "2025-09-08",
+        "2025-09-09",
+        "2025-09-10",
+        "2025-09-11",
+        "2025-09-12",
+        "2025-09-15",
+        "2025-09-16",
+        "2025-09-17",
+        "2025-09-18",
+        "2025-09-19",
+        "2025-09-22",
+        "2025-09-23",
+        "2025-09-24",
+        "2025-09-25",
+        "2025-09-26",
+        "2025-09-29",
+        "2025-09-30",
+        "2025-10-01",
+        "2025-10-02",
+        "2025-10-03",
+        "2025-10-06",
+        "2025-10-07",
+        "2025-10-08",
+        "2025-10-09",
+        "2025-10-10",
+        "2025-10-13",
+        "2025-10-14",
+        "2025-10-15",
+        "2025-10-16",
+        "2025-10-17",
+        "2025-10-20",
+        "2025-10-21",
+        "2025-10-22",
+        "2025-10-23",
+        "2025-10-24",
+        "2025-10-27",
+        "2025-10-28",
+        "2025-10-29",
+        "2025-10-30",
+        "2025-10-31",
+        "2025-11-03",
+        "2025-11-04",
+        "2025-11-05",
+        "2025-11-06",
+        "2025-11-07",
+        "2025-11-10",
+        "2025-11-11",
+        "2025-11-12",
+        "2025-11-13",
+        "2025-11-14",
+        "2025-11-17",
+        "2025-11-18",
+        "2025-11-19",
+        "2025-11-20",
+        "2025-11-21",
+        "2025-11-24",
+        "2025-11-25",
+        "2025-11-26",
+        "2025-11-27",
+        "2025-11-28",
+        "2025-12-01",
+        "2025-12-02",
+        "2025-12-03",
+        "2025-12-04",
+        "2025-12-05",
+        "2025-12-08",
+        "2025-12-09",
+        "2025-12-10",
+        "2025-12-11",
+        "2025-12-12",
+        "2025-12-15",
+        "2025-12-16",
+        "2025-12-17",
+        "2025-12-18",
+        "2025-12-19",
+        "2025-12-22",
+        "2025-12-23",
+        "2025-12-24",
+        "2025-12-26",
+        "2025-12-29",
+        "2025-12-30",
+        "2025-12-31"
+      ],
+      "effectiveFrom": "2024-08-27",
+      "effectiveTo": "2026-01-29",
+      "measured": true,
+      "operableDays": 258,
+      "pitEligibleDays": 258,
+      "requestedFrom": "2025-01-02",
+      "requestedTo": "2025-12-31",
+      "truncationReason": null,
+      "universeCoverage": {
+        "excludedInsufficientBars": 0,
+        "excludedNoBars": 0,
+        "excludedNoSector": 0,
+        "historicalMode": true,
+        "instrumentsConsidered": 181,
+        "membersMaterialized": 181,
+        "provenance": {
+          "active_from": "DECLARADO (modo histórico): availability_from REAL (primera barra D1). El alta en el catálogo (instruments.created_at) NO es fecha de listado y se declara aparte.",
+          "active_until": "DECLARADO: None si is_active; última barra si is_active=False.",
+          "availability_from": "REAL: MIN(timestamp) de barras D1 durables.",
+          "availability_until": "REAL: MAX(timestamp) de barras D1 durables.",
+          "sector_at": "DECLARADO: instruments.sector actual (no point-in-time)."
+        },
+        "provider": "CatalogPointInTimeUniverse"
+      },
+      "watch": [
+        "00c9dfa339f54d8282559886c",
+        "01c68329d40947edbef8e68aa",
+        "02f4563312794f9a813d60f1a",
+        "07621d3dc7b945a3be08c1840",
+        "0777f43dabc14bc293b8860e0",
+        "07c16c6dc739457b94150ece4",
+        "083a8ec8709247a2abcef0e95",
+        "08846392fac34bd99be7370e6",
+        "0ade61bff8ea4005b1dcbbaef",
+        "0fc9b8cad8474e0f811568bb9",
+        "103c29b5256749c0a93550397",
+        "12205be6a1df43afae07f7e98",
+        "1343457a3c0c4b398f6c5b182",
+        "135b7ede352b4a33b560046ed",
+        "1455d6a314274947a89b869e1",
+        "15a313d4d66945349ec2b49c7",
+        "17a3de5bfe4341c9945013183",
+        "19340e4585da4e939a9fa879f",
+        "1a1025d561d64941838bce44e",
+        "1b514d4e76044e31abebaa799"
+      ],
+      "watchSource": "pit",
+      "windowFallback": null,
+      "year": "2025"
+    },
+    {
+      "cyclesMeasured": 30,
+      "days": [
+        "2026-01-02",
+        "2026-01-05",
+        "2026-01-06",
+        "2026-01-07",
+        "2026-01-08",
+        "2026-01-09",
+        "2026-01-12",
+        "2026-01-13",
+        "2026-01-14",
+        "2026-01-15",
+        "2026-01-16",
+        "2026-01-19",
+        "2026-01-20",
+        "2026-01-21",
+        "2026-01-22",
+        "2026-01-23",
+        "2026-01-26",
+        "2026-01-27",
+        "2026-01-28",
+        "2026-01-29",
+        "2026-01-30",
+        "2026-02-02",
+        "2026-02-03",
+        "2026-02-04",
+        "2026-02-05",
+        "2026-02-06",
+        "2026-02-09",
+        "2026-02-10",
+        "2026-02-11",
+        "2026-02-12",
+        "2026-02-13",
+        "2026-02-16",
+        "2026-02-17",
+        "2026-02-18",
+        "2026-02-19",
+        "2026-02-20",
+        "2026-02-23",
+        "2026-02-24",
+        "2026-02-25",
+        "2026-02-26",
+        "2026-02-27",
+        "2026-03-02",
+        "2026-03-03",
+        "2026-03-04",
+        "2026-03-05",
+        "2026-03-06",
+        "2026-03-09",
+        "2026-03-10",
+        "2026-03-11",
+        "2026-03-12",
+        "2026-03-13",
+        "2026-03-16",
+        "2026-03-17",
+        "2026-03-18",
+        "2026-03-19",
+        "2026-03-20",
+        "2026-03-23",
+        "2026-03-24",
+        "2026-03-25",
+        "2026-03-26",
+        "2026-03-27",
+        "2026-03-30",
+        "2026-03-31",
+        "2026-04-01",
+        "2026-04-02",
+        "2026-04-06",
+        "2026-04-07",
+        "2026-04-08",
+        "2026-04-09",
+        "2026-04-10",
+        "2026-04-13",
+        "2026-04-14",
+        "2026-04-15",
+        "2026-04-16",
+        "2026-04-17",
+        "2026-04-20",
+        "2026-04-21",
+        "2026-04-22",
+        "2026-04-23",
+        "2026-04-24",
+        "2026-04-27",
+        "2026-04-28",
+        "2026-04-29",
+        "2026-04-30",
+        "2026-05-01",
+        "2026-05-04",
+        "2026-05-05",
+        "2026-05-06",
+        "2026-05-07",
+        "2026-05-08",
+        "2026-05-11",
+        "2026-05-12",
+        "2026-05-13",
+        "2026-05-14",
+        "2026-05-15",
+        "2026-05-18",
+        "2026-05-19",
+        "2026-05-20",
+        "2026-05-21",
+        "2026-05-22",
+        "2026-05-25",
+        "2026-05-26",
+        "2026-05-27",
+        "2026-05-28",
+        "2026-05-29",
+        "2026-06-01",
+        "2026-06-02",
+        "2026-06-03",
+        "2026-06-04",
+        "2026-06-05",
+        "2026-06-08",
+        "2026-06-09",
+        "2026-06-10",
+        "2026-06-11",
+        "2026-06-12",
+        "2026-06-15",
+        "2026-06-16",
+        "2026-06-17",
+        "2026-06-18",
+        "2026-06-19",
+        "2026-06-22",
+        "2026-06-23",
+        "2026-06-24",
+        "2026-06-25",
+        "2026-06-26",
+        "2026-06-29",
+        "2026-06-30",
+        "2026-07-01",
+        "2026-07-02",
+        "2026-07-03",
+        "2026-07-06",
+        "2026-07-07",
+        "2026-07-08",
+        "2026-07-09",
+        "2026-07-10",
+        "2026-07-13",
+        "2026-07-14",
+        "2026-07-15",
+        "2026-07-16",
+        "2026-07-17",
+        "2026-07-20",
+        "2026-07-21",
+        "2026-07-22",
+        "2026-07-23",
+        "2026-07-24",
+        "2026-07-27",
+        "2026-07-28",
+        "2026-07-29",
+        "2026-07-30",
+        "2026-07-31",
+        "2026-08-03",
+        "2026-08-04",
+        "2026-08-05",
+        "2026-08-06",
+        "2026-08-07",
+        "2026-08-10",
+        "2026-08-11",
+        "2026-08-12",
+        "2026-08-13",
+        "2026-08-14",
+        "2026-08-17",
+        "2026-08-18",
+        "2026-08-19",
+        "2026-08-20",
+        "2026-08-21",
+        "2026-08-24",
+        "2026-08-25",
+        "2026-08-26",
+        "2026-08-27",
+        "2026-08-28",
+        "2026-08-31",
+        "2026-09-01",
+        "2026-09-02",
+        "2026-09-03",
+        "2026-09-04",
+        "2026-09-07",
+        "2026-09-08",
+        "2026-09-09",
+        "2026-09-10",
+        "2026-09-11",
+        "2026-09-14",
+        "2026-09-15",
+        "2026-09-16",
+        "2026-09-17",
+        "2026-09-18",
+        "2026-09-21",
+        "2026-09-22",
+        "2026-09-23",
+        "2026-09-24",
+        "2026-09-25",
+        "2026-09-28",
+        "2026-09-29",
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-05",
+        "2026-10-06",
+        "2026-10-07",
+        "2026-10-08",
+        "2026-10-09",
+        "2026-10-12",
+        "2026-10-13",
+        "2026-10-14",
+        "2026-10-15",
+        "2026-10-16",
+        "2026-10-19",
+        "2026-10-20",
+        "2026-10-21",
+        "2026-10-22",
+        "2026-10-23",
+        "2026-10-26",
+        "2026-10-27",
+        "2026-10-28",
+        "2026-10-29",
+        "2026-10-30",
+        "2026-11-02",
+        "2026-11-03",
+        "2026-11-04",
+        "2026-11-05"
+      ],
+      "effectiveFrom": "2025-08-27",
+      "effectiveTo": "2026-11-05",
+      "measured": true,
+      "operableDays": 219,
+      "pitEligibleDays": 219,
+      "requestedFrom": "2026-01-02",
+      "requestedTo": "2026-11-05",
+      "truncationReason": null,
+      "universeCoverage": {
+        "excludedInsufficientBars": 0,
+        "excludedNoBars": 0,
+        "excludedNoSector": 0,
+        "historicalMode": true,
+        "instrumentsConsidered": 181,
+        "membersMaterialized": 181,
+        "provenance": {
+          "active_from": "DECLARADO (modo histórico): availability_from REAL (primera barra D1). El alta en el catálogo (instruments.created_at) NO es fecha de listado y se declara aparte.",
+          "active_until": "DECLARADO: None si is_active; última barra si is_active=False.",
+          "availability_from": "REAL: MIN(timestamp) de barras D1 durables.",
+          "availability_until": "REAL: MAX(timestamp) de barras D1 durables.",
+          "sector_at": "DECLARADO: instruments.sector actual (no point-in-time)."
+        },
+        "provider": "CatalogPointInTimeUniverse"
+      },
+      "watch": [
+        "00c9dfa339f54d8282559886c",
+        "01c68329d40947edbef8e68aa",
+        "02f4563312794f9a813d60f1a",
+        "07621d3dc7b945a3be08c1840",
+        "0777f43dabc14bc293b8860e0",
+        "07c16c6dc739457b94150ece4",
+        "083a8ec8709247a2abcef0e95",
+        "08846392fac34bd99be7370e6",
+        "0ade61bff8ea4005b1dcbbaef",
+        "0fc9b8cad8474e0f811568bb9",
+        "103c29b5256749c0a93550397",
+        "12205be6a1df43afae07f7e98",
+        "1343457a3c0c4b398f6c5b182",
+        "135b7ede352b4a33b560046ed",
+        "1455d6a314274947a89b869e1",
+        "15a313d4d66945349ec2b49c7",
+        "17a3de5bfe4341c9945013183",
+        "19340e4585da4e939a9fa879f",
+        "1a1025d561d64941838bce44e",
+        "1b514d4e76044e31abebaa799"
+      ],
+      "watchSource": "pit",
+      "windowFallback": null,
+      "year": "2026"
+    }
+  ]
+}
