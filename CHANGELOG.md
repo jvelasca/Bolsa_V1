@@ -2,6 +2,57 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.185-beta] — **SELLO DE OPERACIÓN del cierre del PAPER 20261105: el forward suelta su lease al apagar y H-1 queda declarado con causa raíz medida** (**`Δ motor = 0` · `Δ decisión = 0` · SIN migración · head `066_account_evidence_policy`**)
+
+**Naturaleza:** sello **de operación**, no funcional. **No** cambia el motor, ni una regla, ni un umbral, ni
+la cadena de migraciones (`066_account_evidence_policy` se incorporó en `.184` y sigue siendo el `head`).
+Cambia **un** fichero de operación —el apagado del script de forward— y publica el expediente que cierra
+la corrida `20261105` con su diagnóstico medido. **Bump** `2.11.184-beta` → **`2.11.185-beta`** (+ los **14**
+literales `meta.bump`; `test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87`
+**no** se toca).
+
+**Por qué hay un sello y no basta `.184`.** La corrida que certifica la ventana debe nacer de un árbol
+**posterior** al último cambio de código. `.184` se selló y, después, el cierre de la corrida obligó a
+corregir el ciclo de vida del lease: medir con el literal `.184` atribuiría el resultado a un árbol que
+no contiene ese fix. El pin se re-ancla a este sello y **toda medición anterior queda `STALE`**.
+
+**(1) El forward suelta su lease antes de cerrar el pool.** `_run` terminaba con `engine.dispose()` sin
+liberar el lease durable de `auto_engine_runs` (migración 063): el dueño anterior seguía “vivo” hasta el
+`TTL` (180 s), así que una reanudación inmediata (`--force` el mismo día o el día siguiente) esperaba ese
+vencimiento aunque el proceso ya no existiera. `_shutdown(runtime, engine)` cierra el `AutoSimRuntime`
+—que **solo** suelta si dueño y generación siguen siendo los suyos, de modo que la valla de `P7` no se
+debilita— y **después** libera el pool, porque `close()` necesita el `session_factory` vivo. El
+`try/finally` garantiza el `dispose()` aunque `close()` reciba `CancelledError`. `runtime = None` cubre
+preflight y fallo de watch. **`auto_simulation_worker.py` intacto:** el apagado es del script, no del
+motor. Verificado con **6** casos unitarios (orden `release → dispose`, error en `close()`, `CancelledError`,
+`runtime = None`, idempotencia).
+
+**(2) H-1, cerrado como hallazgo declarado, no como corrección.** La corrida se quedó en `reason = idle`
+durante 302 de sus 400 ticks. Contraste read-only sobre `auto_engine_ticks` (`seq` 231-532 frente a
+133-230) demuestra la causa: `activity = ANALYZING` (el bucle **sí** recorrió los 80 símbolos),
+`pending_plans = 3` (la readopción de posición **no** se perdió) y `vetoes = 0` (no se ejecutó **ni un**
+`_veto`, ni siquiera el `hold_no_op` que dejan los ticks con precio). El único camino que deja `reasons`
+vacío sin veto es el `continue` por `raw_price is None`. La barra de ejecución del día corriente
+(`OhlcvPriceSource` sobre `B`) no existía: `ohlcv_bars` tenía **180** barras del 5/11 y **0** del 6/11, y
+las 80 advertencias `precio AUSENTE` se agrupan en el primer tick tras la medianoche UTC. **No fue el
+hueco de standby de 7 h 24 min** —fue el cruce de día, que el hueco solo retrasó en observarse—, **no fue
+el lease** y **no hubo pérdida de estado**: es el contrato fail-closed del precio encontrándose con una
+barra que aún no existe. No se corrigió durante la medición ni en este sello; se declara, con la deuda
+de producto explícita (un tick que recorre 80 símbolos, aprueba 2 entradas y se publica como `idle` sin
+declarar el motivo real).
+
+**(3) Cierre de la corrida.** `400/400` ticks, `stopReason = completed` a las `11:40:35Z`,
+`manifest.status = MEDIDO`, gate **`INCONCLUSIVE`** (`2/4` días, `0/2` episodios, `0/32` ciclos),
+readiness **`BLOCKED`** por `no closed cycles`. Material: **13** fills (todos `MARKET_CLOSE`), **3**
+posiciones abiertas, **4** propuestas, **4** órdenes, **1** salida y **0** ciclos cerrados. Se publica
+también el contraste que destapa dos defectos de telemetría: `lastGateReason` describe el último tick
+**con motivos**, no el último tick, y `manifest.watchSize = 20` registra la configuración frente al watch
+efectivo de **80** (`--watch-from-estudio`).
+
+**Gobernanza (no cambia por este sello).** **AUTO sigue `OFF`** y **PAPER sigue `INCONCLUSIVE`**. Este
+sello no acredita ninguna estrategia: entrega el árbol desde el que debe lanzarse la medición que, si
+acaso, podría acreditarla.
+
 ## [2.11.184-beta] — **SELLO FUNCIONAL del bloque de auditoría AUTO/TRADING (`P`/`M`/`S`), la política de evidencia por cuenta y la evidencia monetaria del DÍA-D** (**`Δ motor ≠ 0` · 4 migraciones nuevas · head `066_account_evidence_policy`**)
 
 **Naturaleza:** sello **funcional**, no de infraestructura de pruebas. A diferencia de `.183`, aquí **sí** cambia
