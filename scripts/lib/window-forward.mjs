@@ -875,9 +875,17 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-11-06 — pin del arbol re-anclado a `31c2d3cd`
+ * (`apps` `e9486e12f46f22dc10b535e22fb9c0d6715fd804` / `packages` `2de53cda49ed847dbd5d4b9572c826c6368ddc52`).
+ * Motivo: sello 2.11.185-beta (operacion): apagado del forward que suelta el lease antes de disponer el pool (#100); Delta motor = 0; head 066_account_evidence_policy; cierre del PAPER 20261105 con H-1 declarado
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '6c654d13',
-  appsHash: '0c64a5602e45df7b225a49551cd81d304cdd336e',
+  commit: '31c2d3cd',
+  appsHash: 'e9486e12f46f22dc10b535e22fb9c0d6715fd804',
   packagesHash: '2de53cda49ed847dbd5d4b9572c826c6368ddc52',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
